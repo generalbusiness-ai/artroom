@@ -27,6 +27,7 @@ import type {
   ReviewBody,
   Seq,
   Sha,
+  TeamId,
   Verdict,
 } from "@generalbusiness/artroom-contract";
 import { globsOverlap, overlapIsCertain } from "./glob.ts";
@@ -150,11 +151,19 @@ export interface EvidenceRow {
   readonly qualifies: readonly ObligationId[];
   readonly flags: readonly Flag[];
   readonly authority: Authority;
+  /** Facts fixed at admission: the member's teams, and whether the member was an author (R-REV-1, R-OBL-2). */
+  readonly admission: EvidenceAdmission;
   readonly body: ReviewBody | CheckBody;
 }
 
+export interface EvidenceAdmission {
+  readonly teams: readonly TeamId[];
+  /** The proposer of that generation, or the lane's holder, when the evidence was admitted. */
+  readonly author: boolean;
+}
+
 function evidenceFrom(r: SqlRow): EvidenceRow {
-  const body = JSON.parse(r["body"] as string) as { authority: Authority; body: ReviewBody | CheckBody };
+  const body = JSON.parse(r["body"] as string) as { authority: Authority; admission?: EvidenceAdmission; body: ReviewBody | CheckBody };
   return {
     act: r["act"] as ActId,
     seq: r["seq"] as number,
@@ -169,6 +178,7 @@ function evidenceFrom(r: SqlRow): EvidenceRow {
     qualifies: JSON.parse(r["qualifies"] as string) as ObligationId[],
     flags: JSON.parse(r["flags"] as string) as Flag[],
     authority: body.authority,
+    admission: body.admission ?? { teams: [], author: false },
     body: body.body,
   };
 }

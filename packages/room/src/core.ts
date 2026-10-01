@@ -16,6 +16,8 @@ import type {
   ActId,
   ArtroomError,
   Authority,
+  Carried,
+  Checkpoint,
   CheckerConfig,
   Digest,
   EntryContent,
@@ -24,6 +26,8 @@ import type {
   LaneId,
   LogEntry,
   MemberId,
+  NotCarried,
+  ObligationId,
   OpId,
   PolicyActor,
   PolicyDocument,
@@ -46,10 +50,10 @@ import { canonicalize, parseStrict } from "./canonical.ts";
 import { b64url, digestJson, keyPairFromSeed, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
-import { idOf, seal } from "./log.ts";
-import { changedPaths, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
-import { adminObligation, latestReviews, obligationsFor } from "./obligations.ts";
-import type { ActivePolicy, Evaluation, LandingHost, LandingPort, LandRecordLike, ObligationSpec, Ports, Readiness, Sql } from "./ports.ts";
+import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
+import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
+import { adminObligation, invalidity, latestReviews, obligationsFor, qualification } from "./obligations.ts";
+import type { ActivePolicy, Evaluation, LandingHost, LandingPort, LandRecordLike, ObligationSpec, Ports, PublisherPort, Readiness, Sql } from "./ports.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
@@ -82,6 +86,39 @@ export class Moved extends Error {
   constructor() {
     super("the log moved during admission");
   }
+}
+
+/** The publication in progress: its cohort, fixed before any remote write (R-LOG-8). */
+export interface PendingPublication {
+  /** The expected parent: the last log commit the Room confirmed. */
+  readonly parent: Sha | null;
+  readonly through: Seq;
+  readonly hash: Digest;
+  readonly checkpoint: Checkpoint;
+  readonly retained: readonly Digest[];
+}
+
+/** One open proposal's obligations recomputed under a new policy (R-POL-9). */
+export interface Recomputation {
+  readonly version: PolicyVersion;
+  readonly lane: LaneId;
+  readonly generation: number;
+  readonly obligations: readonly ObligationSpec[];
+  readonly carried: readonly { readonly obligation: ObligationId; readonly evidence: Carried }[];
+  readonly notCarried: readonly NotCarried[];
+  readonly blocked: Refusal | null;
+  readonly evaluations: readonly Evaluation[];
+}
+
+let faultHook: ((point: string) => void) | null = null;
+
+/** Tests only: throw at a named point inside a write, as a crash would. */
+export function setFault(f: ((point: string) => void) | null): void {
+  faultHook = f;
+}
+
+export function fault(point: string): void {
+  faultHook?.(point);
 }
 
 export class RoomCore {
@@ -287,7 +324,7 @@ export class RoomCore {
     if (previous) {
       this.landing.policyActivated(version);
       for (const g of open) this.sql.all("UPDATE generations SET recompute = ?, blocked = NULL WHERE lane = ? AND generation = ?", version, g.lane, g.generation);
-      if (open.length) this.kick("recompute", () => this.recompute());
+      if (open.length) this.run("recompute");
     }
     return version;
   }
@@ -300,48 +337,102 @@ export class RoomCore {
   }
 
   /**
-   * After an activation: recompute each open proposal's obligations under the
-   * new policy (R-POL-9). A failing `require` blocks landing until a new
-   * generation or policy. Runs from the queue; retried by the alarm.
+   * After an activation: recompute each open proposal under the new policy
+   * (R-POL-9). Applicability comes from `require` on the actual changed paths;
+   * carried verdicts are re-judged by `carry` with `policy.same` false; and the
+   * one calculator re-judges every verdict and check against the new
+   * requirements from its recorded admission facts. A failing `require` blocks
+   * landing until a new generation or policy. Runs from the queue; durable,
+   * so the alarm resumes it.
    */
   async recompute(): Promise<void> {
     await this.serial(async () => {
       const policy = this.activePolicy();
       for (const g of this.openGenerations()) {
         if (g.recompute !== policy.version) continue;
-        const lane = laneRow(this.sql, g.lane)!;
-        const paths = changedPaths(g.changed);
-        const admin = adminObligation(policy.version, paths);
-        let specs: ObligationSpec[] = admin ? [admin] : [];
-        let blocked: Refusal | null = null;
-        const evaluations: Evaluation[] = [];
-        if (lane.purpose !== "config-recovery") {
-          const r = await this.ports.policy.require(
-            policy,
-            { kind: "require", actor: this.policyActorOf(g.proposer), lane: this.policyLane(lane), proposal: this.proposalInput(policy.doc, g), room: this.policyRoom() },
-            { budget: this.ports.policy.actBudget() },
-          );
-          evaluations.push(...r.evaluations);
-          blocked = r.refusal;
-          for (const o of r.obligations) if (!specs.some((s) => s.id === o.id)) specs.push(o);
-        }
-        if (blocked) specs = [...g.obligations];
+        const r = await this.recomputeOne(policy, g);
         this.sql.transaction(() => {
           const now = generationRow(this.sql, g.lane, g.generation);
           if (!now || now.recompute !== policy.version || getMeta(this.sql, "policy") !== policy.version) return;
-          this.retainEvaluations(evaluations);
-          this.sql.all(
-            "UPDATE generations SET obligations = ?, blocked = ?, recompute = NULL WHERE lane = ? AND generation = ?",
-            JSON.stringify(specs),
-            blocked ? JSON.stringify(blocked) : null,
-            g.lane,
-            g.generation,
-          );
+          this.recordRecomputation(r);
         });
         const op = this.activeLandOp(g.lane);
         if (op) this.landing.evaluate(op);
       }
     });
+  }
+
+  private async recomputeOne(policy: ActivePolicyFull, g: GenerationRow): Promise<Recomputation> {
+    const lane = laneRow(this.sql, g.lane)!;
+    const paths = changedPaths(g.changed);
+    const admin = adminObligation(policy.version, paths);
+    let specs: ObligationSpec[] = admin ? [admin] : [];
+    let blocked: Refusal | null = null;
+    const evaluations: Evaluation[] = [];
+    const budget = this.ports.policy.actBudget();
+    const proposal = this.proposalInput(policy.doc, g);
+    if (lane.purpose !== "config-recovery") {
+      const r = await this.ports.policy.require(
+        policy,
+        { kind: "require", actor: this.policyActorOf(g.proposer), lane: this.policyLane(lane), proposal, room: this.policyRoom() },
+        { budget },
+      );
+      evaluations.push(...r.evaluations);
+      blocked = r.refusal;
+      for (const o of r.obligations) if (!specs.some((s) => s.id === o.id)) specs.push(o);
+    }
+    if (blocked) specs = [...g.obligations];
+    const carried: { obligation: ObligationId; evidence: Carried }[] = [];
+    const notCarried: NotCarried[] = [...g.notCarried];
+    for (const c of g.carried) {
+      if (!specs.some((s) => s.id === c.obligation) || lane.purpose === "config-recovery") continue;
+      const ev = evidenceByAct(this.sql, c.evidence.act);
+      if (!ev) continue;
+      const since = await this.ports.artifacts.changedBetween(c.evidence.from.head, g.head);
+      const revoked = invalidity(this.sql, ev, "reopens");
+      const body = ev.body as { scope: readonly string[]; dependsOn?: readonly string[] };
+      const res = await this.ports.policy.carry(
+        policy,
+        {
+          kind: "carry",
+          evidence: { act: ev.act, kind: "review", verdict: ev.verdict, by: this.policyActor(ev.authority), from: c.evidence.from, scope: body.scope, dependsOn: body.dependsOn ?? [] },
+          changedSince: [...(since ?? paths)],
+          proposal,
+          policy: { same: false },
+        },
+        revoked ? { revoked: revoked.reason } : {},
+        { budget, purpose: lane.purpose },
+      );
+      evaluations.push(...res.evaluations);
+      if (res.carried) carried.push({ obligation: c.obligation, evidence: res.carried });
+      else if (res.notCarried) notCarried.push(res.notCarried);
+    }
+    return { version: policy.version, lane: g.lane, generation: g.generation, obligations: specs, carried, notCarried, blocked, evaluations };
+  }
+
+  /**
+   * Apply one recomputation. Its decisions are retained (R-LOG-7). When the
+   * contract's obligations-recomputed event lands (amendment 2), this is the
+   * one place that seals it.
+   */
+  recordRecomputation(r: Recomputation): void {
+    this.retainEvaluations(r.evaluations);
+    this.sql.all(
+      "UPDATE generations SET obligations = ?, carried = ?, not_carried = ?, blocked = ?, recompute = NULL WHERE lane = ? AND generation = ?",
+      JSON.stringify(r.obligations),
+      JSON.stringify(r.carried),
+      JSON.stringify(r.notCarried),
+      r.blocked ? JSON.stringify(r.blocked) : null,
+      r.lane,
+      r.generation,
+    );
+    this.sql.all(
+      "INSERT INTO recomputations (version, lane, generation, body) VALUES (?, ?, ?, ?) ON CONFLICT (version, lane, generation) DO NOTHING",
+      r.version,
+      r.lane,
+      r.generation,
+      JSON.stringify({ obligations: r.obligations, carried: r.carried, notCarried: r.notCarried, blocked: r.blocked, decisions: r.evaluations.map((e) => e.decision) }),
+    );
   }
 
   retainEvaluations(evaluations: readonly Evaluation[]): void {
@@ -379,9 +470,16 @@ export class RoomCore {
     const reviewers = new Set<MemberId>();
     if (lane) {
       const l = laneRow(this.sql, lane);
-      if (l && l.generation > 0) for (const r of latestReviews(evidenceOn(this.sql, lane, l.generation))) if (r.qualifies.length) reviewers.add(r.member);
+      const g = l && l.generation > 0 ? generationRow(this.sql, lane, l.generation) : null;
+      if (g) for (const r of latestReviews(evidenceOn(this.sql, lane, g.generation))) if (this.qualifiesAny(g, r)) reviewers.add(r.member);
     }
     return { roles, reviewers: [...reviewers].sort() };
+  }
+
+  /** Does a verdict qualify, under the active policy, for any review obligation of its generation (R-POL-7)? */
+  qualifiesAny(gen: GenerationRow, r: Parameters<typeof qualification>[2]): boolean {
+    const doc = this.activePolicy().doc;
+    return gen.obligations.some((o) => o.kind === "review" && qualification(doc, o, r) === true);
   }
 
   // ------------------------------------------------------------ the queue
@@ -391,6 +489,24 @@ export class RoomCore {
     const next = this.chain.then(fn);
     this.chain = next.catch(() => undefined);
     return next;
+  }
+
+  /**
+   * Run `fn` against the state it writes, then roll every write back. It
+   * judges an act as it would be after another, without recording either.
+   */
+  simulate<T>(fn: () => T): T {
+    const rollback = new Error("simulation");
+    let out: { value: T } | null = null;
+    try {
+      this.sql.transaction(() => {
+        out = { value: fn() };
+        throw rollback;
+      });
+    } catch (e) {
+      if (e !== rollback) throw e;
+    }
+    return (out as { value: T } | null)!.value;
   }
 
   /** Start deferred work once; the alarm retries anything that did not finish. */
@@ -437,9 +553,10 @@ export class RoomCore {
   attend(principal: string, seq: Seq, lane: LaneId | null, item: Record<string, unknown> & { why: string }, text: string): void {
     const n = num(one(this.sql, "SELECT COUNT(*) AS n FROM attention WHERE seq = ?", seq), "n") ?? 0;
     this.sql.all(
-      "INSERT INTO attention (id, seq, principal, lane, item, open) VALUES (?, ?, ?, ?, ?, 1)",
+      "INSERT INTO attention (id, seq, n, principal, lane, item, open) VALUES (?, ?, ?, ?, ?, ?, 1)",
       `att_${seq}_${n}`,
       seq,
+      n,
       principal,
       lane,
       JSON.stringify({ ...item, text }),
@@ -509,7 +626,7 @@ export class RoomCore {
     const gen = generationRow(this.sql, op.lane, op.generation);
     if (!gen) return { reason: "authority-lost", fix: "Land again." };
     if (gen.blocked) return { reason: "obligation-open", fix: gen.blocked.fix ?? "Propose a new generation." };
-    const obligations = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, integration: op.integration ?? null });
+    const obligations = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration: op.integration ?? null });
     for (const act of op.evidence ?? []) {
       if (!obligations.some((o) => o.evidenceActs.includes(act))) {
         // Evidence stopped counting: a compromised key, retirement under "reopens", or a sole-admin flag that no longer holds.
@@ -534,9 +651,9 @@ export class RoomCore {
 
   /** The land-rule input (R-POL-6, R-LAND-4 step 3). Pure: rebuilt at reservation and compared by digest. */
   landInput(op: Pick<LandRecordLike, "lane" | "generation" | "integration">, lane: LaneRow, gen: GenerationRow, policy: ActivePolicyFull, stage: "land" | "reservation", actor?: Authority) {
-    const obligations = obligationsFor(this.sql, gen.lane, gen.generation, { doc: policy.doc, integration: op.integration ?? null });
+    const obligations = obligationsFor(this.sql, gen.lane, gen.generation, { doc: policy.doc, checkers: policy.checkers, integration: op.integration ?? null });
     const reviews = latestReviews(evidenceOn(this.sql, gen.lane, gen.generation))
-      .filter((r) => r.qualifies.length > 0)
+      .filter((r) => this.qualifiesAny(gen, r))
       .map((r) => ({ act: r.act, verdict: r.verdict!, by: this.policyActor(r.authority), basis: "here" as const }));
     for (const o of obligations)
       for (const e of o.evidence)
@@ -584,7 +701,7 @@ export class RoomCore {
           reason: { code: "refused", refusal: { refused: true, rule: "policy-invalid", reason: `The integrated configuration is invalid: ${cfg.problems?.[0] ?? "unknown problem"}.`, fix: "Correct the configuration and propose again." } },
         };
     }
-    const obligations = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, integration });
+    const obligations = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration });
     const openReview = obligations.find((o) => o.kind === "review" && o.state !== "met");
     if (openReview) return { kind: "retry", reason: "obligation-open", fix: `The obligation ${openReview.id} is open again. Meet it, then land again.` };
     const waiting: `obl_${string}`[] = [];
@@ -663,7 +780,7 @@ export class RoomCore {
         }
         // Main moved: previews of open proposals are recomputed (R-PROP-7).
         this.sql.all("UPDATE previews SET state = 'pending', body = json_set(body, '$.state', 'pending') WHERE id IN (SELECT p.id FROM previews p JOIN lanes l ON l.id = p.lane AND l.generation = p.generation)");
-        this.kick("previews", () => this.refreshPreviews());
+        this.run("previews");
       }
     } else if (event.type === "revert-lane") {
       // R-REV-6: an unheld lane whose ID is this event's ID.
@@ -703,23 +820,30 @@ export class RoomCore {
 
   /** R-LANE-8: seal `lease-expired` for every lease past its expiry. */
   async expireLeases(): Promise<number> {
-    return this.serial(async () => {
-      const now = this.now();
-      const due = this.sql.all("SELECT id FROM lanes WHERE state = 'held' AND expires_ms <= ?", now).map((r) => str(r, "id") as LaneId);
-      for (const id of due) {
-        this.sql.transaction(() => {
-          const lane = laneRow(this.sql, id);
-          if (!lane || lane.state !== "held" || (lane.expiresMs ?? 0) > now) return;
-          const entry = this.sealSystem({ type: "lease-expired", lane: id, holder: lane.holder!, leaseGeneration: lane.leaseGen });
-          this.sql.all("UPDATE lanes SET state = 'unheld', why = 'expired', holder = NULL, expires_ms = NULL, lease_gen = lease_gen + 1 WHERE id = ?", id);
-          this.landing.laneChanged(id, "lease-changed");
-          this.attend("role:member", entry.seq, id, { why: "lane-unheld", lane: id, reason: "expired" }, `The lease on ${id} expired. Any member may take the lane over.`);
-        });
-        this.kick(`revoke:${id}`, () => this.revokeTokens(id));
-      }
-      if (due.length) this.committed();
-      return due.length;
-    });
+    return this.serial(async () => this.expireDueSync());
+  }
+
+  /**
+   * Seal `lease-expired` for every lease past its expiry by the room clock
+   * now. Synchronous: admission calls it inside the queue before deciding,
+   * so no act is judged on a lease that has already run out (R-LANE-8).
+   */
+  expireDueSync(): number {
+    const now = this.now();
+    const due = this.sql.all("SELECT id FROM lanes WHERE state = 'held' AND expires_ms <= ?", now).map((r) => str(r, "id") as LaneId);
+    for (const id of due) {
+      this.sql.transaction(() => {
+        const lane = laneRow(this.sql, id);
+        if (!lane || lane.state !== "held" || (lane.expiresMs ?? 0) > now) return;
+        const entry = this.sealSystem({ type: "lease-expired", lane: id, holder: lane.holder!, leaseGeneration: lane.leaseGen });
+        this.sql.all("UPDATE lanes SET state = 'unheld', why = 'expired', holder = NULL, expires_ms = NULL, lease_gen = lease_gen + 1 WHERE id = ?", id);
+        this.landing.laneChanged(id, "lease-changed");
+        this.attend("role:member", entry.seq, id, { why: "lane-unheld", lane: id, reason: "expired" }, `The lease on ${id} expired. Any member may take the lane over.`);
+      });
+      this.run("tokens");
+    }
+    if (due.length) this.committed();
+    return due.length;
   }
 
   /** Revoke every live workspace token of a lane whose lease ended (R-WS-3, R-LANE-8). */
@@ -729,6 +853,50 @@ export class RoomCore {
       if (l && l.state === "held" && num(r, "lease_gen") === l.leaseGen) continue;
       await this.ports.artifacts.revokeForkToken(lane, str(r, "id")!);
       this.sql.all("UPDATE fork_tokens SET revoked = 1 WHERE id = ?", str(r, "id")!);
+    }
+  }
+
+  /** Revoke every token whose lease has ended, on every lane. */
+  async revokeEndedTokens(): Promise<void> {
+    for (const lane of this.tokensToRevoke()) await this.revokeTokens(lane);
+  }
+
+  /**
+   * Open the forks of pending workspace operations (R-WS). Durable: an op
+   * interrupted before or after the fork was created is resumed with the same
+   * op ID and lease. If the lease ended meanwhile, the op fails as fenced, so
+   * a stale holder never gets a ready workspace (R-WS-2, R-WS-3).
+   */
+  async resumeWorkspaces(): Promise<void> {
+    for (const r of this.sql.all("SELECT id, lane, lease_gen, attempts FROM workspaces WHERE state = 'pending' ORDER BY updated_ms")) {
+      const id = str(r, "id")!;
+      const laneId = str(r, "lane") as LaneId;
+      const leaseGen = num(r, "lease_gen")!;
+      const current = () => {
+        const l = laneRow(this.sql, laneId);
+        return !!l && l.state === "held" && l.leaseGen === leaseGen;
+      };
+      const finish = (body: Record<string, unknown>) =>
+        this.sql.all("UPDATE workspaces SET state = ?, body = ?, updated_ms = ? WHERE id = ? AND state = 'pending'", body["state"] as string, JSON.stringify(body), this.now(), id);
+      const base = { id, kind: "workspace", updatedAt: iso(this.now()), lane: laneId };
+      const fenced = () => finish({ ...base, state: "failed", error: artroomError("forbidden", "The lease ended before the workspace was ready.") });
+      if (!current()) {
+        fenced();
+        continue;
+      }
+      let remote: `https://${string}`;
+      try {
+        ({ remote } = await this.ports.artifacts.ensureFork(laneId));
+      } catch {
+        const attempts = (num(r, "attempts") ?? 0) + 1;
+        if (attempts >= 5) finish({ ...base, state: "failed", error: artroomError("unavailable", "The lane's fork could not be created.") });
+        else this.sql.all("UPDATE workspaces SET attempts = ?, updated_ms = ? WHERE id = ?", attempts, this.now(), id);
+        continue;
+      }
+      // Re-validate after the await: the lease may have ended (R-ADM-6).
+      if (!current()) fenced();
+      else finish({ ...base, state: "ready", detail: { remote, leaseGeneration: leaseGen } });
+      fault("workspace:after-fork");
     }
   }
 
@@ -813,7 +981,137 @@ export class RoomCore {
     return num(one(this.sql, "SELECT MIN(next_ms) AS t FROM notify_queue"), "t");
   }
 
-  // ------------------------------------------------------------ alarm schedule
+  // ------------------------------------------------------------ log publication (R-LOG-8)
+
+  private publisherCache: Promise<PublisherPort> | null = null;
+  private publishing = false;
+
+  /** The cohort chosen for the publication in progress, durable until its commit is confirmed. */
+  pendingPublication(): PendingPublication | null {
+    return json<PendingPublication>(one(this.sql, "SELECT v FROM meta WHERE k = 'pending_publication'"), "v");
+  }
+
+  /** Publication is due at 50 unpublished entries, or a minute after the oldest one (R-LOG-8, R-LOG-11). */
+  publicationDue(): boolean {
+    const through = Number(getMeta(this.sql, "published_through") ?? "-1");
+    const lag = this.headSeq() - through;
+    if (lag <= 0) return false;
+    if (lag >= 50) return true;
+    const oldest = str(one(this.sql, "SELECT at FROM entries WHERE seq = ?", through + 1), "at");
+    return oldest !== null && this.now() - Date.parse(oldest) >= 60_000;
+  }
+
+  /**
+   * One publication step (R-LOG-8). The cohort (entries through N, the signed
+   * checkpoint and the retained files) is chosen once and stored before any
+   * remote write. Until its commit is confirmed by the publisher's read-back,
+   * every attempt, even after a restart, publishes that same cohort; only then
+   * is the `checkpoint` event sealed and `publishedThrough` moved.
+   */
+  async publish(force = false): Promise<{ readonly through: number; readonly commit: Sha } | null> {
+    if (this.publishing) return null;
+    this.publishing = true;
+    try {
+      let pending = this.pendingPublication();
+      if (!pending) {
+        if (this.headSeq() <= Number(getMeta(this.sql, "published_through") ?? "-1")) return null;
+        if (!force && !this.publicationDue()) return null;
+        pending = this.sql.transaction(() => {
+          const n = this.headSeq();
+          const through = entryAt(this.sql, n)!;
+          const p: PendingPublication = {
+            parent: (getMeta(this.sql, "log_commit") as Sha | null) ?? null,
+            through: n,
+            hash: through.hash,
+            checkpoint: checkpoint(this.roomId, this.genesis.roomKey, this.seed(), through, iso(this.now())),
+            retained: this.sql.all("SELECT digest FROM retained ORDER BY digest").map((r) => str(r, "digest") as Digest),
+          };
+          setMeta(this.sql, "pending_publication", JSON.stringify(p));
+          return p;
+        });
+      }
+      const cohort = pending;
+      const retained = cohort.retained.map((d) => {
+        const r = one(this.sql, "SELECT kind, body FROM retained WHERE digest = ?", d)!;
+        return { kind: str(r, "kind") === "input" ? ("input" as const) : ("policy" as const), body: str(r, "body")! };
+      });
+      let result: Awaited<ReturnType<PublisherPort["publish"]>>;
+      try {
+        this.publisherCache ??= this.ports.log();
+        const publisher = await this.publisherCache;
+        // The Room's own fence: the ref holds either the last commit it confirmed, or a commit
+        // that publishes exactly this pending cohort (a push whose reply was lost). Anything
+        // else is another writer, and publication stops; it is never built on (R-LOG-8).
+        const confirmed = getMeta(this.sql, "log_commit") as Sha | null;
+        const confirmedThrough = Number(getMeta(this.sql, "published_through") ?? "-1");
+        if (publisher.head !== confirmed && !(publisher.publishedThrough === cohort.through && cohort.through > confirmedThrough))
+          throw Object.assign(new Error("the log ref holds a commit the room did not confirm"), { code: "unexpected-writer" });
+        result = await publisher.publish(entriesAfter(this.sql, -1, cohort.through + 1), cohort.checkpoint, retained);
+      } catch (e) {
+        // Reopen from the ref next time: the read-back decides what happened.
+        this.publisherCache = null;
+        const code = (e as { code?: string }).code ?? "transport";
+        await this.serial(async () =>
+          this.sql.transaction(() => {
+            const was = getMeta(this.sql, "publication_error");
+            setMeta(this.sql, "publication_error", code);
+            if (code === "unexpected-writer" && was !== code)
+              this.attendAdmins(this.headSeq(), null, { why: "publication-unresolved", op: "op_log", since: iso(this.now()) }, "Another writer moved refs/artroom/log. Publication of the log has stopped.");
+          }),
+        );
+        throw artroomError("unavailable", `The log could not be published (${code}); the same cohort is retried.`);
+      }
+      await this.serial(async () =>
+        this.sql.transaction(() => {
+          const now = this.pendingPublication();
+          if (!now || now.through !== cohort.through) return;
+          this.sealSystem({ type: "checkpoint", through: cohort.through, hash: cohort.hash, commit: result.commit });
+          setMeta(this.sql, "published_through", String(cohort.through));
+          setMeta(this.sql, "log_commit", result.commit);
+          this.sql.all("DELETE FROM meta WHERE k IN ('pending_publication', 'publication_error')");
+        }),
+      );
+      this.committed();
+      return { through: cohort.through, commit: result.commit };
+    } finally {
+      this.publishing = false;
+    }
+  }
+
+  // ------------------------------------------------------------ durable alarm work
+
+  /**
+   * The Room's one mechanism for work after a commit. Each step reads its own
+   * durable rows, is idempotent, and may run at any time; the alarm runs them
+   * all, and `run` starts one at once. Nothing depends on a promise surviving.
+   */
+  readonly steps = {
+    leases: () => this.expireLeases().then(() => undefined),
+    notify: () => this.drainNotify(),
+    tokens: () => this.revokeEndedTokens(),
+    pins: () => this.completePins(),
+    previews: () => this.refreshPreviews(),
+    workspaces: () => this.resumeWorkspaces(),
+    recompute: () => this.recompute(),
+    landing: () => this.resumeLanding(),
+    publication: () => this.publish().then(() => undefined),
+  } as const;
+
+  /** Start one durable step now, in the background. */
+  run(step: keyof RoomCore["steps"]): void {
+    this.kick(`step:${step}`, () => this.steps[step]());
+  }
+
+  /** Run every durable step once, in order. A step that fails is retried at the next alarm. */
+  async runAll(): Promise<void> {
+    for (const step of Object.keys(this.steps) as (keyof RoomCore["steps"])[]) await this.steps[step]().catch(() => undefined);
+  }
+
+  /** Re-evaluate preparing landings (resuming their derived work), then drive the engine (R-PUB-7 first). */
+  async resumeLanding(): Promise<void> {
+    for (const op of this.landing.activeViews()) if (op.state === "preparing" && op.integration !== undefined) this.landing.evaluate(op.id);
+    await this.landing.reconcile();
+  }
 
   /** When the alarm should next run, or null. */
   nextAlarm(): number | null {
@@ -825,8 +1123,15 @@ export class RoomCore {
     const landing = this.landing.nextDue();
     if (landing !== null) times.push(landing);
     const now = this.now();
-    if (this.tokensToRevoke().length || one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0") || one(this.sql, "SELECT 1 AS x FROM previews WHERE state = 'pending'") || one(this.sql, "SELECT 1 AS x FROM generations WHERE recompute IS NOT NULL"))
-      times.push(now + 5_000);
+    const pending =
+      this.tokensToRevoke().length > 0 ||
+      !!one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0") ||
+      !!one(this.sql, "SELECT 1 AS x FROM previews WHERE state = 'pending'") ||
+      !!one(this.sql, "SELECT 1 AS x FROM workspaces WHERE state = 'pending'") ||
+      !!one(this.sql, "SELECT 1 AS x FROM generations WHERE recompute IS NOT NULL") ||
+      this.pendingPublication() !== null;
+    if (pending) times.push(now + 5_000);
+    if (this.headSeq() > Number(getMeta(this.sql, "published_through") ?? "-1")) times.push(now + 60_000);
     return times.length ? Math.min(...times) : null;
   }
 

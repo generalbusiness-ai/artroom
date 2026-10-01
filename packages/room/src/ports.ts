@@ -17,6 +17,7 @@ import type { CarryFacts, InputOf, ObligationSpec } from "@generalbusiness/artro
 import type {
   ActId,
   Carried,
+  Checkpoint,
   CheckerConfig,
   Decision,
   Digest,
@@ -25,6 +26,7 @@ import type {
   KeyId,
   LandOp,
   LaneId,
+  LogEntry,
   LanePurpose,
   LeaseGeneration,
   NotifyDirectory,
@@ -260,12 +262,37 @@ export interface ArtifactsPort {
   changedBetween(from: Sha, to: Sha): Promise<readonly RepoPath[] | null>;
   /** A merge preview of head onto main (R-PROP-7). */
   preview(head: Sha, main: Sha | null): Promise<PreviewResult>;
-  /** The log ref's commit, read now (R-LOG-8 step 5). */
-  readLogRef(): Promise<Sha | null>;
-  /** Build a log commit from files, with the given parent (R-LOG-8 step 3). */
-  commitLog(files: Readonly<Record<string, string>>, parent: Sha | null): Promise<Sha>;
-  /** Move `refs/artroom/log` from `expected` to `commit`, forward only (R-LOG-8 step 4). */
-  pushLog(commit: Sha, expected: Sha | null): Promise<void>;
+}
+
+// ---------------------------------------------------------------- log publication
+
+/** A retained file for a log commit: a replay context (`input`) or a policy or checker document (`policy`). */
+export interface RetainedFile {
+  readonly kind: "input" | "policy";
+  /** Canonical JSON text; its digest names the file. */
+  readonly body: string;
+}
+
+/**
+ * Publication of the log (R-LOG-8), shaped like lane L's `LogPublisher`, so
+ * `LogPublisher.open(remote)` is the adapter. `publish` is deterministic: the
+ * same entries, checkpoint and retained files always give the same commit.
+ * It pushes with a lease on the previous log commit, reads the ref back after
+ * an unclear answer, completes forward, never forces, and returns only once
+ * the ref is confirmed at the new commit. Failures are thrown with a `code`:
+ * `would-rewrite`, `invalid-input`, `unexpected-writer` or `unresolved`; any
+ * other throw is a transport failure. The Room keeps the pending cohort
+ * durable, so a retry, even after a restart, passes the same input.
+ */
+export interface PublisherPort {
+  /** The last entry the ref is known to publish, or -1. */
+  readonly publishedThrough: Seq;
+  readonly head: Sha | null;
+  publish(
+    entries: readonly LogEntry[],
+    checkpoint: Checkpoint,
+    retained: readonly RetainedFile[],
+  ): Promise<{ readonly commit: Sha; readonly through: Seq; readonly hash: Digest; readonly publishedThrough: Seq }>;
 }
 
 // ---------------------------------------------------------------- all ports
@@ -274,4 +301,6 @@ export interface Ports {
   readonly policy: PolicyPort;
   readonly artifacts: ArtifactsPort;
   readonly landing: LandingFactory;
+  /** Open (or resume from the ref) the log publisher. */
+  readonly log: () => Promise<PublisherPort>;
 }

@@ -24,11 +24,12 @@ import type {
   RepoPath,
   Role,
   Sha,
+  TeamId,
 } from "@generalbusiness/artroom-contract";
 import { matchGlob } from "./glob.ts";
 import { evidenceByAct, evidenceOn, generationRow, type EvidenceRow, type GenerationRow } from "./model.ts";
 import type { ObligationSpec, Sql } from "./ports.ts";
-import { activeAdmins, revocationOf, teamMembers } from "./roster.ts";
+import { activeAdmins, revocationOf } from "./roster.ts";
 
 export const ADMIN_APPROVAL: ObligationId = "obl_admin-approval";
 export const ADMIN_SCOPE = ".artroom/**";
@@ -54,23 +55,55 @@ export function ownersOf(doc: PolicyDocument, paths: readonly RepoPath[]): Princ
   return [...out];
 }
 
-/** Does a principal include this member, with the role recorded at admission? */
-export function principalIncludes(sql: Sql, principal: Principal, member: MemberId | null, role: Role | null): boolean {
+/** Does a principal include this member, by the role and teams recorded at admission? */
+export function principalIncludes(principal: Principal, member: MemberId | null, role: Role | null, teams: readonly TeamId[]): boolean {
   if (member === null) return false;
   if (principal.startsWith("role:")) return role === principal.slice(5);
-  if (principal === member) return true;
-  return teamMembers(sql, principal).includes(member);
+  return principal === member || teams.includes(principal as TeamId);
 }
 
-/** Does a recorded authority match an obligation's `from` or `by` (R-OBL-2, R-OBL-3)? */
-export function qualifies(sql: Sql, doc: PolicyDocument, spec: ObligationSpec, by: Authority): boolean {
+/** Does a recorded authority match an obligation's `from` or `by` (R-OBL-2, R-OBL-3)? Owners come from the given policy. */
+export function principalMatches(doc: PolicyDocument, spec: ObligationSpec, by: Authority, teams: readonly TeamId[]): boolean {
   const list = spec.kind === "review" ? spec.from : spec.by;
   for (const p of list) {
     if (p === "owners") {
-      if (ownersOf(doc, spec.paths).some((o) => principalIncludes(sql, o, by.member, by.role))) return true;
-    } else if (principalIncludes(sql, p as Principal, by.member, by.role)) return true;
+      if (ownersOf(doc, spec.paths).some((o) => principalIncludes(o, by.member, by.role, teams))) return true;
+    } else if (principalIncludes(p as Principal, by.member, by.role, teams)) return true;
   }
   return false;
+}
+
+/**
+ * Whether one piece of evidence qualifies for one obligation: the single
+ * rule, used at admission, for status, after a policy activation and at
+ * reservation. It reads only facts recorded at the evidence's admission
+ * (authority, teams, authorship, flags, the act's body) and the requirement
+ * it is judged against, never today's roles (R-REV-1, R-OBL-2, R-OBL-3).
+ * `"self"` means the principal matches but the author may not meet it.
+ */
+export function qualification(
+  doc: PolicyDocument,
+  spec: ObligationSpec,
+  ev: Pick<EvidenceRow, "kind" | "authority" | "admission" | "flags" | "body">,
+  checkers?: Readonly<Record<string, { readonly digest: string }>>,
+): true | "principal" | "self" | "binding" {
+  if (spec.kind === "review") {
+    if (ev.kind !== "review") return "binding";
+    if (!principalMatches(doc, spec, ev.authority, ev.admission.teams)) return "principal";
+    if (!ev.admission.author) return true;
+    if (selfAllowed(spec)) return true;
+    // R-ADMIN-2: a sole admin's own approval of `.artroom/**`, flagged at admission.
+    if (spec.id === ADMIN_APPROVAL && ev.flags.includes("sole-admin-self-approval")) return true;
+    return "self";
+  }
+  if (ev.kind !== "check") return "binding";
+  const b = ev.body as CheckBody;
+  if (b.obligation !== spec.id || b.check !== spec.check) return "binding";
+  if (!principalMatches(doc, spec, ev.authority, ev.admission.teams)) return "principal";
+  if (ev.admission.author) return "self";
+  // R-OBL-3, R-CARRY-7: the configuration digest of the active policy version.
+  if (checkers && checkers[spec.check]?.digest !== b.config) return "binding";
+  return true;
 }
 
 export type Invalid = { readonly key: string; readonly reason: "compromised" | "retired"; readonly revocation: ActId | null };
@@ -91,10 +124,14 @@ export function invalidity(sql: Sql, ev: Pick<EvidenceRow, "key" | "grantor">, r
 
 export interface StatusOptions {
   readonly doc: PolicyDocument;
+  /** The active checker configuration digests: a check counts only under the configuration in force (R-CARRY-7). */
+  readonly checkers?: Readonly<Record<string, { readonly digest: string }>>;
   /** For check obligations: the integration the checks must bind (R-OBL-3). Absent: any integration of this generation. */
   readonly integration?: Sha | null;
   /** Evidence to treat as invalid, to compute what a revocation would reopen (R-REV-3). */
   readonly exclude?: ReadonlySet<ActId>;
+  /** Evidence not yet stored, judged as if it were: what an act being admitted would change (sealed effects). */
+  readonly extra?: readonly EvidenceRow[];
 }
 
 /** Each member's latest review on this generation (R-POL-7: "latest verdict"). */
@@ -104,8 +141,13 @@ export function latestReviews(rows: readonly EvidenceRow[]): EvidenceRow[] {
   return [...latest.values()];
 }
 
-/** One obligation with its current status. */
-export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationSpec, opts: StatusOptions): Obligation & { readonly evidenceActs: readonly ActId[] } {
+export type Status = Obligation & { readonly evidenceActs: readonly ActId[] };
+
+/**
+ * One obligation's status: the single calculator behind the projection,
+ * sealed effects, land admission, readiness and reservation.
+ */
+export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationSpec, opts: StatusOptions): Status {
   const exclude = opts.exclude ?? new Set<ActId>();
   const evidence: Evidence[] = [];
   const acts: ActId[] = [];
@@ -114,16 +156,23 @@ export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationS
     if (exclude.has(ev.act)) return false;
     const bad = invalidity(sql, ev, opts.doc.retiredEvidence);
     if (bad) {
-      if (bad.reason === "compromised" && bad.revocation) reopened ??= { because: "key-compromised", key: bad.key as `key_${string}`, revocation: bad.revocation };
+      if (bad.revocation) reopened ??= { because: bad.reason === "compromised" ? "key-compromised" : "key-retired", key: bad.key as `key_${string}`, revocation: bad.revocation };
       return false;
     }
     // R-ADMIN-2: a flagged sole-admin self-approval counts only while there is exactly one active admin.
-    if (ev.flags.includes("sole-admin-self-approval") && spec.id === ADMIN_APPROVAL && activeAdmins(sql).length !== 1) return false;
+    if (ev.flags.includes("sole-admin-self-approval") && spec.id === ADMIN_APPROVAL && ev.admission.author) {
+      const admins = activeAdmins(sql).length;
+      if (admins !== 1) {
+        reopened ??= { because: "sole-admin-ended", approval: ev.act, activeAdmins: admins };
+        return false;
+      }
+    }
     return true;
   };
+  const rows = [...evidenceOn(sql, gen.lane, gen.generation), ...(opts.extra ?? [])];
 
   if (spec.kind === "review") {
-    const here = latestReviews(evidenceOn(sql, gen.lane, gen.generation)).filter((r) => r.qualifies.includes(spec.id));
+    const here = latestReviews(rows.filter((r) => r.kind === "review" && qualification(opts.doc, spec, r) === true));
     const members = new Set<string>();
     for (const r of here) {
       if (r.verdict !== "approve" || !valid(r)) continue;
@@ -134,7 +183,7 @@ export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationS
     for (const c of gen.carried) {
       if (c.obligation !== spec.id) continue;
       const r = evidenceByAct(sql, c.evidence.act);
-      if (!r || !valid(r) || members.has(r.member)) continue;
+      if (!r || qualification(opts.doc, spec, r) !== true || !valid(r) || members.has(r.member)) continue;
       // A member's later verdict here replaces a carried one.
       if (here.some((h) => h.member === r.member)) continue;
       members.add(r.member);
@@ -147,12 +196,12 @@ export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationS
       : { ...spec, state: "open", evidence, ...(reopened ? { reopened } : {}), evidenceActs: acts };
   }
 
-  for (const r of evidenceOn(sql, gen.lane, gen.generation)) {
+  for (const r of rows) {
     if (r.kind !== "check") continue;
     const b = r.body as CheckBody;
-    if (b.obligation !== spec.id || b.check !== spec.check || !b.ok) continue;
+    if (!b.ok || qualification(opts.doc, spec, r, opts.checkers) !== true) continue;
     if (opts.integration && b.integration !== opts.integration) continue;
-    if (!r.qualifies.includes(spec.id) || !valid(r)) continue;
+    if (!valid(r)) continue;
     acts.push(r.act);
     evidence.push({ basis: "here", act: r.act, kind: "check", generation: gen.generation, head: gen.head });
   }
@@ -161,10 +210,21 @@ export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationS
     : { ...spec, state: "open", evidence, ...(reopened ? { reopened } : {}), evidenceActs: acts };
 }
 
-export function obligationsFor(sql: Sql, lane: string, generation: number, opts: StatusOptions): (Obligation & { readonly evidenceActs: readonly ActId[] })[] {
-  const gen = generationRow(sql, lane, generation);
-  if (!gen) return [];
+export function statusesOf(sql: Sql, gen: GenerationRow, opts: StatusOptions): Status[] {
   return gen.obligations.map((spec) => obligationStatus(sql, gen, spec, opts));
+}
+
+export function obligationsFor(sql: Sql, lane: string, generation: number, opts: StatusOptions): Status[] {
+  const gen = generationRow(sql, lane, generation);
+  return gen ? statusesOf(sql, gen, opts) : [];
+}
+
+/** The `obligations` effect between two status lists of one generation: what opened and what became met. */
+export function transitions(before: readonly Status[], after: readonly Status[], all = false): { readonly opened: ObligationId[]; readonly met: ObligationId[] } {
+  const was = new Map(before.map((o) => [o.id, o.state]));
+  const opened = after.filter((o) => o.state !== "met" && (all || was.get(o.id) === "met")).map((o) => o.id);
+  const met = after.filter((o) => o.state === "met" && was.get(o.id) !== "met").map((o) => o.id);
+  return { opened, met };
 }
 
 /** Strip the internal field for the public view. */

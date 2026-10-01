@@ -69,8 +69,11 @@ export function judge(
   // (c) Join.
   if (!as && isJoin(env)) return judgeJoin(sql, actor, env.body as Extract<RosterOp, { op: "join" }>, path, nowMs);
 
-  // (d) Recovery key.
+  // (d) Recovery key. In every case the signing key must not be revoked (R-ADM-3); rotation also refuses
+  // revoked keys, so this is a backstop (P1.2 of review aabda1ed).
   if (actor === recoveryKey(sql)) {
+    const revoked = revocationOf(sql, actor);
+    if (revoked) return no("key-revoked", `The recovery key was revoked (${revoked.reason}) at seq ${revoked.at}.`, "Restore the room from a recovery key that was never revoked.");
     if (kind !== "roster" || op === undefined || NOT_RECOVERY_OPS.includes(op))
       return no("role-forbids", `The recovery key may sign only roster ops other than join, delegate and undelegate; this is ${op ?? kind}.`, "Sign this act with a member's key.");
     return { ok: true, authority: { via: "recovery", member: null, role: null, key: actor }, flags: ["recovery-key"] };

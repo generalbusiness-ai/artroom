@@ -31,16 +31,9 @@ import { alarmTime, clock, portsFor, type RoomEnv } from "./config.ts";
 import { RoomCore } from "./core.ts";
 import { unb64url } from "./crypto.ts";
 import { artroomError, wire, type Wire } from "./errors.ts";
-import { iso } from "./ids.ts";
-import { checkpoint, entriesAfter, entryAt, publicationFiles } from "./log.ts";
-import { liveCursor, publishedThrough, read, updateAfter } from "./reads.ts";
+import { liveCursor, read, updateAfter } from "./reads.ts";
 import { authenticateRead, bearerAct, redeem, request } from "./requests.ts";
 import type { Sql } from "./ports.ts";
-import { getMeta, setMeta, str } from "./store.ts";
-
-/** Publish the log once this many entries are unpublished, or after a minute (R-LOG-8). */
-const LOG_BATCH = 50;
-const LOG_INTERVAL_MS = 60_000;
 
 interface SocketState {
   readonly token: string | null;
@@ -51,8 +44,6 @@ interface SocketState {
 export class Room extends DurableObject<RoomEnv> {
   readonly core: RoomCore;
   private scheduled: number | null = null;
-  private publishing = false;
-  private lastPublishMs = clock();
 
   constructor(ctx: DurableObjectState, env: RoomEnv) {
     super(ctx, env);
@@ -155,7 +146,7 @@ export class Room extends DurableObject<RoomEnv> {
 
   /** Publish the log now (R-LOG-8). Also run by the alarm. */
   publishLog(): Promise<Wire<{ readonly through: number; readonly commit: Sha } | null>> {
-    return wire(() => this.publish());
+    return wire(() => this.core.publish(true));
   }
 
   /** Run the alarm's work once, now. For tests and operators; the alarm calls the same code. */
@@ -175,19 +166,10 @@ export class Room extends DurableObject<RoomEnv> {
     this.schedule();
   }
 
+  /** The alarm's work: every durable step once (R-LANE-8, R-LOG-13, R-PUB-7, R-LOG-8). */
   private async work(): Promise<void> {
-    const core = this.core;
-    if (!core.founded) return;
-    await core.expireLeases();
-    await core.drainNotify();
-    for (const lane of core.tokensToRevoke()) await core.revokeTokens(lane).catch(() => undefined);
-    await core.completePins().catch(() => undefined);
-    await core.refreshPreviews().catch(() => undefined);
-    await core.recompute().catch(() => undefined);
-    // R-PUB-7: the engine resolves a held slot before any other landing work.
-    await core.landing.reconcile().catch(() => undefined);
-    const lag = core.headSeq() - publishedThrough(core);
-    if (lag >= LOG_BATCH || (lag > 0 && clock() - this.lastPublishMs >= LOG_INTERVAL_MS)) await this.publish().catch(() => undefined);
+    if (!this.core.founded) return;
+    await this.core.runAll();
   }
 
   private schedule(): void {
@@ -202,47 +184,6 @@ export class Room extends DurableObject<RoomEnv> {
   private onCommit(): void {
     this.schedule();
     this.broadcast();
-  }
-
-  // ------------------------------------------------------------ log publication (R-LOG-8)
-
-  private async publish(): Promise<{ readonly through: number; readonly commit: Sha } | null> {
-    if (this.publishing) return null;
-    this.publishing = true;
-    try {
-      const core = this.core;
-      const sql = core.sql;
-      // Step 1: choose N.
-      const n = core.headSeq();
-      if (n <= publishedThrough(core)) return null;
-      const through = entryAt(sql, n)!;
-      // Step 2: the checkpoint names entry N's hash, never a commit.
-      const cp = checkpoint(core.roomId, core.genesis.roomKey, core.seed(), through, iso(clock()));
-      const retained = sql.all("SELECT digest, kind, body FROM retained ORDER BY digest").map((r) => ({
-        digest: str(r, "digest") as `sha256:${string}`,
-        kind: str(r, "kind")!,
-        body: str(r, "body")!,
-      }));
-      const files = publicationFiles(core.genesis, entriesAfter(sql, -1, n + 1), retained, cp);
-      // Steps 3 and 4: the commit, whose parent is the previous log commit, pushed with a lease on it.
-      const parent = (getMeta(sql, "log_commit") as Sha | null) ?? null;
-      const commit = await core.ports.artifacts.commitLog(files, parent);
-      await core.ports.artifacts.pushLog(commit, parent);
-      // Step 5: read the ref back, then seal the checkpoint event and move publishedThrough.
-      if ((await core.ports.artifacts.readLogRef()) !== commit) throw artroomError("unavailable", "The log ref did not move.");
-      await core.serial(async () =>
-        sql.transaction(() => {
-          core.sealSystem({ type: "checkpoint", through: through.seq, hash: through.hash, commit });
-          setMeta(sql, "published_through", String(through.seq));
-          setMeta(sql, "log_commit", commit);
-        }),
-      );
-      this.lastPublishMs = clock();
-      core.committed();
-      return { through: through.seq, commit };
-    } finally {
-      this.publishing = false;
-    }
   }
 
   // ------------------------------------------------------------ WebSocket (R-API-8)

@@ -33,7 +33,6 @@ export class MemoryArtifacts implements ArtifactsPort {
   readonly forks = new Map<LaneId, Set<Sha>>();
   readonly refs = new Map<string, Sha>();
   readonly tokens = new Map<string, ForkToken>();
-  readonly logCommits = new Map<Sha, { readonly files: Readonly<Record<string, string>>; readonly parent: Sha | null }>();
   main: Sha | null = null;
   /** Largest diff before `too-large` (R-PROP-6). */
   diffLimit = 10_000;
@@ -224,25 +223,6 @@ export class MemoryArtifacts implements ArtifactsPort {
     return this.integrate(head, main);
   }
 
-  async readLogRef(): Promise<Sha | null> {
-    this.enter("readLogRef");
-    return this.refs.get("refs/artroom/log") ?? null;
-  }
-
-  async commitLog(files: Readonly<Record<string, string>>, parent: Sha | null): Promise<Sha> {
-    this.enter("commitLog");
-    const id = sha({ log: files, parent });
-    this.logCommits.set(id, { files: { ...files }, parent });
-    return id;
-  }
-
-  async pushLog(commit: Sha, expected: Sha | null): Promise<void> {
-    this.enter("pushLog");
-    const current = this.refs.get("refs/artroom/log") ?? null;
-    if (current !== expected) throw new Error(`refs/artroom/log is ${current}, not ${expected}`);
-    if (expected !== null && this.logCommits.get(commit)?.parent !== expected) throw new Error("the log ref only moves forward");
-    this.refs.set("refs/artroom/log", commit);
-  }
 }
 
 /**
@@ -266,7 +246,4 @@ export class UnwiredArtifacts implements ArtifactsPort {
   diff = async (): Promise<DiffResult> => this.fail();
   changedBetween = async (): Promise<readonly RepoPath[] | null> => this.fail();
   preview = async (): Promise<PreviewResult> => this.fail();
-  readLogRef = async (): Promise<Sha | null> => this.fail();
-  commitLog = async (): Promise<Sha> => this.fail();
-  pushLog = async (): Promise<void> => this.fail();
 }

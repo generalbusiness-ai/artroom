@@ -13,4 +13,6 @@ export { setPortsFactory, setClock, setAlarmDelay, UnwiredLanding, type PortsFac
 export { lanePolicy } from "./policy.ts";
 export { MemoryArtifacts, UnwiredArtifacts } from "./memory/artifacts.ts";
 export { MemoryLanding } from "./memory/landing.ts";
+export { MemoryLogPublisher, MemoryLogRemote } from "./memory/log.ts";
+export { setFault } from "./core.ts";
 export type * from "./ports.ts";

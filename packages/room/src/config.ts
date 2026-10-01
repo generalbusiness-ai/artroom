@@ -66,6 +66,9 @@ const productionPorts: PortsFactory = () => ({
   policy: lanePolicy(),
   artifacts: new UnwiredArtifacts(),
   landing: () => new UnwiredLanding(),
+  log: async () => {
+    throw new Error("The log publisher is not wired into this deployment yet.");
+  },
 });
 
 let factory: PortsFactory = productionPorts;

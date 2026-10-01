@@ -25,7 +25,7 @@ import type {
   SignedEnvelope,
 } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
-import { MemoryArtifacts, MemoryLanding, lanePolicy, setAlarmDelay, setClock, setPortsFactory, type PolicyPort, type Room } from "../../src/index.ts";
+import { MemoryArtifacts, MemoryLanding, MemoryLogPublisher, MemoryLogRemote, lanePolicy, setAlarmDelay, setClock, setPortsFactory, type PolicyPort, type Room } from "../../src/index.ts";
 import { b64url, digestBytes, keyPairFromSeed, newKeyPair, randomBytes, randomToken, sign, type KeyPair } from "../../src/crypto.ts";
 import { iso, roomIdOf } from "../../src/ids.ts";
 import { unwire, type Wire } from "../../src/errors.ts";
@@ -50,6 +50,8 @@ export interface FaultyPolicy extends PolicyPort {
   gate: Promise<void> | null;
   /** A port that ignores the lane purpose: only the Room's own platform rules then protect recovery lanes. */
   ignorePurpose: boolean;
+  /** Called with each refuse input before evaluation; a test may throw from it (a runtime failure). */
+  refuseHook: ((input: { act: { kind: string; body: unknown } }) => void) | null;
 }
 
 function faultyPolicy(): FaultyPolicy {
@@ -62,9 +64,11 @@ function faultyPolicy(): FaultyPolicy {
     calls: { notify: 0, refuse: 0 },
     gate: null,
     ignorePurpose: false,
+    refuseHook: null,
     refuse: async (policy, input, opts) => {
       p.calls.refuse++;
       if (p.gate) await p.gate;
+      if (p.refuseHook) p.refuseHook(input as never);
       const a = [policy, p.ignorePurpose ? { ...input, lane: { ...input.lane, purpose: "ordinary" as const } } : input, opts] as const;
       if (p.failures.refuse > 0) {
         p.failures.refuse--;
@@ -95,6 +99,7 @@ function faultyPolicy(): FaultyPolicy {
 
 export interface World {
   readonly artifacts: MemoryArtifacts;
+  readonly log: MemoryLogRemote;
   readonly policy: FaultyPolicy;
   landing: MemoryLanding | null;
 }
@@ -102,7 +107,7 @@ export interface World {
 const worlds = new Map<string, World>();
 
 function newWorld(): World {
-  return { artifacts: new MemoryArtifacts(), policy: faultyPolicy(), landing: null };
+  return { artifacts: new MemoryArtifacts(), log: new MemoryLogRemote(), policy: faultyPolicy(), landing: null };
 }
 
 setPortsFactory((_env, objectId) => {
@@ -116,6 +121,7 @@ setPortsFactory((_env, objectId) => {
     policy: world.policy,
     artifacts: world.artifacts,
     landing: (sql, host) => (world.landing = new MemoryLanding(sql, host, world.artifacts, () => clock.now)),
+    log: () => MemoryLogPublisher.open(world.log),
   };
 });
 
@@ -271,6 +277,11 @@ export function pushChange(room: TestRoom, lane: LaneId, changes: Record<string,
 /** Run the room's alarm work once. */
 export async function tick(room: TestRoom, times = 1): Promise<void> {
   for (let i = 0; i < times; i++) await call(room.stub.tick());
+}
+
+/** A thrown policy runtime failure, as lane C's evaluator throws it (R-EVAL-5). */
+export function runtimeFailure(): Error {
+  return Object.assign(new Error("injected engine fault"), { name: "ArtroomError", code: "policy-runtime", retryable: true, maybeRecorded: false });
 }
 
 export function expectRefusal(r: unknown, rule: string): Refusal {

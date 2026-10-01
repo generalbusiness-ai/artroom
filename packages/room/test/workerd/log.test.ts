@@ -55,10 +55,10 @@ describe("section 23, Log construction (R-LOG-2, R-LOG-8, R-LOG-12, R-LOG-13)", 
     // Steps 11 to 13: the second publication; its parent is the first.
     const p2 = (await call<{ through: number; commit: Sha }>(room.stub.publishLog()))!;
     expect(p2.through).toBe(9);
-    const c1 = room.world.artifacts.logCommits.get(p1.commit)!;
-    const c2 = room.world.artifacts.logCommits.get(p2.commit)!;
+    const c1 = room.world.log.commits.get(p1.commit)!;
+    const c2 = room.world.log.commits.get(p2.commit)!;
     expect(c2.parent).toBe(p1.commit);
-    expect(room.world.artifacts.refs.get("refs/artroom/log")).toBe(p2.commit);
+    expect(room.world.log.ref).toBe(p2.commit);
     const seg1 = c1.files["artroom-log/v1/segments/000000000000.jsonl"]!.split("\n");
     const seg2 = c2.files["artroom-log/v1/segments/000000000000.jsonl"]!.split("\n");
     expect(seg1.length).toBe(4);
@@ -70,7 +70,7 @@ describe("section 23, Log construction (R-LOG-2, R-LOG-8, R-LOG-12, R-LOG-13)", 
     const v2 = await verifyLogFiles(c2.files, new Map([[p1.commit, c1.files]]));
     expect(v2).toEqual({ ok: true, problems: [], through: 9 });
     // A tampered entry fails verification.
-    const tampered = { ...c2.files, "artroom-log/v1/segments/000000000000.jsonl": seg2.map((l, i) => (i === 5 ? l.replace("note 0", "note X") : l)).join("\n") };
+    const tampered = { ...c2.files, "artroom-log/v1/segments/000000000000.jsonl": seg2.map((l: string, i: number) => (i === 5 ? l.replace("note 0", "note X") : l)).join("\n") };
     expect((await verifyLogFiles(tampered, new Map([[p1.commit, c1.files]]))).ok).toBe(false);
     expect((await room.admin.read({ q: "log" })).publishedThrough).toBe(9);
   });
@@ -80,7 +80,7 @@ describe("section 23, Log construction (R-LOG-2, R-LOG-8, R-LOG-12, R-LOG-13)", 
     await room.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
     await tick(room);
     const p = (await call<{ commit: Sha }>(room.stub.publishLog()))!;
-    const files = room.world.artifacts.logCommits.get(p.commit)!.files;
+    const files = room.world.log.commits.get(p.commit)!.files;
     const log = await entries(room);
     const decision = (log[3]!.entry as unknown as { event: { decisions: { input: string }[] } }).event.decisions[0]!;
     const ctx = files[`artroom-log/v1/inputs/${decision.input.slice(7)}.json`];

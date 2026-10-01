@@ -57,20 +57,24 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS previews (id TEXT PRIMARY KEY, lane TEXT NOT NULL, generation INTEGER NOT NULL, head TEXT NOT NULL,
      state TEXT NOT NULL, body TEXT NOT NULL, main TEXT, updated_ms INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, state TEXT NOT NULL,
-     body TEXT NOT NULL, updated_ms INTEGER NOT NULL)`,
+     body TEXT NOT NULL, updated_ms INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0)`,
   // Workspace tokens by ID only; the token text is never stored (R-WS-4).
   `CREATE TABLE IF NOT EXISTS fork_tokens (id TEXT PRIMARY KEY, lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, revoked INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS pins (ref TEXT PRIMARY KEY, head TEXT NOT NULL, done INTEGER NOT NULL)`,
   // Policy versions (R-POL-9), and `.artroom/` configuration read from integrations.
   `CREATE TABLE IF NOT EXISTS policies (version TEXT PRIMARY KEY, seq INTEGER NOT NULL, digest TEXT NOT NULL, doc TEXT NOT NULL, checkers TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS configs (commit_sha TEXT PRIMARY KEY, body TEXT NOT NULL)`,
+  // Recomputations after a policy activation (R-POL-9): the decisions and the new obligations, per proposal.
+  `CREATE TABLE IF NOT EXISTS recomputations (version TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL, body TEXT NOT NULL,
+     PRIMARY KEY (version, lane, generation))`,
   `CREATE TABLE IF NOT EXISTS land_evals (op TEXT NOT NULL, digest TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY (op, digest))`,
   // R-LOG-13: notify runs after commit, from this durable queue.
   `CREATE TABLE IF NOT EXISTS notify_queue (seq INTEGER PRIMARY KEY, entry TEXT NOT NULL, policy TEXT NOT NULL, context TEXT NOT NULL,
      attempts INTEGER NOT NULL, next_ms INTEGER NOT NULL, last_error TEXT)`,
-  `CREATE TABLE IF NOT EXISTS attention (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, principal TEXT NOT NULL, lane TEXT,
+  // An item's position is (seq, n): n orders the items one entry produced.
+  `CREATE TABLE IF NOT EXISTS attention (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, n INTEGER NOT NULL DEFAULT 0, principal TEXT NOT NULL, lane TEXT,
      item TEXT NOT NULL, open INTEGER NOT NULL)`,
-  `CREATE INDEX IF NOT EXISTS attention_principal ON attention (principal, seq)`,
+  `CREATE INDEX IF NOT EXISTS attention_position ON attention (principal, seq, n)`,
   `CREATE INDEX IF NOT EXISTS evidence_lane ON evidence (lane, generation)`,
   `CREATE INDEX IF NOT EXISTS keys_member ON keys (member)`,
 ];

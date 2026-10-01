@@ -42,21 +42,46 @@ import { utf8 } from "./canonical.ts";
 // ------------------------------------------------------------ cursors
 
 /** Opaque cursors: they encode a position, and stay valid as long as the room (R-API-6). */
-export function cursor(kind: string, n: number): Cursor {
-  return `c1.${b64url(utf8(JSON.stringify({ k: kind, n })))}` as Cursor;
+export function cursor(kind: string, n: number, extra: Record<string, number> = {}): Cursor {
+  return `c1.${b64url(utf8(JSON.stringify({ k: kind, n, ...extra })))}` as Cursor;
 }
 
-export function fromCursor(c: string | undefined, kind: string): number | null {
-  if (!c) return null;
+function decodeCursor(c: string, kind: string): Record<string, number> {
   if (!c.startsWith("c1.")) throw artroomError("bad-request", "The cursor is not valid.");
   const raw = unb64url(c.slice(3));
   try {
-    const v = JSON.parse(new TextDecoder().decode(raw ?? new Uint8Array())) as { k: string; n: number };
-    if (v.k !== kind || !Number.isSafeInteger(v.n)) throw new Error("kind");
-    return v.n;
+    const v = JSON.parse(new TextDecoder().decode(raw ?? new Uint8Array())) as Record<string, unknown>;
+    if (v["k"] !== kind) throw new Error("kind");
+    const out: Record<string, number> = {};
+    for (const [k, x] of Object.entries(v)) {
+      if (k === "k") continue;
+      if (typeof x !== "number" || !Number.isSafeInteger(x)) throw new Error("field");
+      out[k] = x;
+    }
+    if (out["n"] === undefined) throw new Error("n");
+    return out;
   } catch {
     throw artroomError("bad-request", "The cursor is not valid for this read.");
   }
+}
+
+export function fromCursor(c: string | undefined, kind: string): number | null {
+  return c ? decodeCursor(c, kind)["n"]! : null;
+}
+
+/** An attention item's position: the entry that made it, and its order among that entry's items. */
+export interface Position {
+  readonly seq: Seq;
+  readonly n: number;
+}
+
+const END = Number.MAX_SAFE_INTEGER;
+
+/** An attention position from a cursor. A cursor with only a seq (the earlier format) means "after every item of that seq". */
+function attentionPosition(c: string | undefined, kind: string, seqField: string, nField: string): Position | null {
+  if (!c) return null;
+  const v = decodeCursor(c, kind);
+  return { seq: v[seqField] ?? v["n"]!, n: v[nField] ?? END };
 }
 
 function limitOf(page: PageRequest | undefined): number {
@@ -187,25 +212,38 @@ function stillOpen(core: RoomCore, item: AttentionItem): boolean {
   return item.open;
 }
 
-export function attentionItems(core: RoomCore, member: MemberId, afterSeq: Seq, limit: number): AttentionItem[] {
+/** Items for a member after a position, in (seq, n) order, up to `maxSeq`. */
+export function attentionItems(core: RoomCore, member: MemberId, after: Position, limit: number, maxSeq: Seq = END): AttentionItem[] {
   const ps = principalsOf(core, member);
   const marks = ps.map(() => "?").join(", ");
   return core.sql
-    .all(`SELECT id, seq, lane, item, open FROM attention WHERE principal IN (${marks}) AND seq > ? ORDER BY seq, id LIMIT ?`, ...ps, afterSeq, limit)
+    .all(
+      `SELECT id, seq, n, lane, item, open FROM attention WHERE principal IN (${marks}) AND (seq > ? OR (seq = ? AND n > ?)) AND seq <= ? ORDER BY seq, n LIMIT ?`,
+      ...ps,
+      after.seq,
+      after.seq,
+      after.n,
+      maxSeq,
+      limit,
+    )
     .map((r) => {
       const item = { ...(JSON.parse(str(r, "item")!) as object), id: str(r, "id")!, seq: num(r, "seq")!, ...(str(r, "lane") ? { lane: str(r, "lane") } : {}), open: num(r, "open") === 1 } as AttentionItem;
       return { ...item, open: stillOpen(core, item) };
     });
 }
 
+function positionOf(core: RoomCore, item: AttentionItem): Position {
+  return { seq: item.seq, n: num(one(core.sql, "SELECT n FROM attention WHERE id = ?", item.id), "n") ?? 0 };
+}
+
 function attention(core: RoomCore, member: MemberId, page: PageRequest | undefined): Page<AttentionItem> {
-  const start = fromCursor(page?.cursor, "attention") ?? -1;
+  const start = attentionPosition(page?.cursor, "attention", "n", "i") ?? { seq: -1, n: END };
   const limit = limitOf(page);
   const items = attentionItems(core, member, start, limit + 1);
   const more = items.length > limit;
   const shown = items.slice(0, limit);
-  const last = shown.length ? shown[shown.length - 1]!.seq : start;
-  return { items: shown, cursor: cursor("attention", last), more };
+  const last = shown.length ? positionOf(core, shown[shown.length - 1]!) : start;
+  return { items: shown, cursor: cursor("attention", last.seq, { i: last.n }), more };
 }
 
 // ------------------------------------------------------------ the log (R-API-7, R-LOG-11)
@@ -268,16 +306,28 @@ export function summary(e: LogEntry): EntrySummary {
 
 /** A cursor at the live tail: the current head. A subscription fixes it once, when it starts. */
 export function liveCursor(core: RoomCore): Cursor {
-  return cursor("updates", core.headSeq());
+  const head = core.headSeq();
+  return cursor("updates", head, { as: head, an: END });
 }
 
-/** The next update after a cursor: new entries and new attention items. No cursor means the live tail now. */
+/** At most this many entries, and this many attention items, per update. */
+export const UPDATE_LIMIT = 100;
+
+/**
+ * The next update after a cursor. Entries and attention items each keep
+ * their own position, so a full page of either never moves the cursor past
+ * an item the reader has not seen (P2.8 of review aabda1ed).
+ */
 export function updateAfter(core: RoomCore, member: MemberId, c: string | undefined): Update {
-  const from = fromCursor(c, "updates") ?? core.headSeq();
-  const entries = entriesAfter(core.sql, from, 100);
-  const last = entries.length ? entries[entries.length - 1]!.seq : from;
-  const attention = attentionItems(core, member, from, 100).filter((a) => a.seq <= last);
-  return { cursor: cursor("updates", last), entries: entries.map(summary), attention, publishedThrough: publishedThrough(core) };
+  const from = c ?? liveCursor(core);
+  const v = decodeCursor(from, "updates");
+  const after = v["n"]!;
+  const att: Position = { seq: v["as"] ?? after, n: v["an"] ?? END };
+  const entries = entriesAfter(core.sql, after, UPDATE_LIMIT);
+  const last = entries.length ? entries[entries.length - 1]!.seq : after;
+  const attention = attentionItems(core, member, att, UPDATE_LIMIT, last);
+  const lastAtt = attention.length ? positionOf(core, attention[attention.length - 1]!) : att;
+  return { cursor: cursor("updates", last, { as: lastAtt.seq, an: lastAtt.n }), entries: entries.map(summary), attention, publishedThrough: publishedThrough(core) };
 }
 
 export { memberRow };

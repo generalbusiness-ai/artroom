@@ -27,11 +27,11 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
-import { submit } from "./admission.ts";
+import { commit, decide, earlySteps, finalBoundary, refuseApplies, refuseInput, submit, type DecideOptions } from "./admission.ts";
 import { judge, refusal } from "./authority.ts";
 import { canonicalize, utf8 } from "./canonical.ts";
-import type { RoomCore } from "./core.ts";
-import { digestBytes, newKeyPair, randomToken, sha256Hex, sign, unb64url, verify } from "./crypto.ts";
+import { fault, Moved, type RoomCore } from "./core.ts";
+import { digestBytes, digestJson, newKeyPair, randomToken, sha256Hex, sign, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { iso, opIds, parseTime } from "./ids.ts";
 import { laneRow } from "./model.ts";
@@ -77,7 +77,7 @@ export async function request(core: RoomCore, input: unknown): Promise<Workspace
     if (existing) return JSON.parse(str(existing, "body")!) as WorkspaceOp;
     const op: WorkspaceOp = { id: opId, kind: "workspace", updatedAt: iso(now), lane: lane.id, state: "pending" };
     core.sql.all("INSERT INTO workspaces (id, lane, lease_gen, state, body, updated_ms) VALUES (?, ?, ?, 'pending', ?, ?)", opId, lane.id, lane.leaseGen, JSON.stringify(op), now);
-    core.kick(`workspace:${opId}`, () => openWorkspace(core, opId, lane.id, lane.leaseGen));
+    core.run("workspaces");
     core.committed();
     return op;
   }
@@ -111,17 +111,6 @@ function workspaceAuthority(core: RoomCore, actor: KeyId, delegationId: Delegati
     return refusal("not-holder", `Only the lane's holder may open its workspace or retrieve its token.`, "Claim the lane first.", { current: { leaseGeneration: lane.leaseGen } });
   if (lease !== lane.leaseGen) return refusal("lease-fenced", `The request carries lease generation ${lease}; the current one is ${lane.leaseGen}.`, "Use the current lease.", { current: { leaseGeneration: lane.leaseGen } });
   return { lane, member: j.authority.member! };
-}
-
-async function openWorkspace(core: RoomCore, opId: string, lane: LaneId, leaseGen: number): Promise<void> {
-  let body: WorkspaceOp;
-  try {
-    const { remote } = await core.ports.artifacts.ensureFork(lane);
-    body = { id: opId as WorkspaceOp["id"], kind: "workspace", updatedAt: iso(core.now()), lane, state: "ready", detail: { remote, leaseGeneration: leaseGen } };
-  } catch {
-    body = { id: opId as WorkspaceOp["id"], kind: "workspace", updatedAt: iso(core.now()), lane, state: "failed", error: artroomError("unavailable", "The lane's fork could not be created.") };
-  }
-  core.sql.all("UPDATE workspaces SET state = ?, body = ?, updated_ms = ? WHERE id = ?", body.state, JSON.stringify(body), core.now(), opId);
 }
 
 // ------------------------------------------------------------ read sessions (R-CRED-7)
@@ -202,17 +191,38 @@ export async function redeem(core: RoomCore, input: unknown, address: string, mc
     const body = r.join.envelope.body as { op?: string };
     if (r.join.envelope.kind !== "roster" || body.op !== "join" || r.join.envelope.delegation !== undefined)
       throw artroomError("bad-request", "A client-custody redemption carries a signed join.");
-    // The same admission as any act, on the `submitted` path (R-ADM-12).
-    const out = await submit(core, r.join, "submitted");
+    // The same admission as any act, on the `submitted` path (R-ADM-12). A refusal records nothing (R-CRED-9).
+    const out = await submit(core, r.join, "submitted", { recordRefusals: false });
     if (isRefusal(out)) return out;
     const record = out as RosterRecord;
     const by = record.by as Extract<RosterRecord["by"], { via: "join" }>;
     return { custody: "client", member: by.member, role: by.role, key: by.key, record, session: newSession(core, by.member, by.key, null, 3600) };
   }
+  return redeemRoom(core, r.invitation, r.secret, mcpBase);
+}
 
-  // Room custody: check custody and secret before making any key (R-ADM-12, R-CRED-9).
-  const inv = invitation(core.sql, r.invitation);
-  const secret = unb64url(r.secret);
+class Abort extends Error {
+  constructor(readonly refusal: Refusal) {
+    super("redemption refused at the final boundary");
+  }
+}
+
+/**
+ * Room-custody redemption (R-CRED-3, R-CRED-9, R-ADM-12), all or nothing.
+ *
+ * 1. Custody and secret are checked before any key is made.
+ * 2. The `join` is decided on the `room-redemption` path; the `delegate` to
+ *    the session key is decided on the state after the join, simulated and
+ *    rolled back, with its policy evaluated outside any transaction.
+ * 3. One synchronous transaction re-checks both at the final boundary, then
+ *    seals the join and the delegate, stores the room-held keys and the
+ *    bearer hash. A refusal or failure at any point records nothing, makes
+ *    no key and leaves the invitation unused.
+ */
+async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText: string, mcpBase: string): Promise<Redeemed | Refusal> {
+  const now = core.now();
+  const inv = invitation(core.sql, invitationId);
+  const secret = unb64url(secretText);
   if (!inv || inv.used !== undefined || inv.expiresMs <= now || !secret || digestBytes(secret) !== inv.secretHash)
     return refusal("invitation-invalid", "The invitation does not exist, was used, expired, or the secret does not match.", "Ask an admin for a new invitation.");
   if (inv.custody !== "room")
@@ -222,25 +232,20 @@ export async function redeem(core: RoomCore, input: unknown, address: string, mc
       "Make a key, sign a join, and send it to redeem with custody client.",
     );
   const memberKey = newKeyPair();
-  const join: Envelope = {
+  const sessionKey = newKeyPair();
+  const ttl = inv.session?.ttlSeconds ?? 24 * 3600;
+  const expiresMs = now + ttl * 1000;
+  const signed = (env: Envelope): SignedEnvelope => ({ envelope: env, sig: sign(memberKey.seed, "artroom-envelope-v1", env) });
+  const join = signed({
     v: 1,
     room: core.roomId,
     actor: memberKey.key,
     kind: "roster",
     target: null,
-    body: { op: "join", invitation: inv.id, secret: r.secret },
+    body: { op: "join", invitation: inv.id, secret: secretText },
     idempotencyKey: `redeem-${randomToken().slice(0, 32)}`,
-  };
-  const joined = await submit(core, { envelope: join, sig: sign(memberKey.seed, "artroom-envelope-v1", join) }, "room-redemption", {
-    heldKeys: [{ key: memberKey.key, seed: memberKey.seed, purpose: "member" }],
   });
-  if (isRefusal(joined)) return joined;
-  const by = (joined as RosterRecord).by as Extract<RosterRecord["by"], { via: "join" }>;
-  // R-CRED-3 step 2: a session key, and a recorded delegation from the member key to it.
-  const ttl = inv.session?.ttlSeconds ?? 24 * 3600;
-  const sessionKey = newKeyPair();
-  const expiresMs = now + ttl * 1000;
-  const delegate: Envelope = {
+  const grant = signed({
     v: 1,
     room: core.roomId,
     actor: memberKey.key,
@@ -248,24 +253,71 @@ export async function redeem(core: RoomCore, input: unknown, address: string, mc
     target: null,
     body: { op: "delegate", to: sessionKey.key, kinds: inv.session?.kinds ?? "*", lanes: "*", expiresAt: iso(expiresMs) },
     idempotencyKey: `session-${randomToken().slice(0, 32)}`,
-  };
-  const granted = await submit(core, { envelope: delegate, sig: sign(memberKey.seed, "artroom-envelope-v1", delegate) }, "submitted", {
-    heldKeys: [{ key: sessionKey.key, seed: sessionKey.seed, purpose: "session" }],
   });
-  if (isRefusal(granted)) return granted;
-  // R-CRED-3 step 3: the bearer token is returned once; only its hash is stored.
-  const bearer = `arb_${randomToken()}`;
-  core.sql.all("INSERT INTO bearers (hash, member, key, delegation, expires_ms) VALUES (?, ?, ?, ?, ?)", tokenHash(bearer), by.member, sessionKey.key, (granted as ActRecord).id, expiresMs);
-  return {
-    custody: "room",
-    member: by.member,
-    role: by.role,
-    key: memberKey.key,
-    delegation: (granted as ActRecord).id,
-    bearer,
-    expiresAt: iso(expiresMs),
-    mcp: `${mcpBase}/v1/rooms/${core.roomId}/mcp` as `https://${string}`,
-  };
+
+  return core.serial(async () => {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      core.expireDueSync();
+      const snap = core.headSeq();
+      const joinPlan = await decide(core, join, "room-redemption", {});
+      if (joinPlan.t === "replay") throw artroomError("internal", "A fresh redemption key was already used.");
+      if (joinPlan.t !== "accept") return joinPlan.refusal;
+      // The delegate, as it would be judged after the join (simulated, then rolled back).
+      const sim = core.simulate(() => {
+        commit(core, joinPlan, {});
+        const j = judge(core.sql, grant.envelope, "submitted", core.now());
+        if (!j.ok) return { refusal: j.refusal } as const;
+        const early = earlySteps(core, grant, "submitted", digestJson(grant.envelope), j.authority);
+        if (early) return { refusal: early.t === "unrecorded" ? early.refusal : refusal("invalid-body", "The session grant was refused.") } as const;
+        return { authority: j.authority, input: refuseApplies(grant.envelope, j.authority) ? refuseInput(core, grant.envelope, j.authority, null) : null } as const;
+      });
+      if ("refusal" in sim) return sim.refusal;
+      let precomputed: NonNullable<DecideOptions["precomputed"]> = { input: null, refusal: null, evaluations: [] };
+      if (sim.input) {
+        const r = await core.ports.policy.refuse(core.activePolicy(), sim.input, { budget: core.ports.policy.actBudget(), recoveryKey: false });
+        if (r.refusal) return r.refusal;
+        precomputed = { input: sim.input, refusal: null, evaluations: r.evaluations };
+      }
+      const grantPlan = await decide(core, grant, "submitted", {}, { authority: sim.authority, precomputed });
+      if (grantPlan.t !== "accept") return grantPlan.t === "replay" ? refusal("invalid-body", "The session grant was replayed.") : grantPlan.refusal;
+      const bearer = `arb_${randomToken()}`;
+      try {
+        const out = core.sql.transaction(() => {
+          if (core.headSeq() !== snap) throw new Moved();
+          const late = finalBoundary(core, joinPlan);
+          if (late) throw new Abort(late);
+          const joined = commit(core, joinPlan, { heldKeys: [{ key: memberKey.key, seed: memberKey.seed, purpose: "member" }] });
+          fault("redemption:after-join");
+          const late2 = finalBoundary(core, grantPlan);
+          if (late2) throw new Abort(late2);
+          // The policy input judged before must be the one this state gives now (R-ADM-6).
+          if (precomputed.input && canonicalize(refuseInput(core, grant.envelope, grantPlan.ctx.authority, null)) !== canonicalize(precomputed.input)) throw new Moved();
+          const granted = commit(core, grantPlan, { heldKeys: [{ key: sessionKey.key, seed: sessionKey.seed, purpose: "session" }] });
+          fault("redemption:after-delegate");
+          core.sql.all("INSERT INTO bearers (hash, member, key, delegation, expires_ms) VALUES (?, ?, ?, ?, ?)", tokenHash(bearer), (joined.result as RosterRecord).by.member, sessionKey.key, granted.id, expiresMs);
+          return { joined: joined.result as RosterRecord, delegation: granted.id };
+        });
+        core.committed();
+        const by = out.joined.by as Extract<RosterRecord["by"], { via: "join" }>;
+        // R-CRED-3 step 3: the bearer token is returned once; only its hash is stored.
+        return {
+          custody: "room",
+          member: by.member,
+          role: by.role,
+          key: memberKey.key,
+          delegation: out.delegation,
+          bearer,
+          expiresAt: iso(expiresMs),
+          mcp: `${mcpBase}/v1/rooms/${core.roomId}/mcp` as `https://${string}`,
+        };
+      } catch (e) {
+        if (e instanceof Moved) continue;
+        if (e instanceof Abort) return e.refusal;
+        throw e;
+      }
+    }
+    throw artroomError("unavailable", "The room is busy. Retry the redemption.", { retryAfterMs: 100, maybeRecorded: false });
+  });
 }
 
 // ------------------------------------------------------------ bearer acts (R-CRED-3 step 4)

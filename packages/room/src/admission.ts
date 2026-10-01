@@ -87,13 +87,13 @@ import {
   adminObligation,
   invalidity,
   obligationsFor,
-  obligationStatus,
   publicObligation,
-  qualifies,
-  selfAllowed,
+  qualification,
+  statusesOf,
+  transitions,
 } from "./obligations.ts";
 import type { ArtroomConfig, DiffResult, Evaluation, ObligationSpec } from "./ports.ts";
-import { activeAdmins, activeKeys, delegableBy, delegation, invitation, keyRow, memberRow, recoveryKey } from "./roster.ts";
+import { activeAdmins, activeKeys, delegableBy, delegation, invitation, keyRow, memberRow, recoveryKey, revocationOf, teamsOf } from "./roster.ts";
 import { checkBody, checkEnvelopeSize, checkSignedEnvelope, ShapeError } from "./schema.ts";
 import { scanValue } from "./secrets.ts";
 import { one, num, str } from "./store.ts";
@@ -116,6 +116,8 @@ export interface Pre {
 /** Something to do inside the commit transaction with the room-held key of a room-custody join (R-CRED-3). */
 export interface AdmitHooks {
   readonly heldKeys?: readonly { readonly key: KeyId; readonly seed: Uint8Array; readonly purpose: string }[];
+  /** False for a redemption: a refused redemption records nothing (R-CRED-9). */
+  readonly recordRefusals?: boolean;
 }
 
 interface Ctx {
@@ -132,9 +134,20 @@ interface Ctx {
   flags: Flag[];
   readonly evaluations: Evaluation[];
   readonly invariants: { rule: `R-${string}`; held: boolean; detail?: string }[];
+  /** The refuse input built for this act, kept so a later boundary can compare it (R-ADM-6). */
+  refuseInput?: InputOf<"refuse">;
+  /** A refuse evaluation made earlier, on the state this act will see (a redemption's `delegate`). */
+  readonly precomputed?: { readonly input: InputOf<"refuse"> | null; readonly refusal: Refusal | null; readonly evaluations: readonly Evaluation[] };
 }
 
-type Plan =
+/** Options for deciding one act. */
+export interface DecideOptions {
+  /** The authority judged on a simulated state, for an act that follows another in one transaction. */
+  readonly authority?: Authority;
+  readonly precomputed?: Ctx["precomputed"];
+}
+
+export type Plan =
   | { readonly t: "replay"; readonly result: ActRecord | Refusal }
   | { readonly t: "unrecorded"; readonly refusal: Refusal }
   | { readonly t: "refused"; readonly ctx: Ctx; readonly refusal: Refusal }
@@ -190,18 +203,24 @@ export async function submit(core: RoomCore, input: unknown, path: AdmissionPath
 
   return core.serial(async () => {
     for (let attempt = 0; attempt < 6; attempt++) {
+      // Leases already past their expiry end before anything is decided on them (R-LANE-8).
+      core.expireDueSync();
       const snap = core.headSeq();
       const plan = await decide(core, signed, path, pre);
       if (plan.t === "replay") return plan.result;
       if (plan.t === "unrecorded") return plan.refusal;
+      if (plan.t === "refused" && hooks.recordRefusals === false) return plan.refusal;
       try {
         const out = core.sql.transaction(() => {
           if (core.headSeq() !== snap) throw new Moved();
-          return commit(core, plan, hooks);
+          const late = finalBoundary(core, plan);
+          if (late) return { late };
+          return { done: commit(core, plan, hooks) };
         });
+        if ("late" in out) return out.late;
         core.committed();
-        if (plan.t === "accept" && plan.afterCommit) plan.afterCommit(out.id, out.entry);
-        return out.result;
+        if (plan.t === "accept" && plan.afterCommit) plan.afterCommit(out.done.id, out.done.entry);
+        return out.done.result;
       } catch (e) {
         if (e instanceof Moved) continue;
         throw e;
@@ -211,10 +230,31 @@ export async function submit(core: RoomCore, input: unknown, path: AdmissionPath
   });
 }
 
+/**
+ * The last check before sealing, inside the write transaction and with the
+ * room clock read now (R-ADM-6, P1.3 of review aabda1ed). Authority that
+ * depends on time (a delegation's or an invitation's expiry) or on state is
+ * judged again; a lease past its expiry makes the admission start over, so
+ * the expiry is sealed first. Returns an unrecorded refusal, or null to seal.
+ * Throws `Moved` to decide again.
+ */
+export function finalBoundary(core: RoomCore, plan: Extract<Plan, { t: "refused" | "accept" }>): Refusal | null {
+  const ctx = plan.ctx;
+  const j = judge(core.sql, ctx.env, ctx.path, core.now());
+  if (!j.ok) return j.refusal;
+  if (canonicalize(j.authority) !== canonicalize(ctx.authority)) throw new Moved();
+  const lane = laneOf(ctx.env);
+  if (lane) {
+    const row = laneRow(core.sql, lane);
+    if (row && row.state === "held" && (row.expiresMs ?? Infinity) <= core.now()) throw new Moved();
+  }
+  return null;
+}
+
 // =============================================================== steps 3 to 6
 
 /** Steps 3 to 6. Returns a plan when one of them decides the outcome, otherwise null. Synchronous. */
-function earlySteps(core: RoomCore, signed: SignedEnvelope, path: AdmissionPath, digest: string): Plan | null {
+export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: AdmissionPath, digest: string, authority?: Authority): Plan | null {
   const env = signed.envelope;
   const sql = core.sql;
   // Step 3: idempotency, scoped to the signing key (R-IDEM-1 to R-IDEM-4).
@@ -228,7 +268,7 @@ function earlySteps(core: RoomCore, signed: SignedEnvelope, path: AdmissionPath,
     };
   }
   // Step 4: authority at admission (R-ADM-3, R-ADM-12).
-  const j = judge(sql, env, path, core.now());
+  const j = authority ? ({ ok: true, authority } as const) : judge(sql, env, path, core.now());
   if (!j.ok) return { t: "unrecorded", refusal: j.refusal };
   // Step 5: body schema and sizes (R-SIG-4, R-SIG-6, R-PATH-1).
   let fixed: ReadonlySet<string>;
@@ -311,6 +351,8 @@ function rosterSemantics(core: RoomCore, env: Envelope, by: Authority): Refusal 
     case "rotate-recovery":
       if (op.key === recoveryKey(sql)) return bad("That is already the recovery key.");
       if (keyRow(sql, op.key)) return bad("A member's key cannot become the recovery key.");
+      // P1.2: a key revoked for any reason, bound to a member or not, never becomes the recovery key (R-ADM-3).
+      if (revocationOf(sql, op.key)) return bad("A revoked key can never become the recovery key.");
       return null;
     case "join":
       return null;
@@ -353,12 +395,12 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
 
 // =============================================================== steps 7 to 9
 
-async function decide(core: RoomCore, signed: SignedEnvelope, path: AdmissionPath, pre: Pre): Promise<Plan> {
+export async function decide(core: RoomCore, signed: SignedEnvelope, path: AdmissionPath, pre: Pre, opts: DecideOptions = {}): Promise<Plan> {
   const digest = digestJson(signed.envelope);
-  const early = earlySteps(core, signed, path, digest);
+  const early = earlySteps(core, signed, path, digest, opts.authority);
   if (early) return early;
   const env = signed.envelope;
-  const j = judge(core.sql, env, path, core.now());
+  const j = opts.authority ? ({ ok: true, authority: opts.authority, flags: [] as Flag[] } as const) : judge(core.sql, env, path, core.now());
   if (!j.ok) return { t: "unrecorded", refusal: j.refusal };
   const ctx: Ctx = {
     core,
@@ -374,6 +416,7 @@ async function decide(core: RoomCore, signed: SignedEnvelope, path: AdmissionPat
     flags: [...j.flags],
     evaluations: [],
     invariants: [{ rule: "R-ADM-3", held: true, detail: `authority by case ${j.authority.via}` }],
+    ...(opts.precomputed ? { precomputed: opts.precomputed } : {}),
   };
   // R-LAND-8: while the slot is held, every act is ordered after the reservation (open point 6).
   if (core.landing.after()) ctx.flags.push("after-reservation");
@@ -437,17 +480,32 @@ async function policyRefuse(ctx: Ctx, lane: LaneRow | null, proposal: InputOf<"r
     ctx.invariants.push({ rule: "R-ADMIN-3", held: true, detail: "roster act by an admin or the recovery key: refuse rules are not evaluated" });
     return null;
   }
-  const input: InputOf<"refuse"> = {
-    kind: "refuse",
-    act: { kind: env.kind, target: env.target as never, body: env.body as never },
-    actor: ctx.core.policyActor(ctx.authority),
-    lane: ctx.core.policyLane(lane),
-    proposal,
-    room: ctx.core.policyRoom(),
-  };
+  const input = refuseInput(ctx.core, env, ctx.authority, lane, proposal);
+  ctx.refuseInput = input;
+  if (ctx.precomputed) {
+    ctx.evaluations.push(...ctx.precomputed.evaluations);
+    return ctx.precomputed.refusal;
+  }
   const r = await ctx.core.ports.policy.refuse(ctx.policy, input, { budget: ctx.budget, recoveryKey });
   ctx.evaluations.push(...r.evaluations);
   return r.refusal;
+}
+
+/** Whether policy `refuse` rules apply to this act at all (R-ADMIN-3). */
+export function refuseApplies(env: Pick<Envelope, "kind">, by: Authority): boolean {
+  return !(env.kind === "roster" && (by.via === "recovery" || by.role === "admin"));
+}
+
+/** The refuse rule input for an act, built synchronously from the current state (R-EVAL-3). */
+export function refuseInput(core: RoomCore, env: Envelope, by: Authority, lane: LaneRow | null, proposal: InputOf<"refuse">["proposal"] = null): InputOf<"refuse"> {
+  return {
+    kind: "refuse",
+    act: { kind: env.kind, target: env.target as never, body: env.body as never },
+    actor: core.policyActor(by),
+    lane: core.policyLane(lane),
+    proposal,
+    room: core.policyRoom(),
+  };
 }
 
 function renewEffect(ctx: Ctx, lane: LaneRow): Effect {
@@ -659,7 +717,7 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
   const notCarried: NotCarried[] = [];
   if (lane.purpose !== "config-recovery" && lane.generation > 0) {
     const prev = generationRow(core.sql, laneId, lane.generation)!;
-    const prevStatus = obligationsFor(core.sql, laneId, prev.generation, { doc: ctx.policy.doc });
+    const prevStatus = obligationsFor(core.sql, laneId, prev.generation, { doc: ctx.policy.doc, checkers: ctx.policy.checkers });
     const candidates = new Map<ActId, ObligationId[]>();
     for (const o of prevStatus) for (const act of o.evidenceActs) if (o.kind === "review") candidates.set(act, [...(candidates.get(act) ?? []), o.id]);
     for (const [act, obls] of candidates) {
@@ -756,8 +814,8 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
       return proposalRecord(core, recordBase(ctx, entry, id, "propose", receiptOf(entry)), laneId, generation, ctx.policy);
     },
     afterCommit: () => {
-      core.kick("pins", () => core.completePins());
-      core.kick("previews", () => core.refreshPreviews());
+      core.run("pins");
+      core.run("previews");
     },
   };
 }
@@ -788,8 +846,8 @@ function obligationsEffect(
     blocked: null,
     recompute: null,
   };
-  const met = specs.filter((s) => s.kind === "review" && obligationStatus(core.sql, gen, s, { doc: policy.doc }).state === "met").map((s) => s.id);
-  return { type: "obligations", lane, generation, opened: specs.map((s) => s.id).filter((id) => !met.includes(id)), met };
+  const { opened, met } = transitions([], statusesOf(core.sql, gen, { doc: policy.doc, checkers: policy.checkers }), true);
+  return { type: "obligations", lane, generation, opened, met };
 }
 
 /** The `Proposal` record, as admitted or as read now. */
@@ -805,7 +863,7 @@ export function proposalRecord(core: RoomCore, base: ReturnType<typeof recordBas
     pinnedRef: pinnedRef(lane, generation),
     summary: g.summary,
     changed: g.changed,
-    obligations: obligationsFor(core.sql, lane, generation, { doc: policy.doc }).map(publicObligation),
+    obligations: obligationsFor(core.sql, lane, generation, { doc: policy.doc, checkers: policy.checkers }).map(publicObligation),
     notCarried: g.notCarried,
     preview,
   };
@@ -869,41 +927,48 @@ async function review(ctx: Ctx, laneId: LaneId, generation: Generation, body: Re
   if (rec) return refused(ctx, rec, "R-ADMIN-5");
   // R-OBL-1: the review binds the head the reviewer saw.
   if (body.head !== g.head) return refused(ctx, nope("head-mismatch", `Generation ${generation}'s head is ${g.head}, not ${body.head}.`, "Review the head of that generation."), "R-OBL-1");
-  // R-OBL-2: who may meet which review obligation.
-  const reviewObls = g.obligations.filter((o) => o.kind === "review");
-  const matching = reviewObls.filter((o) => qualifies(core.sql, ctx.policy.doc, o, ctx.authority));
-  if (!matching.length)
-    return refused(ctx, nope("not-authorized-reviewer", `${ctx.authority.member ?? "This signer"} qualifies for no review obligation on this generation.`, "Ask a qualifying reviewer."), "R-OBL-2");
+  // R-OBL-2: who may meet which review obligation, by the one qualification rule.
   const member = ctx.authority.member!;
-  const isAuthor = member === g.proposer || (lane.state === "held" && lane.holder === member);
+  const author = member === g.proposer || (lane.state === "held" && lane.holder === member);
   const admins = activeAdmins(core.sql).length;
-  let soleAdminSelf = false;
-  const usable = matching.filter((o) => {
-    if (!isAuthor) return true;
-    if (selfAllowed(o)) return true;
-    // R-ADMIN-2, R-ADMIN-7: a sole active admin may approve their own `.artroom/**` change, flagged.
-    if (o.id === ADMIN_APPROVAL && admins === 1 && ctx.authority.role === "admin") {
-      soleAdminSelf = true;
-      return true;
-    }
-    return false;
+  const admission = { teams: ctx.authority.member ? teamsOf(core.sql, ctx.authority.member) : [], author };
+  const reviewObls = g.obligations.filter((o) => o.kind === "review");
+  // R-ADMIN-2, R-ADMIN-7: a sole active admin's own approval of `.artroom/**` is admitted, flagged.
+  const flags = [...ctx.flags];
+  if (author && body.verdict === "approve" && admins === 1 && ctx.authority.role === "admin" && reviewObls.some((o) => o.id === ADMIN_APPROVAL))
+    flags.push("sole-admin-self-approval");
+  const prospective = (act: ActId, seq: number): EvidenceRow => ({
+    act,
+    seq,
+    kind: "review",
+    lane: laneId,
+    generation,
+    head: body.head,
+    member,
+    key: ctx.env.actor,
+    grantor: ctx.authority.via === "delegation" ? ctx.authority.grantor : null,
+    verdict: body.verdict,
+    qualifies: [],
+    flags,
+    authority: ctx.authority,
+    admission,
+    body,
   });
+  const judged = reviewObls.map((o) => qualification(ctx.policy.doc, o, prospective("act_0_00000000", 0)));
+  if (!judged.some((q) => q === true || q === "self"))
+    return refused(ctx, nope("not-authorized-reviewer", `${ctx.authority.member ?? "This signer"} qualifies for no review obligation on this generation.`, "Ask a qualifying reviewer."), "R-OBL-2");
+  const usable = reviewObls.filter((_, i) => judged[i] === true);
   if (!usable.length)
     return refused(ctx, nope("self-review", "The author cannot meet these obligations on their own lane.", admins > 1 ? "Ask another admin or reviewer." : "Ask another reviewer."), "R-OBL-2");
-  if (soleAdminSelf && body.verdict === "approve") ctx.flags.push("sole-admin-self-approval");
+  ctx.flags = flags;
   const r = await policyRefuse(ctx, lane);
   if (r) return refused(ctx, r);
-  const before = obligationsFor(core.sql, laneId, generation, { doc: ctx.policy.doc });
   const qualifiesIds = usable.map((o) => o.id);
-  // What this verdict meets, if admitted: simulate by adding it to the status computation.
-  const metNow: ObligationId[] = [];
-  if (body.verdict === "approve")
-    for (const o of usable) {
-      const prevState = before.find((b) => b.id === o.id)?.state;
-      const count = o.kind === "review" ? o.count : 1;
-      const already = before.find((b) => b.id === o.id)?.evidenceActs.length ?? 0;
-      if (prevState !== "met" && already + 1 >= count) metNow.push(o.id);
-    }
+  // P2.7: the sealed effect comes from the same calculator as the projection, before and after this verdict.
+  const statusOpts = { doc: ctx.policy.doc, checkers: ctx.policy.checkers };
+  const before = statusesOf(core.sql, g, statusOpts);
+  const after = statusesOf(core.sql, g, { ...statusOpts, extra: [prospective(`act_${core.headSeq() + 1}_00000000`, core.headSeq() + 1)] });
+  const { met: metNow } = transitions(before, after);
   return {
     t: "accept",
     ctx,
@@ -923,7 +988,7 @@ async function review(ctx: Ctx, laneId: LaneId, generation: Generation, body: Re
         body.verdict,
         JSON.stringify(qualifiesIds),
         JSON.stringify(ctx.flags),
-        JSON.stringify({ authority: ctx.authority, body }),
+        JSON.stringify({ authority: ctx.authority, admission, body }),
       );
       if (body.verdict === "object" && lane.holder)
         core.attend(lane.holder, entry.seq, laneId, { why: "objection", proposal: { lane: laneId, generation }, review: id }, `${member} objected to generation ${generation}.`);
@@ -962,7 +1027,27 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   const spec = g.obligations.find((o) => o.id === body.obligation);
   if (!spec || spec.kind !== "check") return refused(ctx, nope("obligation-unknown", `Generation ${generation} has no check obligation ${body.obligation}.`, "Name an open check obligation."), "R-OBL-3");
   const member = ctx.authority.member;
-  if (!qualifies(core.sql, ctx.policy.doc, spec, ctx.authority) || member === g.proposer || (lane.state === "held" && member === lane.holder))
+  const admission = { teams: member ? teamsOf(core.sql, member) : [], author: member === g.proposer || (lane.state === "held" && member === lane.holder) };
+  const prospective = (act: ActId, seq: number): EvidenceRow => ({
+    act,
+    seq,
+    kind: "check",
+    lane: laneId,
+    generation,
+    head: g.head,
+    member: member!,
+    key: ctx.env.actor,
+    grantor: ctx.authority.via === "delegation" ? ctx.authority.grantor : null,
+    verdict: null,
+    qualifies: [],
+    flags: ctx.flags,
+    authority: ctx.authority,
+    admission,
+    body,
+  });
+  // R-OBL-3 by the one qualification rule: the holder or proposer never meets its own check.
+  const q = qualification(ctx.policy.doc, spec, prospective("act_0_00000000", 0), ctx.policy.checkers);
+  if (q === "principal" || q === "self")
     return refused(ctx, nope("not-authorized-checker", `${member ?? "This signer"} may not meet ${spec.id}.`, "Ask an authorized checker."), "R-OBL-3");
   const binding = (why: string) => refused(ctx, nope("check-binding", why, "Run the check on the integration the room prepared, with the active configuration."), "R-OBL-3");
   if (body.check !== spec.check) return binding(`The obligation needs the ${spec.check} checker, not ${body.check}.`);
@@ -975,12 +1060,15 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   const cfg = ctx.policy.checkers[body.check];
   if (!cfg || cfg.digest !== body.config) return binding("The check's configuration digest is not the active configuration's.");
   if (body.input.kind !== "tree" || ctx.pre.tree === undefined || body.input.tree !== ctx.pre.tree) return binding("The check's input is not the integration's tree.");
+  if (q !== true) return binding("The check does not bind this obligation under the active configuration.");
   const r = await policyRefuse(ctx, lane);
   if (r) return refused(ctx, r);
+  const statusOpts = { doc: ctx.policy.doc, checkers: ctx.policy.checkers };
+  const { met } = transitions(statusesOf(core.sql, g, statusOpts), statusesOf(core.sql, g, { ...statusOpts, extra: [prospective(`act_${core.headSeq() + 1}_00000000`, core.headSeq() + 1)] }));
   return {
     t: "accept",
     ctx,
-    effects: body.ok ? [{ type: "obligations", lane: laneId, generation, opened: [], met: [spec.id] }] : [],
+    effects: met.length ? [{ type: "obligations", lane: laneId, generation, opened: [], met }] : [],
     notify: { lane: laneId, proposal: core.proposalInput(ctx.policy.doc, g) },
     apply: (entry, id) => {
       core.sql.all(
@@ -995,7 +1083,7 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
         ctx.authority.via === "delegation" ? ctx.authority.grantor : null,
         JSON.stringify([spec.id]),
         JSON.stringify(ctx.flags),
-        JSON.stringify({ authority: ctx.authority, body }),
+        JSON.stringify({ authority: ctx.authority, admission, body }),
       );
       const op = core.activeLandOp(laneId);
       if (op) core.landing.evaluate(op);
@@ -1038,7 +1126,7 @@ async function land(ctx: Ctx, laneId: LaneId, generation: Generation, body: { le
   if (inFlight) return refused(ctx, nope("land-in-progress", "This lane already has a landing operation in flight.", "Wait for it to finish.", { op: inFlight }), "R-LANE-10");
   if (g.blocked) return refused(ctx, { ...g.blocked, refused: true }, "R-POL-9");
   if (g.recompute) return refused(ctx, nope("obligation-open", "The obligations are being recomputed under a new policy.", "Try again shortly."), "R-POL-9");
-  const obligations = obligationsFor(core.sql, laneId, generation, { doc: ctx.policy.doc });
+  const obligations = obligationsFor(core.sql, laneId, generation, { doc: ctx.policy.doc, checkers: ctx.policy.checkers });
   const open = obligations.find((o) => o.kind === "review" && o.state !== "met");
   if (open) return refused(ctx, nope("obligation-open", `The obligation ${open.id} is open.`, "Meet it, then land."), "R-LAND-1");
   // Step 9: refuse rules on `land`, then land rules at stage "land" (R-POL-6); neither on a recovery lane (R-ADMIN-8).
@@ -1095,7 +1183,7 @@ async function release(ctx: Ctx, laneId: LaneId, body: ReleaseBody): Promise<Pla
       const rl: Release = { ...recordBase(ctx, entry, id, "release", receiptOf(entry)), lane: laneId, ...(body.note !== undefined ? { note: body.note } : {}) };
       return rl;
     },
-    afterCommit: () => core.kick(`revoke:${laneId}`, () => core.revokeTokens(laneId)),
+    afterCommit: () => core.run("tokens"),
   };
 }
 
@@ -1166,9 +1254,8 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
     for (const { lane, generation } of byGen.values()) {
       const g = generationRow(sql, lane, generation);
       if (!g || g.landed) continue;
-      const before = obligationsFor(sql, lane, generation, { doc: ctx.policy.doc });
-      const after = obligationsFor(sql, lane, generation, { doc: ctx.policy.doc, exclude });
-      const opened = after.filter((a) => a.state !== "met" && before.find((b) => b.id === a.id)?.state === "met").map((a) => a.id);
+      const opts = { doc: ctx.policy.doc, checkers: ctx.policy.checkers };
+      const { opened } = transitions(obligationsFor(sql, lane, generation, opts), obligationsFor(sql, lane, generation, { ...opts, exclude }));
       for (const o of opened) reopened.push({ lane, generation, obligation: o });
       if (opened.length) effects.push({ type: "obligations", lane, generation, opened, met: [] });
     }
@@ -1306,7 +1393,7 @@ function landAuthority(core: RoomCore, act: ActId): Authority | null {
 
 // =============================================================== step 10
 
-function commit(core: RoomCore, plan: Extract<Plan, { t: "refused" | "accept" }>, hooks: AdmitHooks): { result: ActRecord | Refusal; id: ActId; entry: LogEntry } {
+export function commit(core: RoomCore, plan: Extract<Plan, { t: "refused" | "accept" }>, hooks: AdmitHooks): { result: ActRecord | Refusal; id: ActId; entry: LogEntry } {
   const ctx = plan.ctx;
   const sql = core.sql;
   const at = iso(ctx.now);
