@@ -724,7 +724,10 @@ function scriptedReadiness(w: World, id: OpId) {
   const ready = { kind: "ready" as const, evidence: [actId(50)], retained: null };
   const waiting = { kind: "waiting" as const, obligations: ["obl_tests" as const] };
   const until = async (n: number) => {
-    while (calls.length < n) await new Promise((r) => setTimeout(r, 2));
+    for (let i = 0; calls.length < n; i++) {
+      if (i > 1000) throw new Error(`readiness was asked ${calls.length} times, not ${n}`);
+      await new Promise((r) => setTimeout(r, 2));
+    }
   };
   return { calls, ready, waiting, until };
 }

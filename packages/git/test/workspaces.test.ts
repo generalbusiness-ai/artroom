@@ -28,6 +28,7 @@ class FakeRepo implements RepoHandle {
   }
   mintRaw(scope: "read" | "write", ttl: number): MintedToken {
     const id = `tid_${++this.ns.counter}`;
+    this.ns.minted.push(id);
     const plaintext = `art_v1_${id}${"a".repeat(30)}?expires=${ttl}`;
     const expiresAt = this.ns.clock.t + ttl * 1000;
     this.tokens.set(id, { plaintext, scope, state: "active", expiresAt, ttl });
@@ -50,6 +51,7 @@ class FakeRepo implements RepoHandle {
     return false;
   }
   async listTokens() {
+    if (this.ns.failRevoke) throw new ArtifactsError("INTERNAL_ERROR", 10400);
     const tokens = [...this.tokens].map(([id, t]) => ({ id, scope: t.scope, state: t.state, expiresAt: new Date(t.expiresAt).toISOString() }));
     return { tokens, total: tokens.length };
   }
@@ -92,6 +94,7 @@ class FakeNamespace implements ArtifactsNamespace {
   readonly clock: Clock;
   createGate: Promise<void> | null = null;
   readonly namespace = "ns";
+  readonly minted: string[] = [];
   /** Each call of createToken first awaits the next of these, if any. */
   readonly mintDelays: (() => Promise<void>)[] = [];
   failRevoke = false;
@@ -303,10 +306,13 @@ test("a new lease generation while the old one's token is being minted: the old 
   ws.open(lane, 3, clock.t + LEASE_MS); // taken over while lease 2's token is minted
   handoff();
   await first;
+  const lease2Token = ns.minted[ns.minted.length - 1]!;
+  assert.equal(fork().tokens.get(lease2Token)?.state, "revoked", "the token minted for lease 2 is revoked, not handed to lease 3");
   assert.equal((await ws.provision(lane)).state, "ready");
   const g = ws.grant(lane, 3);
   assert.ok(!("refused" in g) && g.leaseGeneration === 3);
   assert.equal(fork().live().length, 1, "only lease 3's token is live");
+  assert.notEqual(fork().live()[0], lease2Token);
   assert.ok("refused" in ws.grant(lane, 2));
 });
 

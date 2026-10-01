@@ -44,7 +44,10 @@ accepted → preparing → ready → publishing → landed
   evaluation, SHA-256), so it runs outside any transaction and is applied
   only if the operation has not moved on meanwhile. On `ready` the engine
   keeps the Room's `RetainedLandInput` (canonical bytes and digest); the
-  digest is `ready.landInput`.
+  digest is `ready.landInput`. Each evaluation takes a durable revision, and
+  only the latest revision's answer is applied: an older answer that
+  arrives late is dropped, whatever it says. A ready operation whose newer
+  evaluation is still out is not reserved until it answers.
 - **Reservation is the one decision point** (R-LAND-7). `reserve` is one
   synchronous SQLite transaction. It re-checks the lane, the policy version
   and main, and asks the Room to re-check authority and evidence and to
@@ -125,6 +128,20 @@ The fork's own creation token is revoked at once. `revoke` lists the fork's
 tokens and revokes every active one, so a token minted just before a crash
 is caught too.
 
+- **Only a real fork is used.** A repository at the lane's fork name is used
+  only if its source is exactly `artifacts:<namespace>/<canonical>`. Any
+  other repository there (a plain repo, a fork of something else) is
+  refused, and never used, changed or deleted.
+- **A token never outlives the lease.** The lease is read again after every
+  await. A token whose actual expiry runs past the lease, or that was minted
+  for a lease that has ended or changed hands, is revoked; a replacement is
+  minted only if Artifacts' 60-second minimum still fits. Tokens end 5
+  seconds inside the lease, so clock differences cannot carry them past it.
+  `grant` refuses an expired lease.
+- **A failed revocation is not forgotten.** It is recorded, and `sweep`
+  (also run by `provision` and `revoke`, and by the Room's alarm) retries
+  it.
+
 ## Tests
 
 From the repository root, after `npm install`:
@@ -167,6 +184,13 @@ To remove the Worker: `env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-l
 - **Diff bounds** (R-PROP-6): 64 levels, 100,000 tree entries, 2,000
   commits to find a merge base, 8 tree reads in flight. A diff over a bound
   is refused, the same way every time for the same trees.
+- **Refusals are stable.** The diff walks trees level by level and counts
+  entries in path order after each level is read, so the same two trees
+  give the same answer, or the same refusal, whatever the cache holds and
+  whichever read finishes first.
+- **Merge bases** come from git's paint-down walk, then any base that is an
+  ancestor of another is removed by following parent links only, so clock
+  skew cannot add a redundant base.
 - **Renames** are exact (same blob). A rename with edits is listed as a
   deletion and an addition, which names the same two paths.
 - **One container per room.** Its operations run one at a time, because

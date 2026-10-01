@@ -255,10 +255,11 @@ for (const skew of ["backward", "equal"] as const) {
     t.after(() => f.dispose());
     const R = f.main;
     const time = (n: number) => (skew === "equal" ? 1_700_000_000 : 1_700_000_000 + n * 100);
-    const A = await commitAt(f, [R], { "shared.txt": "a\n" }, time(1), "A");
-    const M = await commitAt(f, [A], { "m.txt": "m\n" }, time(5), "M");
-    // B's clock is behind: its time precedes M's although M is its parent.
-    const B = await commitAt(f, [M], { "b.txt": "b\n" }, skew === "equal" ? time(0) : time(2), "B");
+    // Skewed clocks: A looks newer than its descendants M and B, and B older than its parent M.
+    // The time-ordered walk reports A as a base before it reaches M, then stops.
+    const A = await commitAt(f, [R], { "shared.txt": "a\n" }, time(4), "A");
+    const M = await commitAt(f, [A], { "m.txt": "m\n" }, time(1), "M");
+    const B = await commitAt(f, [M], { "b.txt": "b\n" }, time(0), "B");
     const C = await commitAt(f, [R], { "c.txt": "c\n" }, time(3), "C");
     const X = await commitAt(f, [A, B, C], { "shared.txt": "a\n", "m.txt": "m\n", "b.txt": "b\n", "c.txt": "c\n", "x.txt": "x\n" }, time(6), "X");
     const Y = await commitAt(f, [A, B, C], { "shared.txt": "a\n", "m.txt": "m\n", "b.txt": "b\n", "c.txt": "c\n", "lane.txt": "y\n" }, time(7), "Y");
