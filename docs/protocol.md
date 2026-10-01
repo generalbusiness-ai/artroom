@@ -21,7 +21,7 @@ sections 4 to 11 and 13.
 4. Room genesis, the roster and the recovery key (R-GEN)
 5. Admission and authority (R-ADM)
 6. Idempotency (R-IDEM)
-7. Credentials per transport (R-CRED)
+7. Credentials per transport (R-CRED, R-WS)
 8. Lanes and leases (R-LANE)
 9. Paths and proposals (R-PATH, R-PROP)
 10. Obligations, reviews and checks (R-OBL)
@@ -38,6 +38,7 @@ sections 4 to 11 and 13.
 21. The API on every transport (R-API)
 22. Open points
 23. Acceptance cases and the rules they test
+24. Review 45431cd9
 
 ## 1. Terms
 
@@ -99,8 +100,14 @@ reused in a room, even after removal.
 **R-ID-7.** A digest of JSON is the SHA-256 of its canonical bytes (R-SIG-3).
 A digest of a file is the SHA-256 of its raw bytes.
 
-**R-ID-8.** The room chooses operation IDs. An operation ID never changes
-during the operation's life. Operations are not log entries.
+**R-ID-8.** Operation IDs come from sequence numbers, never from hashes, so
+an entry can name the operation it creates:
+- a landing operation is `op_land_<seq>`, from its `land` act's seq;
+- a preview operation is `op_preview_<seq>`, from its `propose` act's seq;
+- a workspace operation is `op_ws_<laneSeq>_<leaseGeneration>`.
+
+An operation ID never changes during the operation's life. Operations are
+not log entries.
 
 **R-ID-9.** An obligation ID is `obl_` followed by the ID of the rule that
 created it. The platform's own admin obligation is `obl_admin-approval`.
@@ -213,9 +220,12 @@ may review or check a particular proposal is decided by its obligations
   the role. For an existing member it adds a key, and sets no role.
 - The invitation records `secretHash`, the SHA-256 of a random secret of at
   least 32 bytes. The secret travels out of band.
+- The invitation names no key. It binds whichever key redeems it, at
+  redemption (R-ADM-3, case (c)).
 - `join` is signed by the new key and reveals the secret. It is admitted
   only if the secret's hash matches and the invitation is unexpired and
-  unused at admission. The same entry consumes it.
+  unused at admission. The same entry consumes it. For a room-custody
+  invitation the room makes the key and signs the `join` (R-CRED-3).
 - A refused `join` is not recorded, so a secret that fails is never
   published.
 
@@ -243,14 +253,14 @@ The first failing step decides the outcome.
 | 1 | Parse, version, room ID, size of the whole envelope | `ArtroomError` `bad-request`, `unauthenticated` or `payload-too-large` | No |
 | 2 | Signature (R-SIG-5) | `ArtroomError` `unauthenticated` | No |
 | 3 | Idempotency (R-IDEM) | The original result, or refusal `idempotency-mismatch` | No new entry |
-| 4 | Authority at admission (R-ADM-3) | Refusal `not-member`, `key-revoked`, `delegation-invalid`, `role-forbids`, `admin-required`, `recovery-only` or `invitation-invalid` | No |
+| 4 | Authority at admission, by case (R-ADM-3) | Refusal `not-member`, `key-revoked`, `key-in-use`, `delegation-invalid`, `role-forbids`, `admin-required`, `recovery-only` or `invitation-invalid` | No |
 | 5 | Body schema and sizes (R-SIG-4, R-SIG-6) | Refusal `invalid-body` or `body-too-large` | No |
 | 6 | Secret scan (R-SEC-1) | Refusal `secret-detected` | No |
 | 7 | Lane and lease (R-LANE) | Refusal, such as `generation-moved` | Yes |
 | 8 | Platform invariants (R-PROP, R-OBL, R-ADMIN) | Refusal, such as `outside-claim` | Yes |
-| 9 | Policy `refuse` rules, and `require` on `propose` (R-POL) | Refusal with the rule's ID and fix, or `policy-budget-exceeded`, `policy-type-error` | Yes |
-| 10 | Record the act and its receipt; apply effects | — | Yes |
-| 11 | Policy `notify` rules (R-POL-5) | Never refuses | Decision recorded |
+| 9 | Policy `refuse` rules, and `require` on `propose` (R-POL). Skipped on a configuration-recovery lane (R-ADMIN-5) | Refusal with the rule's ID and fix, or `policy-budget-exceeded`, `policy-type-error` | Yes |
+| 10 | Seal the entry: content, hash, ID, room signature (R-LOG-2); commit; apply effects | — | Yes |
+| 11 | Policy `notify` rules, after the commit (R-LOG-13) | Never refuses; never changes the sealed entry | In a later `notified` entry |
 
 Admission is the act's place in the room's order. The room clock at
 admission is recorded as `at`. It is informational. The envelope carries
@@ -260,18 +270,48 @@ no trusted signing time.
 signature. It never takes identity from a field. Over a service binding,
 `as` only chooses which of the caller's delegations to sign under.
 
-**R-ADM-3.** An act is admitted only if, at its admission, all of these are
-current:
-- the signing key is active, not revoked for any reason;
-- the key's member is active, and its role may sign the kind (R-GEN-5);
-- if the envelope names a delegation: the delegation exists, is not revoked,
-  has not expired by the room clock, covers the kind and the lane, and was
-  granted to the signing key;
-- for a delegation: the grantor key is active, and the grantor's member is
-  active and its role may sign the kind.
+**R-ADM-3.** Authority is judged at admission, in exactly one of four
+cases. The room picks the case from the envelope; no other case's checks
+apply. In every case the signing key must not be revoked, for any reason.
+The receipt records the case and the authority used (`Authority`, field
+`via`).
 
-With a delegation, the act's authority is the grantor's member, limited to
-the delegation. The receipt records the authority used (`Authority`).
+**(a) Direct member** (no `delegation`, not a `join`, not the recovery key):
+- the key is an active key of a member;
+- that member is active;
+- its role may sign the kind (R-GEN-5), and, for roster ops, R-GEN-4 allows
+  it.
+
+**(b) Delegation** (the envelope names a `delegation`):
+- the delegation exists, is not revoked, and has not expired by the room
+  clock;
+- it was granted to the signing key;
+- it covers the kind (R-ADM-5) and, for lane acts, the lane;
+- the grantor key is an active key of an active member, and that member's
+  role may sign the kind.
+
+The signing key need not belong to any member and need not have joined.
+Its own membership and role, if any, are not consulted. The act's authority
+is the grantor's member, limited to the delegation.
+
+**(c) Join** (a `roster` act whose op is `join`, with no `delegation`):
+- the invitation exists, is unused and has not expired by the room clock;
+- the SHA-256 of the revealed secret equals the invitation's `secretHash`;
+- the signing key is not already a key of any member, and has never been
+  revoked. Otherwise the refusal is `key-in-use`.
+
+The invitation binds the signing key at redemption. It names no key in
+advance. The authority is the invited member, with the invitation's role
+for a new member or the existing role for an added key.
+
+**(d) Recovery** (the signing key is the room's current recovery key):
+- the kind is `roster` and the op is one R-GEN-3 allows;
+- there is no `delegation`.
+
+No membership, role or policy check applies. The recovery key is fixed by
+genesis, and changed only by `rotate-recovery` signed by itself.
+
+The room key never signs envelopes. It signs only entries and checkpoints.
 
 **R-ADM-4.** An act signed before a revocation but submitted after it is
 refused with `key-revoked`. An act under an expired or revoked delegation
@@ -280,7 +320,9 @@ is refused with `delegation-invalid`. Neither is recorded.
 **R-ADM-5.** A delegation can grant only kinds the grantor's role may sign,
 excluding `roster`. A delegation cannot grant a role. A delegated key cannot
 re-delegate what it was granted: a `delegate` signed under a delegation is
-refused with `delegation-invalid`.
+refused with `delegation-invalid`. A grantor's later loss of a kind, by a
+role change, makes the delegation stop covering that kind at the next
+admission.
 
 **R-ADM-6.** Admission is atomic. No other act is admitted between the reads
 used to judge an act (roster, lane, lease, generation, policy version) and
@@ -335,18 +377,20 @@ the same idempotency key. Every act method and MCP tool accepts one.
 | Browser | Ed25519 key made with WebCrypto (non-extractable), joined by invitation | The browser | Session from a signed `session` request |
 | CLI or script | Key file made by `artroom login` from an invitation | The client | Session from a signed `session` request |
 | MCP agent | Bearer token from an invitation | The room, with a room-held key, under a delegation | The bearer token |
-| Worker (service binding) | A delegation key in a Worker secret | The calling Worker, under the delegation chosen by `as` | Session from a signed `session` request |
+| Worker (service binding) | A delegate key in a Worker secret; never joins | The calling Worker, under the delegation chosen by `as` | Session from a signed `session` request under that delegation |
 
 **R-CRED-1. Browser.** The browser makes the key with WebCrypto and redeems
-an invitation with `join`. It signs each envelope. GitHub sign-in may be
+a client-custody invitation by signing a `join` and sending it to `redeem`
+(R-CRED-9). It signs each envelope. GitHub sign-in may be
 linked later. It never replaces the key.
 
 **R-CRED-2. CLI.** `artroom login <invitation>` makes a key file readable
 only by the user, and redeems the invitation. The CLI signs each envelope.
 
 **R-CRED-3. MCP.** An invitation with `custody: "room"` works like this:
-1. On redemption, the room makes the member's key and keeps it. The room
-   records the `join`, signed by that key.
+1. The caller sends the invitation ID and secret to `redeem` (R-CRED-9),
+   with no other credential. The room makes the member's key and keeps it.
+   It records the `join`, signed by that key (case (c) of R-ADM-3).
 2. For each bearer session, the room makes a session key. It records a
    `delegate` act from the member key to the session key, with the
    invitation's `session` kinds and lifetime.
@@ -356,15 +400,20 @@ only by the user, and redeems the invitation. The CLI signs each envelope.
 
 Revoking the delegation, or the member's key, ends the bearer session.
 
-**R-CRED-4. Worker.** The Worker holds a delegate key as a secret. Members
-grant delegations to that key. The Worker signs each envelope, and `as`
-chooses the delegation. The room never sees the private key.
+**R-CRED-4. Worker.** The Worker holds a delegate key as a secret. The key
+is not a member and never joins. A member grants a delegation to that key's
+ID, and gives the delegation's ID to the Worker's operator. The Worker signs
+each envelope under it, and `as` chooses among its delegations (case (b) of
+R-ADM-3). The room never sees the private key.
 
-**R-CRED-5. Unrecorded requests.** Opening a workspace and starting a read
-session are signed request envelopes (`artroom-request-v1`), not acts. The
-room checks their authority as for an act:
-- `workspace`: as for `propose` on that lane, including the lease;
-- `session`: an active member.
+**R-CRED-5. Unrecorded requests.** Opening a workspace, retrieving its
+token and starting a read session are signed request envelopes
+(`artroom-request-v1`), not acts. The room judges their authority by the
+cases of R-ADM-3, at the moment of each request:
+- `workspace` and `workspace-token`: as for `propose` on that lane,
+  including holder and lease (R-WS-2);
+- `session`: case (a), or case (b) with the session's member being the
+  grantor's.
 
 They are not recorded in the log.
 
@@ -384,6 +433,56 @@ It stops working when its key or delegation is revoked.
 
 It is never recorded.
 
+**R-CRED-9. Redemption.** `redeem` is the one call that needs no prior
+credential. It is `RoomWire.redeem` over RPC and `POST
+/v1/rooms/:room/redeem` over HTTPS.
+- `custody: "client"`: the body is a signed `join` envelope. The room
+  admits it like any act, by case (c) of R-ADM-3. It returns `Joined`, with
+  a read session.
+- `custody: "room"`: the body is the invitation ID and secret. The room
+  makes the member key, records the `join`, makes a session key, records the
+  `delegate`, and returns `Redeemed`, with the bearer token shown once.
+- A refused redemption records nothing and does not consume the invitation.
+- Redemption is rate-limited per client address and per invitation.
+
+### Workspace credentials (R-WS)
+
+**R-WS-1.** A workspace operation's public view (`WorkspaceOp`) never
+contains a credential. Any member with a read session may read or wait on
+it: state, lane, remote and lease generation. Preview and landing operations
+contain no credentials either.
+
+**R-WS-2.** The write token (`WorkspaceGrant`) is returned only by a
+`workspace-token` request, and only if, at that request:
+- the authority passes R-ADM-3 now: case (a), or case (b) with a delegation
+  that covers `propose` on that lane. A revoked key, a removed member, or an
+  expired or revoked delegation is refused;
+- the authority's member is the lane's current holder (`not-holder`
+  otherwise);
+- the request's `lease` is the current lease generation (`lease-fenced`
+  otherwise);
+- the operation is `ready` (`workspace-not-ready` otherwise).
+
+Each retrieval is judged afresh. A grant retrieved earlier gives no right
+to a later one.
+
+**R-WS-3.** Each lease generation gets its own token. When the lease ends,
+by release, expiry or take-over, the room revokes it. A new holder's token
+is minted for the new lease generation.
+
+**R-WS-4.** A workspace token, publication token, bearer token or session
+token never appears in:
+- the log, receipts, `explain`, attention items or updates;
+- operation reads, waits or subscriptions;
+- error messages or refusals;
+- shared or client caches. Every response that carries a grant has
+  `Cache-Control: no-store`, and no read cache stores one;
+- server logs.
+
+**R-WS-5.** Over MCP, the `workspace` tool returns `grant` only when the
+operation is ready and R-WS-2 holds for the bearer's delegation. Otherwise
+`grant` is `null`.
+
 ## 8. Lanes and leases (R-LANE)
 
 | Transition | Body | Who | Effect |
@@ -399,7 +498,9 @@ It is never recorded.
 | Lease expiry | System event | Room alarm | `expired`: lane unheld |
 
 **R-LANE-1.** A claim with target `null` opens a lane. The lane's ID is the
-claim's entry ID. The lane starts at generation 0 and lease generation 1.
+claim's entry ID, derived after the entry is sealed. The entry itself does
+not contain it (R-LOG-12). The lane starts at generation 0 and lease
+generation 1.
 The holder is the act's authority member. The response lists overlaps
 (R-PATH-3).
 
@@ -430,7 +531,8 @@ take-over.
 
 **R-LANE-7.** A take-over is a claim on an unheld lane, with no `lease`. A
 take-over of a held lane is refused with `lane-held`. A claim on an unheld
-lane that carries a `lease` is refused with `lease-fenced`.
+lane that carries a `lease` is refused with `lease-fenced`. Only an admin
+may take over a configuration-recovery lane (R-ADMIN-5).
 
 **R-LANE-8.** On release or expiry:
 - the lane becomes unheld;
@@ -579,15 +681,30 @@ platform's list plus the policy's additions. Policy cannot remove a platform
 entry. The platform's list is:
 
 ```
-.artroom/**
-package.json   **/package.json
-package-lock.json   **/package-lock.json   npm-shrinkwrap.json
-yarn.lock   pnpm-lock.yaml   pnpm-workspace.yaml   bun.lockb
-tsconfig*.json   **/tsconfig*.json
+# configuration, policy and scripts
+.artroom/**   .github/**   scripts/**   **/scripts/**
+
+# manifests and lockfiles
+package.json   **/package.json   package-lock.json   **/package-lock.json
+npm-shrinkwrap.json   yarn.lock   **/yarn.lock   pnpm-lock.yaml   pnpm-workspace.yaml
+bun.lockb   bun.lock   .npmrc   **/.npmrc   .nvmrc   .node-version   .tool-versions
+
+# tests and fixtures
+tests/**   **/tests/**   test/**   **/test/**   **/__tests__/**   spec/**
+**/*.test.*   **/*.spec.*   **/fixtures/**   **/__fixtures__/**   **/__snapshots__/**
+
+# build and test configuration
+tsconfig*.json   **/tsconfig*.json   jsconfig*.json
 wrangler.*   **/wrangler.*
-vite.config.*   vitest.config.*   jest.config.*   playwright.config.*
-Makefile   Dockerfile   .github/**   scripts/**   .npmrc   .nvmrc
+vite.config.*   **/vite.config.*   vitest.config.*   **/vitest.config.*   vitest.workspace.*
+jest.config.*   **/jest.config.*   playwright.config.*   karma.conf.*   .mocharc*
+babel.config.*   .babelrc*   .swcrc   esbuild.*   rollup.config.*   webpack.config.*
+turbo.json   nx.json   lerna.json   .env.test
+Makefile   **/Makefile   Dockerfile   **/Dockerfile   docker-compose*.yml
 ```
+
+Because a scoped checker's inputs always include this list (R-CARRY-8), a
+new or changed test file always changes the filtered snapshot.
 
 **R-CARRY-4.** And the active policy version is the same, or the new
 version still accepts the verdict when re-evaluated. Policy `carry` rules
@@ -867,8 +984,10 @@ what actually happens:
 The outcome is never guessed.
 
 **R-REV-6.** A revert lane is an unheld lane that the room opens with a
-`revert-lane` system event. Its scope is the landed change's paths. It
-appears in the admins' attention queue. Any member may take it over.
+`revert-lane` system event. The lane's ID is that event's entry ID, so the
+event does not contain it (R-LOG-12). Its scope is the landed change's
+paths. It appears in the admins' attention queue. Any member may take it
+over.
 
 **R-REV-7.** Any other act after reservation follows the reserved landing
 (R-LAND-8). That includes a `retired` revocation.
@@ -894,14 +1013,56 @@ active admin (R-GEN-9), that admin may:
   Otherwise the obligation reopens.
 
 **R-ADMIN-3. The fixed recovery boundary.** Admins can always change the
-roster and the policy:
+roster and the policy, whatever the active policy says:
 - policy `refuse` rules are not evaluated for `roster` acts signed by an
   admin or the recovery key;
-- for a proposal whose changed paths all match `.artroom/**` and whose
-  `obl_admin-approval` is met, the room does not evaluate `refuse`,
-  `require` or `land` rules. Only platform rules apply.
+- an admin can always repair `.artroom/**` through a
+  configuration-recovery lane (R-ADMIN-5 to R-ADMIN-9).
+
+On an ordinary lane, policy rules apply as usual, including to proposals
+that change `.artroom/**`.
 
 **R-ADMIN-4.** The recovery key can always restore an admin (R-GEN-3).
+
+**R-ADMIN-5. Configuration-recovery lanes.** A claim with
+`purpose: "config-recovery"` opens a configuration-recovery lane. On such a
+lane:
+- every act is signed by an active admin, by case (a) of R-ADM-3: the
+  admin's own key, not a delegation. Otherwise `admin-required`;
+- the claim's scope must match only paths under `.artroom/**`: every
+  pattern starts with `.artroom/`. Otherwise `recovery-scope`;
+- policy `refuse`, `require`, `carry` and `land` rules are not evaluated,
+  and `lanes("exclusive")` does not apply. Admin authority is judged under
+  the current roster;
+- every act and record carries the flag `config-recovery`, and the UI shows
+  it;
+- signatures, schema, secret scanning, lease and generation fencing, and
+  every other platform rule still apply.
+
+Only an admin may take over such a lane. Its holder must still be an active
+admin at every act; otherwise `admin-required`.
+
+**R-ADMIN-6.** A proposal on a configuration-recovery lane is admitted only
+if every changed path, old and new, is under `.artroom/**`. Otherwise
+`recovery-scope`. Its head must still pass R-POL-1, so an invalid policy
+cannot be proposed. Its only obligation is `obl_admin-approval`.
+
+**R-ADMIN-7.** On a configuration-recovery lane, an admin's review is
+admitted without policy rules, and meets `obl_admin-approval` under
+R-ADMIN-1 and R-ADMIN-2. With two or more active admins, an admin cannot
+approve their own proposal (`self-review`). A sole admin's own approval
+carries `sole-admin-self-approval`.
+
+**R-ADMIN-8.** On a configuration-recovery lane, `land` needs only the
+platform conditions of R-LAND-1, with `obl_admin-approval` met. The landing
+operation has no checks and no land rules (`landInput` is null).
+Reservation re-validates everything else in R-LAND-7, including R-ADMIN-2
+for a flagged approval and the holder's admin authority.
+
+**R-ADMIN-9.** The proposed policy never judges its own authorization. It
+applies only from its `policy-activated` event, after it lands (R-POL-9).
+Until then, every act on the lane is judged under the current roster and
+the platform rules.
 
 ## 16. Policy (R-POL)
 
@@ -922,9 +1083,11 @@ creates an obligation, which names who may fulfil it (R-OBL-5).
 evidence that meets the platform's carry conditions. It can only narrow
 (R-CARRY-4).
 
-**R-POL-5. `notify`.** Evaluated after the act is recorded. It puts the act
-in the targets' attention queues with the rule's `why`. It never changes the
-act. An error is recorded as a decision, and nobody is notified.
+**R-POL-5. `notify`.** Evaluated after the act's entry is sealed and
+committed. Its decisions are recorded in a later `notified` entry, never in
+the act's receipt (R-LOG-13). It puts the act in the targets' attention
+queues with the rule's `why`. It never changes the act. A deterministic
+error is recorded as a decision, and nobody is notified.
 
 **R-POL-6. `land`.** Evaluated on `land` and at `ready`. Reservation
 re-checks its input digest (R-LAND-7). If `block` is true, the landing is
@@ -1012,7 +1175,8 @@ unchanged, backed by the full conformance corpus.
   same result:
   - for `refuse`, `require` and `land`, the act is refused and recorded;
   - for `carry`, the evidence does not carry;
-  - for `notify`, nobody is notified.
+  - for `notify`, nobody is notified, and the `notified` entry records the
+    error.
 - **A runtime failure** is a Worker CPU limit, running out of memory, or an
   engine fault. It is infrastructure. Nothing is recorded, and the caller
   receives a retryable `ArtroomError` `policy-runtime`. The Worker CPU limit
@@ -1089,9 +1253,18 @@ remedy is to rotate the credential. The README says so.
 **R-LOG-1.** The format is `artroom-log-v1`. Entries are numbered from 0
 with no gaps.
 
-**R-LOG-2.** Each entry's `hash` is the SHA-256 digest of the canonical
-bytes of `{ format, seq, prev, at, entry }`. `prev` is the previous entry's
-hash; for genesis it is `null`.
+**R-LOG-2.** Sealing an entry follows this order, and no step depends on a
+later one:
+1. take `seq` (the head plus one) and `prev` (the previous entry's hash;
+   `null` for genesis);
+2. build the content `{ format, seq, prev, at, entry }` (`EntryContent`),
+   with its receipt complete;
+3. `hash` is the SHA-256 digest of the content's canonical bytes;
+4. the entry ID is `act_<seq>_<hash8>` (R-ID-1);
+5. `roomSig` is the room key's signature over `hash` (R-LOG-4);
+6. commit to SQLite.
+
+A sealed entry is never rewritten.
 
 **R-LOG-3.** An entry is one of:
 - `act`: an accepted act, its signed envelope and its receipt;
@@ -1115,23 +1288,33 @@ signature, except genesis, which also carries the first admin's.
 | `publication-unresolved` | The first time a publication becomes unresolved (R-PUB-5) |
 | `land-outcome` | `landed`, `aborted`, `retryable` or `failed` |
 | `revert-lane` | A revert lane opened by the room (R-REV-6) |
-| `checkpoint` | A confirmed publication of the log (R-LOG-8) |
+| `notified` | The `notify` outcome for one earlier entry (R-LOG-13) |
+| `checkpoint` | A confirmed publication: through, hash and the log commit (R-LOG-8) |
 
-**R-LOG-6.** A receipt records the authority used, every policy decision,
-the effects, the flags and, while a slot is held, `after`.
+**R-LOG-6.** A receipt records the authority used, the policy decisions
+made before sealing (`refuse`, `require`, `carry`, `land`), the effects,
+the flags and, while a slot is held, `after`.
 
 **R-LOG-7.** Retained policy inputs. Every decision's input is kept as
 canonical JSON under its digest. Every activated policy document and checker
 configuration is kept the same way. Both are published with the log.
 
-**R-LOG-8.** Publication of the log:
-- the room publishes in batches;
-- each batch is a commit on `refs/artroom/log` holding the prefix through
-  seq N, and a checkpoint signed by the room key;
-- the ref only moves forward;
-- after the push is confirmed, the room records a `checkpoint` system event
-  and sets `publishedThrough` to N;
-- a checkpoint event is itself published in a later batch.
+**R-LOG-8.** Publication of the log. Each step uses only what earlier steps
+produced:
+1. Choose N, the last sealed entry to publish.
+2. Build the checkpoint (`Checkpoint`): room, `through: N`, `hash` (entry
+   N's hash), time and room key, signed by the room key. It names no git
+   commit.
+3. Build the tree (R-LOG-9) with the checkpoint in it, then the commit,
+   whose parent is the previous log commit.
+4. Push it to `refs/artroom/log` with a lease on the previous log commit.
+   The ref only moves forward.
+5. Read the ref back. When it equals the new commit, seal a `checkpoint`
+   system event naming `through`, `hash` and the commit, and set
+   `publishedThrough` to N.
+
+The checkpoint event is an entry after N, so it is published by the next
+commit, never by the commit it names.
 
 **R-LOG-9.** The tree of each log commit:
 
@@ -1155,13 +1338,67 @@ the checkpoint:
   roster from earlier entries;
 - every retained input's digest;
 - idempotency uniqueness;
-- that full segments match earlier log commits byte for byte.
+- that full segments match earlier log commits byte for byte;
+- that the commit's `checkpoint.json` names the last entry in its segments,
+  by seq and hash;
+- that every `checkpoint` event names an ancestor log commit whose
+  checkpoint has the same `through` and `hash`;
+- that every `notified` event names an earlier entry, and no entry is
+  notified twice;
+- that no `opened` effect or `revert-lane` event names a lane (R-LOG-12).
 
 It proves the integrity of the published prefix. It cannot prove that acts
 after `publishedThrough` exist or do not exist.
 
 **R-LOG-11.** Every log page and update states `publishedThrough`. Log
 pages also state `head`. The publication lag is `head − publishedThrough`.
+
+**R-LOG-12. No self-reference.** An entry's content never contains its own
+hash or its own ID. Where an entry creates something whose ID is the entry's
+ID, the content leaves it out, and readers derive it after sealing:
+- a new claim's `opened` effect has no `lane`;
+- a `revert-lane` event has no `lane`.
+
+An entry may contain its own `seq`, which is fixed before hashing. So
+operation IDs derived from `seq` (R-ID-8) may appear. Records returned by
+the API add the derived IDs; they are projections, not entry content.
+
+**R-LOG-13. Post-admission outcomes are separate entries.** Anything
+decided after an entry is sealed goes in a later entry, never back into
+the sealed one:
+- `notify` decisions go in one `notified` event per notified entry;
+- landing outcomes, activations, expiries and checkpoints are their own
+  system events.
+
+`notify` sees the sealed entry's ID. If `notify` evaluation fails at
+runtime, the act stays recorded. The room retries from a durable queue
+until it reaches a deterministic outcome, then seals the `notified` event.
+Until then, the act's notifications are delayed, and nothing else changes.
+
+### Worked example: a new claim, its notification, and two publications
+
+This shows each value computed from earlier values only. `h(n)` is entry
+n's hash.
+
+| Step | Computed | From |
+|---|---|---|
+| 1 | Entry 0: genesis, `prev: null`; `h(0)` | The genesis object |
+| 2 | Entry 1: initial `policy-activated`; `h(1)` | `h(0)` |
+| 3 | Entry 2: @alice's claim. Receipt: authority, `refuse` decisions, effect `{ type: "opened", purpose, lease }` with no lane; `h(2)` | `h(1)`, the envelope |
+| 4 | Lane ID `L = act_2_<first 8 hex of h(2)>`; the API answers with `L` | `h(2)` |
+| 5 | `notify` runs with input `act.id = L` | `L` |
+| 6 | Entry 3: `notified { entry: L, decisions, to }`; `h(3)` | `h(2)`, `L` |
+| 7 | Checkpoint K1: `through: 3, hash: h(3)`, signed | `h(3)` |
+| 8 | Tree T1: genesis, segment lines 0–3, inputs, policies, K1. Commit C1, no parent | K1, entries 0–3 |
+| 9 | Push C1, read back. Entry 4: `checkpoint { through: 3, hash: h(3), commit: C1 }`; `h(4)`. `publishedThrough = 3` | C1, `h(3)` |
+| 10 | Entries 5–9 are admitted; `h(9)` | `h(4)` onwards |
+| 11 | Checkpoint K2: `through: 9, hash: h(9)` | `h(9)` |
+| 12 | Tree T2: segment lines 0–9 (lines 0–3 unchanged), K2. Commit C2, parent C1 | K2, entries 0–9, C1 |
+| 13 | Push C2, read back. Entry 10: `checkpoint { through: 9, hash: h(9), commit: C2 }`. `publishedThrough = 9` | C2, `h(9)` |
+
+Every arrow points to an earlier step. No value is an input to its own
+computation, and no sealed entry or published commit is changed.
+`examples/log-construction.ts` builds the same sequence through the types.
 
 ## 21. The API on every transport (R-API)
 
@@ -1226,7 +1463,7 @@ Each calls the `RoomApi` method of the same name:
 - `McpHeld` carries `lane` and `lease`, and fencing is the same as for the
   method;
 - `workspace` waits up to `waitMs` (default 20 seconds) for `ready` or
-  `failed`;
+  `failed`, and also calls `workspaceToken`: its `grant` follows R-WS-5;
 - `land` waits up to `waitMs` (default 0);
 - every act tool accepts `idempotencyKey`.
 
@@ -1310,11 +1547,27 @@ safest reading. Each needs confirmation by review.
 22. **Package scope.** `@generalbusiness/artroom-*` is a placeholder. To
     rename, change the `name` in `packages/contract/package.json` and the
     imports in `packages/contract/examples/`.
-23. **Values declared, not implemented.** `connect()`, `Checker` and the
-    policy helpers are declared in the contract and implemented by lanes E,
-    G and C or D. They are exported from the subpaths `/client`, `/checker`
-    and `/policy`, so the package's main entry has no missing values at run
-    time.
+23. **Values declared, not implemented.** `connect()`, `join()`,
+    `redeem()`, `Checker` and the policy helpers are declared in the
+    contract and implemented by lanes E, G and C or D. They are exported
+    from the subpaths `/client`, `/checker` and `/policy`, so the package's
+    main entry has no missing values at run time.
+24. **Configuration-recovery acts need the admin's own key.** A delegation
+    cannot act on a configuration-recovery lane (R-ADMIN-5). This keeps the
+    bypass as narrow as possible. A browser or CLI admin signs directly.
+25. **Recovery lanes have no checks.** `require` rules are not evaluated
+    there (R-ADMIN-6), so a policy repair lands on admin approval alone.
+    That is the price of a boundary that a bad policy cannot block.
+26. **Notifications can be delayed.** A `notify` runtime failure leaves the
+    act recorded and retries from a durable queue (R-LOG-13). Attention may
+    lag the act by the retry time.
+27. **The global input list is wider** (R-CARRY-3). It now includes tests,
+    fixtures and build and test configuration. More checks will rerun
+    instead of carrying. Policy can add to the list, not remove from it.
+28. **Redemption is unauthenticated by design** (R-CRED-9). The invitation
+    secret is the credential. It is rate-limited, and a failed attempt does
+    not consume the invitation. Whether failed attempts should eventually
+    disable an invitation is open.
 
 ## 23. Acceptance cases and the rules they test
 
@@ -1343,3 +1596,34 @@ safest reading. Each needs confirmation by review.
 | Reviewer retired after their review | R-REV-1, R-REV-2 |
 | Sole admin changes policy | R-ADMIN-2 |
 | Locked-out admin restored | R-GEN-3, R-ADMIN-4 |
+
+Cases added for review 45431cd9. Each is normative: an implementation
+must pass it.
+
+| Case | Expected result | Rules |
+|---|---|---|
+| **Policy lockout.** No lane is held. The active policy refuses `claim`, `propose`, `note`, `review`, `land`, `release` and `renew`, and blocks every landing. The sole admin claims `.artroom/policy.json` with `purpose: "config-recovery"`, opens the workspace, pushes, proposes, approves, and lands | Each act is admitted with the flag `config-recovery`; no policy decision is recorded for them; the approval carries `sole-admin-self-approval`; the landing lands; `policy-activated` follows. A non-admin's recovery claim is refused `admin-required`; a recovery proposal that also changes `src/x.ts` is refused `recovery-scope`; a delegated admin key is refused `admin-required` | R-ADMIN-5 to R-ADMIN-9, R-POL-9 |
+| Same lockout, two admins | The author's own approval is refused `self-review`; the other admin's approval meets `obl_admin-approval` | R-ADMIN-7 |
+| **B watches A's workspace.** Member B reads and waits on A's workspace operation, then requests its token | B sees state, remote and lease generation, and no token. B's `workspace-token` request is refused `not-holder` | R-WS-1, R-WS-2 |
+| A requests the token with an old lease generation; after its key is revoked; after it is removed; under an expired delegation | Refused `lease-fenced`, `key-revoked`, `not-member`, `delegation-invalid` | R-WS-2 |
+| A token appears in no attention item, update, log entry, `explain`, error or cached response | Verified by scanning every output for the token | R-WS-4 |
+| **Scoped checker, new test.** A checker with inputs `src/**` passed on generation 1. Generation 2 leaves `src/**` unchanged and adds a failing `tests/login.test.ts` | The filtered snapshot contains the new file, so its digest changes; the check reruns and fails; it is not carried | R-CARRY-3, R-CARRY-8, R-CARRY-9 |
+| **Browser join.** A browser key redeems a client-custody invitation | `Joined`; the key is bound at redemption; a second `join` with the same invitation is refused `invitation-invalid`; a `join` by an already-bound key is refused `key-in-use` | R-ADM-3 (c), R-CRED-9 |
+| **MCP redemption.** An agent redeems a room-custody invitation with no credential | `Redeemed`, with a bearer token shown once; the log holds the `join` and the `delegate`, not the token | R-CRED-3, R-CRED-9, R-SEC-5 |
+| **Unjoined Worker.** A member delegates `check` and `note` to a key that never joined; the Worker signs a `note` under it | Admitted with authority `via: "delegation"`, the grantor as member. After the grantor's key is revoked, the next act is refused `delegation-invalid` | R-ADM-3 (b), R-CRED-4 |
+| **Recovery key.** The recovery key signs `set-role` while no admin can act | Admitted with authority `via: "recovery"` and the flag `recovery-key`; a `claim` signed by it is refused `role-forbids` | R-ADM-3 (d), R-GEN-3 |
+| **Log construction.** A new claim, its `notified` event, and the first two publications | Built in the order of section 20's worked example; `artroom verify` accepts both commits | R-LOG-2, R-LOG-8, R-LOG-12, R-LOG-13 |
+| A `notify` rule hits a runtime failure | The claim stays recorded; a `notified` entry is sealed after a retry | R-LOG-13 |
+
+## 24. Review 45431cd9
+
+Checker's review of `7771921f` requested changes. Each finding, and where
+it is answered:
+
+| Finding | Rules changed or added | Types | Examples |
+|---|---|---|---|
+| P1.1 Acyclic log and publication | R-ID-8, R-ADM-1 (steps 10–11), R-LANE-1, R-REV-6, R-POL-5, R-EVAL-5, R-LOG-2, R-LOG-5, R-LOG-6, R-LOG-8, R-LOG-10, new R-LOG-12, R-LOG-13, the worked example in section 20 | `EntryContent` split from `LogEntry`; `Checkpoint` has no `commit`; the `checkpoint` event carries it; new `notified` event; `opened` effect and `revert-lane` event have no lane; `Receipt` has no `attention` effect; `land-outcome` has no `revertLane` | `log-construction.ts` |
+| P1.2 Configuration recovery before approval exists | R-ADMIN-3 rewritten; new R-ADMIN-5 to R-ADMIN-9; R-LANE-7; R-ADM-1 step 9 | `ClaimBody.purpose`, `LanePurpose`, `Lane.purpose`, `Claim.purpose`, flag `config-recovery`, refusal `recovery-scope`, `landInput: Digest \| null` | `config-recovery.ts` |
+| P1.3 Authority cases, redemption, onboarding | R-ADM-3 split into cases (a)–(d); R-ADM-5; R-GEN-6; R-CRED-1, R-CRED-3, R-CRED-4, R-CRED-5; new R-CRED-9 | `Authority` is a union on `via`; `JoinEnvelope`; `Redemption`, `Joined`, `Redeemed`; `RoomWire.redeem`; `POST /v1/rooms/:room/redeem`; declared `join()`, `redeem()`; refusal `key-in-use` | `onboarding.ts` |
+| P1.4 Workspace credentials | New R-WS-1 to R-WS-5; R-CRED-5; R-API-9 | `WorkspaceDetail` has no token; new `WorkspaceGrant`; `RoomApi.workspaceToken()`; request kind `workspace-token`; MCP `workspace` returns `{ op, grant }`; refusal `workspace-not-ready` | `workspace-visibility.ts`, `demo-loop.ts` |
+| P2.1 Tests as global inputs | R-CARRY-3 list extended | — | Section 23, "Scoped checker, new test" |

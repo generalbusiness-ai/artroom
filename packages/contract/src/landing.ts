@@ -38,21 +38,38 @@ export interface OpRef<K extends OpKind = OpKind> {
 
 // ---------------------------------------------------------------- workspace
 
-/** Workspace detail. The token is a secret: it is never recorded in the log (R-CRED-8, R-SEC-5). */
+/**
+ * The public view of a ready workspace. Any member may read it. It never
+ * holds a credential (R-WS-1).
+ */
 export interface WorkspaceDetail {
-  /** The lane's Artifacts fork remote. */
+  /** The lane's Artifacts fork remote. Not a secret. */
   readonly remote: `https://${string}`;
-  /** Write token scoped to this fork and this lease generation. */
-  readonly token: string;
-  readonly expiresAt: Timestamp;
   readonly leaseGeneration: LeaseGeneration;
 }
 
+/** A workspace operation, as every read, wait, update and log shows it. Never holds a token (R-WS-1). */
 export type WorkspaceOp = OpBase<"workspace"> & { readonly lane: LaneId } & (
     | { readonly state: "pending" }
     | { readonly state: "ready"; readonly detail: WorkspaceDetail }
     | { readonly state: "failed"; readonly error: ArtroomError }
   );
+
+/**
+ * The write credential for a lane's fork. Returned only to the current holder,
+ * judged afresh at each retrieval (R-WS-2). Never recorded, published,
+ * cached or shown anywhere else (R-WS-4, R-SEC-5).
+ */
+export interface WorkspaceGrant {
+  readonly op: OpId;
+  readonly lane: LaneId;
+  readonly leaseGeneration: LeaseGeneration;
+  readonly remote: `https://${string}`;
+  /** Write token scoped to this fork and this lease generation. */
+  readonly token: string;
+  /** No later than the lease's expiry. */
+  readonly expiresAt: Timestamp;
+}
 
 // ------------------------------------------------------------------ preview
 
@@ -131,8 +148,12 @@ export type LandOp = LandOpFields &
         readonly state: "ready";
         readonly integration: Sha;
         readonly evidence: readonly ActId[];
-        /** Digest of the land-rule input evaluated at `ready`; reservation rebuilds and compares it (R-LAND-7). */
-        readonly landInput: Digest;
+        /**
+         * Digest of the land-rule input evaluated at `ready`; reservation rebuilds
+         * and compares it (R-LAND-7). Null on a configuration-recovery lane, where
+         * land rules are not evaluated (R-ADMIN-5).
+         */
+        readonly landInput: Digest | null;
       }
     | (Reserved & { readonly state: "publishing"; readonly pushes: number })
     | (Reserved & {

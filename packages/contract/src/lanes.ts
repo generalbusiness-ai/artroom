@@ -15,6 +15,7 @@ import type {
   Sha,
   Timestamp,
 } from "./ids.ts";
+import type { LanePurpose } from "./acts.ts";
 
 export interface Lease {
   readonly holder: MemberId;
@@ -52,6 +53,7 @@ export interface GenerationSummary {
 
 interface LaneBase {
   readonly lane: LaneId;
+  readonly purpose: LanePurpose;
   readonly goal: string;
   readonly plan?: string;
   readonly scope: readonly Glob[];
@@ -103,7 +105,11 @@ export interface LaneFilter {
  * | landing outcome (system)    | `landed`      | R-PUB-5   |
  */
 export type LaneEffect =
-  | { readonly type: "opened"; readonly lane: LaneId; readonly lease: Lease }
+  /**
+   * The lane is the entry that records this effect. Its ID depends on the
+   * entry's hash, so it is never written here (R-LOG-12).
+   */
+  | { readonly type: "opened"; readonly purpose: LanePurpose; readonly lease: Lease }
   | {
       readonly type: "rescoped";
       readonly lane: LaneId;

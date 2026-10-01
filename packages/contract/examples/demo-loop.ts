@@ -120,7 +120,10 @@ export async function author(): Promise<LandOp | null> {
     show(`workspace failed (${ws.error.code}); retryable: ${ws.error.retryable}`);
     return null;
   }
-  const head = await gitPush(ws.detail.remote, ws.detail.token);
+  // The operation is public; the write token is holder-only (R-WS-1, R-WS-2).
+  const grant = await room.workspaceToken(claim);
+  if (isRefusal(grant)) return explain(grant); // e.g. "lease-fenced" after an expiry
+  const head = await gitPush(grant.remote, grant.token);
 
   // propose, recutting once if the generation moved
   const proposal = await proposeWithRecut(room, claim, head);
@@ -300,8 +303,15 @@ export async function agentOverMcp(): Promise<void> {
   }
   const held = { lane: claim.lane, lease: claim.lease.generation };
   const ws = await callTool("workspace", { ...held, waitMs: 20_000 });
-  if (isRefusal(ws) || ws.state !== "ready") return;
-  const head = await gitPush(ws.detail.remote, ws.detail.token);
+  if (isRefusal(ws)) {
+    explain(ws);
+    return;
+  }
+  if (ws.grant === null) {
+    show(`workspace ${ws.op.state}`);
+    return;
+  }
+  const head = await gitPush(ws.grant.remote, ws.grant.token);
   const p = await callTool("propose", { ...held, head, expectedGeneration: 0, summary: "Copy fix." });
   if (isRefusal(p)) {
     explain(p);

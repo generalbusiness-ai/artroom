@@ -67,6 +67,9 @@ export type Envelope =
 
 export type EnvelopeFor<K extends EnvelopeKind> = Extract<Envelope, { readonly kind: K }>;
 
+/** The envelope that redeems a client-custody invitation; signed by the new key (R-ADM-3c). */
+export type JoinEnvelope = EnvelopeOf<"roster", null, Extract<RosterOp, { readonly op: "join" }>>;
+
 /** An envelope and its Ed25519 signature over the signing bytes (R-SIG-1). */
 export interface SignedEnvelope<E extends Envelope = Envelope> {
   readonly envelope: E;
@@ -81,7 +84,10 @@ export interface SignedEnvelope<E extends Envelope = Envelope> {
  * `artroom-request-v1`. Replay is bounded by `nonce` and `notAfter`.
  */
 export type RequestBody =
+  /** Start, or return, the lane's workspace operation. Holder only. Returns the public view. */
   | { readonly kind: "workspace"; readonly lane: LaneId; readonly lease: LeaseGeneration }
+  /** Retrieve the workspace write token. Holder only, judged at each retrieval (R-WS-2). */
+  | { readonly kind: "workspace-token"; readonly lane: LaneId; readonly lease: LeaseGeneration }
   | { readonly kind: "session"; readonly ttlSeconds: number };
 
 export interface RequestEnvelope {
