@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/cli/src/link.ts at exact 3be00804e501e4f30e8cf653b6dd1ce8de72a25e on request/laneE-clients, under promise git:sha1…68876e3 on request git:sha1…cf2e531","body":{"commit":"3be00804e501e4f30e8cf653b6dd1ce8de72a25e","path":"packages/cli/src/link.ts"}}
+{"kind":"artifact","text":"packages/cli/src/main.ts at exact 3be00804e501e4f30e8cf653b6dd1ce8de72a25e on request/laneE-clients, under promise git:sha1…68876e3 on request git:sha1…cf2e531","body":{"commit":"3be00804e501e4f30e8cf653b6dd1ce8de72a25e","path":"packages/cli/src/main.ts"}}
