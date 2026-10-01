@@ -43,6 +43,10 @@ test("integrate: a merge commit with parents (expectedMain, head), deterministic
   mkdirSync(join(f.root, "publisher2"));
   const again = await fresh.integrate({ ...req, storeRef: integrationRef("op_1", 2) });
   assert.equal(again.kind === "clean" && again.integration, r.integration);
+  // Every input is fixed by (base, head, lane, generation): the message, and both dates at the later parent's commit time.
+  const ct = Math.max(...(await sh(f.root, "--git-dir", f.canonical, "show", "-s", "--format=%ct", other, head)).split("\n").map(Number));
+  assert.equal(await sh(f.root, "--git-dir", f.canonical, "show", "-s", "--format=%B|%at %ad|%ct %cd", "--date=raw", r.integration),
+    `Land ${lane} generation 1\n|${ct} ${ct} +0000|${ct} ${ct} +0000`);
 });
 
 test("integrate: a conflict lists the paths and pushes nothing", async (t) => {
@@ -274,6 +278,10 @@ test("pushLog refuses by lease when another writer moved the ref, and says where
   const fresh = logCommit("again", null);
   const r0 = await f.ops.pushLog(f.canonical, fresh.objects, fresh.commit, null);
   assert.deepEqual(toLogOutcome(r0), { ok: false, reason: "lease-mismatch", current: intruder.commit });
+  // A lease onto a ref that is gone: lease-mismatch, at nothing.
+  await sh(f.root, "--git-dir", f.canonical, "update-ref", "-d", LOG_REF);
+  const r3 = await f.ops.pushLog(f.canonical, c2.objects, c2.commit, c1.commit);
+  assert.deepEqual(toLogOutcome(r3), { ok: false, reason: "lease-mismatch", current: null });
 });
 
 test("pushLog sends nothing for a commit that is not exactly lane L's next commit: wrong parent, missing objects", async (t) => {
