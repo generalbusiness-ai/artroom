@@ -43,6 +43,20 @@ public key. The signature is Ed25519 over the canonical JSON of the act
 
 The answer is the record, or `{refused: true, rule, reason, fix}`.
 
+## Tests
+
+```bash
+npm ci
+npm test               # Node: evaluator isolation, failure paths (15 tests)
+env -u CLOUDFLARE_API_TOKEN npx wrangler dev --port 8787 &
+npm run test:workerd   # the same isolation check inside workerd
+```
+
+`test/build.mjs` bundles `src/` for Node with esbuild. One bundle replaces
+`cloudflare:workers` with a stub; another also makes `$glob` throw a
+`TypeError` for the pattern `__inject_fault__`, to test that an engine fault
+writes nothing.
+
 ## Rerun
 
 Requirements: Node 22 or later, `jq`, and a wrangler OAuth login to account

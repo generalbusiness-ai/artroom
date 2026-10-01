@@ -24,9 +24,12 @@ results: [spikes/room-core/results/](../spikes/room-core/results/).
 - **Deployed CPU is 6–13 times slower than this laptop** (Apple M5 Max) for
   this code, and it varies from request to request. The tail's `cpuTime`
   confirms it. Budget for deployed CPU, not for local runs.
-- **The profile is safe enough for the build, with three changes**: memoise
-  input sizes, a per-act step and byte budget sized for deployed CPU, and a
-  cost charge for host functions such as `$glob`. Without the guard, one
+- **The profile is safe enough for the build, with four changes**: memoise
+  input sizes, a per-act step and byte budget sized for deployed CPU, a
+  cost charge for host functions such as `$glob`, and one expression per
+  evaluation so that hooks and budget counters are never shared (added after
+  review 8f5dede9, below). A rule that fails must refuse the act; an engine
+  fault must write nothing. Without the guard, one
   admitted rule ran until the Durable Object hit its 30 s CPU limit and was
   reset. JSONata's own `timeout` option did not fire in any deployed run.
 
@@ -136,7 +139,9 @@ visits for that input.
 | notify | author-sees-verdicts | 4 | 0.25 | 0.23 | | | 0.02 |
 
 Compiling all 12 rules (parse and admission walk): 6.0 ms deployed, 0.45 ms
-local. Compiled rules are cached per isolate.
+local. When measured, compiled rules were cached per isolate and shared;
+review 8f5dede9 showed that sharing is unsafe, and each evaluation now
+compiles its own expression (see the review section).
 
 For the 99-path propose, the 7 rules it evaluates cost about 105 ms deployed
 with the ported guard and about 20 ms with memo, for 2,772 steps.
@@ -229,7 +234,9 @@ Findings:
    faster on rules that read `$$` in a filter (`memo` in `src/profile.ts`).
 3. **Budget per act, not per rule, sized for deployed CPU.** Suggested:
    25,000 steps and 4 MiB inspected across all rules of one act. Deployed
-   costs measured 3–9 µs per step, so the worst case is 75–225 ms of CPU.
+   costs measured 3–9 µs per step, so the worst case is an estimated
+   75–225 ms of CPU. This is an estimate from measured per-step costs, not a
+   proven bound.
    The 99-path propose used 2,772 steps across 7 rules, so this covers
    changes of several hundred paths. A larger change needs a budget that
    grows with the number of changed paths.
@@ -239,6 +246,8 @@ Findings:
    path length.
 5. **Refuse a policy that trips a budget on a sample input** at the time it is
    proposed, so that a costly rule is caught in review rather than in use.
+6. **Never share an expression between evaluations.** See the review section.
+7. **Fail closed, and keep faults out of the record.** See the review section.
 
 ## Other findings for the build
 
@@ -267,6 +276,82 @@ Findings:
   here; only memo is implemented, as a measurement mode.
 - No measurement of many rooms at once, or of throughput beyond one driver.
 - The tree diff treats a mode change as a change and does not detect renames.
+
+## Review 8f5dede9
+
+The checker requested changes. Both findings were correct; both are fixed in
+the commit after `004954d`.
+
+**P1.1: shared hooks.** JSONata keeps the evaluate hooks in a mutable
+environment on the expression object. The spike cached one expression per
+rule source and assigned hooks to it on every evaluation. Two evaluations of
+the same rule running at once overwrote each other's hooks, step counts,
+nesting map and byte budget. The checker's repro gave 1 step and 0 bytes
+instead of 484 steps and 89,894 bytes, or an engine error. Acts were
+serialised per room, but benchmarks were not, so this could happen in the
+room. The sequential replay of 1,051 evaluations does not show concurrent
+budget integrity; only a concurrent test can.
+
+- Fix: `evaluate(source, input)` now compiles a private expression each
+  time; `compile()` no longer caches. The admission walk still runs on every
+  compiled AST.
+- Cost: compiling all 12 rules took 0.45 ms local and 6.0 ms deployed (table
+  above), so this adds about 0.04 ms local and an estimated 0.5 ms deployed
+  per rule evaluated. I did not re-measure it deployed.
+- This is a **fourth requirement for the build**: budgets and hooks belong to
+  one invocation. A later optimisation may cache the parsed AST, but never an
+  expression whose environment holds hooks.
+
+**P1.2: failure semantics.** A rule that failed with a budget or type error
+was recorded as `{error}` and then ignored by the `require` loop, so the
+proposal was appended with fewer obligations. Every engine error was also
+recorded as an outcome, including faults that depend on scheduling or host.
+
+- Fix: each rule kind has a required output shape (`refuse` and `survive`:
+  boolean; `require`: null, an object or a list of objects; `land`: an object
+  with boolean `ok`; `notify`: null or a list of actor ids). A
+  `ProfileError` or a wrong shape in any rule refuses the act, with the rule,
+  its input and the error recorded. Nothing weaker is appended.
+- Unexpected faults are now an `EngineFault`: an unadmitted AST node, a
+  `TypeError` or `RangeError`, an unknown engine error, and JSONata's
+  wall-clock timeout. They propagate out of the act. The room writes no act,
+  refusal or evaluation, and the Worker answers 503 with `retryable: true`.
+  This follows atseq's runtime profile, which separates deterministic
+  interpretation failures from runtime faults.
+- Recorded refusals replay: `explainRefusal(digest)` re-evaluates them.
+
+**Tests** (`npm test`, Node 26, real `node:sqlite`, real Ed25519, real
+evaluator, Artifacts stubbed):
+
+| Test | Checks |
+|---|---|
+| 8 concurrent guarded evaluations | equal value, steps and bytes to sequential |
+| guarded beside unguarded, memo and steps-only | each equals its sequential twin |
+| budget failures concurrently | same `inspection_budget` / `step_budget` as sequential |
+| evaluation after a failure | equals a fresh evaluation |
+| admission | `$now`, `$random`, `$eval`, free variables, `~>`, `**`, rebinding a function, fractions, reserved keys are still refused |
+| failing `require` (value budget) | act refused with rule and `value_bytes`; no act or proposal appended; evaluation recorded; replays the same twice |
+| `require` returning a string; `refuse` returning null | act refused, no proposal |
+| injected fault in a `require`, `refuse` or `notify` rule | act rejects with `engine_fault`; no row written in any table; the next act succeeds |
+| benchmarks in four guard modes beside a propose | the propose's recorded evaluations equal those of a room with no benchmarks |
+
+Result: 15 tests, 15 pass. Three mutants each fail the tests meant to catch
+them: a shared expression cache (3 profile tests and 1 room test fail),
+ignoring `require` failures (2 fail), and recording faults as outcomes (3
+fail).
+
+`npm run test:workerd` runs against `wrangler dev`: 18 concurrent requests
+and 16 evaluations started together in one request, in all guard modes,
+match sequential results (484 steps, 89,894 bytes). It also fails on the
+shared-expression mutant. Separate requests did not interleave in my runs,
+because an evaluation finishes within one task; evaluations started in the
+same task do interleave.
+
+**Not for promotion.** The spike's transport and admission parts must not be
+promoted unchanged: nonce replay returns the first record for any repeated
+`(actor, nonce)` without comparing bytes; there is no roster, no binding of
+an act to its room or repository, no authentication on setup, and no secret
+scanning.
 
 ## Left on Cloudflare
 

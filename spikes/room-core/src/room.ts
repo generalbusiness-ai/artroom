@@ -5,6 +5,40 @@
 import { DurableObject } from "cloudflare:workers";
 import { b64urlDecode, canonical, sha256hex } from "./canonical";
 import { compile, evaluate, ProfileError } from "./profile";
+
+// The shape each rule kind must return. Anything else is a deterministic
+// rule failure, and the act is refused: a failing rule never weakens policy.
+const shapes: Record<RuleKind, (v: any) => boolean> = {
+  refuse: (v) => typeof v === "boolean",
+  survive: (v) => typeof v === "boolean",
+  require: (v) => v === null || (Array.isArray(v) ? v.every((o) => o && typeof o === "object" && !Array.isArray(o)) : typeof v === "object"),
+  land: (v) => !!v && typeof v === "object" && !Array.isArray(v) && typeof v.ok === "boolean",
+  notify: (v) => v === null || (Array.isArray(v) && v.every((a) => typeof a === "string" || (Array.isArray(a) && a.every((b) => typeof b === "string")))),
+};
+
+/**
+ * Evaluate one rule on one input. Returns the recorded output: the value, or
+ * {error, message} for a deterministic failure (a ProfileError, or a value of
+ * the wrong shape for the rule's kind). An EngineFault or any other error is
+ * thrown, never recorded.
+ */
+export async function outcome(rule: Rule, input: unknown): Promise<{ output: unknown; failed: string | null; steps: number }> {
+  try {
+    const r = await evaluate(rule.expr, input);
+    if (shapes[rule.kind](r.value)) return { output: r.value, failed: null, steps: r.steps };
+    return { output: { error: "rule_output", message: `A ${rule.kind} rule returned ${canonical(r.value ?? null).slice(0, 200)}` }, failed: "rule_output", steps: r.steps };
+  } catch (e) {
+    if (!(e instanceof ProfileError)) throw e;
+    return { output: { error: e.code, message: e.message }, failed: e.code, steps: 0 };
+  }
+}
+
+/** A rule failed deterministically on its input; the act is refused with this rule. */
+class RuleFailed extends Error {
+  constructor(public rule: Rule, public code: string) {
+    super(`Rule ${rule.id} failed: ${code}`);
+  }
+}
 import { changedPaths } from "./treediff";
 import defaultPolicy from "./policy.json";
 
@@ -90,30 +124,25 @@ export class RoomSpike extends DurableObject<Env> {
 
     const { digest: policyDigest, policy } = this.policy();
     const evals: { rule: string; kind: RuleKind; input: string; output: string; steps: number; ms: number }[] = [];
-    const run = async (rule: Rule, input: object) => {
+    // Evaluate one rule and record its input and output. A ProfileError or a
+    // wrong output shape is recorded and throws RuleFailed (the act is then
+    // refused). An EngineFault or any other error propagates: nothing is
+    // written, and the caller may retry.
+    const run = async (rule: Rule, input: object): Promise<any> => {
       const s = now();
-      let output: unknown;
-      let steps = 0;
-      try {
-        const r = await evaluate(compile(rule.expr), input);
-        output = r.value;
-        steps = r.steps;
-      } catch (e) {
-        if (!(e instanceof ProfileError)) throw e;
-        output = { error: e.code, message: e.message };
-      }
+      const { output, failed, steps } = await outcome(rule, input);
       const ms = now() - s;
       tm.rules[rule.kind] = round((tm.rules[rule.kind] ?? 0) + ms);
       tm.evaluations++;
       tm.steps += steps;
       evals.push({ rule: rule.id, kind: rule.kind, input: canonical(input), output: canonical(output ?? null), steps, ms });
+      if (failed) throw new RuleFailed(rule, failed);
       return output;
     };
     const rules = (kind: RuleKind) => policy.rules.filter((r) => r.kind === kind && r.on.includes(act.kind));
     const refuse = async (input: object): Promise<Refusal | null> => {
       for (const rule of rules("refuse")) {
-        const out: any = await run(rule, input);
-        if (out === true || (out && out.error)) return refusal(rule.id, out === true ? `Rule ${rule.id} refused this act.` : `Rule ${rule.id} failed: ${out.error}`, rule.fix ?? "");
+        if ((await run(rule, input)) === true) return refusal(rule.id, `Rule ${rule.id} refused this act.`, rule.fix ?? "");
       }
       return null;
     };
@@ -133,6 +162,9 @@ export class RoomSpike extends DurableObject<Env> {
       }
     };
 
+    // Everything from here to the append runs inside one try: a RuleFailed
+    // anywhere (refuse, require, survive, land, notify) refuses the act.
+    try {
     let record: any;
     let derive: (seq: number) => void;
     let notifyInput: any;
@@ -158,9 +190,9 @@ export class RoomSpike extends DurableObject<Env> {
       if (r) return recordRefusal(r);
       const obligations: any[] = [];
       for (const rule of rules("require")) {
-        const out: any = await run(rule, { act, claim, changed });
+        const out = await run(rule, { act, claim, changed });
         if (Array.isArray(out)) obligations.push(...out);
-        else if (out && typeof out === "object" && !out.error) obligations.push(out);
+        else if (out) obligations.push(out);
       }
       // Survive: carry each fresh review of the previous head if the rule holds.
       const carried: { review: any; fresh: boolean; rule: string }[] = [];
@@ -205,8 +237,8 @@ export class RoomSpike extends DurableObject<Env> {
         .map((x) => ({ actor: x.actor, verdict: x.verdict, scope: JSON.parse(x.scope as string), fresh: x.fresh === 1 }));
       let lane: string | null = null;
       for (const rule of rules("land")) {
-        const out: any = await run(rule, { act, proposal, reviews, roles: policy.roles });
-        if (!out || out.ok !== true) return recordRefusal(refusal(rule.id, out?.error ? `Rule ${rule.id} failed: ${out.error}` : `Unmet: ${JSON.stringify(out?.unmet ?? [])}`, rule.fix ?? ""));
+        const out = await run(rule, { act, proposal, reviews, roles: policy.roles });
+        if (out.ok !== true) return recordRefusal(refusal(rule.id, `Unmet: ${JSON.stringify(out.unmet ?? [])}`, rule.fix ?? ""));
         lane = out.lane ?? lane;
       }
       record = { kind: "land", proposal: p!.id, commit: p!.head, lane };
@@ -227,8 +259,8 @@ export class RoomSpike extends DurableObject<Env> {
     const notifyRules = rules("notify");
     const notifyOut: { rule: string; actors: string[] }[] = [];
     for (const rule of notifyRules) {
-      const out: any = await run(rule, { ...notifyInput, roles: policy.roles });
-      if (Array.isArray(out)) notifyOut.push({ rule: rule.id, actors: out.flat().filter((a: unknown) => typeof a === "string") });
+      const out = await run(rule, { ...notifyInput, roles: policy.roles });
+      if (out) notifyOut.push({ rule: rule.id, actors: out.flat() });
     }
     this.ctx.storage.transactionSync(() => {
       seq = this.sql.exec("INSERT INTO acts (kind, actor, nonce, digest, envelope, record, policy, at) VALUES (?, ?, ?, ?, ?, '{}', ?, ?) RETURNING seq",
@@ -241,6 +273,10 @@ export class RoomSpike extends DurableObject<Env> {
     });
     tm.sql = round(now() - s);
     return finish({ ...record, notified });
+    } catch (e) {
+      if (e instanceof RuleFailed) return recordRefusal(refusal(e.rule.id, e.message, "Fix this rule in the policy: it fails on this input."));
+      throw e;
+    }
   }
 
   private saveEvals(evals: { rule: string; kind: string; input: string; output: string; steps: number; ms: number }[], digest: string, seq: number | null, policy: string) {
@@ -252,15 +288,23 @@ export class RoomSpike extends DurableObject<Env> {
   // ------------------------------------------------------------ reads
   /** Replay every recorded evaluation of an act and compare outputs. */
   async explain(seq: number) {
-    const rows = this.sql.exec("SELECT e.rule, e.kind, e.input, e.output, p.body FROM evaluations e JOIN policies p ON p.digest = e.policy WHERE e.seq = ?", seq).toArray();
+    return this.replay(this.sql.exec("SELECT e.rule, e.kind, e.input, e.output, p.body FROM evaluations e JOIN policies p ON p.digest = e.policy WHERE e.seq = ?", seq).toArray(), { seq });
+  }
+
+  /** Replay the recorded evaluations of a refused act, by act digest. */
+  async explainRefusal(digest: string) {
+    return this.replay(this.sql.exec("SELECT e.rule, e.kind, e.input, e.output, p.body FROM evaluations e JOIN policies p ON p.digest = e.policy WHERE e.seq IS NULL AND e.act_digest = ?", digest).toArray(), { digest });
+  }
+
+  private async replay(rows: Record<string, SqlStorageValue>[], key: object) {
     const out = [];
     for (const r of rows) {
       const rule = (JSON.parse(r.body as string) as Policy).rules.find((x) => x.id === r.rule)!;
       let again: unknown;
-      try { again = (await evaluate(compile(rule.expr), JSON.parse(r.input as string))).value; } catch (e: any) { again = { error: e.code, message: e.message }; }
+      again = (await outcome(rule, JSON.parse(r.input as string))).output; // an EngineFault propagates
       out.push({ rule: r.rule, kind: r.kind, output: JSON.parse(r.output as string), same: canonical(again ?? null) === r.output });
     }
-    return { seq, evaluations: out, deterministic: out.every((x) => x.same) };
+    return { ...key, evaluations: out, deterministic: out.every((x) => x.same) };
   }
 
   async diff(from: string, to: string, cached: boolean, limit = Infinity) {
@@ -299,28 +343,26 @@ export class RoomSpike extends DurableObject<Env> {
         if (req.rule && r.rule !== req.rule) continue;
         const rule = (JSON.parse(r.body as string) as Policy).rules.find((x) => x.id === r.rule)!;
         const input = JSON.parse(r.input as string);
-        const c = compile(rule.expr);
         const ts: number[] = [];
         let steps = 0;
         let value: unknown;
-        for (let i = 0; i < n; i++) { const s = now(); for (let j = 0; j < inner; j++) ({ steps, value } = await evaluate(c, input, { guard: req.guard ?? true })); ts.push((now() - s) / inner); }
+        for (let i = 0; i < n; i++) { const s = now(); for (let j = 0; j < inner; j++) ({ steps, value } = await evaluate(rule.expr, input, { guard: req.guard ?? true })); ts.push((now() - s) / inner); }
         result[r.rule as string] = { kind: r.kind as string, steps, times: ts, inputBytes: (r.input as string).length, output: canonical(value ?? null), recorded: r.output as string };
       }
       return { op: "rules", n, inner, guard: req.guard ?? true, rules: result };
     }
     if (req.op === "compile") {
       const { policy } = this.policy();
-      for (let i = 0; i < n; i++) { const s = now(); for (let j = 0; j < inner; j++) for (const r of policy.rules) compile(r.expr, false); times.push((now() - s) / inner); }
+      for (let i = 0; i < n; i++) { const s = now(); for (let j = 0; j < inner; j++) for (const r of policy.rules) compile(r.expr); times.push((now() - s) / inner); }
       return { op: "compile", n, inner, rules: policy.rules.length, times };
     }
     if (req.op === "patho") {
       // A rule the profile admits whose cost is cubic in the input size.
       const expr = req.expr ?? "$count(changed[$count($$.changed[$count($$.changed[$ = $$.changed[0]]) > 0]) > 0])";
       const changed = Array.from({ length: req.size ?? 100 }, (_, i) => `src/dir${i % 10}/file${i}.ts`);
-      const c = compile(expr, true, req.timeoutMs ?? 0);
       const s = now();
       try {
-        const r = await evaluate(c, { changed }, { guard: req.guard ?? true });
+        const r = await evaluate(expr, { changed }, { guard: req.guard ?? true, timeoutMs: req.timeoutMs ?? 0 });
         return { op: "patho", size: changed.length, guard: req.guard ?? true, timeoutMs: req.timeoutMs ?? 0, value: typeof r.value === "string" ? `string of ${r.value.length}` : r.value, steps: r.steps, ms: now() - s };
       } catch (e: any) {
         return { op: "patho", size: changed.length, guard: req.guard ?? true, timeoutMs: req.timeoutMs ?? 0, error: e.code ?? String(e), message: e.message, ms: now() - s };

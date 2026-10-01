@@ -6,11 +6,11 @@
 // evaluate-exit hooks that count steps and active depth, the per-result byte
 // inspection, the checked integer $sum, and the mapping of engine errors to
 // stable codes. Changes for the spike: a host $glob function for path rules,
-// compiled expressions cached per source, a `guard: false` mode used only to
-// measure the unguarded engine, and a smaller value walker in place of
-// atseq's canonicalJson.
+// measurement modes (memo, steps only, no guard), a smaller value walker in
+// place of atseq's canonicalJson, and, after review 8f5dede9, one expression
+// per evaluation (no shared hooks) and an explicit EngineFault boundary.
 import jsonata from "jsonata";
-import { glob } from "./glob";
+import { glob, GLOB_MAX } from "./glob";
 
 export const PROFILE = Object.freeze({
   id: "artroom-spike-jsonata-0",
@@ -153,26 +153,39 @@ function deepFreeze<T>(x: T): T {
   return x;
 }
 
+/**
+ * An unexpected engine or host fault: not a property of the rule and its
+ * input, so it must never become a recorded outcome. Callers treat it as a
+ * retryable infrastructure failure and write nothing.
+ */
+export class EngineFault extends Error {
+  constructor(message: string) {
+    super(`engine_fault: ${message}`);
+    this.name = "EngineFault";
+  }
+}
+
 export interface Compiled {
   source: string;
   expression: jsonata.Expression;
   parents: WeakMap<Ast, Ast | undefined>;
 }
 
-const cache = new Map<string, Compiled>();
-
-/** `timeoutMs` turns on jsonata's own Date.now() timeout guardrail (measured, not relied on). */
-export function compile(source: string, useCache = true, timeoutMs = 0): Compiled {
-  const key = `${timeoutMs}\u0000${source}`;
-  const hit = useCache ? cache.get(key) : undefined;
-  if (hit) return hit;
+/**
+ * Parse, admit and bind host functions. Every call returns a new expression:
+ * a JSONata expression holds its hooks in a mutable environment, so one
+ * compiled expression must never be shared between evaluations (review
+ * 8f5dede9, P1.1). `timeoutMs` turns on jsonata's own Date.now() timeout,
+ * kept only to measure that it does not work on Cloudflare.
+ */
+export function compile(source: string, timeoutMs = 0): Compiled {
   if (encoder.encode(source).length > PROFILE.programBytes) throw new ProfileError("source_bytes", "Program exceeds 64 KiB");
   let expression: jsonata.Expression;
   try {
     expression = jsonata(source, { sequence: PROFILE.sequenceLength, ...(timeoutMs ? { timeout: timeoutMs } : {}) } as any);
   } catch (error: any) {
     if (error && typeof error.code === "string" && /^S0\d{3}$/.test(error.code)) throw new ProfileError("invalid_source", String(error.message));
-    throw error;
+    throw new EngineFault(`parser: ${error?.message ?? error}`);
   }
   const parents = checkAst(expression.ast());
   expression.registerFunction(
@@ -195,13 +208,12 @@ export function compile(source: string, useCache = true, timeoutMs = 0): Compile
       if (path === undefined) return undefined;
       const list = typeof patterns === "string" ? [patterns] : patterns;
       if (list.length > 256) throw new ProfileError("glob_limit", "at most 256 patterns");
+      if (path.length > GLOB_MAX || list.some((p) => p.length > GLOB_MAX)) throw new ProfileError("glob_limit", `glob arguments are at most ${GLOB_MAX} characters`);
       return list.some((p) => glob(path, p));
     },
     "<s-(sa):b>",
   );
-  const compiled = { source, expression, parents };
-  if (useCache) cache.set(key, compiled);
-  return compiled;
+  return { source, expression, parents };
 }
 
 export interface Evaluation {
@@ -218,8 +230,9 @@ export interface Evaluation {
  *  "steps"  step and depth hooks only, no byte inspection
  *  false    no hooks
  */
-export async function evaluate(c: Compiled, input: unknown, opts: { guard?: boolean | "steps" | "memo" } = {}): Promise<Evaluation> {
+export async function evaluate(source: string, input: unknown, opts: { guard?: boolean | "steps" | "memo"; timeoutMs?: number } = {}): Promise<Evaluation> {
   const guard = opts.guard ?? true;
+  const c = compile(source, opts.timeoutMs ?? 0); // private to this invocation
   const memo: Memo | undefined = guard === "memo" ? new WeakMap() : undefined;
   const owned = structuredClone(input);
   if (memo) deepFreeze(owned);
@@ -235,7 +248,7 @@ export async function evaluate(c: Compiled, input: unknown, opts: { guard?: bool
     };
     assign(Symbol.for("jsonata.__evaluate_entry"), (node: Ast) => {
       if (++steps > PROFILE.evaluationSteps) throw new ProfileError("step_budget", "Evaluation step budget exhausted");
-      if (!parents.has(node)) throw new ProfileError("engine_error", "Engine evaluated an unadmitted AST node");
+      if (!parents.has(node)) throw new EngineFault("engine evaluated an unadmitted AST node");
       let parent = parents.get(node);
       while (parent && !active.has(parent)) parent = parents.get(parent);
       const depth = (parent ? active.get(parent)!.depth : 0) + 1;
@@ -261,12 +274,15 @@ export async function evaluate(c: Compiled, input: unknown, opts: { guard?: bool
     measure(value, PROFILE.outputBytes, PROFILE.inputDepth, undefined, 0, true);
     return { value: JSON.parse(JSON.stringify(value)), steps, inspectedBytes };
   } catch (error: any) {
-    if (error instanceof ProfileError) throw error;
+    if (error instanceof ProfileError || error instanceof EngineFault) throw error;
     const code = error?.code;
-    if (code === "D1012") throw new ProfileError("engine_timeout", String(error.message));
+    // Deterministic outcomes of the rule and its input become ProfileErrors.
+    // Anything else (a wall-clock timeout, a TypeError or RangeError, an
+    // unknown engine error) is an EngineFault and is never recorded.
+    if (code === "D1012") throw new EngineFault("jsonata wall-clock timeout");
     if (code === "D1011") throw new ProfileError("evaluation_depth", "Engine evaluation nesting limit reached");
     if (code === "D2014" || code === "D2015") throw new ProfileError("sequence_limit", "Engine sequence length limit reached");
     if (typeof code === "string" && /^[DT][0-9]{4}$/.test(code)) throw new ProfileError("engine_input", `JSONata rejected the data (${code}): ${error.message}`);
-    throw new ProfileError("engine_error", String(error?.message ?? error));
+    throw new EngineFault(String(error?.message ?? error));
   }
 }
