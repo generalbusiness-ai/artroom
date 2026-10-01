@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review lane L revision 3 at exact b22b9ae6, all 32 artifacts, including timestamp and retained-file repairs, onboarding grants and checker configuration verification."}
+{"kind":"artifact","text":"notes/2026-10-01-laneB-token-inflight.md at exact 23a112f084e12ca0300f90f2a43eefc176a956d3 on request/laneB-git, under promise git:sha1…1626171 on request git:sha1…0e051fa","body":{"commit":"23a112f084e12ca0300f90f2a43eefc176a956d3","path":"notes/2026-10-01-laneB-token-inflight.md"}}
