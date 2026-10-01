@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:915dc07e7db39ad4748aab4b887900602187585b","text":"Replaced by the review request for exact head 3be00804e501e4f30e8cf653b6dd1ce8de72a25e; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"artifact","text":"package-lock.json at exact b22b9ae67881bc9cd71ca0f76d0febc29fea480a on request/laneL-log, under promise git:sha1…4989b87 on request git:sha1…628d88a","body":{"commit":"b22b9ae67881bc9cd71ca0f76d0febc29fea480a","path":"package-lock.json"}}
