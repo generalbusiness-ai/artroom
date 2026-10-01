@@ -1,0 +1,27 @@
+{
+  "name": "@generalbusiness/artroom-mcp",
+  "version": "0.0.0",
+  "description": "Artroom's MCP server: exactly the contract's ten tools, as a stateless Workers handler and as a local stdio server.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/worker.ts",
+    "./stdio": "./src/stdio.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-client": "0.0.0",
+    "@generalbusiness/artroom-contract": "0.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "agents": "0.24.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "vitest": "4.1.11"
+  }
+}

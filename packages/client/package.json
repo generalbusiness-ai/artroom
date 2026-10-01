@@ -1,0 +1,24 @@
+{
+  "name": "@generalbusiness/artroom-client",
+  "version": "0.0.0",
+  "description": "Artroom's typed client: the contract's RoomApi over HTTPS (and RPC), with Ed25519 envelope signing, idempotent retries, invitation redemption and resumable cursors. WebCrypto only.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-contract": "0.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "@types/ws": "8.18.2",
+    "vitest": "4.1.11",
+    "ws": "8.21.0"
+  }
+}
