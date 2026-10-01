@@ -83,7 +83,7 @@ export async function route(req: Request, env: RoomEnv): Promise<Response> {
     if (parts.length === 3 && parts[2] === "found" && req.method === "POST") {
       const b = await body(req);
       if (!isPlainObject(b)) throw artroomError("bad-request", "Send genesis, sig and draft.");
-      return json({ room: await foundRoom(env, b["genesis"], b["sig"], b["draft"], clock()) });
+      return json({ room: await foundRoom(env, b["genesis"], b["sig"], b["draft"], clock) });
     }
     const room = parts[2];
     if (!room) return failure(artroomError("not-found", "No such route."));

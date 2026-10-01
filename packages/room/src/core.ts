@@ -92,6 +92,8 @@ export class Moved extends Error {
 
 /** The publication in progress: its cohort, fixed before any remote write (R-LOG-8). */
 export interface PendingPublication {
+  /** The stored form's version. */
+  readonly v: 2;
   /** The expected parent: the last log commit the Room confirmed. */
   readonly parent: Sha | null;
   /** The exact commit the publisher makes of this cohort on `parent`. */
@@ -101,6 +103,13 @@ export interface PendingPublication {
   readonly checkpoint: Checkpoint;
   readonly retained: readonly Digest[];
 }
+
+/**
+ * A cohort as stored. Version 1 (before review 8faa2ef9) has no version
+ * field and no expected commit; `publish` derives the commit and stores
+ * version 2 before any further write (review 1249097f).
+ */
+export type StoredPublication = PendingPublication | (Omit<PendingPublication, "v" | "expected"> & { readonly v?: undefined; readonly expected?: undefined });
 
 /** One open proposal's obligations recomputed under a new policy (R-POL-9). */
 export interface Recomputation {
@@ -1055,8 +1064,29 @@ export class RoomCore {
   private publishing = false;
 
   /** The cohort chosen for the publication in progress, durable until its commit is confirmed. */
-  pendingPublication(): PendingPublication | null {
-    return json<PendingPublication>(one(this.sql, "SELECT v FROM meta WHERE k = 'pending_publication'"), "v");
+  pendingPublication(): StoredPublication | null {
+    return json<StoredPublication>(one(this.sql, "SELECT v FROM meta WHERE k = 'pending_publication'"), "v");
+  }
+
+  /**
+   * A version 1 cohort, upgraded: the exact commit derived by the publisher's
+   * serialization from the cohort's recorded parent, entries, checkpoint and
+   * retained bytes, and stored before anything else is written. Nothing is
+   * inferred from what the ref holds, and the cohort is never discarded.
+   */
+  private upgradePublication(publisher: PublisherPort, stored: StoredPublication): PendingPublication {
+    if (stored.v === 2) return stored;
+    const version: unknown = (stored as { v?: unknown }).v;
+    if (version !== undefined) throw Object.assign(new Error(`unknown pending publication version ${String(version)}`), { code: "unknown-version" });
+    return this.sql.transaction(() => {
+      const entries = entriesAfter(this.sql, -1, stored.through + 1);
+      const last = entries[entries.length - 1];
+      if (!last || last.seq !== stored.through || last.hash !== stored.hash) throw Object.assign(new Error("the pending cohort does not match the log"), { code: "cohort-mismatch" });
+      const expected = publisher.commitFor(stored.parent, entries, stored.checkpoint, this.retainedFiles(stored.retained));
+      const p: PendingPublication = { v: 2, parent: stored.parent, expected, through: stored.through, hash: stored.hash, checkpoint: stored.checkpoint, retained: stored.retained };
+      setMeta(this.sql, "pending_publication", JSON.stringify(p));
+      return p;
+    });
   }
 
   /** Publication is due at 50 unpublished entries, or a minute after the oldest one (R-LOG-8, R-LOG-11). */
@@ -1094,16 +1124,17 @@ export class RoomCore {
         // The cohort and its exact commit are fixed and stored before any remote write: the
         // entries through N, the signed checkpoint, the retained files, the confirmed parent, and
         // the commit the publisher's own serialization makes of them (review 8faa2ef9).
-        cohort =
-          this.pendingPublication() ??
-          this.sql.transaction(() => {
+        const stored = this.pendingPublication();
+        cohort = stored
+          ? this.upgradePublication(publisher, stored)
+          : this.sql.transaction(() => {
             const n = this.headSeq();
             const through = entryAt(this.sql, n)!;
             const parent = (getMeta(this.sql, "log_commit") as Sha | null) ?? null;
             const cp = checkpoint(this.roomId, this.genesis.roomKey, this.seed(), through, iso(this.now()));
             const digests = this.sql.all("SELECT digest FROM retained ORDER BY digest").map((r) => str(r, "digest") as Digest);
             const expected = publisher.commitFor(parent, entriesAfter(this.sql, -1, n + 1), cp, this.retainedFiles(digests));
-            const p: PendingPublication = { parent, expected, through: n, hash: through.hash, checkpoint: cp, retained: digests };
+            const p: PendingPublication = { v: 2, parent, expected, through: n, hash: through.hash, checkpoint: cp, retained: digests };
             setMeta(this.sql, "pending_publication", JSON.stringify(p));
             return p;
           });

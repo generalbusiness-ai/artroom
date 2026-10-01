@@ -8,7 +8,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 import type { RoomId, RoomRef } from "@generalbusiness/artroom-contract";
-import type { RoomEnv } from "./config.ts";
+import { clock, type RoomEnv } from "./config.ts";
 import { artroomError, wire, type Wire } from "./errors.ts";
 import type { Sql } from "./ports.ts";
 import { migrate, type Migration } from "./store.ts";
@@ -46,13 +46,20 @@ export class Registry extends DurableObject<RoomEnv> {
   }
 
   /** Bind repository, room ID and name in one step (R-GEN-13). */
-  bind(repo: string, room: RoomId, name: string): Promise<Wire<"bound" | "already-bound">> {
+  /**
+   * Bind atomically. `notAfter` is an import grant's deadline (epoch ms): a
+   * first binding at or after it is refused, judged with the clock read here.
+   * The same binding again succeeds whatever the time, so founding completes
+   * forward after an interruption.
+   */
+  bind(repo: string, room: RoomId, name: string, notAfter?: number): Promise<Wire<"bound" | "already-bound">> {
     return wire(async () => {
       const byRepo = this.row("SELECT * FROM bindings WHERE repo = ?", repo);
       if (byRepo) {
         if (byRepo.room === room && byRepo.name === name) return "already-bound";
         throw artroomError("forbidden", "This repository is already bound to another room.");
       }
+      if (notAfter !== undefined && notAfter <= clock()) throw artroomError("forbidden", "The grant has expired.");
       if (this.row("SELECT * FROM bindings WHERE room = ?", room)) throw artroomError("forbidden", "This room is already bound to another repository.");
       if (this.row("SELECT * FROM bindings WHERE name = ?", name)) throw artroomError("forbidden", "This name is already bound to another room.");
       this.ctx.storage.sql.exec("INSERT INTO bindings (repo, room, name) VALUES (?, ?, ?)", repo, room, name);
