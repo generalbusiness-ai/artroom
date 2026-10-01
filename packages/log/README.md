@@ -36,6 +36,15 @@ Each log commit holds the files of R-LOG-9:
 
 The publisher follows these rules:
 
+- **Owned cohort.** `publish` copies the canonical entries, the checkpoint
+  and the retained files before its first `await`. The commit and the
+  publisher's state come only from that copy. A caller that appends to or
+  changes its arrays and objects during the push cannot change either.
+- **Retained files are kept.** Each commit holds every retained file of the
+  earlier commits, plus the new ones. They are named by digest, so they
+  never change. `retained` needs to list only new files, and a restarted
+  publisher reads the earlier ones back from the ref.
+
 - **Order.** The commit's parent is the previous log commit. Its checkpoint
   names the last entry by seq and hash, never a commit. So nothing refers to
   itself.
@@ -70,6 +79,14 @@ commits, so it does not depend on lane B's unfinished code.
 
 `verifyLog` reads every log commit, oldest first.
 
+**Decoding.** Every entry, checkpoint and retained file passes through one
+decoding boundary (`src/decode.ts`) before any field is read. Content that
+is not UTF-8, not strict JSON, or not of the contract's shape is the named
+failure `malformed`. The verified prefix ends before the first malformed
+entry, or before the first entry that needs a malformed retained file.
+Only reading the repository throws, so `artroom verify` exits 2 only when
+it cannot read the remote.
+
 **For each commit**, it checks that:
 - the commit has one parent, the previous log commit;
 - every earlier entry and every full segment is unchanged;
@@ -84,17 +101,25 @@ commits, so it does not depend on lane B's unfinished code.
   - the recorded authority. Verify replays the roster from earlier entries
     and judges the act by the four cases of R-ADM-3, including revocations
     (R-ADM-4, R-REV-3);
+  - delegations (R-ADM-5). When a `delegate` is admitted, its kinds must be
+    ones the grantor's role may sign. `*` means all of those, fixed at the
+    grant. At each use: the grantor's current role, the expiry and
+    revocation;
   - the recovery-key flag and idempotency;
   - that no effect or event names its own lane (R-LOG-12);
-- that `notified` events name an earlier entry, and no entry twice;
+- that `notified` events name an earlier accepted act, and no act twice;
 - that `checkpoint` events name an earlier log commit with the same
   `through` and `hash`.
 
 **For each recorded policy decision**, it finds the retained replay context
 by the decision's digest, and the policy document by the policy version.
 It runs `replay` from the policy package, and requires the same decisions
-(R-EVAL-6). It also checks that the decision's profile stamp and policy
-version are the ones in force.
+(R-EVAL-6). It also checks the decision's profile stamp, and that it names
+exactly one policy version, chosen by event kind:
+- an act or refusal: the policy in force when it was admitted;
+- a `notified` event: the policy in force when the act it names was
+  admitted. The room pins that version when it queues the notification, so
+  later activations do not change it.
 
 **The report** gives:
 - the verified prefix: the last good entry and its ID;
@@ -144,6 +169,9 @@ entries of the last consistent commit.
   | A checkpoint signed by another key | `checkpoint-signature` |
   | A later commit that changes a published entry | `history-rewritten` |
 
+- `test/review-ea4a9bd0.test.ts` covers the findings of review ea4a9bd0
+  (see below).
+
 - `test/gitcli.node.test.ts` (Node only) publishes to a real local git
   repository and checks it:
   - `git fsck` passes;
@@ -180,8 +208,14 @@ On 2026-10-01 it passed:
 3. **Lane and obligation state are not re-derived.** Verify checks
    authority and policy decisions, not lane, lease, obligation or landing
    transitions. These are listed under "cannot prove".
-4. **Delegation grants are not checked against the grantor's role at grant
-   time** (R-ADM-5). Uses of a delegation are checked.
+4. **`*` in a delegation.** The contract says `*` means all delegable
+   kinds, and R-ADM-5 allows only kinds the grantor's role may sign. Verify
+   reads `*` as all kinds the grantor's role may sign at the grant. The
+   Room (lane A, `authority.ts`) instead judges `*` against the grantor's
+   current role at each use. They differ in one case: a member grants `*`,
+   is promoted to checker, and the grantee signs `check`. The Room admits
+   it; verify reports `delegation-invalid`. The contract should say which
+   is meant.
 5. **Revocation time.** The roster records revocations by log order; the
    contract has no revocation timestamp. That is enough, because authority
    is judged at admission order.
@@ -191,5 +225,70 @@ On 2026-10-01 it passed:
 - A Workers-native push adapter. In a Worker, `MemoryGit` hands the objects
   over, and lane B's publisher sandbox will push them. That adapter belongs
   with lane B's code, which is not finished.
+- Malformed git structure (a log ref or parent that is not a commit, a
+  tree entry that is not a tree) still throws, as a read error does. The
+  decoding boundary covers the log's content, not git's object format.
 - Incremental verification from a trusted earlier checkpoint. Verify always
   starts from genesis.
+
+## Review ea4a9bd0
+
+Each finding, its fix, and the tests that prove it. All tests are in
+`test/review-ea4a9bd0.test.ts` unless named otherwise. Each guard was
+broken on purpose and a named test failed.
+
+1. **P1: own the publication cohort before asynchronous I/O.**
+   Fix: `LogPublisher.publish` builds a `Cohort` (canonical lines,
+   checkpoint text, retained files) synchronously, before the first
+   `await`. `done` sets state only from it.
+   Tests: "appending and mutating the caller's objects during the push
+   changes neither the commit nor the state", and the same "during the
+   read". Each also publishes the next cohort and checks it is a new commit
+   with the new entry.
+2. **P1: check delegation kinds when the grant is admitted.**
+   Fix: `RosterReplay.judge` refuses a `delegate` that lists a kind the
+   grantor's role may not sign (`delegation-invalid`). `apply` stores `*`
+   as `delegableBy(role)` at the grant. Current role, expiry and revocation
+   are still judged at each use.
+   Tests: "a member grants check, is promoted to checker, the grantee
+   checks: delegation-invalid at the grant"; "a member's * covers only the
+   member's kinds: after promotion to checker, check is delegation-invalid
+   at the use"; "a valid grant used within its kinds verifies"; "an admin
+   may grant check, and a later demotion still stops it at the use
+   (current role)"; "expiry and revocation are still judged at the use".
+3. **P2: report malformed log content instead of throwing.**
+   Fix: `src/decode.ts` is the one decoding boundary for entries,
+   envelopes, roster bodies, decisions, checkpoints and retained replay
+   contexts and policies. Verify reports `malformed` with the last valid
+   prefix.
+   Tests: "a first entry {"seq":0} is malformed at entry 0; verify does
+   not throw"; "a malformed later entry stops the prefix before it"; "a
+   line that is not JSON, and one that is not UTF-8, are malformed";
+   "malformed signatures: entry, envelope and genesis signatures that are
+   not strings"; "a checkpoint whose signature is not a string is
+   malformed, not a throw"; "a roster body outside the contract is
+   malformed"; "malformed retained data: a replay context and a policy
+   document, each where an entry needs it"; "a malformed retained file no
+   entry needs fails the commit but not the prefix"; "a genuine read error
+   still throws, so the CLI reports it apart from a failed check". In
+   `test/gitcli.node.test.ts`: "artroom verify exits 1, not 2, on a log
+   whose first entry is malformed".
+4. **P2: preserve previously published replay evidence.**
+   Fix: the publisher merges the retained files of the last log commit
+   into every later one, and `open` reads them back from the ref.
+   Tests: "a publication that omits earlier retained files keeps them, and
+   every prefix stays replayable"; "a restarted publisher reads the
+   retained files back and keeps them".
+5. **P2: replay delayed notifications with their pinned policy.**
+   Fix: verify records the policy in force at each entry. A `notified`
+   event's decisions must name the policy in force when the act it names
+   was admitted, the version the Room queues. An act's decisions must name
+   the policy in force at its own admission. A `notified` event may name
+   only an accepted act.
+   Tests: "an activation between queueing and sealing: the notification
+   keeps the act's policy"; "a retry sealed after several activations
+   still uses the original version"; "substituting another policy is
+   policy-version-mismatch: an older one, a newer one, or a version that
+   does not exist"; "a notification may name only an earlier accepted
+   act: naming a system entry is notified-unknown"; "an act's own
+   decisions still use the policy active at its admission".
