@@ -165,7 +165,8 @@ async function main() {
   out.concurrent = { passStillPasses: ca.ok === true, failStillFails: cb.ok === false };
   log("concurrent:", out.concurrent);
   // G4: a scoped listing over 64 KiB with a credential-shaped file name.
-  const big = await check("scoped: 1,800 files and a credential-shaped name", "tests", c7, { scoped: ["src/**"] });
+  // Declared paths that leave out src/secret.txt: the snapshot store is shared by this checker's snapshots, and the scoped probe below must find no excluded blob in it.
+  const big = await check("scoped: 1,800 files and a credential-shaped name", "tests", c7, { scoped: ["src/add.js", "src/gen/**", odd] });
   out.bigScoped = { ok: big.ok, files: out.runs.at(-1).snapshot?.files?.length ?? null };
   log("big scoped:", out.bigScoped);
 

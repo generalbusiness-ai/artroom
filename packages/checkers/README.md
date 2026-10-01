@@ -113,8 +113,9 @@ used only by the `/h/*` routes.
 
 A new container per job means every check starts cold: the live runs before
 this design measured 4.5 to 5.4 seconds for a cold check and 1.7 seconds for
-a warm one, with the image already on the host (see the lane note for the
-current figures). Reusing a container across jobs is not safe: a job's code
+a warm one, with the image already on the host. With a new container per
+job, checks took 2.9 to 5.3 seconds in the live run of 2026-10-01 (see the
+lane note). Reusing a container across jobs is not safe: a job's code
 can change the container's files and leave processes running, and the next
 job would trust them. A cache shared between jobs may only be part of the
 pinned image, which is read only.
