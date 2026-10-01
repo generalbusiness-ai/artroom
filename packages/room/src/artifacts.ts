@@ -230,7 +230,8 @@ export class ArtifactsAdapter implements ArtifactsPort {
   async snapshot(commit: Sha, inputs: readonly Glob[]): Promise<{ readonly digest: `sha256:${string}`; readonly files: number; readonly entries: readonly SnapshotEntry[] } | null> {
     const repo = await this.canonical();
     const c = await repo.readCommit(commit);
-    if (!c) throw new Error(`commit ${commit} is missing`);
+    // A commit the repository does not have has no snapshot: a check that names it binds nothing.
+    if (!c) return null;
     const max = this.o.bounds?.maxEntries ?? DEFAULT_BOUNDS.maxEntries;
     const entries: SnapshotEntry[] = [];
     let seen = 0;
