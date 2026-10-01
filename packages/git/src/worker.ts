@@ -70,7 +70,7 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
     const artifacts = this.env.ARTIFACTS as unknown as ArtifactsNamespace;
     const opts = { stub, artifacts, canonical: { name: repo, remote } };
     this.pinning = new Pinning(opts);
-    this.workspaces = new Workspaces({ sql: this.sql, artifacts, canonical: repo });
+    this.workspaces = new Workspaces({ sql: this.sql, artifacts, canonical: repo, namespace: this.env.ARTIFACTS_NAMESPACE });
     this.landing = new Landing({
       sql: this.sql,
       room: this,

@@ -132,6 +132,12 @@ export interface LandRecord {
   retained?: RetainedLandInput | null;
   /** The integration is built and the Room's readiness answer is due. */
   readinessPending?: boolean;
+  /**
+   * The revision of the latest readiness evaluation started. Only the answer
+   * to this revision may be applied: an older answer that arrives later is
+   * dropped, whatever it says.
+   */
+  evaluation?: number;
   /** When a failed preparation step may run again. */
   retryAt?: number;
   prepareBackoffMs?: number;

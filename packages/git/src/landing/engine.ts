@@ -147,7 +147,7 @@ export class Landing {
 
   private async evaluateNow(id: OpId, force = false): Promise<void> {
     this.alive();
-    const due = this.core.readinessDue(id, force);
+    const due = this.core.startEvaluation(id, force);
     if (!due) return;
     const op = this.core.get(id);
     if (!op) return;
@@ -156,11 +156,11 @@ export class Landing {
       r = await this.room.readiness(op, due.integration);
     } catch (e) {
       this.alive();
-      this.core.readinessFailed(id, due.attempt, message(e));
+      this.core.readinessFailed(id, due.attempt, due.rev, message(e));
       return;
     }
     this.alive();
-    this.core.applyReadiness(id, due.attempt, due.integration, r);
+    this.core.applyReadiness(id, due.attempt, due.integration, due.rev, r);
   }
   reserve(id: OpId): ReserveResult {
     return this.core.reserve(id);
@@ -379,7 +379,7 @@ export class Landing {
       const due = this.core.active().filter((o) => o.state === "accepted" || (o.state === "preparing" && o.integration === undefined));
       await Promise.all(due.map((o) => this.prepare(o.id)));
       // A built integration whose readiness answer was lost (a crash, a failed evaluation).
-      const pending = this.core.active().filter((o) => o.state === "preparing" && o.readinessPending);
+      const pending = this.core.active().filter((o) => (o.state === "preparing" || o.state === "ready") && o.integration !== undefined && o.readinessPending);
       await Promise.all(pending.map((o) => this.evaluateNow(o.id)));
     });
   }

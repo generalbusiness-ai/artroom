@@ -2,7 +2,7 @@
 // here by real git objects, and checked against `git diff`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Fixture, sh } from "./support.ts";
+import { Fixture, localExec, sh } from "./support.ts";
 import {
   TreeCache,
   changedPaths,
@@ -225,4 +225,92 @@ test("previewPlan: a sandbox preview is needed only when the proposal and main t
   const d = await previewPlan(reader, main3, dirFile);
   assert.deepEqual(d.kind === "overlap" && d.paths, ["dir", "dir/c.txt"]);
   assert.equal((await previewPlan(reader, main2, main2)).kind, "disjoint");
+});
+
+// ------------------------------------------------------------------ review 50104b16, P2.4: clock skew
+
+/** Commit `files` on top of `parents[0]` with exactly these parents and this commit time. */
+async function commitAt(f: Fixture, parents: string[], files: Record<string, string>, at: number, msg: string): Promise<string> {
+  const env = {
+    HOME: f.work, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@i", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@i",
+    GIT_AUTHOR_DATE: `@${at} +0000`, GIT_COMMITTER_DATE: `@${at} +0000`,
+  };
+  const run = async (...args: string[]) => {
+    const r = await localExec(["git", ...args], { cwd: f.work, env });
+    if (r.code !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  await run("checkout", "-q", "--detach", parents[0]!);
+  f.write(files);
+  await run("add", "-A");
+  const tree = await run("write-tree");
+  const commit = await run("commit-tree", tree, ...parents.flatMap((p) => ["-p", p]), "-m", msg);
+  await run("push", "-q", f.canonical, `${commit}:refs/test/${msg}`);
+  return commit;
+}
+
+for (const skew of ["backward", "equal"] as const) {
+  test(`merge bases with ${skew} timestamps match git merge-base --all, and the changed paths are the union over exactly those bases`, async (t) => {
+    const f = await new Fixture().init({ "shared.txt": "r\n", "r.txt": "r\n" });
+    t.after(() => f.dispose());
+    const R = f.main;
+    const time = (n: number) => (skew === "equal" ? 1_700_000_000 : 1_700_000_000 + n * 100);
+    const A = await commitAt(f, [R], { "shared.txt": "a\n" }, time(1), "A");
+    const M = await commitAt(f, [A], { "m.txt": "m\n" }, time(5), "M");
+    // B's clock is behind: its time precedes M's although M is its parent.
+    const B = await commitAt(f, [M], { "b.txt": "b\n" }, skew === "equal" ? time(0) : time(2), "B");
+    const C = await commitAt(f, [R], { "c.txt": "c\n" }, time(3), "C");
+    const X = await commitAt(f, [A, B, C], { "shared.txt": "a\n", "m.txt": "m\n", "b.txt": "b\n", "c.txt": "c\n", "x.txt": "x\n" }, time(6), "X");
+    const Y = await commitAt(f, [A, B, C], { "shared.txt": "a\n", "m.txt": "m\n", "b.txt": "b\n", "c.txt": "c\n", "lane.txt": "y\n" }, time(7), "Y");
+    const reader = gitReader(f.canonical);
+    const gitBases = (await sh(f.root, "--git-dir", f.canonical, "merge-base", "--all", X, Y)).split("\n").sort();
+    assert.deepEqual(gitBases, [B, C].sort(), "git's answer: B and C; A is an ancestor of B");
+    assert.deepEqual(await mergeBases(reader, X, Y), gitBases);
+    const r = await changedPaths(reader, X, Y);
+    assert.equal(r.kind, "ok");
+    const union = new Set<string>();
+    for (const base of gitBases) for (const p of (await sh(f.root, "--git-dir", f.canonical, "diff", "--name-only", "--no-renames", base, Y)).split("\n").filter(Boolean)) union.add(p);
+    assert.deepEqual(r.kind === "ok" ? touchedPaths(r.changes) : null, [...union].sort());
+  });
+}
+
+// ------------------------------------------------------------------ review 50104b16, P2.5: deterministic refusal
+
+test("a diff that crosses both the depth and the entry bounds is refused the same way, whatever the cache and read order", async (t) => {
+  const files: Record<string, string> = { "deep/a/b/c/d/e/f.txt": "0\n" };
+  for (let i = 0; i < 40; i++) files[`wide/f${i}.txt`] = "0\n";
+  const f = await new Fixture().init(files);
+  t.after(() => f.dispose());
+  const change: Record<string, string> = { "deep/a/b/c/d/e/f.txt": "1\n" };
+  for (let i = 0; i < 40; i++) change[`wide/f${i}.txt`] = "1\n";
+  const head = await commit(f, f.main, change);
+  const inner = gitReader(f.canonical);
+  const [ta, tb] = [(await inner.readCommit(f.main))!.treeHash, (await inner.readCommit(head))!.treeHash];
+  // Which trees are slow: the deep chain, the wide directory, or neither.
+  const wideTrees = new Set([await sh(f.root, "--git-dir", f.canonical, "rev-parse", `${f.main}:wide`), await sh(f.root, "--git-dir", f.canonical, "rev-parse", `${head}:wide`)]);
+  const delayed = (slow: "deep" | "wide" | "none"): TreeReader => ({
+    async readTree(h) {
+      const isWide = wideTrees.has(h);
+      if ((slow === "wide" && isWide) || (slow === "deep" && !isWide)) await new Promise((r) => setTimeout(r, 15));
+      return inner.readTree(h);
+    },
+    readCommit: (h) => inner.readCommit(h),
+  });
+  const outcomes = new Set<string>();
+  for (const bounds of [{ maxDepth: 3, maxEntries: 60 }, { maxDepth: 3, maxEntries: 1000 }, { maxDepth: 10, maxEntries: 60 }]) {
+    const seen = new Set<string>();
+    for (const slow of ["deep", "wide", "none"] as const) {
+      for (const warm of [false, true]) {
+        const cache = new TreeCache();
+        if (warm) await treeDiff(inner, ta, tb, { cache, bounds: { maxDepth: 100, maxEntries: 1_000_000 } });
+        const r = await treeDiff(delayed(slow), ta, tb, { cache, bounds: { ...bounds, concurrency: 2 } });
+        seen.add(r.kind === "too-large" ? `${r.bound}` : "ok");
+      }
+    }
+    assert.equal(seen.size, 1, `bounds ${JSON.stringify(bounds)} gave ${[...seen].join(", ")}`);
+    outcomes.add([...seen][0]!);
+  }
+  // Both limits crossed: entries are counted first, level by level, so the
+  // wide directory (level 1) trips the entry bound before depth 4 is reached.
+  assert.deepEqual([...outcomes].sort(), ["depth", "entries"]);
 });
