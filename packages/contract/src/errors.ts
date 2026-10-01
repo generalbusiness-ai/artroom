@@ -23,7 +23,8 @@ export type PlatformRule =
   | "role-forbids" //           the member's role may not sign this kind (R-ADM-3)
   | "idempotency-mismatch" //   R-IDEM-3
   | "secret-detected" //        R-SEC-2
-  | "invitation-invalid" //     unknown, expired or already used (R-GEN-6)
+  | "invitation-invalid" //     unknown, expired, already used, or the secret does not match (R-GEN-6)
+  | "key-in-use" //             a `join` signed by a key that is already bound or revoked (R-ADM-3c)
   // Lanes and leases (R-LANE)
   | "lane-unknown"
   | "lane-held" //              take-over of a lane that has a holder
@@ -39,6 +40,8 @@ export type PlatformRule =
   | "diff-too-large" //         R-PROP-6
   | "policy-invalid" //         a proposed `.artroom/` file fails its schema or the profile (R-POL-1)
   | "land-in-progress" //       the lane already has a landing operation in flight
+  | "recovery-scope" //         a configuration-recovery lane's scope or changed paths leave `.artroom/**` (R-ADMIN-5)
+  | "workspace-not-ready" //    a workspace token was requested before the operation is ready (R-WS-2)
   // Review and check authority (R-OBL)
   | "not-authorized-reviewer"
   | "self-review"
