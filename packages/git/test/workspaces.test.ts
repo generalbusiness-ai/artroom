@@ -2,7 +2,7 @@
 // against a fake Artifacts namespace with the binding's shape.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TOKEN_MARGIN_S, Workspaces, forkName } from "../src/workspace/workspaces.ts";
+import { FORK_TOKEN_TTL_S, RECHECK_MS, TOKEN_MARGIN_S, Workspaces, forkName } from "../src/workspace/workspaces.ts";
 import type { ArtifactsNamespace, MintedToken, RepoHandle, TokenInfo } from "../src/artifacts.ts";
 import { Clock, deferred, laneId, nodeSql } from "./support.ts";
 
@@ -394,10 +394,13 @@ test("a token minted just before a crash, never recorded, is found by the cleanu
   const orphan = ns.minted[ns.minted.length - 1]!;
   assert.equal(fork().tokens.get(orphan)?.state, "active", "minted in Artifacts, unknown to the room");
   const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
-  assert.equal(await restarted.reconcile(), 0);
-  assert.equal(fork().tokens.get(orphan)?.state, "revoked");
-  assert.equal((await restarted.provision(lane)).state, "ready");
+  assert.equal(await restarted.reconcile(), 1, "the mint is still in flight: its outcome is not known");
+  assert.equal(fork().tokens.get(orphan)?.state, "revoked", "but the token it made is found and revoked");
+  assert.equal((await restarted.provision(lane)).state, "ready", "an unresolved old step does not block the lease");
   assert.equal(fork().live().length, 1);
+  clock.advance(2 * 3_600_000 + LEASE_MS); // past the step's bound: send time + apply bound + requested TTL
+  assert.equal(await restarted.reconcile(), 0);
+  assert.equal(restarted.nextDue(), null);
 });
 
 test("when the inventory on release fails, an unrecorded token is not forgotten: the cleanup stays owed until it is revoked", async () => {
@@ -538,4 +541,120 @@ test("an orphan the inventory finds but cannot revoke stays owed by its ID until
   ns.failRevokeOnly = false;
   assert.equal(await ws.sweep(), 0);
   assert.deepEqual(fork().live(), []);
+});
+
+// ------------------------------------------------------------------ review f2f25fda, P2: every mint attempt is accounted for
+
+test("a mint attempt that applies and then answers with a retryable error: its token is swept before the workspace is ready", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ns.mintAfter.push(async () => {
+    throw new ArtifactsError("INTERNAL_ERROR", 10400); // applied in Artifacts, then the answer failed
+  });
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "ready");
+  assert.equal(fork().live().length, 1, "only the installed token is live");
+  const g = ws.grant(lane, 1);
+  assert.equal(fork().tokens.get(fork().live()[0]!)?.plaintext, !("refused" in g) ? g.token : "");
+  assert.equal(ws.pendingCleanup(), 0);
+  assert.equal(ws.nextDue(), null);
+});
+
+for (const failure of ["inventory", "revocation"] as const) {
+  test(`a retried mint whose sweep fails (${failure}): not ready, the orphan stays owed, and a later sweep finishes it`, async () => {
+    const { clock, ns, ws, lane, fork } = setup();
+    ns.mintAfter.push(async () => {
+      throw new ArtifactsError("INTERNAL_ERROR", 10400);
+    });
+    ns.mintDelays.push(async () => {}); // attempt 1
+    ns.mintDelays.push(async () => {
+      if (failure === "inventory") ns.failRevoke = true; // listing (and revoking) fail from attempt 2 on
+      else ns.failRevokeOnly = true; // listing works, revoking fails
+    });
+    ws.open(lane, 1, clock.t + LEASE_MS);
+    const v = await ws.provision(lane);
+    assert.equal(v.state, "failed");
+    assert.ok(v.state === "failed" && v.error.retryable);
+    assert.ok("refused" in ws.grant(lane, 1), "no credential while the orphan is live");
+    assert.equal(fork().live().length, 2);
+    assert.ok(ws.pendingCleanup() > 0 && ws.nextDue() !== null);
+    ns.failRevoke = false;
+    ns.failRevokeOnly = false;
+    ws.open(lane, 1, clock.t + LEASE_MS);
+    assert.equal((await ws.provision(lane)).state, "ready");
+    assert.equal(fork().live().length, 1);
+    assert.equal(ws.pendingCleanup(), 0);
+  });
+}
+
+// ------------------------------------------------------------------ review f2f25fda, P1: remote steps with no answer
+
+test("restart while a fork creation is outstanding: its 24-hour token is revoked when it appears, and the duty lasts until its bound", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const entered = deferred();
+  const release = deferred();
+  const remoteDone = deferred();
+  const canon = ns.repos.get("canon")!;
+  const realFork = canon.fork.bind(canon);
+  canon.fork = async (name: string) => {
+    entered.resolve();
+    await release.promise;
+    await realFork(name);
+    remoteDone.resolve();
+    return await new Promise<never>(() => {}); // the stopped host never hears back
+  };
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  void ws.provision(lane);
+  await entered.promise;
+  const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  assert.equal(await restarted.reconcile(), 1, "an absent fork proves nothing while its creation is in flight");
+  assert.ok(restarted.nextDue() !== null);
+  release.resolve();
+  await remoteDone.promise;
+  assert.equal(fork().live().length, 1, "the creation token now exists");
+  clock.advance(RECHECK_MS.max);
+  assert.equal(await restarted.reconcile(), 1, "still in flight: still owed");
+  assert.deepEqual(fork().live(), [], "the creation token was revoked by the scheduled inventory");
+  clock.advance(3_600_000 + FORK_TOKEN_TTL_S * 1000); // past send time + apply bound + 24 h
+  assert.equal(await restarted.reconcile(), 0);
+  assert.equal(restarted.nextDue(), null);
+  assert.ok(restarted.duties().some((d) => d.kind === "fork-create" && d.doneReason === "past-bound"));
+});
+
+test("restart while a mint is outstanding on a verified fork, then a later lease: the old token is revoked when it appears, the new lease keeps its own", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane); // the fork exists, verified
+  await ws.revoke(lane, 1);
+  ws.open(lane, 2, clock.t + LEASE_MS);
+  const entered = deferred();
+  const release = deferred();
+  const remoteDone = deferred();
+  const realCreate = fork().createToken.bind(fork());
+  let held = true;
+  fork().createToken = async (scope: "write" | "read" = "write", ttl = 86400) => {
+    if (!held) return realCreate(scope, ttl);
+    held = false;
+    entered.resolve();
+    await release.promise;
+    fork().mintRaw(scope, ttl);
+    remoteDone.resolve();
+    return await new Promise<never>(() => {}); // no answer reaches the stopped host
+  };
+  void ws.provision(lane);
+  await entered.promise;
+  const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  assert.equal(await restarted.reconcile(), 1, "the mint is in flight");
+  // The lane is taken over: lease 3 provisions on the new host while the old mint is unresolved.
+  restarted.open(lane, 3, clock.t + LEASE_MS);
+  assert.equal((await restarted.provision(lane)).state, "ready");
+  const g = restarted.grant(lane, 3);
+  assert.ok(!("refused" in g));
+  release.resolve();
+  await remoteDone.promise;
+  assert.equal(fork().live().length, 2, "the old mint has now applied");
+  clock.advance(RECHECK_MS.max);
+  await restarted.reconcile();
+  const live = fork().live();
+  assert.equal(live.length, 1, "the late token is revoked");
+  assert.equal(fork().tokens.get(live[0]!)?.plaintext, !("refused" in g) ? g.token : "", "lease 3 keeps its own");
 });

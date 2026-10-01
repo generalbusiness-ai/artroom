@@ -11,25 +11,38 @@
  *   (R-WS-3).
  * - Fork creation retries Artifacts' transient internal errors (10400).
  *
- * One durable cleanup protocol covers every token that must not stay live:
- * - Before any step that can leave a token nobody records (creating a fork,
- *   which comes with its own long-lived token; minting a lease token;
- *   releasing a lease), an obligation is written to SQLite first.
- * - An obligation is resolved only after Artifacts confirms the cleanup:
- *   `inventory` lists the fork's tokens and revokes every active one except
- *   the current ready lease's recorded token; `token` revokes one known ID.
- * - Every operation on one fork (provisioning, cleanup) runs one at a time,
- *   so cleanup can never revoke a token that is being installed.
- * - A workspace is made ready only when its fork has no cleanup owed, so a
- *   ready workspace has exactly one live token.
- * - The Room's alarm calls `reconcile()` and sets its next alarm from
- *   `nextDue()`. That is how cleanup survives failures and restarts.
- * - Cleanup checks provenance first, and never touches a repository that is
- *   not this canonical repo's fork.
+ * One durable protocol covers every remote step that can leave a token
+ * nobody records, and every token that must not stay live. Each is a duty
+ * in SQLite, with an explicit state:
+ * - `in-flight`: a non-idempotent remote step was sent (creating a fork,
+ *   which comes with its own 24-hour token; one attempt to mint a lease
+ *   token) and no answer has been received. If the host stops, the step
+ *   stays in flight: it may still apply.
+ * - `answered`: the step's answer (success or error) was received, so the
+ *   remote call has finished. An answer is the completion fence.
+ * - `owed`: an inventory (revoke every active token except the recorded
+ *   lease token) or one known token, to revoke.
+ * - `done`: settled, with the reason.
  *
- * The token is kept in this Durable Object's SQLite until revoked, so the
- * holder can retrieve it again. It is never logged, published or put in an
- * error (R-WS-4).
+ * An inventory run lists the fork's tokens and revokes every active one that
+ * no ready or installing lease has recorded. When it succeeds, it settles
+ * every `owed` inventory and every step answered before it started. An
+ * `in-flight` step is never settled by a run: a snapshot taken before it
+ * could finish proves nothing. It keeps a scheduled inventory every few
+ * minutes, which revokes anything it creates, until its bound has passed:
+ * the time it was sent, plus `applyBoundMs` (how long an unanswered request
+ * is assumed able to stay outstanding; default one hour, an assumption, not
+ * an Artifacts guarantee), plus the longest life of a token it could create
+ * (the requested TTL, or 24 hours for a fork's creation token, whose TTL
+ * the binding cannot shorten). After that, no token from it can be live.
+ *
+ * A workspace becomes ready only after an inventory that started after its
+ * token was recorded has succeeded, so every attempt that answered (even
+ * with a retryable error after it applied) has been swept. The in-memory
+ * fork lock coordinates one live host only; it is never restart evidence.
+ * The Room's alarm calls `reconcile()` and sets its next alarm from
+ * `nextDue()`. Cleanup checks provenance first, and never touches a
+ * repository that is not this canonical repo's fork.
  */
 
 import type {
@@ -42,7 +55,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { type Sql, type SqlRow, text } from "../sql.ts";
-import { type ArtifactsNamespace, type RepoHandle, artifactsCode, withRetry } from "../artifacts.ts";
+import { type ArtifactsNamespace, type RepoHandle, artifactsCode, retriable, withRetry } from "../artifacts.ts";
 
 /** Artifacts' shortest token lifetime. */
 export const MIN_TOKEN_TTL_S = 60;
@@ -56,7 +69,14 @@ export interface WorkspacesOptions {
   readonly namespace: string;
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
+  /** How long a remote request that never answered is assumed able to stay outstanding. Default one hour. */
+  readonly applyBoundMs?: number;
 }
+
+/** A fork's creation token lives 24 hours; the binding cannot ask for less. */
+export const FORK_TOKEN_TTL_S = 86_400;
+/** How often an unresolved remote step's inventory runs: first after 1 minute, then backing off to 10 minutes. */
+export const RECHECK_MS = { first: 60_000, max: 600_000 } as const;
 
 const iso = (ms: number) => new Date(ms).toISOString();
 const TOKEN = /art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g;
@@ -113,6 +133,7 @@ export class Workspaces {
   private readonly namespace: string;
   private readonly now: () => number;
   private readonly sleep: ((ms: number) => Promise<void>) | undefined;
+  private readonly applyBoundMs: number;
   private readonly inFlight = new Map<LaneId, Promise<WorkspaceOp>>();
   private readonly locks = new Map<string, Promise<unknown>>();
 
@@ -123,16 +144,18 @@ export class Workspaces {
     this.namespace = opts.namespace;
     this.now = opts.now ?? Date.now;
     this.sleep = opts.sleep;
+    this.applyBoundMs = opts.applyBoundMs ?? 3_600_000;
     this.sql.all(
       "CREATE TABLE IF NOT EXISTS artroom_ws (lane TEXT PRIMARY KEY, lease INTEGER NOT NULL, state TEXT NOT NULL, fork TEXT NOT NULL, " +
         "remote TEXT, lease_expires_at INTEGER NOT NULL, token_id TEXT, token_expires_at INTEGER, error TEXT, updated_at INTEGER NOT NULL)",
     );
     // Secrets live apart from the public row, so no read of the row can carry one.
     this.sql.all("CREATE TABLE IF NOT EXISTS artroom_ws_secret (lane TEXT PRIMARY KEY, lease INTEGER NOT NULL, token TEXT NOT NULL)");
-    // Cleanup owed on a fork: `inventory` (every active token but the current one) or one `token`.
+    // Duties: remote steps whose outcome matters, and cleanup owed (see the module comment).
     this.sql.all(
-      "CREATE TABLE IF NOT EXISTS artroom_ws_cleanup (id INTEGER PRIMARY KEY AUTOINCREMENT, fork TEXT NOT NULL, kind TEXT NOT NULL, " +
-        "token_id TEXT, reason TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, last_error TEXT)",
+      "CREATE TABLE IF NOT EXISTS artroom_ws_duty (id INTEGER PRIMARY KEY AUTOINCREMENT, fork TEXT NOT NULL, kind TEXT NOT NULL, " +
+        "token_id TEXT, reason TEXT NOT NULL, state TEXT NOT NULL, started_at INTEGER NOT NULL, answered_at INTEGER, bound INTEGER, " +
+        "attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, last_error TEXT, done_at INTEGER, done_reason TEXT)",
     );
   }
 
@@ -174,34 +197,80 @@ export class Workspaces {
     );
   }
 
-  /** Record cleanup owed on a fork. Returns its ID. */
-  private owe(fork: string, kind: "inventory" | "token", reason: string, tokenId: string | null = null): number {
-    this.sql.all("INSERT INTO artroom_ws_cleanup (fork, kind, token_id, reason, next_at) VALUES (?, ?, ?, ?, ?)", fork, kind, tokenId, reason, this.now());
+  private insertDuty(fork: string, kind: DutyKind, state: DutyState, reason: string, tokenId: string | null, bound: number | null): number {
+    this.sql.all(
+      "INSERT INTO artroom_ws_duty (fork, kind, token_id, reason, state, started_at, bound, next_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      fork,
+      kind,
+      tokenId,
+      reason,
+      state,
+      this.now(),
+      bound,
+      this.now(),
+    );
     return Number(this.sql.all("SELECT last_insert_rowid() AS id")[0]?.["id"]);
   }
 
-  private owed(fork: string): { id: number; kind: "inventory" | "token"; tokenId: string | null; attempts: number }[] {
-    return this.sql.all("SELECT id, kind, token_id, attempts FROM artroom_ws_cleanup WHERE fork = ? ORDER BY id", fork).map((r) => ({
+  /** Cleanup owed: an inventory of the fork, or one known token. */
+  private owe(fork: string, kind: "inventory" | "token", reason: string, tokenId: string | null = null): number {
+    return this.insertDuty(fork, kind, "owed", reason, tokenId, null);
+  }
+
+  /**
+   * A non-idempotent remote step is about to be sent. Written first, so that
+   * if the host stops before the answer, the step is known to be unresolved.
+   */
+  private beginStep(fork: string, kind: "fork-create" | "mint", tokenTtlS: number): number {
+    return this.insertDuty(fork, kind, "in-flight", kind, null, this.now() + this.applyBoundMs + tokenTtlS * 1000);
+  }
+
+  /** The step's answer (success or error) arrived: the remote call has finished. */
+  private answered(id: number, error?: unknown): void {
+    this.sql.all(
+      "UPDATE artroom_ws_duty SET state = 'answered', answered_at = ?, next_at = ?, last_error = ? WHERE id = ? AND state = 'in-flight'",
+      this.now(),
+      this.now(),
+      error === undefined ? null : redact(String(error)).slice(0, 300),
+      id,
+    );
+  }
+
+  private open_(fork: string): Duty[] {
+    return this.sql.all("SELECT * FROM artroom_ws_duty WHERE fork = ? AND state != 'done' ORDER BY id", fork).map((r) => ({
       id: Number(r["id"]),
-      kind: text(r, "kind") as "inventory" | "token",
+      kind: text(r, "kind") as DutyKind,
+      state: text(r, "state") as DutyState,
       tokenId: text(r, "token_id"),
+      startedAt: Number(r["started_at"]),
+      answeredAt: r["answered_at"] === null ? null : Number(r["answered_at"]),
+      bound: r["bound"] === null ? null : Number(r["bound"]),
       attempts: Number(r["attempts"]),
     }));
   }
 
-  private resolve(ids: readonly number[]): void {
-    for (const id of ids) this.sql.all("DELETE FROM artroom_ws_cleanup WHERE id = ?", id);
+  private done(ids: readonly number[], reason: string): void {
+    for (const id of ids) this.sql.all("UPDATE artroom_ws_duty SET state = 'done', done_at = ?, done_reason = ? WHERE id = ?", this.now(), reason, id);
   }
 
-  private deferCleanup(ids: readonly number[], error: string): void {
+  private defer(ids: readonly number[], error: string, maxMs = 300_000): void {
     for (const id of ids) {
-      const attempts = Number(this.sql.all("SELECT attempts FROM artroom_ws_cleanup WHERE id = ?", id)[0]?.["attempts"] ?? 0) + 1;
-      const wait = Math.min(1000 * 2 ** Math.min(attempts, 8), 300_000);
-      this.sql.all("UPDATE artroom_ws_cleanup SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?", attempts, this.now() + wait, redact(error).slice(0, 300), id);
+      const attempts = Number(this.sql.all("SELECT attempts FROM artroom_ws_duty WHERE id = ?", id)[0]?.["attempts"] ?? 0) + 1;
+      const wait = Math.min(1000 * 2 ** Math.min(attempts, 9), maxMs);
+      this.sql.all("UPDATE artroom_ws_duty SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?", attempts, this.now() + wait, redact(error).slice(0, 300), id);
     }
   }
 
-  /** Run `fn` with this fork to itself: provisioning and cleanup never interleave. */
+  /** Schedule the next inventory for steps still in flight. */
+  private recheck(ids: readonly number[]): void {
+    for (const id of ids) {
+      const attempts = Number(this.sql.all("SELECT attempts FROM artroom_ws_duty WHERE id = ?", id)[0]?.["attempts"] ?? 0) + 1;
+      const wait = Math.min(RECHECK_MS.first * 2 ** Math.min(attempts - 1, 4), RECHECK_MS.max);
+      this.sql.all("UPDATE artroom_ws_duty SET attempts = ?, next_at = ? WHERE id = ?", attempts, this.now() + wait, id);
+    }
+  }
+
+  /** Run `fn` with this fork to itself: one live host never interleaves provisioning and cleanup. */
   private exclusive<T>(fork: string, fn: () => Promise<T>): Promise<T> {
     const prev = this.locks.get(fork) ?? Promise.resolve();
     const next = prev.then(fn, fn);
@@ -223,9 +292,19 @@ export class Workspaces {
     return { ...base, state: "pending" };
   }
 
-  /** Cleanup still owed, by fork. For admins and tests. */
+  /** Duties not yet settled: cleanup owed, and remote steps whose outcome is not yet safe. */
   pendingCleanup(): number {
-    return Number(this.sql.all("SELECT COUNT(*) AS n FROM artroom_ws_cleanup")[0]?.["n"] ?? 0);
+    return Number(this.sql.all("SELECT COUNT(*) AS n FROM artroom_ws_duty WHERE state != 'done'")[0]?.["n"] ?? 0);
+  }
+
+  /** Every duty, for admins and tests. */
+  duties(): { kind: DutyKind; state: DutyState; reason: string; doneReason: string | null }[] {
+    return this.sql.all("SELECT kind, state, reason, done_reason FROM artroom_ws_duty ORDER BY id").map((r) => ({
+      kind: text(r, "kind") as DutyKind,
+      state: text(r, "state") as DutyState,
+      reason: text(r, "reason") ?? "",
+      doneReason: text(r, "done_reason"),
+    }));
   }
 
   // ---------------------------------------------------------------- open and provision
@@ -266,7 +345,7 @@ export class Workspaces {
     });
   }
 
-  /** Create the fork if needed, settle any cleanup owed, and mint this lease's token. Safe to call again. */
+  /** Create the fork if needed, settle cleanup, mint this lease's token, and sweep the fork. Safe to call again. */
   provision(lane: LaneId): Promise<WorkspaceOp> {
     const running = this.inFlight.get(lane);
     if (running) return running;
@@ -287,11 +366,19 @@ export class Workspaces {
         const now = this.row(lane);
         if (now && now.lease === lease && now.state === "pending" && now.remote !== remote) this.put({ ...now, remote });
       });
-      // Ready only with nothing owed: then the lease's token is the fork's only live token.
-      const owedLeft = await this.cleanFork(start.fork);
-      if (owedLeft > 0) throw new CleanupOwed(`${owedLeft} token cleanup step(s) on the fork are still owed; trying again later`);
-      const minted = await this.mintWithinLease(lane, lease, start.fork, fork);
-      if (!minted) return this.view(lane) ?? this.failed(lane, new Error("the lease ended"));
+      // Settle what is owed before minting, so nothing older is left behind.
+      const owed = await this.cleanFork(start.fork);
+      if (owed > 0) throw new CleanupOwed(`${owed} token cleanup step(s) on the fork are still owed; trying again later`);
+      const token = await this.mintWithinLease(lane, lease, start.fork, fork);
+      if (!token) return this.view(lane) ?? this.failed(lane, new Error("the lease ended"));
+      // Ready only after an inventory that started after the token was recorded:
+      // every attempt that answered, even with an error after applying, is swept.
+      const left = await this.cleanFork(start.fork);
+      if (left > 0) throw new CleanupOwed(`${left} token cleanup step(s) on the fork are still owed; trying again later`);
+      this.sql.transaction(() => {
+        const now = this.row(lane);
+        if (now && now.lease === lease && now.state === "pending" && now.tokenId === token) this.put({ ...now, state: "ready" });
+      });
       return this.view(lane)!;
     } catch (e) {
       return this.fail(lane, lease, e);
@@ -300,22 +387,40 @@ export class Workspaces {
 
   /**
    * Mint a write token that ends no later than the lease (R-CRED-8), and
-   * install it. An inventory obligation is written before the mint, so a
-   * token minted just before a crash is found and revoked. The lease is read
-   * again after the await: a token for an ended or changed lease, or one
-   * whose actual expiry runs past the lease, is revoked; an overlong token is
-   * replaced by one for the time that is left, if Artifacts' minimum still
-   * fits. Returns false if the lease ended.
+   * record it on the pending row. Each attempt is one remote step, written
+   * as in flight before it is sent and marked answered when its answer
+   * arrives; no attempt is retried inside the call, so every attempt is
+   * accounted for. The lease is read again after the await: a token for an
+   * ended or changed lease, or one whose actual expiry runs past the lease,
+   * is owed revocation; an overlong token is replaced by one for the time
+   * that is left, if Artifacts' minimum still fits. Returns the recorded
+   * token's ID, or null if the lease ended.
    */
-  private async mintWithinLease(lane: LaneId, lease: LeaseGeneration, forkName: string, fork: RepoHandle): Promise<boolean> {
-    for (let i = 0; i < 3; i++) {
+  private async mintWithinLease(lane: LaneId, lease: LeaseGeneration, forkName: string, fork: RepoHandle): Promise<string | null> {
+    const existing = this.row(lane);
+    // A token recorded by an earlier attempt whose sweep did not finish is reused, not doubled.
+    if (existing?.tokenId && existing.lease === lease && existing.state === "pending" && existing.tokenExpiresAt !== null && existing.tokenExpiresAt <= existing.leaseExpiresAt && existing.tokenExpiresAt > this.now()) {
+      return existing.tokenId;
+    }
+    let lastError: unknown = null;
+    for (let i = 0; i < 4; i++) {
       const before = this.row(lane);
-      if (!before || before.lease !== lease || before.state !== "pending") return false;
+      if (!before || before.lease !== lease || before.state !== "pending") return null;
       const ttl = Math.floor((before.leaseExpiresAt - this.now()) / 1000) - TOKEN_MARGIN_S;
       if (ttl < MIN_TOKEN_TTL_S) throw new Error("the lease ends too soon for a workspace token; renew it first");
-      const mintDebt = this.owe(forkName, "inventory", "mint");
-      const token = await withRetry(() => fork.createToken("write", ttl), this.retryOpts());
-      const installed = this.sql.transaction(() => {
+      const step = this.beginStep(forkName, "mint", ttl);
+      let token: Awaited<ReturnType<RepoHandle["createToken"]>>;
+      try {
+        token = await fork.createToken("write", ttl);
+      } catch (e) {
+        this.answered(step, e);
+        lastError = e;
+        if (!retriable(e)) throw e;
+        await (this.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(500 * 2 ** i);
+        continue;
+      }
+      const outcome = this.sql.transaction(() => {
+        this.answered(step);
         const still = this.row(lane);
         const expiresAt = Date.parse(token.expiresAt);
         const current = !!still && still.lease === lease && still.state === "pending";
@@ -323,22 +428,20 @@ export class Workspaces {
           this.owe(forkName, "token", current ? "overlong" : "lease-ended", token.id);
           return current ? "retry" : "ended";
         }
-        this.put({ ...still, state: "ready", remote: still.remote ?? null, tokenId: token.id, tokenExpiresAt: expiresAt });
+        this.put({ ...still, tokenId: token.id, tokenExpiresAt: expiresAt });
         this.sql.all(
           "INSERT INTO artroom_ws_secret (lane, lease, token) VALUES (?, ?, ?) ON CONFLICT (lane) DO UPDATE SET lease = excluded.lease, token = excluded.token",
           lane,
           lease,
           token.plaintext,
         );
-        // The minted token is now recorded: this mint can leave no orphan.
-        this.resolve([mintDebt]);
-        return "ready";
+        return "recorded";
       });
-      if (installed === "ready") return true;
+      if (outcome === "recorded") return token.id;
       await this.cleanFork(forkName);
-      if (installed === "ended") return false;
+      if (outcome === "ended") return null;
     }
-    throw new Error("could not mint a workspace token that ends within the lease");
+    throw lastError ?? new Error("could not mint a workspace token that ends within the lease");
   }
 
   private retryOpts() {
@@ -358,15 +461,20 @@ export class Workspaces {
 
   // ---------------------------------------------------------------- the fork
 
-  /** Get the fork, creating it from the canonical repo on first use. Its creation token is owed revocation from before the call. */
+  /** Get the fork, creating it from the canonical repo on first use. The creation is a remote step, recorded before it is sent. */
   private async ensureFork(name: string): Promise<{ fork: RepoHandle; remote: string }> {
     const existing = await this.forkState(name);
     if (existing.kind === "ours") return existing;
     const canonical = await withRetry(() => this.artifacts.get(this.canonical), this.retryOpts());
-    // Written before the call: the fork's long-lived creation token must never outlive a lost response or a crash.
-    this.owe(name, "inventory", "fork-created");
+    const step = this.beginStep(name, "fork-create", FORK_TOKEN_TTL_S);
     try {
-      const made = await withRetry(() => canonical.fork(name, { description: `Artroom lane fork of ${this.canonical}`, defaultBranchOnly: true }), this.retryOpts());
+      let made: { readonly remote: string };
+      try {
+        made = await withRetry(() => canonical.fork(name, { description: `Artroom lane fork of ${this.canonical}`, defaultBranchOnly: true }), this.retryOpts());
+      } finally {
+        // Reached only when an answer (success or error) arrived.
+        this.answered(step);
+      }
       const got = await this.forkState(name);
       if (got.kind === "ours") return got;
       return { fork: await withRetry(() => this.artifacts.get(name), this.retryOpts()), remote: made.remote };
@@ -402,89 +510,109 @@ export class Workspaces {
   }
 
   /**
-   * Settle the cleanup owed on one fork. The caller holds the fork's lock.
-   * Each obligation is resolved only after Artifacts confirms it. Returns how
-   * many are still owed.
+   * Settle the duties of one fork. The caller holds the fork's lock.
+   * Returns how many duties still block a ready workspace: everything not
+   * settled except remote steps still in flight from a host that stopped,
+   * which keep their scheduled inventories without blocking a new lease.
    */
   private async cleanFork(name: string): Promise<number> {
-    const owed = this.owed(name);
-    if (owed.length === 0) return 0;
+    const duties = this.open_(name);
+    if (duties.length === 0) return 0;
+    const runStart = this.now();
+    const blocking = () => this.open_(name).filter((d) => d.state !== "in-flight").length;
     let state: Awaited<ReturnType<Workspaces["forkState"]>>;
     try {
       state = await this.forkState(name);
     } catch (e) {
       if (e instanceof NotOurFork) {
-        // Not ours: never touched. Nothing of ours can be live in it.
-        this.resolve(owed.map((o) => o.id));
+        // Not ours: never touched, and nothing of ours can be live in it.
+        this.done(duties.map((d) => d.id), "not-our-repository");
         return 0;
       }
-      this.deferCleanup(owed.map((o) => o.id), String(e));
-      return owed.length;
+      this.defer(duties.map((d) => d.id), String(e));
+      return blocking();
     }
+    if (state.kind === "busy") return blocking();
+    const inFlight = duties.filter((d) => d.state === "in-flight");
     if (state.kind === "absent") {
-      this.resolve(owed.map((o) => o.id)); // no repository, no tokens
-      return 0;
+      // No repository, so no tokens. But a fork creation still in flight may yet create one.
+      this.done(duties.filter((d) => d.state !== "in-flight").map((d) => d.id), "no-repository");
+      this.retire(inFlight, runStart);
+      return blocking();
     }
-    if (state.kind === "busy") return owed.length;
     const fork = state.fork;
-    for (const o of owed.filter((x) => x.kind === "token")) {
+    for (const d of duties.filter((x) => x.kind === "token" && x.state === "owed")) {
       try {
-        await withRetry(() => fork.revokeToken(o.tokenId!), this.retryOpts());
-        this.resolve([o.id]);
+        await withRetry(() => fork.revokeToken(d.tokenId!), this.retryOpts());
+        this.done([d.id], "revoked");
       } catch (e) {
-        this.deferCleanup([o.id], String(e));
+        this.defer([d.id], String(e));
       }
     }
-    const inventory = owed.filter((x) => x.kind === "inventory");
-    if (inventory.length > 0) {
+    const sweep = duties.filter((x) => x.kind !== "token");
+    if (sweep.length > 0) {
       try {
         const { tokens } = await withRetry(() => fork.listTokens(), this.retryOpts());
-        // Keep only the token a ready lease has recorded on this fork.
+        // Keep only tokens a ready or installing lease has recorded on this fork.
         const keep = new Set(
-          this.sql.all("SELECT token_id FROM artroom_ws WHERE fork = ? AND state = 'ready' AND token_id IS NOT NULL", name).map((r) => text(r, "token_id")!),
+          this.sql
+            .all("SELECT token_id FROM artroom_ws WHERE fork = ? AND state IN ('ready', 'pending') AND token_id IS NOT NULL", name)
+            .map((r) => text(r, "token_id")!),
         );
         for (const t of tokens) {
           if (t.state !== "active" || keep.has(t.id)) continue;
           try {
             await withRetry(() => fork.revokeToken(t.id), this.retryOpts());
           } catch (e) {
-            // Owed by ID from now on, so the inventory itself is done.
-            const id = this.owe(name, "token", "inventory", t.id);
-            this.deferCleanup([id], String(e));
+            // Owed by ID from now on.
+            this.defer([this.owe(name, "token", "inventory", t.id)], String(e));
           }
         }
-        this.resolve(inventory.map((o) => o.id));
+        // This run settles owed inventories, and steps answered before it started.
+        this.done(sweep.filter((d) => d.state === "owed").map((d) => d.id), "inventory");
+        this.done(sweep.filter((d) => d.state === "answered" && d.answeredAt !== null && d.answeredAt <= runStart).map((d) => d.id), "answered-and-swept");
+        this.retire(inFlight, runStart);
       } catch (e) {
-        this.deferCleanup(inventory.map((o) => o.id), String(e));
+        this.defer(sweep.map((d) => d.id), String(e));
       }
+    } else {
+      this.retire(inFlight, runStart);
     }
-    return this.owed(name).length;
+    return blocking();
+  }
+
+  /** Steps still in flight: retired once their bound has passed, otherwise rechecked later. */
+  private retire(inFlight: readonly Duty[], at: number): void {
+    const past = inFlight.filter((d) => d.bound !== null && d.bound <= at);
+    this.done(past.map((d) => d.id), "past-bound");
+    this.recheck(inFlight.filter((d) => !past.includes(d)).map((d) => d.id));
   }
 
   // ---------------------------------------------------------------- the alarm contract
 
   /**
    * The Room's alarm calls this, then sets its next alarm to `nextDue()`.
-   * It settles every cleanup that is due, one fork at a time. Returns how
-   * many cleanup steps are still owed.
+   * It runs every duty that is due, one fork at a time. Returns how many
+   * duties are still not settled (including steps in flight from a host
+   * that stopped, which keep being rechecked until their bound passes).
    */
   async reconcile(): Promise<number> {
     const forks = this.sql
-      .all("SELECT DISTINCT fork FROM artroom_ws_cleanup WHERE next_at <= ?", this.now())
+      .all("SELECT DISTINCT fork FROM artroom_ws_duty WHERE state != 'done' AND next_at <= ?", this.now())
       .map((r) => text(r, "fork")!);
     for (const f of forks) await this.exclusive(f, () => this.cleanFork(f));
     return this.pendingCleanup();
   }
 
-  /** When the next cleanup step is due, or null if none is owed. */
+  /** When the next duty is due, or null if none is open. */
   nextDue(): number | null {
-    const r = this.sql.all("SELECT MIN(next_at) AS t FROM artroom_ws_cleanup")[0];
+    const r = this.sql.all("SELECT MIN(next_at) AS t FROM artroom_ws_duty WHERE state != 'done'")[0];
     return r?.["t"] == null ? null : Number(r["t"]);
   }
 
-  /** Same as `reconcile`, ignoring backoff. Returns how many are still owed. */
+  /** Same as `reconcile`, ignoring backoff. Returns how many duties are still open. */
   async sweep(): Promise<number> {
-    this.sql.all("UPDATE artroom_ws_cleanup SET next_at = ?", this.now());
+    this.sql.all("UPDATE artroom_ws_duty SET next_at = ? WHERE state != 'done'", this.now());
     return this.reconcile();
   }
 
@@ -526,10 +654,10 @@ export class Workspaces {
    * End a lease's workspace access: on release, expiry or take-over
    * (R-LANE-8, R-WS-3). In one transaction it forgets the secret, records
    * the lease's token and an inventory of the fork as owed, and marks the
-   * workspace revoked. Then it settles that cleanup, under the fork's lock,
-   * so it can never revoke a later lease's token. A release of a lease that
-   * has already been replaced changes nothing. Returns how many cleanup
-   * steps are still owed on the fork (0 when everything is revoked).
+   * workspace revoked. Then it settles that cleanup under the fork's lock. A
+   * release of a lease that has already been replaced changes nothing.
+   * Returns how many duties on the fork still block (0 when everything owed
+   * is revoked).
    */
   async revoke(lane: LaneId, lease: LeaseGeneration): Promise<number> {
     const r = this.row(lane);
@@ -548,3 +676,15 @@ export class Workspaces {
   }
 }
 
+type DutyKind = "inventory" | "token" | "fork-create" | "mint";
+type DutyState = "in-flight" | "answered" | "owed" | "done";
+interface Duty {
+  readonly id: number;
+  readonly kind: DutyKind;
+  readonly state: DutyState;
+  readonly tokenId: string | null;
+  readonly startedAt: number;
+  readonly answeredAt: number | null;
+  readonly bound: number | null;
+  readonly attempts: number;
+}

@@ -124,21 +124,33 @@ ws.grant(lane, leaseGeneration);                   // the token, after the Room 
 await ws.revoke(lane, leaseGeneration);            // release, expiry or take-over of that lease (R-WS-3)
 
 // The Room's alarm (alongside landing.reconcile()):
-await ws.reconcile();                              // settle the token cleanup that is due
+await ws.reconcile();                              // run the duties that are due (cleanup, and checks on unanswered steps)
 const next = ws.nextDue();                         // set the next alarm to the earlier of this and landing.nextDue()
 ```
 
-- **One durable cleanup protocol.** Before any step that could leave a
-  token nobody records (creating a fork, which comes with a long-lived
-  token; minting a lease token; releasing a lease), a cleanup obligation is
-  written to SQLite. An obligation is resolved only after Artifacts
-  confirms it: an *inventory* lists the fork's tokens and revokes every
-  active one except the ready lease's recorded token; a *token* obligation
-  revokes one known ID. Failures are retried with backoff by
-  `reconcile()`, which the Room's alarm calls, and survive restarts.
-- **Ready means exactly one live token.** Provisioning settles any cleanup
-  owed on the fork before it mints; while any is owed, the workspace fails
-  (retryable) and no token is granted.
+- **One durable protocol for remote steps and cleanup.** Every
+  non-idempotent remote step (creating a fork, which comes with a 24-hour
+  token; each attempt to mint a lease token) is written to SQLite as *in
+  flight* before it is sent, and marked *answered* when its answer (success
+  or error) arrives: an answer is the completion fence. Cleanup is *owed* as
+  an inventory (revoke every active token except the one a ready or
+  installing lease recorded) or one known token. An inventory that
+  succeeds settles every owed inventory and every step answered before it
+  started. A step still in flight (its host stopped) is never settled by a
+  snapshot: it keeps a scheduled inventory every few minutes, which revokes
+  whatever it creates, until its bound has passed: send time, plus
+  `applyBoundMs` (how long an unanswered request is assumed able to stay
+  outstanding; default one hour; an assumption, not an Artifacts
+  guarantee), plus the longest life of a token it could create (the TTL
+  requested, or 24 hours for a fork's creation token, which the binding
+  cannot shorten). Each duty ends *done*, with its reason.
+- **Ready means swept.** Provisioning settles what is owed, mints once per
+  attempt (never a hidden retry), records the token, and then runs an
+  inventory that started after the token was recorded. Only when that
+  succeeds is the workspace ready, so a mint that applied and then answered
+  with an error cannot leave a second live token. A step still in flight
+  from a stopped host does not block a new lease; its inventories revoke
+  anything it creates.
 - **Results are fenced by lease.** Provisioning and cleanup of one fork
   run one at a time, so cleanup never revokes a token being installed, and
   a late error or a late release of an old lease never changes a newer
