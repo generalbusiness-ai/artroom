@@ -1,0 +1,236 @@
+{
+  "repo": "artroom-lb-tok-mupu6khv",
+  "git": "git version 2.54.0 (Apple Git-157)",
+  "results": [
+    {
+      "case": "E",
+      "what": "token revoked the moment the last byte of the push body is sent, while the receiver processes it",
+      "tokenTtlS": 600,
+      "pushExit": 0,
+      "pushStdout": "To http://127.0.0.1:54841/git/gitseq-spike/artroom-lb-tok-mupu6khv.git\n*\tHEAD:refs/heads/case-e-mupu6mq2\t[new branch]\nDone",
+      "pushStderr": "",
+      "refAccepted": true,
+      "timesSinceMintS": {
+        "expiresAt": 600,
+        "revokedAt": 5.8,
+        "revokeAnsweredAt": 6.2,
+        "postForwarded": 0.4,
+        "postBodyDone": 5.8,
+        "postResponse": 6.4,
+        "pushDone": 7.3
+      },
+      "postStatus": 200,
+      "postBodyBytes": 2098200,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.3,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 200,
+          "at": 0.4,
+          "error": null
+        }
+      ]
+    },
+    {
+      "case": "E",
+      "what": "token revoked the moment the last byte of the push body is sent, while the receiver processes it",
+      "tokenTtlS": 600,
+      "pushExit": 0,
+      "pushStdout": "To http://127.0.0.1:54921/git/gitseq-spike/artroom-lb-tok-mupu6khv.git\n*\tHEAD:refs/heads/case-e-mupu6spm\t[new branch]\nDone",
+      "pushStderr": "",
+      "refAccepted": true,
+      "timesSinceMintS": {
+        "expiresAt": 600,
+        "revokedAt": 5.8,
+        "revokeAnsweredAt": 6.2,
+        "postForwarded": 0.5,
+        "postBodyDone": 5.8,
+        "postResponse": 6.4,
+        "pushDone": 7.3
+      },
+      "postStatus": 200,
+      "postBodyBytes": 2098200,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.4,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 200,
+          "at": 0.5,
+          "error": null
+        }
+      ]
+    },
+    {
+      "case": "E",
+      "what": "token revoked the moment the last byte of the push body is sent, while the receiver processes it",
+      "tokenTtlS": 600,
+      "pushExit": 0,
+      "pushStdout": "To http://127.0.0.1:54963/git/gitseq-spike/artroom-lb-tok-mupu6khv.git\n*\tHEAD:refs/heads/case-e-mupu6ytg\t[new branch]\nDone",
+      "pushStderr": "",
+      "refAccepted": true,
+      "timesSinceMintS": {
+        "expiresAt": 600,
+        "revokedAt": 5.8,
+        "revokeAnsweredAt": 6.1,
+        "postForwarded": 0.3,
+        "postBodyDone": 5.8,
+        "postResponse": 6.2,
+        "pushDone": 7.1
+      },
+      "postStatus": 200,
+      "postBodyBytes": 2098201,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.2,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 200,
+          "at": 0.3,
+          "error": null
+        }
+      ]
+    },
+    {
+      "case": "E",
+      "what": "token revoked the moment the last byte of the push body is sent, while the receiver processes it",
+      "tokenTtlS": 600,
+      "pushExit": 0,
+      "pushStdout": "To http://127.0.0.1:55123/git/gitseq-spike/artroom-lb-tok-mupu6khv.git\n*\tHEAD:refs/heads/case-e-mupu74oj\t[new branch]\nDone",
+      "pushStderr": "",
+      "refAccepted": true,
+      "timesSinceMintS": {
+        "expiresAt": 600,
+        "revokedAt": 5.8,
+        "revokeAnsweredAt": 6.5,
+        "postForwarded": 0.3,
+        "postBodyDone": 5.8,
+        "postResponse": 6.2,
+        "pushDone": 7.1
+      },
+      "postStatus": 200,
+      "postBodyBytes": 2098201,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0.1,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.3,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 200,
+          "at": 0.3,
+          "error": null
+        }
+      ]
+    },
+    {
+      "case": "E",
+      "what": "token revoked the moment the last byte of the push body is sent, while the receiver processes it",
+      "tokenTtlS": 600,
+      "pushExit": 0,
+      "pushStdout": "To http://127.0.0.1:55230/git/gitseq-spike/artroom-lb-tok-mupu6khv.git\n*\tHEAD:refs/heads/case-e-mupu7ajh\t[new branch]\nDone",
+      "pushStderr": "",
+      "refAccepted": true,
+      "timesSinceMintS": {
+        "expiresAt": 600,
+        "revokedAt": 5.6,
+        "revokeAnsweredAt": 6.1,
+        "postForwarded": 0.3,
+        "postBodyDone": 5.6,
+        "postResponse": 6.1,
+        "pushDone": 7
+      },
+      "postStatus": 200,
+      "postBodyBytes": 2098199,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.2,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 200,
+          "at": 0.3,
+          "error": null
+        }
+      ]
+    }
+  ]
+}

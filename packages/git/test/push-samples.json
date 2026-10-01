@@ -1,0 +1,101 @@
+[
+ {
+  "case": "landed",
+  "exitCode": 0,
+  "stdout": "To <tmp>/ok/remote.git\n \tcc1237434b831f99f8968bed7b06f4fe843eb98f:refs/heads/main\t04b8444..cc12374\nDone\n",
+  "stderr": "",
+  "expected": "landed",
+  "refChanged": true,
+  "note": "correct lease"
+ },
+ {
+  "case": "lease-client",
+  "exitCode": 1,
+  "stdout": "To <tmp>/stale/remote.git\n!\tcc1237434b831f99f8968bed7b06f4fe843eb98f:refs/heads/main\t[rejected] (stale info)\nDone\n",
+  "stderr": "error: failed to push some refs to '<tmp>/stale/remote.git'\n",
+  "expected": "rejected:lease",
+  "refChanged": false,
+  "note": "wrong expected base"
+ },
+ {
+  "case": "remote-rejected",
+  "exitCode": 1,
+  "stdout": "To <tmp>/hook/remote.git\n!\tcc1237434b831f99f8968bed7b06f4fe843eb98f:refs/heads/main\t[remote rejected] (pre-receive hook declined)\nDone\n",
+  "stderr": "remote: declined        \nerror: failed to push some refs to '<tmp>/hook/remote.git'\n",
+  "expected": "rejected:remote-rejected",
+  "refChanged": false,
+  "note": "pre-receive hook declines"
+ },
+ {
+  "case": "error-dns",
+  "exitCode": 128,
+  "stdout": "",
+  "stderr": "fatal: unable to access 'https://no-such-host.invalid/repo.git/': Could not resolve host: no-such-host.invalid\n",
+  "expected": "error",
+  "refChanged": false,
+  "note": "host does not resolve"
+ },
+ {
+  "case": "error-refused",
+  "exitCode": 128,
+  "stdout": "",
+  "stderr": "fatal: unable to access 'https://127.0.0.1:59902/repo.git/': Failed to connect to 127.0.0.1 port 59902 after 0 ms: Couldn't connect to server\n",
+  "expected": "error",
+  "refChanged": false,
+  "note": "nothing listens on the port"
+ },
+ {
+  "case": "error-auth",
+  "exitCode": 128,
+  "stdout": "",
+  "stderr": "remote: Invalid or expired token\nfatal: unable to access 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/no-such-repo.git/': The requested URL returned error: 403\n",
+  "expected": "error",
+  "refChanged": false,
+  "note": "Artifacts host, dummy token"
+ },
+ {
+  "case": "unknown-502",
+  "exitCode": 1,
+  "stdout": "Done\n",
+  "stderr": "error: RPC failed; HTTP 502 curl 22 The requested URL returned error: 502\nsend-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly\n",
+  "expected": "unknown",
+  "refChanged": true,
+  "note": "the receiver applied the push, then the response was lost"
+ },
+ {
+  "case": "unknown-dropped",
+  "exitCode": 1,
+  "stdout": "Done\n",
+  "stderr": "error: RPC failed; curl 52 Empty reply from server\nsend-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly\n",
+  "expected": "unknown",
+  "refChanged": true,
+  "note": "the receiver applied the push, then the response was lost"
+ },
+ {
+  "case": "unknown-401-after-send",
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "fatal: could not read Username for 'http://127.0.0.1:59914': terminal prompts disabled\nsend-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly\nerror: failed to push some refs to 'http://127.0.0.1:59914/repo.git'\n",
+  "expected": "unknown",
+  "refChanged": false,
+  "note": "the receive-pack POST was refused with 401 after discovery; the client cannot know that"
+ },
+ {
+  "case": "unknown-hangup",
+  "exitCode": 128,
+  "stdout": "",
+  "stderr": "send-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly\n",
+  "expected": "unknown",
+  "refChanged": true,
+  "note": "receive-pack output cut after the advertisement; no report arrives"
+ },
+ {
+  "case": "lease-server",
+  "exitCode": 1,
+  "stdout": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\tfe2beea7e506fcb0d7355f551958e6748d323852:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+  "stderr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+  "expected": "rejected:lease",
+  "refChanged": false,
+  "note": "Artifacts race loser, from 10011212-121331.raw.json"
+ }
+]
