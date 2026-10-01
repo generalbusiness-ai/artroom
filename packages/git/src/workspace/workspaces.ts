@@ -569,7 +569,8 @@ export class Workspaces {
             await withRetry(() => fork.revokeToken(t.id), this.retryOpts());
           } catch (e) {
             // Owed by ID from now on.
-            this.defer([this.owe(name, "token", "inventory", t.id)], String(e));
+            const expires = Date.parse(t.expiresAt);
+            this.defer([this.owe(name, "token", "inventory", t.id, Number.isFinite(expires) ? expires : null)], String(e));
           }
         }
         // This run settles owed inventories, and steps answered before it started.

@@ -56,7 +56,12 @@ class FakeRepo implements RepoHandle {
   }
   async listTokens() {
     if (this.ns.failRevoke) throw new ArtifactsError("INTERNAL_ERROR", 10400);
-    const tokens = [...this.tokens].map(([id, t]) => ({ id, scope: t.scope, state: t.state, expiresAt: new Date(t.expiresAt).toISOString() }));
+    const tokens = [...this.tokens].map(([id, t]) => ({
+      id,
+      scope: t.scope,
+      state: t.state === "active" && t.expiresAt <= this.ns.clock.t ? ("expired" as const) : t.state,
+      expiresAt: new Date(t.expiresAt).toISOString(),
+    }));
     return { tokens, total: tokens.length };
   }
   async info() {
@@ -763,4 +768,43 @@ test("restart while a mint is outstanding on a verified fork, then a later lease
   const live = fork().live();
   assert.equal(live.length, 1, "the late token is revoked");
   assert.equal(fork().tokens.get(live[0]!)?.plaintext, !("refused" in g) ? g.token : "", "lease 3 keeps its own");
+});
+
+test("each fork-creation retry is its own step: an earlier attempt's late side effect is still found", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const release = deferred();
+  const remoteDone = deferred();
+  const canon = ns.repos.get("canon")!;
+  const realFork = canon.fork.bind(canon);
+  let first = true;
+  canon.fork = async (name: string) => {
+    if (!first) return realFork(name);
+    first = false;
+    // Attempt 1 fails at the client; its server work later leaves a 24-hour token on the fork.
+    void release.promise.then(() => {
+      ns.repos.get(name)!.mintRaw("write", 86400);
+      remoteDone.resolve();
+    });
+    throw new TypeError("connection lost after request sent");
+  };
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "ready", "attempt 2 created the fork");
+  release.resolve();
+  await remoteDone.promise;
+  assert.equal(fork().live().length, 2);
+  clock.t = Math.max(clock.t, ws.nextDue()!);
+  await ws.reconcile();
+  assert.equal(fork().live().length, 1, "attempt 1 was still watched, so its late token is revoked");
+});
+
+test("a known token's debt ends once that token has expired, even if Artifacts never confirms the revocation", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  ns.failRevokeOnly = true;
+  assert.ok((await ws.revoke(lane, 1)) > 0, "the release's token revocation is owed");
+  clock.advance(LEASE_MS + 1_000); // the token has expired
+  assert.equal(await ws.sweep(), 0);
+  assert.ok(ws.duties().some((d) => d.kind === "token" && d.doneReason === "expired"));
+  assert.deepEqual(fork().live(), []);
 });
