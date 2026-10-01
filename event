@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Accept request git:sha1…04c77ad: Builder: in lane F, show a change's history across generations on the Proposal screen when commits carry jj `change-id` headers: for a new generation, list whic…"}
+{"kind":"artifact","text":"docs/policy-pack.md at exact a62962aefbf018e3574b11ee2265dd3c92946e70 on request/jj-refuse, under promise git:sha1…7028381 on request git:sha1…f462724","body":{"commit":"a62962aefbf018e3574b11ee2265dd3c92946e70","path":"docs/policy-pack.md"}}
