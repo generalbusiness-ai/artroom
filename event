@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c72fd6f33c5f214202ed2dcdacd8d15e5cc973e6","text":"Republished at 45c7946ffd53de2d9ee3021c9e32924ec3c24586; the successor stands at packages/room/src/memory/artifacts.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6c2f9378cfa34e1a38902d5214e5ed221803b615","text":"Republished at 45c7946ffd53de2d9ee3021c9e32924ec3c24586, which no longer changes packages/room/src/memory/landing.ts: the pointer is withdrawn with no successor."}
