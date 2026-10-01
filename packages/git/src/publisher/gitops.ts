@@ -30,7 +30,7 @@ export interface ExecResult {
  */
 export type Exec = (
   argv: readonly string[],
-  opts: { readonly cwd?: string; readonly env: Readonly<Record<string, string>>; readonly timeoutMs?: number },
+  opts: { readonly cwd?: string; readonly env: Readonly<Record<string, string>>; readonly timeoutMs?: number; readonly stdin?: Uint8Array },
 ) => Promise<ExecResult>;
 
 export interface GitOpsOptions {
@@ -92,7 +92,14 @@ export function integrationRef(op: string, attempt: number): string {
 }
 
 export type PreviewResult =
-  | { readonly kind: "clean"; readonly base: string; readonly tree: string }
+  /**
+   * A clean preview carries its integration commit: `head` itself when it
+   * fast-forwards `base`, otherwise the merge commit, built by the same
+   * planner as the landing, so a landing on the same main lands exactly this
+   * commit. A merge commit is stored in the canonical repo at
+   * `refs/artroom/objects/<integration>`.
+   */
+  | { readonly kind: "clean"; readonly base: string; readonly tree: string; readonly integration: string; readonly fastForward: boolean }
   | { readonly kind: "conflict"; readonly base: string; readonly paths: readonly string[] };
 
 export type BuildResult =
@@ -108,14 +115,29 @@ export interface IntegrateRequest {
     readonly head: string;
     readonly headRef: string;
     readonly storeRef: string;
-    readonly message: string;
-    readonly committedAt: number;
+    /** For the commit message. The message and dates depend only on the inputs, so a rebuild is the same commit. */
+    readonly lane: string;
+    readonly generation: number;
   }
 
 export interface IntegrateHooks {
   /** Called with the new merge commit before it is pushed to `storeRef`, so the gateway can allow exactly that update. */
   readonly beforeStore?: (integration: string) => Promise<void>;
 }
+
+/** The message of an integration commit. It names only the inputs, so preview and landing build the same commit. */
+export function integrationMessage(lane: string, generation: number): string {
+  return `Land ${lane} generation ${generation}\n`;
+}
+
+/** An object for `pushLog`: lane L's git object, without its SHA (git computes and checks it). */
+export interface LogObject {
+  readonly type: "blob" | "tree" | "commit";
+  readonly data: Uint8Array;
+}
+
+/** The ref lane L publishes the log to (R-LOG-8). The only ref `pushLog` writes. */
+export const LOG_REF = "refs/artroom/log";
 
 export class GitError extends Error {
   readonly step: string;
@@ -150,11 +172,12 @@ export class GitOps {
   }
 
   /** Run git with the hardening settings. */
-  async git(args: readonly string[], extraEnv: Readonly<Record<string, string>> = {}): Promise<ExecResult> {
+  async git(args: readonly string[], extraEnv: Readonly<Record<string, string>> = {}, stdin?: Uint8Array): Promise<ExecResult> {
     const config = [...HARDENING, ...(this.opts.config ?? [])].flatMap((c) => ["-c", c]);
     return this.opts.exec(["git", ...config, ...args], {
       env: { ...this.env, ...extraEnv },
       timeoutMs: this.opts.timeoutMs ?? 120_000,
+      ...(stdin ? { stdin } : {}),
     });
   }
 
@@ -263,14 +286,23 @@ export class GitOps {
   }
 
   /** Push `sha` to a ref that must not exist yet; an existing ref at the same commit is fine. */
+  /**
+   * The one push: move `ref` on `remote` to `sha` under a lease (`lease`
+   * null: the ref must not exist), and classify the answer (push-outcome.ts).
+   * Pinning, staging, publication to main and the log all push through here.
+   */
+  private async pushWithLease(dir: string, remote: string, sha: string, ref: string, lease: string | null): Promise<PushOutcome> {
+    const r = await this.git(["-C", dir, "push", "--porcelain", `--force-with-lease=${assertRef(ref)}:${lease === null ? "" : assertSha(lease, "lease")}`, remote, `${assertSha(sha)}:${ref}`]);
+    return classifyGitPush(r.code, r.stdout, r.stderr, ref);
+  }
+
   private async createRef(dir: string, remote: string, sha: string, ref: string): Promise<PinResult> {
-    const r = await this.git(["-C", dir, "push", "--porcelain", `--force-with-lease=${ref}:`, remote, `${assertSha(sha)}:${ref}`]);
-    const outcome = classifyGitPush(r.code, r.stdout, r.stderr, ref);
-    if (outcome.outcome === "landed") return { kind: "pinned", already: /\[up to date\]/.test(r.stdout) };
+    const outcome = await this.pushWithLease(dir, remote, sha, ref, null);
+    if (outcome.outcome === "landed") return { kind: "pinned", already: /\[up to date\]/.test(outcome.detail) };
     const observed = await this.lsRemote(remote, ref);
     if (observed === sha) return { kind: "pinned", already: true };
     if (observed !== null) return { kind: "conflict", observed };
-    throw new GitError(`push ${ref}`, r);
+    throw new Error(`push ${ref} failed: ${outcome.outcome}: ${outcome.detail.slice(-300)}`);
   }
 
   // ------------------------------------------------------------ preview and integration
@@ -286,23 +318,64 @@ export class GitOps {
     return { dir, main };
   }
 
-  /** A merge preview of a pinned head against main (R-PROP-7). */
-  preview(canonical: string, head: string, headRef: string): Promise<PreviewResult> {
-    return this.exclusive(canonical, () => this.previewNow(canonical, head, headRef));
+  /** A merge preview of a pinned head against main (R-PROP-7), with its integration commit. */
+  preview(canonical: string, head: string, headRef: string, lane: string, generation: number, hooks: IntegrateHooks = {}): Promise<PreviewResult> {
+    return this.exclusive(canonical, () => this.previewNow(canonical, head, headRef, lane, generation, hooks));
   }
 
-  private async previewNow(canonical: string, head: string, headRef: string): Promise<PreviewResult> {
+  private async previewNow(canonical: string, head: string, headRef: string, lane: string, generation: number, hooks: IntegrateHooks): Promise<PreviewResult> {
     const { dir, main } = await this.syncFor(canonical, head, headRef);
-    const m = await this.mergeTree(dir, main, head);
-    return m.clean ? { kind: "clean", base: main, tree: m.tree } : { kind: "conflict", base: main, paths: m.paths };
+    const plan = await this.planIntegration(dir, main, head, lane, generation);
+    if (plan.kind === "conflict") return { kind: "conflict", base: main, paths: plan.paths };
+    if (!plan.fastForward) {
+      await hooks.beforeStore?.(plan.integration);
+      const stored = await this.createRef(dir, canonical, plan.integration, objectsRef(plan.integration));
+      if (stored.kind !== "pinned") throw new Error(`could not store the previewed integration ${plan.integration}`);
+    }
+    return { kind: "clean", base: main, tree: plan.tree, integration: plan.integration, fastForward: plan.fastForward };
+  }
+
+  /**
+   * The integration planner, shared by preview and landing (R-LAND-4 step 1,
+   * R-PROP-7): `head` itself when it fast-forwards `base`; otherwise a merge
+   * commit with parents (base, head), the merged tree, the message
+   * `integrationMessage(lane, generation)`, and author and committer dates
+   * equal to the later of the two parents' commit times. Every input of the
+   * commit is fixed by (base, head, lane, generation), so the same inputs
+   * always give the same commit.
+   */
+  private async planIntegration(
+    dir: string,
+    base: string,
+    head: string,
+    lane: string,
+    generation: number,
+  ): Promise<{ kind: "clean"; integration: string; tree: string; fastForward: boolean } | { kind: "conflict"; paths: string[] }> {
+    if (await this.isAncestor(dir, base, head)) {
+      return { kind: "clean", integration: head, tree: await this.ok("rev-parse", ["-C", dir, "rev-parse", `${assertSha(head)}^{tree}`]), fastForward: true };
+    }
+    const m = await this.mergeTree(dir, base, head);
+    if (!m.clean) return { kind: "conflict", paths: m.paths };
+    const times = (await this.ok("show", ["-C", dir, "show", "-s", "--format=%ct", assertSha(base), assertSha(head)])).split("\n").map(Number);
+    const at = Math.max(...times.filter((t) => Number.isSafeInteger(t)));
+    if (!Number.isSafeInteger(at)) throw new Error("could not read the parents' commit times");
+    const date = `@${at} +0000`;
+    const integration = assertSha(
+      await this.ok("commit-tree", ["-C", dir, "commit-tree", m.tree, "-p", assertSha(base), "-p", assertSha(head), "-m", integrationMessage(lane, generation)], {
+        GIT_AUTHOR_DATE: date,
+        GIT_COMMITTER_DATE: date,
+      }),
+      "integration",
+    );
+    return { kind: "clean", integration, tree: m.tree, fastForward: false };
   }
 
   /**
    * Build the integration commit (R-LAND-4 step 1): `head` itself when it
    * fast-forwards `expectedMain`, otherwise a merge commit with parents
-   * (expectedMain, head). The commit is deterministic for the same inputs and
-   * `committedAt`, and is pushed to `storeRef` in the canonical repo so that
-   * checkers and every later push use exactly this commit.
+   * (expectedMain, head), from the same planner as the preview. The commit is
+   * deterministic for the same inputs, and is pushed to `storeRef` in the
+   * canonical repo so that checkers and every later push use exactly it.
    */
   integrate(req: IntegrateRequest, hooks: IntegrateHooks = {}): Promise<BuildResult> {
     return this.exclusive(req.canonical, () => this.integrateNow(req, hooks));
@@ -313,20 +386,10 @@ export class GitOps {
     if (!(await this.hasCommit(dir, req.expectedMain))) {
       throw new Error(`expected main ${req.expectedMain} is not in the canonical repo`);
     }
-    if (await this.isAncestor(dir, req.expectedMain, req.head)) {
-      return { kind: "clean", integration: req.head, ref: req.headRef, fastForward: true };
-    }
-    const m = await this.mergeTree(dir, req.expectedMain, req.head);
-    if (!m.clean) return { kind: "conflict", paths: m.paths };
-    const date = `@${Math.floor(req.committedAt)} +0000`;
-    const integration = assertSha(
-      await this.ok(
-        "commit-tree",
-        ["-C", dir, "commit-tree", m.tree, "-p", assertSha(req.expectedMain), "-p", assertSha(req.head), "-m", req.message],
-        { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
-      ),
-      "integration",
-    );
+    const plan = await this.planIntegration(dir, req.expectedMain, req.head, req.lane, req.generation);
+    if (plan.kind === "conflict") return { kind: "conflict", paths: plan.paths };
+    if (plan.fastForward) return { kind: "clean", integration: req.head, ref: req.headRef, fastForward: true };
+    const integration = plan.integration;
     await hooks.beforeStore?.(integration);
     const stored = await this.createRef(dir, req.canonical, integration, assertRef(req.storeRef));
     if (stored.kind !== "pinned") throw new Error(`could not store the integration at ${req.storeRef}`);
@@ -354,16 +417,54 @@ export class GitOps {
     } catch (e) {
       return { outcome: "error", detail: `before the push: ${e instanceof Error ? e.message : String(e)}`.slice(0, 600) };
     }
-    const target = "refs/heads/main";
-    const r = await this.git([
-      "-C",
-      dir,
-      "push",
-      "--porcelain",
-      `--force-with-lease=${target}:${assertSha(expectedMain)}`,
-      canonical,
-      `${assertSha(integration)}:${target}`,
-    ]);
-    return classifyGitPush(r.code, r.stdout, r.stderr, target);
+    return this.pushWithLease(dir, canonical, integration, "refs/heads/main", expectedMain);
+  }
+
+  // ------------------------------------------------------------ the log (lane L)
+
+  /**
+   * Push lane L's log commit to `refs/artroom/log` under a lease (R-LOG-8):
+   * write the given objects, check that `next` is a commit whose only parent
+   * is `lease` (none when `lease` is null) and whose whole history is
+   * present, then push it with the lease. Returns the push outcome and, on a
+   * lease refusal, where the ref is now. Anything that fails before the push
+   * runs sent nothing (`error`).
+   */
+  pushLog(
+    canonical: string,
+    objects: readonly LogObject[],
+    next: string,
+    lease: string | null,
+  ): Promise<{ readonly outcome: PushOutcome; readonly current?: string | null }> {
+    return this.exclusive(canonical, async () => {
+      const ref = LOG_REF;
+      let dir: string;
+      try {
+        dir = await this.repo(canonical);
+        assertSha(next, "next");
+        // Where the ref is now. Fetching it also brings the parent's history, so only the new objects are sent.
+        const current = await this.lsRemote(canonical, ref);
+        if (current !== lease) return { outcome: { outcome: "rejected", reason: "lease", detail: `${ref} is at ${current ?? "nothing"}, not the lease` }, current };
+        if (lease !== null) await this.fetch(dir, canonical, [`+${ref}:refs/artroom-remote/log`]);
+        for (const o of objects) {
+          if (o.type !== "blob" && o.type !== "tree" && o.type !== "commit") throw new Error("not a git object type");
+          const w = await this.git(["-C", dir, "hash-object", "-w", "-t", o.type, "--stdin"], {}, o.data);
+          if (w.code !== 0) throw new GitError("hash-object", w);
+        }
+        if ((await this.git(["-C", dir, "cat-file", "-t", next])).stdout.trim() !== "commit") throw new Error(`${next} is not a commit`);
+        const parents = (await this.ok("rev-list", ["-C", dir, "rev-list", "--parents", "-n", "1", next])).split(" ").slice(1);
+        if (parents.join(" ") !== (lease ?? "")) throw new Error(`${next} does not have exactly the lease as its parent`);
+        const connected = await this.git(["-C", dir, "rev-list", "--objects", next]);
+        if (connected.code !== 0) throw new Error(`objects reachable from ${next} are missing`);
+      } catch (e) {
+        return { outcome: { outcome: "error", detail: `before the push: ${e instanceof Error ? e.message : String(e)}`.slice(0, 600) } };
+      }
+      const outcome = await this.pushWithLease(dir, canonical, next, ref, lease);
+      if (outcome.outcome === "rejected" && outcome.reason === "lease") {
+        const current = await this.lsRemote(canonical, ref).catch(() => undefined);
+        return current === undefined ? { outcome } : { outcome, current };
+      }
+      return { outcome };
+    });
   }
 }

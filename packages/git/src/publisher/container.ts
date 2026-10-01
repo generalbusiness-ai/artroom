@@ -19,7 +19,8 @@
  */
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
-import { type BuildResult, type Exec, GitOps, type PinResult, type PreviewResult, objectsRef } from "./gitops.ts";
+import { type BuildResult, type Exec, GitOps, LOG_REF, type PinResult, type PreviewResult, objectsRef } from "./gitops.ts";
+import { decodeLogPush, toLogOutcome, type LogPushOutcome } from "./log-push.ts";
 import { type AllowedUpdates, FenceError, ZERO, checkUpdates, isReceivePack, readCommands } from "./ref-fence.ts";
 import type { PushOutcome } from "./push-outcome.ts";
 
@@ -111,7 +112,22 @@ export class Publisher extends DurableObject<PublisherEnv> {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), opts.timeoutMs ?? 120_000);
     try {
-      const proc = await c.exec([...argv], { env: { ...opts.env, PATH: "/usr/local/bin:/usr/bin:/bin" }, signal: ac.signal, ...(opts.cwd ? { cwd: opts.cwd } : {}) });
+      const input = opts.stdin;
+      const proc = await c.exec([...argv], {
+        env: { ...opts.env, PATH: "/usr/local/bin:/usr/bin:/bin" },
+        signal: ac.signal,
+        ...(opts.cwd ? { cwd: opts.cwd } : {}),
+        ...(input
+          ? {
+              stdin: new ReadableStream<Uint8Array>({
+                start(ctrl) {
+                  ctrl.enqueue(input);
+                  ctrl.close();
+                },
+              }),
+            }
+          : {}),
+      });
       const out = await proc.output();
       const dec = new TextDecoder();
       return { code: out.exitCode, stdout: dec.decode(out.stdout), stderr: redact(dec.decode(out.stderr)).slice(-4000) };
@@ -192,9 +208,42 @@ export class Publisher extends DurableObject<PublisherEnv> {
     );
   }
 
-  /** R-PROP-7: a merge preview. Read only. */
-  preview(req: { readonly canonical: RemoteAccess; readonly head: string; readonly headRef: string }): Promise<PreviewResult> {
-    return this.withRoute([[req.canonical, null]], () => this.ops.preview(req.canonical.remote, req.head, req.headRef));
+  /**
+   * R-PROP-7: a merge preview with its integration commit. The token may
+   * only create `refs/artroom/objects/<integration>`, for a merge commit just
+   * built; a fast-forward stores nothing.
+   */
+  preview(req: { readonly canonical: RemoteAccess; readonly head: string; readonly headRef: string; readonly lane: string; readonly generation: number }): Promise<PreviewResult> {
+    return this.withRoute([[req.canonical, null]], () =>
+      this.ops.preview(req.canonical.remote, req.head, req.headRef, req.lane, req.generation, {
+        beforeStore: (sha) => this.route([[req.canonical, { [objectsRef(sha)]: { old: ZERO, new: sha } }]]),
+      }),
+    );
+  }
+
+  /**
+   * Lane L's log push (R-LOG-8): write the log commit's objects and move
+   * `refs/artroom/log` from `lease` to `next`. The caller's per-push token
+   * (at most 60 s, revoked by the caller after) lives only in the gateway,
+   * which allows exactly that one ref update. Answers with lane L's
+   * `PushOutcome`: `ok`, `lease-mismatch` with where the ref is, or
+   * `unknown`. A push whose outcome is unknown may still have landed; the
+   * publisher reads the ref back, and neither revocation nor elapsed time
+   * proves it did not (R-PUB-2).
+   */
+  pushLog(req: {
+    readonly canonical: RemoteAccess;
+    readonly objects: readonly { readonly type: string; readonly data: string }[];
+    readonly ref: string;
+    readonly next: string;
+    readonly lease: string | null;
+  }): Promise<LogPushOutcome> {
+    const d = decodeLogPush(req);
+    if ("refused" in d) return Promise.resolve(d.refused);
+    const objects = d.objects;
+    return this.withRoute([[req.canonical, { [LOG_REF]: { old: req.lease ?? ZERO, new: req.next } }]], async () =>
+      toLogOutcome(await this.ops.pushLog(req.canonical.remote, objects, req.next, req.lease)),
+    );
   }
 
   /** R-LAND-4 step 1. The write token may only create `storeRef`, at the commit just built. */
@@ -204,12 +253,12 @@ export class Publisher extends DurableObject<PublisherEnv> {
     readonly head: string;
     readonly headRef: string;
     readonly storeRef: string;
-    readonly message: string;
-    readonly committedAt: number;
+    readonly lane: string;
+    readonly generation: number;
   }): Promise<BuildResult> {
     return this.withRoute([[req.canonical, null]], () =>
       this.ops.integrate(
-        { canonical: req.canonical.remote, expectedMain: req.expectedMain, head: req.head, headRef: req.headRef, storeRef: req.storeRef, message: req.message, committedAt: req.committedAt },
+        { canonical: req.canonical.remote, expectedMain: req.expectedMain, head: req.head, headRef: req.headRef, storeRef: req.storeRef, lane: req.lane, generation: req.generation },
         { beforeStore: (sha) => this.route([[req.canonical, { [req.storeRef]: { old: ZERO, new: sha } }]]) },
       ),
     );

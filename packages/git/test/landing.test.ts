@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import type { OpId, Sha } from "@generalbusiness/artroom-contract";
 import { Landing, type FaultPoint } from "../src/landing/engine.ts";
 import { GitPublisher } from "../src/publisher/git-publisher.ts";
-import { GitOps } from "../src/publisher/gitops.ts";
+import { GitOps, pinnedRef } from "../src/publisher/gitops.ts";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -196,6 +196,27 @@ test("two operations preparing in parallel: one lands, the other re-prepares on 
   assert.match(await w.f.show(main, "src/a.txt"), /from lane a/);
   assert.match(await w.f.show(main, "src/b.txt"), /from lane b/);
   assert.equal(await sh(w.f.root, "--git-dir", w.f.canonical, "rev-parse", `${main}^1`), a.head);
+});
+
+test("contract gap 7: the integration a clean preview shows is the commit the landing puts on main, byte for byte", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const a = await w.land(1, { "src/a.txt": edit(lines("a"), 2, "from lane a") });
+  await w.engine.settle();
+  assert.equal(w.engine.view(a.id)?.state, "landed");
+  const b = await w.land(2, { "src/b.txt": edit(lines("b"), 2, "from lane b") }, { accept: false });
+  // The preview runs in another sandbox, before the landing is accepted.
+  mkdirSync(join(w.f.root, "previewer"));
+  const previewer = new GitOps({ exec: localExec, workdir: join(w.f.root, "previewer"), config: ["protocol.file.allow=always"] });
+  const p = await previewer.preview(w.f.canonical, b.head, pinnedRef(b.lane, 1), b.lane, 1);
+  assert.ok(p.kind === "clean" && !p.fastForward, "a clean non-fast-forward preview");
+  assert.equal(p.base, a.head);
+  const r = w.engine.accept({ id: b.id, lane: b.lane, generation: 1, head: b.head, act: actId(502), leaseGeneration: 1, policyVersion: w.room.policy });
+  assert.ok(!("refused" in r));
+  await w.engine.settle();
+  assert.equal(w.engine.view(b.id)?.state, "landed");
+  assert.equal(await w.f.canonicalMain(), p.integration, "main is the previewed integration");
+  assert.equal(await sh(w.f.root, "--git-dir", w.f.canonical, "rev-parse", `${p.integration}^{tree}`), p.tree);
 });
 
 test("serial publication with a rebuild on every main move: wasted preparations, measured", async (t) => {

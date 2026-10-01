@@ -13,7 +13,8 @@
     "types": "wrangler types --include-env=false src/worker-runtime.d.ts >/dev/null",
     "typecheck": "npm run types && tsc -p tsconfig.json && tsc -p test/tsconfig.json",
     "test": "node --test --test-concurrency=1 --test-timeout=60000 'test/*.test.ts'",
-    "test:workers": "vitest run --config vitest.config.ts"
+    "test:workers": "vitest run --config vitest.config.ts",
+    "test:log": "vitest run --config vitest.log.config.ts"
   },
   "dependencies": {
     "@generalbusiness/artroom-contract": "*"
@@ -22,6 +23,7 @@
     "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@types/node": "^24.0.0",
     "vitest": "^4.1.0",
-    "wrangler": "^4.146.0"
+    "wrangler": "^4.146.0",
+    "@generalbusiness/artroom-log": "*"
   }
 }
