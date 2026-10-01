@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6cf3f951ee89a25af681c93d351676b80a6fdd1f","text":"Merge retired a covered predecessor; the successor is at packages/log/vitest.config.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:765804e93a05fa62dae6833af9093bd0c57aeb45","text":"Merge retired a covered predecessor; the successor is at packages/log/test/support/logs.ts."}
