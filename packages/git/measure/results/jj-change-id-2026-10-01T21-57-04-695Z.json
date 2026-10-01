@@ -1,0 +1,318 @@
+{
+  "script": "jj-change-id",
+  "lanes": {
+    "1": {
+      "head": "2429ce15450bf5946a408985c4edd4259bacf704",
+      "changeId": "tkyyxrloqpokxxlkpvowkssqxsqosuyl",
+      "headerWritten": true,
+      "fork": true,
+      "pinned": true,
+      "landed": "landed",
+      "mainFastForwardParent": true,
+      "inMain": true
+    },
+    "2": {
+      "head": "2f7dc84260324fa06916ec7b13e173774e9eab2e",
+      "changeId": "ksrkuppkuxwnwwtkypqvtynkzxsxxmqv",
+      "headerWritten": true,
+      "fork": true,
+      "pinned": true,
+      "landed": "landed",
+      "mainMergeParent": true,
+      "inMain": true
+    }
+  },
+  "steps": [
+    {
+      "route": "create",
+      "status": 200,
+      "result": {
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-jj-muq2qhw7.git",
+        "ms": 1933
+      }
+    },
+    {
+      "route": "init",
+      "status": 200,
+      "result": {
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-jj-muq2qhw7.git",
+        "main": "0a870809718844f2671fe305046e64e16319694d",
+        "revoked": 1,
+        "ms": 333
+      }
+    },
+    {
+      "route": "workspace",
+      "status": 200,
+      "result": {
+        "view": {
+          "id": "op_ws_act_1001_abcdef01_1",
+          "kind": "workspace",
+          "lane": "act_1001_abcdef01",
+          "updatedAt": "2026-10-01T21:56:41.787Z",
+          "state": "ready",
+          "detail": {
+            "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-jj-muq2qhw7--act_1001_abcdef01.git",
+            "leaseGeneration": 1
+          }
+        },
+        "grant": {
+          "op": "op_ws_act_1001_abcdef01_1",
+          "lane": "act_1001_abcdef01",
+          "leaseGeneration": 1,
+          "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-jj-muq2qhw7--act_1001_abcdef01.git",
+          "token": "<token>",
+          "expiresAt": "2026-10-01T22:11:33.783Z"
+        },
+        "fork": "artroom-lb-jj-muq2qhw7--act_1001_abcdef01",
+        "ms": 2388
+      }
+    },
+    {
+      "route": "workspace",
+      "status": 200,
+      "result": {
+        "view": {
+          "id": "op_ws_act_1002_abcdef02_1",
+          "kind": "workspace",
+          "lane": "act_1002_abcdef02",
+          "updatedAt": "2026-10-01T21:56:47.310Z",
+          "state": "ready",
+          "detail": {
+            "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-jj-muq2qhw7--act_1002_abcdef02.git",
+            "leaseGeneration": 1
+          }
+        },
+        "grant": {
+          "op": "op_ws_act_1002_abcdef02_1",
+          "lane": "act_1002_abcdef02",
+          "leaseGeneration": 1,
+          "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-jj-muq2qhw7--act_1002_abcdef02.git",
+          "token": "<token>",
+          "expiresAt": "2026-10-01T22:11:38.273Z"
+        },
+        "fork": "artroom-lb-jj-muq2qhw7--act_1002_abcdef02",
+        "ms": 3153
+      }
+    },
+    {
+      "route": "propose",
+      "status": 200,
+      "result": {
+        "pinned": [
+          {
+            "kind": "pinned",
+            "already": false
+          },
+          {
+            "kind": "pinned",
+            "already": false
+          }
+        ],
+        "diff": {
+          "kind": "ok",
+          "changes": [
+            {
+              "status": "added",
+              "path": ".config/jj/repos/1a57987928d839844b7a/metadata.binpb"
+            },
+            {
+              "status": "added",
+              "path": "one.txt"
+            }
+          ],
+          "stats": {
+            "treeReads": 6,
+            "cacheHits": 0,
+            "entries": 8,
+            "commitReads": 3
+          },
+          "bases": [
+            "0a870809718844f2671fe305046e64e16319694d"
+          ]
+        },
+        "plan": "disjoint",
+        "preview": null,
+        "ms": {
+          "pinObjects": 1673,
+          "pinRef": 381,
+          "diff": 87,
+          "plan": 38,
+          "preview": 0,
+          "total": 2274
+        }
+      }
+    },
+    {
+      "route": "propose",
+      "status": 200,
+      "result": {
+        "pinned": [
+          {
+            "kind": "pinned",
+            "already": false
+          },
+          {
+            "kind": "pinned",
+            "already": false
+          }
+        ],
+        "diff": {
+          "kind": "ok",
+          "changes": [
+            {
+              "status": "added",
+              "path": ".config/jj/repos/72c01c4d437f1a79a974/metadata.binpb"
+            },
+            {
+              "status": "added",
+              "path": "two.txt"
+            }
+          ],
+          "stats": {
+            "treeReads": 5,
+            "cacheHits": 1,
+            "entries": 8,
+            "commitReads": 3
+          },
+          "bases": [
+            "0a870809718844f2671fe305046e64e16319694d"
+          ]
+        },
+        "plan": "disjoint",
+        "preview": null,
+        "ms": {
+          "pinObjects": 1138,
+          "pinRef": 400,
+          "diff": 76,
+          "plan": 40,
+          "preview": 0,
+          "total": 1721
+        }
+      }
+    },
+    {
+      "route": "land",
+      "status": 200,
+      "result": {
+        "op": {
+          "id": "op_land_act_1001_abcdef01_1",
+          "kind": "land",
+          "updatedAt": "2026-10-01T21:56:57.359Z",
+          "lane": "act_1001_abcdef01",
+          "generation": 1,
+          "head": "2429ce15450bf5946a408985c4edd4259bacf704",
+          "act": "act_900001_00000000",
+          "leaseGeneration": 1,
+          "expectedMain": "0a870809718844f2671fe305046e64e16319694d",
+          "policyVersion": "act_0_00000000",
+          "attempts": 1,
+          "integration": "2429ce15450bf5946a408985c4edd4259bacf704",
+          "evidence": [],
+          "publication": 1,
+          "reservedAt": 1,
+          "state": "landed",
+          "receipt": "act_2_6eb4ed52"
+        },
+        "reserve": {
+          "kind": "reserved",
+          "publication": 1,
+          "reservedAt": 1
+        },
+        "ms": {
+          "prepare": 408,
+          "publish": 477,
+          "total": 946
+        }
+      }
+    },
+    {
+      "route": "land",
+      "status": 200,
+      "result": {
+        "op": {
+          "id": "op_land_act_1002_abcdef02_1",
+          "kind": "land",
+          "updatedAt": "2026-10-01T21:56:58.668Z",
+          "lane": "act_1002_abcdef02",
+          "generation": 1,
+          "head": "2f7dc84260324fa06916ec7b13e173774e9eab2e",
+          "act": "act_900001_00000000",
+          "leaseGeneration": 1,
+          "expectedMain": "2429ce15450bf5946a408985c4edd4259bacf704",
+          "policyVersion": "act_0_00000000",
+          "attempts": 1,
+          "integration": "42b7bcbf02d41ac38d820a43cfb0d456a7d5c752",
+          "evidence": [],
+          "publication": 2,
+          "reservedAt": 3,
+          "state": "landed",
+          "receipt": "act_4_7f8827ad"
+        },
+        "reserve": {
+          "kind": "reserved",
+          "publication": 2,
+          "reservedAt": 3
+        },
+        "ms": {
+          "prepare": 751,
+          "publish": 458,
+          "total": 1234
+        }
+      }
+    },
+    {
+      "route": "release",
+      "status": 200,
+      "result": {
+        "invalidated": [],
+        "cleanupOwed": 0,
+        "after": null,
+        "ms": 105
+      }
+    },
+    {
+      "route": "release",
+      "status": 200,
+      "result": {
+        "invalidated": [],
+        "cleanupOwed": 0,
+        "after": null,
+        "ms": 118
+      }
+    },
+    {
+      "route": "reset",
+      "status": 200,
+      "result": {
+        "wasRunning": true
+      }
+    }
+  ],
+  "main": {
+    "sha": "42b7bcbf02d41ac38d820a43cfb0d456a7d5c752",
+    "parents": [
+      "2429ce15450bf5946a408985c4edd4259bacf704",
+      "2f7dc84260324fa06916ec7b13e173774e9eab2e"
+    ],
+    "mergeCarriesChangeId": false
+  },
+  "survives": true,
+  "cleanup": [
+    {
+      "repo": "artroom-lb-jj-muq2qhw7--act_1002_abcdef02",
+      "tokensRevoked": 0,
+      "deleted": true
+    },
+    {
+      "repo": "artroom-lb-jj-muq2qhw7--act_1001_abcdef01",
+      "tokensRevoked": 0,
+      "deleted": true
+    },
+    {
+      "repo": "artroom-lb-jj-muq2qhw7",
+      "tokensRevoked": 0,
+      "deleted": true
+    }
+  ]
+}
