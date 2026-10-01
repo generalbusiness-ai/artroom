@@ -57,6 +57,28 @@ export function gitAuthEnvFor(token: string): Record<string, string> {
   return { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: `Authorization: Bearer ${token}` };
 }
 
+function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    for (const v of Object.values(value)) deepFreeze(v);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/**
+ * The service's own copy of a job: a deep, frozen clone. `handle` takes it
+ * before its first await and reads only it, so a caller that changes its job
+ * object while the check runs changes nothing that is checked out, run or
+ * signed.
+ */
+export function ownJob(job: CheckJob): CheckJob | Refusal {
+  try {
+    return deepFreeze(structuredClone(job));
+  } catch {
+    return refuse("The job is not plain data.");
+  }
+}
+
 export function checkJob(job: CheckJob, exp: JobExpectations): BoundJob | Refusal {
   if (!JOB_ID.test(job.id)) return refuse("The job ID is malformed.");
   if (job.room !== exp.room) return refuse("The job is for another room.");

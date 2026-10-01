@@ -6,8 +6,12 @@
 //
 // Shows: pass, fail, a changed test with unchanged source rerunning, a type
 // error, a scoped checker unable to read an excluded file, a runner that
-// cannot push or reach the internet, and the advisory LLM reviewer. Records
-// cold and warm timings. Deletes its repos at the end. Prints no token.
+// cannot push or reach the internet, and the advisory LLM reviewer. Also
+// (review c46a4491): a job that replaces npm in the image and leaves a
+// process running, then the same failing commit again; two checks of one
+// checker at once; and a scoped snapshot whose listing is over 64 KiB with
+// a credential-shaped file name. Every job runs in a new container, so every
+// timing is a cold start. Deletes its repos at the end. Prints no token.
 
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
@@ -114,21 +118,56 @@ async function main() {
   git(["checkout", "-q", "--detach", c1], w);
   write(w, { "test/secret.test.js": 'import { test } from "node:test";\nimport { readFileSync } from "node:fs";\ntest("reads an undeclared file", () => readFileSync(new URL("../src/secret.txt", import.meta.url), "utf8"));\n' });
   const c5 = commitAll("a test that reads an undeclared file");
-  for (const [c, ref] of [[c1, "main"], [c2, "refs/artroom/integration/op_2/1"], [c3, "refs/artroom/integration/op_3/1"], [c4, "refs/artroom/integration/op_4/1"], [c5, "refs/artroom/integration/op_5/1"]]) {
+  git(["checkout", "-q", "--detach", c1], w);
+  // A job that replaces npm in the image and leaves a process running that keeps replacing it.
+  write(w, {
+    "package.json": PROJECT["package.json"].replace('"test": "node --test"', '"test": "node poison.mjs"'),
+    "poison.mjs": [
+      'import { writeFileSync, realpathSync } from "node:fs";',
+      'import { spawn } from "node:child_process";',
+      'const npm = realpathSync("/usr/local/bin/npm");',
+      'const fake = "#!/bin/sh\\nexit 0\\n";',
+      'try { writeFileSync(npm, fake, { mode: 0o755 }); console.log("replaced", npm); } catch (e) { console.log("could not replace npm:", e.code); }',
+      'spawn("sh", ["-c", `while true; do printf "${fake}" > ${npm}; sleep 1; done`], { detached: true, stdio: "ignore" }).unref();',
+      'console.log("left a process running");',
+    ].join("\n") + "\n",
+  });
+  const c6 = commitAll("poison the runner image");
+  git(["checkout", "-q", "--detach", c1], w);
+  // A scoped snapshot listing over 64 KiB, with a credential-shaped (but legal) file name.
+  const odd = `src/${["art", "v1", "notatoken0123456789"].join("_")}.js`;
+  const many = { [odd]: "export const odd = 1;\n" };
+  for (let i = 0; i < 1800; i++) many[`src/gen/file-${String(i).padStart(4, "0")}.js`] = "export const n = 1;\n";
+  write(w, many);
+  const c7 = commitAll("1,800 small files and a credential-shaped name");
+  for (const [c, ref] of [[c1, "main"], [c2, "refs/artroom/integration/op_2/1"], [c3, "refs/artroom/integration/op_3/1"], [c4, "refs/artroom/integration/op_4/1"], [c5, "refs/artroom/integration/op_5/1"], [c6, "refs/artroom/integration/op_6/1"], [c7, "refs/artroom/integration/op_7/1"]]) {
     git(["push", "-q", made.remote, `${c}:${ref.startsWith("refs/") ? ref : `refs/heads/${ref}`}`], w, made.seedToken);
   }
   const sealed = await h("seal", { repo: REPO });
-  log(`seeded 5 commits; seed token revoked: ${sealed.revoked}`);
+  log(`seeded 7 commits; seed token revoked: ${sealed.revoked}`);
   const secretBlob = git(["rev-parse", `${c1}:src/secret.txt`], w);
 
-  await check("pass (cold)", "tests", c1);
-  await check("pass (warm)", "tests", c1);
-  await check("fail", "tests", c2);
+  await check("pass", "tests", c1);
+  await check("pass, again", "tests", c1);
+  const failed = await check("fail", "tests", c2);
   await check("changed test, unchanged source", "tests", c3);
-  await check("types pass (cold)", "types", c1);
-  await check("types fail (warm)", "types", c4);
+  await check("types pass", "types", c1);
+  await check("types fail", "types", c4);
   await check("scoped: a test reads an excluded file", "tests", c5, { scoped: ["src/add.js"] });
-  await check("llm review (cold)", "llm-review", c2);
+  await check("llm review", "llm-review", c2);
+  // G1: a job poisons its container; the next check of the failing commit must still fail, with the same runner digest.
+  await check("poison: replace npm and leave a process running", "tests", c6);
+  const again = await check("fail, after the poison job", "tests", c2);
+  out.poison = { stillFails: again.ok === false, sameRunnerDigest: again.runner === failed.runner };
+  log("after the poison job:", out.poison);
+  // G2: two checks of one checker at once.
+  const [ca, cb] = await Promise.all([check("concurrent: pass", "tests", c1), check("concurrent: fail", "tests", c2)]);
+  out.concurrent = { passStillPasses: ca.ok === true, failStillFails: cb.ok === false };
+  log("concurrent:", out.concurrent);
+  // G4: a scoped listing over 64 KiB with a credential-shaped file name.
+  const big = await check("scoped: 1,800 files and a credential-shaped name", "tests", c7, { scoped: ["src/**"] });
+  out.bigScoped = { ok: big.ok, files: out.runs.at(-1).snapshot?.files?.length ?? null };
+  log("big scoped:", out.bigScoped);
 
   const p1 = await h("probe", { repo: REPO, checker: "tests", commit: c1 });
   out.probeTree = p1;
@@ -139,9 +178,7 @@ async function main() {
   log(`probe, scoped job (snapshot files: ${p2.snapshot?.files?.join(", ")}):`);
   for (const r of p2.results) log(`   ${r.argv.slice(0, 80)} -> exit ${r.exit}: ${r.out.split("\n").slice(-1)[0]}`);
 
-  // Cleanup.
-  const reset = await h("reset", { runners: ["tests", "types", "llm-review"].map((c) => `pool-room_6c670000000000000000000000000000-${c}`) });
-  log("runner containers stopped:", reset);
+  // Cleanup. Runner containers were destroyed at the end of each job.
   const repos = (await api("GET", `/repos?limit=200&search=${REPO}`)).result ?? [];
   for (const r of repos) {
     const toks = (await api("GET", `/repos/${r.name}/tokens?state=active&per_page=100`)).result ?? [];

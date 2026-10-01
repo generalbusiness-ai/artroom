@@ -26,6 +26,11 @@ export interface Finding {
   readonly message: string;
 }
 
+/** The reviewer's outcome: the check's, plus the findings for its note. */
+export interface ReviewOutcome extends CheckOutcome {
+  readonly findings: readonly Finding[];
+}
+
 /** A model call: a system prompt and the user's text in, the model's text out. */
 export type Model = (system: string, user: string) => Promise<string>;
 
@@ -69,7 +74,7 @@ export function formatFindings(findings: readonly Finding[]): string {
   return findings.map((f, i) => `${i + 1}. [${f.severity}] ${f.path || "(general)"}${f.line ? `:${f.line}` : ""}: ${f.message}`).join("\n");
 }
 
-export abstract class LlmReviewer<Env = unknown> extends Checker<Env> {
+export abstract class LlmReviewer<Env = unknown> extends Checker<Env, ReviewOutcome> {
   readonly name: string = "llm-review";
   readonly volatile = true;
   protected override readonly depth = 2;
@@ -81,39 +86,35 @@ export abstract class LlmReviewer<Env = unknown> extends Checker<Env> {
     return `Advisory machine review by the model ${this.modelName}. It never blocks landing and is not a review verdict.`;
   }
 
-  private readonly findingsOf = new Map<string, Finding[]>();
-
-  async run(job: CheckJob): Promise<CheckOutcome> {
+  async run(job: CheckJob): Promise<ReviewOutcome> {
     const ws = this.workspace(job);
     const parents = (await git(ws.runner, ws, ["rev-list", "--parents", "-n", "1", "HEAD"])).stdout.trim().split(" ").slice(1);
     const base = parents[0] ?? "4b825dc642cb6eb9a060e54bf8d69288fbee4904"; // the empty tree for a root commit
     const stat = await git(ws.runner, ws, ["diff", "--stat", base, "HEAD"]);
     const diff = await git(ws.runner, ws, ["diff", "-U3", "--no-color", base, "HEAD"]);
     if (stat.exitCode !== 0 || diff.exitCode !== 0) {
-      return { ok: true, detail: `Advisory review skipped: the runner could not read the change (exit ${diff.exitCode}).` };
+      return { ok: true, findings: [], detail: `Advisory review skipped: the runner could not read the change (exit ${diff.exitCode}).` };
     }
     const text = diff.stdout.length > MAX_DIFF ? `${diff.stdout.slice(0, MAX_DIFF)}\n… (diff truncated)` : diff.stdout;
     let answer: string;
     try {
       answer = await this.model()(REVIEW_PROMPT, `<diff>\n${text}\n</diff>`);
     } catch (e) {
-      return { ok: true, detail: `Advisory review skipped: the model did not answer (${e instanceof Error ? e.message : String(e)}).` };
+      return { ok: true, findings: [], detail: `Advisory review skipped: the model did not answer (${e instanceof Error ? e.message : String(e)}).` };
     }
     const { findings, problem } = parseFindings(answer);
-    this.findingsOf.set(job.id, findings);
     return {
       ok: true,
+      findings,
       detail: [`Change reviewed against ${base.slice(0, 12)}:`, stat.stdout.trim(), "", problem ?? `${findings.length} finding(s):`, formatFindings(findings)].join("\n"),
     };
   }
 
-  protected override async after(job: CheckJob, check: Check): Promise<void> {
-    const findings = this.findingsOf.get(job.id) ?? [];
-    this.findingsOf.delete(job.id);
+  protected override async after(job: CheckJob, check: Check, outcome: ReviewOutcome): Promise<void> {
     const text = [
       `Machine-generated, advisory review (model ${this.modelName}; checker "${this.name}"). It is not a review verdict and does not block landing.`,
       "",
-      formatFindings(findings),
+      formatFindings(outcome.findings),
     ].join("\n");
     await this.note(job, { act: check.id }, text, "note");
   }

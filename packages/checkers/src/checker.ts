@@ -3,17 +3,22 @@
  * "Checkers"; R-EXEC, R-OBL-3, R-CARRY-6, R-CARRY-9).
  *
  * `handle(job)`:
- * 1. checks the job's binding before anything starts (`checkJob`);
- * 2. opens a runner sandbox, checks out the exact integration and confirms
- *    `HEAD`, the tree or the snapshot digest (`checkout`);
- * 3. calls the subclass's `run(job)`, which runs untrusted code only inside
- *    the sandbox;
- * 4. outside the sandbox, builds the `check` body bound to the generation,
- *    integration, input, configuration digest and runner digest, labels it
- *    machine-run, signs it with the service's delegation key, and submits
- *    it to the room.
+ * 1. takes its own deep, frozen copy of the job before anything else, so
+ *    nothing the caller changes later reaches the check (`ownJob`);
+ * 2. checks that copy's binding before anything starts (`checkJob`);
+ * 3. opens a new runner sandbox for this job alone, checks out the exact
+ *    integration and confirms `HEAD`, the tree or the snapshot digest
+ *    (`checkout`);
+ * 4. calls the subclass's `run(job)` with the copy, which runs untrusted code
+ *    only inside the sandbox;
+ * 5. closes the sandbox, then, outside it, builds the `check` body from the
+ *    copy (generation, integration, input, configuration digest) and the
+ *    runner digest, labels it machine-run, signs it with the service's
+ *    delegation key, and submits it to the room.
  *
- * A subclass writes `run()` (and, for the LLM reviewer, `after()`).
+ * A subclass writes `run()` (and, for the LLM reviewer, `after()`). Each
+ * `handle` call owns its job copy, session and workspace; they are found by
+ * the copy's identity, so two calls never share them, even for one job ID.
  */
 
 import type {
@@ -33,8 +38,9 @@ import type {
   Runner,
   SignedEnvelope,
 } from "@generalbusiness/artroom-contract";
-import { checkJob, isRefusal, type BoundJob, type JobExpectations } from "./job.ts";
+import { checkJob, isRefusal, ownJob, type BoundJob, type JobExpectations } from "./job.ts";
 import { checkout, type CheckoutOptions, type Workspace } from "./runner.ts";
+import { isOutputLimit } from "./sandbox.ts";
 import { signEnvelope, type Signer } from "./signing.ts";
 
 /** How the service reaches the room: `RoomWire.submit`. */
@@ -78,7 +84,18 @@ export function unavailable(message: string): ArtroomError {
   return { name: "ArtroomError", code: "unavailable", message: clip(message, 500), retryable: true };
 }
 
-export abstract class Checker<Env = unknown> {
+/** A runner command's output went over the runner's limit: thrown, never recorded as a failed check, and not worth retrying. */
+export function outputTooLarge(message: string): ArtroomError {
+  return { name: "ArtroomError", code: "payload-too-large", message: clip(message, 500), retryable: false };
+}
+
+/** One job's run, owned by one `handle` call. */
+interface JobRun {
+  readonly session: RunnerSession;
+  readonly ws: Workspace;
+}
+
+export abstract class Checker<Env = unknown, Outcome extends CheckOutcome = CheckOutcome> {
   protected readonly env: Env;
   protected readonly ctx: CheckerContext;
   abstract readonly name: string;
@@ -88,8 +105,8 @@ export abstract class Checker<Env = unknown> {
   abstract readonly label: string;
   /** Commits to fetch: 1, or 2 when `run()` needs the parent. */
   protected readonly depth: number = 1;
-  private readonly workspaces = new Map<string, Workspace>();
-  private readonly sessions = new Map<string, RunnerSession>();
+  /** Runs in progress, by the identity of the job copy each `handle` call owns. */
+  private readonly runs = new WeakMap<CheckJob, JobRun>();
 
   constructor(ctx: CheckerContext, env: Env) {
     this.ctx = ctx;
@@ -99,29 +116,34 @@ export abstract class Checker<Env = unknown> {
   /** The key, room, runners and expectations, built from `env`. */
   protected abstract services(): CheckerServices | Promise<CheckerServices>;
 
-  /** The check itself. Untrusted code runs only through `this.workspace(job).runner`. */
-  abstract run(job: CheckJob): Promise<CheckOutcome>;
+  /** The check itself, given the job copy `handle` owns. Untrusted code runs only through `this.workspace(job).runner`. */
+  abstract run(job: CheckJob): Promise<Outcome>;
 
-  /** Called after the check is recorded. The LLM reviewer posts its note here. */
-  protected after(_job: CheckJob, _check: Check, _outcome: CheckOutcome): Promise<void> {
+  /** Called after the check is recorded, with the same job copy, when `run()` ran. The LLM reviewer posts its note here. */
+  protected after(_job: CheckJob, _check: Check, _outcome: Outcome): Promise<void> {
     return Promise.resolve();
   }
 
-  /** The verified workspace of a job in progress. */
+  private run$(job: CheckJob): JobRun {
+    const r = this.runs.get(job);
+    if (!r) throw new Error("no run in progress for this job: pass the job that run() was given");
+    return r;
+  }
+
+  /** The verified workspace of the job in progress. */
   protected workspace(job: CheckJob): Workspace {
-    const ws = this.workspaces.get(job.id);
-    if (!ws) throw new Error("no workspace for this job");
-    return ws;
+    return this.run$(job).ws;
   }
 
-  /** The runner session of a job in progress (for fetching more commits). */
+  /** The runner session of the job in progress (for fetching more commits). */
   protected session(job: CheckJob): RunnerSession {
-    const s = this.sessions.get(job.id);
-    if (!s) throw new Error("no session for this job");
-    return s;
+    return this.run$(job).session;
   }
 
-  async handle(job: CheckJob): Promise<Result<Check>> {
+  async handle(input: CheckJob): Promise<Result<Check>> {
+    // Before the first await: from here on only this copy is read.
+    const job = ownJob(input);
+    if (isRefusal(job)) return job;
     const s = await this.services();
     const bound = checkJob(job, s.expectations);
     if (isRefusal(bound)) return bound;
@@ -132,20 +154,22 @@ export abstract class Checker<Env = unknown> {
       throw unavailable(`could not start a runner: ${e instanceof Error ? e.message : String(e)}`);
     }
     let outcome: CheckOutcome;
+    // What run() returned, when the checkout was confirmed and it ran.
+    let produced: Outcome | null = null;
     try {
       const co = await checkout(session.runner, job, { ...session, depth: this.depth });
       if (!co.ok) {
         outcome = { ok: false, detail: `The runner could not confirm what it checked out, so nothing ran.\n${co.detail}` };
       } else {
-        this.workspaces.set(job.id, co.ws);
-        this.sessions.set(job.id, session);
-        outcome = await this.run(job);
+        this.runs.set(job, { session, ws: co.ws });
+        outcome = produced = await this.run(job);
       }
     } catch (e) {
-      throw unavailable(`the runner failed: ${e instanceof Error ? e.message : String(e)}`);
+      const message = e instanceof Error ? e.message : String(e);
+      if (isOutputLimit(e)) throw outputTooLarge(`Nothing was recorded: ${message}`);
+      throw unavailable(`the runner failed: ${message}`);
     } finally {
-      this.workspaces.delete(job.id);
-      this.sessions.delete(job.id);
+      this.runs.delete(job);
       await session.close().catch(() => undefined);
     }
     const body: CheckBody = {
@@ -173,7 +197,7 @@ export abstract class Checker<Env = unknown> {
     const recorded = await s.room.submit(signed);
     if (isRefusal(recorded)) return recorded as Refusal;
     const check = recorded as Check;
-    await this.after(job, check, outcome);
+    if (produced) await this.after(job, check, produced);
     return check;
   }
 

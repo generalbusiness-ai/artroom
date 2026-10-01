@@ -38,19 +38,22 @@ export class Ledger implements RoomPort {
     this.o = opts;
   }
 
-  /** The room issued this job; a check must bind it. */
+  /** The room issued this job; a check must bind it. The ledger keeps its own copy. */
   issue(job: CheckJob): void {
-    this.jobs.set(`${job.lane}/${job.generation}/${job.obligation}/${job.integration}`, job);
+    const own = structuredClone(job);
+    this.jobs.set(`${own.lane}/${own.generation}/${own.obligation}/${own.integration}`, own);
   }
 
   async submit(signed: SignedEnvelope): Promise<Result<ActRecord>> {
     if (!(await verifyEnvelope(signed))) throw { name: "ArtroomError", code: "unauthenticated", message: "bad signature", retryable: false };
     const e = signed.envelope;
     if (e.actor !== this.o.key) return refuse("not-member", "The signing key is not the checker service's.");
+    const hash = await sha256Hex(new TextEncoder().encode(canonicalize(e as never)));
+    // No await between this replay check and recording, so concurrent retries of one key record once.
     const replay = this.byKey.get(`${e.actor}/${e.idempotencyKey}`);
     if (replay) return replay;
     const seq = ++this.seq;
-    const id = `act_${seq}_${(await sha256Hex(new TextEncoder().encode(canonicalize(e as never)))).slice(0, 8)}` as ActId;
+    const id = `act_${seq}_${hash.slice(0, 8)}` as ActId;
     const base = {
       id,
       seq,

@@ -5,13 +5,17 @@
  *   the RPC entrypoints the room calls over a service binding:
  *   `handle(job) → Result<Check>` (the contract's `CheckerService`). They
  *   hold the delegation key (secret `CHECKER_KEY`) and sign outside the
- *   runner sandbox.
- * - `RunnerBox` and `RunnerGateway` are the runner sandbox (container.ts).
+ *   runner sandbox. They submit only to the room bound as `ROOM` (lane A's
+ *   `RoomWire`); with no room bound they refuse to run.
+ * - `RunnerBox` and `RunnerGateway` are the runner sandbox (container.ts,
+ *   sandbox.ts): a new container for every job.
  * - `Publisher` (from the git package) builds filtered snapshots, in its own
  *   container, which is never a runner's.
  * - `HarnessLedger` and the `/h/*` routes play the room for live runs: they
- *   build jobs, mint read tokens, record checks, and probe the runner. Every
- *   route needs the `x-lg-key` header to equal the `LG_KEY` secret.
+ *   build jobs, mint read tokens, record checks in the harness ledger, and
+ *   probe the runner. Every route needs the `x-lg-key` header to equal the
+ *   `LG_KEY` secret. The production entrypoints never submit to the harness
+ *   ledger.
  */
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
@@ -21,11 +25,13 @@ import { withRetry } from "@generalbusiness/artroom-git";
 import type { CheckerServices, RoomPort, RunnerProvider } from "./checker.ts";
 import { TestsChecker, TypesChecker } from "./checkers.ts";
 import { LlmReviewer, type Model } from "./llm.ts";
-import { checkJob, gitAuthEnvFor, isRefusal } from "./job.ts";
+import { unavailable } from "./checker.ts";
+import { checkJob, gitAuthEnvFor, isRefusal, ownJob } from "./job.ts";
 import { checkout, git } from "./runner.ts";
 import { importSigner } from "./signing.ts";
 import { Ledger } from "./ledger.ts";
 import { CA, type RunnerBox } from "./container.ts";
+import { runnerProvider, type RunnerStub } from "./sandbox.ts";
 import type { Publisher } from "@generalbusiness/artroom-git/worker";
 
 export { RunnerBox, RunnerGateway } from "./container.ts";
@@ -45,28 +51,16 @@ interface Env {
   readonly RUNNER: DurableObjectNamespace<RunnerBox>;
   readonly PUBLISHER: DurableObjectNamespace<Publisher>;
   readonly LEDGER: DurableObjectNamespace<HarnessLedger>;
+  /** The room (lane A's `RoomWire`), as a service binding. Not bound yet: the production entrypoints refuse to run without it. */
+  readonly ROOM?: RoomPort;
 }
 
 const TOKEN = /art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g;
 const redact = (s: string) => s.replace(TOKEN, "<token>");
 
-/** Runner sandboxes for jobs (R-EXEC-1, R-EXEC-7). */
+/** Runner sandboxes for jobs (R-EXEC-1, R-EXEC-7): a new `RunnerBox`, so a new container, for every job. */
 function runners(env: Env): RunnerProvider {
-  return {
-    async open(bound) {
-      const job = bound.job;
-      const fresh = job.input.kind === "filtered";
-      const stub = env.RUNNER.getByName(fresh ? `job-${job.id}` : `pool-${job.room}-${job.check}`);
-      const digest = (await stub.open({ repoPath: bound.repoPath, token: bound.token, registry: ["registry.npmjs.org"] })) as Digest;
-      return {
-        runner: { digest, exec: (argv, opts) => stub.exec(argv, opts ?? {}) },
-        remote: job.readUrl,
-        root: "/work",
-        env: { GIT_SSL_CAINFO: CA, NODE_EXTRA_CA_CERTS: CA },
-        close: () => stub.close({ jobDir: `/work/${job.id}`, destroy: fresh }),
-      };
-    },
-  };
+  return runnerProvider({ fresh: () => env.RUNNER.get(env.RUNNER.newUniqueId()) as unknown as RunnerStub, registry: ["registry.npmjs.org"] });
 }
 
 async function services(env: Env, checker: string, room: RoomPort): Promise<CheckerServices> {
@@ -122,29 +116,31 @@ class Llm extends LlmReviewer<WithRoom> {
 const CHECKERS = { tests: Tests, types: Types, "llm-review": Llm } as const;
 type CheckerName = keyof typeof CHECKERS;
 
-/**
- * The room's port, for the RPC entrypoints. In production it is the room's
- * `RoomWire.submit` (lane A); until lane A binds one, acts go to the harness
- * ledger.
- */
-function roomPort(env: Env, room: string): RoomPort {
+/** The production room: the `ROOM` binding. Never the harness ledger. */
+function productionRoom(env: Env): RoomPort {
+  if (!env.ROOM) throw unavailable("No room is bound to this checker service (the ROOM service binding), so it cannot record a check.");
+  return env.ROOM;
+}
+
+/** The harness's room: its ledger. Used only by the `/h/*` routes. */
+function harnessRoom(env: Env, room: string): RoomPort {
   const ledger = env.LEDGER.getByName(room);
   return { submit: (act) => ledger.submit(act) as Promise<Result<ActRecord>> };
 }
 
 export class TestsCheckerService extends WorkerEntrypoint<Env> {
-  handle(job: CheckJob): Promise<Result<Check>> {
-    return new Tests(this.ctx, { env: this.env, room: roomPort(this.env, job.room) }).handle(job);
+  async handle(job: CheckJob): Promise<Result<Check>> {
+    return new Tests(this.ctx, { env: this.env, room: productionRoom(this.env) }).handle(job);
   }
 }
 export class TypesCheckerService extends WorkerEntrypoint<Env> {
-  handle(job: CheckJob): Promise<Result<Check>> {
-    return new Types(this.ctx, { env: this.env, room: roomPort(this.env, job.room) }).handle(job);
+  async handle(job: CheckJob): Promise<Result<Check>> {
+    return new Types(this.ctx, { env: this.env, room: productionRoom(this.env) }).handle(job);
   }
 }
 export class LlmReviewService extends WorkerEntrypoint<Env> {
-  handle(job: CheckJob): Promise<Result<Check>> {
-    return new Llm(this.ctx, { env: this.env, room: roomPort(this.env, job.room) }).handle(job);
+  async handle(job: CheckJob): Promise<Result<Check>> {
+    return new Llm(this.ctx, { env: this.env, room: productionRoom(this.env) }).handle(job);
   }
 }
 
@@ -257,7 +253,10 @@ async function makeJob(env: Env, b: Record<string, unknown>): Promise<{ job: Che
 
 /** Probes run inside a runner after checkout, as untrusted code would. */
 async function probe(env: Env, b: Record<string, unknown>) {
-  const { job, revoke, snapshot } = await makeJob(env, b);
+  const made = await makeJob(env, b);
+  const { revoke, snapshot } = made;
+  const job = ownJob(made.job);
+  if (isRefusal(job)) return { refused: job };
   const bound = checkJob(job, { room: job.room, checker: job.check, host: env.ARTIFACTS_HOST, namespace: env.ARTIFACTS_NAMESPACE, now: Date.now });
   if (isRefusal(bound)) return { refused: bound };
   const session = await runners(env).open(bound);
@@ -322,7 +321,7 @@ export default {
           await ledger.issue(job);
           const prep = Date.now() - t0;
           try {
-            const result = await new Cls(ctx, { env, room: roomPort(env, job.room) }).handle(job);
+            const result = await new Cls(ctx, { env, room: harnessRoom(env, job.room) }).handle(job);
             const records = await ledger.records();
             const note = isRefusal(result) ? null : records.find((r) => r.kind === "note" && "act" in r.anchor && r.anchor.act === result.id) ?? null;
             return json({ result, note, snapshot, ms: { jobAndSnapshot: prep, check: Date.now() - t0 - prep, total: Date.now() - t0 } });
@@ -334,12 +333,6 @@ export default {
           return json({ ...(await probe(env, b)), ms: Date.now() - t0 });
         case "records":
           return json(await env.LEDGER.getByName(env.ROOM_ID).records());
-        case "reset": {
-          const names = (b["runners"] as string[] | undefined) ?? [];
-          const out: Record<string, boolean> = {};
-          for (const n of names) out[n] = await env.RUNNER.getByName(n).reset();
-          return json(out);
-        }
         default:
           return json({ error: "unknown route" }, 404);
       }

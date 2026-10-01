@@ -8,8 +8,11 @@
  * - With whole-tree input it also confirms the tree. With a filtered
  *   snapshot it lists every file it received and recomputes the snapshot
  *   digest, and refuses a file outside the declared paths.
- * - Each job gets its own directory, home and npm cache: nothing is shared
- *   between jobs.
+ * - Each job gets its own directory, home and npm cache. Isolation between
+ *   jobs does not rest on these directories: every job runs in its own new
+ *   container (sandbox.ts).
+ * - Structured git output (`git ls-tree`) is read whole and unchanged. Only
+ *   `step` cuts output, and only for display.
  */
 
 import type { CheckJob, Runner, Sha } from "@generalbusiness/artroom-contract";
@@ -103,7 +106,7 @@ export async function checkout(runner: Runner, job: CheckJob, opts: CheckoutOpti
   return { ok: true, ws: { runner, dir, head: head as Sha, tree: tree as Sha, env, files } };
 }
 
-/** Run a step in the workspace and keep the tail of its output. */
+/** Run a step in the workspace and keep the tail of its output, for display in the check's detail. */
 export async function step(ws: Workspace, argv: readonly [string, ...string[]], timeoutMs = 600_000) {
   const r = await ws.runner.exec(argv, { cwd: ws.dir, env: ws.env, timeoutMs });
   const out = `${r.stdout}\n${r.stderr}`.trim();
