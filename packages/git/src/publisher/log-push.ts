@@ -60,19 +60,26 @@ export interface LogPushRequest {
   readonly lease: string | null;
 }
 
-export const LOG_PUSH_LIMITS = { objects: 100_000, bytes: 64 * 1024 * 1024 } as const;
+/**
+ * One push's bound: objects and decoded bytes. Lane L's publisher sends
+ * only the objects its lease does not hold and checks the same bound
+ * before pushing (`LOG_TRANSFER_LIMITS`, error `cohort-too-large`), so the
+ * bound limits one cohort, never the accumulated log.
+ */
+export const LOG_PUSH_LIMITS: { readonly objects: number; readonly bytes: number } = Object.freeze({ objects: 100_000, bytes: 64 * 1024 * 1024 });
 
 /**
  * Check and decode a `pushLog` request before anything touches git. A
  * request this refuses sends nothing; the answer is `unknown` (lane L's
  * only "not settled" case), and lane L reads the ref back.
  */
-export function decodeLogPush(req: LogPushRequest): { readonly objects: LogObject[] } | { readonly refused: LogPushOutcome } {
+export function decodeLogPush(req: LogPushRequest, limits: { readonly objects: number; readonly bytes: number } = LOG_PUSH_LIMITS): { readonly objects: LogObject[] } | { readonly refused: LogPushOutcome } {
   const refuse = (detail: string) => ({ refused: { ok: false, reason: "unknown", detail: `nothing was sent: ${detail}` } as const });
   if (req.ref !== LOG_REF) return refuse(`pushLog writes only ${LOG_REF}`);
   if (!/^[0-9a-f]{40}$/.test(req.next)) return refuse("next is not a commit id");
   if (req.lease !== null && !/^[0-9a-f]{40}$/.test(req.lease)) return refuse("the lease is not a commit id");
-  if (!Array.isArray(req.objects) || req.objects.length > LOG_PUSH_LIMITS.objects) return refuse("too many objects");
+  if (!Array.isArray(req.objects)) return refuse("objects is not a list");
+  if (req.objects.length > limits.objects) return refuse(`cohort too large: ${req.objects.length} objects, over ${limits.objects} in one push`);
   const objects: LogObject[] = [];
   let bytes = 0;
   for (const o of req.objects) {
@@ -84,7 +91,7 @@ export function decodeLogPush(req: LogPushRequest): { readonly objects: LogObjec
       return refuse("an object is not base64url");
     }
     bytes += data.length;
-    if (bytes > LOG_PUSH_LIMITS.bytes) return refuse("objects over 64 MiB");
+    if (bytes > limits.bytes) return refuse(`cohort too large: over ${limits.bytes} bytes in one push`);
     objects.push({ type: o.type, data });
   }
   return { objects };

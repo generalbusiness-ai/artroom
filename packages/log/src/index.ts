@@ -26,6 +26,7 @@ export {
   type TreeEntry,
 } from "./git.ts";
 export {
+  LOG_TRANSFER_LIMITS,
   LogPublisher,
   PublishError,
   publicationDue,
