@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5e10e3ed9701bdf0f42f34a8cb2282538287fdce","text":"Merge retired a covered predecessor; the successor is at spikes/sandbox-git/test/push-outcome.test.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:66be4461b20cb23448c61feb90785c92a4f60c8f","text":"Merge retired a covered predecessor; the successor is at spikes/sandbox-git/test/gitbox-exception.test.mjs."}
