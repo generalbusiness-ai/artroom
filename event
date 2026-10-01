@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cab79d744ce3f56cc04d8b93f4b7f9cf398ef17e","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/room/glob.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cd3626a3d252651c2392e1def1192d8c5ee3f795","text":"Merge retired a covered predecessor; the successor is at packages/ui/public/favicon.svg."}
