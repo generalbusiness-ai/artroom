@@ -2478,12 +2478,10 @@ pin it.
 3. **Record.** Before it issues a filtered job, the Room derives the
    commit and records it with the canonical integration, the checker, the
    configuration digest, the snapshot digest and the paths.
-4. **Store.** The publisher writes the commit, its trees and the filtered
-   blobs into the room's snapshot repository for that checker, at
-   `refs/artroom/snapshots/<digest hex>`. That repository holds snapshot
-   commits only, never canonical history (R-CARRY-9). The Room issues the
-   job only if the commit the publisher wrote has the ID the Room recorded;
-   otherwise it issues nothing and retries later.
+4. **Store.** The publisher writes the commit into its own snapshot
+   repository (R-CARRY-16). The Room issues the job only if the commit the
+   publisher wrote has the ID the Room recorded; otherwise it issues
+   nothing and retries later.
 5. **Binding.** A filtered job's `integration`, and its check's
    `integration`, is the snapshot commit, not the canonical integration.
    The Room admits a filtered check only if its `integration` is a snapshot
@@ -2491,6 +2489,35 @@ pin it.
    and `input.paths` equal the recorded digest and paths. The check then
    counts for the canonical integration recorded with the snapshot. Any
    other filtered check is refused `check-binding`. Amends R-OBL-3.
+
+**R-CARRY-16. A filtered job reads only its own snapshot.** A runner must
+not be able to read any file outside its own snapshot, whatever it asks
+the server for: an advertised ref, or the ID of another commit, tree or
+blob it learned elsewhere (R-CARRY-9, R-EXEC-7). So isolation comes from
+what the repository holds and what the token reaches. It never depends on
+what the runner checks out, on the snapshot having no parents, on IDs
+being undisclosed, or on refs being removed.
+- **One repository per snapshot commit.** The Room creates a new, empty
+  repository for each snapshot commit. The publisher writes into it that
+  commit and exactly the trees and blobs it reaches, under one ref,
+  `refs/artroom/snapshot`, and nothing else, ever. A repository is never
+  given a second snapshot, and no object or ref is added to it later.
+- **One token per job.** For each filtered job the Room mints a read token
+  for that repository only, expiring no later than the job's `deadline`.
+  The job's `readUrl` is that repository (R-EXEC-9). A token never reaches
+  another snapshot's repository, the canonical repository, or a fork.
+- **Reuse only for the same commit.** Jobs that name the same snapshot
+  commit, and so the same files, may share its repository, each with its
+  own token. A job for any other snapshot, including the same checker after
+  its configuration or the integration changed, gets its own repository.
+- **Retirement.** The Room deletes the repository, and revokes every token
+  minted for it, when its last job ends, or at the latest 24 hours after,
+  if it keeps the repository for reuse by the same commit. Deletion and
+  revocation are durable cleanup duties: recorded when owed, and retried
+  until Artifacts confirms them, as for workspace tokens (R-WS-3).
+- Amends R-CARRY-9, whose words "the runner receives only that snapshot"
+  this rule makes concrete, and replaces the per-checker snapshot
+  repository that amendment 3 first proposed.
 
 ### 29.4 Check jobs (R-EXEC-8 to R-EXEC-10, R-OBL-7)
 
@@ -2505,19 +2532,25 @@ pin it.
   is the job's authentication: only a Worker that the operator binds to
   the service can call it. Jobs are not signed, and no signing domain
   exists for them.
-- Two checks limit a forged job. The service checks the job's binding
-  before it starts a sandbox (room, checker, the read URL's host, the
-  `gitAuthEnv` shape, the deadline), and refuses with `check-binding`. The
-  Room admits the resulting check only if it binds an integration or a
-  snapshot that the Room recorded (R-OBL-3, R-CARRY-15). So a forged job
-  can at most produce a check that the Room refuses.
+- **The trust boundary is the operator's.** A deployment binds only
+  trusted Room producers to the checker service, and a production
+  deployment excludes any harness route that builds jobs. A caller bound
+  to the service is trusted to submit only jobs the Room recorded. The
+  service does not otherwise verify a job's origin: a bound caller can make
+  it run code against any repository its token reaches.
+- Within that boundary, two checks catch mistakes. The service checks the
+  job's binding before it starts a sandbox (room, checker, the read URL's
+  host, the `gitAuthEnv` shape, the deadline), and refuses with
+  `check-binding`. The Room admits a resulting check only if it binds an
+  integration or a snapshot that the Room recorded (R-OBL-3, R-CARRY-15).
 
 **R-EXEC-9. Git's credential and the runner's environment.**
 - `CheckJob.gitAuthEnv` is exactly three variables (`GitAuthEnv`):
   `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=http.extraHeader`, and
   `GIT_CONFIG_VALUE_0=Authorization: Bearer <token>`. The token is
   read-only, for the repository of `readUrl` only, and expires no later
-  than `deadline`.
+  than `deadline`. For a filtered job, that repository holds only the
+  job's own snapshot (R-CARRY-16).
 - The service may route the runner's git through a gateway that holds the
   token, so that the token never enters the runner. Then the runner's
   process environment holds `PATH` and the variables that name the
@@ -2610,6 +2643,11 @@ Each is normative.
 | The publisher writes a snapshot commit with another identity or time | Its ID differs from the recorded one; no job is issued | R-CARRY-15 |
 | A filtered check names an unrecorded commit, another checker's snapshot, or another digest | Refused `check-binding` | R-CARRY-15 |
 | A filtered check names the recorded snapshot | Admitted; it counts for the canonical integration recorded with the snapshot | R-CARRY-15 |
+| **Older snapshot, omitted file.** Snapshot S1 included `src/secret.txt`; the current snapshot S2 omits it. The S2 job's runner fetches S1's commit, and the blob of `src/secret.txt`, by their known IDs, and lists the server's advertised refs | Each fetch fails: the S2 repository has no such object. The only advertised ref is `refs/artroom/snapshot`, at S2. The runner cannot read the file | R-CARRY-16, R-CARRY-9 |
+| **Exact current commit.** The same runner fetches S2's commit by its ID and checks it out | It succeeds, and `HEAD` is S2 | R-CARRY-16, R-EXEC-4 |
+| **Concurrent jobs, different snapshots.** Two filtered jobs, for snapshots S2 and S3, run at once | Each job's token reads only its own repository; each runner fails to fetch the other's commit or blobs, by ID or by ref | R-CARRY-16 |
+| **Configuration change.** An approved proposal changes the checker's declared inputs; the next job's snapshot is S4 | S4 gets a new repository; the S2 job's token cannot read it, and the S4 job's token cannot read S2's | R-CARRY-16 |
+| **Retirement.** The last job for S2 ends | Within 24 hours the S2 repository is deleted and every token minted for it is revoked; an Artifacts outage leaves both owed and retried | R-CARRY-16 |
 | **Jobs.** A request to the checker service from anything but the service binding | No route accepts it | R-EXEC-8 |
 | A job with a `gitAuthEnv` of any other shape, or for another host | Refused `check-binding` before any sandbox starts | R-EXEC-8, R-EXEC-9 |
 | A signed check whose `volatile` differs from its configuration, either way | Refused `check-binding` | R-EXEC-10 |
@@ -2622,7 +2660,7 @@ Each is normative.
 |---|---|---|
 | (1) Check carry recorded, or fail closed | R-CARRY-13; amends R-LOG-5, R-LOG-10, R-LOG-13 | `SystemEvent` gains `check-carried` |
 | (2) Runner environment | R-CARRY-14, R-EXEC-11; amends R-CARRY-6, R-OBL-3 | `CheckerConfig.runner?`; `CheckJob.runner`; `CheckCarryFacts.now.runner` documented as the current pin |
-| (3) Filtered snapshot commit, binding, who issues jobs | R-CARRY-15, R-EXEC-8; amends R-OBL-3 | `SnapshotIdentity`, `SnapshotMessage`; comments on `CheckJob.integration` and `CheckBody.integration` |
+| (3) Filtered snapshot commit, binding, who issues jobs | R-CARRY-15, R-CARRY-16 (one repository per snapshot commit, one token per job), R-EXEC-8; amends R-OBL-3 and R-CARRY-9 | `SnapshotIdentity`, `SnapshotMessage`; comments on `CheckJob.integration` and `CheckBody.integration` |
 | (4) Jobs: authentication, `gitAuthEnv`, advisory, base, volatile | R-EXEC-8 (service binding), R-EXEC-9, R-EXEC-10, R-OBL-7; amends R-EXEC-3 | `GitAuthEnv`; `CheckJob` gains `base`, `volatile`, `advisory`, `runner`; `CheckerConfig.advisory?`; `CheckObligation.advisory?` |
 | (5) jj decisions | Open points 38 (head root entries) and 39 (commit history read), each with reasons and the shape a later amendment would add | — |
 | (6) Additive, lane edits, gates | This section | `CheckerConfig` and `CheckObligation` fields are optional. `CheckJob` fields are required, because the Room is the only producer and a job without them is incomplete. `packages/policy`'s checker configuration validator accepts `advisory` and `runner`, with a test. `examples/check-job.ts` compiles a filtered job and a `check-carried` event |
@@ -2631,19 +2669,24 @@ The contract adopts what lanes A and G built wherever it is sound: lane
 A's snapshot commit (`src/snapshot.ts`) and its message, lane A's
 fail-closed carry and volatile check, lane A's proposed `check-carried`
 event, lane G's `gitAuthEnv` shape and gateway, and lane G's measured
-runner digest. It departs in two places:
+runner digest. It departs in three places:
 - **Every check carry needs a sealed event**, not only one judged by a
   carry rule. Lane A carries a check by platform conditions alone without
   recording the judgment.
 - **The snapshot commit has a fixed identity.** Lane G's `writeSnapshot`
   fixes the time but takes the author and committer from the sandbox's git
   configuration, so the Room refuses its commits.
+- **Each snapshot commit has its own repository** (review 1fe39980). Lane
+  G keeps every snapshot of a checker in one repository, so a runner with
+  that repository's token can fetch an older snapshot and read a file its
+  own snapshot omits.
 
 ### 29.8 Required lane edits
 
 "(type)" marks an edit that a lane's typecheck forces once it builds on
 this contract. Packages on main (`git`, `log`, `policy`, `ui`) typecheck
-unchanged at this amendment's head.
+unchanged at this amendment's head. Lane B was not in the request's list,
+but review 1fe39980 needs its Artifacts port and cleanup duties.
 
 **Lane A (`packages/room`)**
 1. Seal a `check-carried` event for every check carry judgment, carried or
@@ -2657,35 +2700,59 @@ unchanged at this amendment's head.
 3. Snapshot: keep `snapshotCommit`, which matches R-CARRY-15. Before
    issuing a filtered job, check that the commit the publisher wrote has
    the recorded ID.
-4. Jobs: issue every job, only through the checker's service binding, with
+4. Snapshot repositories (R-CARRY-16): create a new, empty repository for
+   each snapshot commit, and have the publisher write only that commit and
+   its closure into it, at `refs/artroom/snapshot`. Mint each filtered
+   job's read token for that repository only, expiring by the job's
+   deadline, and set `readUrl` to it. Reuse a repository only for jobs
+   naming the same snapshot commit. When its last job ends, or at most 24
+   hours later, record its deletion and the revocation of its tokens as
+   durable cleanup duties, retried until Artifacts confirms them.
+5. Jobs: issue every job, only through the checker's service binding, with
    `base`, `volatile`, `advisory`, `runner` and a `GitAuthEnv`
    (R-EXEC-8 to R-EXEC-10). (type, for code and fixtures that build a
    `CheckJob`)
-5. Advisory obligations: set `CheckObligation.advisory` from the
+6. Advisory obligations: set `CheckObligation.advisory` from the
    configuration. `land` admission, readiness and reservation do not wait
    for them, and a failing advisory check does not fail a landing
    (R-OBL-7).
-6. The volatile check already matches R-EXEC-10.
+7. The volatile check already matches R-EXEC-10.
 
 **Lane G (`packages/checkers`, and its copy of `packages/git`)**
 1. `writeSnapshot`: set the author and committer to
    `Artroom Snapshot <snapshot@artroom.invalid>` as well as the time 0, and
-   use the message the Room gives (R-CARRY-15). Lane B's package takes the
-   same change when this publisher operation lands there.
-2. `gitAuthEnvFor` returns `GitAuthEnv`. (type)
-3. `checkJob`: refuse with `check-binding` a job whose `runner` differs
+   use the message the Room gives (R-CARRY-15). Write into the snapshot's
+   own new repository, at `refs/artroom/snapshot` only (R-CARRY-16). Lane
+   B's package takes the same change when this publisher operation lands
+   there.
+2. Expect a per-snapshot repository: drop the per-checker store
+   (`<repo>--snap-<checker>`) from the harness, and test that a filtered
+   runner cannot fetch an older snapshot's commit or blobs by ID or by
+   ref, while the job's own commit fetches (R-CARRY-16).
+3. `gitAuthEnvFor` returns `GitAuthEnv`. (type)
+4. `checkJob`: refuse with `check-binding` a job whose `runner` differs
    from the measured digest, and, for a volatile checker, a job that says
    `volatile: false`. Sign `volatile` as the job states it (R-EXEC-10,
    R-EXEC-11).
-4. Accept jobs only through the service binding. The live harness's
-   job-building route must not be part of a production deployment
-   (R-EXEC-8).
-5. The LLM reviewer compares `job.base` with the integration, instead of
+5. Accept jobs only through the service binding. The live harness's
+   job-building route must not be part of a production deployment; a
+   deployment binds only the Room to the service (R-EXEC-8).
+6. The LLM reviewer compares `job.base` with the integration, instead of
    the integration's first parent. Its configuration says `advisory: true`
    (R-EXEC-10, R-OBL-7).
-6. Show the measured runner digest in each check's `detail` (R-EXEC-11).
-7. Tests and fixtures that build a `CheckJob` add `base`, `volatile`,
+7. Show the measured runner digest in each check's `detail` (R-EXEC-11).
+8. Tests and fixtures that build a `CheckJob` add `base`, `volatile`,
    `advisory` and `runner`. (type)
+
+**Lane B (`packages/git`)**
+1. The Artifacts port (`ArtifactsNamespace`) gains creating an empty
+   repository and deleting one. Today it has only `get` (R-CARRY-16).
+2. The durable cleanup duties, which today cover workspace tokens, also
+   cover deleting a snapshot repository and revoking its tokens: recorded
+   when owed, retried until Artifacts confirms them (R-CARRY-16).
+3. When `listTree` and `writeSnapshot` land in this package, `writeSnapshot`
+   writes the fixed commit of R-CARRY-15 into a new repository, at
+   `refs/artroom/snapshot` only, and adds nothing to it afterwards.
 
 **Lane E (`packages/client`, `packages/mcp`, `packages/cli`)**: none. MCP is
 outside this amendment.
@@ -2711,3 +2778,13 @@ outside this amendment.
    `packages/policy` now accepts `advisory` and `runner`; this branch makes
    that edit, with a test. The guide may show an advisory checker and a
    pinned runner.
+
+### 29.9 Review 1fe39980
+
+Checker's review of `56eb2316` confirmed conditions 1 to 4, and found one
+P2 and one wording fault.
+
+| Finding | Change | Cases (29.6) | Lane edits (29.8) |
+|---|---|---|---|
+| P2 A filtered runner could fetch an older snapshot from the shared per-checker repository and read a file its own snapshot omits | New R-CARRY-16: one new repository per snapshot commit, holding only its closure under one ref; one read token per job for that repository only; reuse only for the same commit; deletion and token revocation within 24 hours of the last job, as durable cleanup. R-CARRY-15 step 4 and R-EXEC-9 point to it | Older snapshot, omitted file (by known ID and by advertised ref); exact current commit; concurrent jobs, different snapshots; configuration change; retirement | A 4; G 1 and 2; B 1 to 3 |
+| Wording: a forged job was said to produce only a refused check | R-EXEC-8 now states the operator's trust boundary: only trusted Room producers are bound to the checker service, the harness route is excluded in production, and a bound caller is trusted to submit only jobs the Room recorded | — | G 5 |

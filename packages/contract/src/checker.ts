@@ -54,7 +54,11 @@ export interface CheckJob {
    */
   readonly base: Sha;
   readonly input: CheckInput;
-  /** Read-only URL on the room's own Artifacts host. Canonical repo for `tree`; snapshot repo for `filtered`. */
+  /**
+   * Read-only URL on the room's own Artifacts host: the canonical repository
+   * for `tree`; for `filtered`, the repository that holds only this job's
+   * snapshot (R-CARRY-16).
+   */
   readonly readUrl: `https://${string}`;
   /** Git's credential only (R-EXEC-3, R-EXEC-9). */
   readonly gitAuthEnv: GitAuthEnv;
