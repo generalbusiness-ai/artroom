@@ -82,7 +82,7 @@ The Room talks to other lanes through three small interfaces in
 |---|---|---|
 | `PolicyPort` | Evaluates `refuse`, `require`, `carry`, `land` and `notify` rules | **Wired.** [src/policy.ts](src/policy.ts) calls lane C's `@generalbusiness/artroom-policy`. It passes the lane purpose, the recovery-key flag, carry facts and the notify directory, so each is in the replay context. One act shares one meter. |
 | `LandingPort` and `LandingHost` | The landing state machine, and the Room's side of it | **Not wired.** The interfaces match lane B's `Landing` class and `LandingRoom` interface, so the adapter is `(sql, host) => new Landing({ sql, room: host, publisher, tokens })`. Lane B's package is not on main yet. Tests use [src/memory/landing.ts](src/memory/landing.ts), which follows lane B's state machine. |
-| `ArtifactsPort` | Forks, workspace tokens, heads, pinned refs, diffs and previews | **Not wired.** Tests use [src/memory/artifacts.ts](src/memory/artifacts.ts), a small in-memory git. |
+| `ArtifactsPort` | Repository creation at founding, forks, workspace tokens, heads, pinned refs, diffs and previews | **Not wired.** Tests use [src/memory/artifacts.ts](src/memory/artifacts.ts), a small in-memory git. |
 | `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | **Not wired.** It has lane L's `LogPublisher` contract, so the adapter is `() => LogPublisher.open(remote)`. Lane L's package is in review. Tests use a stand-in with the same contract over [src/memory/log.ts](src/memory/log.ts)'s remote, whose faults are transport faults only. |
 
 The Room's side of log publication is durable. Before any remote write it
@@ -111,9 +111,17 @@ and the log.
 ### RPC
 
 `env.ARTROOM.room(idOrName)` returns a `RoomWire`: `submit`, `request`,
-`redeem`, `read` and `subscribe`. Refusals are returned values. Failures are
-thrown objects with `name: "ArtroomError"`; their `code` and `retryable`
-survive the RPC hop.
+`redeem`, `bearerAct`, `bearerRequest`, `read` and `subscribe`. Refusals are
+returned values. Failures are thrown objects with `name: "ArtroomError"`;
+their `code` and `retryable` survive the RPC hop.
+
+`bearerAct` and `bearerRequest` serve an MCP agent's bearer session
+(R-CRED-10). The room judges the token first: an unknown or expired token,
+or a revoked delegation or session key, is `unauthenticated`, and nothing is
+recorded. It then builds the envelope (session key, delegation, room ID),
+signs it and admits it on the `submitted` path, so a retry with the same act
+and idempotency key gets the original result while the token is valid.
+`bearerRequest` takes `workspace` and `workspace-token` only.
 
 ### HTTPS
 
@@ -130,34 +138,66 @@ table of R-API-1. Every JSON response is `Cache-Control: no-store`.
 ### Live updates
 
 - HTTPS: `GET /v1/rooms/:room/subscribe?cursor=…&waitMs=…`, a long poll.
-- WebSocket: `GET /v1/rooms/:room/ws`. Send `{"session": "<token>"}` as the
-  first message. Tokens never go in a URL.
+- WebSocket: `GET /v1/rooms/:room/ws?cursor=…`, offering the subprotocols
+  `artroom.v1` and `artroom.token.<token>` (R-API-12). The room judges the
+  token before the upgrade (401 when missing or not valid), answers
+  `artroom.v1`, keeps only the token's hash, judges it again before each
+  update (closing with 1008 when it ends), and ignores client messages.
 - RPC: `subscribe(session, cursor)` returns a byte stream of
   newline-delimited JSON `Update`s.
 
 ### Founding a room
 
-The contract has no route for this, so the package adds two:
+Founding is two steps with no credential (R-GEN-10). Over RPC they are the
+Worker's `draft` and `found` (`ArtroomFounder`).
 
-1. `POST /v1/rooms` with `{ name, repo, admin: { handle, key }, recovery }`
-   returns the genesis object to sign and a `draft` value. The Worker
-   derives the room key from `ROOM_KEY_SECRET` and the draft.
-2. `POST /v1/rooms/found` with `{ genesis, sig, draft }` founds the room.
-   Entry 0 is the genesis; entry 1 activates the policy on main, or the
-   default (R-GEN-1, R-POL-9).
+1. `POST /v1/rooms` with a `RoomDraft`: name, repository source, first
+   admin and recovery key. The source is `{ "kind": "new" }` for a fresh
+   repository, or `{ "kind": "import", "grant": … }` with an operator's
+   signed onboarding grant (R-GEN-12). The answer is the genesis to sign
+   and a `draft` value. `draft` creates, reads and binds nothing.
+2. `POST /v1/rooms/found` with `{ genesis, sig, draft }`. The Worker:
+   1. validates every genesis field again, including the profile and the
+      `jsonata` version;
+   2. checks the room key against the draft value;
+   3. verifies the first admin's signature;
+   4. authorizes the repository: for `new`, it must be the fresh identity
+      derived from the draft value in the public namespace; for `import`,
+      the grant must be signed by a configured operator key, for this
+      repository and this admin key, unexpired unless this is a retry;
+   5. binds repository, room ID and name in the registry, in one atomic
+      step (R-GEN-13);
+   6. only then has the room create or read the repository and seal
+      entries 0 and 1. The room itself refuses to do this unless the
+      registry binds it.
 
-The same two steps are RPC methods on the Worker: `draft` and `found`.
+A failure in steps 1 to 5 binds nothing. A failure in step 6 is
+`unavailable`; the binding stays, and the same `found` again completes the
+founding or returns the same room ID.
+
+The **registry** is one Durable Object per deployment. It never moves or
+removes a binding, so a repository has one room, one name, one sequencer and
+one publisher. The room publishes the log and drives landing (minting
+canonical write tokens) only when the registry binds it (R-PUB-10).
+`GET /v1/rooms/:room`, with a name or an ID and no credential, returns the
+room's `RoomRef` (R-API-11). A name in the form of a room ID is refused.
+
+Until the Artifacts adapter (phase 2b), a repository identity has the form
+`<namespace>/<32 hex characters>`; a name or URL is refused as
+`bad-request`.
 
 ## Configuration
 
-[wrangler.jsonc](wrangler.jsonc) declares the `Room` and `RoomNames`
+[wrangler.jsonc](wrangler.jsonc) declares the `Room` and `Registry`
 Durable Objects with SQLite storage. It is not deployed by this lane.
 
 | Setting | Meaning |
 |---|---|
 | `LEASE_SECONDS` | Lease length, default 1800 |
 | `PUBLIC_URL` | Base URL, used for the MCP endpoint in `Redeemed` |
-| `ROOM_KEY_SECRET` (secret) | Derives each new room's signing key |
+| `ROOM_KEY_SECRET` (secret) | Derives each new room's signing key and, for public founding, its repository identity |
+| `OPERATOR_KEYS` | Operator key IDs, comma-separated, whose onboarding grants are accepted (R-GEN-12) |
+| `PUBLIC_NAMESPACE` | The repository namespace reserved for public founding, default `artroom-public` |
 
 ## Running the tests
 
@@ -188,8 +228,9 @@ Four kinds of evidence, from weakest to strongest:
   below has a test whose name starts with "section 23" or with the finding
   number.
 - **Real B and L integration.** The same cases with lane B's landing engine
-  and lane L's publisher on shared SQLite. **Pending** (phase 2, P1.9): it
-  waits for lane B revision 2, lane L revision 2 and amendment 2.
+  and lane L's publisher on shared SQLite, and the Artifacts adapter.
+  **Pending** (phase 2b): it waits for lane B revision 2 and lane L
+  revision 2.
 - **Deployed.** On Cloudflare with Artifacts. **Pending** for every case.
 
 "n/a" means the case does not involve landing, Artifacts or the publisher.
@@ -237,6 +278,31 @@ inputs (lanes C and G); crash before or after push, two operations
 preparing in parallel, the delayed authenticated push, the failing forward
 retry, token revocation during a push, and the lease race on publication
 (lane B's publisher).
+
+### Amendment 2 cases (section 23)
+
+| Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
+|---|---|---|---|
+| Isolated public creation | yes: founding | Artifacts pending (repository creation) | pending |
+| Unauthorized existing repository | yes: founding | n/a | pending |
+| Repository altered after draft | yes: founding | n/a | pending |
+| Authorized import | yes: founding | Artifacts pending; lane L's verify of the grant pending | pending |
+| Simultaneous founding | yes: founding | n/a | pending |
+| Duplicate import | yes: founding | n/a | pending |
+| Canonical-name aliases | yes: founding | Artifacts pending (identity format) | pending |
+| Recovery after binding | yes: founding | Artifacts pending | pending |
+| Profile, room key or name refused; bound name | yes: founding | n/a | pending |
+| Name to ID | yes: founding | n/a | pending |
+| WebSocket | yes: log | n/a | pending |
+| RPC subscription | yes: amendment2 | n/a | pending |
+| Recompute after activation | yes: amendment2 | L pending (replay) | pending |
+| Land rules in preparation | yes: amendment2 | B pending | pending |
+| Byte mismatch | yes: landing | B pending | pending |
+| Notify across an activation | yes: amendment2 | L pending (verify replays V1) | pending |
+| Bearer receipt after revocation | yes: amendment2 | n/a | pending |
+
+The MCP case of amendment 2 (`explain`, `attention`, `because`) belongs to
+lane E.
 
 ### Review aabda1ed findings
 
@@ -304,6 +370,32 @@ tests. One guard that could not be reached (re-comparing the `delegate`'s
 policy input inside the redemption transaction) was removed: the queue and
 the log-head check already exclude any change between decision and commit.
 
+## Contract amendment 2
+
+Amendment 2 (protocol section 27) listed 13 edits for this package. Each is
+made, and each new guard was broken once against its tests: all 29
+mutations were caught (one at the second attempt, after a test was
+strengthened).
+
+| Edit | What the Room does | Tests |
+|---|---|---|
+| 1. `found` re-validates and runs R-GEN-10 in order | [src/founding.ts](src/founding.ts): six ordered steps; nothing read, minted, sealed or bound before authorization and binding | founding: "a different profile or jsonata version…", "an edited genesis not re-signed…", "the Room itself refuses to found a genesis the registry does not bind…" |
+| 2. Repository source | `new`: a fresh identity from the draft value in the public namespace, created at step 6; `import`: an operator grant, checked at `draft` and `found`, carried as `genesis.onboarding` | founding: "Isolated public creation", "Unauthorized existing repository" (both), "Authorized import", "Repository altered after draft", "an import grant naming … the public founding namespace" |
+| 3. Registry | `Registry` Durable Object binds repository, room ID and name atomically; the same binding again succeeds; room-ID-shaped names are `bad-request` | founding: "Simultaneous founding", "Duplicate import", "Canonical-name aliases", "Recovery after binding", "a name in the form of a room ID…" |
+| 4. One publisher per repository | Publication and the landing step run only for the bound room | founding: "a room that the registry does not bind … publishes nothing and drives no landing" |
+| 5. `GET /v1/rooms/:room` | `RoomRef` from the registry, no credential | founding: "Name to ID" |
+| 6. `bearerAct`, `bearerRequest` | On the Worker's `RoomWire` target, which now implements `RoomWire` whole; R-CRED-10 judging and retries | amendment2: "a bearer claims, opens its workspace…", "Bearer receipt after revocation" |
+| 7. WebSocket by subprotocol | Judged before the upgrade; `artroom.v1`; `?cursor=`; hash only; client messages ignored | log: "WebSocket (R-API-12)…", "?cursor= resumes…" |
+| 8. `publishedThrough` in attention | `AttentionPage` | amendment2: "the page's publishedThrough comes from the same read" |
+| 9. `checkers` in `policy-activated` | Name and digest pairs, sorted by name | amendment2: "as name and digest pairs, sorted by name" |
+| 10. `obligations-recomputed` | Sealed by `recordRecomputation`, with decisions, obligations, `reopened` and `blocked` | amendment2: "Recompute after activation" |
+| 11. `land-evaluated` | Sealed when preparation's land-rule evaluation is stored, pass or block | amendment2: "Land rules in preparation" |
+| 12. Notify across an activation | A queued notify uses the version stored with it | amendment2: "Notify across an activation" |
+| 13. `land-input-changed` | Reservation's byte mismatch; in the in-memory engine's table | landing: "Stage-specific land rule and Byte mismatch" |
+
+The RPC subscription case ("RPC subscription", amendment2) checks that the
+stream is UTF-8 with one `Update` per line.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
@@ -321,48 +413,32 @@ returned, logged or published.
 
 ## Contract gaps
 
-1. **Founding.** The contract has no route or method to create a room.
-   This package adds `POST /v1/rooms`, `POST /v1/rooms/found` and the RPC
-   methods `draft` and `found`.
-2. **Bearer acts.** The contract says the room signs an MCP agent's acts,
-   but `RoomWire` has no method for it. The Durable Object has
-   `bearerAct(bearer, act)` for the MCP package (lane E).
-3. **RPC subscriptions carry bytes.** Workers RPC streams carry bytes, so
-   `subscribe` returns newline-delimited JSON `Update`s, not a stream of
-   objects. The client package decodes it.
-4. **Recomputation after activation is not yet an entry.** R-POL-9
-   recomputes open proposals' obligations when a policy activates. That
-   needs policy evaluation, which is asynchronous, but `policy-activated`
-   must be the next entry after the landing (R-PUB-9). So the event records
-   `recomputed.proposals` and `fenced`, and always `reopened: 0`. The room
-   recomputes from a durable mark; until that finishes, `land` on such a
-   proposal is refused `obligation-open`. Each recomputation (new
-   obligations, carried and not-carried evidence, decisions) is stored by
-   `recordRecomputation`, and its decisions are retained (R-LOG-7).
-   Amendment 2's `obligations-recomputed` event will be sealed in that one
-   place.
-5. **Readiness decisions.** Land rules evaluated during preparation
-   (stage `reservation`) are retained, but no entry records their
-   decisions. A failure is recorded in the `land-outcome` refusal.
-6. **The retry reason when reservation's byte comparison fails.** The
-   contract lists no reason for "the land-rule input changed". The room uses
-   `obligation-open`.
-7. **Unknown note anchors.** A note anchored to an entry that does not
+Contract amendment 2 resolved the six gaps this package first listed:
+founding is in the contract (R-GEN-10 to R-GEN-13), bearer acts and requests
+are `RoomWire` methods (R-CRED-10), the RPC subscription carries bytes
+(R-API-8), recomputation and readiness decisions are the
+`obligations-recomputed` and `land-evaluated` events, and the byte mismatch
+is `land-input-changed`. One remains open:
+
+1. **Unknown note anchors.** A note anchored to an entry that does not
    exist is refused, recorded, with `lane-unknown`; the contract has no
-   closer rule.
+   closer rule (open point 36).
 
 ## Not done
 
-Phase 2 of review aabda1ed (P1.9) waits for lane B revision 2, lane L
-revision 2 and contract amendment 2 to be approved:
+Phase 2b waits for lane B revision 2 and lane L revision 2 to be approved:
 
 - the real landing engine (lane B) behind `LandingPort`, replacing the
   in-memory state machine, with shared-SQLite integration tests;
 - the real publisher (lane L) behind `PublisherPort`;
-- the Artifacts adapter;
+- the Artifacts adapter, including repository creation at founding and the
+  mapping of repository identities;
 - carrying checks across integrations, and filtered checker inputs;
-- the Room's authority replay;
-- amendment 2's 13 lane A edits (protocol section 27).
+- the Room's authority replay.
+
+Amendment 2's 13 lane A edits are done (see "Contract amendment 2"). The
+deployment still needs an operator command to sign onboarding grants, and
+the MCP endpoint's `RoomApi` over `bearerAct` and `bearerRequest`.
 
 Also not done:
 - [src/verify.ts](src/verify.ts) does the offline checks of R-LOG-10
