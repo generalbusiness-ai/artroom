@@ -5,7 +5,7 @@
  */
 
 import type { ActId, Checkpoint, Digest, EntryContent, Genesis, KeyId, LogEntry, RoomId, Seq } from "@generalbusiness/artroom-contract";
-import { canonicalize } from "./canonical.ts";
+import { canonicalize, parseStrict } from "./canonical.ts";
 import { digestJson, sha256Hex, sign } from "./crypto.ts";
 import { utf8 } from "./canonical.ts";
 
@@ -63,16 +63,29 @@ export function retainedPath(r: Retained): string {
 
 /** The files of one log commit (R-LOG-9). Full segments are identical in every later commit. */
 export function logFiles(entries: readonly LogEntry[], retained: readonly Retained[], checkpoint: Checkpoint): Record<string, string> {
-  const first = entries[0];
-  if (!first || first.entry.type !== "system" || first.entry.event.type !== "genesis") throw new Error("entry 0 must be genesis");
+  return layout(
+    entries.map((e) => canonicalize(e)),
+    new Map(retained.map((r) => [retainedPath(r), r.body])),
+    canonicalize(checkpoint),
+  );
+}
+
+/**
+ * The files of one log commit from canonical text: one line per entry from
+ * seq 0, retained files by path, and the checkpoint.
+ */
+export function layout(lines: readonly string[], retained: ReadonlyMap<string, string>, checkpoint: string): Record<string, string> {
+  const first = lines[0] === undefined ? undefined : (parseStrict(lines[0]) as LogEntry);
+  if (!first || first.entry?.type !== "system" || first.entry.event?.type !== "genesis") throw new Error("entry 0 must be genesis");
   const files: Record<string, string> = {};
   files[`${ROOT}/genesis.json`] = canonicalize(first.entry.event.genesis);
-  for (let at = 0; at < entries.length; at += SEGMENT_SIZE)
-    files[segmentPath(at)] = entries
-      .slice(at, at + SEGMENT_SIZE)
-      .map((e) => canonicalize(e))
-      .join("\n");
-  for (const r of retained) files[retainedPath(r)] = r.body;
-  files[`${ROOT}/checkpoint.json`] = canonicalize(checkpoint);
+  for (let at = 0; at < lines.length; at += SEGMENT_SIZE) files[segmentPath(at)] = lines.slice(at, at + SEGMENT_SIZE).join("\n");
+  for (const [path, body] of retained) files[path] = body;
+  files[`${ROOT}/checkpoint.json`] = checkpoint;
   return files;
+}
+
+/** True for the path of a retained replay context or policy document. */
+export function isRetainedPath(path: string): boolean {
+  return /^artroom-log\/v1\/(inputs|policies)\/[0-9a-f]{64}\.json$/.test(path);
 }

@@ -11,7 +11,13 @@
  *   (R-ADM-3, R-REV); idempotency; `notified` and `checkpoint` events; no
  *   self-reference (R-LOG-12);
  * - each recorded policy decision: it replays, with its retained context and
- *   the policy version it names, to the same decision (R-EVAL-6).
+ *   the policy version it names, to the same decision (R-EVAL-6). The version
+ *   must be the one in force when the act was admitted; for a `notified`
+ *   event, when the act it names was admitted.
+ *
+ * Untrusted content is decoded at one boundary (`decode.ts`) before any field
+ * is read. Malformed content is a named failure, `malformed`, and the
+ * verified prefix ends before it. Only reading the repository can throw.
  *
  * It proves the integrity of the published prefix. It cannot prove whether
  * acts after the last checkpoint exist.
@@ -32,10 +38,11 @@ import type {
   Sha,
 } from "@generalbusiness/artroom-contract";
 import { replay } from "@generalbusiness/artroom-policy";
-import { canonicalize, fromUtf8, parseStrict } from "./canonical.ts";
+import { canonicalize } from "./canonical.ts";
 import { digestJson, sha256Hex, verifySig } from "./crypto.ts";
 import { LOG_REF, ROOT, SEGMENT_SIZE, contentOf, entryId, roomIdOf, segmentPath } from "./entries.ts";
 import { parseCommit, type GitReader } from "./git.ts";
+import { decodeCheckpoint, decodeEntry, decodeRetained, segmentLines, textOf } from "./decode.ts";
 import { readLogFiles } from "./publisher.ts";
 import { RosterReplay, type AuthorityFailure } from "./roster.ts";
 
@@ -163,7 +170,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     const files = await readLogFiles(reader, sha);
     const lines: string[] = [];
     for (let first = 0; files.has(segmentPath(first)); first += SEGMENT_SIZE) {
-      const seg = fromUtf8(files.get(segmentPath(first))!).split("\n");
+      const seg = segmentLines(files.get(segmentPath(first))!);
       lines.push(...seg);
       if (seg.length !== SEGMENT_SIZE && files.has(segmentPath(first + SEGMENT_SIZE)))
         fail({ reason: "malformed", commit: sha, detail: `segment ${first} is not full but a later one exists` });
@@ -171,11 +178,11 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     const cpBytes = files.get(`${ROOT}/checkpoint.json`);
     let checkpoint: Checkpoint | null = null;
     try {
-      checkpoint = cpBytes ? (parseStrict(fromUtf8(cpBytes)) as Checkpoint) : null;
+      checkpoint = cpBytes ? decodeCheckpoint(cpBytes) : null;
     } catch (e) {
-      fail({ reason: "malformed", commit: sha, detail: `checkpoint.json: ${(e as Error).message}` });
+      fail({ reason: "malformed", commit: sha, detail: (e as Error).message });
     }
-    if (!checkpoint) fail({ reason: "checkpoint-missing", commit: sha, detail: "the commit has no checkpoint.json" });
+    if (!checkpoint && !cpBytes) fail({ reason: "checkpoint-missing", commit: sha, detail: "the commit has no checkpoint.json" });
     views.push({ sha, files, lines, checkpoint });
   }
 
@@ -208,19 +215,24 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     basis = i;
   }
 
+  // Decode the entries at the boundary: verification covers the prefix before the first malformed line.
   const top = views[basis]!;
-  let entries: LogEntry[];
-  try {
-    entries = top.lines.map((l) => parseStrict(l) as LogEntry);
-  } catch (e) {
-    fail({ reason: "malformed", commit: top.sha, detail: `a segment line: ${(e as Error).message}` });
-    return empty({ commits: views.length });
+  const entries: LogEntry[] = [];
+  let firstBad = Number.POSITIVE_INFINITY;
+  for (const [i, line] of top.lines.entries()) {
+    try {
+      entries.push(decodeEntry(line));
+    } catch (e) {
+      fail({ reason: "malformed", seq: i, commit: top.sha, detail: `entry ${i}: ${(e as Error).message}` });
+      firstBad = i;
+      break;
+    }
   }
 
   // --------------------------------------------------------- genesis first
   const g0 = entries[0];
   if (!g0 || g0.entry.type !== "system" || g0.entry.event.type !== "genesis" || g0.seq !== 0 || g0.prev !== null) {
-    fail({ reason: "genesis-invalid", seq: 0, detail: "entry 0 is not a genesis system entry with prev null" });
+    if (firstBad !== 0) fail({ reason: "genesis-invalid", seq: 0, detail: "entry 0 is not a genesis system entry with prev null" });
     return empty({ commits: views.length });
   }
   const genesis: Genesis = g0.entry.event.genesis;
@@ -229,7 +241,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
 
   for (const v of views.slice(0, basis + 1)) {
     const gj = v.files.get(`${ROOT}/genesis.json`);
-    if (!gj || fromUtf8(gj) !== canonicalize(genesis)) fail({ reason: "genesis-mismatch", commit: v.sha, detail: "genesis.json is not entry 0's genesis" });
+    if (!gj || textOf(gj) !== canonicalize(genesis)) fail({ reason: "genesis-mismatch", commit: v.sha, detail: "genesis.json is not entry 0's genesis" });
     const cp = v.checkpoint;
     if (!cp) continue;
     const { sig, ...unsigned } = cp;
@@ -238,7 +250,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     const lastLine = v.lines.at(-1);
     let last: LogEntry | null = null;
     try {
-      last = lastLine ? (parseStrict(lastLine) as LogEntry) : null;
+      last = lastLine ? decodeEntry(lastLine) : null;
     } catch {
       last = null;
     }
@@ -246,9 +258,11 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       fail({ reason: "checkpoint-mismatch", commit: v.sha, detail: `the checkpoint names ${cp.through} but the segments end at ${last?.seq ?? "nothing"}` });
   }
 
-  // Retained files are named by their digest (R-LOG-7).
-  const inputs = new Map<string, unknown>();
-  const policies = new Map<string, unknown>();
+  // Retained files are named by their digest (R-LOG-7), and decoded at the boundary.
+  // A malformed one is reported where an entry needs it, so the verified prefix stops there.
+  const inputs = new Map<Digest, ReplayContext>();
+  const policies = new Map<Digest, PolicyDocument>();
+  const malformed = new Map<Digest, { path: string; detail: string; reported: boolean }>();
   for (const [path, bytes] of top.files) {
     const m = /^artroom-log\/v1\/(inputs|policies)\/([0-9a-f]{64})\.json$/.exec(path);
     if (!m) continue;
@@ -256,8 +270,21 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       fail({ reason: "retained-digest", commit: top.sha, detail: `${path} does not match its digest` });
       continue;
     }
-    (m[1] === "inputs" ? inputs : policies).set(`sha256:${m[2]}`, parseStrict(fromUtf8(bytes)));
+    const digest: Digest = `sha256:${m[2]}`;
+    try {
+      if (m[1] === "inputs") inputs.set(digest, decodeRetained("input", bytes));
+      else policies.set(digest, decodeRetained("policy", bytes));
+    } catch (e) {
+      malformed.set(digest, { path, detail: (e as Error).message, reported: false });
+    }
   }
+  /** The failure for a retained file that is missing or malformed. */
+  const absent = (digest: Digest, missing: "input-missing" | "policy-missing", what: string): { reason: VerifyReason; detail: string } => {
+    const m = malformed.get(digest);
+    if (!m) return { reason: missing, detail: `${what} ${digest} is not published` };
+    m.reported = true;
+    return { reason: "malformed", detail: `${m.path}: ${m.detail}` };
+  };
 
   // -------------------------------------------------------------- entries
   const roster = new RosterReplay(genesis);
@@ -265,11 +292,19 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   const notified = new Set<string>();
   const policyByVersion = new Map<PolicyVersion, { doc: PolicyDocument; digest: Digest }>();
   let activePolicy: PolicyVersion | null = null;
+  /** The policy in force when each entry was admitted, by seq. */
+  const policyAt: (PolicyVersion | null)[] = [];
   let decisionsReplayed = 0;
-  let firstBad = Number.POSITIVE_INFINITY;
   const checkpointsByCommit = new Map(views.slice(0, basis + 1).map((v) => [v.sha, v.checkpoint] as const));
 
-  const replayDecisions = async (seq: Seq, decisions: readonly Decision[]): Promise<boolean> => {
+  /**
+   * Replay `decisions` under `version`, the one policy they must name. The
+   * caller picks it per event kind: an act's or refusal's decisions use the
+   * policy in force at its admission; a `notified` event's use the policy
+   * in force when the act it names was admitted, which the room pinned when
+   * it queued the notification, however many activations came after.
+   */
+  const replayDecisions = async (seq: Seq, decisions: readonly Decision[], version: PolicyVersion | null, why: string): Promise<boolean> => {
     if (opts.replayDecisions === false) return true;
     const groups = new Map<Digest, Decision[]>();
     for (const d of decisions) groups.set(d.input, [...(groups.get(d.input) ?? []), d]);
@@ -279,20 +314,20 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           fail({ reason: "stamp-mismatch", seq, detail: `${d.rule}: stamp ${d.stamp.profile} ${d.stamp.jsonata} is not the genesis profile` });
           return false;
         }
-        if (d.policy !== activePolicy) {
-          fail({ reason: "policy-version-mismatch", seq, detail: `${d.rule} names policy ${d.policy}; the active policy is ${activePolicy ?? "none"}` });
+        if (d.policy !== version) {
+          fail({ reason: "policy-version-mismatch", seq, detail: `${d.rule} names policy ${d.policy}; ${why} is ${version ?? "none"}` });
           return false;
         }
       }
       const context = inputs.get(digest);
       if (context === undefined) {
-        fail({ reason: "input-missing", seq, detail: `the replay context ${digest} is not published` });
+        fail({ seq, ...absent(digest, "input-missing", "the replay context") });
         return false;
       }
-      const policy = policyByVersion.get(recorded[0]!.policy)!;
+      const policy = policyByVersion.get(version!)!;
       let replayed: readonly Decision[];
       try {
-        const result = await replay({ doc: policy.doc, version: recorded[0]!.policy }, context as ReplayContext);
+        const result = await replay({ doc: policy.doc, version: version! }, context);
         replayed = result.evaluations.map((e) => e.decision);
       } catch (e) {
         fail({ reason: "policy-decision-mismatch", seq, detail: `replay failed: ${(e as Error).message}` });
@@ -313,6 +348,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       fail({ reason, seq: i, detail });
       firstBad = Math.min(firstBad, i);
     };
+    policyAt[i] = activePolicy;
     if (e.seq !== i) {
       // A later position holding seq i means the entries were reordered; none means one was dropped.
       if (entries.some((x) => x.seq === i)) bad("entry-order", `entry at position ${i} has seq ${e.seq}; seq ${i} appears later`);
@@ -348,16 +384,17 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       } else if (ev.type === "policy-activated") {
         const doc = policies.get(ev.policy);
         if (doc === undefined) {
-          bad("policy-missing", `policy ${ev.policy} is not published`);
+          const why = absent(ev.policy, "policy-missing", "policy");
+          bad(why.reason, why.detail);
           break;
         }
-        policyByVersion.set(id, { doc: doc as PolicyDocument, digest: ev.policy });
+        policyByVersion.set(id, { doc, digest: ev.policy });
         activePolicy = id;
       } else if (ev.type === "notified") {
         const m = /^act_(0|[1-9][0-9]*)_([0-9a-f]{8})$/.exec(ev.entry);
         const target = m ? entries[Number(m[1])] : undefined;
-        if (!m || !target || target.seq >= i || target.hash.slice(7, 15) !== m[2]) {
-          bad("notified-unknown", `notified names ${ev.entry}, which is not an earlier entry`);
+        if (!m || !target || target.seq >= i || target.hash.slice(7, 15) !== m[2] || target.entry.type !== "act") {
+          bad("notified-unknown", `notified names ${ev.entry}, which is not an earlier accepted act`);
           break;
         }
         if (notified.has(ev.entry)) {
@@ -365,7 +402,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           break;
         }
         notified.add(ev.entry);
-        if (!(await replayDecisions(i, ev.decisions))) {
+        if (!(await replayDecisions(i, ev.decisions, policyAt[target.seq] ?? null, `the policy pinned when ${ev.entry} was admitted`))) {
           firstBad = Math.min(firstBad, i);
           break;
         }
@@ -416,12 +453,15 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       bad("self-reference", "an opened effect names its own lane");
       break;
     }
-    if (!(await replayDecisions(i, body.receipt.decisions))) {
+    if (!(await replayDecisions(i, body.receipt.decisions, activePolicy, "the active policy"))) {
       firstBad = Math.min(firstBad, i);
       break;
     }
     if (body.type === "act") roster.apply(env, id, judged.authority);
   }
+
+  for (const m of malformed.values())
+    if (!m.reported) fail({ reason: "malformed", commit: top.sha, detail: `${m.path}: ${m.detail}` });
 
   const verifiedThrough = Math.min(entries.length - 1, firstBad - 1);
   const lastEntry = verifiedThrough >= 0 ? entries[verifiedThrough]! : null;

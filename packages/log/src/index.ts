@@ -8,6 +8,7 @@
 
 export { CanonicalError, canonicalBytes, canonicalize, parseStrict } from "./canonical.ts";
 export { b64url, digestJson, keyIdOf, keyPairFromSeed, publicKeyOf, sign, verifySig, type KeyPair } from "./crypto.ts";
+export { Malformed, decodeCheckpoint, decodeEntry, decodeRetained } from "./decode.ts";
 export { LOG_REF, contentOf, entryId, logFiles, makeCheckpoint, retain, retainedPath, roomIdOf, seal, segmentPath, type Retained } from "./entries.ts";
 export {
   MemoryGit,
@@ -35,5 +36,5 @@ export {
   type PublishResult,
   type PublisherOptions,
 } from "./publisher.ts";
-export { RosterReplay, roleMaySign, type AuthorityFailure, type Judgement } from "./roster.ts";
+export { RosterReplay, delegableBy, roleMaySign, type AuthorityFailure, type Judgement } from "./roster.ts";
 export { verifyLog, type VerifyFailure, type VerifyOptions, type VerifyReason, type VerifyReport } from "./verify.ts";

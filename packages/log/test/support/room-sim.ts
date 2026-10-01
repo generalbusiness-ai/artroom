@@ -155,10 +155,14 @@ export class RoomSim {
     return { entry, lane: entryId(entry.seq, entry.hash) };
   }
 
-  /** The `notify` outcome for an earlier entry, as a later `notified` event (R-LOG-13). */
-  async notified(of: ActId, kind: Envelope["kind"], holder: MemberId): Promise<LogEntry> {
+  /**
+   * The `notify` outcome for an earlier entry, as a later `notified` event
+   * (R-LOG-13). `pinned` is the policy queued with the act; by default the
+   * active one, as when nothing was activated in between.
+   */
+  async notified(of: ActId, kind: Envelope["kind"], holder: MemberId, pinned: ActivePolicy = this.policy): Promise<LogEntry> {
     const r = await evaluateNotify(
-      this.policy,
+      pinned,
       {
         kind: "notify",
         act: { id: of, kind, target: null, body: {} },

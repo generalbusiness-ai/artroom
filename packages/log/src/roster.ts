@@ -39,6 +39,7 @@ export type Judgement =
   | { readonly ok: false; readonly reason: AuthorityFailure; readonly detail: string };
 
 const MEMBER_KINDS: readonly EnvelopeKind[] = ["claim", "propose", "note", "review", "land", "release", "renew"];
+const DELEGABLE: readonly DelegableKind[] = ["claim", "propose", "note", "review", "check", "land", "release", "renew"];
 const NOT_RECOVERY_OPS: readonly RosterOp["op"][] = ["join", "delegate", "undelegate"];
 
 /** R-GEN-5 and R-GEN-4: may this role sign this kind (and roster op)? */
@@ -47,6 +48,16 @@ export function roleMaySign(role: Role, kind: EnvelopeKind, op?: RosterOp["op"])
   if (kind === "roster") return op === "delegate" || op === "undelegate";
   if (role === "checker") return kind === "check" || kind === "note";
   return MEMBER_KINDS.includes(kind);
+}
+
+/**
+ * R-ADM-5: the kinds a delegation granted by this role covers. A list may
+ * name only kinds the role may sign; `*` means all of those, fixed when the
+ * delegation is granted. A later role change can narrow it (checked at each
+ * use), never widen it.
+ */
+export function delegableBy(role: Role): readonly DelegableKind[] {
+  return DELEGABLE.filter((k) => roleMaySign(role, k));
 }
 
 interface MemberState {
@@ -63,7 +74,8 @@ interface KeyState {
 interface DelegationState {
   grantor: KeyId;
   grantee: KeyId;
-  kinds: readonly DelegableKind[] | "*";
+  /** The kinds granted, with `*` already expanded by the grantor's role at the grant (R-ADM-5). */
+  kinds: readonly DelegableKind[];
   lanes: readonly LaneId[] | "*";
   expiresMs: number;
   revoked: boolean;
@@ -118,7 +130,7 @@ export class RosterReplay {
       if (d.expiresMs <= atMs) return no("delegation-invalid", `delegation ${env.delegation} had expired`);
       if (d.grantee !== actor) return no("delegation-invalid", `delegation ${env.delegation} was not granted to ${actor}`);
       if (env.kind === "roster") return no("delegation-invalid", "a delegation never covers roster acts");
-      if (d.kinds !== "*" && !d.kinds.includes(env.kind as DelegableKind)) return no("delegation-invalid", `delegation does not cover ${env.kind}`);
+      if (!d.kinds.includes(env.kind as DelegableKind)) return no("delegation-invalid", `delegation does not cover ${env.kind}`);
       const lane = laneOf(env);
       if (d.lanes !== "*" && (lane === null || !d.lanes.includes(lane))) return no("delegation-invalid", `delegation does not cover lane ${lane ?? "new"}`);
       const g = this.keys.get(d.grantor);
@@ -164,6 +176,13 @@ export class RosterReplay {
       if (op === "undelegate") {
         const d = this.delegations.get((env.body as Extract<RosterOp, { op: "undelegate" }>).delegation);
         if (d && d.grantor !== actor) return no("admin-required", "only the grantor key may undelegate (R-GEN-4)");
+      }
+      if (op === "delegate") {
+        // R-ADM-5, judged when the grant is admitted: only kinds the grantor's role may sign.
+        const kinds = (env.body as Extract<RosterOp, { op: "delegate" }>).kinds;
+        const may = delegableBy(m.role);
+        const beyond = kinds === "*" ? [] : kinds.filter((k) => !may.includes(k));
+        if (beyond.length) return no("delegation-invalid", `the role ${m.role} may not grant ${beyond.join(", ")} (R-ADM-5)`);
       }
     } else if (!roleMaySign(m.role, env.kind)) return no("role-forbids", `the role ${m.role} may not sign ${env.kind}`);
     return { ok: true, authority: { via: "member", member: k.member, role: m.role, key: actor } };
@@ -213,7 +232,7 @@ export class RosterReplay {
         this.delegations.set(id, {
           grantor: authority.key,
           grantee: op.to,
-          kinds: op.kinds,
+          kinds: op.kinds === "*" ? delegableBy(authority.role!) : op.kinds,
           lanes: op.lanes,
           expiresMs: Date.parse(op.expiresAt),
           revoked: false,

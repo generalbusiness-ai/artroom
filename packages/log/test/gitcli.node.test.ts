@@ -64,6 +64,26 @@ describe("round trip through a local git repository", () => {
     expect((JSON.parse(bad.stdout) as { failures: { reason: string }[] }).failures.map((f) => f.reason)).toContain("history-rewritten");
   });
 
+  test("review ea4a9bd0 finding 3: artroom verify exits 1, not 2, on a log whose first entry is malformed", async () => {
+    const remote = repo();
+    await goldenLog(GitCli.open(remote));
+    const work = mkdtempSync(join(tmpdir(), "artroom-malformed-"));
+    git(work, "init", "--quiet");
+    git(work, "fetch", "--quiet", remote, `${LOG_REF}:refs/heads/log`);
+    git(work, "checkout", "--quiet", "--orphan", "alone", "log"); // one root commit, so no history check intervenes
+    const seg = join(work, "artroom-log/v1/segments/000000000000.jsonl");
+    const { readFileSync, writeFileSync } = await import("node:fs");
+    const lines = readFileSync(seg, "utf8").split("\n");
+    writeFileSync(seg, ['{"seq":0}', ...lines.slice(1)].join("\n"));
+    git(work, "-c", "user.name=x", "-c", "user.email=x@x", "commit", "--quiet", "-am", "malformed");
+    git(work, "push", "--quiet", "--force", remote, `HEAD:${LOG_REF}`);
+    const r = spawnSync(process.execPath, [cli, "verify", remote, "--json"], { encoding: "utf8" });
+    expect(r.status, r.stderr).toBe(1);
+    const report = JSON.parse(r.stdout) as { verifiedThrough: number; failures: { reason: string; seq?: number }[] };
+    expect(report.failures).toContainEqual(expect.objectContaining({ reason: "malformed", seq: 0 }));
+    expect(report.verifiedThrough).toBe(-1);
+  });
+
   test("a publisher with a stale view meets the lease and stops; the ref does not move", async () => {
     const remote = repo();
     const { sim, c3 } = await goldenLog(GitCli.open(remote));
