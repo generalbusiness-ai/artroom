@@ -42,8 +42,6 @@ export interface PublisherPort {
     readonly generation: number;
     readonly head: Sha;
     readonly expectedMain: Sha;
-    /** Unix seconds for the merge commit's dates, so a rebuild gives the same commit. */
-    readonly committedAt: number;
   }): Promise<IntegrateResult>;
   /** `git push --force-with-lease=refs/heads/main:<expectedMain> <integration>:refs/heads/main` with this token (R-PUB-4). */
   push(req: {
@@ -213,7 +211,6 @@ export class Landing {
           generation: op.generation,
           head: start.head,
           expectedMain: start.expectedMain,
-          committedAt: Math.floor(op.createdAt / 1000),
         });
       } catch (e) {
         result = { kind: "error", detail: message(e) };

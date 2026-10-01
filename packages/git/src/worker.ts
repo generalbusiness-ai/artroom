@@ -18,7 +18,9 @@ import type { ActId, LaneId, OpId, PolicyVersion, Seq, Sha, SystemEvent } from "
 import { durableSql, type Sql, text } from "./sql.ts";
 import { Landing } from "./landing/engine.ts";
 import type { LaneFacts, LandingRoom, LandRecord, Readiness } from "./landing/types.ts";
-import { ContainerPublisher, Pinning, type PublisherStub } from "./publisher/client.ts";
+import { ContainerPublisher, type LogRemoteStub, Pinning, type PublisherStub } from "./publisher/client.ts";
+import { LOG_REF } from "./publisher/gitops.ts";
+import type { LogPushRequest } from "./publisher/log-push.ts";
 import { Workspaces, forkName } from "./workspace/workspaces.ts";
 import { type ArtifactsNamespace, canonicalTokens, withRetry } from "./artifacts.ts";
 import { TreeCache, changedPaths, previewPlan } from "./diff/treediff.ts";
@@ -283,6 +285,80 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
         };
         const info = await repo.info();
         return { defaultBranch: info.defaultBranch, lastPushAt: info.lastPushAt, none: await tryLog({ limit: 1 }), main: await tryLog({ ref: "main", limit: 1 }), full: await tryLog({ ref: "refs/heads/main", limit: 1 }), head: await tryLog({ ref: "HEAD", limit: 1 }) };
+      }
+      case "logpush": {
+        // Lane A's log remote, as packages/room/src/logremote.ts calls it: a 60 s write
+        // token on the canonical repo, the sandbox's pushLog, then revoke the token.
+        const repo = this.need(this.meta("repo"), "repo");
+        const r = await this.env.ARTIFACTS.get(repo);
+        const stub = this.env.PUBLISHER.getByName(repo) as unknown as LogRemoteStub;
+        const ref = typeof body["ref"] === "string" ? body["ref"] : LOG_REF;
+        const t = await withRetry(() => r.createToken("write", 60));
+        let outcome: unknown;
+        let revoked = false;
+        try {
+          outcome = await stub.pushLog({
+            canonical: { remote: (await r.info()).remote, token: t.plaintext },
+            objects: body["objects"] as LogPushRequest["objects"],
+            ref,
+            next: String(body["next"]),
+            lease: body["lease"] === null || body["lease"] === undefined ? null : String(body["lease"]),
+          });
+        } catch (e) {
+          outcome = { threw: e instanceof Error ? e.message : String(e) };
+        } finally {
+          revoked = await withRetry(() => r.revokeToken(t.id)).catch(() => false);
+        }
+        const pushMs = lap();
+        const active = (await r.listTokens()).tokens.filter((x) => x.state === "active").length;
+        // How the binding resolves the log ref (lane A's readRef uses log({ ref })).
+        const viaLog = (ref: string) => r.log({ ref, limit: 1 }).then((c) => c[0]?.hash ?? null, (e: unknown) => `error: ${e instanceof Error ? e.message : String(e)}`);
+        const binding = { full: await viaLog(LOG_REF), short: await viaLog("artroom/log") };
+        return { outcome, revoked, activeTokens: active, binding, ms: { push: pushMs, total: lap() } };
+      }
+      case "logref": {
+        // Lane A's readRef: a 60 s read token, the sandbox's readLogRef, then revoke.
+        const repo = this.need(this.meta("repo"), "repo");
+        const r = await this.env.ARTIFACTS.get(repo);
+        const stub = this.env.PUBLISHER.getByName(repo) as unknown as LogRemoteStub;
+        const t = await withRetry(() => r.createToken("read", 60));
+        let value: unknown;
+        let revoked = false;
+        try {
+          value = { ref: await stub.readLogRef({ canonical: { remote: (await r.info()).remote, token: t.plaintext }, ref: typeof body["ref"] === "string" ? body["ref"] : LOG_REF }) };
+        } catch (e) {
+          value = { threw: e instanceof Error ? e.message : String(e) };
+        } finally {
+          revoked = await withRetry(() => r.revokeToken(t.id)).catch(() => false);
+        }
+        const active = (await r.listTokens()).tokens.filter((x) => x.state === "active").length;
+        return { ...(value as object), revoked, activeTokens: active, ms: lap() };
+      }
+      case "logobjects": {
+        // The binding's reads by object ID, raw, for lane A's readObject to be checked against.
+        const r = await this.env.ARTIFACTS.get(this.need(this.meta("repo"), "repo"));
+        const attempt = async <T>(f: () => Promise<T>) => {
+          try {
+            return { value: await f() };
+          } catch (e) {
+            return { error: e instanceof Error ? e.message : String(e) };
+          }
+        };
+        const out: Record<string, unknown> = {};
+        for (const sha of body["shas"] as string[]) {
+          out[sha] = {
+            commit: await attempt(() => r.readCommit(sha)),
+            tree: await attempt(() => r.readTree(sha)),
+            blob: await attempt(async () => {
+              const b = await r.readBlob(sha);
+              if (!b) return null;
+              let bin = "";
+              for (const x of new Uint8Array(await b.arrayBuffer())) bin += String.fromCharCode(x);
+              return btoa(bin);
+            }),
+          };
+        }
+        return { objects: out, ms: lap() };
       }
       case "reset": {
         const repo = this.need(this.meta("repo"), "repo");

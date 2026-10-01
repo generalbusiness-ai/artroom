@@ -5,14 +5,15 @@
  * gateway adds them (publisher/gateway.ts).
  */
 
-import type { OpId, Sha } from "@generalbusiness/artroom-contract";
+import type { Sha } from "@generalbusiness/artroom-contract";
 import type { IntegrateResult } from "../landing/core.ts";
 import type { PublisherPort } from "../landing/engine.ts";
 import type { PushOutcome } from "./push-outcome.ts";
-import { GitError, type GitOps, integrationRef, pinnedRef } from "./gitops.ts";
+import { GitError, type GitOps, integrationMessage, integrationRef, pinnedRef } from "./gitops.ts";
 
-export function landMessage(lane: string, generation: number, op: OpId): string {
-  return `Land ${lane} generation ${generation}\n\nArtroom-Op: ${op}\n`;
+/** The message of an integration commit (see gitops `integrationMessage`). */
+export function landMessage(lane: string, generation: number): string {
+  return integrationMessage(lane, generation);
 }
 
 export class GitPublisher implements PublisherPort {
@@ -31,8 +32,8 @@ export class GitPublisher implements PublisherPort {
         head: req.head,
         headRef: pinnedRef(req.lane, req.generation),
         storeRef: integrationRef(req.op, req.attempt),
-        message: landMessage(req.lane, req.generation, req.op),
-        committedAt: req.committedAt,
+        lane: req.lane,
+        generation: req.generation,
       });
       return r.kind === "clean" ? { kind: "clean", integration: r.integration as Sha, ref: r.ref } : { kind: "conflict", paths: r.paths };
     } catch (e) {

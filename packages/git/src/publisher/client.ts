@@ -12,7 +12,6 @@ import type { PublisherPort } from "../landing/engine.ts";
 import { type ArtifactsNamespace, type RepoHandle, readMainVia, withRetry } from "../artifacts.ts";
 import type { BuildResult, PinResult, PreviewResult } from "./gitops.ts";
 import { integrationRef, pinnedRef } from "./gitops.ts";
-import { landMessage } from "./git-publisher.ts";
 import type { PushOutcome } from "./push-outcome.ts";
 
 interface RemoteAccess {
@@ -24,17 +23,30 @@ interface RemoteAccess {
 export interface PublisherStub {
   pinObjects(req: { fork: RemoteAccess; canonical: RemoteAccess; head: string }): Promise<PinResult>;
   pinRef(req: { canonical: RemoteAccess; ref: string; head: string }): Promise<PinResult>;
-  preview(req: { canonical: RemoteAccess; head: string; headRef: string }): Promise<PreviewResult>;
+  preview(req: { canonical: RemoteAccess; head: string; headRef: string; lane: string; generation: number }): Promise<PreviewResult>;
   integrate(req: {
     canonical: RemoteAccess;
     expectedMain: string;
     head: string;
     headRef: string;
     storeRef: string;
-    message: string;
-    committedAt: number;
+    lane: string;
+    generation: number;
   }): Promise<BuildResult>;
   push(req: { canonical: RemoteAccess; integration: string; expectedMain: string; integrationRef: string }): Promise<PushOutcome>;
+}
+
+/**
+ * The sandbox's log remote (R-LOG-8), as lane A's log remote calls it. For
+ * each call the caller mints a token of at most 60 s on the canonical repo
+ * (write for `pushLog`, read for `readLogRef`) and revokes it afterwards.
+ * Separate from `PublisherStub`, which is what the landing and pinning
+ * clients call.
+ */
+export interface LogRemoteStub {
+  pushLog(req: LogPushRequest & { canonical: RemoteAccess }): Promise<LogPushOutcome>;
+  /** `refs/artroom/log`'s commit, or null if it does not exist; throws if it cannot be read. */
+  readLogRef(req: { canonical: RemoteAccess; ref: string }): Promise<Sha | null>;
 }
 
 export interface PublisherClientOptions {
@@ -44,6 +56,8 @@ export interface PublisherClientOptions {
   readonly canonical: { readonly name: string; readonly remote: string };
   readonly sleep?: (ms: number) => Promise<void>;
 }
+
+import type { LogPushOutcome, LogPushRequest } from "./log-push.ts";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -96,8 +110,8 @@ export class ContainerPublisher implements PublisherPort {
             head: req.head,
             headRef: pinnedRef(req.lane, req.generation),
             storeRef: integrationRef(req.op, req.attempt),
-            message: landMessage(req.lane, req.generation, req.op),
-            committedAt: req.committedAt,
+            lane: req.lane,
+            generation: req.generation,
           }),
         this.o.sleep,
       );
@@ -164,11 +178,15 @@ export class Pinning {
     );
   }
 
-  /** A merge preview of a pinned generation against main. */
+  /**
+   * A merge preview of a pinned generation against main, with its
+   * integration commit (stored in the canonical repo when it is a merge), the
+   * same commit a landing on that main builds.
+   */
   async preview(lane: string, generation: number, head: Sha): Promise<PreviewResult> {
     const canonical = await this.get(this.o.canonical.name);
-    return withToken(canonical, "read", (token) =>
-      this.o.stub.preview({ canonical: { remote: this.o.canonical.remote, token }, head, headRef: pinnedRef(lane, generation) }),
+    return withToken(canonical, "write", (token) =>
+      this.o.stub.preview({ canonical: { remote: this.o.canonical.remote, token }, head, headRef: pinnedRef(lane, generation), lane, generation }),
     );
   }
 }

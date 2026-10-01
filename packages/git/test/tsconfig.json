@@ -3,8 +3,22 @@
   "compilerOptions": {
     "rootDir": "..",
     "erasableSyntaxOnly": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2024",
+      "ESNext.Disposable"
+    ]
   },
-  "include": ["./*.ts", "../src/**/*.ts"],
-  "exclude": ["../src/worker.ts", "../src/publisher/container.ts", "../src/publisher/gateway.ts", "../src/worker-runtime.d.ts"]
+  "include": [
+    "./*.ts",
+    "../src/**/*.ts"
+  ],
+  "exclude": [
+    "../src/worker.ts",
+    "../src/publisher/container.ts",
+    "../src/publisher/gateway.ts",
+    "../src/worker-runtime.d.ts"
+  ]
 }
