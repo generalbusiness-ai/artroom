@@ -1,0 +1,99 @@
+/**
+ * The parts of the Artifacts Workers binding this package uses, as
+ * structural types, so the core needs no Workers types. A real `Artifacts`
+ * binding and `ArtifactsRepo` handle satisfy them.
+ */
+
+import type { TreeReader } from "./diff/treediff.ts";
+
+export interface TokenInfo {
+  readonly id: string;
+  readonly scope: "read" | "write";
+  readonly state: "active" | "expired" | "revoked";
+  readonly expiresAt: string;
+}
+
+export interface MintedToken {
+  readonly id: string;
+  readonly plaintext: string;
+  readonly scope: "read" | "write";
+  readonly expiresAt: string;
+}
+
+export interface RepoHandle extends TreeReader {
+  createToken(scope?: "write" | "read", ttl?: number): Promise<MintedToken>;
+  revokeToken(tokenOrId: string): Promise<boolean>;
+  listTokens(): Promise<{ readonly tokens: readonly TokenInfo[]; readonly total: number }>;
+  info(): Promise<{ readonly name: string; readonly remote: string; readonly source: string | null }>;
+  fork(
+    name: string,
+    opts?: { description?: string; readOnly?: boolean; defaultBranchOnly?: boolean },
+  ): Promise<{ readonly name: string; readonly remote: string; readonly token: string }>;
+  log(opts?: { ref?: string; limit?: number }): Promise<readonly { readonly hash: string }[]>;
+}
+
+export interface ArtifactsNamespace {
+  get(name: string): Promise<RepoHandle>;
+}
+
+/** An Artifacts error, as thrown by the binding. */
+export function artifactsCode(e: unknown): string | null {
+  const code = (e as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : null;
+}
+
+/**
+ * Artifacts creation sometimes fails with an internal error (10400) that
+ * succeeds on retry (plan section 2: about 5 in 70). Retry those, and only
+ * those, with backoff.
+ */
+export function retriable(e: unknown): boolean {
+  const code = artifactsCode(e);
+  const numeric = (e as { numericCode?: unknown } | null)?.numericCode;
+  return code === "INTERNAL_ERROR" || code === "UPSTREAM_UNAVAILABLE" || numeric === 10400 || /10400/.test(String(e));
+}
+
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  opts: { readonly attempts?: number; readonly firstMs?: number; readonly sleep?: (ms: number) => Promise<void> } = {},
+): Promise<T> {
+  const attempts = opts.attempts ?? 5;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let wait = opts.firstMs ?? 500;
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i >= attempts || !retriable(e)) throw e;
+      await sleep(wait);
+      wait *= 2;
+    }
+  }
+}
+
+/** Publication and staging tokens on the canonical repo (R-PUB-3): write, 60 s, revoked after use. */
+export function canonicalTokens(repo: () => Promise<RepoHandle>, opts: { readonly sleep?: (ms: number) => Promise<void> } = {}) {
+  return {
+    async mint(): Promise<{ readonly id: string; readonly plaintext: string }> {
+      const r = await repo();
+      const t = await withRetry(() => r.createToken("write", 60), opts);
+      return { id: t.id, plaintext: t.plaintext };
+    },
+    async mintRead(): Promise<{ readonly id: string; readonly plaintext: string }> {
+      const r = await repo();
+      const t = await withRetry(() => r.createToken("read", 60), opts);
+      return { id: t.id, plaintext: t.plaintext };
+    },
+    async revoke(id: string): Promise<boolean> {
+      const r = await repo();
+      return withRetry(() => r.revokeToken(id), opts);
+    },
+  };
+}
+
+/** Main on a repo, read through the binding. */
+export async function readMainVia(repo: RepoHandle): Promise<string> {
+  const [top] = await repo.log({ ref: "refs/heads/main", limit: 1 });
+  if (!top) throw new Error("main is missing");
+  return top.hash;
+}

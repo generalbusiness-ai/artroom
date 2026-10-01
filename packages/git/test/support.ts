@@ -110,9 +110,10 @@ export class Fixture {
   write(files: Record<string, string | null>): void {
     for (const [path, body] of Object.entries(files)) {
       const full = join(this.work, path);
-      if (body === null) rmSync(full, { force: true });
+      if (body === null) rmSync(full, { force: true, recursive: true });
       else {
         mkdirSync(dirname(full), { recursive: true });
+        rmSync(full, { force: true, recursive: true }); // a directory becomes a file
         writeFileSync(full, body);
       }
     }

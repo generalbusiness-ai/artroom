@@ -112,6 +112,11 @@ export interface IntegrateRequest {
     readonly committedAt: number;
   }
 
+export interface IntegrateHooks {
+  /** Called with the new merge commit before it is pushed to `storeRef`, so the gateway can allow exactly that update. */
+  readonly beforeStore?: (integration: string) => Promise<void>;
+}
+
 export class GitError extends Error {
   readonly step: string;
   readonly result: ExecResult;
@@ -299,11 +304,11 @@ export class GitOps {
    * `committedAt`, and is pushed to `storeRef` in the canonical repo so that
    * checkers and every later push use exactly this commit.
    */
-  integrate(req: IntegrateRequest): Promise<BuildResult> {
-    return this.exclusive(req.canonical, () => this.integrateNow(req));
+  integrate(req: IntegrateRequest, hooks: IntegrateHooks = {}): Promise<BuildResult> {
+    return this.exclusive(req.canonical, () => this.integrateNow(req, hooks));
   }
 
-  private async integrateNow(req: IntegrateRequest): Promise<BuildResult> {
+  private async integrateNow(req: IntegrateRequest, hooks: IntegrateHooks): Promise<BuildResult> {
     const { dir } = await this.syncFor(req.canonical, req.head, req.headRef);
     if (!(await this.hasCommit(dir, req.expectedMain))) {
       throw new Error(`expected main ${req.expectedMain} is not in the canonical repo`);
@@ -322,6 +327,7 @@ export class GitOps {
       ),
       "integration",
     );
+    await hooks.beforeStore?.(integration);
     const stored = await this.createRef(dir, req.canonical, integration, assertRef(req.storeRef));
     if (stored.kind !== "pinned") throw new Error(`could not store the integration at ${req.storeRef}`);
     return { kind: "clean", integration, ref: req.storeRef, fastForward: false };
