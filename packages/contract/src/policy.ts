@@ -27,9 +27,9 @@ import type {
   Sha,
   TeamId,
 } from "./ids.ts";
-import type { EnvelopeKind, PathChange, Verdict } from "./acts.ts";
-import type { Principal, Role } from "./roster.ts";
-import type { ReviewerSpec } from "./evidence.ts";
+import type { EnvelopeKind, LanePurpose, PathChange, Verdict } from "./acts.ts";
+import type { Principal, RevocationReason, Role } from "./roster.ts";
+import type { CheckCarryFacts, ReviewerSpec } from "./evidence.ts";
 
 /** A JSONata expression in the `artroom-jsonata-v1` profile (R-EVAL-1). */
 export type Expr = string;
@@ -105,7 +105,11 @@ export interface CarrySettings {
   readonly checks: boolean;
   /** Added to the platform's global inputs. Policy cannot remove a platform entry. */
   readonly globalInputs: readonly Glob[];
-  /** Default `dependsOn` per area: a changed path matching a key's pattern adds these. */
+  /**
+   * Default `dependsOn` per area (R-CARRY-2). For a verdict whose reviewed
+   * scope may overlap a key's pattern (R-PATH-3), that key's globs are added
+   * to the verdict's declared `dependsOn`.
+   */
   readonly dependsOn: Readonly<Record<Glob, readonly Glob[]>>;
 }
 
@@ -153,6 +157,19 @@ export interface PolicyLane {
   readonly holder: MemberId | null;
   readonly scope: readonly Glob[];
   readonly generation: Generation;
+  /** `config-recovery` lanes skip `refuse`, `require`, `carry` and `land` rules (R-ADMIN-5). */
+  readonly purpose: LanePurpose;
+}
+
+/**
+ * The owners policy assigns to one changed path. Ownership is a list of
+ * these pairs, never a map keyed by path: legal paths such as `constructor`,
+ * `prototype`, `__proto__` and `_jsonata_cache` are reserved keys in the
+ * evaluator profile (R-EVAL-3).
+ */
+export interface PathOwners {
+  readonly path: RepoPath;
+  readonly owners: readonly Principal[];
 }
 
 /** The proposal, as policy sees it. `paths` lists old and new paths. */
@@ -162,8 +179,8 @@ export interface PolicyProposal {
   readonly base: Sha;
   readonly changed: readonly PathChange[];
   readonly paths: readonly RepoPath[];
-  /** The owners policy assigns to each changed path. */
-  readonly owners: Readonly<Record<RepoPath, readonly Principal[]>>;
+  /** The owners policy assigns to each changed path: one entry per path in `paths`, in the same order. */
+  readonly owners: readonly PathOwners[];
 }
 
 export interface PolicyRoom {
@@ -214,6 +231,10 @@ export type RuleInput =
       readonly lane: PolicyLane;
       readonly proposal: PolicyProposal;
       readonly obligations: readonly { readonly id: ObligationId; readonly met: boolean }[];
+      /**
+       * Each qualifying reviewer's latest verdict on this generation, reviewed
+       * here or carried: one entry per reviewer (R-POL-7).
+       */
       readonly reviews: readonly { readonly act: ActId; readonly verdict: Verdict; readonly by: PolicyActor; readonly basis: "here" | "carried" }[];
       readonly stage: "land" | "reservation";
     }
@@ -245,6 +266,12 @@ export interface PolicyProfile {
     "abs", "ceil", "floor", "round", "count", "sum", "min", "max", "length",
     "exists", "not", "lookup", "append", "merge", "contains", "substring",
   ];
+  /** Steps across all evaluations for one act (R-EVAL-2, R-EVAL-9). */
+  readonly actSteps: 25_000;
+  /** Inspected bytes across all evaluations for one act (R-EVAL-2, R-EVAL-9). */
+  readonly actInspectedBytes: 4_194_304;
+  /** How the per-act budget is counted and shared (R-EVAL-9). */
+  readonly accounting: "artroom-act-budget-v1";
 }
 
 /** Recorded with every decision (R-EVAL-4). */
@@ -252,7 +279,68 @@ export interface ProfileStamp {
   readonly profile: "artroom-jsonata-v1";
   /** The pinned `jsonata` package version, for example `2.2.2`. */
   readonly jsonata: string;
+  /** The per-act budget accounting (R-EVAL-9). */
+  readonly accounting: "artroom-act-budget-v1";
 }
+
+// ---------------------------------------------------------- replay context
+
+export interface Usage {
+  readonly steps: number;
+  readonly inspectedBytes: number;
+}
+
+/** The act budget as one evaluate call saw it (R-EVAL-9). */
+export interface BudgetState {
+  readonly accounting: "artroom-act-budget-v1";
+  readonly limits: Usage;
+  /** Spent by earlier evaluate calls for the same act, before this call began. */
+  readonly start: Usage;
+}
+
+/** What the room supplies to turn notify targets into members and teams (R-POL-5). */
+export interface NotifyDirectory {
+  /** Active members by role, to expand `role:<role>` principals. */
+  readonly roles: Readonly<Partial<Record<Role, readonly MemberId[]>>>;
+  /** The proposal's qualifying reviewers, for the `reviewers` target. */
+  readonly reviewers: readonly MemberId[];
+}
+
+/** The platform facts for one carry question, as JSON: absent values are null (R-CARRY-6 to 12). */
+export interface CarryFactsRecord {
+  /** The current revocation of the evidence's signing or grantor key. */
+  readonly revoked: RevocationReason | null;
+  /** For a check: its binding and the new integration. Null for a verdict. */
+  readonly check: CheckCarryFacts | null;
+}
+
+type InputOf<K extends RuleKind> = Extract<RuleInput, { readonly kind: K }>;
+
+/**
+ * Everything besides the active policy and the profile that decides one
+ * evaluate call's outcome (R-EVAL-8). The evaluator copies and freezes it
+ * before any asynchronous work. `Decision.input` is the digest of its
+ * canonical JSON, and it is retained with the log (R-LOG-7).
+ */
+export type ReplayContext =
+  | {
+      readonly kind: "refuse";
+      readonly input: InputOf<"refuse">;
+      readonly budget: BudgetState;
+      readonly purpose: LanePurpose;
+      /** True when the act is signed by the recovery key (R-ADMIN-3). */
+      readonly recoveryKey: boolean;
+    }
+  | { readonly kind: "require"; readonly input: InputOf<"require">; readonly budget: BudgetState; readonly purpose: LanePurpose }
+  | {
+      readonly kind: "carry";
+      readonly input: InputOf<"carry">;
+      readonly budget: BudgetState;
+      readonly purpose: LanePurpose;
+      readonly facts: CarryFactsRecord;
+    }
+  | { readonly kind: "land"; readonly input: InputOf<"land">; readonly budget: BudgetState; readonly purpose: LanePurpose }
+  | { readonly kind: "notify"; readonly input: InputOf<"notify">; readonly budget: BudgetState; readonly directory: NotifyDirectory };
 
 /** One rule's outcome on one act. Recorded in the receipt (R-LOG-6). */
 export interface Decision {
@@ -260,7 +348,13 @@ export interface Decision {
   readonly kind: RuleKind;
   readonly policy: PolicyVersion;
   readonly stamp: ProfileStamp;
-  /** Digest of the canonical rule input; the input itself is retained with the log (R-LOG-7). */
+  /**
+   * Digest of the canonical `ReplayContext` of the evaluate call that made
+   * this decision: the rule input, the starting act usage and limits, the
+   * accounting version, the lane purpose, recovery-key authority, carry facts
+   * and notify directory. The context is retained with the log (R-LOG-7,
+   * R-EVAL-8).
+   */
   readonly input: Digest;
   readonly outcome:
     | { readonly result: "pass" }

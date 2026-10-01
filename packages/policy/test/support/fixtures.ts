@@ -7,13 +7,15 @@ import type {
   PathChange,
   PolicyActor,
   PolicyDocument,
+  LanePurpose,
   PolicyLane,
+  PolicyProposal,
   PolicyVersion,
   RepoPath,
   Role,
   Sha,
 } from "@generalbusiness/artroom-contract";
-import type { InputOf, ProposalInput } from "../../src/inputs.ts";
+import type { InputOf } from "../../src/inputs.ts";
 import type { ActivePolicy } from "../../src/rules.ts";
 import type { CarryInput } from "../../src/carry.ts";
 import { ownersFor } from "../../src/rules.ts";
@@ -29,11 +31,14 @@ export function actor(member: MemberId | null, role: Role | null = "member", tea
   return { member, role, teams, delegated: false };
 }
 
-export function lane(holder: MemberId | null = "@alice", claimed = true): PolicyLane {
-  return { id: act(10), claimed, holder, scope: ["src/**"], generation: 1 };
+export function lane(holder: MemberId | null = "@alice", claimed = true, purpose: LanePurpose = "ordinary"): PolicyLane {
+  return { id: act(10), claimed, holder, scope: ["src/**"], generation: 1, purpose };
 }
 
-export function proposal(doc: PolicyDocument, paths: readonly RepoPath[], generation = 1): ProposalInput {
+/** A configuration-recovery lane held by @root (R-ADMIN-5). */
+export const recoveryLane = (): PolicyLane => lane("@root", true, "config-recovery");
+
+export function proposal(doc: PolicyDocument, paths: readonly RepoPath[], generation = 1): PolicyProposal {
   const changed: PathChange[] = paths.map((path) => ({ status: "modified", path }));
   return { generation, head: sha("b"), base: sha("a"), changed, paths, owners: ownersFor(doc, paths) };
 }

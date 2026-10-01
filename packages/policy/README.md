@@ -12,10 +12,12 @@ every host. It contains:
 - the authoring helpers `policy()`, `owners()`, `requireCheck()`,
   `requireReview()`, `carry()`, `lanes()` and `rule()`.
 
-**Dependency.** This package uses the types of the lane 0 contract
-(`packages/contract`). The branch is based on `7771921f` and has merged the
-contract's repair for review 45431cd9 (`845c7fd`), which is still under
-checker review. If its types change, this package must follow.
+**Dependency.** This package compiles against the contract on the same
+branch (`packages/contract`). The policy amendment for approval 81c31bc7
+moved the shapes this package needs into the contract: `PathOwners`,
+`ReplayContext` and its parts, `CheckCarryFacts`, the per-act budget in
+`PolicyProfile` and `ProfileStamp`, and `PolicyLane.purpose`. This package
+defines no shadow copies of them. Protocol section 26 lists the changes.
 
 ## Run the tests
 
@@ -86,7 +88,7 @@ Platform code is plain TypeScript. Policy cannot change it (R-POL-10).
 ## Replay contexts
 
 Every evaluate call first copies and freezes, synchronously, one
-`ReplayContext` (`src/context.ts`). It holds the rule input and every side
+`ReplayContext` (a contract type, R-EVAL-8). It holds the rule input and every side
 input that decides the outcome:
 
 - the act budget: accounting version (`artroom-act-budget-v1`), limits, and
@@ -105,7 +107,7 @@ its digest.
 ## Path-safe rule inputs
 
 Ownership in rule inputs is a list of `{ path, owners }` pairs
-(`ProposalInput`, `src/inputs.ts`), not a map keyed by path. Paths are
+(the contract's `PathOwners`), not a map keyed by path. Paths are
 string values, never object keys, so legal paths such as `constructor`,
 `prototype`, `_jsonata_cache` and `__proto__` work without widening the
 profile. A rule reads them as `proposal.owners[path = "x"].owners`.
@@ -122,9 +124,9 @@ holder's current admin authority is a separate check, `judgeInitiator`.
 
 ## Configuration-recovery lanes
 
-Pass `{ purpose: "config-recovery" }` to `evaluateRefuse`,
-`evaluateRequire`, `evaluateCarry` and `evaluateLand` for an act on a
-configuration-recovery lane. Policy rules are then not evaluated (R-ADMIN-5);
+An act on a configuration-recovery lane has `lane.purpose:
+"config-recovery"` in its rule input; for `evaluateCarry`, whose input has
+no lane, pass `{ purpose: "config-recovery" }`. Policy rules are then not evaluated (R-ADMIN-5);
 platform rules are. `evaluateRequire` returns only `obl_admin-approval`, and
 refuses with `recovery-scope` a proposal that changes anything outside
 `.artroom/**` (R-ADMIN-6). On an ordinary lane, policy applies as usual,
@@ -221,108 +223,26 @@ export { policy, owners, requireCheck, requireReview, carry, lanes, rule } from 
 The helper imports only types from the contract, so this adds no runtime
 cycle.
 
-## Contract gaps
+## Contract gaps and how they were resolved
 
-These are added in this package or decided here. Each needs a decision in
-the contract.
+The policy amendment (protocol section 26) resolved or kept open each gap
+that this package listed:
 
-1. **Per-act budget.** See "Required contract changes" below. The codes
-   `act_step_budget` and `act_inspection_budget` are details inside
-   `policy-budget-exceeded`.
-2. **Default `dependsOn`.** The comment on `CarrySettings.dependsOn` says a
-   changed path that matches a key adds that key's values. R-CARRY-2 says the
-   defaults apply to "the areas of the reviewed scope". This package follows
-   R-CARRY-2: a key applies when it may overlap a reviewed scope pattern.
-3. **Retired evidence.** `NotCarried.code` has no code for a retired key under
-   `retiredEvidence: "reopens"`. This package uses `policy-rejected`.
-4. **Sole-admin reopening.** `Reopened` has no reason for a flagged
-   self-approval that stops counting at reservation. `judgeAdminApproval`
-   returns `reopens: true` with a text.
-5. **Notify targets.** `Decision.outcome.to` holds only members and teams,
-   and the notify `RuleInput` has no reviewers. The room passes a
-   `NotifyDirectory`, which is recorded in the replay context.
-6. **Land reviews.** The land `RuleInput` does not say that `reviews` holds
-   each qualifying reviewer's latest verdict. The default `objection-open`
-   rule assumes it does.
-7. **Check carry facts.** The carry `RuleInput` has no check binding. The
-   room passes `CarryFacts`, which are recorded in the replay context.
-8. **Require errors at activation.** An open proposal cannot be refused
-   after it is recorded. `activate()` returns a `refusal` for that proposal,
-   which should block its landing until a new generation or policy.
-9. **No `$glob`.** The profile's allowlist has no path-matching function,
-   so expressions cannot match globs; `require` rules' `paths` cover the
-   common case. If one is added, it must charge steps for its work.
-10. **Lane purpose in rule inputs.** `PolicyLane` has no `purpose`, so the
-    room passes it as an option. It is recorded in the replay context.
+| Gap | Resolution |
+|---|---|
+| 1. Per-act budget | Resolved: `PolicyProfile.actSteps`, `actInspectedBytes`, `accounting`; `ProfileStamp.accounting`; R-EVAL-2, R-EVAL-9 |
+| 2. Default `dependsOn` | Resolved: R-CARRY-2 and the `CarrySettings.dependsOn` comment say a key applies when it may overlap a reviewed scope pattern |
+| 3. Retired evidence | Resolved: `NotCarried` code `key-retired` and `Reopened` because `key-retired` (R-REV-2) |
+| 4. Sole-admin reopening | Resolved: `Reopened` because `sole-admin-ended` (R-ADMIN-2); `judgeAdminApproval` returns `because` |
+| 5. Notify targets | Resolved: `NotifyDirectory` in the contract and in `ReplayContext` (R-POL-5). Kept open: reviewers are not in the notify rule input (open point 32) |
+| 6. Land reviews | Resolved: `reviews` holds one latest verdict per qualifying reviewer (R-POL-7) |
+| 7. Check carry facts | Resolved: `CheckCarryFacts` and `CarryFactsRecord` in the contract |
+| 8. Require errors at activation | Resolved: the proposal's `land` is refused with the recorded refusal until a new generation or activation (R-POL-9) |
+| 9. No `$glob` | Kept open (open point 30): needs a new profile version and a step charge |
+| 10. Lane purpose | Resolved: `PolicyLane.purpose`. Refuse, require and land take the purpose from `input.lane.purpose`; carry, whose input has no lane, takes `opts.purpose` |
 
-Resolved by the contract repair `845c7fd`: tests, fixtures and test and build
-configuration are now platform global inputs (R-CARRY-3). This package uses
-that list verbatim.
-
-## Required contract changes
-
-This branch does not edit `packages/contract`. These shapes are defined in
-this package and should move into the contract:
-
-1. **Path-safe ownership** (review dd2a995b P2.1). In `policy.ts`:
-
-   ```ts
-   export interface PathOwners { readonly path: RepoPath; readonly owners: readonly Principal[] }
-   // PolicyProposal: replace
-   //   readonly owners: Readonly<Record<RepoPath, readonly Principal[]>>;
-   // with
-   readonly owners: readonly PathOwners[]; // one entry per path in `paths`, same order
-   ```
-
-2. **Replay context** (P1.1, P1.2). In `policy.ts`, and change the comment
-   on `Decision.input` to "Digest of the canonical `ReplayContext`; the
-   context itself is retained with the log (R-LOG-7)":
-
-   ```ts
-   export interface Usage { readonly steps: number; readonly inspectedBytes: number }
-   export interface BudgetState {
-     readonly accounting: "artroom-act-budget-v1";
-     readonly limits: Usage;
-     readonly start: Usage; // spent by earlier calls for the same act
-   }
-   export interface NotifyDirectory {
-     readonly roles: Readonly<Partial<Record<Role, readonly MemberId[]>>>;
-     readonly reviewers: readonly MemberId[];
-   }
-   export interface CarryFactsRecord {
-     readonly revoked: RevocationReason | null;
-     readonly check: {
-       readonly before: { readonly integration: Sha; readonly input: CheckInput; readonly config: Digest; readonly runner: Digest };
-       readonly now: { readonly integration: Sha; readonly tree: Sha; readonly snapshot: Digest | null; readonly config: Digest; readonly runner: Digest };
-       readonly volatile: boolean;
-     } | null;
-   }
-   type In<K extends RuleKind> = Extract<RuleInput, { readonly kind: K }>;
-   export type ReplayContext =
-     | { readonly kind: "refuse"; readonly input: In<"refuse">; readonly budget: BudgetState; readonly purpose: LanePurpose; readonly recoveryKey: boolean }
-     | { readonly kind: "require"; readonly input: In<"require">; readonly budget: BudgetState; readonly purpose: LanePurpose }
-     | { readonly kind: "carry"; readonly input: In<"carry">; readonly budget: BudgetState; readonly purpose: LanePurpose; readonly facts: CarryFactsRecord }
-     | { readonly kind: "land"; readonly input: In<"land">; readonly budget: BudgetState; readonly purpose: LanePurpose }
-     | { readonly kind: "notify"; readonly input: In<"notify">; readonly budget: BudgetState; readonly directory: NotifyDirectory };
-   ```
-
-3. **Versioned act budget** (P1.1). Add to `PolicyProfile`, and to
-   R-EVAL-2's table:
-
-   ```ts
-   readonly actSteps: 25_000;
-   readonly actInspectedBytes: 4_194_304;
-   readonly accounting: "artroom-act-budget-v1";
-   ```
-
-   and to `ProfileStamp`: `readonly accounting: "artroom-act-budget-v1";`.
-   Until then, the accounting version and limits are in every replay
-   context, so they are covered by `Decision.input`.
-
-4. **Admin evidence facts** (P1.3). No new contract type is needed: the
-   facts come from `Review.by: Authority` (its `member` and `role`) and the
-   roster's key states. R-ADMIN-2's text could say that only a flagged
-   self-approval depends on the current admin count.
+The review dd2a995b shapes (path/owners pairs, replay context, versioned
+act budget) are now contract types; see protocol section 26.
 
 ## Review dd2a995b
 
@@ -340,8 +260,9 @@ only the rule input; notify inheriting a meter; admission role ignored;
 grantor compromise ignored; ownership as a path-keyed map.
 
 All of these run in Node and in workerd. The pinned usage of the spike's
-cubic rule changed (775 steps, 4,200,107 bytes, from 932 and 4,203,669),
-because ownership pairs change the input's size.
+cubic rule changed with each input shape change: 932 steps and 4,203,669
+bytes before review dd2a995b; 775 and 4,200,107 with ownership pairs; 775
+and 4,202,795 once `PolicyLane.purpose` joined the input.
 
 ## Not done
 

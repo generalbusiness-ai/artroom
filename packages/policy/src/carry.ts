@@ -7,13 +7,12 @@
 
 import type {
   CarrySettings,
-  CheckInput,
   Digest,
   Glob,
+  CarryFactsRecord,
   NotCarried,
   PolicyDocument,
   RepoPath,
-  RevocationReason,
   Sha,
 } from "@generalbusiness/artroom-contract";
 import { globsOverlap, matchesAny, matching } from "./glob.ts";
@@ -84,35 +83,11 @@ export interface Invariant {
   readonly detail?: string;
 }
 
-/** What the platform knows about the evidence beyond the carry rule input. */
-export interface CarryFacts {
-  /** The current state of the evidence's signing key (R-REV-2, R-REV-3). */
-  readonly revoked?: RevocationReason;
-  /** For checks only: the earlier binding and the new integration (R-CARRY-6, R-CARRY-9). */
-  readonly check?: CheckCarryFacts;
-}
-
-export interface CheckBinding {
-  readonly integration: Sha;
-  readonly input: CheckInput;
-  readonly config: Digest;
-  readonly runner: Digest;
-}
-
-export interface CheckCarryFacts {
-  readonly before: CheckBinding;
-  readonly now: {
-    readonly integration: Sha;
-    readonly tree: Sha;
-    /** The filtered snapshot the room built for the new integration, for a scoped checker. */
-    readonly snapshot: Digest | null;
-    /** From the active checker configuration (R-CARRY-7). */
-    readonly config: Digest;
-    readonly runner: Digest;
-  };
-  /** From the active checker configuration (R-CARRY-10). */
-  readonly volatile: boolean;
-}
+/**
+ * What the platform knows about the evidence beyond the carry rule input:
+ * the contract's `CarryFactsRecord`, where absent and null both mean "none".
+ */
+export type CarryFacts = Partial<CarryFactsRecord>;
 
 export type CarryInput = InputOf<"carry">;
 
@@ -152,7 +127,7 @@ function revocation(input: CarryInput, doc: PolicyDocument, facts: CarryFacts, i
   if (facts.revoked === "retired" && doc.retiredEvidence === "reopens")
     return refuse(
       input,
-      "policy-rejected",
+      "key-retired",
       "not carried: the key that signed it was retired, and this policy reopens evidence from retired keys",
       inv,
       "R-REV-2",

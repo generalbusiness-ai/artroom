@@ -11,7 +11,7 @@ import { activate } from "../src/activation.ts";
 import { carry, policy, requireReview, rule } from "../src/helpers.ts";
 import { evaluateCarry, evaluateLand, evaluateRefuse, evaluateRequire } from "../src/rules.ts";
 import { validatePolicy } from "../src/validate.ts";
-import { act, active, actor, carryInput, landInput, lane, refuseInput, requireInput, V1, V2 } from "./support/fixtures.ts";
+import { act, active, actor, carryInput, landInput, lane, recoveryLane, refuseInput, requireInput, V1, V2 } from "./support/fixtures.ts";
 
 import type { AdminApprovalFacts } from "../src/admin.ts";
 import { judgeInitiator } from "../src/admin.ts";
@@ -58,7 +58,7 @@ describe("admin boundary and sole-admin bootstrap (R-ADMIN-1 to 9)", () => {
 
   test("R-REV-3: a compromised signer or grantor key reopens an admin approval", () => {
     const other = { ...approve, ...by("@other"), activeAdmins: 2 };
-    expect(judgeAdminApproval({ ...other, revoked: { signer: "compromised" } }, "reservation")).toMatchObject({ counts: false, rule: "evidence-invalid", reopens: true });
+    expect(judgeAdminApproval({ ...other, revoked: { signer: "compromised" } }, "reservation")).toMatchObject({ counts: false, rule: "evidence-invalid", reopens: true, because: "key-compromised" });
     expect(judgeAdminApproval({ ...other, revoked: { grantor: "compromised" } }, "reservation")).toMatchObject({ counts: false, reopens: true });
   });
 
@@ -76,7 +76,7 @@ describe("admin boundary and sole-admin bootstrap (R-ADMIN-1 to 9)", () => {
 
   test("at reservation a flagged approval counts only while there is still exactly one admin", () => {
     expect(judgeAdminApproval({ ...approve, activeAdmins: 1, flagged: true }, "reservation")).toMatchObject({ counts: true, flag: "sole-admin-self-approval" });
-    expect(judgeAdminApproval({ ...approve, activeAdmins: 2, flagged: true }, "reservation")).toMatchObject({ counts: false, reopens: true });
+    expect(judgeAdminApproval({ ...approve, activeAdmins: 2, flagged: true }, "reservation")).toMatchObject({ counts: false, reopens: true, because: "sole-admin-ended" });
   });
 
   test("policy cannot remove the admin obligation: an empty policy still requires it", async () => {
@@ -94,7 +94,7 @@ describe("admin boundary and sole-admin bootstrap (R-ADMIN-1 to 9)", () => {
   test("R-ADMIN-3: on an ordinary lane, policy rules apply to .artroom/** changes as usual", async () => {
     const lockout = policy(rule({ id: "freeze", on: "propose", refuse: "true", fix: "Nothing may change." }));
     const proposal = requireInput(lockout, [".artroom/policy.json"]).proposal;
-    const r = await evaluateRefuse(active(lockout), refuseInput(lockout, "propose", { proposal }), { purpose: "ordinary" });
+    const r = await evaluateRefuse(active(lockout), refuseInput(lockout, "propose", { proposal }));
     expect(r.refusal?.rule).toBe("freeze");
   });
 
@@ -109,15 +109,15 @@ describe("admin boundary and sole-admin bootstrap (R-ADMIN-1 to 9)", () => {
     const proposal = requireInput(lockout, paths).proposal;
     const opts = { purpose: "config-recovery" as const };
     for (const kind of ["claim", "propose", "review", "land"] as const) {
-      const r = await evaluateRefuse(active(lockout), refuseInput(lockout, kind, { proposal, actor: actor("@root", "admin") }), opts);
+      const r = await evaluateRefuse(active(lockout), refuseInput(lockout, kind, { proposal, actor: actor("@root", "admin"), lane: recoveryLane() }));
       expect(r.refusal, kind).toBeNull();
       expect(r.evaluations).toEqual([]);
       expect(r.invariants).toContainEqual(expect.objectContaining({ rule: "R-ADMIN-5" }));
     }
-    const req = await evaluateRequire(active(lockout), requireInput(lockout, paths), opts);
+    const req = await evaluateRequire(active(lockout), { ...requireInput(lockout, paths), lane: recoveryLane() });
     expect(req.obligations.map((o) => o.id)).toEqual(["obl_admin-approval"]);
     expect(req.evaluations).toEqual([]);
-    const land = await evaluateLand(active(lockout), landInput(lockout, paths), opts);
+    const land = await evaluateLand(active(lockout), { ...landInput(lockout, paths), lane: recoveryLane() });
     expect(land.refusal).toBeNull();
     const carried = await evaluateCarry(active(lockout), carryInput(lockout, { scope: [".artroom/checkers/**"], changedSince: ["README.md"] }), {}, opts);
     expect(carried.carried).not.toBeNull();
@@ -126,7 +126,7 @@ describe("admin boundary and sole-admin bootstrap (R-ADMIN-1 to 9)", () => {
 
   test("R-ADMIN-6: a recovery proposal that also changes src/x.ts is refused recovery-scope", async () => {
     const doc = policy();
-    const r = await evaluateRequire(active(doc), requireInput(doc, [".artroom/policy.json", "src/x.ts"]), { purpose: "config-recovery" });
+    const r = await evaluateRequire(active(doc), { ...requireInput(doc, [".artroom/policy.json", "src/x.ts"]), lane: recoveryLane() });
     expect(r.refusal).toMatchObject({ rule: "recovery-scope" });
     expect(r.obligations).toEqual([]);
   });

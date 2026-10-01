@@ -21,7 +21,7 @@ export {
 } from "./errors.ts";
 export { actMeter, admit, assertEngine, evaluate, ENGINE_FINGERPRINT, type ActMeter, type Evaluation, type Meter } from "./evaluator.ts";
 export { budgetState, meterFrom, own, type BudgetState, type CarryFactsRecord, type NotifyDirectory, type ReplayContext, type Usage } from "./context.ts";
-export { ownersFor, type InputOf, type PathOwners, type PolicyRuleInput, type ProposalInput } from "./inputs.ts";
+export { ownersFor, type InputOf } from "./inputs.ts";
 export { PreparedInput, prepareInput } from "./values.ts";
 export { canonicalize, digestJson, sha256Hex, snapshotDigest, type SnapshotEntry } from "./integrity.ts";
 export { globProblem, globsOverlap, isGlob, matchGlob, matchesAny, matching } from "./glob.ts";
@@ -35,8 +35,6 @@ export {
   reviewConditions,
   type CarryFacts,
   type CarryInput,
-  type CheckBinding,
-  type CheckCarryFacts,
   type Invariant,
   type PlatformCarry,
 } from "./carry.ts";
@@ -51,6 +49,7 @@ export {
   replay,
   type ActivePolicy,
   type BudgetOptions,
+  type CarryOptions,
   type CarryResult,
   type Explained,
   type LandOptions,

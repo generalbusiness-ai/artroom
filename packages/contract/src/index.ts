@@ -22,6 +22,12 @@ export type * from "./log.ts";
 export type * from "./pagination.ts";
 export type * from "./checker.ts";
 export type {
+  BudgetState,
+  CarryFactsRecord,
+  NotifyDirectory,
+  PathOwners,
+  ReplayContext,
+  Usage,
   CarryRule,
   CarrySettings,
   CheckerConfig,

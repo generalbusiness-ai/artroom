@@ -147,13 +147,12 @@ function rulesOf<K extends RuleKind>(doc: PolicyDocument, kind: K): Extract<Rule
   return doc.rules.filter((r): r is Extract<Rule, { readonly kind: K }> => r.kind === kind);
 }
 
-/** Options for the evaluate functions that run before or at admission. */
+/**
+ * Options for the evaluate functions that run before or at admission. The
+ * lane purpose comes from `input.lane.purpose`; on a `config-recovery` lane,
+ * `refuse`, `require`, `carry` and `land` rules are not evaluated (R-ADMIN-5).
+ */
 export interface BudgetOptions {
-  /**
-   * The lane's purpose. On a `config-recovery` lane, `refuse`, `require`,
-   * `carry` and `land` rules are not evaluated (R-ADMIN-5).
-   */
-  readonly purpose?: LanePurpose;
   /**
    * The act's shared budget (ACT_BUDGET). Pass the same meter to every
    * evaluate call for one act, for example `refuse` and `require` on a
@@ -183,7 +182,7 @@ export interface RefuseResult extends Explained {
 /** `refuse` rules, when an act of a listed kind arrives (R-POL-2). The first refusal stops evaluation. */
 export async function evaluateRefuse(policy: ActivePolicy, input: InputOf<"refuse">, opts: RefuseOptions = {}): Promise<RefuseResult> {
   const budget = opts.budget ?? actMeter();
-  const ctx = own<Ctx<"refuse">>({ kind: "refuse", input, budget: budgetState(budget), purpose: opts.purpose ?? "ordinary", recoveryKey: opts.recoveryKey ?? false });
+  const ctx = own<Ctx<"refuse">>({ kind: "refuse", input, budget: budgetState(budget), purpose: input.lane.purpose, recoveryKey: opts.recoveryKey ?? false });
   return runRefuse(policy, ctx, budget);
 }
 
@@ -236,7 +235,7 @@ export interface RequireResult extends Explained {
 /** `require` rules, on `propose` and at activation (R-POL-3, R-OBL-5). */
 export async function evaluateRequire(policy: ActivePolicy, input: InputOf<"require">, opts: RequireOptions = {}): Promise<RequireResult> {
   const budget = opts.budget ?? actMeter();
-  const ctx = own<Ctx<"require">>({ kind: "require", input, budget: budgetState(budget), purpose: opts.purpose ?? "ordinary" });
+  const ctx = own<Ctx<"require">>({ kind: "require", input, budget: budgetState(budget), purpose: input.lane.purpose });
   return runRequire(policy, ctx, budget);
 }
 
@@ -318,7 +317,12 @@ const CARRIED_TEXT = "carried: reviewed and declared paths unchanged";
  * The platform conditions run first, in plain TypeScript. Only evidence that
  * meets them reaches the policy's `carry` rules, which can only stop it.
  */
-export async function evaluateCarry(policy: ActivePolicy, input: CarryInput, facts: CarryFacts = {}, opts: BudgetOptions = {}): Promise<CarryResult> {
+export interface CarryOptions extends BudgetOptions {
+  /** The lane's purpose. The carry input has no lane, so the room passes it (R-ADMIN-5). Default `ordinary`. */
+  readonly purpose?: LanePurpose;
+}
+
+export async function evaluateCarry(policy: ActivePolicy, input: CarryInput, facts: CarryFacts = {}, opts: CarryOptions = {}): Promise<CarryResult> {
   const budget = opts.budget ?? actMeter();
   const ctx = own<Ctx<"carry">>({
     kind: "carry",
@@ -400,7 +404,7 @@ export interface LandResult extends Explained {
 /** `land` rules, on `land`, at `ready` and at reservation (R-POL-6). The first block stops evaluation. */
 export async function evaluateLand(policy: ActivePolicy, input: InputOf<"land">, opts: LandOptions = {}): Promise<LandResult> {
   const budget = opts.budget ?? actMeter();
-  const ctx = own<Ctx<"land">>({ kind: "land", input, budget: budgetState(budget), purpose: opts.purpose ?? "ordinary" });
+  const ctx = own<Ctx<"land">>({ kind: "land", input, budget: budgetState(budget), purpose: input.lane.purpose });
   return runLand(policy, ctx, budget);
 }
 

@@ -9,6 +9,7 @@ import { digestJson } from "../src/integrity.ts";
 import { ACT_BUDGET, STAMP } from "../src/profile.ts";
 import { PolicyRuntimeFailure } from "../src/errors.ts";
 import { act, active, actor, landInput, lane, notifyInput, refuseInput, requireInput, V1 } from "./support/fixtures.ts";
+import { recoveryLane } from "./support/fixtures.ts";
 
 // The plan's section 5 example, verbatim.
 const plan = policy(
@@ -133,8 +134,7 @@ describe("land (R-POL-6, R-POL-7)", () => {
   test("R-ADMIN-3, R-ADMIN-8: land rules apply on an ordinary lane, even for .artroom/**, and not on a recovery lane", async () => {
     const p = policy(rule({ id: "never", kind: "land", block: "true", reason: "Never.", fix: "None." }));
     expect((await evaluateLand(active(p), landInput(p, [".artroom/policy.json"]))).refusal?.rule).toBe("never");
-    expect((await evaluateLand(active(p), landInput(p, [".artroom/policy.json"]), { purpose: "ordinary" })).refusal?.rule).toBe("never");
-    const recovery = await evaluateLand(active(p), landInput(p, [".artroom/policy.json"]), { purpose: "config-recovery" });
+    const recovery = await evaluateLand(active(p), { ...landInput(p, [".artroom/policy.json"]), lane: recoveryLane() });
     expect(recovery.refusal).toBeNull();
     expect(recovery.evaluations).toEqual([]);
   });
@@ -191,7 +191,7 @@ describe("budgets on Workers (room-core spike 2026-10-01)", () => {
     expect(outcome).toMatchObject({ result: "error", code: "policy-budget-exceeded" });
     expect(outcome.result === "error" && outcome.detail.split(":")[0]).toBe("act_inspection_budget");
     // Pinned: the Node and workerd runs must both give exactly this usage.
-    expect(r.evaluations[0]!.decision.usage).toEqual({ steps: 775, inspectedBytes: 4200107 });
+    expect(r.evaluations[0]!.decision.usage).toEqual({ steps: 775, inspectedBytes: 4202795 });
   });
 
   test("without the act budget, the per-evaluation atseq budget still refuses the cubic rule", async () => {
