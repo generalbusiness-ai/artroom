@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fc75b6ba27f3081d545b5b20ef90026d9b366083"}
+{"kind":"promise","text":"Review Lane A Room core at exact 315a8576 across all 52 artifacts, including SQLite authority/admission, durable async recovery and transport boundaries; independently validate in workerd."}
