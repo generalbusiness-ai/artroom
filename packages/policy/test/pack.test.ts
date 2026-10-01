@@ -17,6 +17,7 @@ import { actMeter } from "../src/evaluator.ts";
 import { checkerInputs, filterSnapshot } from "../src/carry.ts";
 import { snapshotDigest, type SnapshotEntry } from "../src/integrity.ts";
 import { ACT_BUDGET } from "../src/profile.ts";
+import { matchesAny } from "../src/glob.ts";
 import { act, active, actor, carryInput, lane, landInput, notifyInput, recoveryLane, refuseInput, requireInput, sha } from "./support/fixtures.ts";
 
 const P: PolicyDocument = demo;
@@ -32,15 +33,57 @@ describe("the pack compiles to the committed demo policy", () => {
     expect(JSON.parse(JSON.stringify(starter))).toEqual(demoJson);
   });
 
-  test("the pack has 11 named rules, each documented with what it replaces", () => {
+  test("the pack has 12 named rules, each documented with what it replaces", () => {
     const ids = P.rules.map((r) => r.id).sort();
     expect(ids).toEqual(PACK.map((e) => e.id).sort());
-    expect(ids).toHaveLength(11);
+    expect(ids).toHaveLength(12);
     expect(ids).toContain(OBJECTION_OPEN.id);
   });
 });
 
 describe("refuse rules", () => {
+  const JJ = {
+    refused: true,
+    rule: "jj-conflicts",
+    reason: "This proposal contains unresolved jj conflicts: it has .jjconflict-base-* or .jjconflict-side-* directories at the root of its tree.",
+    fix: "Resolve the jj conflicts, then propose again.",
+  };
+  const propose = (paths: string[], over: Partial<Parameters<typeof refuseInput>[2]> = {}) =>
+    evaluateRefuse(A, refuseInput(P, "propose", { proposal: requireInput(P, paths).proposal, ...over }));
+
+  test("jj-conflicts: a proposal adding .jjconflict-side-0/ is refused with jj-conflicts, not outside-claim", async () => {
+    // The lane claims src/**, so R-PROP-4 would refuse these paths as outside-claim. For propose,
+    // refuse rules run before the claim check (R-ADM-1 step 8), so the author sees the real cause.
+    const claim = lane().scope;
+    for (const paths of [
+      [".jjconflict-side-0/src/app.ts"],
+      ["src/app.ts", ".jjconflict-base-0/src/app.ts", ".jjconflict-side-0/src/app.ts", ".jjconflict-side-1/src/app.ts"],
+      [".jjconflict-base-12/README.md"],
+    ]) {
+      expect(paths.some((p) => !matchesAny(p, claim)), paths.join()).toBe(true);
+      const r = await propose(paths);
+      expect(r.refusal, paths.join()).toEqual(JJ);
+      expect(r.refusal?.rule).not.toBe("outside-claim");
+    }
+  });
+
+  test("jj-conflicts: fires first among the pack's refuse rules, even on an unclaimed lane", async () => {
+    const r = await propose([".jjconflict-side-0/src/app.ts"], { lane: lane(null, false) });
+    expect(r.refusal).toEqual(JJ);
+    expect(r.evaluations.map((e) => e.decision.rule)).toEqual(["jj-conflicts"]);
+  });
+
+  test("jj-conflicts: a name that merely contains jjconflict below the root, or lacks the prefix at the root, is not refused", async () => {
+    for (const paths of [
+      ["src/.jjconflict-side-0/app.ts"],
+      ["docs/jjconflict-notes.md", "src/a.jjconflict-base-1.ts"],
+      ["jjconflict-side-0/app.ts", ".jjconflict/app.ts", ".jjconflict-left-0/app.ts"],
+    ]) {
+      const r = await propose(paths);
+      expect(r.refusal, paths.join()).toBeNull();
+    }
+  });
+
   test("claim-before-propose: refuses an unclaimed lane, passes a claimed one", async () => {
     const proposal = requireInput(P, ["src/app.ts"]).proposal;
     const refused = await evaluateRefuse(A, refuseInput(P, "propose", { proposal, lane: lane(null, false) }));
@@ -231,15 +274,27 @@ describe("budget: the pack on a 500-path proposal", () => {
     expect(landed.refusal).toBeNull();
     expect(reserved.refusal).toBeNull();
     const fresh = landed.evaluations.find((e) => e.decision.rule === "fresh-approval")!.decision.usage;
+    const jj = refuse.evaluations.find((e) => e.decision.rule === "jj-conflicts")!.decision.usage;
     // carry: stale-approval on 500 changed paths outside the reviewed scope.
     const carried = await evaluateCarry(A, carryInput(P, { scope: ["docs/x.md"], changedSince: paths.map((p) => p.replace("src/api/", "src/ui/")) }));
     expect(carried.notCarried?.rule).toBe("stale-approval");
-    const measured = { propose, land: used(landed.evaluations), reservation: used(reserved.evaluations), freshApproval: fresh, carry: used(carried.evaluations) };
+    const measured = { propose, jjConflicts: jj, land: used(landed.evaluations), reservation: used(reserved.evaluations), freshApproval: fresh, carry: used(carried.evaluations) };
     expect(measured).toEqual(MEASURED);
     for (const u of Object.values(measured)) {
       expect(u.steps).toBeLessThan(ACT_BUDGET.steps);
       expect(u.inspectedBytes).toBeLessThan(ACT_BUDGET.inspectedBytes);
     }
+  });
+
+  test("jj-conflicts does not lower the path limit: at the largest proposal input the profile accepts, propose fits the act budget", async () => {
+    // 1,461 such paths is the most a propose input can hold under the per-value byte limit, with or without this rule.
+    const big = (n: number) => Array.from({ length: n }, (_, i) => `src/api/module${String(i).padStart(4, "0")}/handler.ts`);
+    const meter = actMeter();
+    const ok = await evaluateRefuse(A, refuseInput(P, "propose", { proposal: requireInput(P, big(1461)).proposal }), { budget: meter });
+    expect(ok.refusal).toBeNull();
+    expect({ steps: meter.steps, inspectedBytes: meter.inspectedBytes }).toEqual(LARGEST_PROPOSE);
+    const over = await evaluateRefuse(A, refuseInput(P, "propose", { proposal: requireInput(P, big(1462)).proposal }));
+    expect(over.refusal?.reason).toContain("value_bytes");
   });
 
   test("when the act budget runs out, the largest rule gives a deterministic policy-budget-exceeded", async () => {
@@ -254,8 +309,12 @@ describe("budget: the pack on a 500-path proposal", () => {
 });
 
 /** Measured on Node and workerd; both runs must give exactly these (docs/policy-pack.md). */
+/** Propose at 1,461 paths: jj-conflicts and claim-before-propose. */
+const LARGEST_PROPOSE = { steps: 11700, inspectedBytes: 413749 };
+
 const MEASURED = {
-  propose: { steps: 5, inspectedBytes: 127 },
+  propose: { steps: 4012, inspectedBytes: 139286 },
+  jjConflicts: { steps: 4007, inspectedBytes: 139159 },
   land: { steps: 3546, inspectedBytes: 148055 },
   reservation: { steps: 3546, inspectedBytes: 148055 },
   freshApproval: { steps: 3532, inspectedBytes: 147708 },

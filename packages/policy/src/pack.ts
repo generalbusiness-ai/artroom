@@ -1,5 +1,5 @@
 /**
- * The default policy pack (lane D). Eleven named rules, each built with the
+ * The default policy pack (lane D). Twelve named rules, each built with the
  * authoring helpers, plus carry settings. `starterPolicy()` assembles them
  * for a repository; `PACK` documents each rule for the guide
  * (docs/policy-pack.md).
@@ -17,6 +17,25 @@ import { OBJECTION_OPEN, carry, owners, policy, requireCheck, requireReview, rul
 import { globCovers } from "./glob.ts";
 
 // ------------------------------------------------------------------ refuse
+
+/**
+ * Refuse a proposal that contains jj conflict directories. jj stores a
+ * conflicted commit, pushed with `--allow-conflicts`, as a Git tree with
+ * `.jjconflict-base-*` and `.jjconflict-side-*` directories at its root.
+ * The proposal paths are matched by prefix, so only the tree root counts.
+ * For `propose`, refuse rules run before the claim check (R-ADM-1), so the
+ * author sees this cause, not `outside-claim`.
+ */
+export const jjConflicts = (): PolicyPart =>
+  rule({
+    id: "jj-conflicts",
+    kind: "refuse",
+    description: "A proposal must not contain unresolved jj conflicts, which jj pushes as .jjconflict-* directories.",
+    on: ["propose"],
+    refuse: '$count(proposal.paths[$substring($, 0, 12) = ".jjconflict-" and $substring($, 12, 5) in ["base-", "side-"]]) > 0',
+    reason: "This proposal contains unresolved jj conflicts: it has .jjconflict-base-* or .jjconflict-side-* directories at the root of its tree.",
+    fix: "Resolve the jj conflicts, then propose again.",
+  });
 
 /** Refuse a proposal on a lane nobody has claimed. */
 export const claimBeforePropose = (): PolicyPart =>
@@ -143,6 +162,7 @@ export function starterPolicy(opts: StarterOptions): PolicyDocument {
   const ci = opts.ci ?? "@ci";
   const doc = policy(
     owners(opts.owners),
+    jjConflicts(),
     claimBeforePropose(),
     narrowClaims(),
     ownerReview(),
@@ -198,6 +218,7 @@ export interface PackEntry {
 }
 
 export const PACK: readonly PackEntry[] = [
+  { id: "jj-conflicts", kind: "refuse", replaces: "a pre-push hook or CI step that rejects commits with unresolved conflicts" },
   { id: "claim-before-propose", kind: "refuse", replaces: "a pre-push hook that requires a ticket or branch name" },
   { id: "narrow-claims", kind: "refuse", replaces: "a pre-push hook that rejects repository-wide changes" },
   { id: "owner-review", kind: "require", replaces: "CODEOWNERS with 'require review from code owners'" },

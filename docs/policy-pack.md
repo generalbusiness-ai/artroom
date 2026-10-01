@@ -1,6 +1,6 @@
 # The default policy pack
 
-Artroom's default policy pack is eleven rules. Each one replaces something a
+Artroom's default policy pack is twelve rules. Each one replaces something a
 team sets up today in a Git hook, branch protection, a `CODEOWNERS` file,
 required CI checks or a review assistant's instructions. In Artroom they are
 one file, `.artroom/policy.json`. It is versioned with the code and changed
@@ -96,6 +96,25 @@ Each rule below shows what it replaces, the setup before and after, and what
 the user sees.
 
 ### Before an act is recorded
+
+**`jj-conflicts`** replaces a pre-push hook or CI step that rejects commits
+with unresolved conflicts.
+- Before: jj can push a commit that still has conflicts
+  (`jj git push --allow-conflicts`). jj stores such a commit as a Git tree
+  with `.jjconflict-base-*` and `.jjconflict-side-*` directories at its
+  root. Without this rule the room would refuse it as `outside-claim`, or
+  its checks would fail, and neither says why.
+- After: the room refuses a proposal if any changed path starts with
+  `.jjconflict-base-` or `.jjconflict-side-`. Only the root of the tree
+  counts: `src/.jjconflict-side-0/app.ts` or `docs/jjconflict-notes.md` is
+  an ordinary file.
+- For a proposal, the room runs `refuse` rules before it checks the claim
+  (R-ADM-1, step 8). So the author sees this rule, not `outside-claim`. It
+  is also the pack's first `refuse` rule, so it fires before
+  `claim-before-propose`.
+- The user sees: *This proposal contains unresolved jj conflicts: it has
+  .jjconflict-base-\* or .jjconflict-side-\* directories at the root of its
+  tree.* Fix: *Resolve the jj conflicts, then propose again.*
 
 **`claim-before-propose`** replaces a pre-push hook that requires a ticket or
 branch name.
@@ -219,20 +238,26 @@ and workerd. Both gave the same numbers, and the corpus pins them.
 
 | Act | Rules evaluated | Steps | Inspected bytes | Share of the act budget |
 |---|---|---|---|---|
-| `propose` | `claim-before-propose`; the `require` rules | 5 | 127 | under 0.1% |
+| `propose` | `jj-conflicts`, `claim-before-propose`; the `require` rules | 4,012 | 139,286 | 16.0% of steps; 3.3% of bytes |
 | `land`, and preparation at the reservation stage | `objection-open`, `fresh-approval` | 3,546 | 148,055 | 14.2% of steps; 3.5% of bytes |
 | One carried approval | `stale-approval` | 6 | 30,012 | under 1% |
 
-- The largest rule is `fresh-approval`, which reads every path: 3,532 steps
-  and 147,708 bytes. It reads each path's owners, so the fallback owner adds
-  15 bytes per path.
-- The largest act therefore has 21,454 steps of headroom (85.8%) and 4,046,249
-  bytes (96.5%).
+- The two rules that read every path are `jj-conflicts` (4,007 steps and
+  139,159 bytes) and `fresh-approval` (3,532 steps and 147,708 bytes).
+  `fresh-approval` reads each path's owners, so the fallback owner adds 15
+  bytes per path.
+- The largest act by steps is `propose`, with 20,988 steps of headroom
+  (84.0%). The largest by bytes is `land`, with 4,046,249 bytes (96.5%).
+- Adding `jj-conflicts` raised `propose` from 5 steps and 127 bytes. It
+  does not lower the largest proposal the pack accepts. That limit comes
+  from the profile's 256 KiB limit on one input value, with or without the
+  rule: 1,461 paths of the length measured here. At that size `propose`
+  uses 11,700 steps (46.8%) and 413,749 bytes (9.9%).
 - `require` and `notify-owners` match paths in platform code, so they use no
   evaluator steps.
 - The room-core spike estimated 3 to 9 microseconds of deployed CPU per step
-  on the rules it sampled. That suggests about 11 to 32 ms for the largest
-  act. This is an estimate, not a bound.
+  on the rules it sampled. That suggests about 12 to 36 ms for the largest
+  act at 500 paths. This is an estimate, not a bound.
 
 If an act runs out of budget, the refusal is deterministic:
 `policy-budget-exceeded`, the same on every host and on replay. The corpus
@@ -243,7 +268,9 @@ shows this for `fresh-approval` on the same 500 paths with a 3,000-step budget.
 `packages/policy/test/pack.test.ts` runs the demo policy through the real
 runtime on Node and on workerd. It checks:
 
-- each rule's pass case and refuse or apply case;
+- each rule's pass case and refuse or apply case, including a jj conflict
+  proposal outside the lane's claim and names that only contain
+  `jjconflict`;
 - the carry cases of plan section 7;
 - the policy-level cases of protocol section 23 ("scoped checker, new test"
   and the policy lockout);

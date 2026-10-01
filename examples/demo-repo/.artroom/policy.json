@@ -32,6 +32,17 @@
   "retiredEvidence": "counts",
   "rules": [
     {
+      "id": "jj-conflicts",
+      "kind": "refuse",
+      "description": "A proposal must not contain unresolved jj conflicts, which jj pushes as .jjconflict-* directories.",
+      "on": [
+        "propose"
+      ],
+      "refuse": "$count(proposal.paths[$substring($, 0, 12) = \".jjconflict-\" and $substring($, 12, 5) in [\"base-\", \"side-\"]]) > 0",
+      "reason": "This proposal contains unresolved jj conflicts: it has .jjconflict-base-* or .jjconflict-side-* directories at the root of its tree.",
+      "fix": "Resolve the jj conflicts, then propose again."
+    },
+    {
       "id": "claim-before-propose",
       "kind": "refuse",
       "description": "Work is proposed only on a claimed lane, so everyone can see who is changing what.",
