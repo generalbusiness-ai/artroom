@@ -174,3 +174,29 @@ describe("atseq corpus: budgets", () => {
       "inspection_budget",
     ));
 });
+
+describe("Artroom additions: exact budget boundaries the atseq corpus leaves at even steps", () => {
+  test("AST depth exact boundary at an odd level: 64 admitted, 65 refused", async () => {
+    const { admit } = await import("../src/evaluator.ts");
+    // 31 nested arrays around `a` reach AST depth 64; around `-a`, depth 65.
+    admit("[".repeat(31) + "a" + "]".repeat(31));
+    await rejects(() => admit("[".repeat(31) + "-a" + "]".repeat(31)), "source_complexity");
+  });
+
+  test("inspected bytes exact boundary to the byte", async () => {
+    // `$` charges the whole input once, so one more character in `q` adds exactly one inspected byte.
+    const source = "($a:=s; rows.$length($a); $; 1)";
+    const input = { s: "x".repeat(246705), rows: Array(64).fill(1), q: "x".repeat(24) };
+    expect((await evaluate(source, input)).inspectedBytes).toBe(PROFILE.inspectionBytes);
+    await rejects(() => evaluate(source, { ...input, q: input.q + "x" }), "inspection_budget");
+  });
+
+  test("evaluations of one program interleave without sharing hooks or budgets", async () => {
+    const source = "$count(rows[$ = $$.rows[0]])";
+    const small = { rows: [1, 2, 1] };
+    const large = { rows: Array(500).fill(1) };
+    const alone = [await evaluate(source, small), await evaluate(source, large)];
+    const together = await Promise.all([evaluate(source, small), evaluate(source, large), evaluate(source, small)]);
+    expect(together).toEqual([alone[0], alone[1], alone[0]]);
+  });
+});

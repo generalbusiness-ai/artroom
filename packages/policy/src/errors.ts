@@ -72,6 +72,8 @@ export class PolicyRuntimeFailure extends Error implements ArtroomError {
   override readonly name = "ArtroomError";
   readonly code = "policy-runtime";
   readonly retryable = true;
+  /** Definitely not recorded: the caller must write no act, refusal or decision (R-ADM-9). */
+  readonly maybeRecorded = false;
   /** atseq's code for the fault, for logs: `engine_error` or `dependency_mismatch`. */
   readonly fault: "engine_error" | "dependency_mismatch";
   constructor(fault: "engine_error" | "dependency_mismatch", message: string) {

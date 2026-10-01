@@ -8,7 +8,7 @@ import { describe, expect, test } from "vitest";
 import type { Digest } from "@generalbusiness/artroom-contract";
 import { carry, owners, policy, requireCheck, requireReview, retiredEvidence } from "../src/helpers.ts";
 import { evaluateCarry, evaluateRequire } from "../src/rules.ts";
-import { PLATFORM_CHECK_INPUTS, checkerInputs, filterSnapshot, type CheckCarryFacts } from "../src/carry.ts";
+import { PLATFORM_GLOBAL_INPUTS, checkerInputs, filterSnapshot, type CheckCarryFacts } from "../src/carry.ts";
 import { snapshotDigest, type SnapshotEntry } from "../src/integrity.ts";
 import { explain } from "../src/explain.ts";
 import { active, carryInput, requireInput, sha } from "./support/fixtures.ts";
@@ -84,6 +84,13 @@ describe("plan 7: carrying a verdict forward", () => {
     const extra = policy(carry({ globalInputs: ["config/**"] }));
     const r = await evaluateCarry(active(extra), carryInput(extra, { ...login, changedSince: ["config/app.yaml"] }));
     expect(r.notCarried?.code).toBe("global-input-changed");
+  });
+
+  test("R-CARRY-3: tests, fixtures and test configuration are global inputs for verdicts too", async () => {
+    for (const path of ["tests/login.test.ts", "src/api/login.spec.ts", "src/__fixtures__/user.json", "vitest.config.ts"]) {
+      const r = await evaluateCarry(active(base), carryInput(base, { ...login, changedSince: [path] }));
+      expect(r.notCarried?.code, path).toBe("global-input-changed");
+    }
   });
 
   test("R-CARRY-3: policy cannot remove a platform global input", async () => {
@@ -187,7 +194,7 @@ describe("plan 7: carrying a check forward", () => {
     expect(r.notCarried?.code).toBe("integration-changed");
   });
 
-  test("plan 7 case 6, scoped (review 45431cd9 P2.1): inputs src/**, src unchanged, a new file under tests/: not carried", async () => {
+  test("plan 7 case 6, scoped (R-CARRY-3 as revised for review 45431cd9): inputs src/**, src unchanged, a new file under tests/: not carried", async () => {
     const inputs = checkerInputs(["src/**"], base.carry)!;
     expect(inputs).toEqual(expect.arrayContaining(["src/**", "**/tests/**", "**/*.test.*"]));
     const before: SnapshotEntry[] = [
@@ -218,13 +225,13 @@ describe("plan 7: carrying a check forward", () => {
 
   test("plan 7 case 7: a file read by tests but missing from a scoped checker's inputs is not in the runner's snapshot", () => {
     const inputs = checkerInputs(["src/**"], base.carry)!;
-    const files: SnapshotEntry[] = [["src/app.ts", "100644", blob("1")], ["fixtures/data.json", "100644", blob("2")]];
+    const files: SnapshotEntry[] = [["src/app.ts", "100644", blob("1")], ["data/users.json", "100644", blob("2")]];
     expect(filterSnapshot(files, inputs).map((e) => e[0])).toEqual(["src/app.ts"]);
   });
 
-  test("R-CARRY-8: every platform check input is in a scoped checker's inputs, whatever the policy", () => {
+  test("R-CARRY-8: every platform global input is in a scoped checker's inputs, whatever the policy", () => {
     const inputs = checkerInputs(["src/**"], policy(carry({ globalInputs: [] })).carry)!;
-    for (const g of PLATFORM_CHECK_INPUTS) expect(inputs).toContain(g);
+    for (const g of PLATFORM_GLOBAL_INPUTS) expect(inputs).toContain(g);
     expect(checkerInputs(undefined, base.carry)).toBeNull();
   });
 

@@ -13,7 +13,8 @@ every host. It contains:
   `requireReview()`, `carry()`, `lanes()` and `rule()`.
 
 **Dependency.** This package uses the types of the lane 0 contract
-(`packages/contract`) at commit `7771921f`. That contract is still under
+(`packages/contract`). The branch is based on `7771921f` and has merged the
+contract's repair for review 45431cd9 (`845c7fd`), which is still under
 checker review. If its types change, this package must follow.
 
 ## Run the tests
@@ -51,7 +52,7 @@ Platform code is plain TypeScript. Policy cannot change it (R-POL-10).
 | Whole-tree default for checks, filtered snapshots, config and runner digests, volatile checkers (R-CARRY-6 to 10) | `carry({ verdicts, checks })` switches |
 | Revoked keys: compromised evidence never carries (R-CARRY-12) | `retiredEvidence: "reopens"` |
 | `carry` rules run only after the platform conditions pass, and can only stop carrying (R-CARRY-4) | `carry` rules' `allow` expressions |
-| `obl_admin-approval` for `.artroom/**`, sole-admin self-approval, the recovery boundary (R-ADMIN-1 to 3) | nothing |
+| `obl_admin-approval` for `.artroom/**`, sole-admin self-approval, roster acts by admins, configuration-recovery lanes (R-ADMIN-1 to 9) | nothing |
 | Obligations from actual changed paths; `allowSelf` only for `docs/**` and `**/*.md` (R-PROP-5, R-OBL-2) | `require` rules' `paths`, `when` and obligation |
 | Glob syntax, matching and conservative overlap (R-PATH) | the globs themselves |
 | Budgets and the expression profile (R-EVAL) | `refuse`, `land` and `notify` expressions |
@@ -67,9 +68,29 @@ Platform code is plain TypeScript. Policy cannot change it (R-POL-10).
   - For `refuse`, `require` and `land` the act is refused. For `carry` the
     evidence does not carry. For `notify` that rule notifies nobody.
 - **A runtime failure** is thrown as `PolicyRuntimeFailure`. It has the
-  `ArtroomError` shape, with code `policy-runtime` and `retryable: true`.
-  Nothing is recorded. Causes: an engine fault, a stack overflow, a changed
-  engine, or a rule input from the room that is not plain JSON.
+  `ArtroomError` shape, with code `policy-runtime`, `retryable: true` and
+  `maybeRecorded: false`. The caller records nothing: no act, refusal or
+  decision. Causes: an engine fault (any exception from the engine that is
+  not a budget or profile check), a stack overflow, a changed engine, or a
+  rule input from the room that is not plain JSON. Worker CPU and memory
+  limits are runtime failures too; they end the isolate, so nothing is
+  written.
+- `notify` runs after the act is sealed (R-LOG-13). If `evaluateNotify`
+  throws, the act stays recorded and the room retries the call before it
+  seals the `notified` entry.
+- A rule that fails is never treated as "did not apply". A failed `require`
+  rule refuses the propose and returns no obligations.
+
+## Configuration-recovery lanes
+
+Pass `{ purpose: "config-recovery" }` to `evaluateRefuse`,
+`evaluateRequire`, `evaluateCarry` and `evaluateLand` for an act on a
+configuration-recovery lane. Policy rules are then not evaluated (R-ADMIN-5);
+platform rules are. `evaluateRequire` returns only `obl_admin-approval`, and
+refuses with `recovery-scope` a proposal that changes anything outside
+`.artroom/**` (R-ADMIN-6). On an ordinary lane, policy applies as usual,
+including to `.artroom/**` (R-ADMIN-3). The room enforces admin-only
+signing on the lane.
 
 ## Budgets
 
@@ -100,7 +121,9 @@ A test interleaves evaluations of one rule to check this.
 ## The conformance corpus
 
 `test/profile-corpus.test.ts` ports atseq's evaluator cases with their
-expected values unchanged, including every exact budget boundary. It does not
+expected values unchanged, including every exact budget boundary. Two
+Artroom cases tighten boundaries that atseq tests in steps of two: AST depth
+at an odd level, and inspected bytes to the byte. It does not
 port atseq's fold, Lexicon schema and Inlay view cases, which have no Artroom
 counterpart, or its Node-only dependency check, which
 `test/integrity.test.ts` replaces with WebCrypto checks.
@@ -108,12 +131,15 @@ counterpart, or its Node-only dependency check, which
 Artroom's cases:
 
 - `test/carry.test.ts`: the seven acceptance cases of plan section 7, the
-  scoped-checker case from checker review 45431cd9 (P2.1), and one named case
+  "scoped checker, new test" case of protocol section 23, and one named case
   for each carry condition;
-- `test/admin.test.ts`: sole-admin bootstrap, the admin boundary, and policy
-  activation;
+- `test/admin.test.ts`: sole-admin bootstrap, the policy lockout case, the
+  configuration-recovery lane, and policy activation;
 - `test/rules.test.ts`: the five rule kinds, determinism, replay, the
-  spike's pathological rule, the per-act budget and interleaving;
+  spike's pathological rule, a `require` rule over budget, the per-act
+  budget and interleaving;
+- `test/faults.test.ts`: an injected engine fault in each rule kind gives a
+  retryable error that records nothing;
 - `test/helpers.test.ts`: the plan's section 5 policy example, the default
   policy, validation and globs.
 
@@ -136,39 +162,40 @@ cycle.
 These are added in this package or decided here. Each needs a decision in
 the contract.
 
-1. **Check inputs for tests.** R-CARRY-3 and R-CARRY-8 list no tests or test
-   configuration. Checker review 45431cd9 (P2.1) requires them for check
-   carrying. `PLATFORM_CHECK_INPUTS` adds `**/tests/**`, `**/test/**`,
-   `**/__tests__/**`, `**/*.test.*`, `**/*.spec.*`, and test and build
-   configuration. Verdict carrying keeps the protocol's list.
-2. **Per-act budget.** `PolicyProfile` has no per-act budget. `ACT_BUDGET`
+1. **Per-act budget.** `PolicyProfile` has no per-act budget. `ACT_BUDGET`
    and the codes `act_step_budget` and `act_inspection_budget` are added
    here.
-3. **Default `dependsOn`.** The comment on `CarrySettings.dependsOn` says a
+2. **Default `dependsOn`.** The comment on `CarrySettings.dependsOn` says a
    changed path that matches a key adds that key's values. R-CARRY-2 says the
    defaults apply to "the areas of the reviewed scope". This package follows
    R-CARRY-2: a key applies when it may overlap a reviewed scope pattern.
-4. **Retired evidence.** `NotCarried.code` has no code for a retired key under
+3. **Retired evidence.** `NotCarried.code` has no code for a retired key under
    `retiredEvidence: "reopens"`. This package uses `policy-rejected`.
-5. **Sole-admin reopening.** `Reopened` has no reason for a flagged
+4. **Sole-admin reopening.** `Reopened` has no reason for a flagged
    self-approval that stops counting at reservation. `judgeAdminApproval`
    returns `reopens: true` with a text.
-6. **Notify targets.** `Decision.outcome.to` holds only members and teams,
+5. **Notify targets.** `Decision.outcome.to` holds only members and teams,
    and the notify `RuleInput` has no reviewers. The room passes a
    `NotifyDirectory` (members by role, and reviewers) to expand `role:`
    principals, `owners` and `reviewers`.
-7. **Land reviews.** The land `RuleInput` does not say that `reviews` holds
+6. **Land reviews.** The land `RuleInput` does not say that `reviews` holds
    each qualifying reviewer's latest verdict. The default `objection-open`
    rule assumes it does.
-8. **Check carry facts.** The carry `RuleInput` has no check binding. The
+7. **Check carry facts.** The carry `RuleInput` has no check binding. The
    room passes `CarryFacts` (earlier binding, new tree or snapshot, config and
    runner digests, `volatile`).
-9. **Require errors at activation.** An open proposal cannot be refused
+8. **Require errors at activation.** An open proposal cannot be refused
    after it is recorded. `activate()` returns a `refusal` for that proposal,
    which should block its landing until a new generation or policy.
-10. **No `$glob`.** The profile's allowlist has no path-matching function,
-    so expressions cannot match globs; `require` rules' `paths` cover the
-    common case. If one is added, it must charge steps for its work.
+9. **No `$glob`.** The profile's allowlist has no path-matching function,
+   so expressions cannot match globs; `require` rules' `paths` cover the
+   common case. If one is added, it must charge steps for its work.
+10. **Lane purpose in rule inputs.** `PolicyLane` has no `purpose`, so the
+    room passes it as an option (`purpose`) rather than in the recorded input.
+
+Resolved by the contract repair `845c7fd`: tests, fixtures and test and build
+configuration are now platform global inputs (R-CARRY-3). This package uses
+that list verbatim.
 
 ## Not done
 

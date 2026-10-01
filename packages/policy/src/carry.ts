@@ -19,54 +19,30 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import { globsOverlap, matchesAny, matching } from "./glob.ts";
 
-/** The platform's global inputs (R-CARRY-3). Policy can add to this list, never remove from it. */
-export const PLATFORM_GLOBAL_INPUTS: readonly Glob[] = Object.freeze([
-  ".artroom/**",
-  "package.json",
-  "**/package.json",
-  "package-lock.json",
-  "**/package-lock.json",
-  "npm-shrinkwrap.json",
-  "yarn.lock",
-  "pnpm-lock.yaml",
-  "pnpm-workspace.yaml",
-  "bun.lockb",
-  "tsconfig*.json",
-  "**/tsconfig*.json",
-  "wrangler.*",
-  "**/wrangler.*",
-  "vite.config.*",
-  "vitest.config.*",
-  "jest.config.*",
-  "playwright.config.*",
-  "Makefile",
-  "Dockerfile",
-  ".github/**",
-  "scripts/**",
-  ".npmrc",
-  ".nvmrc",
-]);
-
 /**
- * Inputs every scoped checker sees in addition to its declared inputs: the
- * global inputs plus tests and test and build configuration (plan section 7,
- * "Carrying a check forward"; checker review 45431cd9 P2.1). The protocol at
- * 7771921f lists only the shared global inputs; see the README's contract gaps.
+ * The platform's global inputs (R-CARRY-3, as revised for review 45431cd9),
+ * in the protocol's order. Policy can add to this list, never remove from it.
+ * Tests, fixtures and build and test configuration are included, so a
+ * scoped checker always sees them (R-CARRY-8).
  */
-export const PLATFORM_CHECK_INPUTS: readonly Glob[] = Object.freeze([
-  ...PLATFORM_GLOBAL_INPUTS,
-  "**/tests/**",
-  "**/test/**",
-  "**/__tests__/**",
-  "**/*.test.*",
-  "**/*.spec.*",
-  "**/vite.config.*",
-  "**/vitest.config.*",
-  "**/vitest.workspace.*",
-  "**/jest.config.*",
-  "**/playwright.config.*",
-  "**/Makefile",
-  "**/Dockerfile",
+export const PLATFORM_GLOBAL_INPUTS: readonly Glob[] = Object.freeze([
+  // configuration, policy and scripts
+  ".artroom/**", ".github/**", "scripts/**", "**/scripts/**",
+  // manifests and lockfiles
+  "package.json", "**/package.json", "package-lock.json", "**/package-lock.json",
+  "npm-shrinkwrap.json", "yarn.lock", "**/yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml",
+  "bun.lockb", "bun.lock", ".npmrc", "**/.npmrc", ".nvmrc", ".node-version", ".tool-versions",
+  // tests and fixtures
+  "tests/**", "**/tests/**", "test/**", "**/test/**", "**/__tests__/**", "spec/**",
+  "**/*.test.*", "**/*.spec.*", "**/fixtures/**", "**/__fixtures__/**", "**/__snapshots__/**",
+  // build and test configuration
+  "tsconfig*.json", "**/tsconfig*.json", "jsconfig*.json",
+  "wrangler.*", "**/wrangler.*",
+  "vite.config.*", "**/vite.config.*", "vitest.config.*", "**/vitest.config.*", "vitest.workspace.*",
+  "jest.config.*", "**/jest.config.*", "playwright.config.*", "karma.conf.*", ".mocharc*",
+  "babel.config.*", ".babelrc*", ".swcrc", "esbuild.*", "rollup.config.*", "webpack.config.*",
+  "turbo.json", "nx.json", "lerna.json", ".env.test",
+  "Makefile", "**/Makefile", "Dockerfile", "**/Dockerfile", "docker-compose*.yml",
 ]);
 
 /** The platform's list followed by the policy's additions, without repeats (R-CARRY-3). */
@@ -87,14 +63,13 @@ export function defaultDependsOn(settings: CarrySettings, scope: readonly Glob[]
 }
 
 /**
- * What a scoped checker's runner sees: its declared inputs, the platform's
- * check inputs and the policy's global inputs. Null means the whole tree,
- * the default (R-CARRY-6, R-CARRY-8). Neither a proposal nor policy can
- * remove a platform entry.
+ * What a scoped checker's runner sees: its declared inputs plus the global
+ * inputs. Null means the whole tree, the default (R-CARRY-6, R-CARRY-8).
+ * Neither a proposal nor policy can remove a platform entry.
  */
 export function checkerInputs(declared: readonly Glob[] | undefined, settings: CarrySettings): Glob[] | null {
   if (declared === undefined) return null;
-  return [...new Set([...declared, ...PLATFORM_CHECK_INPUTS, ...settings.globalInputs])];
+  return [...new Set([...declared, ...globalInputs(settings)])];
 }
 
 /** The files a scoped runner receives: exactly those matching its inputs (R-CARRY-9). */

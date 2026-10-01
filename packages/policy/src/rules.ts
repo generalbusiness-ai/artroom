@@ -15,6 +15,7 @@ import type {
   Carried,
   CheckObligation,
   Decision,
+  LanePurpose,
   Expr,
   Json,
   MemberId,
@@ -40,7 +41,7 @@ import { digestJson } from "./integrity.ts";
 import { STAMP } from "./profile.ts";
 import { matching, matchGlob } from "./glob.ts";
 import { checkConditions, reviewConditions, type CarryFacts, type CarryInput, type Invariant } from "./carry.ts";
-import { adminObligation, isBoundaryProposal, isRecoveryBoundaryAct } from "./admin.ts";
+import { ADMIN_SCOPE, adminObligation, isRecoveryBoundaryAct, skipsPolicy } from "./admin.ts";
 
 /** The active policy and its version: the ID of the event that activated it. */
 export interface ActivePolicy {
@@ -124,6 +125,11 @@ async function retain(input: RuleInput): Promise<{ json: Json; digest: Decision[
 /** Options every evaluate function takes. */
 export interface BudgetOptions {
   /**
+   * The lane's purpose. On a `config-recovery` lane, `refuse`, `require`,
+   * `carry` and `land` rules are not evaluated (R-ADMIN-5); `notify` still is.
+   */
+  readonly purpose?: LanePurpose;
+  /**
    * The act's shared budget (ACT_BUDGET). Pass the same meter to every
    * evaluate call for one act, for example `refuse` and `require` on a
    * propose. A fresh one is used when absent.
@@ -162,9 +168,13 @@ function rulesOf<K extends RuleKind>(doc: PolicyDocument, kind: K): Extract<Rule
 export interface RefuseOptions extends BudgetOptions {
   /** True when the act is signed by the recovery key (R-ADMIN-3). */
   readonly recoveryKey?: boolean;
-  /** True when the act's proposal has its `obl_admin-approval` met (R-ADMIN-3). */
-  readonly adminApprovalMet?: boolean;
 }
+
+const RECOVERY_LANE: Invariant = Object.freeze({
+  rule: "R-ADMIN-5",
+  held: true,
+  detail: "configuration-recovery lane: policy rules are not evaluated; platform rules apply",
+});
 
 export interface RefuseResult extends Explained {
   readonly refusal: Refusal | null;
@@ -174,8 +184,7 @@ export interface RefuseResult extends Explained {
 export async function evaluateRefuse(policy: ActivePolicy, input: Input<"refuse">, opts: RefuseOptions = {}): Promise<RefuseResult> {
   if (isRecoveryBoundaryAct(input, opts.recoveryKey ?? false))
     return { refusal: null, evaluations: [], invariants: [{ rule: "R-ADMIN-3", held: true, detail: "roster act by an admin or the recovery key: refuse rules are not evaluated" }] };
-  if (input.proposal && isBoundaryProposal(input.proposal.paths, opts.adminApprovalMet ?? false))
-    return { refusal: null, evaluations: [], invariants: [{ rule: "R-ADMIN-3", held: true, detail: "admin-approved change to .artroom/** only: refuse rules are not evaluated" }] };
+  if (skipsPolicy(opts.purpose)) return { refusal: null, evaluations: [], invariants: [RECOVERY_LANE] };
   const { json, digest, prepared } = await retain(input);
   const budget = opts.budget ?? actMeter();
   const evaluations: RuleEvaluation[] = [];
@@ -202,13 +211,14 @@ export type ObligationSpec = ReviewObligation | CheckObligation;
 /** The documentation scopes in which `allowSelf` may take effect (R-OBL-2). */
 export const SELF_REVIEW_SCOPES = Object.freeze(["docs/**", "**/*.md"] as const);
 
-export interface RequireOptions extends BudgetOptions {
-  /** True when the proposal's `obl_admin-approval` is met (R-ADMIN-3, at activation). */
-  readonly adminApprovalMet?: boolean;
-}
+export type RequireOptions = BudgetOptions;
 
 export interface RequireResult extends Explained {
-  /** The obligations, including the platform's `obl_admin-approval` (R-OBL-5). */
+  /**
+   * The obligations, including the platform's `obl_admin-approval` (R-OBL-5).
+   * Empty whenever `refusal` is set: a rule that failed never yields a
+   * proposal with fewer obligations.
+   */
   readonly obligations: readonly ObligationSpec[];
   /** Set when a `when` expression failed: the propose is refused (R-ADM-1 step 9). */
   readonly refusal: Refusal | null;
@@ -221,9 +231,20 @@ export async function evaluateRequire(policy: ActivePolicy, input: Input<"requir
   const admin = adminObligation(policy.version, paths);
   if (admin) invariants.push({ rule: "R-ADMIN-1", held: true, detail: "a changed path matches .artroom/**: obl_admin-approval added" });
   const obligations: ObligationSpec[] = admin ? [admin] : [];
-  if (isBoundaryProposal(paths, opts.adminApprovalMet ?? false)) {
-    invariants.push({ rule: "R-ADMIN-3", held: true, detail: "admin-approved change to .artroom/** only: require rules are not evaluated" });
-    return { obligations, refusal: null, evaluations: [], invariants };
+  if (skipsPolicy(opts.purpose)) {
+    const outside = paths.filter((p) => !matchGlob(p, ADMIN_SCOPE));
+    if (outside.length || !paths.length) {
+      invariants.push({ rule: "R-ADMIN-6", held: false, detail: `changed paths outside .artroom/**: ${outside.join(", ")}` });
+      const refusal: Refusal = {
+        refused: true,
+        rule: "recovery-scope",
+        reason: `A configuration-recovery proposal may change only .artroom/**, and it changes ${outside.join(", ") || "nothing"}.`,
+        fix: "Propose the other changes on an ordinary lane.",
+      };
+      return { obligations: [], refusal, evaluations: [], invariants };
+    }
+    invariants.push({ rule: "R-ADMIN-6", held: true, detail: "configuration-recovery lane: obl_admin-approval is the only obligation" });
+    return { obligations, refusal: null, evaluations: [], invariants: [...invariants, RECOVERY_LANE] };
   }
   const { json, digest, prepared } = await retain(input);
   const budget = opts.budget ?? actMeter();
@@ -240,7 +261,7 @@ export async function evaluateRequire(policy: ActivePolicy, input: Input<"requir
       usage = answer.usage;
       if (!answer.ok) {
         evaluations.push(evaluation(policy, rule, digest, json, { result: "error", code: answer.code, detail: answer.detail }, usage, `${rule.id} could not be evaluated, so the proposal is refused: ${answer.detail}`));
-        return { obligations, refusal: errorRefusal(rule, answer), evaluations, invariants };
+        return { obligations: [], refusal: errorRefusal(rule, answer), evaluations, invariants };
       }
       if (!answer.value) {
         evaluations.push(evaluation(policy, rule, digest, json, { result: "pass" }, usage, `${rule.id} does not apply: its condition is false`));
@@ -286,11 +307,14 @@ export async function evaluateCarry(policy: ActivePolicy, input: CarryInput, fac
   if (!platform.carries)
     return { carried: null, notCarried: platform.notCarried, highlight: false, evaluations: [], invariants: platform.invariants };
   const invariants = [...platform.invariants];
+  if (skipsPolicy(opts.purpose)) invariants.push(RECOVERY_LANE);
   const { json, digest, prepared } = await retain(input);
   const budget = opts.budget ?? actMeter();
   const evaluations: RuleEvaluation[] = [];
   const act: ActId = input.evidence.act;
-  const applicable = rulesOf(policy.doc, "carry").filter((r: CarryRule) => r.evidence === "any" || r.evidence === input.evidence.kind);
+  const applicable = skipsPolicy(opts.purpose)
+    ? []
+    : rulesOf(policy.doc, "carry").filter((r: CarryRule) => r.evidence === "any" || r.evidence === input.evidence.kind);
   for (const rule of applicable) {
     const answer = await ask(rule.allow, prepared, budget);
     if (!answer.ok || !answer.value) {
@@ -331,10 +355,7 @@ export async function evaluateCarry(policy: ActivePolicy, input: CarryInput, fac
 
 // -------------------------------------------------------------------- land
 
-export interface LandOptions extends BudgetOptions {
-  /** True when the proposal's `obl_admin-approval` is met (R-ADMIN-3). */
-  readonly adminApprovalMet?: boolean;
-}
+export type LandOptions = BudgetOptions;
 
 export interface LandResult extends Explained {
   readonly refusal: Refusal | null;
@@ -342,8 +363,7 @@ export interface LandResult extends Explained {
 
 /** `land` rules, on `land`, at `ready` and at reservation (R-POL-6). The first block stops evaluation. */
 export async function evaluateLand(policy: ActivePolicy, input: Input<"land">, opts: LandOptions = {}): Promise<LandResult> {
-  if (isBoundaryProposal(input.proposal.paths, opts.adminApprovalMet ?? false))
-    return { refusal: null, evaluations: [], invariants: [{ rule: "R-ADMIN-3", held: true, detail: "admin-approved change to .artroom/** only: land rules are not evaluated" }] };
+  if (skipsPolicy(opts.purpose)) return { refusal: null, evaluations: [], invariants: [RECOVERY_LANE] };
   const { json, digest, prepared } = await retain(input);
   const budget = opts.budget ?? actMeter();
   const evaluations: RuleEvaluation[] = [];
@@ -397,7 +417,13 @@ function targets(rule: NotifyRule, input: Input<"notify">, dir: NotifyDirectory)
   return [...out].sort();
 }
 
-/** `notify` rules, after an act is recorded (R-POL-5). They never refuse. An error notifies nobody for that rule. */
+/**
+ * `notify` rules, after the act's entry is sealed (R-POL-5, R-LOG-13). They
+ * never refuse. A deterministic error notifies nobody for that rule and is
+ * recorded. A runtime failure throws `PolicyRuntimeFailure`: the act stays
+ * recorded, and the room retries this call from its durable queue before it
+ * seals the `notified` entry.
+ */
 export async function evaluateNotify(policy: ActivePolicy, input: Input<"notify">, dir: NotifyDirectory, opts: BudgetOptions = {}): Promise<NotifyResult> {
   const { json, digest, prepared } = await retain(input);
   const budget = opts.budget ?? actMeter();

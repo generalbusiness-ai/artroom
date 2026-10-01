@@ -78,6 +78,18 @@ describe("require (R-POL-3, R-OBL-5)", () => {
     expect(r.evaluations.map((e) => e.decision.outcome.result)).toEqual(["pass", "pass"]);
   });
 
+  test("a require rule over its budget refuses the act: never admitted with fewer obligations", async () => {
+    const cubic = "$count(proposal.paths[$count($$.proposal.paths[$count($$.proposal.paths[$ = $$.proposal.paths[0]]) > 0]) > 0]) > 0";
+    const p = policy(
+      requireReview({ id: "first", paths: "**", from: "@lead" }),
+      requireReview({ id: "costly", paths: "**", from: "@lead", when: cubic }),
+    );
+    const r = await evaluateRequire(active(p), requireInput(p, Array.from({ length: 150 }, (_, i) => `src/f${i}.ts`)));
+    expect(r.refusal).toMatchObject({ refused: true, rule: "policy-budget-exceeded" });
+    expect(r.obligations).toEqual([]);
+    expect(explain(r).decisions.map((d) => [d.rule, d.outcome.result])).toEqual([["first", "obligation"], ["costly", "error"]]);
+  });
+
   test("when: false skips the obligation; an error refuses the propose", async () => {
     const p = policy(
       requireReview({ id: "big-change", paths: "**", from: "@lead", when: "$count(proposal.paths) > 2" }),
@@ -87,6 +99,7 @@ describe("require (R-POL-3, R-OBL-5)", () => {
     expect(small.obligations).toEqual([]);
     const broken = await evaluateRequire(active(p), requireInput(p, ["src/a.ts"]));
     expect(broken.refusal).toMatchObject({ rule: "policy-type-error" });
+    expect(broken.obligations).toEqual([]);
   });
 
   test("R-OBL-2: allowSelf takes effect only when every path is a documentation path", async () => {
@@ -117,11 +130,13 @@ describe("land (R-POL-6, R-POL-7)", () => {
     expect(clear.evaluations[0]!.decision.outcome).toEqual({ result: "pass" });
   });
 
-  test("R-ADMIN-3: land rules are not evaluated for an admin-approved .artroom/** change", async () => {
+  test("R-ADMIN-3, R-ADMIN-8: land rules apply on an ordinary lane, even for .artroom/**, and not on a recovery lane", async () => {
     const p = policy(rule({ id: "never", kind: "land", block: "true", reason: "Never.", fix: "None." }));
-    expect((await evaluateLand(active(p), landInput(p, [".artroom/policy.json"]), { adminApprovalMet: true })).refusal).toBeNull();
-    expect((await evaluateLand(active(p), landInput(p, [".artroom/policy.json"]), { adminApprovalMet: false })).refusal?.rule).toBe("never");
-    expect((await evaluateLand(active(p), landInput(p, [".artroom/policy.json", "src/a.ts"]), { adminApprovalMet: true })).refusal?.rule).toBe("never");
+    expect((await evaluateLand(active(p), landInput(p, [".artroom/policy.json"]))).refusal?.rule).toBe("never");
+    expect((await evaluateLand(active(p), landInput(p, [".artroom/policy.json"]), { purpose: "ordinary" })).refusal?.rule).toBe("never");
+    const recovery = await evaluateLand(active(p), landInput(p, [".artroom/policy.json"]), { purpose: "config-recovery" });
+    expect(recovery.refusal).toBeNull();
+    expect(recovery.evaluations).toEqual([]);
   });
 });
 

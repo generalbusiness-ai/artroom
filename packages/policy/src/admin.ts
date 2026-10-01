@@ -1,9 +1,10 @@
 /**
- * The fixed admin boundary (R-ADMIN-1 to 3, plan section 9). Platform code:
+ * The fixed admin boundary (R-ADMIN-1 to 9, plan section 9). Platform code:
  * no policy can remove or weaken it (R-POL-10).
  */
 
 import type {
+  LanePurpose,
   MemberId,
   ObligationId,
   PolicyVersion,
@@ -26,9 +27,15 @@ export function adminObligation(policy: PolicyVersion, paths: readonly RepoPath[
   return { id: ADMIN_APPROVAL, rule: "admin-approval", policy, paths: hit, kind: "review", from: ["role:admin"], count: 1, allowSelf: false };
 }
 
-/** A proposal whose changed paths all match `.artroom/**` and whose admin approval is met (R-ADMIN-3). */
-export function isBoundaryProposal(paths: readonly RepoPath[], adminApprovalMet: boolean): boolean {
-  return adminApprovalMet && paths.length > 0 && paths.every((p) => matchGlob(p, ADMIN_SCOPE));
+/**
+ * On a configuration-recovery lane, policy `refuse`, `require`, `carry` and
+ * `land` rules are not evaluated (R-ADMIN-5). Platform rules still apply,
+ * and the room enforces the lane's admin-only signing and `.artroom/**`
+ * scope (R-ADMIN-5, R-ADMIN-6). On an ordinary lane, policy applies as
+ * usual, including to proposals that change `.artroom/**` (R-ADMIN-3).
+ */
+export function skipsPolicy(purpose: LanePurpose | undefined): boolean {
+  return purpose === "config-recovery";
 }
 
 /** A `roster` act signed by an admin or the recovery key: refuse rules are not evaluated (R-ADMIN-3). */

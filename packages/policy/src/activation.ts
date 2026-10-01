@@ -10,6 +10,7 @@ import type {
   Carried,
   Generation,
   LaneId,
+  LanePurpose,
   NotCarried,
   ObligationId,
   Refusal,
@@ -25,7 +26,7 @@ export interface OpenProposal {
   readonly lane: LaneId;
   readonly generation: Generation;
   readonly require: Extract<RuleInput, { readonly kind: "require" }>;
-  readonly adminApprovalMet: boolean;
+  readonly purpose: LanePurpose;
   /** Obligation IDs before activation. */
   readonly obligations: readonly ObligationId[];
   /** Evidence currently counted as carried. Evidence reviewed here is bound to this generation and is not re-evaluated. */
@@ -57,7 +58,7 @@ export async function activate(policy: ActivePolicy, proposals: readonly OpenPro
   const results: ActivationResult[] = [];
   for (const p of proposals) {
     const budget = actMeter();
-    const req = await evaluateRequire(policy, p.require, { adminApprovalMet: p.adminApprovalMet, budget });
+    const req = await evaluateRequire(policy, p.require, { purpose: p.purpose, budget });
     const ids = req.obligations.map((o) => o.id);
     const evaluations: RuleEvaluation[] = [...req.evaluations];
     const invariants: Invariant[] = [{ rule: "R-POL-9", held: true, detail: `obligations recomputed under ${policy.version}` }, ...req.invariants];
@@ -65,7 +66,7 @@ export async function activate(policy: ActivePolicy, proposals: readonly OpenPro
     const reopened: { obligation: ObligationId; reopened: Reopened; notCarried: NotCarried }[] = [];
     for (const c of p.carried) {
       if (!ids.includes(c.obligation)) continue;
-      const result = await evaluateCarry(policy, { ...c.input, policy: { same: false } }, c.facts, { budget });
+      const result = await evaluateCarry(policy, { ...c.input, policy: { same: false } }, c.facts, { purpose: p.purpose, budget });
       evaluations.push(...result.evaluations);
       invariants.push(...result.invariants);
       if (result.carried) carried.push({ obligation: c.obligation, evidence: result.carried });
@@ -75,8 +76,9 @@ export async function activate(policy: ActivePolicy, proposals: readonly OpenPro
       lane: p.lane,
       generation: p.generation,
       obligations: req.obligations,
-      added: ids.filter((id) => !p.obligations.includes(id)),
-      removed: p.obligations.filter((id) => !ids.includes(id)),
+      // A refusal leaves the obligations undecided, so none is reported added or removed.
+      added: req.refusal ? [] : ids.filter((id) => !p.obligations.includes(id)),
+      removed: req.refusal ? [] : p.obligations.filter((id) => !ids.includes(id)),
       refusal: req.refusal,
       carried,
       reopened,

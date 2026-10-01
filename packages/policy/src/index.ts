@@ -24,7 +24,6 @@ export { PreparedInput, prepareInput } from "./values.ts";
 export { canonicalize, digestJson, sha256Hex, snapshotDigest, type SnapshotEntry } from "./integrity.ts";
 export { globProblem, globsOverlap, isGlob, matchGlob, matchesAny, matching } from "./glob.ts";
 export {
-  PLATFORM_CHECK_INPUTS,
   PLATFORM_GLOBAL_INPUTS,
   checkConditions,
   checkerInputs,
@@ -67,9 +66,9 @@ export {
   ADMIN_SCOPE,
   SOLE_ADMIN_FLAG,
   adminObligation,
-  isBoundaryProposal,
   isRecoveryBoundaryAct,
   judgeAdminApproval,
+  skipsPolicy,
   type AdminApproval,
   type AdminApprovalFacts,
 } from "./admin.ts";
