@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7dcb74637d0327fde5457b0a1cef9a436b571129","text":"Merge retired a covered predecessor; the successor is at spikes/room-core/src/treediff.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7fc53e8872845e82f0cf98c9ef85b906337c742a","text":"Merge retired a covered predecessor; the successor is at spikes/room-core/test/build.mjs."}
