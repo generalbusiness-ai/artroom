@@ -574,8 +574,10 @@ changed:
   integration, an earlier passing check of the same obligation carries onto
   it if lane C's platform conditions hold: the tree or the filtered
   snapshot is identical, the configuration is the same, the checker is not
-  volatile, and the key is not revoked. A carry counts only on the
-  integration it was judged for.
+  volatile, the key is not revoked, and the runner environment attested now
+  is the earlier check's. A carry counts only on the integration and under
+  the policy version that judged it. No deployment attests a runner yet, so
+  in production checks do not carry (see "Review a711f7b6").
 - **The alarm** is set from the earliest of the Room's own work, lane B's
   `landing.nextDue()` and `workspaces.nextDue()`, so it follows lane B's
   capped backoff and never spins.
@@ -594,6 +596,59 @@ change: all 19 mutations were caught, four after a test was strengthened
 (an abort carried out by the alarm; the renewed deadline reaching the
 token; a snapshot that leaves out the global inputs; a carry counting only
 on its own integration).
+
+## Review a711f7b6
+
+The checker's review of revision 5 (`45c7946f`) requested changes. The fixes
+are on top of `80d2351`, which adopted lane B's follow-up. Its
+reproductions now fail; the correct outcomes are asserted in
+[test/workerd/review-a711f7b6.test.ts](test/workerd/review-a711f7b6.test.ts).
+
+| Finding | Fix | Tests (in that file) |
+|---|---|---|
+| 1. P1 A stored check carry survived a policy that turns carrying off | Each carry is stored with the policy version that judged it and counts only under that version and on its integration (migration 7). An activation leaves earlier carries uncounted; readiness judges again under the new policy, which carries nothing when `carry.checks` is false or a carry rule applies to checks. Reservation requires every obligation met on the integration. | "an activation with checks: false …"; "an activation with a carry rule that refuses checks …"; "reservation itself refuses a ready landing whose carried check stopped counting"; "reservation requires every obligation met on the integration …"; "the earlier check's key compromised after the carry …"; "the checker configuration changed …"; phase2b "does not carry when main changed a global input" |
+| 2. P2 Migration dropped outstanding workspace cleanup | Migration 7 keeps access opened before lane B's workspaces as `legacy`: its recorded token IDs, and an inventory for provisioning whose answer was never recorded. When the lease ends (release, expiry, take-over, with or without reopening) these become lane B's durable cleanup duties, in the transaction that marks it ended; they stay owed until Artifacts confirms them. | "release without reopening …"; "a mint whose answer was never recorded …"; "a recorded token is owed by its ID …"; "expiry without reopening …"; "take-over without reopening …, and with Artifacts down the cleanup stays owed …" |
+| 3. P2 An older room had no canonical remote for the landing publisher | Before any landing work, the Room resolves the remote from its bound repository identity through the binding (refusing an answer for any other repository) and stores it. An outage throws and the alarm retries; the publisher never gets a guessed remote. | "the landing completes, with the bound repository's own remote stored"; "a binding that answers for another repository …"; "Artifacts is down: nothing is guessed …" |
+| 4a. Lane B's follow-up | Kept as adopted in `80d2351`. | phase2b, as listed under "Phase 2b cases" |
+| 4b. Runner digest | Check carry needs a runner environment attested now for the checker (`RoomServices.runnerDigest`); none is attested in production, so nothing carries there (fail closed). | "no runner environment attested …"; "another runner environment attested …"; "the same runner attested …" |
+| 4c. Carry rule decisions | No event can seal a `carry` rule's decision on a check (amendment 2). The Room fails closed: when a carry rule applies to checks (`evidence: "check"` or `"any"`), checks do not carry. A rule for reviews only does not stop them. | "a carry rule for reviews only does not stop a check carrying; one for checks does …" |
+| 4d. Scoped job flow | When a check obligation waits on an integration for a scoped checker, the Room records the snapshot commit it derives from that integration (the filtered files, no parents, a fixed identity and message; [src/snapshot.ts](src/snapshot.ts)), with its paths and digest. A scoped check whose `integration` is that recorded commit is admitted with exactly that digest and paths, and counts for the integration it was built from. Tested with a contract-shaped fixture: a `CheckJob` as the contract types it and the body lane G's `Checker` builds from it; lane G's service code is not run (its branch is under repair and not a dependency). | "contract-shaped CheckJob fixture …"; "a snapshot commit with another digest, another checker's commit, or an unrecorded commit is check-binding" |
+| 4e. Volatile flag | A check whose signed `volatile` differs from its configuration's is `check-binding`, either way. | "a check whose volatile flag contradicts the configuration (volatile: false) …"; "… (volatile: true) …" |
+
+The checker's scoped-job reproduction built its snapshot commit with
+another identity and time, so the Room still refuses that commit: only
+the commit the Room recorded is admitted. A publisher must write exactly
+that commit (contract change 3 below).
+
+Each new guard was broken once and the whole workerd suite run against the
+change: 14 of 17 mutations were caught, four after a test was added. Three
+are equivalent: requiring an attested runner before lane C's runner
+comparison (lane C already refuses a missing one); the early return when
+`carry.checks` is false (lane C refuses it, and stored carries are bound to
+their policy); and the publisher's missing-remote guard (the remote is
+always resolved before landing work).
+
+### Contract changes needed (candidates for amendment 3)
+
+1. **A sealed check-carry decision.** A system event, for example
+   `check-carried { op, lane, generation, integration, obligation, act,
+   carried | notCarried, decisions }`, sealed when the Room judges a check
+   carry at readiness, so `carry` rules can apply to checks and their
+   decisions be replayed. Until then checks do not carry while a carry rule
+   applies to them.
+2. **An attested runner environment.** A way for the Room to know, before
+   a check runs, the runner environment digest it would run in: pinned in
+   `CheckerConfig`, or attested by the checker service. Until then no check
+   carries in production.
+3. **The snapshot commit format, and who issues jobs.** The filtered
+   snapshot commit a scoped job names: a tree of exactly the filtered files
+   at their modes and blobs, no parents, author and committer
+   `Artroom Snapshot <snapshot@artroom.invalid> 0 +0000`, and the message
+   `Artroom filtered snapshot for <checker>\n\nDigest: <digest>\n`. The Room
+   derives and records it; the publisher's `writeSnapshot` (in lane G's copy
+   of lane B's package, not in the landed one) must write exactly it; and
+   the contract should say that `CheckJob.integration` for a filtered input
+   is this commit, and which lane issues jobs.
 
 ## Secrets
 
@@ -622,15 +677,8 @@ is `land-input-changed`. These remain open:
 1. **Unknown note anchors.** A note anchored to an entry that does not
    exist is refused, recorded, with `lane-unknown`; the contract has no
    closer rule (open point 36).
-2. **No event for a check's carry decision.** A check carried onto a new
-   integration is judged when lane B prepares it, and no system event can
-   seal a `carry` rule's decision there. So the Room carries a check on
-   lane C's platform conditions alone (`Carried.rules` is empty), and when
-   any `carry` rule is in force, checks do not carry: they rerun.
-3. **Runner digest of a new integration.** R-CARRY-6 compares runner
-   digests, but no runner has run on the new integration when the Room
-   judges the carry. The Room uses the earlier check's runner digest, so
-   only a changed configuration, tree or snapshot stops a carry.
+2. **Check carry decisions, runner environments, snapshot commits.** See
+   "Contract changes needed" under "Review a711f7b6".
 
 ## Not done
 
