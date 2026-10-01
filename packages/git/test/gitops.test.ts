@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { Fixture, edit, lines, localExec, sh } from "./support.ts";
-import { GitOps, HARDENING, LOG_REF, integrationRef, objectsRef, pinnedRef } from "../src/publisher/gitops.ts";
+import { type Exec, GitOps, HARDENING, LOG_REF, integrationRef, objectsRef, pinnedRef } from "../src/publisher/gitops.ts";
 import { decodeLogPush, toB64url, toLogOutcome } from "../src/publisher/log-push.ts";
 import { createHash } from "node:crypto";
 
@@ -345,4 +345,49 @@ test("a pushLog request is checked before git: only refs/artroom/log, commit ids
   refused({ objects: Array.from({ length: 100_001 }, () => ({ type: "blob", data: "" })) });
   const mib = toB64url(new Uint8Array(1024 * 1024));
   refused({ objects: Array.from({ length: 65 }, () => ({ type: "blob", data: mib })) });
+});
+
+test("the integration is dated at the later parent's commit time, whichever side it is on", async (t) => {
+  const f = await new Fixture().init();
+  t.after(() => f.dispose());
+  const env = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@x", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@x" };
+  const proposed = await f.propose("act_1002_abcdef02", 1, f.main, { "src/b.txt": edit(lines("b"), 3, "main side") });
+  for (const at of [1_000_000_000, 4_000_000_000]) {
+    // main moves to a commit dated far before, then far after, the lane's head
+    const tree = await sh(f.root, "--git-dir", f.canonical, "rev-parse", `${proposed}^{tree}`);
+    const dated = await localExec(["git", "--git-dir", f.canonical, "commit-tree", tree, "-p", f.main, "-m", `main at ${at}`],
+      { env: { ...env, GIT_AUTHOR_DATE: `@${at} +0000`, GIT_COMMITTER_DATE: `@${at} +0000` } });
+    const other = dated.stdout.trim();
+    await sh(f.root, "--git-dir", f.canonical, "update-ref", "refs/heads/main", other);
+    const g = at === 1_000_000_000 ? 1 : 2;
+    const head = await f.propose(lane, g, f.main, { "src/a.txt": edit(lines("a"), 3, `lane ${at}`) });
+    const p = await f.ops.preview(f.canonical, head, pinnedRef(lane, g), lane, g);
+    assert.ok(p.kind === "clean" && !p.fastForward);
+    const headTime = Number(await sh(f.root, "--git-dir", f.canonical, "show", "-s", "--format=%ct", head));
+    const want = Math.max(at, headTime);
+    assert.equal(await sh(f.root, "--git-dir", f.canonical, "show", "-s", "--format=%at %ct", p.integration), `${want} ${want}`);
+  }
+});
+
+test("a lease refusal at the push itself (the ref moved after the check) reads back where the ref is", async (t) => {
+  // An exec that moves refs/artroom/log just before the push, as a concurrent writer would.
+  let intruder = "";
+  let canonical = "";
+  const racing: Exec = async (argv, opts) => {
+    if (argv.includes("push") && intruder) await localExec(["git", "--git-dir", canonical, "update-ref", LOG_REF, intruder], { env: {} });
+    return localExec(argv, opts);
+  };
+  const f = await new Fixture(racing).init();
+  t.after(() => f.dispose());
+  canonical = f.canonical;
+  const c1 = logCommit("first", null);
+  await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
+  const other = logCommit("other", c1.commit);
+  await f.ops.pushLog(f.canonical, other.objects, other.commit, c1.commit);
+  await sh(f.root, "--git-dir", f.canonical, "update-ref", LOG_REF, c1.commit);
+  intruder = other.commit;
+  const c2 = logCommit("second", c1.commit);
+  const r = await f.ops.pushLog(f.canonical, c2.objects, c2.commit, c1.commit);
+  assert.equal(r.outcome.outcome, "rejected");
+  assert.deepEqual(toLogOutcome(r), { ok: false, reason: "lease-mismatch", current: other.commit });
 });

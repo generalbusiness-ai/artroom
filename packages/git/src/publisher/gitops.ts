@@ -451,7 +451,6 @@ export class GitOps {
           const w = await this.git(["-C", dir, "hash-object", "-w", "-t", o.type, "--stdin"], {}, o.data);
           if (w.code !== 0) throw new GitError("hash-object", w);
         }
-        if ((await this.git(["-C", dir, "cat-file", "-t", next])).stdout.trim() !== "commit") throw new Error(`${next} is not a commit`);
         const parents = (await this.ok("rev-list", ["-C", dir, "rev-list", "--parents", "-n", "1", next])).split(" ").slice(1);
         if (parents.join(" ") !== (lease ?? "")) throw new Error(`${next} does not have exactly the lease as its parent`);
         const connected = await this.git(["-C", dir, "rev-list", "--objects", next]);
