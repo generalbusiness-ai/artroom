@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3a57747b788d3dacf3dcb0d265985cbc741e092e","text":"Merge retired a covered predecessor; the successor is at spikes/room-core/.gitignore."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3a84ca8bab5958882f39e241f320b98040e4e91d","text":"Merge retired a covered predecessor; the successor is at spikes/room-core/test/profile.test.mjs."}
