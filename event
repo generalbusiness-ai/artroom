@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:22814090080b3d5aee11c106e345af7de470f34d","text":"Merge retired a covered predecessor; the successor is at spikes/sandbox-git/test/iso-concurrency.test.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2aa822cdee8a36ad8af544accfd7303621a1ccdf","text":"Merge retired a covered predecessor; the successor is at spikes/sandbox-git/image.sh."}
