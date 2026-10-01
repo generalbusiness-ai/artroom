@@ -24,20 +24,37 @@ export function describeEntry(e: LogEntry): FeedEntry {
         case "land-reserved":
           return `A landing was reserved: publication ${ev.publication}.`;
         case "abort-attempt":
-          return "The room tried to abort a publication after a key was reported compromised.";
+          return `A key that is evidence for a reserved landing was revoked as compromised, so the room stopped pushing it forward and recorded an abort attempt${ev.attempt.tokenRevoked ? "; the publication token was revoked" : ""}.`;
         case "publication-unresolved":
-          return "A publication is unresolved. The room keeps pushing the same commit forward.";
+          return ev.readBack.main === "unexpected"
+            ? `A publication is unresolved: main shows another writer (${ev.readBack.observed.slice(0, 7)}). The room stopped pushing and keeps the slot held until an admin reconciles main.`
+            : "A publication is unresolved: main still reads as before, so the room pushes the same reserved commit forward again.";
         case "land-outcome":
-          return `A landing ended: ${ev.outcome.state}.`;
+          switch (ev.outcome.state) {
+            case "landed":
+              return `A landing completed: main is ${ev.outcome.commit.slice(0, 7)} (publication ${ev.outcome.publication}).`;
+            case "aborted":
+              return `Publication ${ev.outcome.publication} was aborted: it is established that it did not and cannot land.`;
+            case "retryable":
+              return `A landing stopped before reservation (${ev.outcome.reason}); it needs a new land.`;
+            case "failed":
+              return ev.outcome.reason.code === "refused"
+                ? `A landing was refused by ${ev.outcome.reason.refusal.rule}: ${ev.outcome.reason.refusal.reason} Fix: ${ev.outcome.reason.refusal.fix ?? "none recorded"}`
+                : ev.outcome.reason.code === "conflict"
+                  ? `A landing failed: it conflicts with main on ${ev.outcome.reason.paths.join(", ")}.`
+                  : "A landing failed: a required check failed on its integration.";
+          }
+          break;
         case "revert-lane":
-          return "The room opened a revert lane.";
+          return `The room opened a revert lane (${ev.reason.replace(/-/g, " ")}).`;
         case "notified":
           return `Told ${ev.to.join(", ") || "nobody"} about an act.`;
         case "checkpoint":
           return `The log was published through entry ${ev.through}.`;
       }
     })();
-    return { ...common, type: "system", kind: ev.type, by: null, text, flags: [], ...(lane ? { lane } : {}) };
+    const refusal = ev.type === "land-outcome" && ev.outcome.state === "failed" && ev.outcome.reason.code === "refused" ? { ...ev.outcome.reason.refusal, act: id } : undefined;
+    return { ...common, type: "system", kind: ev.type, by: null, text: text ?? ev.type, flags: [], ...(lane ? { lane } : {}), ...(refusal ? { refusal } : {}) };
   }
   const env = x.act.envelope;
   const by = x.receipt.authority.member;

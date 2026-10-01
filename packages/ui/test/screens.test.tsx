@@ -50,7 +50,7 @@ describe("Room", () => {
 
   test("the landing queue shows a held, unresolved slot and a ready landing waiting", () => {
     renderAt("#/room", { step: stepOf("Rate limit is ready") });
-    expect(document.querySelector("[data-op='unresolved']")!.textContent).toContain("keeps pushing the same commit forward");
+    expect(document.querySelector("[data-op='unresolved']")!.textContent).toContain("pushes the same reserved commit forward again");
     expect(document.querySelector("[data-op='ready']")!.textContent).toContain("Waiting for the publication slot");
     expect(screen.getByRole("region", { name: "Room status" }).textContent).toContain("Held: unresolved");
   });

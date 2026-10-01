@@ -264,20 +264,32 @@ function DryRun() {
 
 function DryRunView({ r }: { r: DryRunResult }) {
   const { snap } = useApp();
+  if (r.status === "not-compiled")
+    return (
+      <div class="notice warn" role="status" data-testid="dry-run-result" data-status="not-compiled">
+        <div class="notice-title">
+          <Icon name="alert" /> This draft cannot be written as a faithful rule
+        </div>
+        <p class="small">{r.reason}</p>
+        <p class="small">
+          <strong>Fix:</strong> {r.fix}
+        </p>
+        <p class="small muted">Nothing was replayed, so there is no prediction to show.</p>
+      </div>
+    );
   return (
-    <div class="stack" role="status" aria-live="polite" data-testid="dry-run-result">
+    <div class="stack" role="status" aria-live="polite" data-testid="dry-run-result" data-status="replayed">
       <p>
-        <strong>
-          {r.changes.length ? `${plural(r.changes.length, "outcome")} would change.` : "No outcome would change."}
-        </strong>{" "}
+        <strong>{r.changes.length ? `${plural(r.changes.length, "outcome")} would change.` : "No outcome would change."}</strong>{" "}
         <span class="muted">
-          Checked against {plural(r.examined.claims, "claim")}, {plural(r.examined.proposals, "proposal")} and {plural(r.examined.carried, "carry decision")}.
+          Replayed {plural(r.examined.claims, "claim")}, {plural(r.examined.proposals, "proposal")} and {plural(r.examined.carried, "carry decision")} through the policy runtime ({r.stamp}),
+          under the active policy and under the draft.
         </span>
       </p>
       {r.changes.length > 0 && (
         <ol class="stack-sm">
           {r.changes.map((c) => (
-            <li class="change" key={`${c.seq}${c.act}`}>
+            <li class="change" key={`${c.seq}${c.act}${c.after}`}>
               <p class="small muted">
                 Entry {c.seq}
                 {c.lane && <> · {laneGoal(snap, c.lane)}</>} · {c.what}
@@ -292,6 +304,22 @@ function DryRunView({ r }: { r: DryRunResult }) {
             </li>
           ))}
         </ol>
+      )}
+      {r.mismatches.length > 0 && (
+        <div class="notice warn" data-testid="dry-run-mismatches">
+          <div class="notice-title">
+            <Icon name="alert" /> Where this rule and path overlap disagree
+          </div>
+          <p class="small">The policy language has no glob function, so the compiled rule tests literal text. For these claims its answer differs from path overlap:</p>
+          <ul class="stack-sm small">
+            {r.mismatches.map((m) => (
+              <li key={m.act}>
+                Entry {m.seq}, {m.by}'s claim of <code>{m.scope.join(", ")}</code>:{" "}
+                {m.kind === "missed" ? "it may cover these paths, but the rule would not refuse it." : "the rule would refuse it, though it cannot cover these paths."}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <details>
         <summary class="disclosure">
@@ -374,7 +402,7 @@ export function PolicyScreen() {
               <ul class="stack-sm small muted">
                 <li>A verdict stays bound to the head it reviewed. Carrying is shown, never silent.</li>
                 <li>Changes to <code>.artroom/**</code> need an admin's approval.</li>
-                <li>A reserved landing completes forward; it is never released on a timer.</li>
+                <li>A reserved landing completes forward and is never released on a timer. Only a key revoked as compromised starts an abort attempt.</li>
                 <li>Workspace and publication tokens never appear in the log, the API or this page.</li>
               </ul>
             </section>

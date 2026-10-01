@@ -96,6 +96,16 @@ export interface PolicyView {
   readonly outcomes: readonly PolicyOutcome[];
 }
 
+/** What the transport could read completely. */
+export interface Coverage {
+  /** False when the lane list ended before the room's last lane. */
+  readonly lanes: boolean;
+  /** False when the viewer's attention queue ended before its last item. */
+  readonly attention: boolean;
+  /** The log entries loaded: from `from` (earlier ones are not shown); `complete` when every entry from there to the head was read. */
+  readonly feed: { readonly from: Seq; readonly complete: boolean };
+}
+
 export interface RoomSnapshot {
   readonly room: { readonly id: RoomId; readonly name: string };
   /** The room clock. In the mock it is the scenario clock, so screens are deterministic. */
@@ -111,11 +121,15 @@ export interface RoomSnapshot {
   readonly checks: readonly Check[];
   readonly notes: readonly Note[];
   readonly landOps: readonly LandOp[];
-  readonly slot: PublicationSlot;
+  /** The publication slot, or null when the transport cannot read it. Never guessed as free. */
+  readonly slot: PublicationSlot | null;
+  /** How much of the room the transport could read. Screens never claim "none" or "all" beyond it. */
+  readonly coverage: Coverage;
   /** The viewer's attention queue, open and resolved. */
   readonly attention: readonly AttentionItem[];
   /** The log, oldest first, as plain sentences. */
   readonly feed: readonly FeedEntry[];
+  /** The room's own log counters (LogPage.head and publishedThrough): the publication lag is head − publishedThrough. */
   readonly log: { readonly head: Seq; readonly publishedThrough: Seq };
   readonly policy: PolicyView;
   readonly source: { readonly kind: "mock" | "live"; readonly status: "live" | "connecting" | "offline"; readonly note?: string };
@@ -178,11 +192,33 @@ export interface DryRunChange {
   readonly after: string;
 }
 
-export interface DryRunResult {
-  readonly compiled: Rule | { readonly carry: Record<string, unknown> };
-  readonly examined: { readonly claims: number; readonly proposals: number; readonly carried: number };
-  readonly changes: readonly DryRunChange[];
+/** Where the compiled rule and the platform's path overlap (R-PATH-3) disagree about a claim. */
+export interface DryRunMismatch {
+  readonly seq: Seq;
+  readonly act: ActId;
+  readonly by: MemberId | null;
+  readonly scope: readonly Glob[];
+  /** `missed`: the scope may cover the draft's paths, but the rule does not refuse it. `extra`: the reverse. */
+  readonly kind: "missed" | "extra";
 }
+
+export type DryRunResult =
+  | {
+      /** Every outcome below came from the policy runtime itself, under the active policy and under the draft. */
+      readonly status: "replayed";
+      readonly compiled: Rule | { readonly carry: Record<string, unknown> };
+      /** The evaluator that produced the outcomes. */
+      readonly stamp: string;
+      readonly examined: { readonly claims: number; readonly proposals: number; readonly carried: number };
+      readonly changes: readonly DryRunChange[];
+      readonly mismatches: readonly DryRunMismatch[];
+    }
+  | {
+      /** The draft cannot be expressed faithfully as a rule; nothing was replayed. */
+      readonly status: "not-compiled";
+      readonly reason: string;
+      readonly fix: string;
+    };
 
 // ---------------------------------------------------------------- timeline
 

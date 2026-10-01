@@ -11,6 +11,8 @@
 import type {
   ActId,
   Check,
+  Cursor,
+  Page,
   HttpRoom,
   Lane,
   LandOp,
@@ -78,9 +80,9 @@ export class LiveRoom implements RoomAdapter {
   private async load(): Promise<RoomSnapshot> {
     const [roster, lanePage, attention, log] = await Promise.all([
       this.room.members(),
-      this.room.lanes({ limit: 500 }),
-      this.room.attention({ limit: 200 }),
-      this.room.log({ after: -1, limit: 500 }),
+      readAll((cursor) => this.room.lanes({ limit: 500, ...(cursor ? { cursor } : {}) })),
+      readAll((cursor) => this.room.attention({ limit: 200, ...(cursor ? { cursor } : {}) })),
+      this.readLog(),
     ]);
     const lanes: Lane[] = [...lanePage.items];
     const proposals: Proposal[] = [];
@@ -115,10 +117,13 @@ export class LiveRoom implements RoomAdapter {
         .map((d) => ({ seq: e.seq, at: e.at, act: entryId(e), actKind: e.entry.type === "system" ? "system" : e.entry.act.envelope.kind, by, decision: d, text: `${d.rule}: ${d.outcome.result}` }));
     });
 
+    // The contract has no read for the slot. A loaded landing that holds it
+    // proves it is held; nothing here can prove it is free.
     const held = landOps.find(holdsSlot);
-    const slot: PublicationSlot = held && holdsSlot(held)
-      ? { state: "held", op: held.id, publication: held.publication, reservedAt: held.reservedAt, ...(held.state === "unresolved" ? { unresolvedSince: held.since } : {}) }
-      : { state: "free", last: 0 };
+    const slot: PublicationSlot | null =
+      held && holdsSlot(held)
+        ? { state: "held", op: held.id, publication: held.publication, reservedAt: held.reservedAt, ...(held.state === "unresolved" ? { unresolvedSince: held.since } : {}) }
+        : null;
 
     return {
       room: { id: this.room.id, name: this.room.name },
@@ -131,12 +136,37 @@ export class LiveRoom implements RoomAdapter {
       ...records,
       landOps,
       slot,
+      coverage: { lanes: lanePage.complete, attention: attention.complete, feed: { from: log.from, complete: log.complete } },
       attention: attention.items,
       feed,
       log: { head: log.head, publishedThrough: log.publishedThrough },
       policy: { version: null, activatedAt: null, document: null, outcomes },
       source: { kind: "live", status: "live" },
     };
+  }
+
+  /**
+   * The newest log window: up to WINDOW entries before the head, following
+   * the cursor. The counters come from the room's last page, not from how many
+   * entries arrived.
+   */
+  private async readLog(): Promise<{ acts: LogEntry[]; head: number; publishedThrough: number; from: number; complete: boolean }> {
+    const probe = await this.room.log({ after: -1, limit: 1 });
+    const after = Math.max(-1, probe.head - WINDOW);
+    const acts: LogEntry[] = [];
+    let page = await this.room.log({ after, limit: 500 });
+    let complete = !page.more;
+    acts.push(...page.acts);
+    const seen = new Set<string>([page.cursor]);
+    for (let i = 1; i < MAX_PAGES && page.more; i++) {
+      const next = await this.room.log({ after, limit: 500, cursor: page.cursor });
+      if (seen.has(next.cursor) && next.more) break; // the cursor did not advance
+      seen.add(next.cursor);
+      page = next;
+      acts.push(...page.acts);
+      complete = !page.more;
+    }
+    return { acts, head: page.head, publishedThrough: page.publishedThrough, from: after + 1, complete };
   }
 
   snapshot(): RoomSnapshot | null {
@@ -199,6 +229,25 @@ export class LiveRoom implements RoomAdapter {
   setViewer(_member: MemberId) {
     // One identity: the credential's.
   }
+}
+
+const WINDOW = 500;
+const MAX_PAGES = 20;
+
+/** Follow a paginated read to its end, or stop and say it is incomplete (a cap, or a cursor that does not advance). */
+async function readAll<T>(read: (cursor?: Cursor) => Promise<Page<T>>): Promise<{ items: T[]; complete: boolean }> {
+  const items: T[] = [];
+  const seen = new Set<string>();
+  let cursor: Cursor | undefined;
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const page = await read(cursor);
+    items.push(...page.items);
+    if (!page.more) return { items, complete: true };
+    if (seen.has(page.cursor)) break;
+    seen.add(page.cursor);
+    cursor = page.cursor;
+  }
+  return { items, complete: false };
 }
 
 /** Rebuild review, check and note records from their log entries. */

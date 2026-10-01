@@ -1,11 +1,19 @@
 /**
  * The scenario room's `.artroom/policy.json`, as the contract's
- * `PolicyDocument`. The mock does not run JSONata: each expression has a
- * plain TypeScript twin below that gives the same answer on this scenario.
+ * `PolicyDocument`. The mock admits acts synchronously, so each expression
+ * has a TypeScript twin below; tests check each twin against the policy
+ * runtime's evaluator (test/policy-runtime.test.ts).
  */
 
 import type { Glob, PolicyDocument, Role } from "../contract.ts";
-import { matchesAny, overlap } from "../glob.ts";
+import { compileTargets, refuseClaimExpr, refusesClaimTwin } from "../refuse-claim.ts";
+
+const MIGRATIONS = (() => {
+  const c = compileTargets(["migrations/**"]);
+  if ("problem" in c) throw new Error(c.problem);
+  return c.targets;
+})();
+const AGENTS: readonly Role[] = ["agent"];
 
 export const POLICY: PolicyDocument = {
   format: "artroom-policy-v1",
@@ -26,7 +34,7 @@ export const POLICY: PolicyDocument = {
       kind: "refuse",
       description: "Database migrations are claimed by people, not agents.",
       on: ["claim"],
-      refuse: 'actor.role = "agent" and $count(act.body.scope[$contains($, "migrations/")]) > 0',
+      refuse: refuseClaimExpr(AGENTS, MIGRATIONS),
       reason: "Agents may not claim database migrations.",
       fix: "Leave migrations/** out of the claim, or ask @sam to claim the migration.",
     },
@@ -56,7 +64,7 @@ export const POLICY: PolicyDocument = {
       kind: "notify",
       description: "Tell @platform whenever authorization code changes.",
       on: ["propose"],
-      when: '$count(proposal.paths[$contains($, "src/lib/authz/")]) > 0',
+      when: '$count(proposal.paths[$substring($, 0, 14) = "src/lib/authz/"]) > 0',
       to: ["@platform"],
       why: "Authorization code changed, and rule authz-changes tells @platform.",
     },
@@ -65,27 +73,10 @@ export const POLICY: PolicyDocument = {
 
 /** The TypeScript twin of `agents-stay-out-of-migrations`. */
 export function refusesClaim(role: Role, scope: readonly Glob[]): boolean {
-  return role === "agent" && scope.some((g) => overlap(g, "migrations/**") !== null);
+  return refusesClaimTwin(AGENTS, MIGRATIONS, role, scope);
 }
 
 /** The TypeScript twin of `authz-changes`'s `when`. */
 export function notifiesAuthz(paths: readonly string[]): boolean {
-  return paths.some((p) => matchesAny(p, ["src/lib/authz/**"]));
+  return paths.some((p) => Array.from(p).slice(0, 14).join("") === "src/lib/authz/");
 }
-
-/** The platform's global inputs (docs/protocol.md R-CARRY-3), abridged to what the scenario can touch. */
-export const PLATFORM_GLOBAL_INPUTS: readonly Glob[] = [
-  ".artroom/**",
-  ".github/**",
-  "scripts/**",
-  "package.json",
-  "**/package.json",
-  "package-lock.json",
-  "tests/**",
-  "**/tests/**",
-  "**/*.test.*",
-  "**/*.spec.*",
-  "tsconfig*.json",
-  "wrangler.*",
-  "vite.config.*",
-];

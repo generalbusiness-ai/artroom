@@ -51,9 +51,15 @@ export const join = (items: readonly string[]) =>
   items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 
 /**
- * Entries recorded but not yet published to refs/artroom/log. A checkpoint
- * entry is never inside the commit it names (R-LOG-8), so it does not count.
+ * Entries recorded but not yet published to refs/artroom/log, from the
+ * room's own counters (R-LOG-8), never from how many entries were loaded.
  */
 export function unpublished(snap: RoomSnapshot): number {
-  return snap.feed.filter((e) => e.seq > snap.log.publishedThrough && e.kind !== "checkpoint").length;
+  return Math.max(0, snap.log.head - snap.log.publishedThrough);
+}
+
+/** True when the only unpublished entry is the checkpoint that records the last publication. */
+export function onlyCheckpointWaits(snap: RoomSnapshot): boolean {
+  const last = snap.feed.at(-1);
+  return unpublished(snap) === 1 && last !== undefined && last.seq === snap.log.head && last.kind === "checkpoint";
 }

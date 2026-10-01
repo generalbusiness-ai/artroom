@@ -105,7 +105,7 @@ describe("live adapter (stub over HttpRoom)", () => {
       await new Promise((r) => setTimeout(r, 10));
       expect(container.innerHTML).not.toContain(SECRET);
     }
-    expect(container.textContent).toContain("This room cannot show the diff yet.");
+    await screen.findByText("This room cannot show the diff yet.");
     expect(f.calls).not.toContain("workspaceToken");
   });
 });

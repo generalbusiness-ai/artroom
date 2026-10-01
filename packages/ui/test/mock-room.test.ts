@@ -44,7 +44,7 @@ describe("mock room", () => {
 
   test("an unresolved publication holds the slot; the next landing waits ready", () => {
     const s = new MockRoom({ step: stepOf("Rate limit is ready") }).snapshot();
-    expect(s.slot.state).toBe("held");
+    expect(s.slot!.state).toBe("held");
     expect(s.landOps.map((o) => o.state).sort()).toEqual(["ready", "unresolved"]);
     const sam = new MockRoom({ step: stepOf("Rate limit is ready"), viewer: "@sam" }).snapshot();
     expect(sam.attention.some((a) => a.open && a.why === "publication-unresolved")).toBe(true);

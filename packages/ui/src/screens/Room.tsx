@@ -9,17 +9,64 @@ import type { FeedEntry } from "../room/adapter.ts";
 import type { Lane, LandOp } from "../room/contract.ts";
 import { Actor, Badge, Glob, LandBadge, RefusalNotice, Sha, When, WhyLink } from "../ui/bits.tsx";
 import { useApp } from "../ui/context.ts";
-import { clock, laneGoal, latest, plural, relative, unpublished } from "../ui/format.ts";
+import { clock, laneGoal, latest, onlyCheckpointWaits, plural, relative, unpublished } from "../ui/format.ts";
+import { LandingDetail, landingFacts } from "../ui/landing.tsx";
 import { Icon } from "../ui/icons.tsx";
 import { href } from "../ui/router.ts";
 
 const landed = (l: Lane) => l.generations.some((g) => g.landed);
 
+function SlotCell() {
+  const { snap } = useApp();
+  const slot = snap.slot;
+  if (slot === null)
+    return (
+      <div class="status-cell" data-slot="unavailable">
+        <span class="label">Publication slot</span>
+        <span class="value">
+          <Badge tone="outline">Unavailable</Badge>
+        </span>
+        <span class="cell-note">This connection cannot read the slot, and no loaded landing holds it. It may be free or held.</span>
+      </div>
+    );
+  if (slot.state === "free")
+    return (
+      <div class="status-cell" data-slot="free">
+        <span class="label">Publication slot</span>
+        <span class="value">
+          <Badge tone="ok">Free</Badge>
+        </span>
+        <span class="cell-note">One publication at a time. The last was publication {slot.last}.</span>
+      </div>
+    );
+  const op = snap.landOps.find((o) => o.id === slot.op);
+  const f = op ? landingFacts(snap, op) : null;
+  const badge =
+    op?.state === "unresolved" ? (
+      op.abort ? (
+        <Badge tone="bad" icon="alert">Held: abort attempt</Badge>
+      ) : op.readBack.main === "unexpected" ? (
+        <Badge tone="bad" icon="alert">Held: another writer</Badge>
+      ) : (
+        <Badge tone="warn" icon="cloudOff">Held: unresolved</Badge>
+      )
+    ) : (
+      <Badge tone="accent" icon="upload">Held: publishing</Badge>
+    );
+  return (
+    <div class="status-cell" data-slot="held">
+      <span class="label">Publication slot</span>
+      <span class="value">{badge}</span>
+      <span class="cell-note">
+        Publication {slot.publication}, “{laneGoal(snap, op?.lane)}”, reserved at entry {slot.reservedAt}. {f?.summary}
+      </span>
+    </div>
+  );
+}
+
 function StatusLine() {
   const { snap } = useApp();
   const lag = unpublished(snap);
-  const slot = snap.slot;
-  const slotOp = slot.state === "held" ? snap.landOps.find((o) => o.id === slot.op) : undefined;
   const lastLanded = snap.landOps.filter((o) => o.state === "landed").at(-1);
   return (
     <section class="card status-line" aria-label="Room status">
@@ -29,30 +76,14 @@ function StatusLine() {
           <Sha sha={snap.main.head} label="main" />
         </span>
         <span class="cell-note">
-          {lastLanded ? <>Last moved by “{laneGoal(snap, lastLanded.lane)}”{snap.main.movedAt && <>, {relative(snap.main.movedAt, snap.now)}</>}</> : "Nothing has landed in this session."}
+          {snap.main.head === null
+            ? "This connection cannot read main."
+            : lastLanded
+              ? <>Last moved by “{laneGoal(snap, lastLanded.lane)}”{snap.main.movedAt && <>, {relative(snap.main.movedAt, snap.now)}</>}</>
+              : "Nothing has landed in this session."}
         </span>
       </div>
-      <div class="status-cell">
-        <span class="label">Publication slot</span>
-        {slot.state === "free" ? (
-          <>
-            <span class="value">
-              <Badge tone="ok">Free</Badge>
-            </span>
-            <span class="cell-note">One publication at a time. The last was publication {slot.last}.</span>
-          </>
-        ) : (
-          <>
-            <span class="value">
-              {slot.unresolvedSince ? <Badge tone="warn" icon="cloudOff">Held: unresolved</Badge> : <Badge tone="accent" icon="upload">Held: publishing</Badge>}
-            </span>
-            <span class="cell-note">
-              Publication {slot.publication}, “{laneGoal(snap, slotOp?.lane)}”, reserved at entry {slot.reservedAt}.
-              {slot.unresolvedSince && <> Unresolved since {clock(slot.unresolvedSince)}.</>}
-            </span>
-          </>
-        )}
-      </div>
+      <SlotCell />
       <div class="status-cell">
         <span class="label">Log</span>
         <span class="value">
@@ -60,6 +91,7 @@ function StatusLine() {
         </span>
         <span class="cell-note">
           Published to <code>refs/artroom/log</code> through entry {snap.log.publishedThrough} of {snap.log.head}. Anyone can verify that part offline.
+          {onlyCheckpointWaits(snap) && " The one waiting is the checkpoint that records this publication; it goes out with the next batch."}
         </span>
       </div>
     </section>
@@ -140,45 +172,19 @@ function LaneCard({ lane }: { lane: Lane }) {
 
 function OpCard({ op }: { op: LandOp }) {
   const { snap } = useApp();
-  const goal = laneGoal(snap, op.lane);
-  let detail = "";
-  switch (op.state) {
-    case "accepted":
-      detail = "Waiting to prepare.";
-      break;
-    case "preparing":
-      detail = op.attempts > 1 ? "Main moved, so it is building and checking a new integration commit." : "Building the integration commit and running required checks.";
-      break;
-    case "ready": {
-      detail = snap.slot.state === "held" ? "Checked and ready. Waiting for the publication slot." : "Checked and ready. Next to reserve the slot.";
-      break;
-    }
-    case "publishing":
-      detail = `Reserved at entry ${op.reservedAt}: this landing is decided. Pushing ${op.integration.slice(0, 7)} to main.`;
-      break;
-    case "unresolved":
-      detail = `Artifacts did not answer, and main still reads as before. The room keeps pushing the same commit forward. Later landings wait.`;
-      break;
-    case "landed":
-      detail = `Main is ${op.integration.slice(0, 7)}.`;
-      break;
-    default:
-      detail = "";
-  }
   return (
     <div class={`op ${op.state}`} data-op={op.state}>
       <div class="row" style={{ justifyContent: "space-between" }}>
         <a class="op-title" href={href.proposal(op.lane, op.generation)}>
-          {goal}
+          {laneGoal(snap, op.lane)}
         </a>
         <LandBadge op={op} />
       </div>
       <p class="small muted">
         Generation {op.generation}
         {"publication" in op && <> · publication {op.publication}</>}
-        {op.state === "unresolved" && <> · since {clock(op.since)}</>}
       </p>
-      {detail && <p class="small">{detail}</p>}
+      <LandingDetail op={op} />
     </div>
   );
 }
@@ -233,7 +239,8 @@ function FeedItem({ e, fresh }: { e: FeedEntry; fresh: boolean }) {
         {e.refusal && <RefusalNotice refusal={e.refusal} />}
         {afterOp && (
           <p class="small tone-warn">
-            Recorded after the landing of “{laneGoal(snap, afterOp.lane)}” was reserved{"publication" in afterOp ? ` (publication ${afterOp.publication})` : ""}. It cannot stop that landing.
+            Recorded after the landing of “{laneGoal(snap, afterOp.lane)}” was reserved{"publication" in afterOp ? ` (publication ${afterOp.publication})` : ""}. Acts after a reservation cannot cancel it; only a
+            compromised-key revocation starts an abort attempt.
           </p>
         )}
         <p class="feed-meta">
@@ -265,6 +272,12 @@ function Activity() {
         <p>Newest first</p>
       </div>
       <div class="card pad">
+        {(snap.coverage.feed.from > 0 || !snap.coverage.feed.complete) && (
+          <p class="small muted" data-partial="feed">
+            {snap.coverage.feed.from > 0 && <>Entries before {snap.coverage.feed.from} are not loaded. </>}
+            {!snap.coverage.feed.complete && <>Not every entry up to {snap.log.head} was loaded.</>}
+          </p>
+        )}
         <ol class="feed">
           {unpublished.map((e) => (
             <FeedItem key={e.id} e={e} fresh={e.seq > prev} />
@@ -309,6 +322,11 @@ export function RoomScreen() {
               <h2 id="lanes-h">Lanes</h2>
               <p>{plural(active.length, "open lane")}</p>
             </div>
+            {!snap.coverage.lanes && (
+              <p class="notice warn small" data-partial="lanes">
+                Showing the first {plural(snap.lanes.length, "lane")}. The room has more than this connection loaded.
+              </p>
+            )}
             {active.length ? (
               <ol class="lanes">
                 {active.map((l) => (
@@ -316,7 +334,9 @@ export function RoomScreen() {
                 ))}
               </ol>
             ) : (
-              <div class="card pad muted">No lanes yet. An agent or a person opens one with a claim.</div>
+              <div class="card pad muted">
+                {snap.coverage.lanes ? "No lanes yet. An agent or a person opens one with a claim." : "No open lanes were loaded."}
+              </div>
             )}
           </section>
           {snap.landOps.length > 0 && <Landing />}

@@ -8,6 +8,7 @@ import type { ActId, MemberId, Note, NoteAnchor, ProposalAt, ProposalRef, Result
 import type { DraftRule, DryRunResult, FileDiff, ReviewDraft, RoomAdapter, RoomSnapshot, Timeline, Why } from "../adapter.ts";
 import { dryRun } from "../dryrun.ts";
 import { DIFFS, parseDiff } from "./diffs.ts";
+import { POLICY } from "./policy.ts";
 import { STEPS } from "./scenario.ts";
 import { PEOPLE, World } from "./world.ts";
 
@@ -155,7 +156,7 @@ export class MockRoom implements RoomAdapter {
     if ("paths" in draft && draft.paths.length === 0) {
       return { refused: true, rule: "glob-invalid", reason: "The draft names no paths.", fix: "Add at least one path pattern, such as src/lib/**." };
     }
-    return dryRun(this.world.history, draft);
+    return dryRun(this.world.history, draft, POLICY, this.world.policyVersion);
   }
 
   setViewer(member: MemberId) {

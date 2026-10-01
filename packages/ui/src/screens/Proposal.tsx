@@ -14,6 +14,7 @@ import { Actor, Badge, Glob, LandBadge, RefusalNotice, Sha, When, WhyLink } from
 import { useApp } from "../ui/context.ts";
 import { clock, join, plural, relative, ruleTitle, short } from "../ui/format.ts";
 import { Icon } from "../ui/icons.tsx";
+import { LandingDetail } from "../ui/landing.tsx";
 import { href } from "../ui/router.ts";
 
 const splitGlobs = (s: string) =>
@@ -262,14 +263,35 @@ function NewNote({ p, path, line, onDone }: { p: Proposal; path: string; line: n
 
 // ------------------------------------------------------------- diff
 
+type Relation = "here" | "unchanged" | "changed" | "unknown" | "later";
+
+/**
+ * How a note's head relates to the head on screen, for one path. "unchanged"
+ * needs the interdiff of every generation in between, each without the path.
+ */
+function relationOf(n: Note, p: Proposal, path: string, changedIn: (g: number) => readonly string[] | null, snap: RoomSnapshot): Relation {
+  const a = n.anchor as Extract<Note["anchor"], { path: string }>;
+  if (a.head === p.head) return "here";
+  if (a.generation >= p.generation) return a.generation === p.generation ? "unknown" : "later";
+  for (let g = a.generation + 1; g <= p.generation; g++) {
+    if (!snap.proposals.some((x) => x.lane === p.lane && x.generation === g)) return "unknown";
+    const changed = changedIn(g);
+    if (changed === null) return "unknown";
+    if (changed.includes(path)) return "changed";
+  }
+  return "unchanged";
+}
+
 function FileView({ file, p, lane, since, prevGen }: { file: FileDiff; p: Proposal; lane: Lane; since: readonly string[] | null; prevGen: number }) {
-  const { snap } = useApp();
+  const { snap, adapter } = useApp();
   const [composing, setComposing] = useState<number | null>(null);
   const changedSince = since?.includes(file.path) ?? false;
-  // Notes on this path: from this generation, or from an earlier one when the file has not changed since.
-  const stillValid = (g: number) => g === p.generation || !changedSince;
   const roots = snap.notes.filter((n) => "path" in n.anchor && n.anchor.lane === p.lane && n.anchor.path === file.path && !n.replyTo);
-  const visible = roots.filter((n) => "path" in n.anchor && n.anchor.generation <= p.generation && stillValid(n.anchor.generation));
+  // A thread stays on the head it was written on. It is shown on this head's
+  // lines only when continuity is proven for every generation in between.
+  const placed = roots.map((n) => ({ note: n, relation: relationOf(n, p, file.path, (g) => adapter.changedSince({ lane: p.lane, generation: g }), snap) }));
+  const visible = placed.filter((x) => x.relation === "here" || x.relation === "unchanged").map((x) => x.note);
+  const elsewhere = placed.filter((x) => x.relation !== "here" && x.relation !== "unchanged");
   const repliesOf = (root: Note) => snap.notes.filter((n) => n.replyTo === root.id);
   const firstChanged = file.hunks.flatMap((h) => h.lines).find((l) => l.kind === "add")?.newLine ?? 1;
   return (
@@ -284,6 +306,28 @@ function FileView({ file, p, lane, since, prevGen }: { file: FileDiff; p: Propos
         </button>
       </div>
       {composing !== null && <NewNote p={p} path={file.path} line={composing} onDone={() => setComposing(null)} />}
+      {elsewhere.length > 0 && (
+        <section class="stack-sm" style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)" }} aria-label={`Notes on other heads of ${file.path}`}>
+          <h3 class="small">Notes written on other heads</h3>
+          {elsewhere.map(({ note, relation }) => {
+            const a = note.anchor as Extract<Note["anchor"], { path: string }>;
+            const why =
+              relation === "changed"
+                ? "This file changed since that head, so its line numbers may not match these."
+                : relation === "later"
+                  ? "That head is newer than this one."
+                  : "Whether this file changed since that head is not known here, so the note is not placed on these lines.";
+            return (
+              <div key={note.id} data-relation={relation} class="stack-sm">
+                <p class="small muted">
+                  On generation {a.generation} (<Sha sha={a.head} />), line {a.line}. {why} <a href={href.proposal(p.lane, a.generation)}>Open generation {a.generation}</a>
+                </p>
+                <Thread root={note} replies={repliesOf(note)} lane={lane} label={`Generation ${a.generation}, line ${a.line}`} />
+              </div>
+            );
+          })}
+        </section>
+      )}
       <table class="diff">
         <colgroup>
           <col style={{ width: "46px" }} />
@@ -326,8 +370,8 @@ function FileView({ file, p, lane, since, prevGen }: { file: FileDiff; p: Propos
                             root={root}
                             replies={repliesOf(root)}
                             lane={lane}
-                            {...("path" in root.anchor && root.anchor.generation !== p.generation
-                              ? { label: `Written on generation ${root.anchor.generation} (${short(root.anchor.head)}); this line has not changed since` }
+                            {...("path" in root.anchor && root.anchor.head !== p.head
+                              ? { label: `Written on generation ${root.anchor.generation} (${short(root.anchor.head)}). The file is unchanged from that head to this one.` }
                               : {})}
                           />
                         </td>
@@ -604,6 +648,12 @@ export function ProposalScreen({ laneId, generation, focus }: { laneId: ActId; g
                 ),
               )}
             </div>
+            {op && (
+              <div class="notice small" data-landing={op.state}>
+                <div class="notice-title">Landing</div>
+                <LandingDetail op={op} />
+              </div>
+            )}
             {p.preview.state === "conflict" && (
               <p class="notice bad small">
                 This head cannot land. The holder recuts it on main as a new generation. The room stops asking for reviews of a head it knows conflicts.

@@ -66,7 +66,7 @@ test("the scenario plays end to end and each screen shows its idea", async ({ pa
   // Parallel landing, a held slot, an unresolved publication.
   await page.getByRole("navigation", { name: "Screens" }).getByRole("link", { name: "Room" }).click();
   await stepTo(page, /Rate limit is ready/);
-  await expect(page.locator("[data-op='unresolved']")).toContainText("keeps pushing the same commit forward");
+  await expect(page.locator("[data-op='unresolved']")).toContainText("pushes the same reserved commit forward again");
   await expect(page.locator("[data-op='ready']")).toContainText("Waiting for the publication slot");
 
   // Lease expiry, then the forward push lands and main moves.
@@ -81,7 +81,7 @@ test("the scenario plays end to end and each screen shows its idea", async ({ pa
   await stepTo(page, /takes over the session lane/);
   await expect(page.locator("[data-lane='Move session checks into authz']")).toContainText("@cedar");
   await stepTo(page, /The log is published again/);
-  await expect(page.getByRole("region", { name: "Room status" })).toContainText("All published");
+  await expect(page.getByRole("region", { name: "Room status" })).toContainText("The one waiting is the checkpoint that records this publication");
 
   expect(errors).toEqual([]);
 });

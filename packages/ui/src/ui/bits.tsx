@@ -119,9 +119,15 @@ export function LandBadge({ op }: { op: LandOp }) {
     case "publishing":
       return <Badge tone="accent" icon="upload">Publishing</Badge>;
     case "unresolved":
-      return <Badge tone="warn" icon="cloudOff">Unresolved</Badge>;
+      return op.abort ? (
+        <Badge tone="bad" icon="alert">Abort attempt</Badge>
+      ) : op.readBack.main === "unexpected" ? (
+        <Badge tone="bad" icon="alert">Another writer on main</Badge>
+      ) : (
+        <Badge tone="warn" icon="cloudOff">Unresolved</Badge>
+      );
     case "landed":
-      return <Badge tone="ok" icon="check">Landed</Badge>;
+      return op.abort ? <Badge tone="warn" icon="alert">Landed despite abort</Badge> : <Badge tone="ok" icon="check">Landed</Badge>;
     case "aborted":
       return <Badge tone="bad">Aborted</Badge>;
     case "retryable":

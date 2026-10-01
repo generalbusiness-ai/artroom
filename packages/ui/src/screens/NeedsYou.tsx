@@ -7,6 +7,7 @@ import { Actor, Empty } from "../ui/bits.tsx";
 import { useApp } from "../ui/context.ts";
 import { clock, join, laneGoal, plural, proposalOf, relative } from "../ui/format.ts";
 import { Icon, type IconName } from "../ui/icons.tsx";
+import { landingFacts } from "../ui/landing.tsx";
 import { href } from "../ui/router.ts";
 
 interface Explained {
@@ -85,6 +86,7 @@ export function explainItem(snap: RoomSnapshot, item: AttentionItem): Explained 
       };
     }
     case "publication-unresolved": {
+      const op = snap.landOps.find((o) => o.id === item.op);
       const waiting = snap.landOps.filter((o) => o.state === "ready" || o.state === "preparing");
       return {
         icon: "cloudOff",
@@ -92,7 +94,7 @@ export function explainItem(snap: RoomSnapshot, item: AttentionItem): Explained 
         why: <>You are an admin. Unresolved publications go to admins.</>,
         detail: (
           <>
-            The room never gives up a reserved publication: it pushes the same commit again until main reads back as that commit.
+            {op ? landingFacts(snap, op).summary : "The landing's current state was not loaded."}
             {waiting.length ? <> Waiting behind it: {join(waiting.map((o) => `“${laneGoal(snap, o.lane)}”`))}.</> : null}
           </>
         ),
@@ -154,7 +156,11 @@ export function NeedsYou() {
       <header class="page-head">
         <h1>Needs you</h1>
         <p>
-          {open.length ? (
+          {!snap.coverage.attention ? (
+            <>
+              Showing {plural(open.length, "open item")} for <Actor handle={snap.viewer} plain />. The room has more than this connection loaded, so this list is not complete.
+            </>
+          ) : open.length ? (
             <>
               {plural(open.length, "thing")} {open.length === 1 ? "is" : "are"} waiting for <Actor handle={snap.viewer} plain />. Each one says why it is yours and what to do.
             </>
@@ -169,10 +175,12 @@ export function NeedsYou() {
             <Item key={a.id} item={a} />
           ))}
         </ol>
-      ) : (
+      ) : snap.coverage.attention ? (
         <div class="card">
           <Empty title="Nothing needs you right now">When something does, it will say why it is yours.</Empty>
         </div>
+      ) : (
+        <div class="card pad muted">No open items were loaded. The queue was not read completely, so there may be some.</div>
       )}
       {done.length > 0 && (
         <details class="section">

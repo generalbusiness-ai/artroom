@@ -12,6 +12,13 @@ The web interface for Artroom: four screens over one data adapter.
 It is built with Preact and Vite, with hand-written CSS. It has no component
 library. It is served as Workers static assets.
 
+**Baseline.** The UI builds against the contract on `main` at `ca61351`: the
+approved lane 0 contract (`940e2dca`) with the policy-runtime amendment
+(path/owner pairs, replay contexts, the per-act budget in `ProfileStamp`,
+check carry facts). It also uses the policy runtime
+(`@generalbusiness/artroom-policy`) for glob matching, carry decisions and
+the policy dry run.
+
 ## Run it
 
 From the repository root:
@@ -39,11 +46,16 @@ the timeline open, <kbd>,</kbd> and <kbd>.</kbd> step back and forward.
 
 ```sh
 cd packages/ui
-npm run typecheck
+npm run typecheck                       # see the note below
 npm test                                # vitest: component and adapter tests (happy-dom)
 npx playwright install chromium         # once
 npm run e2e                             # Playwright, headless: builds, serves, walks the scenario
 ```
+
+`npm run typecheck` first generates declarations for the policy runtime into
+`.types/` (git-ignored) and checks the UI against them. The runtime's sources
+assume a non-DOM library, and the UI needs the DOM, so the UI checks against
+declarations generated from those sources rather than a hand-written copy.
 
 `npm run e2e` also rewrites the screenshots in `screenshots/`. The request
 asked for `ui/screenshots`; they are in `packages/ui/screenshots`:
@@ -70,11 +82,14 @@ npx wrangler deploy
 
 ```
 src/room/contract.ts     the only import of @generalbusiness/artroom-contract
-src/room/adapter.ts      RoomAdapter and the view model (RoomSnapshot)
+src/room/adapter.ts      RoomAdapter and the view model (RoomSnapshot, Coverage)
+src/room/glob.ts         path matching and overlap, from the policy runtime
+src/room/refuse-claim.ts the refuse-claim draft compiled to a profile expression, and its TypeScript twin
 src/room/mock/           MockRoom: a small deterministic room model and the scripted scenario
 src/room/live/           LiveRoom: a stub over the contract's HttpRoom and its WebSocket watch
-src/room/dryrun.ts       the policy dry run
+src/room/dryrun.ts       the policy dry run, through the policy runtime
 src/screens/             the four screens
+src/ui/landing.tsx       what each landing state means, from its recorded facts
 src/ui/                  shell pieces: icons, badges, router, the "why" dialog, the demo bar
 ```
 
@@ -126,19 +141,71 @@ supplies them; the live adapter reports them as unavailable.
    envelopes, which loses `Review.fulfils`.
 3. **No read of landing operations or the publication slot.** `PublicationSlot`
    is a type, but no method returns it. Only in-flight operations are
-   reachable, through `Lane.landing`; finished ones are not listed.
+   reachable, through `Lane.landing`; finished ones are not listed. The live
+   adapter shows the slot as held only when a loaded landing holds it, and
+   otherwise as unavailable, never as free.
 4. **No read of main**: its head and when it last moved.
 5. **No read of the active policy document, and no dry-run method.** Plan
-   section 12 asks for a dry run against history.
+   section 12 asks for a dry run against history. The demo room runs it with
+   the policy runtime over the rule inputs it recorded; a live room would
+   need the retained replay contexts (R-LOG-7).
 6. **`NotCarried` does not name its obligation.** The UI infers it from the
    previous generation's evidence.
 7. **No way to dismiss a notify-only attention item** (`why: "policy"`).
 8. **`Update` carries only entry summaries**, so the live adapter reloads its
-   reads on every update.
+   reads on every update. It follows every cursor (up to 20 pages, and only
+   while the cursor advances) and reads the newest 500 log entries. Whatever
+   it could not read is marked in `RoomSnapshot.coverage`, and the screens say
+   so instead of claiming "nothing" or "all".
 9. **`connect()` is declared, not implemented**, so `LiveRoom` takes an
    `HttpRoom` from its caller, and `main.tsx` runs only the mock.
 
-The mock does not run JSONata. Each rule in its policy has a TypeScript twin
-that gives the same answer on this scenario. The dry run supports four kinds
-of draft: a required review, a refused claim, a default dependency and a
-global input.
+The demo room admits acts synchronously, so each JSONata rule in its policy
+has a TypeScript twin. Tests check every twin against the policy runtime's
+evaluator on every scenario act. The dry run never uses a twin: it runs the
+policy runtime itself. It supports four kinds of draft: a required review, a
+refused claim, a default dependency and a global input.
+
+## Review 82f2743b
+
+Checker reviewed head `5cc8c17b` and asked for six changes. Each is now
+covered by tests (`test/policy-runtime.test.ts`,
+`test/review-82f2743b.test.tsx`).
+
+1. **P1 — the policy preview and the exported rule disagreed.** The dry run
+   now replays the room's recorded rule inputs through the policy runtime
+   (`evaluateRefuse`, `evaluateRequire`, `evaluateCarry`) under the active
+   policy and under the draft. The preview is therefore the compiled rule's
+   own answer. A refuse-claim draft compiles to a profile expression that uses
+   only `$substring`, `$count` and comparisons, with literal text quoted as JSON
+   strings. It catches broad patterns such as `**` and `m*`. A pattern it
+   cannot express (anything but a literal path or `dir/**`) is reported as
+   "cannot be written as a faithful rule", and nothing is replayed. Where the
+   compiled rule and path overlap (R-PATH-3) still disagree about a claim, the
+   screen lists those claims. Tests compare the expression, its twin and the
+   dry run with the real evaluator for broad, intersecting, disjoint, quoted
+   and non-ASCII patterns.
+2. **P1 — publication recovery was described wrongly.** `src/ui/landing.tsx`
+   describes each landing from its recorded read-back and abort facts. The
+   expected main without an abort means the room pushes the same reserved commit
+   forward. Another writer on main means the room stopped pushing, and an admin
+   must reconcile main. An abort attempt means forward pushes stopped; the
+   screen shows the trigger, whether the token was revoked, the read-back, and
+   the possible outcomes (landed with a revert lane, or aborted). The
+   after-reservation note now names the compromise exception. The live
+   adapter's event sentences follow the same facts.
+3. **P2 — failed landings hid their reason.** A refused failure shows the
+   refusal's rule, reason and fix. A retryable outcome shows its reason and
+   recorded fix. A conflict names its paths. A failed check links to the check.
+4. **P2 — note threads were projected onto newer heads.** A thread is placed on
+   another head's lines only when the interdiff of every generation in between
+   is known and leaves the file unchanged. Otherwise it stays with its own head,
+   in "Notes written on other heads", which says whether the file changed or
+   whether that is not known.
+5. **P2 — a late explanation could replace the current one.** Each explain
+   request has a number, and only the latest one may update the dialog.
+   Closing, changing the act and unmounting all invalidate earlier requests. A
+   failed request shows an error with "Try again".
+6. **P2 — partial live reads looked complete.** See contract gap 8. The
+   publication lag comes from the log's own counters (`head` and
+   `publishedThrough`). The slot is "Unavailable" when it cannot be read.

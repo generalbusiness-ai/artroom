@@ -27,6 +27,10 @@ import type {
   OpId,
   Overlap,
   PathChange,
+  PolicyActor,
+  PolicyLane,
+  PolicyProposal,
+  PolicyRoom,
   PreviewOp,
   Principal,
   Proposal,
@@ -38,13 +42,15 @@ import type {
   Review,
   ReviewerSpec,
   Role,
+  RuleInput,
   Sha,
   Verdict,
 } from "../contract.ts";
 import type { FeedEntry, Person, PolicyOutcome, RoomSnapshot, Why } from "../adapter.ts";
+import { defaultDependsOn, ownersFor, reviewConditions } from "@generalbusiness/artroom-policy";
 import { matches, matchesAny, overlap } from "../glob.ts";
 import { actId, at, cursorAt, fakeKey, fakeSha, hex8 } from "./ids.ts";
-import { notifiesAuthz, PLATFORM_GLOBAL_INPUTS, POLICY, refusesClaim } from "./policy.ts";
+import { notifiesAuthz, POLICY, refusesClaim } from "./policy.ts";
 
 export const PEOPLE: readonly Person[] = [
   { handle: "@maya", name: "Maya Okafor", role: "maintainer", kind: "person", teams: ["@security"] },
@@ -120,22 +126,17 @@ interface AttnRec {
   item: AttentionItem;
 }
 
-/** The facts the policy dry run replays (src/room/dryrun.ts). */
+type InputOf<K extends RuleInput["kind"]> = Extract<RuleInput, { readonly kind: K }>;
+
+/**
+ * The rule inputs the room built for each claim, proposal and carry
+ * decision. The policy dry run (src/room/dryrun.ts) replays them through the
+ * policy runtime under the active policy and under the draft.
+ */
 export interface History {
-  claims: { seq: number; act: ActId; by: MemberId; role: Role; scope: Glob[]; lane: ActId | null; refused: boolean }[];
-  proposals: { seq: number; act: ActId; by: MemberId; lane: ActId; generation: Generation; paths: RepoPath[]; obligations: string[] }[];
-  carries: {
-    seq: number;
-    act: ActId;
-    by: MemberId;
-    lane: ActId;
-    from: Generation;
-    to: Generation;
-    scope: Glob[];
-    dependsOn: Glob[];
-    changedSince: RepoPath[];
-    carried: boolean;
-  }[];
+  claims: { seq: number; act: ActId; by: MemberId; lane: ActId | null; input: InputOf<"refuse"> }[];
+  proposals: { seq: number; act: ActId; by: MemberId; lane: ActId; generation: Generation; input: InputOf<"require"> }[];
+  carries: { seq: number; act: ActId; by: MemberId; lane: ActId; from: Generation; to: Generation; input: InputOf<"carry"> }[];
 }
 
 export interface ProposeSpec {
@@ -268,6 +269,32 @@ export class World {
     lane.expiresAt = this.t + LEASE_MINUTES;
   }
 
+  // Rule inputs, as the room builds them (contract RuleInput, R-EVAL-3).
+
+  private policyActor(m: MemberId): PolicyActor {
+    return { member: m, role: roleOf(m), teams: [...person(m).teams], delegated: false };
+  }
+
+  private policyLane(l: LaneRec | null): PolicyLane {
+    return l
+      ? { id: l.id, claimed: true, holder: l.holder, scope: [...l.scope], generation: l.generation, purpose: "ordinary" }
+      : { id: null, claimed: false, holder: null, scope: [], generation: 0, purpose: "ordinary" };
+  }
+
+  private policyProposal(generation: Generation, head: Sha, base: Sha, changed: PathChange[]): PolicyProposal {
+    const paths = pathsOf(changed);
+    return { generation, head, base, changed, paths, owners: ownersFor(POLICY, paths) };
+  }
+
+  private policyRoom(): PolicyRoom {
+    return { admins: PEOPLE.filter((p) => p.role === "admin").length, members: PEOPLE.length };
+  }
+
+  private claimInput(by: MemberId, lane: LaneRec | null, body: { goal?: string; scope: Glob[]; plan?: string; expectedGeneration?: number }): InputOf<"refuse"> {
+    const json = { scope: [...body.scope], ...(body.goal ? { goal: body.goal } : {}), ...(body.plan ? { plan: body.plan } : {}), ...(body.expectedGeneration !== undefined ? { expectedGeneration: body.expectedGeneration } : {}) };
+    return { kind: "refuse", act: { kind: "claim", target: lane ? { lane: lane.id } : null, body: json }, actor: this.policyActor(by), lane: this.policyLane(lane), proposal: null, room: this.policyRoom() };
+  }
+
   tagOf(lane: ActId): string | undefined {
     for (const [tag, l] of this.lanes) if (l.id === lane) return tag;
     return undefined;
@@ -316,7 +343,7 @@ export class World {
       const d = this.decision(rule.id, "refuse", { result: "refuse", reason: refusal.reason, fix: refusal.fix ?? "" });
       this.outcome(e.seq, e.id, "claim", by, d, `Refused ${by}'s claim on ${input.scope.join(", ")}.`);
       this.why(e.id, e.seq, by, `${by} tried to claim ${quote(input.goal)}`, "refused", [d], [{ rule: "R-POL-2", held: true, detail: "Refuse rules run before the act is recorded." }], input.because ?? []);
-      this.history.claims.push({ seq: e.seq, act: e.id, by, role: roleOf(by), scope: input.scope, lane: null, refused: true });
+      this.history.claims.push({ seq: e.seq, act: e.id, by, lane: null, input: this.claimInput(by, null, input) });
       return { ...refusal, act: e.id };
     }
     const overlapsWith = [...this.lanes.values()].filter((l) => this.isActive(l) && this.laneOverlaps(input.scope, l.scope).length > 0);
@@ -339,7 +366,7 @@ export class World {
     };
     this.lanes.set(tag, lane);
     this.feed[this.feed.length - 1] = { ...this.feed[this.feed.length - 1]!, lane: e.id };
-    this.history.claims.push({ seq: e.seq, act: e.id, by, role: roleOf(by), scope: input.scope, lane: e.id, refused: false });
+    this.history.claims.push({ seq: e.seq, act: e.id, by, lane: e.id, input: this.claimInput(by, null, input) });
     const d = this.decision(POLICY.rules[0]!.id, "refuse", { result: "pass" });
     this.why(
       e.id,
@@ -367,7 +394,7 @@ export class World {
     delete lane.unheldWhy;
     this.renew(lane);
     this.resolve((a) => a.item.lane === lane.id && (a.item.why === "lane-unheld" || a.item.why === "recut-needed"));
-    this.history.claims.push({ seq: e.seq, act: e.id, by, role: roleOf(by), scope: lane.scope, lane: lane.id, refused: false });
+    this.history.claims.push({ seq: e.seq, act: e.id, by, lane: lane.id, input: this.claimInput(by, { ...lane, holder: null }, { scope: lane.scope, expectedGeneration: lane.generation }) });
     const p = this.prop(tag);
     if (p?.preview.state === "conflict") {
       this.notify(by, { why: "recut-needed", lane: lane.id, op: p.preview.id, unheld: false, seq: e.seq, text: `Recut ${quote(lane.goal)} on main: it conflicts on ${p.preview.paths.join(", ")}.` });
@@ -410,6 +437,14 @@ export class World {
     const generation = lane.generation + 1;
     const prev = this.prop(tag, lane.generation);
     const head = fakeSha(spec.head);
+    const requireInput: InputOf<"require"> = {
+      kind: "require",
+      actor: this.policyActor(by),
+      lane: this.policyLane(lane),
+      proposal: this.policyProposal(generation, head, this.main, spec.changed),
+      room: this.policyRoom(),
+    };
+    const policyProposal = requireInput.proposal;
     const e = this.entry("act", "propose", by, `${by} proposed generation ${generation} of ${quote(lane.goal)}: ${spec.changed.length} files.`, { lane: lane.id });
     const decisions: Decision[] = [];
 
@@ -439,23 +474,12 @@ export class World {
       for (const old of prev.obligations) {
         const next = obligations.find((o) => o.id === old.id);
         for (const ev of old.evidence) {
-          const result = this.carry(ev, since);
+          const review = this.reviews.find((r) => r.id === ev.act);
+          const result = this.carry(ev, review, since, policyProposal);
           const d = this.decision(old.rule, "carry", { result: result.carried ? "carry" : "no-carry", evidence: ev.act });
           decisions.push(d);
-          const review = this.reviews.find((r) => r.id === ev.act);
-          if (review) {
-            this.history.carries.push({
-              seq: e.seq,
-              act: ev.act,
-              by: review.by.member!,
-              lane: lane.id,
-              from: review.generation,
-              to: generation,
-              scope: [...review.scope],
-              dependsOn: [...review.dependsOn],
-              changedSince: since,
-              carried: result.carried,
-            });
+          if (review && result.input) {
+            this.history.carries.push({ seq: e.seq, act: ev.act, by: review.by.member!, lane: lane.id, from: review.generation, to: generation, input: result.input });
           }
           const who = review?.by.member ?? this.checks.find((c) => c.id === ev.act)?.by.member ?? null;
           if (result.carried) {
@@ -465,13 +489,7 @@ export class World {
               act: ev.act,
               kind: ev.kind,
               from: source,
-              reason: {
-                code: "paths-unchanged",
-                changed: since,
-                tested: { scope: review ? [...review.scope] : [], dependsOn: review ? [...review.dependsOn] : [], globalInputs: [...PLATFORM_GLOBAL_INPUTS] },
-                policy: "same",
-                text: "reviewed paths and declared dependencies unchanged",
-              },
+              reason: { code: "paths-unchanged", changed: since, tested: result.tested, policy: "same", text: "reviewed paths and declared dependencies unchanged" },
               rules: [],
             });
             this.outcome(e.seq, ev.act, "propose", by, d, `${who}'s ${ev.kind} carried to generation ${generation}: reviewed paths and declared dependencies unchanged.`, lane.id);
@@ -518,7 +536,7 @@ export class World {
     lane.generation = generation;
     lane.generations.push({ generation, head, act: e.id });
     this.renew(lane);
-    this.history.proposals.push({ seq: e.seq, act: e.id, by, lane: lane.id, generation, paths, obligations: obligations.map((o) => o.rule) });
+    this.history.proposals.push({ seq: e.seq, act: e.id, by, lane: lane.id, generation, input: requireInput });
 
     // Earlier generations' requests are superseded.
     this.resolve((a) => a.item.lane === lane.id && (("proposal" in a.item && a.item.proposal.generation < generation) || a.item.why === "policy"));
@@ -566,28 +584,54 @@ export class World {
     return this.oblState(o);
   }
 
-  private carry(ev: Evidence, since: readonly RepoPath[]): { carried: true } | { carried: false; why: NotCarried } {
-    const review = this.reviews.find((r) => r.id === ev.act);
+  /**
+   * Whether earlier evidence carries. Reviews go through the policy runtime's
+   * own platform conditions (R-CARRY-1 to 3); this policy has no carry rules.
+   * Checks always rerun here: every new generation has a new integration.
+   */
+  private carry(
+    ev: Evidence,
+    review: Review | undefined,
+    since: RepoPath[],
+    proposal: PolicyProposal,
+  ):
+    | { carried: true; input: InputOf<"carry">; tested: { scope: Glob[]; dependsOn: Glob[]; globalInputs: Glob[] } }
+    | { carried: false; input: InputOf<"carry"> | null; why: NotCarried } {
     if (!review) {
-      return { carried: false, why: { act: ev.act, code: "integration-changed", text: "The integration changed, so the check runs again." } };
+      return { carried: false, input: null, why: { act: ev.act, code: "integration-changed", text: "The integration changed, so the check runs again." } };
     }
-    const inScope = since.filter((p) => matchesAny(p, review.scope));
-    if (inScope.length) {
-      return { carried: false, why: { act: ev.act, code: "scope-changed", paths: inScope, text: `${inScope.join(", ")} changed, inside the reviewed scope.` } };
+    const input: InputOf<"carry"> = {
+      kind: "carry",
+      evidence: {
+        act: review.id,
+        kind: "review",
+        verdict: review.verdict,
+        by: this.policyActor(review.by.member!),
+        from: { generation: review.generation, head: review.head },
+        scope: [...review.scope],
+        dependsOn: [...review.dependsOn],
+      },
+      changedSince: since,
+      proposal,
+      policy: { same: true },
+    };
+    const platform = reviewConditions(input, POLICY);
+    if (platform.carries) {
+      const t = platform.basis.code === "paths-unchanged" ? platform.basis.tested : { scope: [], dependsOn: [], globalInputs: [] };
+      return { carried: true, input, tested: { scope: [...t.scope], dependsOn: [...t.dependsOn], globalInputs: [...t.globalInputs] } };
     }
-    const dependsOn = [...review.dependsOn, ...Object.entries(POLICY.carry.dependsOn).filter(([area]) => review.scope.some((s) => overlap(s, area))).flatMap(([, d]) => d)];
-    const dep = since.filter((p) => matchesAny(p, dependsOn));
-    if (dep.length) {
-      return {
-        carried: false,
-        why: { act: ev.act, code: "dependency-changed", paths: dep, text: `${dep.join(", ")} changed, and ${review.by.member} declared ${dependsOn.join(", ")} as a dependency.` },
-      };
-    }
-    const globals = since.filter((p) => matchesAny(p, [...PLATFORM_GLOBAL_INPUTS, ...POLICY.carry.globalInputs]));
-    if (globals.length) {
-      return { carried: false, why: { act: ev.act, code: "global-input-changed", paths: globals, text: `${globals.join(", ")} changed, and is a global input.` } };
-    }
-    return { carried: true };
+    const n = platform.notCarried;
+    const paths = n.paths ?? [];
+    const declared = [...new Set([...review.dependsOn, ...defaultDependsOn(POLICY.carry, review.scope)])];
+    const text =
+      n.code === "dependency-changed"
+        ? `${paths.join(", ")} changed, and ${review.by.member} declared ${declared.join(", ")} as a dependency.`
+        : n.code === "scope-changed"
+          ? `${paths.join(", ")} changed, inside the reviewed scope.`
+          : n.code === "global-input-changed"
+            ? `${paths.join(", ")} changed, and is a global input.`
+            : n.text;
+    return { carried: false, input, why: { ...n, text } };
   }
 
   private platformRefusal(by: MemberId, kind: string, lane: LaneRec | null, r: { rule: string; reason: string; fix: string }): Refusal {
@@ -950,6 +994,7 @@ export class World {
       notes: [...this.notes],
       landOps: [...this.ops.values()],
       slot: this.slot,
+      coverage: { lanes: true, attention: true, feed: { from: 0, complete: true } },
       attention: this.attention.filter((a) => a.to === viewer).map((a) => a.item),
       feed: [...this.feed],
       log: { head, publishedThrough: this.publishedThrough },

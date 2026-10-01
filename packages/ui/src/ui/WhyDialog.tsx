@@ -28,29 +28,62 @@ function outcomeText(d: Decision): string {
   }
 }
 
+type Loaded =
+  | { readonly act: ActId; readonly status: "loading" }
+  | { readonly act: ActId; readonly status: "ready"; readonly why: Why | null }
+  | { readonly act: ActId; readonly status: "error"; readonly message: string };
+
 export function WhyDialog({ act, onClose }: { act: ActId | null; onClose: () => void }) {
   const { adapter } = useApp();
   const ref = useRef<HTMLDialogElement>(null);
-  const [why, setWhy] = useState<Why | null | "loading">("loading");
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  // Each request gets a number. A response counts only if its number is still the latest.
+  const latest = useRef(0);
+
+  const load = (a: ActId) => {
+    const ticket = ++latest.current;
+    setLoaded({ act: a, status: "loading" });
+    adapter.explain(a).then(
+      (why) => {
+        if (latest.current === ticket) setLoaded({ act: a, status: "ready", why });
+      },
+      (error: unknown) => {
+        if (latest.current !== ticket) return;
+        const message = typeof error === "object" && error && "message" in error ? String((error as { message: unknown }).message) : "no answer";
+        setLoaded({ act: a, status: "error", message });
+      },
+    );
+  };
 
   useEffect(() => {
     const d = ref.current;
+    if (act) load(act);
+    else {
+      latest.current++; // closing invalidates any request in flight
+      setLoaded(null);
+    }
     if (!d) return;
-    if (act) {
-      setWhy("loading");
-      void adapter.explain(act).then(setWhy);
-      if (!d.open) {
-        if (typeof d.showModal === "function") d.showModal();
-        else d.setAttribute("open", "");
-      }
-    } else if (d.open) {
+    if (act && !d.open) {
+      if (typeof d.showModal === "function") d.showModal();
+      else d.setAttribute("open", "");
+    } else if (!act && d.open) {
       if (typeof d.close === "function") d.close();
       else d.removeAttribute("open");
     }
   }, [act, adapter]);
 
+  useEffect(
+    () => () => {
+      latest.current++; // unmounting invalidates too
+    },
+    [],
+  );
+
+  const current = loaded && loaded.act === act ? loaded : null;
+  const why = current?.status === "ready" ? current.why : current?.status === "loading" || !current ? "loading" : null;
+
   return (
-    <dialog class="why" ref={ref} onClose={onClose} onCancel={onClose} aria-labelledby="why-title">
+    <dialog class="why" ref={ref} onClose={onClose} onCancel={onClose} aria-labelledby="why-title" data-act={act ?? ""}>
       <div class="why-head">
         <div class="stack-sm">
           <h2 id="why-title">{why && why !== "loading" ? why.title : "Why"}</h2>
@@ -72,7 +105,16 @@ export function WhyDialog({ act, onClose }: { act: ActId | null; onClose: () => 
         </button>
       </div>
       <div class="why-body">
-        {why === "loading" ? (
+        {current?.status === "error" ? (
+          <div class="notice warn" role="alert">
+            <p>The room did not explain this entry: {current.message}.</p>
+            <div>
+              <button class="btn small" type="button" onClick={() => act && load(act)}>
+                Try again
+              </button>
+            </div>
+          </div>
+        ) : why === "loading" ? (
           <p class="muted">Loading…</p>
         ) : why === null ? (
           <p class="muted">The room has no explanation for this entry.</p>

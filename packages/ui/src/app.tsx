@@ -138,8 +138,9 @@ export function App({ adapter, dev = false, theme: initialTheme }: { adapter: Ro
                 <Icon name={n.icon} />
                 {n.label}
                 {n.name === "needs" && (
-                  <span class={`count${open ? "" : " zero"}`} aria-label={`${open} open`}>
+                  <span class={`count${open ? "" : " zero"}`} aria-label={`${open}${snap.coverage.attention ? "" : " or more"} open`}>
                     {open}
+                    {snap.coverage.attention ? "" : "+"}
                   </span>
                 )}
               </a>
