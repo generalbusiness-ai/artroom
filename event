@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:08ca7df3d0f646cf63ae898625b6b1c94c7d83f4","text":"Merge retired a covered predecessor; the successor is at packages/ui/vite.config.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0f643d474434468dcdeffdc021d9e89f8aa9c0f7","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/room/mock/world.ts."}
