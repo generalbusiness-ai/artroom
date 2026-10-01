@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b1a4c648a7516767816117243a12bc97a99a8d2f","text":"Merge retired a covered predecessor; the successor is at packages/git/measure/live.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c1819a7543b9fc96b26b55dd708b6bd9d65f1f16","text":"Merge retired a covered predecessor; the successor is at packages/git/measure/token-inflight.mjs."}
