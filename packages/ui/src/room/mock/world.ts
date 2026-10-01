@@ -206,7 +206,7 @@ export class World {
       rule,
       kind,
       policy: this.policyVersion,
-      stamp: { profile: "artroom-jsonata-v1", jsonata: "2.2.2" },
+      stamp: { profile: "artroom-jsonata-v1", jsonata: "2.2.2", accounting: "artroom-act-budget-v1" },
       input: `sha256:${fakeSha(`${rule}:${this.seq}`)}${fakeSha(`${rule}:${this.seq}:2`).slice(0, 24)}`,
       outcome,
       usage: { steps: 40 + (this.seq % 17) * 3, inspectedBytes: 900 + (this.seq % 11) * 64 },

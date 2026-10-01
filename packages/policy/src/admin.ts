@@ -75,6 +75,8 @@ export type AdminApproval =
       readonly rule: "admin-required" | "self-review" | "evidence-invalid";
       /** True when an approval that counted before stops counting: the obligation reopens. */
       readonly reopens: boolean;
+      /** When it reopens: the contract's `Reopened.because` to record. */
+      readonly because?: "key-compromised" | "key-retired" | "sole-admin-ended";
       readonly text: string;
     };
 
@@ -102,9 +104,9 @@ export function judgeAdminApproval(facts: AdminApprovalFacts, stage: "admission"
     return { counts: false, rule: "admin-required", reopens: false, text: `${reviewer ?? "the signer"} was not an admin when the review was admitted` };
   const { signer, grantor } = facts.revoked;
   if (signer === "compromised" || grantor === "compromised")
-    return { counts: false, rule: "evidence-invalid", reopens: stage === "reservation", text: `a key behind ${reviewer}'s approval is revoked as compromised` };
+    return { counts: false, rule: "evidence-invalid", reopens: stage === "reservation", because: "key-compromised", text: `a key behind ${reviewer}'s approval is revoked as compromised` };
   if (facts.retiredEvidence === "reopens" && (signer === "retired" || grantor === "retired"))
-    return { counts: false, rule: "evidence-invalid", reopens: stage === "reservation", text: `a key behind ${reviewer}'s approval is retired, and this policy reopens such evidence` };
+    return { counts: false, rule: "evidence-invalid", reopens: stage === "reservation", because: "key-retired", text: `a key behind ${reviewer}'s approval is retired, and this policy reopens such evidence` };
   const self = facts.authors.includes(reviewer);
   if (!self) return { counts: true, flag: null, text: `${reviewer} was an admin and not an author when the review was admitted` };
   if (stage === "reservation" && !facts.flagged)
@@ -115,6 +117,7 @@ export function judgeAdminApproval(facts: AdminApprovalFacts, stage: "admission"
     counts: false,
     rule: "self-review",
     reopens: stage === "reservation",
+    ...(stage === "reservation" ? { because: "sole-admin-ended" as const } : {}),
     text: `${reviewer} is an author and the room has ${facts.activeAdmins} active admins, so another admin must approve`,
   };
 }

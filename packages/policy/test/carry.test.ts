@@ -8,7 +8,8 @@ import { describe, expect, test } from "vitest";
 import type { Digest } from "@generalbusiness/artroom-contract";
 import { carry, owners, policy, requireCheck, requireReview, retiredEvidence } from "../src/helpers.ts";
 import { evaluateCarry, evaluateRequire } from "../src/rules.ts";
-import { PLATFORM_GLOBAL_INPUTS, checkerInputs, filterSnapshot, type CheckCarryFacts } from "../src/carry.ts";
+import type { CheckCarryFacts } from "@generalbusiness/artroom-contract";
+import { PLATFORM_GLOBAL_INPUTS, checkerInputs, filterSnapshot } from "../src/carry.ts";
 import { snapshotDigest, type SnapshotEntry } from "../src/integrity.ts";
 import { explain } from "../src/explain.ts";
 import { active, carryInput, requireInput, sha } from "./support/fixtures.ts";
@@ -148,7 +149,7 @@ describe("plan 7: carrying a verdict forward", () => {
     expect(counts.carried).not.toBeNull();
     const reopens = policy(retiredEvidence("reopens"));
     const r = await evaluateCarry(active(reopens), carryInput(reopens, { ...login, changedSince: helper }), { revoked: "retired" });
-    expect(r.notCarried?.code).toBe("policy-rejected");
+    expect(r.notCarried?.code).toBe("key-retired");
   });
 
   test("explain() shows the carried basis and the conditions tested", async () => {

@@ -1,5 +1,5 @@
 /**
- * The replay context (review dd2a995b P1.1, P1.2). Everything besides the
+ * The replay context (`ReplayContext` in the contract, R-EVAL-8). Everything besides the
  * active policy and the profile that decides an evaluate call's outcome is
  * in one value:
  * - the rule input;
@@ -16,48 +16,15 @@
  * of the canonical context. `replay(policy, context)` reconstructs the call.
  */
 
-import type { Json, LanePurpose, MemberId, RevocationReason, Role } from "@generalbusiness/artroom-contract";
-import type { CheckCarryFacts } from "./carry.ts";
-import type { InputOf } from "./inputs.ts";
+import type { BudgetState, Json } from "@generalbusiness/artroom-contract";
 import { PolicyEvalError, PolicyRuntimeFailure } from "./errors.ts";
 import { canonicalize } from "./integrity.ts";
 import { deepFreeze } from "./values.ts";
 import { ACCOUNTING } from "./profile.ts";
 import type { ActMeter } from "./evaluator.ts";
 
-export interface Usage {
-  readonly steps: number;
-  readonly inspectedBytes: number;
-}
-
-/** The act budget as one call saw it. */
-export interface BudgetState {
-  readonly accounting: typeof ACCOUNTING;
-  readonly limits: Usage;
-  /** Spent by earlier calls for the same act before this call began. */
-  readonly start: Usage;
-}
-
-/** What the room supplies to turn notify targets into members and teams. */
-export interface NotifyDirectory {
-  /** Active members by role, to expand `role:<role>` principals. */
-  readonly roles: Readonly<Partial<Record<Role, readonly MemberId[]>>>;
-  /** The qualifying reviewers of the proposal, for the `reviewers` target. */
-  readonly reviewers: readonly MemberId[];
-}
-
-/** Carry facts as JSON: absent values are null. */
-export interface CarryFactsRecord {
-  readonly revoked: RevocationReason | null;
-  readonly check: CheckCarryFacts | null;
-}
-
-export type ReplayContext =
-  | { readonly kind: "refuse"; readonly input: InputOf<"refuse">; readonly budget: BudgetState; readonly purpose: LanePurpose; readonly recoveryKey: boolean }
-  | { readonly kind: "require"; readonly input: InputOf<"require">; readonly budget: BudgetState; readonly purpose: LanePurpose }
-  | { readonly kind: "carry"; readonly input: InputOf<"carry">; readonly budget: BudgetState; readonly purpose: LanePurpose; readonly facts: CarryFactsRecord }
-  | { readonly kind: "land"; readonly input: InputOf<"land">; readonly budget: BudgetState; readonly purpose: LanePurpose }
-  | { readonly kind: "notify"; readonly input: InputOf<"notify">; readonly budget: BudgetState; readonly directory: NotifyDirectory };
+export type { BudgetState, CarryFactsRecord, NotifyDirectory, ReplayContext, Usage } from "@generalbusiness/artroom-contract";
+import type { ReplayContext } from "@generalbusiness/artroom-contract";
 
 export function budgetState(meter: ActMeter): BudgetState {
   return {

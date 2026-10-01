@@ -22,6 +22,7 @@ import type {
   Sha,
 } from "./ids.ts";
 import type { Principal } from "./roster.ts";
+import type { CheckBinding } from "./landing.ts";
 
 /** Who may fulfil a review obligation. `owners` means the owners policy assigns to the changed paths. */
 export type ReviewerSpec = Principal | "owners";
@@ -54,8 +55,15 @@ export interface CheckObligation extends ObligationBase {
 export type Reopened =
   | { readonly because: "not-carried"; readonly detail: NotCarried }
   | { readonly because: "key-compromised"; readonly key: KeyId; readonly revocation: ActId }
+  /** The key was retired and the policy says `retiredEvidence: "reopens"` (R-REV-2). */
+  | { readonly because: "key-retired"; readonly key: KeyId; readonly revocation: ActId }
   | { readonly because: "policy-activated"; readonly policy: PolicyVersion }
-  | { readonly because: "integration-changed"; readonly integration: Sha };
+  | { readonly because: "integration-changed"; readonly integration: Sha }
+  /**
+   * A flagged sole-admin self-approval stopped counting at reservation
+   * because the room no longer has exactly one active admin (R-ADMIN-2).
+   */
+  | { readonly because: "sole-admin-ended"; readonly approval: ActId; readonly activeAdmins: number };
 
 export type ObligationStatus =
   | { readonly state: "open"; readonly evidence: readonly Evidence[]; readonly reopened?: Reopened }
@@ -125,11 +133,33 @@ export interface NotCarried {
     | "config-changed"
     | "runner-changed"
     | "volatile-inputs"
-    | "key-compromised";
+    | "key-compromised"
+    /** The signing or grantor key was retired, and the policy says `retiredEvidence: "reopens"` (R-REV-2). */
+    | "key-retired";
   /** The changed paths that caused it, when paths caused it. */
   readonly paths?: readonly RepoPath[];
   readonly rule?: RuleId;
   readonly text: string;
+}
+
+/**
+ * What the room knows when it asks whether a check carries: the earlier
+ * check's binding, the new integration, and the active checker
+ * configuration's `volatile` flag (R-CARRY-6 to 10).
+ */
+export interface CheckCarryFacts {
+  /** The earlier check's binding (landing.ts `CheckBinding`) and its input. */
+  readonly before: CheckBinding & { readonly input: CheckInput };
+  readonly now: {
+    readonly integration: Sha;
+    readonly tree: Sha;
+    /** The filtered snapshot the room built for the new integration; null for a whole-tree checker. */
+    readonly snapshot: Digest | null;
+    /** From the active checker configuration (R-CARRY-7). */
+    readonly config: Digest;
+    readonly runner: Digest;
+  };
+  readonly volatile: boolean;
 }
 
 /** The input a check ran on. The default is the whole tree (R-CARRY-6). */
