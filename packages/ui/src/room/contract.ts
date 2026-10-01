@@ -1,0 +1,68 @@
+/**
+ * The UI's only import site for the lane 0 contract
+ * (@generalbusiness/artroom-contract, commit 845c7fd7, under review).
+ *
+ * Everything else in the UI imports contract types from here, so a change in
+ * the contract is absorbed in this folder (src/room) and nowhere else.
+ */
+
+export type {
+  ActId,
+  ArtroomError,
+  AttentionItem,
+  Authority,
+  Carried,
+  Check,
+  Claim,
+  Cursor,
+  Decision,
+  Digest,
+  EntrySummary,
+  Evidence,
+  Flag,
+  Generation,
+  Glob,
+  HttpRoom,
+  Lane,
+  LandOp,
+  LogEntry,
+  LogPage,
+  Member,
+  MemberId,
+  Note,
+  NoteAnchor,
+  NotCarried,
+  Obligation,
+  OpId,
+  Overlap,
+  Page,
+  PathChange,
+  PolicyDocument,
+  PolicyVersion,
+  PreviewOp,
+  Principal,
+  Proposal,
+  ProposalAt,
+  ProposalRef,
+  PublicationSlot,
+  Reason,
+  Refusal,
+  RepoPath,
+  Result,
+  Review,
+  ReviewedHere,
+  ReviewerSpec,
+  Role,
+  RoomId,
+  Roster,
+  Rule,
+  RuleId,
+  Seq,
+  Sha,
+  Subscription,
+  Timestamp,
+  Update,
+  Verdict,
+} from "@generalbusiness/artroom-contract";
+
+export { isCarried, isHeld, isRefusal, holdsSlot, isTerminal } from "@generalbusiness/artroom-contract";
