@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5b7728f99140486db63881321dc29d37f44d567e","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-laneB-token-inflight.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5cb09dd6c4e3a4e659087e74a09660bfc8742698","text":"Merge retired a covered predecessor; the successor is at packages/git/test/landing.test.ts."}
