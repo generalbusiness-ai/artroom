@@ -16,25 +16,25 @@
  * in SQLite, with an explicit state:
  * - `in-flight`: a non-idempotent remote step was sent (creating a fork,
  *   which comes with its own 24-hour token; one attempt to mint a lease
- *   token) and no answer has been received. If the host stops, the step
- *   stays in flight: it may still apply.
- * - `answered`: the step's answer (success or error) was received, so the
- *   remote call has finished. An answer is the completion fence.
+ *   token) and its outcome is not known: no answer yet, or a failure that
+ *   does not prove nothing happened (a transport error, or Artifacts'
+ *   INTERNAL_ERROR). It may still apply, at any time.
+ * - `answered`: success, or an Artifacts error that says the request was
+ *   refused and changed nothing (`refusedUnchanged`). Only these close a
+ *   step: they are the completion fence.
  * - `owed`: an inventory (revoke every active token except the recorded
  *   lease token) or one known token, to revoke.
  * - `done`: settled, with the reason.
  *
  * An inventory run lists the fork's tokens and revokes every active one that
  * no ready or installing lease has recorded. When it succeeds, it settles
- * every `owed` inventory and every step answered before it started. An
- * `in-flight` step is never settled by a run: a snapshot taken before it
- * could finish proves nothing. It keeps a scheduled inventory every few
- * minutes, which revokes anything it creates, until its bound has passed:
- * the time it was sent, plus `applyBoundMs` (how long an unanswered request
- * is assumed able to stay outstanding; default one hour, an assumption, not
- * an Artifacts guarantee), plus the longest life of a token it could create
- * (the requested TTL, or 24 hours for a fork's creation token, whose TTL
- * the binding cannot shorten). After that, no token from it can be live.
+ * every `owed` inventory and every step answered before it started. A step
+ * still `in-flight` is never settled, by any snapshot or by elapsed time:
+ * it keeps an inventory on a capped backoff (every minute at first, then
+ * every 30 minutes), which revokes whatever it creates, for as long as the
+ * fork exists. A known token's debt also ends when that token has expired.
+ * Every retry is its own step, because an earlier failed attempt may still
+ * apply.
  *
  * A workspace becomes ready only after an inventory that started after its
  * token was recorded has succeeded, so every attempt that answered (even
@@ -55,7 +55,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { type Sql, type SqlRow, text } from "../sql.ts";
-import { type ArtifactsNamespace, type RepoHandle, artifactsCode, retriable, withRetry } from "../artifacts.ts";
+import { type ArtifactsNamespace, type RepoHandle, artifactsCode, refusedUnchanged, withRetry } from "../artifacts.ts";
 
 /** Artifacts' shortest token lifetime. */
 export const MIN_TOKEN_TTL_S = 60;
@@ -69,14 +69,10 @@ export interface WorkspacesOptions {
   readonly namespace: string;
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
-  /** How long a remote request that never answered is assumed able to stay outstanding. Default one hour. */
-  readonly applyBoundMs?: number;
 }
 
-/** A fork's creation token lives 24 hours; the binding cannot ask for less. */
-export const FORK_TOKEN_TTL_S = 86_400;
-/** How often an unresolved remote step's inventory runs: first after 1 minute, then backing off to 10 minutes. */
-export const RECHECK_MS = { first: 60_000, max: 600_000 } as const;
+/** How often an unresolved remote step's inventory runs: first after 1 minute, backing off to every 30 minutes. */
+export const RECHECK_MS = { first: 60_000, max: 1_800_000 } as const;
 
 const iso = (ms: number) => new Date(ms).toISOString();
 const TOKEN = /art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g;
@@ -133,7 +129,6 @@ export class Workspaces {
   private readonly namespace: string;
   private readonly now: () => number;
   private readonly sleep: ((ms: number) => Promise<void>) | undefined;
-  private readonly applyBoundMs: number;
   private readonly inFlight = new Map<LaneId, Promise<WorkspaceOp>>();
   private readonly locks = new Map<string, Promise<unknown>>();
 
@@ -144,7 +139,6 @@ export class Workspaces {
     this.namespace = opts.namespace;
     this.now = opts.now ?? Date.now;
     this.sleep = opts.sleep;
-    this.applyBoundMs = opts.applyBoundMs ?? 3_600_000;
     this.sql.all(
       "CREATE TABLE IF NOT EXISTS artroom_ws (lane TEXT PRIMARY KEY, lease INTEGER NOT NULL, state TEXT NOT NULL, fork TEXT NOT NULL, " +
         "remote TEXT, lease_expires_at INTEGER NOT NULL, token_id TEXT, token_expires_at INTEGER, error TEXT, updated_at INTEGER NOT NULL)",
@@ -154,7 +148,7 @@ export class Workspaces {
     // Duties: remote steps whose outcome matters, and cleanup owed (see the module comment).
     this.sql.all(
       "CREATE TABLE IF NOT EXISTS artroom_ws_duty (id INTEGER PRIMARY KEY AUTOINCREMENT, fork TEXT NOT NULL, kind TEXT NOT NULL, " +
-        "token_id TEXT, reason TEXT NOT NULL, state TEXT NOT NULL, started_at INTEGER NOT NULL, answered_at INTEGER, bound INTEGER, " +
+        "token_id TEXT, reason TEXT NOT NULL, state TEXT NOT NULL, started_at INTEGER NOT NULL, answered_at INTEGER, expires_at INTEGER, " +
         "attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, last_error TEXT, done_at INTEGER, done_reason TEXT)",
     );
   }
@@ -197,35 +191,44 @@ export class Workspaces {
     );
   }
 
-  private insertDuty(fork: string, kind: DutyKind, state: DutyState, reason: string, tokenId: string | null, bound: number | null): number {
+  private insertDuty(fork: string, kind: DutyKind, state: DutyState, reason: string, tokenId: string | null, expiresAt: number | null): number {
     this.sql.all(
-      "INSERT INTO artroom_ws_duty (fork, kind, token_id, reason, state, started_at, bound, next_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO artroom_ws_duty (fork, kind, token_id, reason, state, started_at, expires_at, next_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       fork,
       kind,
       tokenId,
       reason,
       state,
       this.now(),
-      bound,
+      expiresAt,
       this.now(),
     );
     return Number(this.sql.all("SELECT last_insert_rowid() AS id")[0]?.["id"]);
   }
 
-  /** Cleanup owed: an inventory of the fork, or one known token. */
-  private owe(fork: string, kind: "inventory" | "token", reason: string, tokenId: string | null = null): number {
-    return this.insertDuty(fork, kind, "owed", reason, tokenId, null);
+  /** Cleanup owed: an inventory of the fork, or one known token (with its expiry, when known). */
+  private owe(fork: string, kind: "inventory" | "token", reason: string, tokenId: string | null = null, expiresAt: number | null = null): number {
+    return this.insertDuty(fork, kind, "owed", reason, tokenId, expiresAt);
   }
 
   /**
    * A non-idempotent remote step is about to be sent. Written first, so that
    * if the host stops before the answer, the step is known to be unresolved.
    */
-  private beginStep(fork: string, kind: "fork-create" | "mint", tokenTtlS: number): number {
-    return this.insertDuty(fork, kind, "in-flight", kind, null, this.now() + this.applyBoundMs + tokenTtlS * 1000);
+  private beginStep(fork: string, kind: "fork-create" | "mint"): number {
+    return this.insertDuty(fork, kind, "in-flight", kind, null, null);
   }
 
-  /** The step's answer (success or error) arrived: the remote call has finished. */
+  /**
+   * A step failed. Only an Artifacts error that says the request was refused
+   * and changed nothing closes it; any other failure leaves it in flight.
+   */
+  private failedStep(id: number, error: unknown): void {
+    if (refusedUnchanged(error)) this.answered(id, error);
+    else this.sql.all("UPDATE artroom_ws_duty SET last_error = ? WHERE id = ?", redact(String(error)).slice(0, 300), id);
+  }
+
+  /** A definite answer arrived (success, or refused-unchanged): the remote call has finished. */
   private answered(id: number, error?: unknown): void {
     this.sql.all(
       "UPDATE artroom_ws_duty SET state = 'answered', answered_at = ?, next_at = ?, last_error = ? WHERE id = ? AND state = 'in-flight'",
@@ -244,7 +247,7 @@ export class Workspaces {
       tokenId: text(r, "token_id"),
       startedAt: Number(r["started_at"]),
       answeredAt: r["answered_at"] === null ? null : Number(r["answered_at"]),
-      bound: r["bound"] === null ? null : Number(r["bound"]),
+      expiresAt: r["expires_at"] === null ? null : Number(r["expires_at"]),
       attempts: Number(r["attempts"]),
     }));
   }
@@ -338,7 +341,7 @@ export class Workspaces {
       if (r && r.lease === lease && r.state === "ready" && tokenFresh && r.leaseExpiresAt === leaseExpiresAt) return this.view(lane)!;
       const fork = r?.fork ?? forkName(this.canonical, lane);
       // A token from a previous state of this row is owed revocation before anything else is minted.
-      if (r?.tokenId) this.owe(fork, "token", r.lease === lease ? "renewed" : "lease-ended", r.tokenId);
+      if (r?.tokenId) this.owe(fork, "token", r.lease === lease ? "renewed" : "lease-ended", r.tokenId, r.tokenExpiresAt);
       this.sql.all("DELETE FROM artroom_ws_secret WHERE lane = ?", lane);
       this.put({ lane, lease, state: "pending", fork, remote: r?.remote ?? null, leaseExpiresAt, tokenId: null, tokenExpiresAt: null, error: null, updatedAt: this.now() });
       return this.view(lane)!;
@@ -408,14 +411,14 @@ export class Workspaces {
       if (!before || before.lease !== lease || before.state !== "pending") return null;
       const ttl = Math.floor((before.leaseExpiresAt - this.now()) / 1000) - TOKEN_MARGIN_S;
       if (ttl < MIN_TOKEN_TTL_S) throw new Error("the lease ends too soon for a workspace token; renew it first");
-      const step = this.beginStep(forkName, "mint", ttl);
+      const step = this.beginStep(forkName, "mint");
       let token: Awaited<ReturnType<RepoHandle["createToken"]>>;
       try {
         token = await fork.createToken("write", ttl);
       } catch (e) {
-        this.answered(step, e);
+        this.failedStep(step, e);
         lastError = e;
-        if (!retriable(e)) throw e;
+        if (refusedUnchanged(e)) throw e;
         await (this.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(500 * 2 ** i);
         continue;
       }
@@ -425,7 +428,7 @@ export class Workspaces {
         const expiresAt = Date.parse(token.expiresAt);
         const current = !!still && still.lease === lease && still.state === "pending";
         if (!current || !Number.isFinite(expiresAt) || expiresAt > still.leaseExpiresAt || expiresAt <= this.now()) {
-          this.owe(forkName, "token", current ? "overlong" : "lease-ended", token.id);
+          this.owe(forkName, "token", current ? "overlong" : "lease-ended", token.id, Number.isFinite(expiresAt) ? expiresAt : null);
           return current ? "retry" : "ended";
         }
         this.put({ ...still, tokenId: token.id, tokenExpiresAt: expiresAt });
@@ -461,34 +464,33 @@ export class Workspaces {
 
   // ---------------------------------------------------------------- the fork
 
-  /** Get the fork, creating it from the canonical repo on first use. The creation is a remote step, recorded before it is sent. */
+  /**
+   * Get the fork, creating it from the canonical repo on first use. Every
+   * attempt is its own remote step, recorded before it is sent, because an
+   * attempt that failed without a definite answer may still create the fork
+   * and its 24-hour token later.
+   */
   private async ensureFork(name: string): Promise<{ fork: RepoHandle; remote: string }> {
-    const existing = await this.forkState(name);
-    if (existing.kind === "ours") return existing;
     const canonical = await withRetry(() => this.artifacts.get(this.canonical), this.retryOpts());
-    const step = this.beginStep(name, "fork-create", FORK_TOKEN_TTL_S);
-    try {
-      let made: { readonly remote: string };
-      try {
-        made = await withRetry(() => canonical.fork(name, { description: `Artroom lane fork of ${this.canonical}`, defaultBranchOnly: true }), this.retryOpts());
-      } finally {
-        // Reached only when an answer (success or error) arrived.
-        this.answered(step);
-      }
-      const got = await this.forkState(name);
-      if (got.kind === "ours") return got;
-      return { fork: await withRetry(() => this.artifacts.get(name), this.retryOpts()), remote: made.remote };
-    } catch (e) {
-      // A fork whose response was lost on an earlier try already exists.
-      if (artifactsCode(e) === "ALREADY_EXISTS" || artifactsCode(e) === "FORK_IN_PROGRESS" || artifactsCode(e) === "INTERNAL_ERROR") {
-        for (let i = 0; i < 10; i++) {
-          const got = await this.forkState(name);
-          if (got.kind === "ours") return got;
-          await (this.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(1000);
+    let lastError: unknown = null;
+    for (let i = 0; i < 5; i++) {
+      const state = await this.forkState(name);
+      if (state.kind === "ours") return state;
+      if (state.kind === "absent") {
+        const step = this.beginStep(name, "fork-create");
+        try {
+          await canonical.fork(name, { description: `Artroom lane fork of ${this.canonical}`, defaultBranchOnly: true });
+          this.answered(step);
+          continue; // read it back, with provenance
+        } catch (e) {
+          this.failedStep(step, e);
+          lastError = e;
+          if (refusedUnchanged(e) && artifactsCode(e) !== "ALREADY_EXISTS") throw e;
         }
       }
-      throw e;
+      await (this.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(500 * 2 ** i);
     }
+    throw lastError ?? new Error(`the fork ${name} is not ready`);
   }
 
   /** The fork by name: ours (a fork of exactly this canonical repo), absent, busy, or not ours (thrown). */
@@ -537,7 +539,7 @@ export class Workspaces {
     if (state.kind === "absent") {
       // No repository, so no tokens. But a fork creation still in flight may yet create one.
       this.done(duties.filter((d) => d.state !== "in-flight").map((d) => d.id), "no-repository");
-      this.retire(inFlight, runStart);
+      this.recheck(inFlight.map((d) => d.id));
       return blocking();
     }
     const fork = state.fork;
@@ -546,7 +548,9 @@ export class Workspaces {
         await withRetry(() => fork.revokeToken(d.tokenId!), this.retryOpts());
         this.done([d.id], "revoked");
       } catch (e) {
-        this.defer([d.id], String(e));
+        // A known token's debt ends when the token itself has expired.
+        if (d.expiresAt !== null && d.expiresAt <= this.now()) this.done([d.id], "expired");
+        else this.defer([d.id], String(e));
       }
     }
     const sweep = duties.filter((x) => x.kind !== "token");
@@ -565,27 +569,21 @@ export class Workspaces {
             await withRetry(() => fork.revokeToken(t.id), this.retryOpts());
           } catch (e) {
             // Owed by ID from now on.
-            this.defer([this.owe(name, "token", "inventory", t.id)], String(e));
+            const expires = Date.parse(t.expiresAt);
+            this.defer([this.owe(name, "token", "inventory", t.id, Number.isFinite(expires) ? expires : null)], String(e));
           }
         }
         // This run settles owed inventories, and steps answered before it started.
         this.done(sweep.filter((d) => d.state === "owed").map((d) => d.id), "inventory");
         this.done(sweep.filter((d) => d.state === "answered" && d.answeredAt !== null && d.answeredAt <= runStart).map((d) => d.id), "answered-and-swept");
-        this.retire(inFlight, runStart);
+        this.recheck(inFlight.map((d) => d.id));
       } catch (e) {
         this.defer(sweep.map((d) => d.id), String(e));
       }
     } else {
-      this.retire(inFlight, runStart);
+      this.recheck(inFlight.map((d) => d.id));
     }
     return blocking();
-  }
-
-  /** Steps still in flight: retired once their bound has passed, otherwise rechecked later. */
-  private retire(inFlight: readonly Duty[], at: number): void {
-    const past = inFlight.filter((d) => d.bound !== null && d.bound <= at);
-    this.done(past.map((d) => d.id), "past-bound");
-    this.recheck(inFlight.filter((d) => !past.includes(d)).map((d) => d.id));
   }
 
   // ---------------------------------------------------------------- the alarm contract
@@ -594,7 +592,7 @@ export class Workspaces {
    * The Room's alarm calls this, then sets its next alarm to `nextDue()`.
    * It runs every duty that is due, one fork at a time. Returns how many
    * duties are still not settled (including steps in flight from a host
-   * that stopped, which keep being rechecked until their bound passes).
+   * that stopped, or failed without a definite answer, which keep being rechecked).
    */
   async reconcile(): Promise<number> {
     const forks = this.sql
@@ -666,7 +664,7 @@ export class Workspaces {
       const now = this.row(lane);
       if (!now || now.lease !== lease || now.state === "revoked") return false;
       this.sql.all("DELETE FROM artroom_ws_secret WHERE lane = ?", lane);
-      if (now.tokenId) this.owe(now.fork, "token", "released", now.tokenId);
+      if (now.tokenId) this.owe(now.fork, "token", "released", now.tokenId, now.tokenExpiresAt);
       this.owe(now.fork, "inventory", "released");
       this.put({ ...now, state: "revoked", tokenId: null, tokenExpiresAt: null });
       return true;
@@ -685,6 +683,6 @@ interface Duty {
   readonly tokenId: string | null;
   readonly startedAt: number;
   readonly answeredAt: number | null;
-  readonly bound: number | null;
+  readonly expiresAt: number | null;
   readonly attempts: number;
 }

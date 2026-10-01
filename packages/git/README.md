@@ -131,27 +131,28 @@ const next = ws.nextDue();                         // set the next alarm to the 
 
 - **One durable protocol for remote steps and cleanup.** Every
   non-idempotent remote step (creating a fork, which comes with a 24-hour
-  token; each attempt to mint a lease token) is written to SQLite as *in
-  flight* before it is sent, and marked *answered* when its answer (success
-  or error) arrives: an answer is the completion fence. Cleanup is *owed* as
-  an inventory (revoke every active token except the one a ready or
-  installing lease recorded) or one known token. An inventory that
+  token; each attempt to mint a lease token; every retry of either) is
+  written to SQLite as *in flight* before it is sent. It becomes *answered*
+  only on a definite answer: success, or an Artifacts error that says the
+  request was refused and changed nothing (`ALREADY_EXISTS`,
+  `INVALID_INPUT`, `INVALID_REPO_NAME`, `INVALID_TTL`, `NOT_FOUND`). A
+  transport failure or Artifacts' `INTERNAL_ERROR` (10400, seen after a
+  fork was created) proves nothing, so the step stays in flight. Cleanup is
+  *owed* as an inventory (revoke every active token except the one a ready
+  or installing lease recorded) or one known token. An inventory that
   succeeds settles every owed inventory and every step answered before it
-  started. A step still in flight (its host stopped) is never settled by a
-  snapshot: it keeps a scheduled inventory every few minutes, which revokes
-  whatever it creates, until its bound has passed: send time, plus
-  `applyBoundMs` (how long an unanswered request is assumed able to stay
-  outstanding; default one hour; an assumption, not an Artifacts
-  guarantee), plus the longest life of a token it could create (the TTL
-  requested, or 24 hours for a fork's creation token, which the binding
-  cannot shorten). Each duty ends *done*, with its reason.
+  started. A step still in flight is never settled, by a snapshot or by
+  elapsed time: it keeps an inventory on a capped backoff (every minute at
+  first, then every 30 minutes), which revokes whatever it creates. A known
+  token's debt also ends once that token has expired. Each duty ends
+  *done*, with its reason.
 - **Ready means swept.** Provisioning settles what is owed, mints once per
   attempt (never a hidden retry), records the token, and then runs an
   inventory that started after the token was recorded. Only when that
   succeeds is the workspace ready, so a mint that applied and then answered
   with an error cannot leave a second live token. A step still in flight
-  from a stopped host does not block a new lease; its inventories revoke
-  anything it creates.
+  from a stopped host, or one that failed without a definite answer, does
+  not block a new lease; its inventories revoke anything it creates.
 - **Results are fenced by lease.** Provisioning and cleanup of one fork
   run one at a time, so cleanup never revokes a token being installed, and
   a late error or a late release of an old lease never changes a newer
