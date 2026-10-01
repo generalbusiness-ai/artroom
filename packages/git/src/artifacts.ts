@@ -43,6 +43,22 @@ export function artifactsCode(e: unknown): string | null {
 }
 
 /**
+ * Artifacts error codes that mean the request was refused and changed
+ * nothing: a definite remote answer. Every other failure, including
+ * Artifacts' INTERNAL_ERROR (10400, which has been seen after a fork was
+ * created) and any transport failure (a lost connection, a reset RPC),
+ * leaves the outcome unknown: the request may still apply.
+ */
+const REFUSED_UNCHANGED = new Set(["ALREADY_EXISTS", "INVALID_INPUT", "INVALID_REPO_NAME", "INVALID_TTL", "NOT_FOUND"]);
+
+/** True only for an Artifacts error that says the request was refused and changed nothing. */
+export function refusedUnchanged(e: unknown): boolean {
+  const code = artifactsCode(e);
+  const numeric = (e as { numericCode?: unknown } | null)?.numericCode;
+  return code !== null && REFUSED_UNCHANGED.has(code) && typeof numeric === "number";
+}
+
+/**
  * Artifacts creation sometimes fails with an internal error (10400) that
  * succeeds on retry (plan section 2: about 5 in 70). Retry those, and only
  * those, with backoff.
