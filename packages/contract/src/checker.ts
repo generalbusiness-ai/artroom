@@ -3,17 +3,35 @@
  * `check` acts (plan sections 5 and 9). Rules R-EXEC and R-CARRY in
  * docs/protocol.md.
  *
- * The room sends a `CheckJob` to the checker service. The service runs it in
- * a separate sandbox with read-only access, then signs the `check` act
- * outside the sandbox. A subclass writes only `run()`.
+ * The room issues every `CheckJob` and sends it to the checker service over
+ * a Workers service binding (R-EXEC-8). The service runs it in a separate
+ * sandbox with read-only access, then signs the `check` act outside the
+ * sandbox. A subclass writes only `run()`.
  */
 
 import type { CheckerName, Digest, Generation, LaneId, ObligationId, OpId, RoomId, Sha, Timestamp } from "./ids.ts";
+
+/**
+ * Git's credential for a job, as environment variables (R-EXEC-9): exactly
+ * one `http.extraHeader` holding a read-only bearer token for `readUrl`'s
+ * repository, expiring no later than the job's deadline.
+ */
+export type GitAuthEnv = {
+  readonly GIT_CONFIG_COUNT: "1";
+  readonly GIT_CONFIG_KEY_0: "http.extraHeader";
+  readonly GIT_CONFIG_VALUE_0: `Authorization: Bearer ${string}`;
+};
+
+/** The author and committer line of every filtered snapshot commit: fixed identity, time 0, UTC (R-CARRY-15). */
+export type SnapshotIdentity = "Artroom Snapshot <snapshot@artroom.invalid> 0 +0000";
+
+/** The message of a filtered snapshot commit (R-CARRY-15). */
+export type SnapshotMessage = `Artroom filtered snapshot for ${CheckerName}\n\nDigest: ${Digest}\n`;
 import type { CheckInput } from "./evidence.ts";
 import type { Check } from "./acts.ts";
 import type { Result } from "./errors.ts";
 
-/** One unit of work for a checker. */
+/** One unit of work for a checker. Issued only by the room (R-EXEC-8). */
 export interface CheckJob {
   /** Unique per run; use it to name the sandbox. */
   readonly id: `job_${string}`;
@@ -23,15 +41,31 @@ export interface CheckJob {
   readonly head: Sha;
   readonly obligation: ObligationId;
   readonly check: CheckerName;
-  /** The integration commit to check. With filtered input, the commit of the filtered snapshot. */
+  /**
+   * The commit to check out. With tree input, the integration. With filtered
+   * input, the snapshot commit the room recorded for the integration
+   * (R-CARRY-15).
+   */
   readonly integration: Sha;
+  /**
+   * The canonical main commit the integration was built on: the landing's
+   * `expectedMain`, or the preview's base (R-EXEC-10). A filtered job's
+   * runner cannot read it.
+   */
+  readonly base: Sha;
   readonly input: CheckInput;
   /** Read-only URL on the room's own Artifacts host. Canonical repo for `tree`; snapshot repo for `filtered`. */
   readonly readUrl: `https://${string}`;
-  /** Environment for git only: a read-only token, scoped to `readUrl`, expiring at `deadline` (R-EXEC-3). */
-  readonly gitAuthEnv: Readonly<Record<string, string>>;
+  /** Git's credential only (R-EXEC-3, R-EXEC-9). */
+  readonly gitAuthEnv: GitAuthEnv;
   /** Digest of the checker configuration in force (from the active policy version). */
   readonly config: Digest;
+  /** The configuration's `volatile`. The signed check must state the same (R-EXEC-10). */
+  readonly volatile: boolean;
+  /** The configuration's `advisory`, false when absent (R-OBL-7). */
+  readonly advisory: boolean;
+  /** The runner environment the configuration pins; null when none is (R-EXEC-11). */
+  readonly runner: Digest | null;
   readonly landOp?: OpId;
   readonly deadline: Timestamp;
 }
@@ -71,8 +105,9 @@ export interface CheckerContext {
 
 /**
  * The base class. Declared here; implemented by the checker package. It
- * verifies the job came from the room, calls `run()`, and signs the `check`
- * act with the service's delegation key, outside the sandbox (R-EXEC-5).
+ * accepts jobs only through the service binding (R-EXEC-8), checks the
+ * job's binding, calls `run()`, and signs the `check` act with the
+ * service's delegation key, outside the sandbox (R-EXEC-5).
  */
 export declare abstract class Checker<Env = unknown> {
   constructor(ctx: CheckerContext, env: Env);
@@ -83,7 +118,7 @@ export declare abstract class Checker<Env = unknown> {
   handle(job: CheckJob): Promise<Result<Check>>;
 }
 
-/** The RPC surface a checker service exposes to the room. */
+/** The RPC surface a checker service exposes to the room, over a service binding only (R-EXEC-8). */
 export interface CheckerService {
   handle(job: CheckJob): Promise<Result<Check>>;
 }
