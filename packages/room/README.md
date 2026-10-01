@@ -37,15 +37,37 @@ Every act takes the same path, whatever the transport:
 2. Steps 3 to 9 run one admission at a time, through a queue. They read
    state and may wait for policy evaluation.
 3. Step 10 runs in one synchronous SQLite transaction. It first checks that
-   the log head has not moved. If it has, the room decides again. Then it
-   seals the entry, applies the effects and stores the idempotency record.
-   There is no `await` between deciding and recording (R-ADM-6).
+   the log head has not moved. Then it passes the **final boundary**: it
+   judges the act's authority again with the room clock read now, so a
+   delegation or invitation that expired while policy was evaluated is
+   refused, unrecorded. A lease past its expiry makes the admission start
+   over, and the expiry is sealed first. Then it seals the entry, applies the
+   effects and stores the idempotency record. There is no `await` between
+   deciding and recording (R-ADM-6).
 4. Step 11, `notify`, runs after the commit from a durable queue. Its result
    is a later `notified` entry (R-LOG-13).
 
 The landing engine can write system events while an admission waits for
 policy. That is why the head check exists: an admission never commits a
 decision made on an older log.
+
+A room-custody redemption is two acts, a `join` and a `delegate` to the
+session key. The room decides both before recording either: it judges the
+`delegate` on the state after the `join` by applying the `join` in a
+transaction it rolls back. Then one transaction seals both, stores the
+room-held keys and the bearer hash. A refusal or failure at any point
+records nothing and leaves the invitation unused (R-CRED-9).
+
+Obligations have one calculator ([src/obligations.ts](src/obligations.ts)).
+Whether a verdict or check qualifies is judged from facts fixed at its
+admission (authority, teams, whether it was the author, flags) against the
+requirement in force. The projection, sealed `obligations` effects, `land`
+admission, readiness and reservation all use it.
+
+Work after a commit is one mechanism: named, idempotent durable steps (lease
+expiry, notify, token revocation, pins, previews, workspaces,
+recomputation, landing, log publication). The alarm runs them all; a commit
+may start one at once. Nothing depends on an in-memory promise surviving.
 
 Sealing is synchronous. SHA-256 and Ed25519 signing use `@noble`, so the
 room can hash and sign inside the transaction. Verifying a caller's
@@ -60,9 +82,21 @@ The Room talks to other lanes through three small interfaces in
 |---|---|---|
 | `PolicyPort` | Evaluates `refuse`, `require`, `carry`, `land` and `notify` rules | **Wired.** [src/policy.ts](src/policy.ts) calls lane C's `@generalbusiness/artroom-policy`. It passes the lane purpose, the recovery-key flag, carry facts and the notify directory, so each is in the replay context. One act shares one meter. |
 | `LandingPort` and `LandingHost` | The landing state machine, and the Room's side of it | **Not wired.** The interfaces match lane B's `Landing` class and `LandingRoom` interface, so the adapter is `(sql, host) => new Landing({ sql, room: host, publisher, tokens })`. Lane B's package is not on main yet. Tests use [src/memory/landing.ts](src/memory/landing.ts), which follows lane B's state machine. |
-| `ArtifactsPort` | Forks, workspace tokens, heads, pinned refs, diffs, previews and the log ref | **Not wired.** Tests use [src/memory/artifacts.ts](src/memory/artifacts.ts), a small in-memory git. |
+| `ArtifactsPort` | Forks, workspace tokens, heads, pinned refs, diffs and previews | **Not wired.** Tests use [src/memory/artifacts.ts](src/memory/artifacts.ts), a small in-memory git. |
+| `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | **Not wired.** It has lane L's `LogPublisher` contract, so the adapter is `() => LogPublisher.open(remote)`. Lane L's package is in review. Tests use a stand-in with the same contract over [src/memory/log.ts](src/memory/log.ts)'s remote, whose faults are transport faults only. |
 
-A deployment without the landing and Artifacts adapters can found rooms
+The Room's side of log publication is durable. Before any remote write it
+stores the cohort: the entries through N, the signed checkpoint, the
+retained files, and the expected parent (the last commit it confirmed).
+Every attempt, even after a restart, publishes that same cohort. The
+publisher reads the ref back after an unclear answer and completes forward.
+The Room seals the `checkpoint` event and moves `publishedThrough` only
+after the publisher confirms the commit. When the publisher reopens, the
+ref must hold either the last confirmed commit or one that publishes exactly
+the pending cohort; anything else is another writer, and publication stops
+and tells the admins.
+
+A deployment without the landing, Artifacts and publisher adapters can found rooms
 and admit roster acts, claims and notes. It treats the canonical repository
 as empty, so a new room starts with the default policy. `propose`, `land`
 and workspaces fail with `unavailable`, and nothing is recorded.
@@ -141,51 +175,81 @@ landing engine and the in-memory Artifacts. Alarms are scheduled as usual,
 but in tests they run only when a test asks (`tick` or
 `runDurableObjectAlarm`).
 
-## Section 23 cases
+## Acceptance cases and their evidence
 
-Each case below has a test whose name starts with "section 23". The file is
-in `test/workerd/`.
+Four kinds of evidence, from weakest to strongest:
 
-| Case | Test file |
-|---|---|
-| Approval with `dependsOn`, helper changes | obligations |
-| No `dependsOn`, room default lists `src/lib/**` | obligations |
-| No declaration and no default | obligations |
-| `package-lock.json` changes | obligations |
-| `.artroom/policy.json` changes | obligations |
-| Release, new generation, policy activation during preparation | landing |
-| Paused push; release, new generation, objection, `retired` revocation | landing |
-| Paused push; `compromised` revocation of evidence | landing (landed with a revert lane, and aborted) |
-| Pre-signed act after its key's revocation | roster |
-| Act under an expired delegation | roster |
-| Byte-identical replay after revocation | roster |
-| Compromised reviewer's approval | obligations |
-| Reviewer retired after their review | obligations |
-| Sole admin changes policy | landing |
-| Locked-out admin restored | roster |
-| Policy lockout | landing |
-| Same lockout, two admins | landing |
-| B watches A's workspace | lanes |
-| A requests the token: old lease, revoked key, removed, expired delegation | lanes |
-| A token appears in no output | lanes |
-| Browser join | roster |
-| MCP redemption | roster |
-| Room-custody invitation, self-signed join on `/acts` | roster |
-| Room-custody invitation, self-signed join over RPC | roster |
-| Room-custody invitation, client redemption | roster |
-| Client-custody invitation, room redemption | roster |
-| Unjoined Worker | roster |
-| Recovery key | roster |
-| Log construction | log |
-| A `notify` rule hits a runtime failure | log |
-| Stage-specific land rule | landing |
+- **Unit.** Node tests of the pure parts (`test/node`): canonical bytes,
+  keys and signatures, globs, secret scanning, shapes and identifiers. They
+  back every row below but prove no row alone.
+- **Room in workerd, real SQLite.** The Room Durable Object with its real
+  SQLite storage, the real policy runtime (lane C), and in-memory doubles
+  for landing, Artifacts and the log publisher (`test/workerd`). Each case
+  below has a test whose name starts with "section 23" or with the finding
+  number.
+- **Real B and L integration.** The same cases with lane B's landing engine
+  and lane L's publisher on shared SQLite. **Pending** (phase 2, P1.9): it
+  waits for lane B revision 2, lane L revision 2 and amendment 2.
+- **Deployed.** On Cloudflare with Artifacts. **Pending** for every case.
 
-These cases belong to other lanes and are not tested here: a new failing
-test under `tests/` and a file missing from a scoped checker's inputs
-(checks carry: lanes C and G); crash before or after push, two operations
+"n/a" means the case does not involve landing, Artifacts or the publisher.
+
+### Section 23
+
+| Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
+|---|---|---|---|
+| Approval with `dependsOn`, helper changes | yes: obligations | n/a | pending |
+| No `dependsOn`, room default lists `src/lib/**` | yes: obligations | n/a | pending |
+| No declaration and no default | yes: obligations | n/a | pending |
+| `package-lock.json` changes | yes: obligations | n/a | pending |
+| `.artroom/policy.json` changes | yes: obligations | n/a | pending |
+| Release, new generation, policy activation during preparation | yes: landing | B pending | pending |
+| Paused push; release, new generation, objection, `retired` revocation | yes: landing | B pending | pending |
+| Paused push; `compromised` revocation of evidence | yes: landing | B pending | pending |
+| Pre-signed act after its key's revocation | yes: roster | n/a | pending |
+| Act under an expired delegation | yes: roster | n/a | pending |
+| Byte-identical replay after revocation | yes: roster | n/a | pending |
+| Compromised reviewer's approval | yes: obligations | B pending | pending |
+| Reviewer retired after their review | yes: obligations | B pending | pending |
+| Sole admin changes policy | yes: landing | B pending | pending |
+| Locked-out admin restored | yes: roster | n/a | pending |
+| Policy lockout | yes: landing | B pending | pending |
+| Same lockout, two admins | yes: landing | n/a | pending |
+| B watches A's workspace | yes: lanes | Artifacts pending | pending |
+| A requests the token: old lease, revoked key, removed, expired delegation | yes: lanes | Artifacts pending | pending |
+| A token appears in no output | yes: lanes | Artifacts pending | pending |
+| Scoped checker, new test (check carry) | — | C/G; Room part pending (P1.9) | pending |
+| Browser join | yes: roster | n/a | pending |
+| MCP redemption | yes: roster | n/a | pending |
+| Room-custody invitation, self-signed join on `/acts` | yes: roster | n/a | pending |
+| Room-custody invitation, self-signed join over RPC | yes: roster | n/a | pending |
+| Room-custody invitation, client redemption | yes: roster | n/a | pending |
+| Client-custody invitation, room redemption | yes: roster | n/a | pending |
+| Unjoined Worker | yes: roster | n/a | pending |
+| Recovery key | yes: roster | n/a | pending |
+| Log construction | yes: log (and Node: verify helpers) | L pending | pending |
+| A `notify` rule hits a runtime failure | yes: log | n/a | pending |
+| Stage-specific land rule | yes: landing | B pending | pending |
+
+These section 23 cases belong to other lanes and have no Room test: a new
+failing test under `tests/` and a file missing from a scoped checker's
+inputs (lanes C and G); crash before or after push, two operations
 preparing in parallel, the delayed authenticated push, the failing forward
 retry, token revocation during a push, and the lease race on publication
-(the publisher: lane B); scoped checker, new test (lanes C and G).
+(lane B's publisher).
+
+### Review aabda1ed findings
+
+| Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
+|---|---|---|---|
+| P1.1 Atomic room-custody redemption | yes: review-aabda1ed | n/a | pending |
+| P1.2 Revoked key as recovery key | yes: review-aabda1ed | n/a | pending |
+| P1.3 Authority expiring during policy evaluation | yes: review-aabda1ed | n/a | pending |
+| P1.4 Recomputation under a changed requirement | yes: review-aabda1ed | B pending (landing part) | pending |
+| P1.5 Lost push or read-back, restart, foreign writer | yes: review-aabda1ed | L pending | pending |
+| P2.6 Durable pending workspaces | yes: review-aabda1ed | Artifacts pending | pending |
+| P2.7 Sealed effects from the calculator | yes: review-aabda1ed | B pending (landing part) | pending |
+| P2.8 Cursors at a page boundary | yes: review-aabda1ed | n/a | pending |
 
 ## Mutation spot-checks
 
@@ -216,6 +280,30 @@ change. Every mutation made at least one named test fail.
 | Duplicate JSON keys accepted (R-SIG-3) | Node: refuses duplicate keys |
 | Overlap misses a real overlap (R-PATH-3) | Node: never misses an overlap |
 
+## Review aabda1ed
+
+The checker's review of `315a8576` requested changes. The eight
+reproductions now assert the correct outcomes in
+[test/workerd/review-aabda1ed.test.ts](test/workerd/review-aabda1ed.test.ts).
+
+| Finding | Fix | Tests (in that file) |
+|---|---|---|
+| P1.1 A refused room redemption consumed the invitation | The `join` and the session `delegate` are decided first (the `delegate` on a rolled-back simulation of the state after the `join`), then sealed together with the room-held keys and the bearer hash in one transaction. A refused client-custody redemption records nothing too. | a policy refusal of the session grant…; a policy runtime failure…; an interruption at redemption:after-join / after-delegate…; response-loss recovery…; a client-custody redemption refused by policy… |
+| P1.2 A revoked key could become the recovery key | `rotate-recovery` refuses any revoked key, bound or not; the recovery case of R-ADM-3 checks revocation as a backstop | rotation to an unbound compromised key and an unbound retired key…; rotation to a member's key…; a fresh key still becomes the recovery key…; backstop… |
+| P1.3 A delegation expiring during policy evaluation still authorized the act | The final boundary judges authority again with the clock read now, inside the write transaction; leases past due are expired before each decision and force a fresh decision at the boundary | a delegation that expires while policy is evaluated…; an invitation that expires…; a lease that runs out…; time passing without any log change… |
+| P1.4 Activation kept old qualifications | One qualification rule judged from recorded admission facts against the current requirement; recomputation re-runs `require` and `carry` and is recorded by `recordRecomputation` | the checker's case…; a raised count…; qualification uses the role recorded at admission…; owners…; self-approval…; checker configuration…; carried reviews are re-judged…; a carried verdict is re-qualified…; a landing prepared before the activation… |
+| P1.5 A lost push reply wedged publication | A durable pending cohort with its expected parent, retried until the publisher confirms the commit; a fence on reopen against foreign commits; `PublisherPort` has lane L's `LogPublisher` contract | a lost push reply…; lost push and read-back replies…; restart…; an unexpected writer… |
+| P2.6 Pending workspaces were never resumed | Workspaces are a durable alarm step: the same op and lease are resumed; the op fails as fenced if the lease ended before or during the fork's creation; a failed `ensureFork` keeps it pending for up to five attempts | interrupted before ensureFork…; interrupted after the fork was created…; a lease that ends while the fork is being created…; a lease that ended before the resume… |
+| P2.7 A repeated approval sealed a false `obligations` effect | Effects come from the one status calculator, before and after the act | a repeated approval seals no met effect…; an approval after the same member's objection… |
+| P2.8 Attention cursors skipped items at a page boundary | Attention items have a `(seq, n)` position; page and update cursors carry it; an update cursor tracks entries and attention separately; earlier seq-only cursors still work | two items from one entry…; overlapping principals…; an update cursor never passes unseen attention…; an earlier attention cursor… |
+
+Each new guard was broken once and the review's tests run against the
+change: all 23 mutations were caught. Two survived at first (carried
+verdicts not re-qualified; no fence before creating a fork) and gained
+tests. One guard that could not be reached (re-comparing the `delegate`'s
+policy input inside the redemption transaction) was removed: the queue and
+the log-head check already exclude any change between decision and commit.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
@@ -242,15 +330,17 @@ returned, logged or published.
 3. **RPC subscriptions carry bytes.** Workers RPC streams carry bytes, so
    `subscribe` returns newline-delimited JSON `Update`s, not a stream of
    objects. The client package decodes it.
-4. **Recomputation after activation is not an entry.** R-POL-9 recomputes
-   open proposals' obligations when a policy activates. That needs policy
-   evaluation, which is asynchronous, but `policy-activated` must be the
-   next entry after the landing (R-PUB-9). So the event records
+4. **Recomputation after activation is not yet an entry.** R-POL-9
+   recomputes open proposals' obligations when a policy activates. That
+   needs policy evaluation, which is asynchronous, but `policy-activated`
+   must be the next entry after the landing (R-PUB-9). So the event records
    `recomputed.proposals` and `fenced`, and always `reopened: 0`. The room
-   then recomputes from a durable mark, and until that finishes a `land` on
-   such a proposal is refused `obligation-open`. The decisions are retained
-   (R-LOG-7) but no entry records the new obligations. The contract needs an
-   event for this.
+   recomputes from a durable mark; until that finishes, `land` on such a
+   proposal is refused `obligation-open`. Each recomputation (new
+   obligations, carried and not-carried evidence, decisions) is stored by
+   `recordRecomputation`, and its decisions are retained (R-LOG-7).
+   Amendment 2's `obligations-recomputed` event will be sealed in that one
+   place.
 5. **Readiness decisions.** Land rules evaluated during preparation
    (stage `reservation`) are retained, but no entry records their
    decisions. A failure is recorded in the `land-outcome` refusal.
@@ -263,13 +353,20 @@ returned, logged or published.
 
 ## Not done
 
-- The landing and Artifacts adapters (see "Ports").
-- Carrying checks across integrations. A check counts only on the
-  integration it bound. Verdict carrying works through the policy port.
-- Filtered snapshots for scoped checkers (R-CARRY-9). A `filtered` check
-  input is refused `check-binding`.
-- `artroom verify` replaying the roster to re-judge each act's authority.
-  [src/verify.ts](src/verify.ts) does the other offline checks of R-LOG-10.
+Phase 2 of review aabda1ed (P1.9) waits for lane B revision 2, lane L
+revision 2 and contract amendment 2 to be approved:
+
+- the real landing engine (lane B) behind `LandingPort`, replacing the
+  in-memory state machine, with shared-SQLite integration tests;
+- the real publisher (lane L) behind `PublisherPort`;
+- the Artifacts adapter;
+- carrying checks across integrations, and filtered checker inputs;
+- the Room's authority replay;
+- amendment 2's 13 lane A edits (protocol section 27).
+
+Also not done:
+- [src/verify.ts](src/verify.ts) does the offline checks of R-LOG-10
+  except replaying the roster; lane L's `verifyLog` does that.
 - The MCP endpoint (lane E) and the client package's `connect`, `join` and
   `redeem`.
 - Attention is a simple projection: review and check requests, objections,
