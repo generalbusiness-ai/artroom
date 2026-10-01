@@ -25,8 +25,10 @@ Code comments and test names cite them by number, for example `R-ADM-12`.
   routes (`HttpRoutes`), and live updates by long poll, WebSocket and RPC
   stream (R-API-8).
 
-It does not land code itself, evaluate policy expressions itself, or talk to
-Artifacts itself. It calls ports for those (see "Ports").
+It does not land code itself, evaluate policy expressions itself, or write
+git itself. It hosts lane B's landing engine and workspaces and lane L's log
+publisher on its own SQLite, and reaches Artifacts through lane B's helpers
+(see "Ports").
 
 ## How admission works
 
@@ -75,15 +77,29 @@ signature uses WebCrypto, before admission starts.
 
 ## Ports
 
-The Room talks to other lanes through three small interfaces in
-[src/ports.ts](src/ports.ts).
+The Room's code talks to other lanes through small interfaces in
+[src/ports.ts](src/ports.ts). Every one is wired to the real package.
 
-| Port | What it does | Adapter today |
+| Port | What it does | Adapter |
 |---|---|---|
-| `PolicyPort` | Evaluates `refuse`, `require`, `carry`, `land` and `notify` rules | **Wired.** [src/policy.ts](src/policy.ts) calls lane C's `@generalbusiness/artroom-policy`. It passes the lane purpose, the recovery-key flag, carry facts and the notify directory, so each is in the replay context. One act shares one meter. |
-| `LandingPort` and `LandingHost` | The landing state machine, and the Room's side of it | **Not wired.** The interfaces match lane B's `Landing` class and `LandingRoom` interface, so the adapter is `(sql, host) => new Landing({ sql, room: host, publisher, tokens })`. Lane B's package is not on main yet. Tests use [src/memory/landing.ts](src/memory/landing.ts), which follows lane B's state machine. |
-| `ArtifactsPort` | Repository creation at founding, forks, workspace tokens, heads, pinned refs, diffs and previews | **Not wired.** Tests use [src/memory/artifacts.ts](src/memory/artifacts.ts), a small in-memory git. |
-| `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | **Not wired.** It has lane L's `LogPublisher` contract, plus `commitFor`: the commit that `publish` would make of a cohort on a given parent, computed by the same Git serialization, with no I/O. The adapter is `() => LogPublisher.open(remote)` once lane L exposes `commitFor`. Lane L's package is in review. Tests use a stand-in with the same contract over [src/memory/log.ts](src/memory/log.ts)'s remote, whose faults are transport faults only. |
+| `PolicyPort` | Evaluates `refuse`, `require`, `carry`, `land` and `notify` rules | [src/policy.ts](src/policy.ts) calls lane C's `@generalbusiness/artroom-policy`. It passes the lane purpose, the recovery-key flag, carry facts and the notify directory, so each is in the replay context. One act shares one meter. |
+| `LandingPort` and `LandingHost` | The landing operation, and the Room's side of it | Lane B's `Landing` and `LandingRoom`, on the Room's SQLite, with lane B's `ContainerPublisher` and `canonicalTokens`. `readiness` may await; `revalidate` compares the rebuilt reservation input with the bytes the engine retained. |
+| Workspaces | One fork per lane, one token per lease generation | Lane B's `Workspaces`, on the Room's SQLite. The Room records which leases it opened (`ws_leases`), carries renewals to the workspace's deadline, and ends a lease's access when it ends. |
+| `ArtifactsPort` | Repository creation at founding, config reads, heads, pinned refs, diffs, previews, filtered snapshots | [src/artifacts.ts](src/artifacts.ts): the Artifacts binding with lane B's `changedPaths`, `treeDiff`, `previewPlan` and `Pinning`. |
+| `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | Lane L's `LogPublisher`, opened over a git remote. In a Worker that remote is [src/logremote.ts](src/logremote.ts): reads through the binding, each object re-encoded and accepted only if it hashes to the SHA asked for; pushes through the publisher sandbox's `pushLog`, which lane B has still to add. |
+
+A deployment gives the Room its remotes ([src/config.ts](src/config.ts)):
+the Artifacts binding for one namespace (`ARTIFACTS`, `ARTIFACTS_NAMESPACE`),
+and lane B's publisher sandbox (`PUBLISHER`, one Durable Object per room).
+The Room builds the adapters over them. A room's repository identity is
+`<namespace>/<name>`; an identity in a namespace the deployment has no
+binding for has no repository here, and founding it is `unavailable`.
+
+Tests give fake remotes instead ([src/memory/artifacts.ts](src/memory/artifacts.ts)):
+an Artifacts namespace and a publisher sandbox over real git objects (lane
+L's object format), with transport faults, Artifacts error codes, lost
+answers, a push held in flight, and another writer. The adapters that run
+over them are the real ones.
 
 The Room's side of log publication is durable. Before any remote write it
 stores the cohort: the entries through N, the signed checkpoint, the
@@ -101,10 +117,10 @@ must hold the parent or that exact commit. Anything else is another
 writer, even a commit with the same entry lines, and publication stops and
 tells the admins.
 
-A deployment without the landing, Artifacts and publisher adapters can found rooms
-and admit roster acts, claims and notes. It treats the canonical repository
-as empty, so a new room starts with the default policy. `propose`, `land`
-and workspaces fail with `unavailable`, and nothing is recorded.
+A deployment without an `ARTIFACTS` binding cannot found a room: founding
+reads or creates the repository, and fails with `unavailable`, recording
+nothing. Without the publisher sandbox, `propose`, `land`, previews and log
+publication fail with `unavailable` in the same way.
 
 The Room keeps every platform rule itself, even where lane C also checks
 it: authority, roles, lanes and leases, `obl_admin-approval` for
@@ -221,6 +237,14 @@ Durable Objects with SQLite storage. It is not deployed by this lane.
 | `ROOM_KEY_SECRET` (secret) | Derives each new room's signing key and, for public founding, its repository identity |
 | `OPERATOR_KEYS` | Operator key IDs, comma-separated, whose onboarding grants are accepted (R-GEN-12) |
 | `PUBLIC_NAMESPACE` | The repository namespace reserved for public founding, default `artroom-public` |
+| `ARTIFACTS` (binding) | The Artifacts binding for the deployment's namespace |
+| `ARTIFACTS_NAMESPACE` | The namespace that binding reaches, default `PUBLIC_NAMESPACE` |
+| `PUBLISHER` (binding) | Lane B's `Publisher` Durable Object class (the git sandbox), one instance per room |
+
+[wrangler.jsonc](wrangler.jsonc) does not declare `ARTIFACTS` or
+`PUBLISHER` yet: the workerd test pool reads the same file, and both are
+remote or container bindings. A deployment adds them, with lane B's
+container image, as lane B's own wrangler.jsonc shows.
 
 ## Running the tests
 
@@ -233,10 +257,14 @@ npm run test:node      # pure parts, in Node
 npm run test:workerd   # the Room in workerd, with real Durable Object SQLite
 ```
 
-The workerd suite uses the real policy runtime (lane C), the in-memory
-landing engine and the in-memory Artifacts. Alarms are scheduled as usual,
-but in tests they run only when a test asks (`tick` or
-`runDurableObjectAlarm`).
+The workerd suite runs the Room with the real policy runtime (lane C), lane
+B's landing engine, workspaces, pinning and diffs, and lane L's log
+publisher, all on the Room's SQLite, over fake remotes. Alarms are scheduled
+as usual, but in tests they run only when a test asks (`tick` or
+`runDurableObjectAlarm`). The type check uses declarations generated from
+lane L's sources (`.types/log`), as the UI does for the policy runtime,
+because lane L's sources assume a lib whose `TextDecoder` options differ
+from the Workers runtime types.
 
 ## Acceptance cases and their evidence
 
@@ -244,85 +272,106 @@ Four kinds of evidence, from weakest to strongest:
 
 - **Unit.** Node tests of the pure parts (`test/node`): canonical bytes,
   keys and signatures, globs, secret scanning, shapes and identifiers. They
-  back every row below but prove no row alone.
-- **Room in workerd, real SQLite.** The Room Durable Object with its real
-  SQLite storage, the real policy runtime (lane C), and in-memory doubles
-  for landing, Artifacts and the log publisher (`test/workerd`). Each case
-  below has a test whose name starts with "section 23" or with the finding
-  number.
-- **Real B and L integration.** The same cases with lane B's landing engine
-  and lane L's publisher on shared SQLite, and the Artifacts adapter.
-  **Pending** (phase 2b): it waits for lane B revision 2 and lane L
-  revision 2.
-- **Deployed.** On Cloudflare with Artifacts. **Pending** for every case.
-
-"n/a" means the case does not involve landing, Artifacts or the publisher.
+  support a row but prove none alone; the column names the Node file that
+  covers a piece of the case.
+- **Real SQLite.** The Room Durable Object in workerd with its real SQLite
+  storage and the real policy runtime (`test/workerd`). Each case has a
+  test whose name starts with "section 23", the finding number, or the rule.
+- **Real B and L.** The same test, with lane B's landing engine, workspaces,
+  pinning and tree diff, and lane L's log publisher, on the Room's shared
+  SQLite, over fake Artifacts and sandbox remotes (phase 2b). Since phase
+  2b every workerd test runs these adapters, so this column says "yes"
+  wherever the case uses landing, workspaces, Artifacts or the log, and
+  "n/a" where it uses none of them.
+- **Deployed.** On Cloudflare with Artifacts. **Pending** for every case,
+  under its own task.
 
 ### Section 23
 
-| Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
-|---|---|---|---|
-| Approval with `dependsOn`, helper changes | yes: obligations | n/a | pending |
-| No `dependsOn`, room default lists `src/lib/**` | yes: obligations | n/a | pending |
-| No declaration and no default | yes: obligations | n/a | pending |
-| `package-lock.json` changes | yes: obligations | n/a | pending |
-| `.artroom/policy.json` changes | yes: obligations | n/a | pending |
-| Release, new generation, policy activation during preparation | yes: landing | B pending | pending |
-| Paused push; release, new generation, objection, `retired` revocation | yes: landing | B pending | pending |
-| Paused push; `compromised` revocation of evidence | yes: landing | B pending | pending |
-| Pre-signed act after its key's revocation | yes: roster | n/a | pending |
-| Act under an expired delegation | yes: roster | n/a | pending |
-| Byte-identical replay after revocation | yes: roster | n/a | pending |
-| Compromised reviewer's approval | yes: obligations | B pending | pending |
-| Reviewer retired after their review | yes: obligations | B pending | pending |
-| Sole admin changes policy | yes: landing | B pending | pending |
-| Locked-out admin restored | yes: roster | n/a | pending |
-| Policy lockout | yes: landing | B pending | pending |
-| Same lockout, two admins | yes: landing | n/a | pending |
-| B watches A's workspace | yes: lanes | Artifacts pending | pending |
-| A requests the token: old lease, revoked key, removed, expired delegation | yes: lanes | Artifacts pending | pending |
-| A token appears in no output | yes: lanes | Artifacts pending | pending |
-| Scoped checker, new test (check carry) | — | C/G; Room part pending (P1.9) | pending |
-| Browser join | yes: roster | n/a | pending |
-| MCP redemption | yes: roster | n/a | pending |
-| Room-custody invitation, self-signed join on `/acts` | yes: roster | n/a | pending |
-| Room-custody invitation, self-signed join over RPC | yes: roster | n/a | pending |
-| Room-custody invitation, client redemption | yes: roster | n/a | pending |
-| Client-custody invitation, room redemption | yes: roster | n/a | pending |
-| Unjoined Worker | yes: roster | n/a | pending |
-| Recovery key | yes: roster | n/a | pending |
-| Log construction | yes: log (and Node: verify helpers) | L pending | pending |
-| A `notify` rule hits a runtime failure | yes: log | n/a | pending |
-| Stage-specific land rule | yes: landing | B pending | pending |
+| Case | Unit | Real SQLite (test file) | Real B and L | Deployed |
+|---|---|---|---|---|
+| Approval with `dependsOn`, helper changes | glob | yes: obligations | yes | pending |
+| No `dependsOn`, room default lists `src/lib/**` | glob | yes: obligations | yes | pending |
+| No declaration and no default | glob | yes: obligations | yes | pending |
+| `package-lock.json` changes | glob | yes: obligations | yes | pending |
+| `.artroom/policy.json` changes | glob | yes: obligations | yes | pending |
+| Release, new generation, policy activation during preparation | — | yes: landing | yes | pending |
+| Paused push; release, new generation, objection, `retired` revocation | — | yes: landing | yes | pending |
+| Paused push; `compromised` revocation of evidence | — | yes: landing, phase2b | yes | pending |
+| Pre-signed act after its key's revocation | crypto | yes: roster | n/a | pending |
+| Act under an expired delegation | — | yes: roster | n/a | pending |
+| Byte-identical replay after revocation | canonical | yes: roster | n/a | pending |
+| Compromised reviewer's approval | — | yes: obligations | yes | pending |
+| Reviewer retired after their review | — | yes: obligations, phase2b | yes | pending |
+| Sole admin changes policy | — | yes: landing | yes | pending |
+| Locked-out admin restored | — | yes: roster | n/a | pending |
+| Policy lockout | — | yes: landing | yes | pending |
+| Same lockout, two admins | — | yes: landing | yes | pending |
+| B watches A's workspace | — | yes: lanes | yes | pending |
+| A requests the token: old lease, revoked key, removed, expired delegation | — | yes: lanes | yes | pending |
+| A token appears in no output | secrets | yes: lanes | yes | pending |
+| Scoped checker, new test (check carry) | glob | yes: phase2b | yes | pending |
+| Browser join | — | yes: roster | n/a | pending |
+| MCP redemption | — | yes: roster | n/a | pending |
+| Room-custody invitation, self-signed join on `/acts` | — | yes: roster | n/a | pending |
+| Room-custody invitation, self-signed join over RPC | — | yes: roster | n/a | pending |
+| Room-custody invitation, client redemption | — | yes: roster | n/a | pending |
+| Client-custody invitation, room redemption | — | yes: roster | n/a | pending |
+| Unjoined Worker | — | yes: roster | n/a | pending |
+| Recovery key | — | yes: roster | n/a | pending |
+| Log construction | canonical, crypto | yes: log (lane L's `verifyLog`), phase2b | yes | pending |
+| A `notify` rule hits a runtime failure | — | yes: log | yes | pending |
+| Stage-specific land rule | — | yes: landing | yes | pending |
 
-These section 23 cases belong to other lanes and have no Room test: a new
-failing test under `tests/` and a file missing from a scoped checker's
-inputs (lanes C and G); crash before or after push, two operations
-preparing in parallel, the delayed authenticated push, the failing forward
-retry, token revocation during a push, and the lease race on publication
-(lane B's publisher).
+These section 23 cases are lane B's or lane C/G's, and are proved in those
+packages: crash before or after push, two operations preparing in
+parallel, the delayed authenticated push, the failing forward retry, token
+revocation during a push and the lease race on publication (lane B's
+publisher), and a file missing from a scoped checker's inputs (the runner,
+lanes C and G). The Room side of several now has a test through lane B's
+engine: phase2b's "the instance stops while the push is in flight", "a push
+that applied but whose report was lost" and "pushes with no answer".
+
+### Phase 2b cases (P1.9)
+
+| Case | Real SQLite and real B and L (test in phase2b unless named) | Deployed |
+|---|---|---|
+| Reservation re-validates authority | landing: "R-LAND-7: reservation re-judges the initiator's authority" | pending |
+| Reservation re-validates evidence | "a reviewer's key retired between ready and reservation" | pending |
+| Reservation compares the retained land input | landing: "Stage-specific land rule and Byte mismatch" | pending |
+| Unknown-outcome publication recovery | "a push that applied but whose report was lost"; "the instance stops while the push is in flight"; "pushes with no answer" | pending |
+| Abort beside a push in flight | landing: "compromised revocation of evidence"; "an abort whose at-once run was lost" | pending |
+| Delayed token cleanup and alarm scheduling | "Artifacts cannot revoke at release" | pending |
+| Workspace lease races | "a renewal while the workspace is pending"; "a take-over while the lease token is being minted"; review-aabda1ed P2.6; review-8faa2ef9 2 | pending |
+| Policy activation and recompute | "an activation adding a check requirement re-prepares"; amendment2 "Recompute after activation" | pending |
+| Scoped check carry | "a scoped check carries"; "does not carry when main changed a global input"; "a whole-tree check does not carry"; "with a policy carry rule in force" | pending |
+| Filtered checker inputs | "a filtered input binds only the room's snapshot" | pending |
+| Offline replay with lane L's `verifyLog` | "a session … publishes a log that verifies, with every decision replayed"; log "Log construction" | pending |
+| Repository identity mapping | "a repository identity in a namespace this deployment has no Artifacts binding for"; founding "Isolated public creation" | pending |
+| Fork provenance | "a repository at the lane's fork name that is not a fork" | pending |
+| Production log reads | "the production log remote reads the published log exactly through the binding" | pending |
 
 ### Amendment 2 cases (section 23)
 
-| Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
-|---|---|---|---|
-| Isolated public creation | yes: founding | Artifacts pending (repository creation) | pending |
-| Unauthorized existing repository | yes: founding | n/a | pending |
-| Repository altered after draft | yes: founding | n/a | pending |
-| Authorized import | yes: founding | Artifacts pending; lane L's verify of the grant pending | pending |
-| Simultaneous founding | yes: founding | n/a | pending |
-| Duplicate import | yes: founding | n/a | pending |
-| Canonical-name aliases | yes: founding | Artifacts pending (identity format) | pending |
-| Recovery after binding | yes: founding | Artifacts pending | pending |
-| Profile, room key or name refused; bound name | yes: founding | n/a | pending |
-| Name to ID | yes: founding | n/a | pending |
-| WebSocket | yes: log | n/a | pending |
-| RPC subscription | yes: amendment2 | n/a | pending |
-| Recompute after activation | yes: amendment2 | L pending (replay) | pending |
-| Land rules in preparation | yes: amendment2 | B pending | pending |
-| Byte mismatch | yes: landing | B pending | pending |
-| Notify across an activation | yes: amendment2 | L pending (verify replays V1) | pending |
-| Bearer receipt after revocation | yes: amendment2 | n/a | pending |
+| Case | Unit | Real SQLite (test file) | Real B and L | Deployed |
+|---|---|---|---|---|
+| Isolated public creation | — | yes: founding | yes (repository creation) | pending |
+| Unauthorized existing repository | — | yes: founding | n/a | pending |
+| Repository altered after draft | — | yes: founding | n/a | pending |
+| Authorized import | — | yes: founding | yes | pending |
+| Simultaneous founding | — | yes: founding | n/a | pending |
+| Duplicate import | — | yes: founding | n/a | pending |
+| Canonical-name aliases | ids | yes: founding | yes (identity mapping) | pending |
+| Recovery after binding | — | yes: founding | yes | pending |
+| Profile, room key or name refused; bound name | ids | yes: founding | n/a | pending |
+| Name to ID | — | yes: founding | n/a | pending |
+| WebSocket | — | yes: log | n/a | pending |
+| RPC subscription | — | yes: amendment2 | n/a | pending |
+| Recompute after activation | — | yes: amendment2, phase2b | yes | pending |
+| Land rules in preparation | — | yes: amendment2 | yes | pending |
+| Byte mismatch | — | yes: landing | yes | pending |
+| Notify across an activation | — | yes: amendment2 | yes (lane L's verify replays it) | pending |
+| Bearer receipt after revocation | — | yes: amendment2 | n/a | pending |
 
 The MCP case of amendment 2 (`explain`, `attention`, `because`) belongs to
 lane E.
@@ -334,18 +383,18 @@ lane E.
 | P1.1 Atomic room-custody redemption | yes: review-aabda1ed | n/a | pending |
 | P1.2 Revoked key as recovery key | yes: review-aabda1ed | n/a | pending |
 | P1.3 Authority expiring during policy evaluation | yes: review-aabda1ed | n/a | pending |
-| P1.4 Recomputation under a changed requirement | yes: review-aabda1ed | B pending (landing part) | pending |
-| P1.5 Lost push or read-back, restart, foreign writer | yes: review-aabda1ed | L pending | pending |
-| P2.6 Durable pending workspaces | yes: review-aabda1ed | Artifacts pending | pending |
-| P2.7 Sealed effects from the calculator | yes: review-aabda1ed | B pending (landing part) | pending |
+| P1.4 Recomputation under a changed requirement | yes: review-aabda1ed | yes | pending |
+| P1.5 Lost push or read-back, restart, foreign writer | yes: review-aabda1ed | yes | pending |
+| P2.6 Durable pending workspaces | yes: review-aabda1ed (now lane B's workspaces) | yes | pending |
+| P2.7 Sealed effects from the calculator | yes: review-aabda1ed | yes | pending |
 | P2.8 Cursors at a page boundary | yes: review-aabda1ed | n/a | pending |
 
 ### Review 8faa2ef9 findings
 
 | Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
 |---|---|---|---|
-| 1. Recovery accepts only the parent or the exact pending commit | yes: review-8faa2ef9 | L pending (needs `commitFor`) | pending |
-| 2. Lease deadline during fork creation | yes: review-8faa2ef9 | Artifacts pending | pending |
+| 1. Recovery accepts only the parent or the exact pending commit | yes: review-8faa2ef9 | yes (lane L's `commitFor`) | pending |
+| 2. Lease deadline during fork creation | yes: review-8faa2ef9 | yes | pending |
 | 3. Attention made later at an existing head | yes: review-8faa2ef9 | n/a | pending |
 | 4. Review reopening in sealed effects | yes: review-8faa2ef9 | n/a | pending |
 | 5. Upgrade of populated storage | yes: review-8faa2ef9 | n/a | pending |
@@ -355,7 +404,7 @@ lane E.
 
 | Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
 |---|---|---|---|
-| 1. Upgrade of a stored cohort without its exact commit | yes: review-1249097f | L pending (`commitFor` in lane L revision 4) | pending |
+| 1. Upgrade of a stored cohort without its exact commit | yes: review-1249097f | yes (lane L's `commitFor`) | pending |
 | 2. Grant deadline at the first binding | yes: review-1249097f | n/a | pending |
 
 ## Mutation spot-checks
@@ -484,6 +533,61 @@ judged the deadline in `found`; those checks could not be told apart from
 the registry's in any test, so they were removed and the registry is the
 one boundary.
 
+## Phase 2b
+
+The checker's P1.9 asked for the real adapters and joint tests. What
+changed:
+
+- **The adapters are real** (see "Ports"). The in-memory landing engine,
+  log publisher and Artifacts are gone, and so is the Room's own partial
+  verifier: lane L's `verifyLog` replaces it in the tests.
+- **Readiness awaits.** Lane B's `readiness` may await, so the Room reads
+  the integration's configuration and evaluates land rules inside it; the
+  decision is sealed as `land-evaluated`, and the engine keeps the
+  retained input. Evaluations the Room asks for after a check or a
+  recomputation are durable (`land_reeval`), run by the alarm's landing
+  step.
+- **Abort attempts run at once.** After a `compromised` revocation the Room
+  starts lane B's `enforceAbort` beside a push in flight, and the alarm
+  runs it again before the engine's queue.
+- **Workspaces are lane B's.** Operation IDs are lane B's
+  (`op_ws_<lane>_<lease generation>`). A workspace whose lease has ended is
+  not shown. A workspace opened by the previous revision is recorded as
+  ended (migration 6); lane B's first inventory of the fork revokes its
+  tokens when the holder opens it again.
+- **Filtered checker inputs** (R-OBL-3, R-CARRY-8, R-CARRY-9). A filtered
+  `check` binds only the Room's own snapshot of the integration over the
+  checker's declared inputs plus the global inputs.
+- **Check carry** (R-CARRY-6 to 10). When lane B prepares a new
+  integration, an earlier passing check of the same obligation carries onto
+  it if lane C's platform conditions hold: the tree or the filtered
+  snapshot is identical, the configuration is the same, the checker is not
+  volatile, and the key is not revoked. A carry counts only on the
+  integration it was judged for.
+- **The alarm** is set from the earliest of the Room's own work, lane B's
+  `landing.nextDue()` and `workspaces.nextDue()`, so it follows lane B's
+  capped backoff and never spins.
+
+What the Room needs from lane B:
+
+1. **`pushLog` on the publisher sandbox.** Lane L's `LogPublisher` needs a
+   git remote that can push in a Worker. The Room reads the log through the
+   binding, but there is no Workers-native push: the sandbox should take
+   lane L's objects, a ref, the next commit and the lease, push with
+   `--force-with-lease` under a 60-second token, and answer with lane L's
+   `PushOutcome`. Until then, production log publication fails with
+   `unavailable` and is retried.
+2. **A preview integration.** `PreviewOp.clean` requires `integration`, but
+   lane B's planner builds none for a disjoint merge, and the sandbox's
+   preview returns a tree. The Room sets `integration` only for a
+   fast-forward (the head itself). This is lane B's contract gap 7.
+
+Each new guard was broken once and the whole workerd suite run against the
+change: all 19 mutations were caught, four after a test was strengthened
+(an abort carried out by the alarm; the renewed deadline reaching the
+token; a snapshot that leaves out the global inputs; a carry counting only
+on its own integration).
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
@@ -506,34 +610,30 @@ founding is in the contract (R-GEN-10 to R-GEN-13), bearer acts and requests
 are `RoomWire` methods (R-CRED-10), the RPC subscription carries bytes
 (R-API-8), recomputation and readiness decisions are the
 `obligations-recomputed` and `land-evaluated` events, and the byte mismatch
-is `land-input-changed`. One remains open:
+is `land-input-changed`. These remain open:
 
 1. **Unknown note anchors.** A note anchored to an entry that does not
    exist is refused, recorded, with `lane-unknown`; the contract has no
    closer rule (open point 36).
+2. **No event for a check's carry decision.** A check carried onto a new
+   integration is judged when lane B prepares it, and no system event can
+   seal a `carry` rule's decision there. So the Room carries a check on
+   lane C's platform conditions alone (`Carried.rules` is empty), and when
+   any `carry` rule is in force, checks do not carry: they rerun.
+3. **Runner digest of a new integration.** R-CARRY-6 compares runner
+   digests, but no runner has run on the new integration when the Room
+   judges the carry. The Room uses the earlier check's runner digest, so
+   only a changed configuration, tree or snapshot stops a carry.
+4. **Preview integration.** See "Phase 2b", item 2.
 
 ## Not done
 
-Phase 2b waits for lane B revision 2 and lane L revision 2 to be approved:
-
-- the real landing engine (lane B) behind `LandingPort`, replacing the
-  in-memory state machine, with shared-SQLite integration tests;
-- the real publisher (lane L) behind `PublisherPort`, which needs lane L
-  to expose `commitFor` from its one Git serialization;
-- the Artifacts adapter, including repository creation at founding and the
-  mapping of repository identities;
-- carrying checks across integrations, and filtered checker inputs;
-- the Room's authority replay.
-
-Amendment 2's 13 lane A edits are done (see "Contract amendment 2"). The
-deployment still needs an operator command to sign onboarding grants, and
-the MCP endpoint's `RoomApi` over `bearerAct` and `bearerRequest`.
-
-Also not done:
-- [src/verify.ts](src/verify.ts) does the offline checks of R-LOG-10
-  except replaying the roster; lane L's `verifyLog` does that.
-- The MCP endpoint (lane E) and the client package's `connect`, `join` and
-  `redeem`.
+- Deployment: wrangler bindings for `ARTIFACTS` and `PUBLISHER` (with lane
+  B's container image), an operator command to sign onboarding grants, and
+  measurements on Cloudflare. The "Deployed" column is pending for every
+  case, under its own task.
+- Lane B's `pushLog` (see "Phase 2b").
+- The MCP endpoint's `RoomApi` over `bearerAct` and `bearerRequest` (lane
+  E), and the client package's `connect`, `join` and `redeem`.
 - Attention is a simple projection: review and check requests, objections,
   notes, landing outcomes, lanes left unheld, revert lanes and notify items.
-- No deployment, and no measurements on Cloudflare.
