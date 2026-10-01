@@ -1,0 +1,11 @@
+// Serves the built UI as Workers static assets. No Worker script is needed:
+// the room's API is a separate Worker (lane A). Build first: `npm run build`.
+{
+  "name": "artroom-ui",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // Hash routes (#/room) mean every path is the one page.
+    "not_found_handling": "single-page-application"
+  }
+}
