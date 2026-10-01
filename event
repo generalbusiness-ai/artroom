@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5043ed52a8006712c28dcb248fa674c19668cd5a","text":"Merge retired a covered predecessor; the successor is at packages/git/test-workers/landing-do.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:50ea71b289b96dd8c94704ec155df6b9cdbd5a24","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-laneB-git.md."}
