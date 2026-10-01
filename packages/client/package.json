@@ -10,12 +10,15 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
-    "test": "vitest run"
+    "test": "npm run test:node && npm run test:workerd",
+    "test:node": "vitest run --config vitest.config.ts",
+    "test:workerd": "vitest run --config vitest.workers.config.ts"
   },
   "dependencies": {
     "@generalbusiness/artroom-contract": "0.0.0"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
     "@types/node": "22.20.4",
     "@types/ws": "8.18.2",
     "vitest": "4.1.11",

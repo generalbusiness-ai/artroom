@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "lib": ["ES2022", "ESNext.Disposable", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

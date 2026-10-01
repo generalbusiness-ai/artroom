@@ -1074,6 +1074,11 @@ export class FakeRoom {
         for (const [k, v] of Object.entries(req.headers)) if (typeof v === "string") headersIn.set(k, v);
         const response = await this.mcp(new Request(url, { method, headers: headersIn, body: raw }), this);
         this.requests.push({ method, route, status: response.status });
+        if (fault?.kind === "drop") {
+          await response.arrayBuffer();
+          res.socket?.destroy();
+          return;
+        }
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(Buffer.from(await response.arrayBuffer()));
         return;
