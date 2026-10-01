@@ -123,6 +123,19 @@ describe("1. a pending cohort stored by the previous revision is upgraded with i
     expect(log[0]?.["v"]).toBe("unexpected-writer");
   });
 
+  it("a stored cohort that does not match the log is neither upgraded, published nor discarded", async () => {
+    const r = await makeRoom();
+    await pendingBeforePush(r);
+    await downgrade(r);
+    await inside(r, (room) => {
+      const p = room.core.pendingPublication()!;
+      room.core.sql.all("UPDATE meta SET v = ? WHERE k = 'pending_publication'", JSON.stringify({ ...p, hash: `sha256:${"0".repeat(64)}` }));
+    });
+    expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
+    expect(r.world.log.ref).toBeNull();
+    expect(await stored(r)).not.toHaveProperty("v");
+  });
+
   it("a cohort of an unknown version is neither published nor discarded", async () => {
     const r = await makeRoom();
     await pendingBeforePush(r);
@@ -138,7 +151,7 @@ describe("1. a pending cohort stored by the previous revision is upgraded with i
 
 // ------------------------------------------------------------------ 2.
 
-describe("2. an import grant's deadline is judged with the clock read after every await, and at the binding", () => {
+describe("2. an import grant's deadline is judged by the registry's clock, in the same step as the first binding", () => {
   afterEach(() => vi.restoreAllMocks());
 
   const real = () => env.REGISTRY.get(env.REGISTRY.idFromName("registry")) as unknown as DurableObjectStub<Registry>;
@@ -153,19 +166,15 @@ describe("2. an import grant's deadline is judged with the clock read after ever
     return { repo, genesis: d.genesis as Genesis, draft: d.draft, sig: sign(admin.seed, "artroom-genesis-v1", d.genesis), world };
   }
 
-  /** The registry, with time passing before a lookup or a bind reaches it. */
-  function slowRegistry(delay: { byRepo?: number; bind?: number }): RoomEnv {
+  /** The registry, with time passing before a bind reaches it. */
+  function slowRegistry(delay: { bind: number }): RoomEnv {
     return {
       ...env,
       REGISTRY: {
         idFromName: (n: string) => env.REGISTRY.idFromName(n),
         get: () => ({
-          byRepo: async (repo: string) => {
-            advance(delay.byRepo ?? 0);
-            return real().byRepo(repo);
-          },
           bind: async (repo: string, room: string, n: string, notAfter?: number) => {
-            advance(delay.bind ?? 0);
+            advance(delay.bind);
             return real().bind(repo, room as RoomId, n, notAfter);
           },
         }),
@@ -184,41 +193,42 @@ describe("2. an import grant's deadline is judged with the clock read after ever
       advance(600);
       return verify(...a);
     });
-    await forbidden(foundRoom(env as unknown as RoomEnv, d.genesis, d.sig, d.draft, () => clock.now));
+    await forbidden(foundRoom(env as unknown as RoomEnv, d.genesis, d.sig, d.draft));
     expect(await real().byRepo(d.repo)).toBeNull();
     expect(d.world.artifacts.calls.size).toBe(0);
   });
 
-  it("a grant that expires during the registry lookup binds nothing and reads nothing", async () => {
+  it("a grant that expired between draft and found binds nothing and reads nothing", async () => {
     const d = await drafted(1000);
-    await forbidden(foundRoom(slowRegistry({ byRepo: 2000 }), d.genesis, d.sig, d.draft, () => clock.now));
+    advance(2000);
+    await forbidden(foundRoom(env as unknown as RoomEnv, d.genesis, d.sig, d.draft));
     expect(await real().byRepo(d.repo)).toBeNull();
     expect(d.world.artifacts.calls.size).toBe(0);
   });
 
   it("a grant that expires while the bind is on its way is refused by the registry itself", async () => {
     const d = await drafted(1000);
-    await forbidden(foundRoom(slowRegistry({ bind: 2000 }), d.genesis, d.sig, d.draft, () => clock.now));
+    await forbidden(foundRoom(slowRegistry({ bind: 2000 }), d.genesis, d.sig, d.draft));
     expect(await real().byRepo(d.repo)).toBeNull();
     expect(d.world.artifacts.calls.size).toBe(0);
   });
 
   it("at notAfter exactly, the grant has expired; a millisecond before, it binds", async () => {
     const late = await drafted(1000);
-    await forbidden(foundRoom(slowRegistry({ bind: 1000 }), late.genesis, late.sig, late.draft, () => clock.now));
+    await forbidden(foundRoom(slowRegistry({ bind: 1000 }), late.genesis, late.sig, late.draft));
     expect(await real().byRepo(late.repo)).toBeNull();
     const early = await drafted(1000);
-    expect(await foundRoom(slowRegistry({ bind: 999 }), early.genesis, early.sig, early.draft, () => clock.now)).toBe(roomIdOf(early.genesis));
+    expect(await foundRoom(slowRegistry({ bind: 999 }), early.genesis, early.sig, early.draft)).toBe(roomIdOf(early.genesis));
     expect((await real().byRepo(early.repo))?.room).toBe(roomIdOf(early.genesis));
   });
 
   it("after the binding, a retry of the same founding completes forward though the grant has expired", async () => {
     const d = await drafted(1000);
     d.world.artifacts.failNext("readMain");
-    await expect(foundRoom(env as unknown as RoomEnv, d.genesis, d.sig, d.draft, () => clock.now)).rejects.toMatchObject({ code: "unavailable" });
+    await expect(foundRoom(env as unknown as RoomEnv, d.genesis, d.sig, d.draft)).rejects.toMatchObject({ code: "unavailable" });
     expect((await real().byRepo(d.repo))?.room).toBe(roomIdOf(d.genesis));
     advance(60_000);
-    expect(await foundRoom(slowRegistry({ byRepo: 1000, bind: 1000 }), d.genesis, d.sig, d.draft, () => clock.now)).toBe(roomIdOf(d.genesis));
+    expect(await foundRoom(slowRegistry({ bind: 1000 }), d.genesis, d.sig, d.draft)).toBe(roomIdOf(d.genesis));
     expect(d.world.artifacts.calls.get("readMain")).toBeGreaterThan(1);
   });
 

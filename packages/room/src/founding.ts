@@ -110,8 +110,8 @@ function grantShape(v: unknown): SignedOnboardingGrant {
 /**
  * An import's grant (R-GEN-12): signed by an operator key in this
  * deployment's configuration, for this repository and this admin key.
- * Its deadline is judged by the caller with the clock read after every
- * await, and again by the registry at the first binding (review 1249097f).
+ * `draft` judges its deadline; at `found`, the registry judges it at the
+ * first binding (review 1249097f).
  */
 async function checkGrant(env: RoomEnv, signed: SignedOnboardingGrant, admin: string): Promise<OnboardingGrant> {
   const g = signed.grant;
@@ -120,11 +120,6 @@ async function checkGrant(env: RoomEnv, signed: SignedOnboardingGrant, admin: st
   if (g.repo.startsWith(`${publicNamespace(env)}/`)) throw artroomError("forbidden", "A grant cannot name a repository in the public founding namespace.");
   if (g.admin !== admin) throw artroomError("forbidden", "The grant is for another admin key.");
   return g;
-}
-
-/** The grant's deadline: expired at `notAfter` itself. */
-function grantExpired(g: OnboardingGrant, now: number): boolean {
-  return parseTime(g.notAfter)! <= now;
 }
 
 /** Step 1 of `found`, and `draft`'s checks: every genesis field (R-GEN-10). */
@@ -168,7 +163,7 @@ export async function draftRoom(env: RoomEnv, input: unknown, now: number): Prom
     closed(source, "draft.repo", ["kind", "grant"]);
     onboarding = grantShape(source["grant"]);
     const g = await checkGrant(env, onboarding, admin["key"] as string);
-    if (grantExpired(g, now)) throw artroomError("forbidden", "The grant has expired.");
+    if (parseTime(g.notAfter)! <= now) throw artroomError("forbidden", "The grant has expired.");
     repo = g.repo;
   } else bad("draft.repo.kind must be new or import.");
   const genesis: Genesis = {
@@ -186,7 +181,7 @@ export async function draftRoom(env: RoomEnv, input: unknown, now: number): Prom
 }
 
 /** Founding, step 2 (R-GEN-10), in order. */
-export async function foundRoom(env: RoomEnv, genesisInput: unknown, sig: unknown, draft: unknown, clock: () => number): Promise<RoomId> {
+export async function foundRoom(env: RoomEnv, genesisInput: unknown, sig: unknown, draft: unknown): Promise<RoomId> {
   // 1. Every genesis field.
   const genesis = checkGenesis(genesisInput);
   // 2. The room key the draft value recovers.
@@ -197,22 +192,19 @@ export async function foundRoom(env: RoomEnv, genesisInput: unknown, sig: unknow
     throw artroomError("unauthenticated", "The genesis is not signed by the first admin's key.");
   const id = roomIdOf(genesis);
   const reg = registry(env);
-  // 4. Authorize the repository (R-GEN-12).
+  // 4. Authorize the repository (R-GEN-12). An import's deadline is not judged here: any
+  // time read here could be stale by the binding (review 1249097f).
   let deadline: number | undefined;
   if (genesis.onboarding) {
     const g = await checkGrant(env, genesis.onboarding, genesis.admin.key);
     if (g.repo !== genesis.repo) throw artroomError("forbidden", "The grant is for another repository.");
-    const bound = await reg.byRepo(genesis.repo);
-    const retry = bound !== null && bound.room === id && bound.name === genesis.name;
-    // The clock is read after the awaits above, so a grant that ran out during them does not
-    // authorize a first binding. Completing an identical binding forward needs no live grant.
-    if (!retry && grantExpired(g, clock())) throw artroomError("forbidden", "The grant has expired.");
     deadline = parseTime(g.notAfter)!;
   } else if (genesis.repo !== publicRepo(env, draft as string)) {
     throw artroomError("forbidden", "A public founding uses the fresh repository its draft names.");
   }
   // 5. Bind repository, room ID and name (R-GEN-13). The registry judges an import's deadline
-  // again, with its own clock, at the first binding itself.
+  // with its own clock, in the same step as the first binding; the same binding again
+  // completes forward after the deadline.
   unwire((await reg.bind(genesis.repo, id, genesis.name, deadline)) as Wire<string>);
   // 6. Create or read the repository, then seal entries 0 and 1.
   const stub = env.ROOMS.get(env.ROOMS.idFromName(id)) as unknown as DurableObjectStub<Room>;

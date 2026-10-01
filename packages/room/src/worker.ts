@@ -89,6 +89,6 @@ export default class Artroom extends WorkerEntrypoint<RoomEnv> implements Omit<A
 
   /** Founding, step 2 (R-GEN-10). */
   async found(genesis: Genesis, sig: string, draft: string): Promise<RoomId> {
-    return foundRoom(this.env, genesis, sig, draft, clock);
+    return foundRoom(this.env, genesis, sig, draft);
   }
 }
