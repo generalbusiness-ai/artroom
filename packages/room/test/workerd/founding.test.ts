@@ -123,6 +123,12 @@ describe("R-GEN-12: imports need an operator's grant", () => {
     expect(world.artifacts.calls.size).toBe(0);
   });
 
+  it("R-GEN-12: an import grant naming a repository in the public founding namespace is forbidden", async () => {
+    const admin = newKeyPair();
+    const pub = `artroom-public/${hex(randomBytes(16))}`;
+    await rejects(worker.draft({ name: name(), repo: { kind: "import", grant: grant(pub, admin.key) }, admin: { handle: "@f", key: admin.key }, recovery: newKeyPair().key }), "forbidden");
+  });
+
   it("section 23, Repository altered after draft: the genesis edited to name another repository, keeping the grant, is forbidden; nothing bound", async () => {
     const repo = importRepo();
     const { admin, drafted } = await foundImport(repo);
