@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:50ea71b289b96dd8c94704ec155df6b9cdbd5a24","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-laneB-git.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:522548fbf6bff4862a252ced5dab2d169a1beadb","text":"Merge retired a covered predecessor; the successor is at packages/git/test/ref-fence.test.ts."}
