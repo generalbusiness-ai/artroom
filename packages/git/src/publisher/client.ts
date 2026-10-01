@@ -34,7 +34,15 @@ export interface PublisherStub {
     generation: number;
   }): Promise<BuildResult>;
   push(req: { canonical: RemoteAccess; integration: string; expectedMain: string; integrationRef: string }): Promise<PushOutcome>;
-  /** Lane L's log push (R-LOG-8); `canonical.token` is a write token of at most 60 s that the caller revokes. */
+}
+
+/**
+ * The sandbox's log push (R-LOG-8), as lane A's log remote calls it:
+ * `canonical.token` is a write token of at most 60 s that the caller
+ * revokes afterwards. Separate from `PublisherStub`, which is what the
+ * landing and pinning clients call.
+ */
+export interface LogPushStub {
   pushLog(req: LogPushRequest & { canonical: RemoteAccess }): Promise<LogPushOutcome>;
 }
 

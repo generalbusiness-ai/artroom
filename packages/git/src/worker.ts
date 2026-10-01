@@ -18,7 +18,7 @@ import type { ActId, LaneId, OpId, PolicyVersion, Seq, Sha, SystemEvent } from "
 import { durableSql, type Sql, text } from "./sql.ts";
 import { Landing } from "./landing/engine.ts";
 import type { LaneFacts, LandingRoom, LandRecord, Readiness } from "./landing/types.ts";
-import { ContainerPublisher, Pinning, type PublisherStub } from "./publisher/client.ts";
+import { ContainerPublisher, type LogPushStub, Pinning, type PublisherStub } from "./publisher/client.ts";
 import { LOG_REF } from "./publisher/gitops.ts";
 import type { LogPushRequest } from "./publisher/log-push.ts";
 import { Workspaces, forkName } from "./workspace/workspaces.ts";
@@ -291,7 +291,7 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
         // token on the canonical repo, the sandbox's pushLog, then revoke the token.
         const repo = this.need(this.meta("repo"), "repo");
         const r = await this.env.ARTIFACTS.get(repo);
-        const stub = this.env.PUBLISHER.getByName(repo) as unknown as PublisherStub;
+        const stub = this.env.PUBLISHER.getByName(repo) as unknown as LogPushStub;
         const ref = typeof body["ref"] === "string" ? body["ref"] : LOG_REF;
         const t = await withRetry(() => r.createToken("write", 60));
         let outcome: unknown;
