@@ -61,6 +61,12 @@ export class ArtifactsGateway extends WorkerEntrypoint<Env, GatewayProps> {
 
 type Run = { code: number; out: string; err: string; ms: number };
 
+// What one operation has established so far. If git or the container fails
+// part-way, the response still carries what is known: the resolved expected
+// base, the integration commit once commit-tree has made it, and whether the
+// push had started.
+type OpContext = { expect: string | null; commit: string | null; pushing: boolean };
+
 // Every land response says what happened (`outcome`), the base it expected and
 // the integration commit (null if none was made or it is not known). A result
 // without an outcome is a failure before the push: `fallback` says which kind.
@@ -71,7 +77,6 @@ function landFields(req: OpRequest, res: Record<string, unknown>, fallback: "err
 
 export class GitBox extends DurableObject<Env> {
 	private chain: Promise<unknown> = Promise.resolve();
-	private pushing = false;
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
@@ -84,13 +89,14 @@ export class GitBox extends DurableObject<Env> {
 	// One operation at a time per sandbox: they share one git directory.
 	async op(req: OpRequest): Promise<Record<string, unknown>> {
 		const next = this.chain.then(async () => {
-			this.pushing = false;
+			const known: OpContext = { expect: req.expect ?? null, commit: null, pushing: false };
 			try {
-				return landFields(req, await this.doOp(req), "error");
+				return landFields(req, await this.doOp(req, known), "error");
 			} catch (e) {
 				if (req.op !== "land") throw e;
 				// A failure once the push has started may have landed.
-				return landFields(req, { ok: false, error: redact(String(e)) }, this.pushing ? "unknown" : "error");
+				return landFields(req, { ok: false, error: redact(String(e)), expect: known.expect, commit: known.commit },
+					known.pushing ? "unknown" : "error");
 			}
 		});
 		this.chain = next.catch(() => undefined);
@@ -143,7 +149,7 @@ export class GitBox extends DurableObject<Env> {
 		return { cold, startMs: Date.now() - t };
 	}
 
-	private async doOp(req: OpRequest): Promise<Record<string, unknown>> {
+	private async doOp(req: OpRequest, known: OpContext): Promise<Record<string, unknown>> {
 		const t0 = Date.now();
 		const c = this.ctx.container!;
 		if (req.op === "destroy") {
@@ -219,6 +225,7 @@ export class GitBox extends DurableObject<Env> {
 		// or unknown; see push-outcome.ts. After `unknown`, read back the base
 		// branch before any further land.
 		const expect = req.expect ?? baseSha;
+		known.expect = expect;
 		const target = `refs/heads/${base}`;
 		if (baseSha !== expect) {
 			return { ok: true, outcome: "rejected", landed: false, refused: "main-moved", expect, commit: null,
@@ -236,12 +243,13 @@ export class GitBox extends DurableObject<Env> {
 			return { ok: false, outcome: "error", landed: false, error: "commit-tree", detail: ct.err, expect, commit: null };
 		}
 		const commit = ct.out;
+		known.commit = commit;
 		let waitedMs = 0;
 		if (req.pushAt) {
 			waitedMs = Math.max(0, req.pushAt - Date.now());
 			if (waitedMs > 0 && waitedMs < 30000) await new Promise((r) => setTimeout(r, waitedMs));
 		}
-		this.pushing = true;
+		known.pushing = true;
 		const push = await this.run([
 			"git", "-C", dir, "push", "--porcelain",
 			`--force-with-lease=${target}:${expect}`,

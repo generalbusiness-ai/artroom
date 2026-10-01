@@ -18,7 +18,7 @@ The findings are in [notes/2026-10-01-spike-sandbox-git.md](../../notes/2026-10-
 | `src/index.ts` | Worker `artroom-spike-sandbox-git`: the `GitBox` Durable Object, which runs git in its container, and the `ArtifactsGateway` entrypoint, which adds the repo token to git's requests |
 | `src/push-outcome.ts` | Classifies a push as `landed`, `rejected`, `error` or `unknown` |
 | `src/iso.ts`, `src/iso-op.ts`, `src/memory-fs.ts` | Worker `artroom-spike-isogit`: the same preview and land with isomorphic-git and no container, for comparison |
-| `test/` | Node tests: same-isolate concurrent lands, and push classification against real git output (`push-samples.json`, made by `capture_push_samples.py`) |
+| `test/` | Node tests: same-isolate concurrent lands, container failures part-way through a land, and push classification against real git output (`push-samples.json`, made by `capture_push_samples.py`) |
 | `wrangler.jsonc`, `wrangler.iso.jsonc` | Configuration for the two Workers |
 | `Dockerfile` | The image to use when Docker is available |
 | `image.sh` | Copies `alpine/git` into the Cloudflare registry without Docker (what this spike used) |
@@ -37,7 +37,11 @@ The findings are in [notes/2026-10-01-spike-sandbox-git.md](../../notes/2026-10-
 `op` is `preview`, `land`, `info` or `destroy`. A land response always has
 `outcome` (`landed`, `rejected`, `error` or `unknown`), `expect` and `commit`.
 After `unknown`, read back the branch before landing again: the push may have
-landed. `box` names the sandbox: one
+landed. When the response names `commit`, reading back the branch shows whether
+that commit landed. When the whole response was lost (`commit` null), reading
+back cannot settle the operation: hold it for recovery. Artroom's Lane B
+supplies a durable identity for each operation, and the reconciliation that
+uses it. `box` names the sandbox: one
 Durable Object and one container. The token travels in the request body and
 stays in the Worker. The container is started with no Internet access and
 reaches only the Artifacts host, through the gateway.

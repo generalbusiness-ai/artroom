@@ -295,6 +295,14 @@ back main, and reconcile it against the commit in the response, before it
 lands anything else. Lane B implements this durable recovery. After `error`,
 nothing was sent. After `rejected`, main did not change because of this push.
 
+Reading back main is enough only when the response names the integration
+commit. The whole response can be lost, for example when the call from the
+Worker to the Durable Object fails. Then the Worker answers `unknown` with
+`commit: null`, and no one knows which commit to look for. Reading back
+main cannot settle that operation. Hold it for recovery, and land nothing
+more until it is settled. Lane B supplies a durable identity for each
+operation, and the reconciliation that uses it.
+
 **Checks run for this revision** (in `spikes/sandbox-git`):
 
 | Command | Result |
@@ -306,6 +314,41 @@ nothing was sent. After `rejected`, main did not change because of this push.
 
 We did not run a live lost-response test against Artifacts, and we did not
 rerun the timing or race measurements.
+
+## Review c20125d6
+
+Checker reviewed head `fbc73fc7`. P1 was resolved. One correction to P2
+remained, now made.
+
+**The container Worker lost what it knew when git failed during the push.**
+By the time `commit-tree` returns, the land knows the integration commit and
+the expected base. Suppose the container's `exec()` or `output()` then threw.
+The response said `unknown`, but `commit` was null. `expect` was also null
+when the caller had not given one and the fetched base was used. Those are
+the values reconciliation needs.
+
+Each operation now has its own context: the resolved expected base, the
+integration commit once it exists, and whether the push has started. The
+failure path returns all three. `test/gitbox-exception.test.mjs` runs the
+real `GitBox` code against a stub container whose output throws:
+
+| Where the output throws | Response |
+|---|---|
+| During the push, no `expect` given | `unknown`; `commit` is the integration commit; `expect` is the fetched base |
+| During the push, `expect` given | `unknown`; `commit` and `expect` are set |
+| During the fetch | `error`; `commit` null; `expect` as given |
+| During `commit-tree` | `error`; `commit` null; `expect` is the fetched base |
+
+With the fix removed (the failure path returning neither value), 3 of these
+4 tests fail.
+
+The note and README now say that when the whole response is lost, reading
+back main cannot settle the operation. See "What `unknown` means for the
+Room" above.
+
+**Checks run for this revision:** `npm test` (22 tests, 22 passed) and
+`npm run typecheck` (exit 0). We did not redeploy or rerun anything live for
+this correction.
 
 ## Left running
 
