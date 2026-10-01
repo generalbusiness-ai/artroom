@@ -1,7 +1,7 @@
 /**
  * The demo repository's policy. Each line is one rule from the default
  * policy pack; docs/policy-pack.md explains what each one replaces.
- * Compile it to policy.json with:
+ * Compile it to policy.json, from the repository root, with:
  *   npm run compile-policy --workspace @generalbusiness/artroom-policy -- examples/demo-repo/.artroom
  */
 
@@ -20,8 +20,11 @@ import {
 } from "@generalbusiness/artroom-policy/pack";
 
 export default policy(
-  // CODEOWNERS
+  // CODEOWNERS. Every matching pattern adds its owners. "**" is the
+  // fallback: root files, tests, deploy files and .artroom/** have an owner,
+  // so owner-review can always be met.
   owners({
+    "**": "@maintainers",
     "src/api/**": "@security",
     "src/**": "@app",
     "docs/**": "@docs",

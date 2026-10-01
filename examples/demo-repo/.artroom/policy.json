@@ -2,6 +2,9 @@
   "format": "artroom-policy-v1",
   "profile": "artroom-jsonata-v1",
   "owners": {
+    "**": [
+      "@maintainers"
+    ],
     "src/api/**": [
       "@security"
     ],

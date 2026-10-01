@@ -28,7 +28,7 @@ describe("the pack compiles to the committed demo policy", () => {
   test("policy.ts, policy.json and starterPolicy() agree, and the document is valid", () => {
     expect(JSON.parse(JSON.stringify(demo))).toEqual(demoJson);
     expect(validatePolicy(demoJson).ok).toBe(true);
-    const starter = starterPolicy({ owners: { "src/api/**": "@security", "src/**": "@app", "docs/**": "@docs" } });
+    const starter = starterPolicy({ owners: { "**": "@maintainers", "src/api/**": "@security", "src/**": "@app", "docs/**": "@docs" } });
     expect(JSON.parse(JSON.stringify(starter))).toEqual(demoJson);
   });
 
@@ -69,7 +69,7 @@ describe("require rules", () => {
     const r = await evaluateRequire(A, requireInput(P, ["src/api/login.ts"]));
     expect(r.obligations.find((o) => o.id === "obl_owner-review")).toMatchObject({ kind: "review", from: ["owners"] });
     expect(r.evaluations[0]!.context.input.kind === "require" && r.evaluations[0]!.context.input.proposal.owners).toEqual([
-      { path: "src/api/login.ts", owners: ["@security", "@app"] },
+      { path: "src/api/login.ts", owners: ["@maintainers", "@security", "@app"] },
     ]);
   });
 
@@ -123,7 +123,7 @@ describe("notify rules", () => {
 
   test("notify-owners: the owners of changed paths hear about a proposal", async () => {
     const r = await evaluateNotify(A, notifyInput(P, "propose", ["src/api/login.ts", "docs/intro.md"]), dir);
-    expect(r.notify.map((n) => n.to)).toEqual(["@app", "@docs", "@security"]);
+    expect(r.notify.map((n) => n.to)).toEqual(["@app", "@docs", "@maintainers", "@security"]);
   });
 
   test("notify-holder: the holder hears about an objection or a failed check, not an approval", async () => {
@@ -256,8 +256,8 @@ describe("budget: the pack on a 500-path proposal", () => {
 /** Measured on Node and workerd; both runs must give exactly these (docs/policy-pack.md). */
 const MEASURED = {
   propose: { steps: 5, inspectedBytes: 127 },
-  land: { steps: 3546, inspectedBytes: 140555 },
-  reservation: { steps: 3546, inspectedBytes: 140555 },
-  freshApproval: { steps: 3532, inspectedBytes: 140208 },
+  land: { steps: 3546, inspectedBytes: 148055 },
+  reservation: { steps: 3546, inspectedBytes: 148055 },
+  freshApproval: { steps: 3532, inspectedBytes: 147708 },
   carry: { steps: 6, inspectedBytes: 30012 },
 };

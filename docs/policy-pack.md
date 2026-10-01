@@ -9,6 +9,7 @@ only by an admin-approved proposal.
 This guide covers:
 
 - how to use the pack;
+- how owners must cover every path;
 - what each rule replaces, with one line for before and after, and the text
   a user sees;
 - what the platform does without any rule;
@@ -24,7 +25,7 @@ import { owners, policy } from "@generalbusiness/artroom-policy/helpers";
 import { claimBeforePropose, ownerReview, checkTests /* … */ } from "@generalbusiness/artroom-policy/pack";
 
 export default policy(
-  owners({ "src/api/**": "@security", "src/**": "@app", "docs/**": "@docs" }),
+  owners({ "**": "@maintainers", "src/api/**": "@security", "src/**": "@app", "docs/**": "@docs" }),
   claimBeforePropose(),
   ownerReview(),
   checkTests("@ci"),
@@ -32,14 +33,62 @@ export default policy(
 );
 ```
 
+Run the compiler from the repository root:
+
 ```sh
 npm run compile-policy --workspace @generalbusiness/artroom-policy -- examples/demo-repo/.artroom
 ```
+
+The directory is relative to where you run `npm`. npm runs the script in
+`packages/policy`, so the compiler reads the directory npm was started from
+(`INIT_CWD`). Without an argument it uses `.artroom`. The compiler writes
+`policy.json` only if the policy is valid (R-POL-1) and every owner-review
+path has an owner (see below). Otherwise it prints the problems and exits
+with status 1. The command above reproduces the committed demo `policy.json`
+byte for byte.
 
 The demo repository's complete policy is in
 [`examples/demo-repo/.artroom/policy.ts`](../examples/demo-repo/.artroom/policy.ts),
 and the compiled file is next to it as `policy.json`. To use every rule with your
 own owners, call `starterPolicy({ owners })` instead.
+
+## Owners must cover every path
+
+`owner-review` applies to every path (`**`) and asks for a review from
+`owners`. Only the owners of the obligation's paths can meet it (R-OBL-2).
+So a change to a path with no owner would open an obligation that nobody
+can meet, and the proposal could never land. An admin's approval does not
+help: `obl_admin-approval` and `obl_deploy-config-review` are separate
+obligations, added on top of owner review, never instead of it.
+
+So the owner map must give every path an owner. The pack's choice is a
+**fallback owner**: an entry for `**`. The demo uses
+`"**": "@maintainers"`, so root files such as `README.md` and
+`package.json`, `tests/**`, deploy files such as `wrangler.jsonc`, and
+`.artroom/**` are all owned by `@maintainers`.
+
+Every matching pattern adds its owners; a later pattern does not replace an
+earlier one, as it does in `CODEOWNERS`. So the fallback owner is also an
+owner of every other path, and can meet `owner-review` for `src/api/**`
+too. Choose a fallback team you trust with every path.
+
+The pack refuses a policy that would leave a path without an owner:
+
+- `starterPolicy()` throws if its owner map has no pattern that covers `**`;
+- the compiler refuses any `policy.ts` in which a review rule whose only
+  `from` is `owners` applies to paths that no single owners pattern covers.
+  The message names the rule and the glob, and suggests
+  `owners({ "**": "@maintainers" })`.
+
+If you do not want a fallback owner, limit owner review to the paths you
+own, for example `ownerReview(["src/**", "docs/**"])`. Paths outside it then
+need no owner review. The check is conservative: two patterns that only
+together cover a glob are not enough, and a rule's `when` is ignored.
+
+The room itself does not run this check: a hand-written `policy.json` with
+a partial owner map is still a valid policy (R-POL-1). Compile policy with
+the compiler, and an admin can repair a stuck policy through a
+configuration-recovery lane (R-ADMIN-5).
 
 ## The rules
 
@@ -69,8 +118,10 @@ changes.
 **`owner-review`** replaces `CODEOWNERS` with "require review from code
 owners".
 - Before: `CODEOWNERS` plus a branch protection setting.
-- After: `owners({ "src/api/**": "@security", … })`, and each changed path
-  needs a review from its owners. Renames count both the old and the new path.
+- After: `owners({ "**": "@maintainers", "src/api/**": "@security", … })`,
+  and each changed path needs a review from its owners. Renames count both
+  the old and the new path. Every path must have an owner (see "Owners must
+  cover every path").
 - The user sees an open obligation, `obl_owner-review`. `land` is refused
   with `obligation-open` until it is met.
 
@@ -169,13 +220,14 @@ and workerd. Both gave the same numbers, and the corpus pins them.
 | Act | Rules evaluated | Steps | Inspected bytes | Share of the act budget |
 |---|---|---|---|---|
 | `propose` | `claim-before-propose`; the `require` rules | 5 | 127 | under 0.1% |
-| `land`, and preparation at the reservation stage | `objection-open`, `fresh-approval` | 3,546 | 140,555 | 14.2% of steps; 3.4% of bytes |
+| `land`, and preparation at the reservation stage | `objection-open`, `fresh-approval` | 3,546 | 148,055 | 14.2% of steps; 3.5% of bytes |
 | One carried approval | `stale-approval` | 6 | 30,012 | under 1% |
 
 - The largest rule is `fresh-approval`, which reads every path: 3,532 steps
-  and 140,208 bytes.
-- The largest act therefore has 21,454 steps of headroom (85.8%) and 4,053,749
-  bytes (96.6%).
+  and 147,708 bytes. It reads each path's owners, so the fallback owner adds
+  15 bytes per path.
+- The largest act therefore has 21,454 steps of headroom (85.8%) and 4,046,249
+  bytes (96.5%).
 - `require` and `notify-owners` match paths in platform code, so they use no
   evaluator steps.
 - The room-core spike estimated 3 to 9 microseconds of deployed CPU per step
@@ -198,3 +250,11 @@ runtime on Node and on workerd. It checks:
 - the reservation-stage case;
 - that `policy.ts`, `policy.json` and `starterPolicy()` agree;
 - the budget figures above.
+
+`packages/policy/test/review-4df45987.test.ts` checks owner coverage, on
+Node and on workerd. For root files, `tests/`, deploy files, `.artroom`
+files and a mixed proposal, it shows who can meet each obligation. It shows
+that a partial owner map would leave `README.md` with nobody, and that
+`starterPolicy()` refuses it. On Node, it runs the compiler and checks that
+it refuses a partial map, writes nothing, and resolves its argument against
+`INIT_CWD`.

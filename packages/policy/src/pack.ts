@@ -14,6 +14,7 @@
 
 import type { Glob, PolicyDocument, PolicyPart, Principal, RuleId } from "@generalbusiness/artroom-contract";
 import { OBJECTION_OPEN, carry, owners, policy, requireCheck, requireReview, rule } from "./helpers.ts";
+import { globCovers } from "./glob.ts";
 
 // ------------------------------------------------------------------ refuse
 
@@ -43,7 +44,11 @@ export const narrowClaims = (): PolicyPart =>
 
 // ----------------------------------------------------------------- require
 
-/** CODEOWNERS: changed paths need a review from their owners. */
+/**
+ * CODEOWNERS: changed paths need a review from their owners. The owners map
+ * must cover every path the rule applies to (see `ownerCoverage`): by
+ * default that is every path, so the map needs a fallback owner for `**`.
+ */
 export const ownerReview = (paths: readonly Glob[] = ["**"]): PolicyPart =>
   requireReview({ id: "owner-review", paths, from: "owners" });
 
@@ -119,7 +124,11 @@ export const notifyHolder = (): PolicyPart =>
 // ---------------------------------------------------------------- assembly
 
 export interface StarterOptions {
-  /** CODEOWNERS-style map: pattern to owners. */
+  /**
+   * CODEOWNERS-style map: pattern to owners. Every matching pattern adds its
+   * owners. It must give every path an owner, so it needs a fallback entry
+   * such as `"**": "@maintainers"`; `starterPolicy` throws otherwise.
+   */
   readonly owners: Readonly<Record<Glob, Principal | readonly Principal[]>>;
   /** The checker principal for tests and types. Default `@ci`. */
   readonly ci?: Principal;
@@ -129,10 +138,10 @@ export interface StarterOptions {
   readonly sensitive?: string;
 }
 
-/** The starter policy: every pack rule, for one repository. */
+/** The starter policy: every pack rule, for one repository. Throws if a path could have no owner. */
 export function starterPolicy(opts: StarterOptions): PolicyDocument {
   const ci = opts.ci ?? "@ci";
-  return policy(
+  const doc = policy(
     owners(opts.owners),
     claimBeforePropose(),
     narrowClaims(),
@@ -145,6 +154,40 @@ export function starterPolicy(opts: StarterOptions): PolicyDocument {
     notifyOwners(),
     notifyHolder(),
   );
+  const problems = ownerCoverage(doc);
+  if (problems.length) throw new TypeError(`Invalid starter policy: ${problems.join("; ")}`);
+  return doc;
+}
+
+/**
+ * Owner coverage. A review obligation whose only `from` is `owners` can be
+ * met only by the owners of its paths (R-OBL-2). If a changed path matches
+ * the rule but no owners pattern, a proposal that changes only such paths
+ * gets an obligation nobody can meet, and it can never land. So each glob
+ * of such a rule must be covered by one owners pattern (validation already
+ * requires each pattern to name at least one owner). Returns one problem per
+ * uncovered glob; empty when covered.
+ *
+ * The check is conservative (`globCovers`): several patterns that only
+ * together cover a glob are not enough. It ignores `when`, since a `when`
+ * may be true for an unowned path. The room's own validation (R-POL-1)
+ * does not run it; the compiler and `starterPolicy` do.
+ */
+export function ownerCoverage(doc: PolicyDocument): string[] {
+  const owned = Object.keys(doc.owners);
+  const problems: string[] = [];
+  for (const r of doc.rules) {
+    if (r.kind !== "require" || r.obligation.type !== "review") continue;
+    if (!r.obligation.from.every((f) => f === "owners")) continue;
+    for (const glob of r.paths)
+      if (!owned.some((pattern) => globCovers(pattern, glob)))
+        problems.push(
+          `rule ${r.id} needs a review from the owners of ${glob}, but no owners pattern covers all of ${glob}, ` +
+            `so a change to an unowned path would need a review nobody can give. ` +
+            `Add a fallback owner, for example owners({ "**": "@maintainers" }), or limit the rule to owned paths`,
+        );
+  }
+  return problems;
 }
 
 /** What each pack rule replaces, for the guide. */
