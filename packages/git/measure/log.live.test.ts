@@ -117,6 +117,7 @@ class LiveRemote implements GitRemote {
     return o;
   }
   async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<PushOutcome> {
+    out["pushed"] = [...((out["pushed"] as unknown[]) ?? []), { objects: objects.length, bytes: objects.reduce((n, o) => n + o.data.length, 0) }];
     const r = await h("logpush", { objects: objects.map((o) => ({ type: o.type, data: b64url(o.data) })), ref, next, lease });
     if ("threw" in r.outcome) throw new Error(`pushLog: ${r.outcome.threw}`);
     return r.outcome as PushOutcome;
