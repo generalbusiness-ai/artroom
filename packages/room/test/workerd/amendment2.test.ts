@@ -56,7 +56,8 @@ describe("edit 6: bearerAct and bearerRequest on the Worker's RoomWire (R-CRED-1
     expectRefusal(await wire.bearerRequest(b.bearer, { kind: "workspace-token", lane: claim.lane, lease: 7 }), "lease-fenced");
     let thrown: unknown = null;
     try {
-      await wire.bearerRequest(b.bearer, { kind: "session", ttlSeconds: 60 });
+      // Even with a lane and lease, a bearer has no `session` request: its token already is a read credential.
+      await wire.bearerRequest(b.bearer, { kind: "session", lane: claim.lane, lease: 1 });
     } catch (e) {
       thrown = e;
     }
