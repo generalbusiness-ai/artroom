@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/room/package.json at exact a5a3406a82bfc2710415f69ef6b2479c9884a980 on request/laneA-room, under promise git:sha1…a64779c on request git:sha1…7d280b4","body":{"commit":"a5a3406a82bfc2710415f69ef6b2479c9884a980","path":"packages/room/package.json"}}
+{"kind":"artifact","text":"packages/room/src/admission.ts at exact a5a3406a82bfc2710415f69ef6b2479c9884a980 on request/laneA-room, under promise git:sha1…a64779c on request git:sha1…7d280b4","body":{"commit":"a5a3406a82bfc2710415f69ef6b2479c9884a980","path":"packages/room/src/admission.ts"}}
