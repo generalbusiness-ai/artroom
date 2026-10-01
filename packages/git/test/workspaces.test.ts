@@ -614,7 +614,9 @@ test("restart while a fork creation is outstanding: its 24-hour token is revoked
   clock.advance(RECHECK_MS.max);
   assert.equal(await restarted.reconcile(), 1, "still in flight: still owed");
   assert.deepEqual(fork().live(), [], "the creation token was revoked by the scheduled inventory");
-  clock.advance(3_600_000 + FORK_TOKEN_TTL_S * 1000); // past send time + apply bound + 24 h
+  clock.advance(3_600_000); // past the apply bound, but the creation token could still be alive
+  assert.equal(await restarted.reconcile(), 1, "the duty lasts for the token's whole possible life");
+  clock.advance(FORK_TOKEN_TTL_S * 1000); // past send time + apply bound + 24 h
   assert.equal(await restarted.reconcile(), 0);
   assert.equal(restarted.nextDue(), null);
   assert.ok(restarted.duties().some((d) => d.kind === "fork-create" && d.doneReason === "past-bound"));
