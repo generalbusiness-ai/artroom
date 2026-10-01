@@ -22,10 +22,14 @@ export async function browserJoin(invitation: InvitationId, secret: string): Pro
   const signer = await webCryptoSigner();
   const joined = await join({ url }, roomId, { invitation, secret, signer });
   if (isRefusal(joined)) {
-    show(`${joined.rule}: ${joined.reason}`); // e.g. "invitation-invalid", "key-in-use"
+    // e.g. "invitation-invalid", "key-in-use", or "custody-mismatch" for an MCP (room-custody) invitation
+    show(`${joined.rule}: ${joined.reason}`);
     return;
   }
   show(`joined as ${joined.member} (${joined.role}) with ${joined.key}`);
+  // The room records which custody the admission path matched (R-ADM-12).
+  const by = joined.record.by;
+  if (by.via === "join" && by.custody === "client") show(`key bound at redemption of ${by.invitation}`);
   using room = await connect({ url }, roomId, { kind: "key", signer });
   const queue = await room.attention();
   show(`${queue.items.length} items need you`);

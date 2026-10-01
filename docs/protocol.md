@@ -39,6 +39,7 @@ sections 4 to 11 and 13.
 22. Open points
 23. Acceptance cases and the rules they test
 24. Review 45431cd9
+25. Review d12b67d6
 
 ## 1. Terms
 
@@ -298,7 +299,9 @@ is the grantor's member, limited to the delegation.
 - the invitation exists, is unused and has not expired by the room clock;
 - the SHA-256 of the revealed secret equals the invitation's `secretHash`;
 - the signing key is not already a key of any member, and has never been
-  revoked. Otherwise the refusal is `key-in-use`.
+  revoked. Otherwise the refusal is `key-in-use`;
+- the invitation's custody matches the admission path (R-ADM-12).
+  Otherwise the refusal is `custody-mismatch`.
 
 The invitation binds the signing key at redemption. It names no key in
 advance. The authority is the invited member, with the invitation's role
@@ -339,14 +342,40 @@ full signed envelope and the decisions that led to them. The returned
 never recorded. So only an authenticated, authorized, well-formed and
 secret-free envelope ever reaches the log.
 
-**R-ADM-9.** A runtime failure records nothing. Examples are a Worker CPU
-limit, running out of memory, a storage error or an engine fault. The caller
-receives a retryable `ArtroomError`.
+**R-ADM-9.** A runtime failure during admission records nothing. Examples
+are a Worker CPU limit, running out of memory, a storage error or an engine
+fault. The caller receives a retryable `ArtroomError`. The one exception is
+`notify`, which runs after the act is committed: a runtime failure there
+leaves the act recorded and is retried (R-LOG-13).
 
 **R-ADM-10.** The room answers an act only after its SQLite write commits.
 
 **R-ADM-11.** An accepted act by the lane holder on its lane renews the
 lease (R-LANE-5). A recorded refusal does not.
+
+**R-ADM-12. Invitation custody is enforced by the admission path.** There
+is one join admission (case (c) of R-ADM-3). Its caller passes the
+admission path (`AdmissionPath`), which the room's own code sets. The path
+is never read from the envelope, the route, the body, or any other caller
+input.
+
+| Path | Who uses it | Invitations it may consume |
+|---|---|---|
+| `submitted` | `submit` over RPC, `POST /v1/rooms/:room/acts`, and `redeem` with `custody: "client"` | `custody: "client"` only |
+| `room-redemption` | Only the room's own handling of `redeem` with `custody: "room"`. It signs the `join` with a key it has just generated and holds | `custody: "room"` only |
+
+- A `join` against a room-custody invitation on the `submitted` path is
+  refused with `custody-mismatch`. So is a room redemption of a
+  client-custody invitation.
+- A refused join records nothing and does not consume the invitation.
+- Every other join check still applies on both paths: signature, invitation
+  state, secret hash, unbound key, and single consumption.
+- The receipt's authority records the invitation's custody (`custody` in
+  the `join` case). `artroom verify` checks it equals the invitation's.
+  For `room`, the joined key's custody is `room`.
+
+So a room-custody member's key never leaves the room, and that member acts
+only through the bounded session delegation of R-CRED-3.
 
 ## 6. Idempotency (R-IDEM)
 
@@ -390,7 +419,9 @@ only by the user, and redeems the invitation. The CLI signs each envelope.
 **R-CRED-3. MCP.** An invitation with `custody: "room"` works like this:
 1. The caller sends the invitation ID and secret to `redeem` (R-CRED-9),
    with no other credential. The room makes the member's key and keeps it.
-   It records the `join`, signed by that key (case (c) of R-ADM-3).
+   It records the `join`, signed by that key, on the `room-redemption` path
+   (case (c) of R-ADM-3, R-ADM-12). No other path can redeem this
+   invitation.
 2. For each bearer session, the room makes a session key. It records a
    `delegate` act from the member key to the session key, with the
    invitation's `session` kinds and lifetime.
@@ -437,11 +468,14 @@ It is never recorded.
 credential. It is `RoomWire.redeem` over RPC and `POST
 /v1/rooms/:room/redeem` over HTTPS.
 - `custody: "client"`: the body is a signed `join` envelope. The room
-  admits it like any act, by case (c) of R-ADM-3. It returns `Joined`, with
-  a read session.
+  admits it like any act, by case (c) of R-ADM-3, on the `submitted` path.
+  It returns `Joined`, with a read session.
 - `custody: "room"`: the body is the invitation ID and secret. The room
-  makes the member key, records the `join`, makes a session key, records the
+  makes the member key, and admits the `join` it signs with that key on the
+  `room-redemption` path. It then makes a session key, records the
   `delegate`, and returns `Redeemed`, with the bearer token shown once.
+- The body's `custody` only selects the branch. The join admission checks
+  the invitation's recorded custody against the path (R-ADM-12).
 - A refused redemption records nothing and does not consume the invitation.
 - Redemption is rate-limited per client address and per invitation.
 
@@ -1178,9 +1212,11 @@ unchanged, backed by the full conformance corpus.
   - for `notify`, nobody is notified, and the `notified` entry records the
     error.
 - **A runtime failure** is a Worker CPU limit, running out of memory, or an
-  engine fault. It is infrastructure. Nothing is recorded, and the caller
-  receives a retryable `ArtroomError` `policy-runtime`. The Worker CPU limit
-  is a backstop, not the budget.
+  engine fault. It is infrastructure. During admission nothing is recorded,
+  and the caller receives a retryable `ArtroomError` `policy-runtime`. For
+  `notify`, which runs after the act is committed, the act stays recorded
+  and evaluation is retried (R-LOG-13). The Worker CPU limit is a backstop,
+  not the budget.
 
 **R-EVAL-6.** Replaying a recorded decision, with its retained input, the
 same policy version and the same profile, gives the same outcome.
@@ -1568,6 +1604,12 @@ safest reading. Each needs confirmation by review.
     secret is the credential. It is rate-limited, and a failed attempt does
     not consume the invitation. Whether failed attempts should eventually
     disable an invitation is open.
+29. **A lost redemption response.** If a room-custody redemption succeeds
+    but its response is lost, the bearer token cannot be shown again. The
+    admin issues a new room-custody invitation for the same member, which
+    adds a key and a session, and may revoke the unused delegation. Lane E
+    tests refused, partial and lost-response redemptions, and that none
+    leaks a bearer token.
 
 ## 23. Acceptance cases and the rules they test
 
@@ -1609,7 +1651,11 @@ must pass it.
 | A token appears in no attention item, update, log entry, `explain`, error or cached response | Verified by scanning every output for the token | R-WS-4 |
 | **Scoped checker, new test.** A checker with inputs `src/**` passed on generation 1. Generation 2 leaves `src/**` unchanged and adds a failing `tests/login.test.ts` | The filtered snapshot contains the new file, so its digest changes; the check reruns and fails; it is not carried | R-CARRY-3, R-CARRY-8, R-CARRY-9 |
 | **Browser join.** A browser key redeems a client-custody invitation | `Joined`; the key is bound at redemption; a second `join` with the same invitation is refused `invitation-invalid`; a `join` by an already-bound key is refused `key-in-use` | R-ADM-3 (c), R-CRED-9 |
-| **MCP redemption.** An agent redeems a room-custody invitation with no credential | `Redeemed`, with a bearer token shown once; the log holds the `join` and the `delegate`, not the token | R-CRED-3, R-CRED-9, R-SEC-5 |
+| **MCP redemption.** An agent redeems a room-custody invitation with no credential | `Redeemed`, with a bearer token shown once; the log holds the `join` (authority `custody: "room"`, key custody `room`) and the `delegate`, not the token; the member's acts are bounded by the session delegation's kinds and lifetime | R-CRED-3, R-CRED-9, R-ADM-12, R-SEC-5 |
+| **Room-custody invitation, self-signed join on `/acts`.** The recipient makes its own key and posts a signed `join` with the invitation's secret to `POST /v1/rooms/:room/acts` | Refused `custody-mismatch`; nothing recorded; the invitation stays unused | R-ADM-12 |
+| **Room-custody invitation, self-signed join over RPC.** The same `join` sent to `RoomWire.submit` | Refused `custody-mismatch`; nothing recorded; the invitation stays unused | R-ADM-12 |
+| **Room-custody invitation, client redemption.** The same `join` sent to `redeem` with `custody: "client"` | Refused `custody-mismatch`; nothing recorded | R-ADM-12, R-CRED-9 |
+| **Client-custody invitation, room redemption.** `redeem` with `custody: "room"` and a client-custody invitation's ID and secret | Refused `custody-mismatch`; no key made; nothing recorded; the invitation stays unused | R-ADM-12, R-CRED-9 |
 | **Unjoined Worker.** A member delegates `check` and `note` to a key that never joined; the Worker signs a `note` under it | Admitted with authority `via: "delegation"`, the grantor as member. After the grantor's key is revoked, the next act is refused `delegation-invalid` | R-ADM-3 (b), R-CRED-4 |
 | **Recovery key.** The recovery key signs `set-role` while no admin can act | Admitted with authority `via: "recovery"` and the flag `recovery-key`; a `claim` signed by it is refused `role-forbids` | R-ADM-3 (d), R-GEN-3 |
 | **Log construction.** A new claim, its `notified` event, and the first two publications | Built in the order of section 20's worked example; `artroom verify` accepts both commits | R-LOG-2, R-LOG-8, R-LOG-12, R-LOG-13 |
@@ -1627,3 +1673,14 @@ it is answered:
 | P1.3 Authority cases, redemption, onboarding | R-ADM-3 split into cases (a)–(d); R-ADM-5; R-GEN-6; R-CRED-1, R-CRED-3, R-CRED-4, R-CRED-5; new R-CRED-9 | `Authority` is a union on `via`; `JoinEnvelope`; `Redemption`, `Joined`, `Redeemed`; `RoomWire.redeem`; `POST /v1/rooms/:room/redeem`; declared `join()`, `redeem()`; refusal `key-in-use` | `onboarding.ts` |
 | P1.4 Workspace credentials | New R-WS-1 to R-WS-5; R-CRED-5; R-API-9 | `WorkspaceDetail` has no token; new `WorkspaceGrant`; `RoomApi.workspaceToken()`; request kind `workspace-token`; MCP `workspace` returns `{ op, grant }`; refusal `workspace-not-ready` | `workspace-visibility.ts`, `demo-loop.ts` |
 | P2.1 Tests as global inputs | R-CARRY-3 list extended | — | Section 23, "Scoped checker, new test" |
+
+## 25. Review d12b67d6
+
+Checker's review of `845c7fd7` found the five earlier findings resolved,
+and one remaining P1.
+
+| Finding | Rules changed or added | Types | Examples |
+|---|---|---|---|
+| P1 Enforce invitation custody at every join | R-ADM-3 (c) adds the custody condition; new R-ADM-12; R-CRED-9 | `AdmissionPath` (internal, never on the wire); `Authority` `join` case gains `custody`; refusal `custody-mismatch`; custody documented on `Invitation`, `Redemption`, `RoomWire.submit` and `POST /acts` | `onboarding.ts`; section 23, four cross-custody cases with the bounded MCP case |
+| Non-blocking: runtime failure wording | R-ADM-9 and R-EVAL-5 name the post-commit `notify` exception of R-LOG-13 | — | — |
+| Non-blocking: Lane E redemption tests | Open point 29 | — | — |
