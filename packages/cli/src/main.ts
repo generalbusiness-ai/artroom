@@ -30,6 +30,7 @@ import {
   type ClientActOptions,
   type ClientOptions,
   type HttpRoomClient,
+  type PreparedAct,
 } from "@generalbusiness/artroom-client";
 import type {
   ActId,
@@ -256,18 +257,36 @@ interface ActSpec<T> {
   readonly command: string;
   /** Resolves the act from current state and sends it. Runs only for new work, never for a journaled act. */
   start(api: HttpRoomClient, room: RoomConfig, opts: ClientActOptions): Promise<Result<T>>;
-  /** The local change this act will own, read from the config before it is sent. Default: none. */
-  intent?(room: RoomConfig): LocalIntent;
+  /** The local change this act will own, fixed from the config and the prepared act just before it is sent. Default: none. */
+  intent?(room: RoomConfig, act: PreparedAct): LocalIntent;
+}
+
+/** Changes the selected lane; every change, even back to an earlier lane, gets a new revision (R: review 80d3710c). */
+function setLane(r: RoomConfig, lane: LaneId | undefined, by: string): void {
+  if (lane === undefined) delete r.lane;
+  else r.lane = lane;
+  r.laneRev = (r.laneRev ?? 0) + 1;
+  r.laneBy = by;
+}
+
+/** Changes the followed landing, with a new revision. */
+function setLanding(r: RoomConfig, landing: RoomConfig["landing"], by: string): void {
+  if (landing === undefined) delete r.landing;
+  else r.landing = landing;
+  r.landingRev = (r.landingRev ?? 0) + 1;
+  r.landingBy = by;
 }
 
 /**
  * The one place an act's local change is made, for a fresh answer and a
- * recovered one alike. Each change is made only if the local state is still
- * the one the act expected, or still belongs to the act's lane. Newer local
- * work is never overwritten or deleted; the lines returned say what was
- * kept. Each step is safe to repeat.
+ * recovered one alike. The act recorded, before it was sent, the revisions
+ * it expects and the credential installation it owns. A change is made only
+ * if that is still so; if this act already made it (`laneBy`, `landingBy`
+ * name its key), nothing is done again. Newer local work, including a later
+ * reselection of the same lane or a newer lease's credential, is never
+ * overwritten or deleted, and the lines returned say what was kept.
  */
-function applyLocal(ctx: Ctx, id: RoomId, local: LocalIntent, out: unknown): string[] {
+function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: unknown): string[] {
   const lines: string[] = [];
   switch (local.kind) {
     case "none":
@@ -275,9 +294,9 @@ function applyLocal(ctx: Ctx, id: RoomId, local: LocalIntent, out: unknown): str
     case "select-lane": {
       const lane = (out as Claim).lane;
       updateRoom(ctx, id, (r) => {
-        const now = r.lane ?? null;
-        if (now === local.expect || now === lane) r.lane = lane;
-        else lines.push(`Kept lane ${now} selected: it was chosen after this claim was sent. To work on ${lane}, pass --lane ${lane}.`);
+        if (r.laneBy === key) return;
+        if ((r.laneRev ?? 0) === local.rev) setLane(r, lane, key);
+        else lines.push(`Kept lane ${r.lane ?? "(none)"} selected: the selection changed after this claim was sent. To work on ${lane}, pass --lane ${lane}.`);
       });
       ctx.step("config-written");
       return lines;
@@ -285,24 +304,28 @@ function applyLocal(ctx: Ctx, id: RoomId, local: LocalIntent, out: unknown): str
     case "follow-landing": {
       const l = out as Landing;
       updateRoom(ctx, id, (r) => {
-        const now = r.landing?.op ?? null;
-        if (now === local.expect || now === l.op.id) r.landing = { op: l.op.id, lane: l.lane };
-        else lines.push(`Kept following landing ${now}: it started after this one. To follow this one: artroom wait ${l.op.id}`);
+        if (r.landingBy === key) return;
+        if ((r.landingRev ?? 0) === local.rev) setLanding(r, { op: l.op.id, lane: l.lane }, key);
+        else lines.push(`Kept following ${r.landing?.op ?? "no landing"}: that changed after this landing started. To follow this one: artroom wait ${l.op.id}`);
       });
       ctx.step("config-written");
       return lines;
     }
     case "release-lane": {
-      if (local.credential !== null) {
-        const done = removeCredential(local.credential, local.lane);
-        if (done === "removed") lines.push(`Removed the workspace credential for lane ${local.lane} from ${local.credential}.`);
-        if (done === "kept") lines.push(`Left the workspace credential at ${local.credential}: it now belongs to another lane.`);
+      const installed = local.installed;
+      if (installed !== null) {
+        const done = removeCredential(installed.file, installed.install);
+        if (done === "removed") lines.push(`Removed the workspace credential for lane ${local.lane}, lease ${installed.lease}, from ${installed.file}.`);
+        if (done === "kept") lines.push(`Left the workspace credential at ${installed.file}: a newer workspace installed it.`);
       }
       ctx.step("credential-removed");
       updateRoom(ctx, id, (r) => {
-        if (r.lane === local.lane) delete r.lane;
-        if (r.landing?.lane === local.lane) delete r.landing;
-        if (r.workspaces?.[local.lane] !== undefined) delete r.workspaces[local.lane];
+        if (installed !== null && r.workspaces?.[local.lane]?.install === installed.install) delete r.workspaces[local.lane];
+        if (r.lane === local.lane && r.laneBy !== key) {
+          if ((r.laneRev ?? 0) === local.laneRev) setLane(r, undefined, key);
+          else lines.push(`Kept lane ${local.lane} selected: it was selected again after this release of lease ${local.lease} was sent.`);
+        }
+        if (r.landing?.lane === local.lane && r.landingBy !== key && (r.landingRev ?? 0) === local.landingRev) setLanding(r, undefined, key);
       });
       ctx.step("config-written");
       return lines;
@@ -337,11 +360,12 @@ async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T
   else {
     if (entry === undefined) {
       const { api } = await open(ctx);
-      // Fixed now, before anything is sent: what this act owns locally, and the state it expects.
-      const local = spec.intent?.(room) ?? { kind: "none" as const };
       out = await spec.start(api, room, {
         idempotencyKey: key,
         onPrepared: (prepared) => {
+          // Fixed now, before anything is sent: what this act owns locally, and the revisions it expects.
+          const now = ctx.store.read().rooms[id] ?? room;
+          const local = spec.intent?.(now, prepared) ?? { kind: "none" as const };
           entry = { v: 1, type: "act", id: key, room: id, command: spec.command, state: "prepared", prepared, local };
           ctx.store.journal(entry);
           ctx.step("act-journaled");
@@ -372,7 +396,7 @@ async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T
     ctx.store.journal(entry);
     ctx.step("act-answered");
   }
-  const extra = isRefusal(out) ? [] : applyLocal(ctx, id, entry!.local ?? { kind: "none" }, out);
+  const extra = isRefusal(out) ? [] : applyLocal(ctx, id, key, entry!.local ?? { kind: "none" }, out);
   ctx.step("act-completed");
   ctx.store.finish(id, "act", key);
   ctx.act = undefined;
@@ -413,7 +437,7 @@ async function waitLanding(ctx: Ctx, api: HttpRoom, id: RoomId, op: OpId, timeou
   }
   if (reached.state !== "unresolved") {
     updateRoom(ctx, id, (r) => {
-      if (r.landing?.op === op) delete r.landing;
+      if (r.landing?.op === op) setLanding(r, undefined, "wait");
     });
   }
   return print(ctx, reached, () => [`Landing ${op}, generation ${reached.generation}: ${short(reached.head)}.`, ...landText(reached)], reached.state === "landed" ? EXIT.ok : EXIT.failed);
@@ -570,7 +594,7 @@ const COMMANDS: Record<string, Command> = {
           const body = { scope: ctx.args, expectedGeneration, ...(goal ? { goal } : {}), ...(plan ? { plan } : {}), ...(because.length ? { because } : {}) };
           return api.claim(mine ? { ...body, lane: lane as Held } : { ...body, lane: target }, opts);
         },
-        intent: (room) => ({ kind: "select-lane", expect: room.lane ?? null }),
+        intent: (room) => ({ kind: "select-lane", rev: room.laneRev ?? 0 }),
       });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => [...claimText(out), ...extra]);
@@ -594,10 +618,11 @@ const COMMANDS: Record<string, Command> = {
       const grant = await api.workspaceToken(h);
       if (isRefusal(grant)) return refused(ctx, grant);
       ctx.secrets.add(grant.token);
-      const file = configureWorkspace(ctx.io.cwd, grant.remote, grant.token, h.lane, grant.leaseGeneration);
+      const install = newIdempotencyKey();
+      const file = configureWorkspace(ctx.io.cwd, grant.remote, grant.token, h.lane, grant.leaseGeneration, install);
       const { id } = roomOf(ctx);
       updateRoom(ctx, id, (r) => {
-        r.workspaces = { ...r.workspaces, [h.lane]: file };
+        r.workspaces = { ...r.workspaces, [h.lane]: { file, lease: grant.leaseGeneration, install } };
       });
       return print(ctx, { op: ready, remote: grant.remote, remoteName: REMOTE, leaseGeneration: grant.leaseGeneration, expiresAt: grant.expiresAt, credentialFile: file }, () => [
         `Workspace ready for lane ${h.lane}, lease ${grant.leaseGeneration}.`,
@@ -643,7 +668,7 @@ const COMMANDS: Record<string, Command> = {
           return api.land(h, proposal, opts);
         },
         // `artroom wait` follows this operation; it is saved before the journal forgets the landing.
-        intent: (room) => ({ kind: "follow-landing", expect: room.landing?.op ?? null }),
+        intent: (room) => ({ kind: "follow-landing", rev: room.landingRev ?? 0 }),
       });
       if (isRefusal(landing)) return refused(ctx, landing);
       if (ctx.values["wait"] !== true) {
@@ -690,10 +715,19 @@ const COMMANDS: Record<string, Command> = {
           const h = await held(api, laneOf(ctx, room), room.member);
           return isRefusal(h) ? h : api.release(h, note === undefined ? {} : { note }, opts);
         },
-        // The credential written for this lane, wherever it is, not whatever is in the current directory.
-        intent: (room) => {
-          const lane = laneOf(ctx, room);
-          return { kind: "release-lane", lane, credential: room.workspaces?.[lane] ?? null };
+        // The released lease, and the credential installed for it, wherever it is: not whatever is in the current directory.
+        intent: (room, act) => {
+          const lane = (act.target as { lane: LaneId }).lane;
+          const lease = (act.body as { lease: number }).lease;
+          const installed = room.workspaces?.[lane];
+          return {
+            kind: "release-lane",
+            lane,
+            lease,
+            installed: installed !== undefined && installed.lease === lease ? installed : null,
+            laneRev: room.laneRev ?? 0,
+            landingRev: room.landingRev ?? 0,
+          };
         },
       });
       if (isRefusal(out)) return refused(ctx, out);

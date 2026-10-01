@@ -61,9 +61,10 @@ finish, run the same command again:
 - `redeem` finishes from the saved result, and never sends a one-time
   redemption twice. If the room may have received it but the answer was
   lost, the CLI says to ask for a new invitation;
-- finishing never undoes newer work: if you chose another lane, or
-  started another landing, after the act was sent, the CLI keeps that and
-  says so;
+- finishing never undoes newer work: if the selected lane or the followed
+  landing changed in any way after the act was sent, even back to the same
+  value, or the lane was taken again with a new lease and workspace, the
+  CLI keeps the newer state and says so;
 - an act that failed prints the `--idempotency-key` to use. With it, the
   CLI finishes from the kept answer, or sends the very act it signed
   before, straight to the room. Neither needs a read session or current

@@ -144,3 +144,14 @@ names each case.
 |---|---|---|
 | P2 Fence recovered local steps against newer work | Before it is sent, each act records the local change it owns, and the state it expects, with its journal entry (`LocalIntent`). One function, `applyLocal`, makes that change for a fresh answer and a recovered one alike. A claim selects its lane, and a land is followed, only if the selection is still the one expected; otherwise the newer one is kept and the output says so. A release removes only the credential `artroom workspace` wrote for that lane, at the path it recorded. Each credential file names its lane on its first line, so a credential that a newer workspace replaced is kept, wherever the command runs. The room's receipt is still recovered without new authority | cli: "repro 1: an older release, recovered after a newer lane's workspace replaced its credential…", "recovery from another directory removes the released lane's own credential, and only that", "repro 2: an older claim, recovered after a newer claim finished…", "an older landing, recovered after a newer one is followed…"; the crash cases in review-17013617 still pass |
 
+## Review 80d3710c
+
+The checker's fourth review confirmed the earlier cases and found the same
+ownership problem in two more forms: a newer lease of the same lane, and a
+selection that returned to the value an older act expected.
+`packages/cli/test/review-80d3710c.test.ts` names each case.
+
+| Finding | Change | Tests |
+|---|---|---|
+| P2 Fence local recovery by revision and lease, not by lane ID or value | The selected lane and the followed landing each carry a revision that every local change bumps, even back to an earlier value. They also record the act that made the change. A prepared act records the revisions it expects; recovery applies a change only if they are unchanged, and never twice. `artroom workspace` gives each credential an installation ID, written in the file's first line and in the config with its lease. A release records the lease it releases and that lease's installation, and removes only that installation. A newer lease's credential for the same lane, and its mapping, are kept. The output says what was kept. Receipts are still recovered without new authority, and the remote act is never sent again to find out | cli: "repro 1: an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both" (also with the recovery interrupted after `credential-removed` or `config-written`), "the released lease's own credential is still removed when nothing newer replaced it", "repro 2: X, then an interrupted claim of Y, then Z, then X again: recovering Y keeps X", "a recovery interrupted after its own config write does not treat its own change as newer work", "a wait that finishes the followed landing is a local change too…"; the review f7c79158 cases still pass |
+

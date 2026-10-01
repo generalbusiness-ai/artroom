@@ -56,10 +56,10 @@ describe("release recovers its receipt without touching newer work", () => {
 
     const again = await cli(home, release, dir);
     expect(again.code).toBe(EXIT.ok);
-    expect(again.out).toContain(`Left the workspace credential at ${credential(dir)}: it now belongs to another lane.`);
+    expect(again.out).toContain(`Left the workspace credential at ${credential(dir)}: a newer workspace installed it.`);
     expect(readFileSync(credential(dir), "utf8")).toBe(yCredential);
     expect(laneOf(home)).toBe(y);
-    expect(config(home).rooms[h.room.id].workspaces[y]).toBe(credential(dir));
+    expect(config(home).rooms[h.room.id].workspaces[y].file).toBe(credential(dir));
     expect(config(home).rooms[h.room.id].workspaces[x]).toBeUndefined();
     expect(acts("release")).toHaveLength(1);
   });
@@ -73,7 +73,7 @@ describe("release recovers its receipt without touching newer work", () => {
     await cli(home, ["workspace"], dir);
     // A credential in the other repository that is not this lane's: release must leave it.
     mkdirSync(join(elsewhere, ".git", "artroom"), { recursive: true });
-    writeFileSync(credential(elsewhere), "# artroom workspace credential for lane act_99_00000000, lease 1.\n");
+    writeFileSync(credential(elsewhere), "# artroom workspace credential for lane act_99_00000000, lease 1, installation other.\n");
     const release = ["release", "--idempotency-key", "rel-away"];
     expect((await cli(home, release, dir, crashAt("act-answered"))).code).toBe(EXIT.failed);
     const again = await cli(home, release, elsewhere);
@@ -96,7 +96,7 @@ describe("claim and land recover their receipts without replacing newer selectio
     expect(again.code).toBe(EXIT.ok);
     const a = `act_${acts("claim")[0]!.seq}_${acts("claim")[0]!.hash.slice(7, 15)}`;
     expect(again.out).toContain(`Claimed lane ${a}`);
-    expect(again.out).toContain(`Kept lane ${b} selected: it was chosen after this claim was sent. To work on ${a}, pass --lane ${a}.`);
+    expect(again.out).toContain(`Kept lane ${b} selected: the selection changed after this claim was sent. To work on ${a}, pass --lane ${a}.`);
     expect(laneOf(home)).toBe(b);
     expect(acts("claim")).toHaveLength(2);
   });
@@ -115,10 +115,11 @@ describe("claim and land recover their receipts without replacing newer selectio
     // A newer landing is followed meanwhile (here written directly, as another lane's land would).
     const c = config(home);
     c.rooms[h.room.id].landing = { op: "op_land_999", lane: "act_999_00000000" };
+    c.rooms[h.room.id].landingRev = (c.rooms[h.room.id].landingRev ?? 0) + 1;
     writeFileSync(join(home, "config.json"), JSON.stringify(c));
     const again = await cli(home, land);
     expect(again.code).toBe(EXIT.ok);
-    expect(again.out).toMatch(/Kept following landing op_land_999: it started after this one\. To follow this one: artroom wait op_land_\d+/);
+    expect(again.out).toMatch(/Kept following op_land_999: that changed after this landing started\. To follow this one: artroom wait op_land_\d+/);
     expect(config(home).rooms[h.room.id].landing.op).toBe("op_land_999");
     expect(acts("land")).toHaveLength(1);
   });

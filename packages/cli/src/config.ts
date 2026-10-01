@@ -20,29 +20,21 @@ export interface RoomConfig {
   readonly custody: "client" | "room";
   readonly key: KeyId;
   readonly mcp?: string;
-  /** The lane the next command acts on, from the last `claim`. */
+  /** The lane the next command acts on, from the last `claim`. Change it only with `setLane` in main.ts. */
   lane?: LaneId;
+  /** Bumped by every change of `lane`, even to an earlier value: a recovered act applies only if it is unchanged. */
+  laneRev?: number;
+  /** Who made the last change of `lane`: an act's idempotency key, or a command name. */
+  laneBy?: string;
   /** The invitation this room was joined or redeemed with, so repeating that command reports it is done. */
   invitation?: string;
-  /** The landing operation `artroom wait` follows, from the last `land`. */
+  /** The landing operation `artroom wait` follows, from the last `land`. Change it only with `setLanding`. */
   landing?: { readonly op: OpId; readonly lane: LaneId };
-  /** Where `artroom workspace` wrote each lane's credential, so `release` removes that one file, wherever it runs. */
-  workspaces?: Record<LaneId, string>;
+  landingRev?: number;
+  landingBy?: string;
+  /** The credential `artroom workspace` installed for each lane: where, for which lease, and its installation ID. */
+  workspaces?: Record<LaneId, Installed>;
 }
-
-/**
- * What an act changes locally once the room answers, and the local state it
- * expects to find then. Recorded with the act before it is sent, so a
- * recovery later changes only what this act owns (see `applyLocal` in main.ts).
- */
-export type LocalIntent =
-  | { readonly kind: "none" }
-  /** `claim`: select the claimed lane, if the selection is still `expect`. */
-  | { readonly kind: "select-lane"; readonly expect: LaneId | null }
-  /** `land`: follow the started landing, if the followed landing is still `expect`. */
-  | { readonly kind: "follow-landing"; readonly expect: OpId | null }
-  /** `release`: forget this lane locally, and remove the credential written for it at `credential`, if it is still that lane's. */
-  | { readonly kind: "release-lane"; readonly lane: LaneId; readonly credential: string | null };
 
 export interface Config {
   current?: RoomId;
@@ -56,6 +48,39 @@ export interface KeyFile {
   readonly key: KeyId;
   readonly jwk: PrivateJwk;
 }
+
+/** One installed workspace credential. Its file's first line names the same lane, lease and installation. */
+export interface Installed {
+  readonly file: string;
+  readonly lease: number;
+  readonly install: string;
+}
+
+/**
+ * What an act changes locally once the room answers, and the local state it
+ * expects to find then. Recorded with the act before it is sent, so a
+ * recovery later changes only what this act owns (see `applyLocal` in main.ts).
+ */
+export type LocalIntent =
+  | { readonly kind: "none" }
+  /** `claim`: select the claimed lane, if no local action changed the selection since `rev`. */
+  | { readonly kind: "select-lane"; readonly rev: number }
+  /** `land`: follow the started landing, if no local action changed the followed landing since `rev`. */
+  | { readonly kind: "follow-landing"; readonly rev: number }
+  /**
+   * `release`: of `lane` at `lease`. Removes the credential installed for
+   * that lease (`installed`), only if it is still that installation; and
+   * forgets the lane's selection and landing only if unchanged since
+   * `laneRev` and `landingRev`.
+   */
+  | {
+      readonly kind: "release-lane";
+      readonly lane: LaneId;
+      readonly lease: number;
+      readonly installed: Installed | null;
+      readonly laneRev: number;
+      readonly landingRev: number;
+    };
 
 /**
  * The journal: one durable record per unfinished piece of work, written
