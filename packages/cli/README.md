@@ -42,6 +42,11 @@ token is never a command argument and never printed. `release` removes
 that lane's credential, from wherever you run it, and leaves a credential
 that a newer workspace for another lane has written.
 
+If two `artroom workspace` commands overlap, or a release happens while one
+is being prepared, only the workspace started last installs anything. The
+other says it was superseded, and leaves the newer remote and credential
+alone.
+
 `land` records the landing operation it starts. `artroom wait` follows
 that operation (or one you name) until it finishes; it never starts a new
 landing. Only a finished landing that did not land suggests a new
@@ -97,3 +102,9 @@ finish, run the same command again:
 
 `$ARTROOM_HOME`, or `$XDG_CONFIG_HOME/artroom`, or `~/.config/artroom`.
 Files are mode 0600 and directories 0700.
+
+The config and journal files carry a schema version. Files from an older
+artroom are read conservatively: where they cannot prove which local
+change is theirs, the CLI still returns the act's result, changes nothing
+locally, and prints "Manual local step" lines. Files from a newer artroom
+are refused.

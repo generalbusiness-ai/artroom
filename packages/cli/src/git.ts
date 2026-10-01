@@ -36,6 +36,12 @@ export function head(cwd: string): string | undefined {
   return tryGit(cwd, ["rev-parse", "HEAD"]);
 }
 
+/** Where `configureWorkspace` writes the credential for the repository at `cwd`. */
+export function credentialPath(cwd: string): string | undefined {
+  const dir = gitDir(cwd);
+  return dir === undefined ? undefined : join(dir, INCLUDE);
+}
+
 /** The first line of a credential file: the lane, lease and installation it was written for. */
 const marker = (lane: string, lease: number, install: string) => `# artroom workspace credential for lane ${lane}, lease ${lease}, installation ${install}.`;
 

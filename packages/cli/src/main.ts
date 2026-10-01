@@ -54,9 +54,9 @@ import type {
   RoomId,
   Sha,
 } from "@generalbusiness/artroom-contract";
-import { Store, type Config, type JournalEntry, type LocalIntent, type RoomConfig } from "./config.ts";
+import { SCHEMA, SchemaError, Store, type Config, type JournalEntry, type LocalIntent, type RoomConfig } from "./config.ts";
 import { attentionText, claimText, errorText, explainText, landText, logText, proposalText, refusalText, short } from "./format.ts";
-import { configureWorkspace, gitDir, head as gitHead, removeCredential, REMOTE } from "./git.ts";
+import { configureWorkspace, credentialPath, head as gitHead, removeCredential, REMOTE } from "./git.ts";
 import { parseInvitation } from "./link.ts";
 
 export interface Io {
@@ -291,6 +291,8 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
   switch (local.kind) {
     case "none":
       return lines;
+    case "manual":
+      return local.steps.map((step) => `Manual local step: ${step}`);
     case "select-lane": {
       const lane = (out as Claim).lane;
       updateRoom(ctx, id, (r) => {
@@ -320,7 +322,17 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
       }
       ctx.step("credential-removed");
       updateRoom(ctx, id, (r) => {
+        // A release supersedes any workspace still being prepared, which must not install a token the release revoked.
+        if (r.workspaceBy !== key) {
+          r.workspaceRev = (r.workspaceRev ?? 0) + 1;
+          r.workspaceBy = key;
+        }
         if (installed !== null && r.workspaces?.[local.lane]?.install === installed.install) delete r.workspaces[local.lane];
+        const legacy = r.workspaces?.[local.lane];
+        if (installed === null && legacy !== undefined && legacy.install === "") {
+          // A mapping from an older artroom names no lease or installation: nothing proves the file is this lease's.
+          lines.push(`Manual local step: ${legacy.file} was set up by an older artroom for lane ${local.lane}. If it still holds this lane's credential, remove it by hand.`);
+        }
         if (r.lane === local.lane && r.laneBy !== key) {
           if ((r.laneRev ?? 0) === local.laneRev) setLane(r, undefined, key);
           else lines.push(`Kept lane ${local.lane} selected: it was selected again after this release of lease ${local.lease} was sent.`);
@@ -366,7 +378,7 @@ async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T
           // Fixed now, before anything is sent: what this act owns locally, and the revisions it expects.
           const now = ctx.store.read().rooms[id] ?? room;
           const local = spec.intent?.(now, prepared) ?? { kind: "none" as const };
-          entry = { v: 1, type: "act", id: key, room: id, command: spec.command, state: "prepared", prepared, local };
+          entry = { v: SCHEMA, type: "act", id: key, room: id, command: spec.command, state: "prepared", prepared, local };
           ctx.store.journal(entry);
           ctx.step("act-journaled");
         },
@@ -464,7 +476,7 @@ const COMMANDS: Record<string, Command> = {
       // The new key and the join's idempotency key are journaled before the join goes out (R-IDEM-2).
       if (entry === undefined) {
         const made = await generateSigner({ extractable: true });
-        entry = { v: 1, type: "login", id: inv.invitation, room: inv.room, url: inv.url, idempotencyKey: newIdempotencyKey(), key: made.signer.key, jwk: made.jwk! };
+        entry = { v: SCHEMA, type: "login", id: inv.invitation, room: inv.room, url: inv.url, idempotencyKey: newIdempotencyKey(), key: made.signer.key, jwk: made.jwk! };
         ctx.store.journal(entry);
         ctx.step("login-journaled");
       }
@@ -528,7 +540,7 @@ const COMMANDS: Record<string, Command> = {
       // A redemption is one-time: once it may have reached the room, it is never sent again.
       if (entry !== undefined && entry.redeemed === undefined) return lost();
       if (entry === undefined) {
-        entry = { v: 1, type: "redeem", id: inv.invitation, room: inv.room, url: inv.url };
+        entry = { v: SCHEMA, type: "redeem", id: inv.invitation, room: inv.room, url: inv.url };
         ctx.store.journal(entry);
         ctx.step("redeem-journaled");
         let out;
@@ -604,10 +616,20 @@ const COMMANDS: Record<string, Command> = {
   workspace: {
     options: { timeout: { type: "string" } },
     async run(ctx) {
-      const { api, room } = await open(ctx);
-      if (gitDir(ctx.io.cwd) === undefined) throw new UsageError("Run artroom workspace inside your git repository, so it can set up the remote.");
+      const { api, id, room } = await open(ctx);
+      const file = credentialPath(ctx.io.cwd);
+      if (file === undefined) throw new UsageError("Run artroom workspace inside your git repository, so it can set up the remote.");
       const h = await held(api, laneOf(ctx, room), room.member);
       if (isRefusal(h)) return refused(ctx, h);
+      // Reserve the installation durably, before asking the room for anything. Any later local workspace
+      // action (a newer workspace, a release's cleanup) bumps the revision and so supersedes this one.
+      const install = newIdempotencyKey();
+      let reserved = 0;
+      updateRoom(ctx, id, (r) => {
+        reserved = r.workspaceRev = (r.workspaceRev ?? 0) + 1;
+        r.workspaceBy = install;
+      });
+      ctx.step("workspace-reserved");
       const op = await api.workspace(h);
       if (isRefusal(op)) return refused(ctx, op);
       const ready = op.state === "pending" ? await api.wait(op, { until: ["ready", "failed"], timeoutMs: (int(ctx.values, "timeout") ?? 60) * 1000 }) : op;
@@ -618,12 +640,22 @@ const COMMANDS: Record<string, Command> = {
       const grant = await api.workspaceToken(h);
       if (isRefusal(grant)) return refused(ctx, grant);
       ctx.secrets.add(grant.token);
-      const install = newIdempotencyKey();
-      const file = configureWorkspace(ctx.io.cwd, grant.remote, grant.token, h.lane, grant.leaseGeneration, install);
-      const { id } = roomOf(ctx);
+      // Install only if this reservation still owns the workspace, and the grant is for the lease it was made for.
+      let owned = false;
       updateRoom(ctx, id, (r) => {
+        if (r.workspaceRev !== reserved || r.workspaceBy !== install || grant.leaseGeneration !== h.lease.generation) return;
+        owned = true;
+        r.workspaceRev = reserved + 1;
         r.workspaces = { ...r.workspaces, [h.lane]: { file, lease: grant.leaseGeneration, install } };
       });
+      if (!owned) {
+        return print(ctx, { op: ready, installed: false, reason: "superseded" }, () => [
+          `Did not install the workspace for lane ${h.lane}, lease ${h.lease.generation}: a newer local workspace action or release happened while it was being prepared.`,
+          "Kept the newer git remote, credential, mapping and lane selection. Run artroom workspace again if you still want this one.",
+        ], EXIT.failed);
+      }
+      ctx.step("workspace-mapped");
+      configureWorkspace(ctx.io.cwd, grant.remote, grant.token, h.lane, grant.leaseGeneration, install);
       return print(ctx, { op: ready, remote: grant.remote, remoteName: REMOTE, leaseGeneration: grant.leaseGeneration, expiresAt: grant.expiresAt, credentialFile: file }, () => [
         `Workspace ready for lane ${h.lane}, lease ${grant.leaseGeneration}.`,
         `Git remote "${REMOTE}": ${grant.remote}`,
@@ -899,6 +931,10 @@ export async function run(argv: readonly string[], rawIo: Io): Promise<number> {
     if (e instanceof UsageError) {
       io.err(`artroom ${name}: ${e.message}`);
       return EXIT.usage;
+    }
+    if (e instanceof SchemaError) {
+      io.err(`artroom ${name}: ${e.message}`);
+      return EXIT.failed;
     }
     // An act the journal holds can be finished: say exactly how.
     const pending = ctx.act !== undefined && ctx.store.entry(ctx.act.room, "act", ctx.act.key) !== undefined ? ctx.act.key : undefined;

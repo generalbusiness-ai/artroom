@@ -34,9 +34,28 @@ export interface RoomConfig {
   landingBy?: string;
   /** The credential `artroom workspace` installed for each lane: where, for which lease, and its installation ID. */
   workspaces?: Record<LaneId, Installed>;
+  /**
+   * Bumped by every local workspace action: a workspace command reserving
+   * its installation before it asks the room, an installation, a release's
+   * cleanup. A workspace installs only if nothing bumped it since its own
+   * reservation (`workspaceBy` is that reservation's installation ID).
+   */
+  workspaceRev?: number;
+  workspaceBy?: string;
 }
 
+/**
+ * The version of the config and journal files this CLI writes. Version 1
+ * (no `v` in the config) was written before revisions, installation IDs
+ * and lease-bound intents; `decode` below reads it conservatively.
+ */
+export const SCHEMA = 2;
+
+/** A file written by a newer artroom: refused, never guessed at. */
+export class SchemaError extends Error {}
+
 export interface Config {
+  v?: typeof SCHEMA;
   current?: RoomId;
   rooms: Record<RoomId, RoomConfig>;
 }
@@ -68,6 +87,11 @@ export type LocalIntent =
   /** `land`: follow the started landing, if no local action changed the followed landing since `rev`. */
   | { readonly kind: "follow-landing"; readonly rev: number }
   /**
+   * An act journaled by version 1, whose local change cannot be proved safe
+   * now. Nothing local is changed; `steps` say what the user may do by hand.
+   */
+  | { readonly kind: "manual"; readonly steps: readonly string[] }
+  /**
    * `release`: of `lane` at `lease`. Removes the credential installed for
    * that lease (`installed`), only if it is still that installation; and
    * forgets the lane's selection and landing only if unchanged since
@@ -96,7 +120,7 @@ export type LocalIntent =
  */
 export type JournalEntry =
   | {
-      readonly v: 1;
+      readonly v: typeof SCHEMA;
       readonly type: "act";
       readonly id: string;
       readonly room: RoomId;
@@ -109,7 +133,7 @@ export type JournalEntry =
       readonly result?: unknown;
     }
   | {
-      readonly v: 1;
+      readonly v: typeof SCHEMA;
       readonly type: "login";
       readonly id: string;
       readonly room: RoomId;
@@ -120,7 +144,7 @@ export type JournalEntry =
       readonly joined?: { readonly member: MemberId; readonly role: Role; readonly record: string };
     }
   | {
-      readonly v: 1;
+      readonly v: typeof SCHEMA;
       readonly type: "redeem";
       readonly id: string;
       readonly room: RoomId;
@@ -169,13 +193,14 @@ export class Store {
   }
 
   read(): Config {
-    if (!existsSync(this.configPath)) return { rooms: {} };
-    return JSON.parse(readFileSync(this.configPath, "utf8")) as Config;
+    if (!existsSync(this.configPath)) return { v: SCHEMA, rooms: {} };
+    return decodeConfig(JSON.parse(readFileSync(this.configPath, "utf8")), this.configPath);
   }
 
+  /** Always writes the current schema. A version 1 file becomes version 2 at its first write, atomically. */
   write(config: Config): void {
     this.#ensure();
-    writePrivate(this.configPath, `${JSON.stringify(config, null, 2)}\n`);
+    writePrivate(this.configPath, `${JSON.stringify({ ...config, v: SCHEMA }, null, 2)}\n`);
   }
 
   saveKey(file: KeyFile): string {
@@ -202,7 +227,7 @@ export class Store {
 
   entry<T extends JournalEntry["type"]>(room: RoomId, type: T, id: string): Extract<JournalEntry, { type: T }> | undefined {
     const path = this.#entryPath(room, type, id);
-    return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Extract<JournalEntry, { type: T }>) : undefined;
+    return existsSync(path) ? (decodeEntry(JSON.parse(readFileSync(path, "utf8")), path) as Extract<JournalEntry, { type: T }>) : undefined;
   }
 
   /** Removes every unfinished act a bearer session prepared for this room, and says how many. */
@@ -212,7 +237,7 @@ export class Store {
     let n = 0;
     for (const file of readdirSync(dir)) {
       if (!file.startsWith("act-")) continue;
-      const entry = JSON.parse(readFileSync(join(dir, file), "utf8")) as JournalEntry;
+      const entry = decodeEntry(JSON.parse(readFileSync(join(dir, file), "utf8")), join(dir, file));
       if (entry.type === "act" && entry.state === "prepared" && entry.prepared.signed === undefined) {
         rmSync(join(dir, file), { force: true });
         n++;
@@ -236,4 +261,75 @@ export class Store {
   loadBearer(room: RoomId): string {
     return readFileSync(this.bearerPath(room), "utf8").trim();
   }
+}
+
+// ------------------------------------------------------------------ schema
+
+type Raw = Record<string, unknown>;
+
+function newer(v: unknown, path: string): never {
+  throw new SchemaError(`${path} was written by a newer artroom (schema ${String(v)}; this one reads 1 and ${SCHEMA}). Update artroom, then run the command again.`);
+}
+
+/**
+ * Reads a config file. Version 1 had no revisions and mapped each lane to
+ * a credential path. Its mappings become installations with no lease or
+ * installation ID, which match no release, so nothing is removed on their
+ * evidence alone.
+ */
+export function decodeConfig(raw: Raw, path: string): Config {
+  const v = raw["v"] ?? 1;
+  if (v === SCHEMA) return raw as unknown as Config;
+  if (v !== 1) newer(v, path);
+  const rooms: Record<string, RoomConfig> = {};
+  for (const [id, r] of Object.entries((raw["rooms"] ?? {}) as Record<string, Raw>)) {
+    const workspaces: Record<string, Installed> = {};
+    for (const [lane, w] of Object.entries((r["workspaces"] ?? {}) as Record<string, unknown>)) {
+      workspaces[lane] = typeof w === "string" ? { file: w, lease: 0, install: "" } : (w as Installed);
+    }
+    rooms[id] = { ...(r as unknown as RoomConfig), workspaces };
+  }
+  return { ...(raw as unknown as Config), v: SCHEMA, rooms };
+}
+
+/**
+ * Reads a journal entry. A version 1 act's local intent recorded values,
+ * not revisions or installations, so it cannot prove that a local change
+ * would touch only what the act owns. It becomes a `manual` intent: the
+ * kept receipt is still returned or recovered, nothing local is changed,
+ * and the user is told what they may do by hand. Login and redemption
+ * entries did not change.
+ */
+export function decodeEntry(raw: Raw, path: string): JournalEntry {
+  const v = raw["v"];
+  if (v === SCHEMA) return raw as unknown as JournalEntry;
+  if (v !== 1) newer(v, path);
+  if (raw["type"] !== "act") return { ...(raw as unknown as JournalEntry), v: SCHEMA } as JournalEntry;
+  const old = (raw["local"] ?? {}) as Raw;
+  const steps: string[] = [];
+  switch (old["kind"]) {
+    case "select-lane":
+      steps.push("This claim was recorded by an older artroom, so its lane was not selected. To work on it, pass --lane with the lane above.");
+      break;
+    case "follow-landing":
+      steps.push("This landing was recorded by an older artroom, so it is not followed. To follow it: artroom wait with the operation above.");
+      break;
+    case "release-lane":
+      steps.push(`This release was recorded by an older artroom, so its local cleanup was not done. If lane ${String(old["lane"])} is still selected, claim or choose another lane.`);
+      if (typeof old["credential"] === "string") steps.push(`If ${old["credential"]} still holds lane ${String(old["lane"])}'s credential, remove it by hand.`);
+      break;
+    case "none":
+      break;
+    default:
+      // Revision 2 journals had no local intent: a claim or land then changed the config.
+      if (raw["command"] === "claim" || raw["command"] === "land" || raw["command"] === "release") {
+        steps.push(`This ${String(raw["command"])} was recorded by an older artroom, so its local step was not done. Choose the lane to work on with --lane if needed.`);
+      }
+  }
+  return {
+    ...(raw as unknown as JournalEntry & { type: "act" }),
+    v: SCHEMA,
+    state: raw["state"] === "answered" ? "answered" : "prepared",
+    local: steps.length === 0 ? { kind: "none" } : { kind: "manual", steps },
+  };
 }
