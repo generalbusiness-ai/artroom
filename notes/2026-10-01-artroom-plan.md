@@ -1,7 +1,8 @@
 # Artroom: plan for the Cloudflare Git platform competition
 
-2026-10-01. Revision 2, answering checker's review `c31169e9` of head
-`8f85a0d5`. Request `7ff7a261`, promise `2bb1a40d`.
+2026-10-01. Revision 3, answering checker's reviews `c31169e9` (of head
+`8f85a0d5`) and `8233c002` (of head `0a5864b1`). Request `7ff7a261`,
+promise `2bb1a40d`.
 
 Artroom ("artifact workroom") is a place where agents and people change
 code together. It runs on Cloudflare Workers, Durable Objects and
@@ -17,7 +18,9 @@ This note covers:
 
 Section 14 lists the decisions still open.
 
-### What changed in this revision
+### What changed in revisions 2 and 3
+
+Revision 2 answers review `c31169e9`:
 
 | Review item | Where it is answered |
 |---|---|
@@ -28,6 +31,17 @@ Section 14 lists the decisions still open.
 | P1.5 scope and capacity | Section 13 |
 | P1.6 the API transitions | Section 5 |
 | P2.7 evidence and claims | Sections 2 and 3, and labels on every target in section 12 |
+
+Revision 3 answers review `8233c002`:
+
+| Review item | Where it is answered |
+|---|---|
+| P1.1 publication linearization and fencing | Section 8: "The linearization point", "Fencing the external writer", acceptance cases |
+| P1.2 complete check inputs | Section 7: "Carrying a check forward" and new acceptance cases; section 5's `Tests` example |
+| P1.3 revocation at admission | Section 9: "Authority is decided at admission" |
+| Non-blocking: sole-admin bootstrap | Section 9: "Bootstrap and recovery for a sole admin" |
+| Non-blocking: waiting for the workspace, safe runner arguments | Section 5's examples |
+| Non-blocking: measure wasted preparations | Section 8's acceptance cases |
 
 ## 1. The competition
 
@@ -310,8 +324,12 @@ const claim = await room.claim({ goal: "Rate-limit /api/login",
   scope: ["src/api/login.ts", "src/lib/ratelimit/**"], because: [issueRef] });
 if (isRefusal(claim)) return explain(claim);       // e.g. "scope-owned", fix: "ask @security"
 
-const ws = await room.workspace(claim.lane);       // Op: pending → ready { remote, token, expiresAt }
-// The agent pushes with plain git to ws.remote. The token is scoped to its fork and its lease.
+const wsOp = await room.workspace(claim.lane);     // Op: pending → ready | failed
+if (isRefusal(wsOp)) return explain(wsOp);
+const ws = await room.wait(wsOp, { until: ["ready", "failed"] });
+if (ws.state === "failed") return retryLater(ws);  // e.g. Artifacts 10400 after bounded retries
+// ws.detail: { remote, token, expiresAt }. The agent pushes with plain git;
+// the token is scoped to its fork and its lease.
 
 const p = await room.propose(claim.lane, { head, expectedGeneration: 0, summary });
 if (isRefusal(p)) return explain(p);               // e.g. "outside-claim": changed paths exceed the scope
@@ -404,17 +422,29 @@ obligations with `check` acts, under the isolation rules in section 9.
 ```ts
 export class Tests extends Checker<Env> {
   name = "tests";
-  inputs = ["src/**", "package*.json"];         // used by the input-equivalence rule
+  // No `inputs`: the default is the whole tree (section 7). Scoped inputs, if
+  // used, live in admin-reviewed .artroom/checkers/tests.json, and the runner
+  // then receives a filtered tree containing only those paths.
   async run(job: CheckJob): Promise<CheckOutcome> {
-    // job: proposal, generation, integration commit, a read-only URL and token
+    // job: proposal, generation, integration commit (or filtered tree), read-only URL and token
+    const sha = assertSha(job.integration);        // 40 hex characters, or throw
+    const url = assertArtifactsUrl(job.readUrl);   // our own Artifacts host only, or throw
     const box = getSandbox(this.env.RUNNER, job.id);
-    await box.exec(`git init w && cd w && git fetch --depth 1 ${job.readUrl} ${job.integration}`);
-    await box.exec(`cd w && git checkout --detach FETCH_HEAD && test "$(git rev-parse HEAD)" = ${job.integration}`);
-    const run = await box.exec("cd w && npm ci && npm test");
+    await box.exec(["git", "init", "w"]);
+    await box.exec(["git", "-C", "w", "fetch", "--depth", "1", url, sha], { env: job.gitAuthEnv });
+    await box.exec(["git", "-C", "w", "checkout", "--detach", "FETCH_HEAD"]);
+    const head = await box.exec(["git", "-C", "w", "rev-parse", "HEAD"]);
+    if (head.stdout.trim() !== sha) return { ok: false, detail: "checked-out head does not match" };
+    const run = await box.exec(["npm", "ci"], { cwd: "w" })
+      .then(() => box.exec(["npm", "test"], { cwd: "w" }));
     return { ok: run.exitCode === 0, detail: run.stdout.slice(-4000) };
   }
 }
 ```
+
+Commands are passed as argument arrays, never as interpolated shell
+strings. The exact `exec` signature follows the Sandbox SDK and is fixed
+in lane 0.
 
 The `Checker` base class signs the `check` act outside the sandbox.
 
@@ -499,13 +529,36 @@ false })`.
 
 ### Carrying a check forward
 
-A required check binds to the exact integration commit it ran on, and to
-a hash of the checker's configuration. After any change to the
-integration (a new generation, or main moving), the check reruns. The
-exception is when the checker's declared `inputs` hash to the same tree
-in both integrations, and the checker configuration hash is unchanged.
-That is the input-equivalence rule; every carried check shows that it
-was carried.
+A required check binds to three things:
+- the exact integration commit it ran on;
+- a hash of the checker's configuration;
+- the digest of the runner's environment (container image and
+  toolchain).
+
+After any change to the integration (a new generation, or main moving),
+the check reruns.
+
+**The default input is the whole repository tree.** A check is carried
+only if the full tree of the new integration is identical. That happens,
+for example, when a land is rebuilt after an unrelated publication
+produced the same tree. The checker configuration and runner digest must
+also be unchanged.
+
+**Scoped reuse is allowed only when the runner cannot see anything
+else:**
+1. **The checker's input set is part of its configuration,** stored
+   under `.artroom/checkers/`. It is changed only by an admin-approved
+   proposal (section 9). Neither a proposal nor its author can narrow it.
+2. **Global inputs are always included.** These are manifests,
+   lockfiles, build and test configuration, scripts and `.artroom/**`.
+3. **The runner receives only the declared inputs.** The publisher
+   builds a filtered tree with exactly those paths, and the runner checks
+   out that tree. A test that reads an undeclared file fails, rather
+   than passing on stale assumptions.
+4. **The check binds to the filtered tree's hash.** It is carried only
+   while that hash is unchanged.
+
+Every carried check shows that it was carried, and why.
 
 ### Acceptance cases (in the policy corpus)
 
@@ -516,6 +569,8 @@ was carried.
 | Same change, no declaration and no default | Carried, shown as "carried: reviewed and declared paths unchanged". The policy dry-run highlights the case |
 | A change to `package-lock.json` | Nothing carried (global input) |
 | A change to `.artroom/policy.json` | Nothing carried; also needs admin review (section 9) |
+| A new failing test under `tests/`, with `src/**` unchanged | The `tests` check reruns: `tests/**` is a global input, and the default is the whole tree. It fails |
+| A file that is read by tests but missing from a scoped checker's inputs | The runner's filtered tree does not contain it, so the check fails visibly |
 
 ## 8. Landing, publication and recovery (answers P1.2)
 
@@ -562,31 +617,76 @@ States:
   disjoint ready operations into one commit and check it once. It uses
   the same invariants.
 
-### Fencing
+### The linearization point: reservation
 
-Before publishing, the publisher re-reads all of these from SQLite, and
-abandons the attempt (state `retryable`) on any mismatch:
-- the lane's generation;
-- its lease generation;
-- the active policy version;
-- the evidence set.
+**A landing is decided at one point: its reservation.** Reservation is a
+single synchronous SQLite transaction in the Room, with no `await`
+inside it. In that transaction the Room:
 
-A release, a new generation or a policy activation during preparation
-therefore cannot be overtaken by a stale push.
+1. **Re-validates the operation against current state:**
+   - the lane's generation and lease generation;
+   - the active policy version;
+   - every piece of evidence;
+   - the current authority (membership, key, delegation) of every actor
+     whose act is evidence.
+
+   On any mismatch, the operation goes to `retryable`.
+2. **Records the operation as `publishing`, with a publication number.**
+3. **Records the room's single publication slot as held by this
+   operation.**
+
+**From that point the landing is authorized irrevocably.** It is shown
+to callers as "landing reserved at seq N".
+
+**Acts that arrive while a reservation is open** are admitted and ordered
+after it; they cannot cancel it. This covers a release, a new generation,
+an objecting review, a role or key revocation, and a policy activation.
+Each one's receipt names the reservation it follows, as `after:
+landOp`. The UI shows it, for example "objection recorded after this
+change was reserved for landing". An objection after reservation becomes
+a review of landed code; policy can open a revert lane from it.
+
+**Before reservation the effect is the opposite.** Any of these acts
+invalidates the operation, and the next reservation attempt sees the
+change.
+
+### Fencing the external writer
+
+A SQLite counter cannot stop a git push already in flight. So each
+publication gets its own write credential:
+- **A fresh canonical write token** with the shortest lifetime Artifacts
+  allows (60 s), minted at reservation and given only to the publisher
+  sandbox for that one push.
+- **One publication at a time per room.** No later operation may update
+  main while any publication is unresolved.
+- **Resolution has three outcomes:**
+  - **Landed:** the push succeeded and main equals `integration`.
+  - **Not landed:** a timeout or crash, and main equals `expectedMain`.
+    This counts only after the room has revoked the publication token,
+    and either stopped the publisher sandbox or let the token's expiry
+    pass, then read main again. Only then is the slot released, and the
+    operation becomes `retryable`.
+  - **Someone else landed:** main has another value. This should be
+    impossible while the room is the only writer. The room flags it for
+    an admin.
+
+**Why a late push is still safe.** If an old push completes late, it can
+only move main from `expectedMain` to this operation's integration. Git's
+lease guarantees that. That is exactly what the reservation authorized,
+so reconciliation records it as landed. A later operation's push carries
+its own `expectedMain`, so it fails its lease and becomes `retryable`.
+Two operations can never both apply against the same main.
 
 ### Crash and timeout recovery
 
-On restart, an alarm reconciles every operation in `publishing` by
-reading canonical main:
+On restart, an alarm resolves the unresolved publication before anything
+else, following the rules above:
 
 | Main is | Meaning | Action |
 |---|---|---|
-| `expectedMain` | The push never happened | Retry the publication |
 | `integration` | The push happened, the receipt did not | Write the `landed` receipt; no second push |
-| Anything else | Someone else landed first | `retryable` |
-
-A timeout during a push is handled the same way: before any further
-attempt, the operation is reconciled against canonical main.
+| `expectedMain` | Not yet known whether the push will still complete | Revoke the token, stop or outlive the writer, read main again; then retry or mark `retryable` |
+| Anything else | Unexpected writer | Hold the slot; flag for an admin |
 
 ### Publication of the log
 
@@ -604,9 +704,24 @@ attempt, the operation is reconciled against canonical main.
 - A crash before push, and after push but before the receipt.
 - Two operations preparing in parallel. One lands; the other
   re-prepares and lands on top, and both changes survive.
-- A release, a new generation and a policy activation, each during
-  preparation.
+- A release, a new generation and a policy activation, each **during
+  preparation**. Each invalidates the operation.
+- **The push itself is paused.** During the pause, each of these is
+  submitted: a release, a new generation, an objecting review, and a
+  key revocation. Each is admitted with `after: landOp`, and the landing
+  completes.
+- **A delayed successful push after a timeout.** The room has revoked
+  the token and reconciled. Either the delayed push is refused because
+  its token was revoked, or it lands the reserved integration and is
+  recorded as landed. Either way no later operation has moved main in
+  the meantime.
+- **The revoked or expired publication token is actually refused** by
+  Artifacts for a push already started. Spike `469a7ab8` or lane B
+  measures this. If an in-flight push can outlive its revocation, the
+  safe rule is "wait for the token's expiry", and the note will say so.
 - A lease race on publication: exactly one publisher wins.
+- Serial publication with rebuild on every main move, measured for wasted
+  preparations. Batching may follow under the same rules.
 
 ## 9. Authorization and execution boundaries (answers P1.3)
 
@@ -632,8 +747,61 @@ add or remove members and keys, and set roles: `admin`, `maintainer`,
 | Mechanism | Rule |
 |---|---|
 | Invitations | Single-use and expiring. Each binds one new key to one role |
-| Key revocation | A roster act. The room refuses acts signed after it |
+| Key revocation | A roster act, with a reason: `retired` or `compromised` |
 | Delegations | A key grants another key a subset of act kinds, lanes and an expiry. Delegations cannot grant roles |
+
+### Authority is decided at admission
+
+**The envelope carries no trusted signing time.** So authority is judged
+at one point only: the sequenced admission of the act.
+
+- **A new act is admitted only if, at that point, all of these are
+  current:** the actor's membership, the role the act needs, the
+  signing key, and any delegation (including its expiry).
+- **An act signed before a revocation but submitted after it is
+  refused.** So is an act under an expired delegation.
+- **A byte-identical replay** of an already admitted act returns its
+  original receipt and creates no new act. That is idempotency, not
+  re-admission.
+
+**What happens to earlier evidence from a revoked key** is a policy
+decision with these defaults:
+- **`retired`:** that key's earlier verdicts and checks stay valid as
+  evidence. They were sound when admitted.
+- **`compromised`:** that key's earlier verdicts and checks stop counting
+  as evidence, and the obligations they fulfilled reopen. Before
+  reservation, a landing operation that depends on them goes to
+  `retryable`.
+- **After reservation (section 8), the landing proceeds:**
+  - **A `compromised` revocation also triggers fencing:** the room
+    revokes the publication token at once, so a push that has not
+    completed is refused.
+  - **If the push already completed,** the room opens a revert lane and
+    puts it in the admins' attention queue.
+
+**Acceptance cases:**
+- A pre-signed act submitted after its key's revocation is refused.
+- An act under an expired delegation is refused.
+- A byte-identical replay after revocation returns the original receipt.
+- A compromised reviewer's approval no longer counts, and the obligation
+  reopens.
+- A compromised revocation during a reserved, paused push leads to the
+  push being refused or a revert lane being opened.
+
+### Bootstrap and recovery for a sole admin
+
+**The problem.** The no-self-review default would leave a room with one
+admin unable to approve its own policy change.
+
+**The rule.** While a room has exactly one active admin, that admin may
+approve a proposal touching `.artroom/**` themselves. The approval is
+recorded with the system flag `sole-admin-self-approval`, and the UI
+shows it on the proposal and in the policy history. The flag stops
+applying as soon as a second admin exists.
+
+**Recovery.** The room's genesis names a recovery key, which can be kept
+offline. That key can always issue roster acts, so an admin locked out
+by a bad policy can be restored. Each use is recorded and shown.
 
 ### Platform invariants that policy cannot change
 
