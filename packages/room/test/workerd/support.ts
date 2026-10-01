@@ -48,32 +48,39 @@ export interface FaultyPolicy extends PolicyPort {
   calls: { notify: number; refuse: number };
   /** While set, `refuse` waits for it: a test holds an admission inside policy evaluation. */
   gate: Promise<void> | null;
+  /** A port that ignores the lane purpose: only the Room's own platform rules then protect recovery lanes. */
+  ignorePurpose: boolean;
 }
 
 function faultyPolicy(): FaultyPolicy {
   const real = lanePolicy();
+  const realLand = real.land;
   const runtime = () => Object.assign(new Error("injected engine fault"), { name: "ArtroomError", code: "policy-runtime", retryable: true, maybeRecorded: false });
   const p: FaultyPolicy = {
     ...real,
     failures: { notify: 0, refuse: 0, require: 0 },
     calls: { notify: 0, refuse: 0 },
     gate: null,
-    refuse: async (...a) => {
+    ignorePurpose: false,
+    refuse: async (policy, input, opts) => {
       p.calls.refuse++;
       if (p.gate) await p.gate;
+      const a = [policy, p.ignorePurpose ? { ...input, lane: { ...input.lane, purpose: "ordinary" as const } } : input, opts] as const;
       if (p.failures.refuse > 0) {
         p.failures.refuse--;
         throw runtime();
       }
       return real.refuse(...a);
     },
-    require: async (...a) => {
+    require: async (policy, input, opts) => {
+      const a = [policy, p.ignorePurpose ? { ...input, lane: { ...input.lane, purpose: "ordinary" as const } } : input, opts] as const;
       if (p.failures.require > 0) {
         p.failures.require--;
         throw runtime();
       }
       return real.require(...a);
     },
+    land: async (policy, input, opts) => realLand(policy, p.ignorePurpose ? { ...input, lane: { ...input.lane, purpose: "ordinary" } } : input, opts),
     notify: async (...a) => {
       p.calls.notify++;
       if (p.failures.notify > 0) {

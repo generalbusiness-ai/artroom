@@ -62,9 +62,10 @@ The Room talks to other lanes through three small interfaces in
 | `LandingPort` and `LandingHost` | The landing state machine, and the Room's side of it | **Not wired.** The interfaces match lane B's `Landing` class and `LandingRoom` interface, so the adapter is `(sql, host) => new Landing({ sql, room: host, publisher, tokens })`. Lane B's package is not on main yet. Tests use [src/memory/landing.ts](src/memory/landing.ts), which follows lane B's state machine. |
 | `ArtifactsPort` | Forks, workspace tokens, heads, pinned refs, diffs, previews and the log ref | **Not wired.** Tests use [src/memory/artifacts.ts](src/memory/artifacts.ts), a small in-memory git. |
 
-A deployment without the landing and Artifacts adapters still admits
-roster acts, claims, notes and reviews. `propose` and `land` fail with
-`unavailable`, and nothing is recorded.
+A deployment without the landing and Artifacts adapters can found rooms
+and admit roster acts, claims and notes. It treats the canonical repository
+as empty, so a new room starts with the default policy. `propose`, `land`
+and workspaces fail with `unavailable`, and nothing is recorded.
 
 The Room keeps every platform rule itself, even where lane C also checks
 it: authority, roles, lanes and leases, `obl_admin-approval` for
@@ -185,6 +186,35 @@ test under `tests/` and a file missing from a scoped checker's inputs
 preparing in parallel, the delayed authenticated push, the failing forward
 retry, token revocation during a push, and the lease race on publication
 (the publisher: lane B); scoped checker, new test (lanes C and G).
+
+## Mutation spot-checks
+
+Each rule below was broken once, and the matching suite run against the
+change. Every mutation made at least one named test fail.
+
+| Mutation | A test that failed |
+|---|---|
+| No head re-check in the commit transaction (R-ADM-6) | R-ADM-6: the admission decides again before it commits |
+| Custody not checked against the admission path (R-ADM-12) | both self-signed join cases of section 23 |
+| Idempotency replays without comparing bytes (R-IDEM-3) | R-IDEM-3: idempotency-mismatch |
+| No secret scan (R-SEC-1) | R-SEC-1 to R-SEC-3 |
+| No `after-reservation` flag (R-LAND-8) | section 23, Paused push |
+| No byte comparison at reservation (R-LAND-7) | section 23, Stage-specific land rule |
+| No lease fencing (R-LANE-6) | R-LANE-6: an old lease generation is fenced |
+| Compromised evidence still counts (R-REV-1) | section 23, Compromised reviewer's approval |
+| Policy `refuse`, `require` or `land` rules run on a recovery lane (R-ADMIN-5, 6, 8) | R-ADMIN-5 is the Room's own rule |
+| Workspace token for a non-holder (R-WS-2) | section 23, B watches A's workspace |
+| No notify queue (R-LOG-13) | section 23, Log construction |
+| Expired delegations accepted (R-ADM-4) | section 23, Act under an expired delegation |
+| No lease expiry in the alarm (R-LANE-8) | R-LANE-8: the alarm expires the lease |
+| Sessions survive key revocation (R-CRED-7) | R-CRED-7 |
+| No last-admin check (R-GEN-8) | R-GEN-8 |
+| Flagged approval counts with two admins (R-ADMIN-2) | section 23, Sole admin changes policy |
+| No abort attempt (R-REV-5) | both R-REV-5 cases |
+| Authors may review their own lane (R-OBL-2) | R-OBL-2: self-review |
+| No outside-claim check (R-PROP-4) | R-PROP-4 |
+| Duplicate JSON keys accepted (R-SIG-3) | Node: refuses duplicate keys |
+| Overlap misses a real overlap (R-PATH-3) | Node: never misses an overlap |
 
 ## Secrets
 

@@ -245,12 +245,16 @@ export class MemoryArtifacts implements ArtifactsPort {
   }
 }
 
-/** The production default until Artifacts is wired: every call is unavailable. */
+/**
+ * The production default until Artifacts is wired. The canonical repository
+ * reads as empty, so a new room activates the default policy (R-POL-7);
+ * every other call is unavailable, so `propose` records nothing.
+ */
 export class UnwiredArtifacts implements ArtifactsPort {
   private fail(): never {
     throw new Error("Artifacts is not wired into this deployment yet.");
   }
-  readMain = async (): Promise<Sha | null> => this.fail();
+  readMain = async (): Promise<Sha | null> => null;
   readConfig = async (): Promise<ArtroomConfig> => this.fail();
   treeOf = async (): Promise<Sha | null> => this.fail();
   ensureFork = async (): Promise<{ readonly remote: `https://${string}` }> => this.fail();

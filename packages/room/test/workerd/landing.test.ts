@@ -289,6 +289,20 @@ describe("R-ADMIN configuration recovery and sole-admin approval", () => {
     expectOk(await bob.act("claim", null, { goal: "back to work", scope: ["src/**"] }));
   });
 
+  it("R-ADMIN-5 is the Room's own rule: with a policy port that ignores the lane purpose, recovery-lane acts are still not judged by policy", async () => {
+    // The lockout, plus a require rule nobody can meet: neither may apply on the recovery lane.
+    const strict: PolicyDocument = { ...lockout, rules: [...lockout.rules, ...policy(requireReview({ paths: ".artroom/**", from: "@nobody", id: "impossible" })).rules.filter((r) => r.kind === "require")] };
+    const room = await makeRoom({ policy: strict });
+    room.world.policy.ignorePurpose = true;
+    const claim = await recoveryLane(room, room.admin);
+    const head = pushChange(room, claim.lane, { ".artroom/policy.json": JSON.stringify(policy()) });
+    await room.admin.ok("propose", { lane: claim.lane }, { lease: 1, expectedGeneration: 0, head, summary: "repair" });
+    await room.admin.ok("review", { lane: claim.lane, generation: 1 }, { head, verdict: "approve", scope: [".artroom/**"], text: "ok" });
+    const land = await room.admin.ok<Landing>("land", { lane: claim.lane, generation: 1 }, { lease: 1, head });
+    await tick(room, 3);
+    expect((await op(room, land.op.id)).state).toBe("landed");
+  });
+
   it("section 23, Same lockout, two admins (R-ADMIN-7): the author's own approval is self-review; the other admin's approval meets obl_admin-approval", async () => {
     const room = await makeRoom({ policy: lockout });
     const admin2 = await addMember(room, "@admin2", "admin");
