@@ -334,6 +334,11 @@ this package and should move into the contract:
 | P2.1 Reserved and prototype path keys | Ownership as `{ path, owners }` pairs; profile unchanged | P2.1: ownership, require, notify, refuse and replay for `constructor`, `prototype`, `_jsonata_cache`, `__proto__` |
 | "At most 225 ms" | Described as an estimate for sampled rules | — |
 
+Seven more mutations, one per repair, each made a named Node test fail:
+the context not copied; starting usage not recorded; the digest covering
+only the rule input; notify inheriting a meter; admission role ignored;
+grantor compromise ignored; ownership as a path-keyed map.
+
 All of these run in Node and in workerd. The pinned usage of the spike's
 cubic rule changed (775 steps, 4,200,107 bytes, from 932 and 4,203,669),
 because ownership pairs change the input's size.
