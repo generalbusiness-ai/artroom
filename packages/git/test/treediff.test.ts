@@ -292,7 +292,7 @@ test("a diff that crosses both the depth and the entry bounds is refused the sam
   const delayed = (slow: "deep" | "wide" | "none"): TreeReader => ({
     async readTree(h) {
       const isWide = wideTrees.has(h);
-      if ((slow === "wide" && isWide) || (slow === "deep" && !isWide)) await new Promise((r) => setTimeout(r, 15));
+      if ((slow === "wide" && isWide) || (slow === "deep" && !isWide)) await new Promise((r) => setTimeout(r, 250));
       return inner.readTree(h);
     },
     readCommit: (h) => inner.readCommit(h),
@@ -304,7 +304,7 @@ test("a diff that crosses both the depth and the entry bounds is refused the sam
       for (const warm of [false, true]) {
         const cache = new TreeCache();
         if (warm) await treeDiff(inner, ta, tb, { cache, bounds: { maxDepth: 100, maxEntries: 1_000_000 } });
-        const r = await treeDiff(delayed(slow), ta, tb, { cache, bounds: { ...bounds, concurrency: 2 } });
+        const r = await treeDiff(delayed(slow), ta, tb, { cache, bounds: { ...bounds, concurrency: 8 } });
         seen.add(r.kind === "too-large" ? `${r.bound}` : "ok");
       }
     }
