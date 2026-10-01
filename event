@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/ui/wrangler.jsonc","body":{"commit":"04e297b2c0953db2cdf6e223132e6c53f47da017","path":"packages/ui/wrangler.jsonc"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:03d1d8e4ef5f4d5822109f26f4f8dc5502d44959","text":"Merge retired a covered predecessor; the successor is at packages/ui/screenshots/needs-you-phone.png."}
