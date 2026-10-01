@@ -139,6 +139,17 @@ describe("1. a stored check carry counts only under the policy version that judg
     void ready;
   });
 
+  it("reservation requires every obligation met on the integration, even one with no evidence the landing relied on", async () => {
+    const { r, l } = await carriedAndReady();
+    await inDO(r, (room) => {
+      room.core.sql.all("UPDATE check_carries SET policy = 'act_0_00000000'");
+      // The engine's record of the evidence it relied on, emptied: only the obligations themselves still say no.
+      const row = room.core.sql.all("SELECT body FROM artroom_land_op WHERE id = ?", l.op.id)[0]!;
+      room.core.sql.all("UPDATE artroom_land_op SET body = ? WHERE id = ?", JSON.stringify({ ...JSON.parse(row["body"] as string), evidence: [] }), l.op.id);
+      expect(room.core.sql.transaction(() => room.core.landing.reserve(l.op.id))).toMatchObject({ kind: "retryable", reason: "obligation-open" });
+    });
+  });
+
   it("the earlier check's key compromised after the carry: the obligation is open and the landing is not reserved", async () => {
     const { r, l, mine, ready, ci } = await carriedAndReady();
     await r.admin.ok("roster", null, { op: "revoke-key", key: ci.key, reason: "compromised" });
@@ -276,7 +287,7 @@ describe("4d. a scoped check binds the snapshot commit the room recorded for the
 
 describe("2. access opened before lane B's workspaces is cleaned up by lane B when its lease ends", () => {
   /** A ready workspace of the previous revision, with a live 30-minute token, migrated to version 7. */
-  async function legacy() {
+  async function legacy(opts: { recorded?: boolean } = {}) {
     const r = await makeRoom();
     const bob = await addMember(r, "@bob", "member");
     const c = await r.admin.ok<Claim>("claim", null, { goal: "old", scope: ["src/**"] });
@@ -286,7 +297,9 @@ describe("2. access opened before lane B's workspaces is cleaned up by lane B wh
     await inDO(r, (room) => {
       const sql = room.core.sql;
       sql.all("INSERT INTO workspaces (id, lane, lease_gen, state, body, updated_ms) VALUES ('old_ws', ?, 1, 'ready', '{}', ?)", c.lane, clock.now);
-      sql.all("INSERT INTO fork_tokens (id, lane, lease_gen, revoked) VALUES (?, ?, 1, 0)", token.id, c.lane);
+      // Recorded, or minted by a provision whose answer was never recorded (pending).
+      if (opts.recorded !== false) sql.all("INSERT INTO fork_tokens (id, lane, lease_gen, revoked) VALUES (?, ?, 1, 0)", token.id, c.lane);
+      else sql.all("UPDATE workspaces SET state = 'pending' WHERE id = 'old_ws'");
       sql.all("DROP TABLE ws_leases");
       sql.all("DROP TABLE check_carries");
       sql.all("DROP TABLE land_reeval");
@@ -304,6 +317,23 @@ describe("2. access opened before lane B's workspaces is cleaned up by lane B wh
     await tick(r, 2);
     expect(tokenLive(r, c.lane, token.plaintext)).toBe(false);
     expect(await pending(r)).toBe(0);
+  });
+
+  it("a mint whose answer was never recorded: the inventory lane B is owed revokes the unknown token", async () => {
+    const { r, c, token } = await legacy({ recorded: false });
+    await r.admin.ok("release", { lane: c.lane }, { lease: 1 });
+    await tick(r, 2);
+    expect(tokenLive(r, c.lane, token.plaintext)).toBe(false);
+  });
+
+  it("a recorded token is owed by its ID: revoked even while Artifacts cannot list the fork's tokens", async () => {
+    const { r, c, token } = await legacy();
+    for (let i = 0; i < 40; i++) r.world.artifacts.failRemote("listTokens", artifactsErrors.internal());
+    await r.admin.ok("release", { lane: c.lane }, { lease: 1 });
+    await tick(r, 2);
+    expect(tokenLive(r, c.lane, token.plaintext)).toBe(false);
+    // The inventory is still owed, until Artifacts can list.
+    expect(await pending(r)).toBeGreaterThan(0);
   });
 
   it("expiry without reopening: the old token is revoked", async () => {
@@ -353,6 +383,23 @@ describe("3. a room founded before the canonical remote was stored resolves it b
     expect(await op(r, l.op.id)).toMatchObject({ state: "landed" });
     expect(r.world.artifacts.main).toBe(head);
     expect(await remote(r)).toBe(r.world.artifacts.canonicalRepo().remote);
+  });
+
+  it("a binding that answers for another repository: its remote is not used", async () => {
+    const { r, l } = await oldRoom();
+    const a = r.world.artifacts;
+    const real = a.binding.get;
+    (a.binding as { get: typeof real }).get = async (name: string) => {
+      const repo = await real(name);
+      return Object.assign(Object.create(repo), { info: async () => ({ ...(await repo.info()), name: "someone-else" }) });
+    };
+    try {
+      await tick(r);
+    } finally {
+      (a.binding as { get: typeof real }).get = real;
+    }
+    expect(await remote(r)).toBeNull();
+    expect((await op(r, l.op.id)).state).not.toBe("landed");
   });
 
   it("Artifacts is down: nothing is guessed, nothing is pushed, and the next alarm completes it", async () => {

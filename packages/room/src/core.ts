@@ -1165,7 +1165,7 @@ export class RoomCore {
       await this.workspaces.revoke(w.lane, w.lease);
       const fork = forkName(this.location().name, w.lane);
       this.sql.transaction(() => {
-        for (const r of this.sql.all("SELECT token FROM ws_legacy WHERE lane = ? AND lease_gen = ?", w.lane, w.lease)) {
+        for (const r of this.sql.all("SELECT token FROM ws_legacy WHERE lane = ? AND lease_gen = ? ORDER BY token DESC", w.lane, w.lease)) {
           const token = str(r, "token")!;
           this.sql.all(
             "INSERT INTO artroom_ws_duty (fork, kind, token_id, reason, state, started_at, expires_at, next_at) VALUES (?, ?, ?, 'migrated', 'owed', ?, NULL, ?)",
