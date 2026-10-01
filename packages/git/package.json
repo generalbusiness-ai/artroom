@@ -1,0 +1,27 @@
+{
+  "name": "@generalbusiness/artroom-git",
+  "version": "0.0.0",
+  "description": "Artroom's git engine: lane forks and tokens, pinned heads, bounded path diffs, merge previews, and the durable landing operation.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/worker.ts"
+  },
+  "scripts": {
+    "types": "wrangler types --include-env=false src/worker-runtime.d.ts >/dev/null",
+    "typecheck": "npm run types && tsc -p tsconfig.json && tsc -p test/tsconfig.json",
+    "test": "node --test --test-concurrency=1 --test-timeout=60000 'test/*.test.ts'",
+    "test:workers": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-contract": "*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@types/node": "^24.0.0",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.146.0"
+  }
+}

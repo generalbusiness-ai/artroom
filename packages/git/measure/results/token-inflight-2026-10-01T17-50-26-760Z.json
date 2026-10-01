@@ -1,0 +1,231 @@
+{
+  "repo": "artroom-lb-tok-muptijaz",
+  "git": "git version 2.54.0 (Apple Git-157)",
+  "results": [
+    {
+      "case": "A0",
+      "what": "control: token revoked after discovery, before the push POST starts",
+      "tokenTtlS": 600,
+      "pushExit": 1,
+      "pushStdout": "Done",
+      "pushStderr": "error: RPC failed; HTTP 403 curl 22 The requested URL returned error: 403\nsend-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly",
+      "refAccepted": false,
+      "timesSinceMintS": {
+        "expiresAt": 600,
+        "revokedAt": 8.5,
+        "postForwarded": 11.2,
+        "postBodyDone": 11.6,
+        "postResponse": 11.8,
+        "pushDone": 12.6
+      },
+      "postStatus": 403,
+      "postBodyBytes": 2098202,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.3,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 403,
+          "at": 0.5,
+          "error": null
+        }
+      ]
+    },
+    {
+      "case": "A",
+      "what": "token revoked while the push body is uploading (POST authenticated ~10 s earlier)",
+      "tokenTtlS": 600,
+      "pushExit": 1,
+      "pushStdout": "Done",
+      "pushStderr": "error: RPC failed; HTTP 403 curl 22 The requested URL returned error: 403\nsend-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly",
+      "refAccepted": false,
+      "timesSinceMintS": {
+        "expiresAt": 600,
+        "revokedAt": 10.4,
+        "postForwarded": 0.3,
+        "postBodyDone": 105.3,
+        "postResponse": 106,
+        "pushDone": 107.5
+      },
+      "postStatus": 403,
+      "postBodyBytes": 4196187,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.2,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 403,
+          "at": 0.3,
+          "error": null
+        }
+      ]
+    },
+    {
+      "case": "B",
+      "what": "token expires while the push body is uploading (POST started ~5 s after minting; 60 s token)",
+      "tokenTtlS": 60,
+      "pushExit": 1,
+      "pushStdout": "Done",
+      "pushStderr": "error: RPC failed; HTTP 403 curl 22 The requested URL returned error: 403\nsend-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly",
+      "refAccepted": false,
+      "timesSinceMintS": {
+        "expiresAt": 60,
+        "revokedAt": null,
+        "postForwarded": 0.3,
+        "postBodyDone": 252.4,
+        "postResponse": 252.8,
+        "pushDone": 254.3
+      },
+      "postStatus": 403,
+      "postBodyBytes": 6294171,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.2,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 403,
+          "at": 0.3,
+          "error": null
+        }
+      ]
+    },
+    {
+      "case": "C",
+      "what": "POST authenticates ~5 s before the 60 s token expires and ends ~30 s after",
+      "tokenTtlS": 60,
+      "pushExit": 1,
+      "pushStdout": "Done",
+      "pushStderr": "error: RPC failed; HTTP 403 curl 22 The requested URL returned error: 403\nsend-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly",
+      "refAccepted": false,
+      "timesSinceMintS": {
+        "expiresAt": 60,
+        "revokedAt": null,
+        "postForwarded": 55,
+        "postBodyDone": 175.4,
+        "postResponse": 175.7,
+        "pushDone": 177.4
+      },
+      "postStatus": 403,
+      "postBodyBytes": 8392158,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.3,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 403,
+          "at": 0.4,
+          "error": null
+        }
+      ]
+    },
+    {
+      "case": "D",
+      "what": "control: the same push with a live token and the same throttle",
+      "tokenTtlS": 600,
+      "pushExit": 0,
+      "pushStdout": "To http://127.0.0.1:53325/git/gitseq-spike/artroom-lb-tok-muptijaz.git\n*\tHEAD:refs/heads/case-d-muptuhgm\t[new branch]\nDone",
+      "pushStderr": "",
+      "refAccepted": true,
+      "timesSinceMintS": {
+        "expiresAt": 600,
+        "revokedAt": null,
+        "postForwarded": 0.6,
+        "postBodyDone": 151.4,
+        "postResponse": 153.3,
+        "pushDone": 154.7
+      },
+      "postStatus": 200,
+      "postBodyBytes": 10490144,
+      "requests": [
+        {
+          "method": "GET",
+          "service": "git-receive-pack",
+          "kind": null,
+          "status": 200,
+          "at": 0,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "probe",
+          "status": 200,
+          "at": 0.4,
+          "error": null
+        },
+        {
+          "method": "POST",
+          "service": null,
+          "kind": "push-body",
+          "status": 200,
+          "at": 0.6,
+          "error": null
+        }
+      ]
+    }
+  ]
+}
