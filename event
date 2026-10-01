@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/ui/test/live-room.test.tsx","body":{"commit":"04e297b2c0953db2cdf6e223132e6c53f47da017","path":"packages/ui/test/live-room.test.tsx"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/ui/test/mock-room.test.ts","body":{"commit":"04e297b2c0953db2cdf6e223132e6c53f47da017","path":"packages/ui/test/mock-room.test.ts"}}
