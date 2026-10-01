@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b5dda641714d4301d694dafc0cb430d83045b075","text":"Replaced by the review request for exact head 854f22ef1939cd79d5271298c26844d481b8b20f; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"promise","text":"I will review the Sandbox final repair at exact head 854f22ef, all 25 artifacts, native exception-context retention and recovery documentation."}
