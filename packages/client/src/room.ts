@@ -361,22 +361,32 @@ export class HttpRoomClient extends RoomCore implements HttpRoom {
 
   /**
    * A WebSocket that calls `onUpdate` for each update and reconnects from
-   * the last cursor it saw, so no update is skipped (R-API-6, R-API-8).
+   * the last cursor it saw, so no update is skipped or repeated (R-API-6,
+   * R-API-8).
+   *
+   * When a socket cannot open, the handle checks its credential over HTTPS
+   * before trying again: an ended read session is replaced (R-CRED-7); a
+   * credential the room no longer accepts stops the watch, sets `error`, and
+   * calls `onError` once, rather than retrying forever.
    */
-  watch(cursor: Cursor | undefined, onUpdate: (update: Update) => void): Subscription {
+  watch(cursor: Cursor | undefined, onUpdate: (update: Update) => void, onError?: (error: ArtroomError) => void): Watch {
     const Ws = this.opts.WebSocket ?? globalThis.WebSocket;
     if (Ws === undefined) throw artroomError("bad-request", "This runtime has no WebSocket; use subscribe() instead.");
-    const sub = new WatchSubscription(
-      cursor,
-      async (from) => {
+    const sub: WatchSubscription = new WatchSubscription(cursor, {
+      open: async (from) => {
         const url = this.#http.url("/ws", from === undefined ? {} : { cursor: from });
         url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
         // Browsers cannot set headers on a WebSocket, so the credential travels as a subprotocol, never in the URL.
         return new Ws(url, [WS_PROTOCOL, `${WS_TOKEN_PREFIX}${await this.auth()}`]);
       },
+      // A read with the current credential. `read` replaces an ended session once, and throws if the room refuses again.
+      check: async () => {
+        await this.read({ q: "log", req: { limit: 1 } });
+      },
       onUpdate,
-      () => this.#watches.delete(sub),
-    );
+      onError: onError ?? (() => {}),
+      onClose: () => this.#watches.delete(sub),
+    });
     this.#watches.add(sub);
     return sub;
   }
@@ -392,20 +402,33 @@ export const WS_PROTOCOL = "artroom.v1";
 /** The prefix of the subprotocol that carries the read credential. */
 export const WS_TOKEN_PREFIX = "artroom.token.";
 
-class WatchSubscription implements Subscription {
+/** A live `watch`: the contract's `Subscription`, and why it stopped, if it did. */
+export interface Watch extends Subscription {
+  /** Set when the room stopped accepting the credential; the watch has then closed. */
+  readonly error: ArtroomError | undefined;
+  readonly closed: boolean;
+}
+
+interface WatchDeps {
+  open(cursor: Cursor | undefined): Promise<WebSocket>;
+  check(): Promise<void>;
+  onUpdate(update: Update): void;
+  onError(error: ArtroomError): void;
+  onClose(): void;
+}
+
+class WatchSubscription implements Watch {
   #cursor: Cursor | undefined;
   #socket: WebSocket | undefined;
+  #timer: ReturnType<typeof setTimeout> | undefined;
   #closed = false;
   #failures = 0;
-  readonly #open: (cursor: Cursor | undefined) => Promise<WebSocket>;
-  readonly #onUpdate: (update: Update) => void;
-  readonly #onClose: () => void;
+  #error: ArtroomError | undefined;
+  readonly #deps: WatchDeps;
 
-  constructor(cursor: Cursor | undefined, open: (cursor: Cursor | undefined) => Promise<WebSocket>, onUpdate: (u: Update) => void, onClose: () => void) {
+  constructor(cursor: Cursor | undefined, deps: WatchDeps) {
     this.#cursor = cursor;
-    this.#open = open;
-    this.#onUpdate = onUpdate;
-    this.#onClose = onClose;
+    this.#deps = deps;
     void this.#connect();
   }
 
@@ -414,13 +437,22 @@ class WatchSubscription implements Subscription {
     return (this.#cursor ?? "") as Cursor;
   }
 
+  get error(): ArtroomError | undefined {
+    return this.#error;
+  }
+
+  get closed(): boolean {
+    return this.#closed;
+  }
+
   async #connect(): Promise<void> {
+    this.#timer = undefined;
     if (this.#closed) return;
     let socket: WebSocket;
     try {
-      socket = await this.#open(this.#cursor);
-    } catch {
-      this.#retry();
+      socket = await this.#deps.open(this.#cursor);
+    } catch (e) {
+      this.#failed(e);
       return;
     }
     if (this.#closed) {
@@ -428,6 +460,11 @@ class WatchSubscription implements Subscription {
       return;
     }
     this.#socket = socket;
+    let opened = false;
+    socket.onopen = () => {
+      opened = true;
+      this.#failures = 0;
+    };
     socket.onmessage = (event: MessageEvent) => {
       let update: Update;
       try {
@@ -437,28 +474,44 @@ class WatchSubscription implements Subscription {
       }
       if (typeof update !== "object" || update === null || typeof update.cursor !== "string") return;
       this.#cursor = update.cursor;
-      this.#failures = 0;
-      this.#onUpdate(update);
+      this.#deps.onUpdate(update);
     };
     socket.onclose = () => {
       if (this.#socket === socket) this.#socket = undefined;
-      this.#retry();
+      if (this.#closed) return;
+      if (opened) this.#retry();
+      // It never opened: perhaps the credential ended. Check it over HTTPS before trying again.
+      else void this.#deps.check().then(() => this.#retry(), (e: unknown) => this.#failed(e));
     };
     socket.onerror = () => {};
+  }
+
+  /** A retryable failure tries again later; any other failure ends the watch, observably. */
+  #failed(e: unknown): void {
+    if (this.#closed) return;
+    if (isArtroomError(e) && !e.retryable) {
+      this.#error = e;
+      this.close();
+      this.#deps.onError(e);
+      return;
+    }
+    this.#retry();
   }
 
   #retry(): void {
     if (this.#closed) return;
     const delay = Math.min(250 * 2 ** this.#failures++, 10_000);
-    setTimeout(() => void this.#connect(), delay);
+    this.#timer = setTimeout(() => void this.#connect(), delay);
   }
 
   close(): void {
     if (this.#closed) return;
     this.#closed = true;
+    if (this.#timer !== undefined) clearTimeout(this.#timer);
+    this.#timer = undefined;
     this.#socket?.close(1000);
     this.#socket = undefined;
-    this.#onClose();
+    this.#deps.onClose();
   }
 
   [Symbol.dispose](): void {

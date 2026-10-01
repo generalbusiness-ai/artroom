@@ -800,6 +800,12 @@ export class FakeRoom {
     throw artroomError("unauthenticated", "A session or bearer token is required.");
   }
 
+  /** Revokes a delegation, which ends every bearer session acting under it (R-CRED-3). */
+  revokeDelegation(id: ActId): void {
+    const d = this.delegations.get(id);
+    if (d) this.delegations.set(id, { ...d, revoked: this.entries.length });
+  }
+
   /** Ends every read session now, as a key rotation would (R-CRED-7). */
   endSessions(): void {
     this.#readers.clear();
@@ -983,7 +989,19 @@ export class FakeRoom {
     return this.#sockets.size;
   }
 
+  /** WebSocket upgrade attempts, accepted or not. */
+  upgrades = 0;
+
+  /** When true, every WebSocket upgrade is answered 503, as during an outage. */
+  rejectUpgrades = false;
+
   async #upgrade(req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {
+    this.upgrades++;
+    if (this.rejectUpgrades) {
+      socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n");
+      socket.destroy();
+      return;
+    }
     const url = new URL(req.url ?? "/", "http://x");
     const protocols = String(req.headers["sec-websocket-protocol"] ?? "").split(",").map((p) => p.trim());
     const token = protocols.find((p) => p.startsWith(WS_TOKEN_PREFIX))?.slice(WS_TOKEN_PREFIX.length);

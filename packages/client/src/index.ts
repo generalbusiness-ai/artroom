@@ -12,7 +12,7 @@
  */
 
 export { connect, join, redeem, roomIdOf, LOST_REDEMPTION } from "./connect.ts";
-export { HttpRoomClient, RpcRoomClient, WS_PROTOCOL, WS_TOKEN_PREFIX } from "./room.ts";
+export { HttpRoomClient, RpcRoomClient, WS_PROTOCOL, WS_TOKEN_PREFIX, type Watch } from "./room.ts";
 export type { ClientOptions } from "./wire.ts";
 export { canonicalize, canonicalBytes, digestOf } from "./canonical.ts";
 export { buildEnvelope, signEnvelope, signRequest, type Identity } from "./envelope.ts";

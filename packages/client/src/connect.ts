@@ -57,6 +57,9 @@ export async function connect(
   options: ClientOptions = {},
 ): Promise<Room | HttpRoom> {
   const redactor = new Redactor();
+  // Register every credential the caller already holds before the first request, so no error
+  // from any request, including the first, can carry it out (R-WS-4).
+  if (credentials.kind === "bearer") redactor.add(credentials.token);
   if (isService(endpoint)) {
     if (credentials.kind === "bearer") throw artroomError("bad-request", "A service binding signs with a key or a delegation, not a bearer token.");
     if (!isRoomId(room)) throw artroomError("bad-request", "Connect by room ID: envelopes are signed with it, and a name can be reused (R-ID-3).");
