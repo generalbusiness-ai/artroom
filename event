@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/policy/src/integrity.ts","body":{"commit":"794c64f6a0063a40478795b31cedbfec0aa00686","path":"packages/policy/src/integrity.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:03a8e101a7bdedf044ecc3b98e4146d485d8b68f","text":"Merge retired a covered predecessor; the successor is at packages/policy/src/integrity.ts."}
