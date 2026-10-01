@@ -24,7 +24,7 @@ import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
 import { obligationsFor } from "../../src/obligations.ts";
 import { artifactsErrors } from "../../src/memory/artifacts.ts";
-import { addMember, advance, call, clock, Client, expectOk, expectRefusal, grant, iso, makeRoom, newKeyPair, openedWorkspace, placeRepo, pushChange, randomBytes, sign, tick, tokenLive, worldFor, type TestRoom } from "./support.ts";
+import { addMember, advance, call, clock, Client, expectOk, expectRefusal, grant, iso, makeRoom, newKeyPair, openedWorkspace, placeRepo, pushChange, randomBytes, sign, tick, tokenLive, until, worldFor, type TestRoom } from "./support.ts";
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const entries = async (r: TestRoom): Promise<LogEntry[]> => [...(await r.admin.read({ q: "log", req: { limit: 500 } })).acts];
@@ -118,12 +118,37 @@ describe("unknown-outcome publication recovery (R-PUB-5, R-PUB-7)", () => {
   });
 });
 
+describe("abort attempts (R-REV-5)", () => {
+  it("an abort whose at-once run was lost is carried out by the alarm, beside the push still in flight", async () => {
+    const r = await makeRoom({ policy: policy(requireReview({ paths: "src/**", from: "role:maintainer", id: "code-review" })) });
+    const alice = await addMember(r, "@alice", "member");
+    const bob = await addMember(r, "@bob", "maintainer");
+    const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    const review = await bob.ok<Review>("review", { lane, generation: 1 }, { head, verdict: "approve", scope: ["src/**"], text: "ok" });
+    const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
+    await tick(r);
+    r.world.landing.controls.pausePush = true;
+    const flight = tick(r);
+    await until(async () => (await op(r, l.op.id)).state === "publishing");
+    // The abort is recorded on the operation, as the revocation's admission does, but its immediate run is lost.
+    await inDO(r, (room) => room.core.sql.transaction(() => room.core.landing.abort(review.id, bob.key, room.core.headSeq())));
+    expect(events(await entries(r), "abort-attempt")).toEqual([]);
+    const alarm = tick(r);
+    await until(async () => events(await entries(r), "abort-attempt").length > 0);
+    expect((events(await entries(r), "abort-attempt")[0]!.entry as unknown as { event: { attempt: { tokenRevoked: boolean } } }).event.attempt.tokenRevoked).toBe(true);
+    r.world.landing.controls.pausePush = false;
+    await flight;
+    await alarm;
+  });
+});
+
 // ------------------------------------------------------------------ workspaces
 
 describe("workspace lease races and delayed cleanup (R-WS, R-CRED-8, R-LANE-8)", () => {
   it("a renewal while the workspace is pending: the token ends within the renewed lease", async () => {
     const r = await makeRoom();
     const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    const first = (await r.admin.read({ q: "lane", lane: c.lane })) as unknown as { lease: { expiresAt: string } };
     await openedWorkspace(r, c.lane);
     advance(600_000);
     await r.admin.ok("renew", { lane: c.lane }, { lease: 1 });
@@ -131,8 +156,8 @@ describe("workspace lease races and delayed cleanup (R-WS, R-CRED-8, R-LANE-8)",
     const g = expectOk(await r.admin.request<WorkspaceGrant>({ kind: "workspace-token", lane: c.lane, lease: 1 }));
     const lease = (await r.admin.read({ q: "lane", lane: c.lane })) as unknown as { lease: { expiresAt: string } };
     expect(Date.parse(g.expiresAt)).toBeLessThanOrEqual(Date.parse(lease.lease.expiresAt));
-    // Minted after the renewal: it runs past the old deadline.
-    expect(Date.parse(g.expiresAt)).toBeGreaterThan(clock.now - 600_000 + 1_800_000 - 10_000);
+    // Minted after the renewal, for the renewed deadline: it runs past the first one.
+    expect(Date.parse(g.expiresAt)).toBeGreaterThan(Date.parse(first.lease.expiresAt));
   });
 
   it("a take-over while the lease token is being minted: that token is revoked, and the new holder's workspace is the only live access", async () => {
@@ -194,7 +219,8 @@ describe("policy activation and recompute, scoped check carry and filtered check
 
   async function checkRoom(cfg: CheckerConfig) {
     const doc = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
-    const r = await makeRoom({ policy: doc, files: { ".artroom/checkers/unit.json": JSON.stringify(cfg) } });
+    // package.json is a global input (R-CARRY-3): a scoped runner always receives it (R-CARRY-8).
+    const r = await makeRoom({ policy: doc, files: { ".artroom/checkers/unit.json": JSON.stringify(cfg), "package.json": "{}" } });
     const alice = await addMember(r, "@alice", "member");
     const ci = await addMember(r, "@ci", "checker");
     return { r, doc, alice, ci };
@@ -219,7 +245,10 @@ describe("policy activation and recompute, scoped check carry and filtered check
     const integration = (await op(r, l.op.id)).integration!;
     const paths = checkerInputs(scoped.inputs, doc.carry)!;
     const snapshot = await snapshotOf(r, integration, paths);
-    expectRefusal(await ci.act("check", { lane, generation: 1 }, checkBody(r, scoped, integration, { kind: "filtered", snapshot, paths: ["src/**"] })), "check-binding");
+    // A snapshot over the declared inputs alone leaves out the global inputs.
+    const narrow = await snapshotOf(r, integration, ["src/**"]);
+    expect(narrow).not.toBe(snapshot);
+    expectRefusal(await ci.act("check", { lane, generation: 1 }, checkBody(r, scoped, integration, { kind: "filtered", snapshot: narrow, paths: ["src/**"] })), "check-binding");
     expectRefusal(await ci.act("check", { lane, generation: 1 }, checkBody(r, scoped, integration, { kind: "filtered", snapshot: `sha256:${"1".repeat(64)}`, paths })), "check-binding");
     expectOk(await ci.act("check", { lane, generation: 1 }, checkBody(r, scoped, integration, { kind: "filtered", snapshot, paths })));
     await tick(r, 2);
@@ -259,6 +288,12 @@ describe("policy activation and recompute, scoped check carry and filtered check
       return obligationsFor(room.core.sql, mine.lane, 1, { doc: policy.doc, checkers: policy.checkers, integration: after.integration as never })[0]!;
     });
     expect(onNew.state).toBe("met");
+    // A carry counts only on the integration it was judged for.
+    const elsewhere = await inDO(r, (room) => {
+      const policy = room.core.activePolicy();
+      return obligationsFor(room.core.sql, mine.lane, 1, { doc: policy.doc, checkers: policy.checkers, integration: "f".repeat(40) as never })[0]!;
+    });
+    expect(elsewhere.state).toBe("open");
     expect(onNew.evidence).toEqual([expect.objectContaining({ basis: "carried", act: check.id, kind: "check", reason: expect.objectContaining({ code: "snapshot-identical" }), rules: [] })]);
     void l;
   });
