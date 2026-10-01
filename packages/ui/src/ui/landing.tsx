@@ -20,6 +20,7 @@ const RETRY: Record<RetryReason, string> = {
   "authority-lost": "The member who asked to land no longer has the authority to.",
   "evidence-invalid": "Evidence it relied on no longer counts.",
   "obligation-open": "An obligation was open when the room checked again.",
+  "land-input-changed": "What the land rules judged changed before the landing was reserved, for example a new objection.",
 };
 
 export interface LandingFacts {
