@@ -7,6 +7,7 @@
 import type { ComponentChildren } from "preact";
 import type { RoomSnapshot } from "../room/adapter.ts";
 import type { AbortAttempt, LandOp, RetryReason } from "../room/contract.ts";
+import { recoveryNow } from "../room/recovery.ts";
 import { RefusalNotice, Sha, WhyLink } from "./bits.tsx";
 import { useApp } from "./context.ts";
 import { clock, laneGoal } from "./format.ts";
@@ -79,7 +80,7 @@ export function landingFacts(snap: RoomSnapshot, op: LandOp): LandingFacts {
             <>Main still reads as the expected main: the push has not landed so far.</>
           );
         return {
-          summary: "Abort attempt in progress. The room no longer pushes this landing; it keeps reading main back.",
+          summary: recoveryNow(op),
           facts: [
             ...abortFacts(op.abort),
             read,
@@ -91,7 +92,7 @@ export function landingFacts(snap: RoomSnapshot, op: LandOp): LandingFacts {
       }
       if (op.readBack.main === "unexpected")
         return {
-          summary: "Main shows another writer. The room stopped pushing and keeps the slot held until an admin reconciles main.",
+          summary: recoveryNow(op),
           facts: [
             <>
               Main reads <Sha sha={op.readBack.observed} />: neither the expected main <Sha sha={op.expectedMain} /> nor this landing's commit <Sha sha={op.integration} />.
@@ -102,7 +103,7 @@ export function landingFacts(snap: RoomSnapshot, op: LandOp): LandingFacts {
           needsAdmin: true,
         };
       return {
-        summary: "Main still reads as before, so the room pushes the same reserved commit forward again. Later landings wait.",
+        summary: recoveryNow(op),
         facts: [
           <>
             Main reads the expected main <Sha sha={op.expectedMain} />; the push of <Sha sha={op.integration} /> has not landed yet.

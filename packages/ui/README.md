@@ -12,7 +12,8 @@ The web interface for Artroom: four screens over one data adapter.
 It is built with Preact and Vite, with hand-written CSS. It has no component
 library. It is served as Workers static assets.
 
-**Baseline.** The UI builds against the contract on `main` at `ca61351`: the
+**Baseline.** The UI builds against the contract on `main` at `0d8f04c`
+(contract unchanged since `ca61351`): the
 approved lane 0 contract (`940e2dca`) with the policy-runtime amendment
 (path/owner pairs, replay contexts, the per-act budget in `ProfileStamp`,
 check carry facts). It also uses the policy runtime
@@ -209,3 +210,31 @@ covered by tests (`test/policy-runtime.test.ts`,
 6. **P2 — partial live reads looked complete.** See contract gap 8. The
    publication lag comes from the log's own counters (`head` and
    `publishedThrough`). The slot is "Unavailable" when it cannot be read.
+
+## Review 88a20f74
+
+Checker reviewed head `c5cf189f` and asked for two changes and one
+screenshot fix. Main at `0d8f04cf` (the lane D policy pack) is merged first.
+Tests are in `test/review-88a20f74.test.tsx`.
+
+1. **P1 — live sentences still promised forward pushes after an abort.** A
+   `publication-unresolved` event records only its operation and what main
+   read back. So its sentence now says only that ("main read back as the
+   expected main, so the push had not landed", or the commit main showed).
+   What the room does next is added only from the loaded operation
+   (`src/room/recovery.ts`, shared with the landing cards): "Abort attempt in
+   progress", "another writer", or "pushes the same reserved commit forward".
+   When the operation is not loaded, the sentence says the current state is
+   not known; it never assumes there was no abort. Explain titles use the same
+   rule. Tests: abort before the first unresolved event, truncated history
+   with a loaded abort, no loaded operation, ordinary forward completion,
+   unexpected main, and the explain title.
+2. **P2 — a dry run could preview a policy the room would refuse.**
+   `compileDraft` now runs the policy runtime's `validatePolicy` on the whole
+   compiled document before anything is evaluated. If it is invalid, the dry
+   run returns the validation problems and a fix, and no prediction. This
+   covers all four kinds of draft: a duplicate rule ID, and patterns outside
+   the glob syntax. Unsupported refuse-claim target shapes are still refused
+   before validation, and a valid draft of each kind still replays.
+3. **Screenshots.** The phone screenshot now waits for the diff to load, as the
+   laptop one does, so it captures the whole page.

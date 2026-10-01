@@ -271,6 +271,13 @@ function DryRunView({ r }: { r: DryRunResult }) {
           <Icon name="alert" /> This draft cannot be written as a faithful rule
         </div>
         <p class="small">{r.reason}</p>
+        {r.problems.length > 1 && (
+          <ul class="small stack-sm">
+            {r.problems.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+        )}
         <p class="small">
           <strong>Fix:</strong> {r.fix}
         </p>

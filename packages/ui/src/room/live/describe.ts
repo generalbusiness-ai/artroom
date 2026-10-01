@@ -1,6 +1,7 @@
 /** Plain sentences for log entries from a live room. */
 
-import type { ActId, LogEntry } from "../contract.ts";
+import type { ActId, LandOp, LogEntry } from "../contract.ts";
+import { recoveryNow } from "../recovery.ts";
 import type { FeedEntry } from "../adapter.ts";
 
 /** `act_<seq>_<first 8 hex of the entry hash>` (R-ID-1). */
@@ -26,9 +27,11 @@ export function describeEntry(e: LogEntry): FeedEntry {
         case "abort-attempt":
           return `A key that is evidence for a reserved landing was revoked as compromised, so the room stopped pushing it forward and recorded an abort attempt${ev.attempt.tokenRevoked ? "; the publication token was revoked" : ""}.`;
         case "publication-unresolved":
+          // Only what the event records. What the room does next depends on
+          // whether an abort attempt exists, which this event cannot show.
           return ev.readBack.main === "unexpected"
-            ? `A publication is unresolved: main shows another writer (${ev.readBack.observed.slice(0, 7)}). The room stopped pushing and keeps the slot held until an admin reconciles main.`
-            : "A publication is unresolved: main still reads as before, so the room pushes the same reserved commit forward again.";
+            ? `A publication is unresolved: main read back as ${ev.readBack.observed.slice(0, 7)}, which is neither the expected main nor the reserved commit.`
+            : "A publication is unresolved: main read back as the expected main, so the push had not landed.";
         case "land-outcome":
           switch (ev.outcome.state) {
             case "landed":
@@ -54,7 +57,8 @@ export function describeEntry(e: LogEntry): FeedEntry {
       }
     })();
     const refusal = ev.type === "land-outcome" && ev.outcome.state === "failed" && ev.outcome.reason.code === "refused" ? { ...ev.outcome.reason.refusal, act: id } : undefined;
-    return { ...common, type: "system", kind: ev.type, by: null, text: text ?? ev.type, flags: [], ...(lane ? { lane } : {}), ...(refusal ? { refusal } : {}) };
+    const op = "op" in ev ? ev.op : undefined;
+    return { ...common, type: "system", kind: ev.type, by: null, text: text ?? ev.type, flags: [], ...(lane ? { lane } : {}), ...(refusal ? { refusal } : {}), ...(op ? { op } : {}) };
   }
   const env = x.act.envelope;
   const by = x.receipt.authority.member;
@@ -95,4 +99,17 @@ export function describeEntry(e: LogEntry): FeedEntry {
     ...(lane ? { lane } : {}),
     ...(x.receipt.after ? { after: x.receipt.after } : {}),
   };
+}
+
+/**
+ * Add what is known now about an unresolved publication's recovery, from its
+ * loaded operation. Without a loaded operation nothing is added: the history
+ * may be truncated, so an abort attempt cannot be ruled out.
+ */
+export function withRecovery(entry: FeedEntry, ops: readonly LandOp[]): FeedEntry {
+  if (entry.kind !== "publication-unresolved" || !entry.op) return entry;
+  const op = ops.find((o) => o.id === entry.op);
+  if (!op) return { ...entry, text: `${entry.text} Its current state was not loaded, so whether the room is still pushing it is not known here.` };
+  if (op.state !== "unresolved") return entry;
+  return { ...entry, text: `${entry.text} Now: ${recoveryNow(op)}` };
 }

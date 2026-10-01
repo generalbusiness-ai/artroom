@@ -72,6 +72,8 @@ export interface FeedEntry {
   readonly refusal?: Refusal;
   /** Admitted while this landing held the publication slot (R-LAND-8). */
   readonly after?: OpId;
+  /** For a system event about a landing operation: that operation. */
+  readonly op?: OpId;
   readonly flags: readonly Flag[];
 }
 
@@ -218,6 +220,8 @@ export type DryRunResult =
       readonly status: "not-compiled";
       readonly reason: string;
       readonly fix: string;
+      /** The policy runtime's validation problems, when the whole compiled policy was invalid. */
+      readonly problems: readonly string[];
     };
 
 // ---------------------------------------------------------------- timeline

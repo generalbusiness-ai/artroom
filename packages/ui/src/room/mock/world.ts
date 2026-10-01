@@ -836,7 +836,7 @@ export class World {
     const op = this.landOp(tag);
     if (op.state !== "publishing") throw new Error("unresolved needs publishing");
     const lane = this.lane(tag);
-    const e = this.entry("system", "publication-unresolved", null, `Publication ${op.publication} is unresolved: Artifacts did not answer, and main still reads as before. The room keeps pushing the same commit forward.`, { lane: lane.id });
+    const e = this.entry("system", "publication-unresolved", null, `Publication ${op.publication} is unresolved: Artifacts did not answer, and main read back as the expected main, so the push had not landed.`, { lane: lane.id });
     const { integration, evidence, publication, reservedAt } = op;
     this.ops.set(op.id, { ...this.opFields(op), state: "unresolved", integration, evidence, publication, reservedAt, since: at(this.t), readBack: { main: "expected-main" } });
     if (this.slot.state === "held") this.slot = { ...this.slot, unresolvedSince: at(this.t) };

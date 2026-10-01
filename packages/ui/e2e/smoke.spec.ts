@@ -146,5 +146,7 @@ test("screenshot, phone width", async ({ page }) => {
   const href = await laneHref(page, "Rate-limit /api/login");
   await page.goto(`/?step=22${href}/2`);
   await expect(page.locator("[data-obligation='security-review']")).toBeVisible();
+  // Wait for the diff, which loads after the page, so the capture is the whole page.
+  await expect(page.locator("[data-file='src/lib/authz/check.ts']")).toBeVisible();
   await capture(page, "proposal-phone");
 });

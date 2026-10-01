@@ -10,16 +10,36 @@
  * nothing is replayed for it.
  */
 
-import { admit, evaluate, evaluateCarry, evaluateRefuse, evaluateRequire, globsOverlap, STAMP, type ActivePolicy } from "@generalbusiness/artroom-policy";
+import { admit, evaluate, evaluateCarry, evaluateRefuse, evaluateRequire, globsOverlap, STAMP, validatePolicy, type ActivePolicy } from "@generalbusiness/artroom-policy";
 import type { DraftRule, DryRunChange, DryRunMismatch, DryRunResult } from "./adapter.ts";
 import type { PolicyDocument, PolicyVersion, Rule } from "./contract.ts";
 import type { History } from "./mock/world.ts";
 import { compileTargets, refuseClaimExpr } from "./refuse-claim.ts";
 
-type Compiled = { readonly doc: PolicyDocument; readonly shown: Rule | { readonly carry: Record<string, unknown> } } | { readonly problem: string; readonly fix: string };
+type Compiled =
+  | { readonly doc: PolicyDocument; readonly shown: Rule | { readonly carry: Record<string, unknown> } }
+  | { readonly problem: string; readonly fix: string; readonly problems?: readonly string[] };
 
-/** The active policy with the draft added, as `.artroom/policy.json` would hold it. */
+/**
+ * The active policy with the draft added, as `.artroom/policy.json` would
+ * hold it, and only if the policy runtime would accept that whole document
+ * (validatePolicy, R-POL-1). A document the room would refuse is never
+ * evaluated, so no prediction is made for it.
+ */
 export function compileDraft(draft: DraftRule, doc: PolicyDocument): Compiled {
+  const built = build(draft, doc);
+  if ("problem" in built) return built;
+  const valid = validatePolicy(built.doc);
+  if (!valid.ok)
+    return {
+      problem: `The policy with this draft would be refused (${valid.refusal.rule}): ${valid.refusal.reason}`,
+      fix: "Change the draft so the whole policy is valid: a new rule ID, and patterns made only of literal text, * and **.",
+      problems: valid.problems,
+    };
+  return built;
+}
+
+function build(draft: DraftRule, doc: PolicyDocument): Compiled {
   switch (draft.kind) {
     case "require-review": {
       const rule: Rule = { id: draft.id, kind: "require", paths: draft.paths, obligation: { type: "review", from: [draft.from], count: draft.count, allowSelf: false } };
@@ -58,7 +78,7 @@ export function compileDraft(draft: DraftRule, doc: PolicyDocument): Compiled {
 
 export async function dryRun(history: History, draft: DraftRule, doc: PolicyDocument, version: PolicyVersion): Promise<DryRunResult> {
   const compiled = compileDraft(draft, doc);
-  if ("problem" in compiled) return { status: "not-compiled", reason: compiled.problem, fix: compiled.fix };
+  if ("problem" in compiled) return { status: "not-compiled", reason: compiled.problem, fix: compiled.fix, problems: compiled.problems ?? [] };
   const before: ActivePolicy = { doc, version };
   const after: ActivePolicy = { doc: compiled.doc, version };
   const changes: DryRunChange[] = [];

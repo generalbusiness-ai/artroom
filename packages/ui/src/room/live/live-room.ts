@@ -30,7 +30,7 @@ import type {
 } from "../contract.ts";
 import { holdsSlot } from "../contract.ts";
 import type { DraftRule, DryRunResult, FileDiff, Person, PolicyOutcome, ReviewDraft, RoomAdapter, RoomSnapshot, Why } from "../adapter.ts";
-import { describeEntry, entryId } from "./describe.ts";
+import { describeEntry, entryId, withRecovery } from "./describe.ts";
 
 export class LiveRoom implements RoomAdapter {
   readonly kind = "live" as const;
@@ -106,7 +106,7 @@ export class LiveRoom implements RoomAdapter {
       }));
 
     const entries = log.acts;
-    const feed = entries.map(describeEntry);
+    const feed = entries.map((e) => withRecovery(describeEntry(e), landOps));
     const records = recordsFromLog(entries);
     const outcomes: PolicyOutcome[] = entries.flatMap((e) => {
       const r = e.entry.type === "system" ? null : e.entry.receipt;
@@ -194,7 +194,7 @@ export class LiveRoom implements RoomAdapter {
     const body = e.type === "system" ? null : (e.act.envelope.body as { because?: Why["reasons"] });
     return {
       act: x.act,
-      title: describeEntry(x.entry).text,
+      title: withRecovery(describeEntry(x.entry), this.snap?.landOps ?? []).text,
       by,
       seq: x.entry.seq,
       outcome: x.outcome,
