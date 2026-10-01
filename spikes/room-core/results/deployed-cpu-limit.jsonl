@@ -1,0 +1,6 @@
+{"url":"/r/limit1/bench","outcome":"ok","cpuTime":1,"wallTime":52104,"entrypoint":null,"ex":[]}
+{"url":"{\"rpcMethod\":\"bench\"}","outcome":"exceededCpu","cpuTime":32000,"wallTime":52038,"entrypoint":"RoomSpike","ex":["Durable Object exceeded its CPU time limit and was reset."]}
+{"url":"{\"rpcMethod\":\"bench\"}","outcome":"exceededCpu","cpuTime":30000,"wallTime":48893,"entrypoint":"RoomSpike","ex":["Durable Object exceeded its CPU time limit and was reset."]}
+{"url":"/r/limit1/bench","outcome":"ok","cpuTime":1,"wallTime":48912,"entrypoint":null,"ex":[]}
+{"url":"{\"rpcMethod\":\"bench\"}","outcome":"ok","cpuTime":1695,"wallTime":1821,"entrypoint":"RoomSpike","ex":[]}
+{"url":"/r/limit1/bench","outcome":"ok","cpuTime":2,"wallTime":1862,"entrypoint":null,"ex":[]}

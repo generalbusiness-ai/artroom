@@ -1,0 +1,1394 @@
+{
+  "base": "http://127.0.0.1:8787",
+  "room": "spike-1790871907631",
+  "runs": 50,
+  "started": "2026-10-01T16:25:07.631Z",
+  "repo": {
+    "base": "7ef98448f8b38099ab1ded55e458538ad47a51e7",
+    "small": "1a65be7afb3765c3a2c4ea097b5f458d5bc4a766",
+    "large": "62a7fb3a4adb4038ad935a0478b0048fdf30feb1",
+    "files": 214
+  },
+  "first": {
+    "setupRoundTrip": 25.877542,
+    "setupWorkerMs": 6,
+    "claimRoundTrip": 3.944915999999999
+  },
+  "sample": {
+    "claim": {
+      "seq": 1,
+      "id": 1,
+      "actor": "fM06boUQk6uJ1-8zeN82ZJcUkjEWfodBmtnSzdr_BVw",
+      "digest": "77daf5bf2f5bf1834824bce7a677622788301ca0ce5c62b409f4502aa0f14569",
+      "policy": "b1b284a95edf8f7ad0b9e7692b1f8dff0b1131a617e6ca6326ae2c13048925f8",
+      "kind": "claim",
+      "goal": "spike run 0",
+      "scope": [
+        "**"
+      ],
+      "overlaps": [],
+      "notified": [],
+      "timings": {
+        "verify": 0,
+        "diff": 0,
+        "rules": {
+          "refuse": 1
+        },
+        "sql": 0,
+        "total": 1,
+        "evaluations": 1,
+        "steps": 6
+      }
+    },
+    "proposeLarge": {
+      "seq": 4,
+      "id": 4,
+      "actor": "fM06boUQk6uJ1-8zeN82ZJcUkjEWfodBmtnSzdr_BVw",
+      "digest": "712d3895c087a187f54eedd89c03400a805479cba583117c4ae71e692f805bff",
+      "policy": "b1b284a95edf8f7ad0b9e7692b1f8dff0b1131a617e6ca6326ae2c13048925f8",
+      "kind": "propose",
+      "claim": 1,
+      "base": "7ef98448f8b38099ab1ded55e458538ad47a51e7",
+      "head": "62a7fb3a4adb4038ad935a0478b0048fdf30feb1",
+      "changed": "99 paths",
+      "obligations": [
+        {
+          "check": "tests"
+        },
+        {
+          "review": "@docs"
+        },
+        {
+          "review": "any"
+        }
+      ],
+      "supersedes": 2,
+      "carried": [
+        {
+          "review": 3,
+          "fresh": false
+        }
+      ],
+      "readTrees": 216,
+      "notified": [
+        "feGS5XCAyR1pE9G-Amkz-ewI0PDXoG6qD76wFsmkz0c"
+      ],
+      "timings": {
+        "verify": 0,
+        "diff": 2302,
+        "rules": {
+          "refuse": 9,
+          "require": 3,
+          "survive": 6,
+          "notify": 0
+        },
+        "sql": 0,
+        "total": 2320,
+        "evaluations": 7,
+        "steps": 2772
+      }
+    },
+    "landRefused": {
+      "refused": true,
+      "rule": "obligations-met",
+      "reason": "Unmet: [\"@docs\",\"any\"]",
+      "fix": "Get a fresh approving review for each unmet review obligation.",
+      "timings": {
+        "verify": 0,
+        "diff": 0,
+        "rules": {
+          "refuse": 0,
+          "land": 1
+        },
+        "sql": 0,
+        "total": 1,
+        "evaluations": 2,
+        "steps": 123
+      }
+    },
+    "land": {
+      "seq": 6,
+      "id": 6,
+      "actor": "fM06boUQk6uJ1-8zeN82ZJcUkjEWfodBmtnSzdr_BVw",
+      "digest": "056305c48b729095a081e0c7a3d7d2dce9f34e5fc5229b243b46e7a07eb63785",
+      "policy": "b1b284a95edf8f7ad0b9e7692b1f8dff0b1131a617e6ca6326ae2c13048925f8",
+      "kind": "land",
+      "proposal": 4,
+      "commit": "62a7fb3a4adb4038ad935a0478b0048fdf30feb1",
+      "lane": "claim-1",
+      "notified": [
+        "fM06boUQk6uJ1-8zeN82ZJcUkjEWfodBmtnSzdr_BVw"
+      ],
+      "timings": {
+        "verify": 0,
+        "diff": 0,
+        "rules": {
+          "refuse": 0,
+          "land": 0,
+          "notify": 0
+        },
+        "sql": 1,
+        "total": 1,
+        "evaluations": 3,
+        "steps": 133
+      }
+    },
+    "selfReview": {
+      "refused": true,
+      "rule": "no-self-review",
+      "reason": "Rule no-self-review refused this act.",
+      "fix": "Ask another actor to review this proposal.",
+      "timings": {
+        "verify": 0,
+        "diff": 0,
+        "rules": {
+          "refuse": 0
+        },
+        "sql": 0,
+        "total": 1,
+        "evaluations": 1,
+        "steps": 14
+      }
+    }
+  },
+  "checks": {
+    "replayed": true,
+    "badSignature": true,
+    "explain": {
+      "actsReplayed": 301,
+      "evaluations": 1051,
+      "differing": 0
+    }
+  },
+  "acts": {
+    "roundTrip": {
+      "claim": {
+        "n": 50,
+        "p50": 2.268,
+        "p90": 4.208,
+        "max": 8.594,
+        "min": 1.607
+      },
+      "propose-small": {
+        "n": 50,
+        "p50": 975.91,
+        "p90": 1460.587,
+        "max": 1650.261,
+        "min": 432.805
+      },
+      "review-refused": {
+        "n": 50,
+        "p50": 2.904,
+        "p90": 3.706,
+        "max": 14.87,
+        "min": 1.894
+      },
+      "review": {
+        "n": 100,
+        "p50": 2.684,
+        "p90": 3.933,
+        "max": 14.299,
+        "min": 1.834
+      },
+      "propose-large-survive": {
+        "n": 50,
+        "p50": 1746.249,
+        "p90": 2761.771,
+        "max": 3625.283,
+        "min": 1066.164
+      },
+      "land-refused": {
+        "n": 50,
+        "p50": 2.723,
+        "p90": 4.101,
+        "max": 13.222,
+        "min": 2.24
+      },
+      "land": {
+        "n": 50,
+        "p50": 2.756,
+        "p90": 5.314,
+        "max": 14.048,
+        "min": 2.018
+      }
+    },
+    "roundTripAll": {
+      "n": 400,
+      "p50": 2.982,
+      "p90": 1531.72,
+      "max": 3625.283,
+      "min": 1.607
+    },
+    "inDurableObject": {
+      "claim": {
+        "n": 50,
+        "p50": 0,
+        "p90": 1,
+        "max": 1,
+        "min": 0
+      },
+      "propose-small": {
+        "n": 50,
+        "p50": 973,
+        "p90": 1455,
+        "max": 1647,
+        "min": 430
+      },
+      "review-refused": {
+        "n": 50,
+        "p50": 0,
+        "p90": 1,
+        "max": 1,
+        "min": 0
+      },
+      "review": {
+        "n": 100,
+        "p50": 0,
+        "p90": 1,
+        "max": 1,
+        "min": 0
+      },
+      "propose-large-survive": {
+        "n": 50,
+        "p50": 1743,
+        "p90": 2758,
+        "max": 3622,
+        "min": 1063
+      },
+      "land-refused": {
+        "n": 50,
+        "p50": 1,
+        "p90": 1,
+        "max": 1,
+        "min": 0
+      },
+      "land": {
+        "n": 50,
+        "p50": 1,
+        "p90": 1,
+        "max": 1,
+        "min": 0
+      }
+    },
+    "parts": {
+      "verify": {
+        "n": 400,
+        "p50": 0,
+        "p90": 0,
+        "max": 1,
+        "min": 0
+      },
+      "diff": {
+        "n": 100,
+        "p50": 1446,
+        "p90": 2357,
+        "max": 3609,
+        "min": 430
+      },
+      "sql": {
+        "n": 400,
+        "p50": 0,
+        "p90": 1,
+        "max": 4,
+        "min": 0
+      }
+    },
+    "rulesPerAct": {
+      "refuse": {
+        "n": 400,
+        "p50": 0,
+        "p90": 4,
+        "max": 9,
+        "min": 0
+      },
+      "require": {
+        "n": 100,
+        "p50": 1,
+        "p90": 2,
+        "max": 5,
+        "min": 0
+      },
+      "notify": {
+        "n": 250,
+        "p50": 0,
+        "p90": 0,
+        "max": 4,
+        "min": 0
+      },
+      "survive": {
+        "n": 50,
+        "p50": 4,
+        "p90": 5,
+        "max": 7,
+        "min": 2
+      },
+      "land": {
+        "n": 100,
+        "p50": 0,
+        "p90": 1,
+        "max": 1,
+        "min": 0
+      }
+    }
+  },
+  "bench": {
+    "noopCall": {
+      "n": 50,
+      "p50": 0,
+      "p90": 1,
+      "max": 1,
+      "min": 0
+    },
+    "verify": {
+      "inner": 200,
+      "perOpInDO": {
+        "n": 50,
+        "p50": 0.03,
+        "p90": 0.03,
+        "max": 0.04,
+        "min": 0.025
+      },
+      "perOpWall": {
+        "n": 50,
+        "p50": 0.03,
+        "p90": 0.035,
+        "max": 0.04,
+        "min": 0.025
+      }
+    },
+    "compileAllRules": {
+      "inner": 20,
+      "perOpInDO": {
+        "n": 50,
+        "p50": 0.45,
+        "p90": 0.6,
+        "max": 1.1,
+        "min": 0.45
+      },
+      "perOpWall": {
+        "n": 50,
+        "p50": 0.5,
+        "p90": 0.9,
+        "max": 1.15,
+        "min": 0.45
+      }
+    },
+    "rules": {
+      "claim-overlap": {
+        "kind": "refuse",
+        "steps": 6,
+        "inputBytes": 168,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.01,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.03,
+            "max": 0.09,
+            "min": 0.01
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.03,
+            "max": 0.06,
+            "min": 0.01
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.01,
+            "max": 0.04,
+            "min": 0
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.02,
+            "max": 0.05,
+            "min": 0.01
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.01,
+            "max": 0.01,
+            "min": 0
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.02,
+            "max": 0.05,
+            "min": 0.01
+          }
+        }
+      },
+      "claim-before-propose": {
+        "kind": "refuse",
+        "steps": 20,
+        "inputBytes": 3156,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.06,
+            "p90": 0.06,
+            "max": 0.07,
+            "min": 0.05
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.07,
+            "p90": 0.1,
+            "max": 0.1,
+            "min": 0.06
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.05,
+            "p90": 0.05,
+            "max": 0.06,
+            "min": 0.04
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.06,
+            "p90": 0.08,
+            "max": 0.1,
+            "min": 0.05
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.04,
+            "p90": 0.05,
+            "max": 0.05,
+            "min": 0.04
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.05,
+            "p90": 0.08,
+            "max": 0.08,
+            "min": 0.05
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.04,
+            "p90": 0.04,
+            "max": 0.05,
+            "min": 0.03
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.05,
+            "p90": 0.08,
+            "max": 0.08,
+            "min": 0.04
+          }
+        }
+      },
+      "within-claim-scope": {
+        "kind": "refuse",
+        "steps": 897,
+        "inputBytes": 3156,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 3.73,
+            "p90": 3.88,
+            "max": 4,
+            "min": 3.52
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 3.73,
+            "p90": 3.89,
+            "max": 4.02,
+            "min": 3.55
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.63,
+            "p90": 0.65,
+            "max": 0.66,
+            "min": 0.6
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.64,
+            "p90": 0.66,
+            "max": 0.67,
+            "min": 0.61
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.41,
+            "p90": 0.43,
+            "max": 0.43,
+            "min": 0.39
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.42,
+            "p90": 0.44,
+            "max": 0.44,
+            "min": 0.4
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.31,
+            "p90": 0.32,
+            "max": 0.36,
+            "min": 0.29
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.32,
+            "p90": 0.33,
+            "max": 0.38,
+            "min": 0.3
+          }
+        }
+      },
+      "no-self-review": {
+        "kind": "refuse",
+        "steps": 14,
+        "inputBytes": 292,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.03,
+            "max": 0.03,
+            "min": 0.02
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.05,
+            "max": 0.05,
+            "min": 0.03
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.03,
+            "max": 0.04,
+            "min": 0.02
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.03,
+            "max": 0.04,
+            "min": 0.01
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.02,
+            "max": 0.03,
+            "min": 0.01
+          }
+        }
+      },
+      "land-own-proposal": {
+        "kind": "refuse",
+        "steps": 20,
+        "inputBytes": 352,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.04,
+            "p90": 0.04,
+            "max": 0.04,
+            "min": 0.03
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.05,
+            "p90": 0.06,
+            "max": 0.07,
+            "min": 0.04
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.03,
+            "max": 0.03,
+            "min": 0.02
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.04,
+            "max": 0.04,
+            "min": 0.03
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.03,
+            "max": 0.04,
+            "min": 0.02
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.03,
+            "max": 0.04,
+            "min": 0.02
+          }
+        }
+      },
+      "tests-for-code": {
+        "kind": "require",
+        "steps": 704,
+        "inputBytes": 3156,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.72,
+            "p90": 0.75,
+            "max": 0.76,
+            "min": 0.69
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.74,
+            "p90": 0.76,
+            "max": 0.77,
+            "min": 0.7
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.71,
+            "p90": 0.73,
+            "max": 0.75,
+            "min": 0.67
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.72,
+            "p90": 0.75,
+            "max": 0.77,
+            "min": 0.67
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.38,
+            "p90": 0.39,
+            "max": 0.43,
+            "min": 0.35
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.39,
+            "p90": 0.41,
+            "max": 0.44,
+            "min": 0.36
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.29,
+            "p90": 0.3,
+            "max": 0.31,
+            "min": 0.27
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.3,
+            "p90": 0.31,
+            "max": 0.32,
+            "min": 0.28
+          }
+        }
+      },
+      "docs-review-for-examples": {
+        "kind": "require",
+        "steps": 407,
+        "inputBytes": 3156,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.38,
+            "p90": 0.4,
+            "max": 0.42,
+            "min": 0.35
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.39,
+            "p90": 0.41,
+            "max": 0.43,
+            "min": 0.37
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.35,
+            "p90": 0.37,
+            "max": 0.39,
+            "min": 0.33
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.37,
+            "p90": 0.39,
+            "max": 0.4,
+            "min": 0.35
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.21,
+            "p90": 0.22,
+            "max": 0.22,
+            "min": 0.2
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.22,
+            "p90": 0.23,
+            "max": 0.24,
+            "min": 0.21
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.15,
+            "p90": 0.16,
+            "max": 0.17,
+            "min": 0.15
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.17,
+            "p90": 0.18,
+            "max": 0.18,
+            "min": 0.16
+          }
+        }
+      },
+      "one-approval": {
+        "kind": "require",
+        "steps": 4,
+        "inputBytes": 3156,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.04,
+            "max": 0.04,
+            "min": 0.03
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.04,
+            "p90": 0.08,
+            "max": 0.08,
+            "min": 0.04
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.04,
+            "p90": 0.04,
+            "max": 0.04,
+            "min": 0.03
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.04,
+            "p90": 0.08,
+            "max": 0.08,
+            "min": 0.04
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.04,
+            "max": 0.05,
+            "min": 0.03
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.04,
+            "p90": 0.07,
+            "max": 0.08,
+            "min": 0.03
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.04,
+            "max": 0.04,
+            "min": 0.03
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.04,
+            "p90": 0.07,
+            "max": 0.08,
+            "min": 0.03
+          }
+        }
+      },
+      "reviewed-paths-unchanged": {
+        "kind": "survive",
+        "steps": 706,
+        "inputBytes": 2990,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 3.59,
+            "p90": 3.74,
+            "max": 3.82,
+            "min": 3.35
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 3.6,
+            "p90": 3.75,
+            "max": 3.83,
+            "min": 3.36
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.62,
+            "p90": 0.64,
+            "max": 0.66,
+            "min": 0.58
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.63,
+            "p90": 0.65,
+            "max": 0.67,
+            "min": 0.59
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.41,
+            "p90": 0.43,
+            "max": 0.51,
+            "min": 0.39
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.42,
+            "p90": 0.43,
+            "max": 0.54,
+            "min": 0.4
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.32,
+            "p90": 0.33,
+            "max": 0.33,
+            "min": 0.29
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.33,
+            "p90": 0.34,
+            "max": 0.37,
+            "min": 0.3
+          }
+        }
+      },
+      "obligations-met": {
+        "kind": "land",
+        "steps": 109,
+        "inputBytes": 648,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.13,
+            "p90": 0.14,
+            "max": 0.16,
+            "min": 0.11
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.14,
+            "p90": 0.15,
+            "max": 0.35,
+            "min": 0.12
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.1,
+            "p90": 0.11,
+            "max": 0.11,
+            "min": 0.1
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.12,
+            "p90": 0.13,
+            "max": 0.14,
+            "min": 0.1
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.07,
+            "p90": 0.07,
+            "max": 0.08,
+            "min": 0.06
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.07,
+            "p90": 0.08,
+            "max": 0.09,
+            "min": 0.07
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.05,
+            "p90": 0.06,
+            "max": 0.06,
+            "min": 0.04
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.06,
+            "p90": 0.07,
+            "max": 0.07,
+            "min": 0.05
+          }
+        }
+      },
+      "owners-see-proposals": {
+        "kind": "notify",
+        "steps": 34,
+        "inputBytes": 3476,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.1,
+            "p90": 0.13,
+            "max": 0.14,
+            "min": 0.09
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.12,
+            "p90": 0.14,
+            "max": 0.15,
+            "min": 0.1
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.07,
+            "p90": 0.07,
+            "max": 0.08,
+            "min": 0.06
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.08,
+            "p90": 0.1,
+            "max": 0.11,
+            "min": 0.07
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.05,
+            "p90": 0.06,
+            "max": 0.06,
+            "min": 0.05
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.06,
+            "p90": 0.09,
+            "max": 0.09,
+            "min": 0.06
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.05,
+            "p90": 0.05,
+            "max": 0.06,
+            "min": 0.04
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.06,
+            "p90": 0.08,
+            "max": 0.09,
+            "min": 0.05
+          }
+        }
+      },
+      "author-sees-verdicts": {
+        "kind": "notify",
+        "steps": 4,
+        "inputBytes": 529,
+        "guarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.04,
+            "max": 0.06,
+            "min": 0.02
+          }
+        },
+        "memo": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.03,
+            "p90": 0.03,
+            "max": 0.06,
+            "min": 0.02
+          }
+        },
+        "stepsOnly": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.03,
+            "max": 0.05,
+            "min": 0.02
+          }
+        },
+        "unguarded": {
+          "inner": 100,
+          "perOpInDO": {
+            "n": 50,
+            "p50": 0.01,
+            "p90": 0.02,
+            "max": 0.02,
+            "min": 0.01
+          },
+          "perOpWall": {
+            "n": 50,
+            "p50": 0.02,
+            "p90": 0.02,
+            "max": 0.05,
+            "min": 0.02
+          }
+        }
+      }
+    },
+    "outputsAgreeAcrossModes": true,
+    "patho": [
+      {
+        "size": 25,
+        "guard": true,
+        "workerMs": 258,
+        "inDO": 257,
+        "error": "inspection_budget"
+      },
+      {
+        "size": 25,
+        "guard": "memo",
+        "workerMs": 69,
+        "inDO": 69,
+        "error": "inspection_budget"
+      },
+      {
+        "size": 25,
+        "guard": "steps",
+        "workerMs": 41,
+        "inDO": 40,
+        "steps": 82679,
+        "error": null
+      },
+      {
+        "size": 25,
+        "guard": false,
+        "workerMs": 28,
+        "inDO": 28,
+        "steps": 0,
+        "error": null
+      },
+      {
+        "size": 25,
+        "guard": false,
+        "timeoutMs": 100,
+        "workerMs": 39,
+        "inDO": 39,
+        "steps": 0,
+        "error": null
+      },
+      {
+        "size": 50,
+        "guard": true,
+        "workerMs": 211,
+        "inDO": 211,
+        "error": "inspection_budget"
+      },
+      {
+        "size": 50,
+        "guard": "memo",
+        "workerMs": 40,
+        "inDO": 40,
+        "error": "inspection_budget"
+      },
+      {
+        "size": 50,
+        "guard": "steps",
+        "workerMs": 51,
+        "inDO": 50,
+        "error": "step_budget"
+      },
+      {
+        "size": 50,
+        "guard": false,
+        "workerMs": 236,
+        "inDO": 236,
+        "steps": 0,
+        "error": null
+      },
+      {
+        "size": 50,
+        "guard": false,
+        "timeoutMs": 100,
+        "workerMs": 101,
+        "inDO": 101,
+        "error": "engine_timeout"
+      },
+      {
+        "size": 100,
+        "guard": true,
+        "workerMs": 191,
+        "inDO": 189,
+        "error": "inspection_budget"
+      },
+      {
+        "size": 100,
+        "guard": "memo",
+        "workerMs": 19,
+        "inDO": 19,
+        "error": "inspection_budget"
+      },
+      {
+        "size": 100,
+        "guard": "steps",
+        "workerMs": 49,
+        "inDO": 48,
+        "error": "step_budget"
+      },
+      {
+        "size": 100,
+        "guard": false,
+        "workerMs": 1839,
+        "inDO": 1837,
+        "steps": 0,
+        "error": null
+      },
+      {
+        "size": 100,
+        "guard": false,
+        "timeoutMs": 100,
+        "workerMs": 102,
+        "inDO": 102,
+        "error": "engine_timeout"
+      },
+      {
+        "rule": "string-doubling",
+        "guard": true,
+        "workerMs": 3,
+        "value": null,
+        "error": "value_bytes"
+      },
+      {
+        "rule": "string-doubling",
+        "guard": "memo",
+        "workerMs": 3,
+        "value": null,
+        "error": "value_bytes"
+      },
+      {
+        "rule": "string-doubling",
+        "guard": "steps",
+        "workerMs": 30,
+        "value": false,
+        "steps": 103,
+        "error": null
+      }
+    ]
+  },
+  "finished": "2026-10-01T16:28:57.415Z"
+}

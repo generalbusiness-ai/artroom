@@ -1,0 +1,84 @@
+{
+  "version": 0,
+  "roles": {},
+  "rules": [
+    {
+      "id": "claim-overlap",
+      "kind": "refuse",
+      "on": ["claim"],
+      "expr": "$count(live_claims[actor != $$.act.actor and $count(scope[$ in $$.act.body.scope]) > 0]) > 0",
+      "fix": "Another live claim holds one of these scopes. Coordinate with its holder or narrow the scope."
+    },
+    {
+      "id": "claim-before-propose",
+      "kind": "refuse",
+      "on": ["propose"],
+      "expr": "$not($exists(claim) and claim.live = true and claim.actor = act.actor)",
+      "fix": "Claim the paths first."
+    },
+    {
+      "id": "within-claim-scope",
+      "kind": "refuse",
+      "on": ["propose"],
+      "expr": "$count(changed[$not($glob($, $$.claim.scope))]) > 0",
+      "fix": "Widen the claim, or drop the changes outside its scope."
+    },
+    {
+      "id": "no-self-review",
+      "kind": "refuse",
+      "on": ["review"],
+      "expr": "$not($exists(proposal)) or act.actor = proposal.actor",
+      "fix": "Ask another actor to review this proposal."
+    },
+    {
+      "id": "land-own-proposal",
+      "kind": "refuse",
+      "on": ["land"],
+      "expr": "$not($exists(proposal)) or act.actor != proposal.actor or proposal.landed = true",
+      "fix": "Only the claimant lands its own live proposal."
+    },
+    {
+      "id": "tests-for-code",
+      "kind": "require",
+      "on": ["propose"],
+      "expr": "$count(changed[$glob($, [\"lib/**\", \"src/**\", \"*.js\"])]) > 0 ? [{\"check\": \"tests\"}] : []"
+    },
+    {
+      "id": "docs-review-for-examples",
+      "kind": "require",
+      "on": ["propose"],
+      "expr": "$count(changed[$glob($, \"examples/**\")]) > 0 ? [{\"review\": \"@docs\"}] : []"
+    },
+    {
+      "id": "one-approval",
+      "kind": "require",
+      "on": ["propose"],
+      "expr": "[{\"review\": \"any\"}]"
+    },
+    {
+      "id": "reviewed-paths-unchanged",
+      "kind": "survive",
+      "on": ["propose"],
+      "expr": "$count(changed_since[$glob($, $$.review.scope)]) = 0"
+    },
+    {
+      "id": "obligations-met",
+      "kind": "land",
+      "on": ["land"],
+      "expr": "($fresh := reviews[fresh = true]; $approvers := $fresh[verdict = \"approve\"].actor; $roles := roles; $unmet := proposal.obligations[$exists(review) and $not(($r := review; $r = \"any\" ? $count($approvers) > 0 : $count($approvers[$ in $lookup($roles, $r)]) > 0))]; $blocked := $count($fresh[verdict = \"changes\"]) > 0; {\"ok\": $count($unmet) = 0 and $not($blocked), \"lane\": \"claim-\" & proposal.claim, \"unmet\": [$unmet.review]})",
+      "fix": "Get a fresh approving review for each unmet review obligation."
+    },
+    {
+      "id": "owners-see-proposals",
+      "kind": "notify",
+      "on": ["propose"],
+      "expr": "[obligations[$exists(review) and review != \"any\"].($lookup($$.roles, review))]"
+    },
+    {
+      "id": "author-sees-verdicts",
+      "kind": "notify",
+      "on": ["review", "land"],
+      "expr": "[proposal.actor]"
+    }
+  ]
+}
