@@ -11,6 +11,7 @@ import type {
   Digest,
   Generation,
   Glob,
+  InvitationId,
   KeyId,
   LaneId,
   LeaseGeneration,
@@ -41,7 +42,14 @@ export type Verdict = "approve" | "object";
 export type Flag =
   | "sole-admin-self-approval" // R-ADMIN-2
   | "recovery-key" //            R-GEN-3
+  | "config-recovery" //         R-ADMIN-5: an act on a configuration-recovery lane
   | "after-reservation"; //      R-LAND-8: admitted while a reservation was held
+
+/**
+ * What a lane is for. `config-recovery` lanes change only `.artroom/**`, are
+ * held by admins, and bypass policy rules (R-ADMIN-5). Absent means ordinary.
+ */
+export type LanePurpose = "ordinary" | "config-recovery";
 
 // ------------------------------------------------------------------ targets
 
@@ -74,6 +82,8 @@ export type NoteAnchor =
 export interface ClaimBody {
   readonly goal: string;
   readonly scope: readonly Glob[];
+  /** Present only to open a configuration-recovery lane (R-ADMIN-5). */
+  readonly purpose?: "config-recovery";
   readonly plan?: string;
   readonly because?: readonly Reason[];
 }
@@ -153,14 +163,35 @@ export interface RenewBody {
 
 // ------------------------------------------------------------------ records
 
-/** The authority under which an act was admitted. Evidence is judged by it (R-REV-1). */
-export interface Authority {
-  /** Null only for the recovery key and for `join` before admission. */
-  readonly member: MemberId | null;
-  readonly role: Role | null;
-  readonly key: KeyId;
-  readonly delegation?: DelegationId;
-}
+/**
+ * The authority under which an act was admitted, by case (R-ADM-3). Evidence
+ * is judged by it (R-REV-1). `member`, `role` and `key` exist in every case.
+ */
+export type Authority =
+  /** A member's own active key (R-ADM-3a). */
+  | { readonly via: "member"; readonly member: MemberId; readonly role: Role; readonly key: KeyId }
+  /**
+   * A key acting under a delegation (R-ADM-3b). `member` and `role` are the
+   * grantor's; `key` is the signing (grantee) key, which need not belong to a member.
+   */
+  | {
+      readonly via: "delegation";
+      readonly member: MemberId;
+      readonly role: Role;
+      readonly key: KeyId;
+      readonly delegation: DelegationId;
+      readonly grantor: KeyId;
+    }
+  /** A `join` that redeems an invitation; `key` becomes the member's key (R-ADM-3c). */
+  | {
+      readonly via: "join";
+      readonly member: MemberId;
+      readonly role: Role;
+      readonly key: KeyId;
+      readonly invitation: InvitationId;
+    }
+  /** The room's current recovery key, for roster acts only (R-ADM-3d). */
+  | { readonly via: "recovery"; readonly member: null; readonly role: null; readonly key: KeyId };
 
 interface RecordBase<K extends EnvelopeKind> {
   readonly id: ActId;
@@ -176,7 +207,9 @@ interface RecordBase<K extends EnvelopeKind> {
 }
 
 export interface Claim extends RecordBase<"claim"> {
+  /** For a new lane, this record's own ID; it is never written inside the entry (R-LOG-12). */
   readonly lane: LaneId;
+  readonly purpose: LanePurpose;
   readonly goal: string;
   readonly plan?: string;
   readonly scope: readonly Glob[];
