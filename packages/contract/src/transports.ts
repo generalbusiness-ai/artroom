@@ -97,6 +97,10 @@ export interface Session {
  * - `client`: the caller already made its key and signs a `join` with it.
  * - `room`: the room makes and keeps the member's key, and returns a bearer
  *   token for MCP (R-CRED-3).
+ *
+ * `custody` only chooses the code path. It is not proof: the shared join
+ * admission compares the invitation's recorded custody with that path
+ * (R-ADM-12), so either branch refuses the other custody.
  */
 export type Redemption =
   | { readonly custody: "client"; readonly join: SignedEnvelope<JoinEnvelope> }
@@ -244,6 +248,7 @@ export interface ReadResults {
 
 /** The per-room RPC target beneath `Room`. Every method is stateless on the server. */
 export interface RoomWire extends Disposable {
+  /** Admitted with path `submitted`: a `join` here can redeem only a client-custody invitation (R-ADM-12). */
   submit(act: SignedEnvelope): Promise<Result<ActRecord>>;
   /** `workspace` returns `WorkspaceOp`; `workspace-token` returns `WorkspaceGrant`; `session` returns `Session`. */
   request(req: SignedRequest): Promise<Result<WorkspaceOp | WorkspaceGrant | Session>>;
@@ -260,6 +265,7 @@ export interface ArtroomService {
 
 /** HTTPS routes (R-API-3). `ok` is the 200 body; refusals are 409 with a `Refusal` body. */
 export interface HttpRoutes {
+  /** Path `submitted`: a `join` here can redeem only a client-custody invitation (R-ADM-12). */
   "POST /v1/rooms/:room/acts": { readonly body: SignedEnvelope; readonly ok: ActRecord };
   /** Responses carrying a `WorkspaceGrant` are sent with `Cache-Control: no-store` (R-WS-4). */
   "POST /v1/rooms/:room/requests": { readonly body: SignedRequest; readonly ok: WorkspaceOp | WorkspaceGrant | Session };

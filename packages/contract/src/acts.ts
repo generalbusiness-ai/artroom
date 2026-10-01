@@ -28,10 +28,20 @@ import type {
 import type { Held, Lease, LaneEffect, Overlap } from "./lanes.ts";
 import type { CheckInput, Evidence, NotCarried, Obligation } from "./evidence.ts";
 import type { LandOp, PreviewOp } from "./landing.ts";
-import type { Role, RosterOp } from "./roster.ts";
+import type { KeyCustody, Role, RosterOp } from "./roster.ts";
 
 /** The seven acts. */
 export type ActKind = "claim" | "propose" | "note" | "review" | "check" | "land" | "release";
+
+/**
+ * How an envelope reached admission. Internal to the room: it is set by the
+ * code path that calls the shared admission, and never read from the wire,
+ * the envelope, the route or the body (R-ADM-12).
+ * - `submitted`: `submit` over RPC, `POST /acts`, or a client-custody `redeem`.
+ * - `room-redemption`: the room's own room-custody redemption, signing a
+ *   `join` with a key it has just generated and holds.
+ */
+export type AdmissionPath = "submitted" | "room-redemption";
 
 /** Every kind a member may sign: the seven acts plus `renew` and `roster`. */
 export type EnvelopeKind = ActKind | "renew" | "roster";
@@ -182,13 +192,18 @@ export type Authority =
       readonly delegation: DelegationId;
       readonly grantor: KeyId;
     }
-  /** A `join` that redeems an invitation; `key` becomes the member's key (R-ADM-3c). */
+  /**
+   * A `join` that redeems an invitation; `key` becomes the member's key
+   * (R-ADM-3c). `custody` is the invitation's, which the admission path
+   * matched; the room writes it, never the caller.
+   */
   | {
       readonly via: "join";
       readonly member: MemberId;
       readonly role: Role;
       readonly key: KeyId;
       readonly invitation: InvitationId;
+      readonly custody: KeyCustody;
     }
   /** The room's current recovery key, for roster acts only (R-ADM-3d). */
   | { readonly via: "recovery"; readonly member: null; readonly role: null; readonly key: KeyId };
