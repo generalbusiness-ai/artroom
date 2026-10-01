@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Accept request git:sha1…53a9f82: Builder: in lane B, add a test that a jj `change-id` commit header survives the whole path: a push to a lane's Artifacts fork, pinning to refs/artroom/heads/\u003cla…"}
+{"kind":"promise","text":"Accept request git:sha1…f462724: Builder: in lane D, add a `refuse` rule to the default policy pack that refuses a `propose` whose changed paths include jj conflict directories (`.jjconflict-ba…"}
