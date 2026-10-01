@@ -17,6 +17,7 @@ import type { CheckerConfig, Checkpoint, LogEntry, PolicyDocument, ReplayContext
 import { validateCheckerConfig, validatePolicy } from "@generalbusiness/artroom-policy";
 import { fromUtf8, parseStrict } from "./canonical.ts";
 import { hex } from "./crypto.ts";
+import { parseTime } from "./time.ts";
 
 export class Malformed extends Error {
   override readonly name = "Malformed";
@@ -67,7 +68,7 @@ type Field =
   | "op" | "member" | "role" | "custody" | "expiresAt" | "secretHash" | "invitation" | "secret" | "reason"
   | "team" | "members" | "kinds" | "lanes" | "delegation"
   // amendment 2: checker configurations, checks and onboarding grants
-  | "checkers" | "name" | "config" | "check" | "onboarding" | "grant" | "repo" | "operator" | "notAfter";
+  | "createdAt" | "checkers" | "name" | "config" | "check" | "onboarding" | "grant" | "repo" | "operator" | "notAfter";
 type Obj = { readonly [K in Field]?: unknown } & Readonly<Record<string, unknown>>;
 
 const bad = (path: string, what: string): never => {
@@ -76,6 +77,7 @@ const bad = (path: string, what: string): never => {
 const obj = (v: unknown, path: string): Obj =>
   typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Obj) : bad(path, "is not an object");
 const str = (v: unknown, path: string): string => (typeof v === "string" ? v : bad(path, "is not a string"));
+const time = (v: unknown, path: string): string => (parseTime(v) !== null ? (v as string) : bad(path, "is not an RFC 3339 UTC time"));
 const seqOf = (v: unknown, path: string): number => (Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : bad(path, "is not a sequence number"));
 const oneOf = <T extends string>(v: unknown, path: string, allowed: readonly T[]): T =>
   allowed.includes(v as T) ? (v as T) : bad(path, `is not one of ${allowed.join(", ")}`);
@@ -136,9 +138,11 @@ function genesis(v: unknown, path: string): void {
     str(o.sig, `${path}.onboarding.sig`);
     const grant = obj(o.grant, `${path}.onboarding.grant`);
     if (grant.v !== 1) bad(`${path}.onboarding.grant.v`, "is not 1");
-    for (const k of ["repo", "admin", "operator", "notAfter"] as const) str(grant[k], `${path}.onboarding.grant.${k}`);
+    for (const k of ["repo", "admin", "operator"] as const) str(grant[k], `${path}.onboarding.grant.${k}`);
+    time(grant.notAfter, `${path}.onboarding.grant.notAfter`);
   }
   str(g.recovery, `${path}.recovery`);
+  time(g.createdAt, `${path}.createdAt`);
   str(g.roomKey, `${path}.roomKey`);
   const profile = obj(g.profile, `${path}.profile`);
   str(profile.policy, `${path}.profile.policy`);
@@ -196,7 +200,7 @@ function rosterOp(v: unknown, path: string): void {
       str(b.member, p("member"));
       optional(b, "role", (x, q) => oneOf(x, q, ROLES), path);
       oneOf(b.custody, p("custody"), CUSTODY);
-      str(b.expiresAt, p("expiresAt"));
+      time(b.expiresAt, p("expiresAt"));
       str(b.secretHash, p("secretHash"));
       break;
     case "join":
@@ -223,7 +227,7 @@ function rosterOp(v: unknown, path: string): void {
       // Any kind is well formed here; R-ADM-5 (roster, or beyond the role) is judged by the roster replay.
       starOr(b.kinds, p("kinds"), (x, q) => oneOf(x, q, ENVELOPE_KINDS));
       starOr(b.lanes, p("lanes"), str);
-      str(b.expiresAt, p("expiresAt"));
+      time(b.expiresAt, p("expiresAt"));
       break;
     case "undelegate":
       str(b.delegation, p("delegation"));
@@ -268,7 +272,7 @@ export function decodeEntry(line: string): LogEntry {
   oneOf(e.format, "format", FORMAT);
   seqOf(e.seq, "seq");
   if (e.prev !== null) str(e.prev, "prev");
-  str(e.at, "at");
+  time(e.at, "at");
   str(e.hash, "hash");
   str(e.roomSig, "roomSig");
   const body = obj(e.entry, "entry");
@@ -303,7 +307,7 @@ export function decodeCheckpoint(bytes: Uint8Array): Checkpoint {
   str(c.room, "checkpoint.room");
   seqOf(c.through, "checkpoint.through");
   str(c.hash, "checkpoint.hash");
-  str(c.at, "checkpoint.at");
+  time(c.at, "checkpoint.at");
   str(c.roomKey, "checkpoint.roomKey");
   str(c.sig, "checkpoint.sig");
   return v as Checkpoint;

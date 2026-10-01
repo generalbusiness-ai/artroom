@@ -87,9 +87,25 @@ entry, or before the first entry that needs a malformed retained file.
 Only reading the repository throws, so `artroom verify` exits 2 only when
 it cannot read the remote.
 
+**Times.** Every time in the log is RFC 3339 in UTC with `Z`, read by one
+function, `parseTime` (`src/time.ts`). It refuses offsets and dates that
+roll over, such as 30 February. A time that bounds authority (an entry's
+`at`, an invitation's or delegation's `expiresAt`, a grant's `notAfter`)
+and is not valid is `malformed`, and the verified prefix ends before that
+entry. The roster replay throws on a time that is not finite, so an invalid
+time can never pass an expiry check.
+
 **For each commit**, it checks that:
 - the commit has one parent, the previous log commit;
 - every earlier entry and every full segment is unchanged;
+- every retained file matches its digest (`retained-digest`), and decodes
+  (`malformed`). Each distinct file is decoded once, by digest;
+- it publishes every retained file that its own verified entries need, so
+  each published prefix can be replayed alone. A missing file fails that
+  commit (`policy-missing`, `checker-missing` or `input-missing`, with
+  `commit` and the `seq` that needed it). The entries are still verified
+  against the latest consistent commit, so the verified prefix does not
+  change;
 - the checkpoint advances, is signed by the room key, and names the last
   entry.
 
@@ -185,6 +201,8 @@ entries of the last consistent commit.
   (see below).
 - `test/amendment-2.test.ts` covers the lane L edits of contract
   amendment 2 (see below).
+- `test/review-07d3150e.test.ts` covers the findings of review 07d3150e
+  (see below).
 
 - `test/gitcli.node.test.ts` (Node only) publishes to a real local git
   repository and checks it:
@@ -220,8 +238,10 @@ is still open:
 
 1. **`*` in a delegation.** The contract says `*` means all delegable
    kinds. R-ADM-5 and R-LOG-10 allow only kinds the grantor's role could
-   sign at the grant, but neither says what `*` means for a role that may
-   not sign every delegable kind. Verify reads `*` as all kinds the
+   sign at the grant, but neither says in words what `*` means for a role
+   that may not sign every delegable kind. In review 07d3150e the checker
+   noted that R-LOG-10's grant scope, bound at admission, supports the
+   reading below, and that the Room will be brought into line with it. Verify reads `*` as all kinds the
    grantor's role may sign at the grant. The Room (lane A, `authority.ts`)
    instead judges `*` against the grantor's current role at each use. They
    differ in one case: a member grants `*`, is promoted to checker, and the
@@ -363,3 +383,49 @@ guard was broken on purpose and a named test failed.
    malformed".
 8. **Log commit signing.** No change: R-LOG-14 adopts what the package
    does.
+
+## Review 07d3150e
+
+The checker confirmed the five findings of review ea4a9bd0 fixed, and
+found two more. Each fix, and the tests that prove it. All tests are in
+`test/review-07d3150e.test.ts`. Each new guard was broken on purpose and a
+named test failed.
+
+1. **P2: expiry authority failed open on invalid timestamps.**
+   Fix: `src/time.ts` holds the one checked time representation,
+   `parseTime`. The decoding boundary uses it for every log time: entry
+   `at`, invitation and delegation `expiresAt`, genesis `createdAt`, grant
+   `notAfter` and checkpoint `at`. An invalid one is `malformed`, and the
+   prefix ends before it. `RosterReplay.judge` throws `RangeError` on a time
+   that is not finite, rather than skipping expiry. The publisher reads the
+   checkpoint time with `parseTime` too.
+   Tests: "one checked representation: RFC 3339 in UTC with Z, and no
+   rollover"; "a use at the delegation's expiry is delegation-invalid;
+   before it, it verifies"; "an entry time that is not a time: malformed,
+   and the prefix ends before it (the expired grant cannot be revived)"; "a
+   delegation expiry that is not a time: malformed at the grant, so no
+   later use is admitted"; "an invitation expiry: malformed when not a
+   time; a join at the expiry is invitation-invalid"; "every other log time
+   uses the same check: genesis createdAt, grant notAfter, checkpoint at";
+   "the roster replay refuses a non-finite admission time instead of
+   treating it as unlimited"; "the publisher refuses a checkpoint whose
+   time is not RFC 3339 UTC".
+2. **P2: earlier published replay evidence was not verified.**
+   Fix: verify checks the retained files of every inspected commit: each
+   digest in each commit, and each distinct file decoded once, by digest.
+   While it walks the entries it records the retained files each one
+   needed. Each earlier commit must publish those its own verified entries
+   need. A missing one fails that commit, named by `commit`, with the
+   entry as `seq`. An unused malformed file fails each commit that
+   publishes it. Availability in the latest commit is judged by that
+   commit's own files, never by an earlier commit's. Policy evaluation is
+   not run again for this.
+   Tests: "a later commit cannot supply a policy its parent's entries
+   needed: policy-missing names the parent"; "a later commit cannot supply
+   a replay context its parent's entries needed: input-missing names the
+   parent"; "evidence for entries an earlier commit does not publish is not
+   required of it"; "evidence an earlier commit published does not stand in
+   for the head's: a child that drops it fails at the entry"; "a bad
+   retained digest in an earlier commit is reported even after a child
+   removes it"; "a malformed retained file in an earlier commit is
+   reported even after a child removes it".

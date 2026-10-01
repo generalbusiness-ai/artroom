@@ -46,6 +46,7 @@ import { LOG_REF, ROOT, SEGMENT_SIZE, contentOf, entryId, roomIdOf, segmentPath 
 import { parseCommit, type GitReader } from "./git.ts";
 import { decodeCheckpoint, decodeEntry, decodeRetained, segmentLines, textOf } from "./decode.ts";
 import { readLogFiles } from "./publisher.ts";
+import { checkedTime } from "./time.ts";
 import { RosterReplay, type AuthorityFailure } from "./roster.ts";
 
 export type VerifyReason =
@@ -271,45 +272,63 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   }
 
   // Retained files are named by their digest (R-LOG-7), and decoded at the boundary.
+  // Every inspected commit is checked, not only the one whose entries are verified:
+  // each file's digest in each commit, and each distinct file decoded once, by digest.
   // A malformed one is reported where an entry needs it, so the verified prefix stops there.
   // Files under policies/ are policy documents or checker configurations; the
   // policy-activated event that names one says which, so it is decoded there.
+  const RETAINED = /^artroom-log\/v1\/(inputs|policies)\/([0-9a-f]{64})\.json$/;
+  const inputPath = (digest: Digest) => `${ROOT}/inputs/${digest.slice(7)}.json`;
+  const policyPath = (digest: Digest) => `${ROOT}/policies/${digest.slice(7)}.json`;
+  /** Whether commit `v` publishes the retained file at `path` with the content its name gives. */
+  const holds = (v: CommitView, path: string): boolean => {
+    const bytes = v.files.get(path);
+    return bytes !== undefined && sha256Hex(bytes) === RETAINED.exec(path)?.[2];
+  };
   const inputs = new Map<Digest, ReplayContext>();
   const policyFiles = new Map<Digest, Uint8Array>();
   const malformed = new Map<Digest, { path: string; detail: string; reported: boolean }>();
-  for (const [path, bytes] of top.files) {
-    const m = /^artroom-log\/v1\/(inputs|policies)\/([0-9a-f]{64})\.json$/.exec(path);
-    if (!m) continue;
-    if (sha256Hex(bytes) !== m[2]) {
-      fail({ reason: "retained-digest", commit: top.sha, detail: `${path} does not match its digest` });
-      continue;
-    }
-    const digest: Digest = `sha256:${m[2]}`;
-    try {
-      if (m[1] === "inputs") inputs.set(digest, decodeRetained("input", bytes));
-      else {
-        decodeRetained("json", bytes);
-        policyFiles.set(digest, bytes);
+  for (const v of views)
+    for (const [path, bytes] of v.files) {
+      const m = RETAINED.exec(path);
+      if (!m) continue;
+      if (!holds(v, path)) {
+        fail({ reason: "retained-digest", commit: v.sha, detail: `${path} does not match its digest` });
+        continue;
       }
-    } catch (e) {
-      malformed.set(digest, { path, detail: (e as Error).message, reported: false });
+      const digest: Digest = `sha256:${m[2]}`;
+      if (inputs.has(digest) || policyFiles.has(digest) || malformed.has(digest)) continue;
+      try {
+        if (m[1] === "inputs") inputs.set(digest, decodeRetained("input", bytes));
+        else {
+          decodeRetained("json", bytes);
+          policyFiles.set(digest, bytes);
+        }
+      } catch (e) {
+        malformed.set(digest, { path, detail: (e as Error).message, reported: false });
+      }
     }
-  }
+  /**
+   * The retained files each verified entry needed. Each earlier commit must
+   * publish those its own entries need, so that every published prefix is
+   * replayable on its own (R-LOG-9).
+   */
+  const needs: { seq: Seq; path: string; reason: "input-missing" | "policy-missing" | "checker-missing" }[] = [];
   /** The failure for a retained file that is missing or malformed. */
   const absent = (digest: Digest, missing: "input-missing" | "policy-missing" | "checker-missing", what: string): { reason: VerifyReason; detail: string } => {
     const m = malformed.get(digest);
-    if (!m) return { reason: missing, detail: `${what} ${digest} is not published` };
+    if (!m || !holds(top, m.path)) return { reason: missing, detail: `${what} ${digest} is not published` };
     m.reported = true;
     return { reason: "malformed", detail: `${m.path}: ${m.detail}` };
   };
   /** A policy document or checker configuration named by a `policy-activated` event, decoded as that. */
   const named = <K extends "policy" | "checker">(digest: Digest, kind: K, missing: "policy-missing" | "checker-missing") => {
-    const bytes = policyFiles.get(digest);
+    const bytes = holds(top, policyPath(digest)) ? policyFiles.get(digest) : undefined;
     if (!bytes) return { ok: false as const, ...absent(digest, missing, kind === "policy" ? "policy" : "checker configuration") };
     try {
       return { ok: true as const, value: kind === "policy" ? decodeRetained("policy", bytes) : decodeRetained("checker", bytes) };
     } catch (e) {
-      return { ok: false as const, reason: "malformed" as VerifyReason, detail: `${ROOT}/policies/${digest.slice(7)}.json: ${(e as Error).message}` };
+      return { ok: false as const, reason: "malformed" as VerifyReason, detail: `${policyPath(digest)}: ${(e as Error).message}` };
     }
   };
 
@@ -352,11 +371,12 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           return false;
         }
       }
-      const context = inputs.get(digest);
+      const context = holds(top, inputPath(digest)) ? inputs.get(digest) : undefined;
       if (context === undefined) {
         fail({ seq, ...absent(digest, "input-missing", "the replay context") });
         return false;
       }
+      needs.push({ seq, path: inputPath(digest), reason: "input-missing" });
       const policy = policyByVersion.get(version!)!;
       let replayed: readonly Decision[];
       try {
@@ -440,6 +460,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           bad(missing.r.reason, `checker ${missing.c.name}: ${missing.r.detail}`);
           break;
         }
+        needs.push({ seq: i, path: policyPath(ev.policy), reason: "policy-missing" });
+        for (const c of ev.checkers) needs.push({ seq: i, path: policyPath(c.config), reason: "checker-missing" });
         policyByVersion.set(id, { doc: doc.value as PolicyDocument, digest: ev.policy, checkers: new Map(ev.checkers.map((c) => [c.name, c.config])) });
         activePolicy = id;
       } else if (ev.type === "obligations-recomputed") {
@@ -496,7 +518,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       bad("actor-signature", `the envelope is not signed by ${env.actor}`);
       break;
     }
-    const judged = roster.judge(env, Date.parse(e.at));
+    const judged = roster.judge(env, checkedTime(e.at, "at"));
     if (!judged.ok) {
       bad(judged.reason, judged.detail);
       break;
@@ -535,10 +557,24 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     if (body.type === "act") roster.apply(env, id, judged.authority);
   }
 
-  for (const m of malformed.values())
-    if (!m.reported) fail({ reason: "malformed", commit: top.sha, detail: `${m.path}: ${m.detail}` });
-
   const verifiedThrough = Math.min(entries.length - 1, firstBad - 1);
+
+  // An unused malformed file fails each commit that publishes it, not the prefix.
+  for (const m of malformed.values())
+    if (!m.reported) for (const v of views) if (holds(v, m.path)) fail({ reason: "malformed", commit: v.sha, detail: `${m.path}: ${m.detail}` });
+
+  // Each earlier commit must publish the evidence its own verified entries need.
+  // The entries themselves verify against the latest consistent commit, so this
+  // fails the earlier commit (named by `commit`, with the entry that needed the
+  // file as `seq`) and leaves the verified prefix as it is.
+  for (const v of views.slice(0, basis)) {
+    const reported = new Set<string>();
+    for (const n of needs)
+      if (n.seq <= verifiedThrough && n.seq < v.lines.length && !reported.has(n.path) && !holds(v, n.path)) {
+        reported.add(n.path);
+        fail({ reason: n.reason, commit: v.sha, seq: n.seq, detail: `${n.path}, which entry ${n.seq} needs, is not published in this commit` });
+      }
+  }
   const lastEntry = verifiedThrough >= 0 ? entries[verifiedThrough]! : null;
   return {
     ok: failures.length === 0,

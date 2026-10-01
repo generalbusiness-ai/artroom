@@ -21,6 +21,7 @@ import type {
   RosterOp,
 } from "@generalbusiness/artroom-contract";
 import { digestBytes, unb64url } from "./crypto.ts";
+import { checkedTime } from "./time.ts";
 
 /** Why an act's recorded authority is not valid. Each is a named verify failure. */
 export type AuthorityFailure =
@@ -114,8 +115,13 @@ export class RosterReplay {
     return this.keys.get(key)?.revoked ?? this.loose.get(key) ?? null;
   }
 
-  /** Judge `env`'s authority at an admission at `atMs` (R-ADM-3), by exactly one case. */
+  /**
+   * Judge `env`'s authority at an admission at `atMs` (R-ADM-3), by exactly
+   * one case. `atMs` must be a finite time: a NaN would make every expiry
+   * comparison false, so it throws rather than grant unlimited authority.
+   */
   judge(env: Envelope, atMs: number): Judgement {
+    if (!Number.isFinite(atMs)) throw new RangeError(`the admission time ${atMs} is not a finite time`);
     const no = (reason: AuthorityFailure, detail: string): Judgement => ({ ok: false, reason, detail });
     const actor = env.actor;
     const op = env.kind === "roster" ? (env.body as RosterOp).op : undefined;
@@ -198,7 +204,7 @@ export class RosterReplay {
           member: op.member,
           role: op.role,
           custody: op.custody,
-          expiresMs: Date.parse(op.expiresAt),
+          expiresMs: checkedTime(op.expiresAt, "expiresAt"),
           secretHash: op.secretHash,
           used: false,
         });
@@ -234,7 +240,7 @@ export class RosterReplay {
           grantee: op.to,
           kinds: op.kinds === "*" ? delegableBy(authority.role!) : op.kinds,
           lanes: op.lanes,
-          expiresMs: Date.parse(op.expiresAt),
+          expiresMs: checkedTime(op.expiresAt, "expiresAt"),
           revoked: false,
         });
         break;

@@ -15,6 +15,7 @@
 import type { Checkpoint, Digest, LogEntry, Seq, Sha } from "@generalbusiness/artroom-contract";
 import { canonicalize, fromUtf8, parseStrict, utf8 } from "./canonical.ts";
 import { verifySig } from "./crypto.ts";
+import { parseTime } from "./time.ts";
 import { decodeEntry, segmentLines } from "./decode.ts";
 import { LOG_REF, SEGMENT_SIZE, isRetainedPath, layout, retainedPath, segmentPath, type Retained } from "./entries.ts";
 import { buildTree, encodeCommit, gitObject, parseCommit, parseTree, type GitObject, type GitReader, type GitRemote } from "./git.ts";
@@ -60,8 +61,8 @@ export interface PublisherOptions {
 
 /** Seconds since the epoch for an RFC 3339 time, for the commit's author line. */
 function epoch(at: string): number {
-  const ms = Date.parse(at);
-  if (!Number.isFinite(ms)) throw new PublishError("invalid-input", `checkpoint time ${at} is not RFC 3339`);
+  const ms = parseTime(at);
+  if (ms === null) throw new PublishError("invalid-input", `checkpoint time ${at} is not RFC 3339`);
   return Math.floor(ms / 1000);
 }
 
