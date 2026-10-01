@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8b45358eb67845bb1059cf94753b40cc1c90fa45","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/room/adapter.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8df378ac0466a94edd2f47af777d46333d595706","text":"Merge retired a covered predecessor; the successor is at packages/ui/test/screens.test.tsx."}
