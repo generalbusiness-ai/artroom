@@ -61,6 +61,16 @@ The publisher follows these rules:
 
   When retries run out, the error is `unresolved` and retryable. Calling
   `publish` again with the same input completes forward.
+- **Only what is new is sent.** A push carries the new commit and the trees
+  and blobs its lease does not already hold: the segment the new entries
+  are in, the checkpoint, the trees above them, and new retained files.
+  After `LogPublisher.open`, the head's objects are rebuilt from its files
+  and trusted only if they rebuild exactly the head's tree; otherwise
+  everything is sent. So the transfer bound limits one cohort, never the
+  accumulated log. A cohort over the bound (`maxTransfer`, default
+  `LOG_TRANSFER_LIMITS`: 100,000 objects and 64 MiB, the same as lane B's
+  publisher sandbox) fails with `cohort-too-large` before anything is
+  sent; the Room publishes a smaller cohort. Tests: `test/transfer.test.ts`.
 - **The commit, in advance.** `commitFor(parent, entries, checkpoint,
   retained)` returns the exact commit `publish` would write for that
   cohort on `parent`, without pushing. Both use the same owned copy and the

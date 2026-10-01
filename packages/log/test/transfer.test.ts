@@ -7,8 +7,8 @@
 import { describe, expect, test } from "vitest";
 import type { Sha } from "@generalbusiness/artroom-contract";
 import { LOG_REF } from "../src/entries.ts";
-import { MemoryGit, type GitObject, type PushOutcome } from "../src/git.ts";
-import { LOG_TRANSFER_LIMITS, LogPublisher, PublishError } from "../src/publisher.ts";
+import { MemoryGit, encodeCommit, encodeTree, gitObject, type GitObject, type PushOutcome, type TreeEntry } from "../src/git.ts";
+import { LOG_TRANSFER_LIMITS, LogPublisher, PublishError, readLogFiles } from "../src/publisher.ts";
 import { verifyLog } from "../src/verify.ts";
 import { goldenLog } from "./support/room-sim.ts";
 
@@ -28,7 +28,8 @@ function reachable(git: MemoryGit, commit: string, out = new Set<string>()): Set
   const walk = (sha: string) => {
     if (out.has(sha)) return;
     out.add(sha);
-    const o = git.objects.get(sha)!;
+    const o = git.objects.get(sha);
+    if (!o) return; // missing: the caller checks git.objects
     const text = new TextDecoder().decode(o.data);
     if (o.type === "commit") for (const m of text.matchAll(/^(?:tree|parent) ([0-9a-f]{40})$/gm)) walk(m[1]!);
     if (o.type === "tree") {
@@ -94,5 +95,39 @@ describe("review f7d273e1 (2): incremental transfer", () => {
     expect(git.refs.get(LOG_REF)).toBe(g.c3.commit);
     const fewer = await LogPublisher.open(git, { maxTransfer: { objects: 2, bytes: LOG_TRANSFER_LIMITS.bytes } });
     await expect(g.sim.publish(fewer)).rejects.toMatchObject({ code: "cohort-too-large" });
+  });
+
+  test("a reopened publisher sends everything when the head's tree does not rebuild exactly from its files", async () => {
+    // A repository whose only log commit has c3's files, with one retained file stored as executable
+    // (100755). The publisher reads it as 100644, so the trees it would rebuild are not ones the remote holds.
+    const g = await goldenLog(new MemoryGit());
+    const files = await readLogFiles(g.remote, g.c3.commit);
+    const git = new Recording();
+    const odd = [...files.keys()].find((p) => p.split("/").length > 3)!;
+    const build = (dir: string): Sha => {
+      const names = new Map<string, TreeEntry>();
+      for (const [path, data] of files) {
+        if (!path.startsWith(dir)) continue;
+        const [name, ...rest] = path.slice(dir.length).split("/");
+        if (rest.length) names.set(name!, { name: name!, mode: "40000", sha: build(`${dir}${name}/`) });
+        else {
+          const blob = gitObject("blob", data);
+          git.objects.set(blob.sha, blob);
+          names.set(name!, { name: name!, mode: (path === odd ? "100755" : "100644") as TreeEntry["mode"], sha: blob.sha });
+        }
+      }
+      const tree = gitObject("tree", encodeTree([...names.values()]));
+      git.objects.set(tree.sha, tree);
+      return tree.sha;
+    };
+    const who = "Other <o@x> 0 +0000";
+    const forged = gitObject("commit", encodeCommit({ tree: build(""), parents: [], author: who, committer: who, message: "other\n" }));
+    git.objects.set(forged.sha, forged);
+    git.refs.set(LOG_REF, forged.sha);
+
+    const reopened = await LogPublisher.open(git);
+    const r = await g.sim.publish(reopened);
+    // Every object the new head reaches is in the repository: nothing was left out as "already there".
+    for (const sha of reachable(git, r.commit)) expect(git.objects.has(sha)).toBe(true);
   });
 });
