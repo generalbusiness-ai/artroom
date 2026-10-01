@@ -1,0 +1,14 @@
+{
+	// Comparison Worker: isomorphic-git, no container.
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "artroom-spike-isogit",
+	"main": "src/iso.ts",
+	"compatibility_date": "2026-10-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": { "enabled": true },
+	"vars": {
+		"ARTIFACTS_HOST": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
+		"ARTIFACTS_NAMESPACE": "gitseq-spike"
+	},
+	"secrets": { "required": ["SPIKE_KEY"] }
+}

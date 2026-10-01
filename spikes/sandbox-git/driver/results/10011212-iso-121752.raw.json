@@ -1,0 +1,1915 @@
+{
+ "run": "10011212-iso-121752",
+ "url": "https://artroom-spike-isogit.inguz.workers.dev",
+ "runs": 10,
+ "started": "2026-10-01T12:17:54-0400",
+ "fresh_small": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 693,
+    "max": 1669,
+    "min": 490
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 516,
+    "max": 965,
+    "min": 363
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 516,
+    "max": 965,
+    "min": 363
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 516,
+    "max": 965,
+    "min": 363
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 0,
+    "max": 0,
+    "min": 0
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 693,
+     "mergeMs": 0,
+     "totalMs": 693
+    },
+    "workerMs": 693,
+    "clientMs": 860
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 570,
+     "mergeMs": 0,
+     "totalMs": 570
+    },
+    "workerMs": 570,
+    "clientMs": 742
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 654,
+     "mergeMs": 0,
+     "totalMs": 654
+    },
+    "workerMs": 654,
+    "clientMs": 796
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 965,
+     "mergeMs": 0,
+     "totalMs": 965
+    },
+    "workerMs": 965,
+    "clientMs": 1669
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 462,
+     "mergeMs": 0,
+     "totalMs": 462
+    },
+    "workerMs": 462,
+    "clientMs": 622
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 443,
+     "mergeMs": 0,
+     "totalMs": 443
+    },
+    "workerMs": 443,
+    "clientMs": 559
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 569,
+     "mergeMs": 0,
+     "totalMs": 569
+    },
+    "workerMs": 569,
+    "clientMs": 749
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 410,
+     "mergeMs": 0,
+     "totalMs": 410
+    },
+    "workerMs": 410,
+    "clientMs": 538
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 457,
+     "mergeMs": 0,
+     "totalMs": 457
+    },
+    "workerMs": 457,
+    "clientMs": 644
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 363,
+     "mergeMs": 0,
+     "totalMs": 363
+    },
+    "workerMs": 363,
+    "clientMs": 490
+   }
+  ]
+ },
+ "cached_small_cand/clean": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 549,
+    "max": 939,
+    "min": 420
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 423,
+    "max": 704,
+    "min": 284
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 423,
+    "max": 704,
+    "min": 284
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 423,
+    "max": 704,
+    "min": 284
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 0,
+    "max": 0,
+    "min": 0
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 333,
+     "mergeMs": 0,
+     "totalMs": 333
+    },
+    "workerMs": 333,
+    "clientMs": 442
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 704,
+     "mergeMs": 0,
+     "totalMs": 704
+    },
+    "workerMs": 704,
+    "clientMs": 939
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 371,
+     "mergeMs": 0,
+     "totalMs": 371
+    },
+    "workerMs": 371,
+    "clientMs": 499
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 595,
+     "mergeMs": 0,
+     "totalMs": 595
+    },
+    "workerMs": 595,
+    "clientMs": 727
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 284,
+     "mergeMs": 0,
+     "totalMs": 284
+    },
+    "workerMs": 284,
+    "clientMs": 420
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 552,
+     "mergeMs": 0,
+     "totalMs": 552
+    },
+    "workerMs": 552,
+    "clientMs": 773
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 354,
+     "mergeMs": 0,
+     "totalMs": 354
+    },
+    "workerMs": 354,
+    "clientMs": 463
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 579,
+     "mergeMs": 0,
+     "totalMs": 579
+    },
+    "workerMs": 579,
+    "clientMs": 844
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 352,
+     "mergeMs": 0,
+     "totalMs": 352
+    },
+    "workerMs": 352,
+    "clientMs": 487
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 475,
+     "mergeMs": 0,
+     "totalMs": 475
+    },
+    "workerMs": 475,
+    "clientMs": 599
+   }
+  ],
+  "syncs": [
+   "fetch",
+   "clone",
+   "fetch",
+   "fetch",
+   "fetch",
+   "clone",
+   "fetch",
+   "clone",
+   "fetch",
+   "fetch"
+  ]
+ },
+ "cached_small_cand/conflict": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 524,
+    "max": 829,
+    "min": 421
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 386,
+    "max": 721,
+    "min": 281
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 386,
+    "max": 721,
+    "min": 281
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 386,
+    "max": 721,
+    "min": 281
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 0,
+    "max": 0,
+    "min": 0
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 506,
+     "mergeMs": 0,
+     "totalMs": 506
+    },
+    "workerMs": 506,
+    "clientMs": 665
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 633,
+     "mergeMs": 0,
+     "totalMs": 633
+    },
+    "workerMs": 633,
+    "clientMs": 768
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 306,
+     "mergeMs": 0,
+     "totalMs": 306
+    },
+    "workerMs": 306,
+    "clientMs": 456
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 454,
+     "mergeMs": 0,
+     "totalMs": 454
+    },
+    "workerMs": 454,
+    "clientMs": 592
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 517,
+     "mergeMs": 0,
+     "totalMs": 517
+    },
+    "workerMs": 517,
+    "clientMs": 623
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 281,
+     "mergeMs": 0,
+     "totalMs": 281
+    },
+    "workerMs": 281,
+    "clientMs": 421
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 317,
+     "mergeMs": 0,
+     "totalMs": 317
+    },
+    "workerMs": 317,
+    "clientMs": 433
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 295,
+     "mergeMs": 0,
+     "totalMs": 295
+    },
+    "workerMs": 295,
+    "clientMs": 431
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 721,
+     "mergeMs": 0,
+     "totalMs": 721
+    },
+    "workerMs": 721,
+    "clientMs": 829
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+    "clean": false,
+    "conflicts": [
+     "a.txt",
+     "c.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 319,
+     "mergeMs": 0,
+     "totalMs": 319
+    },
+    "workerMs": 319,
+    "clientMs": 440
+   }
+  ],
+  "syncs": [
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch"
+  ]
+ },
+ "fresh_medium": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 5978,
+    "max": 7718,
+    "min": 5566
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 4197,
+    "max": 4857,
+    "min": 3712
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 4197,
+    "max": 4857,
+    "min": 3712
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 4197,
+    "max": 4857,
+    "min": 3712
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 0,
+    "max": 0,
+    "min": 0
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4465,
+     "mergeMs": 0,
+     "totalMs": 4465
+    },
+    "workerMs": 4465,
+    "clientMs": 6020
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4208,
+     "mergeMs": 0,
+     "totalMs": 4208
+    },
+    "workerMs": 4208,
+    "clientMs": 5935
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4512,
+     "mergeMs": 0,
+     "totalMs": 4512
+    },
+    "workerMs": 4512,
+    "clientMs": 6518
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4186,
+     "mergeMs": 0,
+     "totalMs": 4186
+    },
+    "workerMs": 4186,
+    "clientMs": 6743
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 3954,
+     "mergeMs": 0,
+     "totalMs": 3954
+    },
+    "workerMs": 3954,
+    "clientMs": 5782
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 3712,
+     "mergeMs": 0,
+     "totalMs": 3712
+    },
+    "workerMs": 3712,
+    "clientMs": 5855
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4167,
+     "mergeMs": 0,
+     "totalMs": 4167
+    },
+    "workerMs": 4167,
+    "clientMs": 5729
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 3957,
+     "mergeMs": 0,
+     "totalMs": 3957
+    },
+    "workerMs": 3957,
+    "clientMs": 5566
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4323,
+     "mergeMs": 0,
+     "totalMs": 4323
+    },
+    "workerMs": 4323,
+    "clientMs": 6595
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4857,
+     "mergeMs": 0,
+     "totalMs": 4857
+    },
+    "workerMs": 4857,
+    "clientMs": 7718
+   }
+  ]
+ },
+ "cached_medium_cand/clean": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 6274,
+    "max": 7925,
+    "min": 5286
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 4346,
+    "max": 5563,
+    "min": 3874
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 4346,
+    "max": 5563,
+    "min": 3874
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 4346,
+    "max": 5563,
+    "min": 3874
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 0,
+    "max": 0,
+    "min": 0
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 4793,
+     "mergeMs": 0,
+     "totalMs": 4793
+    },
+    "workerMs": 4793,
+    "clientMs": 6296
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 3909,
+     "mergeMs": 0,
+     "totalMs": 3909
+    },
+    "workerMs": 3909,
+    "clientMs": 5607
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 4920,
+     "mergeMs": 0,
+     "totalMs": 4920
+    },
+    "workerMs": 4920,
+    "clientMs": 6752
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4023,
+     "mergeMs": 0,
+     "totalMs": 4023
+    },
+    "workerMs": 4023,
+    "clientMs": 5747
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 3925,
+     "mergeMs": 0,
+     "totalMs": 3925
+    },
+    "workerMs": 3925,
+    "clientMs": 5331
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 5563,
+     "mergeMs": 0,
+     "totalMs": 5563
+    },
+    "workerMs": 5563,
+    "clientMs": 7415
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4385,
+     "mergeMs": 0,
+     "totalMs": 4385
+    },
+    "workerMs": 4385,
+    "clientMs": 6252
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 3874,
+     "mergeMs": 0,
+     "totalMs": 3874
+    },
+    "workerMs": 3874,
+    "clientMs": 5286
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 4308,
+     "mergeMs": 0,
+     "totalMs": 4308
+    },
+    "workerMs": 4308,
+    "clientMs": 6642
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 5356,
+     "mergeMs": 0,
+     "totalMs": 5356
+    },
+    "workerMs": 5356,
+    "clientMs": 7925
+   }
+  ],
+  "syncs": [
+   "fetch",
+   "clone",
+   "fetch",
+   "clone",
+   "fetch",
+   "fetch",
+   "clone",
+   "fetch",
+   "clone",
+   "clone"
+  ]
+ },
+ "cached_medium_cand/conflict": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 6170,
+    "max": 8341,
+    "min": 5022
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 4163,
+    "max": 5654,
+    "min": 3408
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 4163,
+    "max": 5654,
+    "min": 3408
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 4163,
+    "max": 5654,
+    "min": 3408
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 0,
+    "max": 0,
+    "min": 0
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 4116,
+     "mergeMs": 0,
+     "totalMs": 4116
+    },
+    "workerMs": 4116,
+    "clientMs": 5723
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 3408,
+     "mergeMs": 0,
+     "totalMs": 3408
+    },
+    "workerMs": 3408,
+    "clientMs": 5022
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 3827,
+     "mergeMs": 0,
+     "totalMs": 3827
+    },
+    "workerMs": 3827,
+    "clientMs": 5616
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 4210,
+     "mergeMs": 0,
+     "totalMs": 4210
+    },
+    "workerMs": 4210,
+    "clientMs": 7022
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 5654,
+     "mergeMs": 0,
+     "totalMs": 5654
+    },
+    "workerMs": 5654,
+    "clientMs": 8341
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 3823,
+     "mergeMs": 0,
+     "totalMs": 3823
+    },
+    "workerMs": 3823,
+    "clientMs": 5639
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 4021,
+     "mergeMs": 0,
+     "totalMs": 4021
+    },
+    "workerMs": 4021,
+    "clientMs": 6087
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 4673,
+     "mergeMs": 0,
+     "totalMs": 4673
+    },
+    "workerMs": 4673,
+    "clientMs": 6682
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 4587,
+     "mergeMs": 0,
+     "totalMs": 4587
+    },
+    "workerMs": 4587,
+    "clientMs": 6254
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+    "clean": false,
+    "conflicts": [
+     "pkg00/file00.txt"
+    ],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 4827,
+     "mergeMs": 0,
+     "totalMs": 4827
+    },
+    "workerMs": 4827,
+    "clientMs": 7086
+   }
+  ],
+  "syncs": [
+   "fetch",
+   "fetch",
+   "clone",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch"
+  ]
+ },
+ "land": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 1022,
+    "max": 1631,
+    "min": 787
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 799,
+    "max": 1402,
+    "min": 618
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 799,
+    "max": 1402,
+    "min": 618
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 593,
+    "max": 1127,
+    "min": 437
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 0,
+    "max": 0,
+    "min": 0
+   },
+   "timing.pushMs": {
+    "n": 10,
+    "p50": 216,
+    "max": 368,
+    "min": 174
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "4120ddc3c5e4f8985145ec358006f57a61a8cca5",
+    "baseSha": "f3febd974254582211d49c1b9964d41e6269ce13",
+    "headSha": "41de8f66b24d1c4d05abcf7ed1d99a727cacdc48",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 1127,
+     "mergeMs": 0,
+     "pushMs": 275,
+     "totalMs": 1402
+    },
+    "workerMs": 1402,
+    "clientMs": 1631
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "1cf58c41df803ae0bdc39dc6e8ebfbe375f91319",
+    "baseSha": "4120ddc3c5e4f8985145ec358006f57a61a8cca5",
+    "headSha": "015a9de4aaaa8b7a2a9b56b7ff13bae40f93c44e",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 513,
+     "mergeMs": 0,
+     "pushMs": 202,
+     "totalMs": 715
+    },
+    "workerMs": 715,
+    "clientMs": 873
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "f86c0ad1395519feafa4d22da9e7e2d618052143",
+    "baseSha": "1cf58c41df803ae0bdc39dc6e8ebfbe375f91319",
+    "headSha": "9b7841cd7ad7292f761fd24b2531d33bdcef959c",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 529,
+     "mergeMs": 0,
+     "pushMs": 175,
+     "totalMs": 704
+    },
+    "workerMs": 704,
+    "clientMs": 861
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "1d6b312f1bca889b7a29a046b91266487be96830",
+    "baseSha": "f86c0ad1395519feafa4d22da9e7e2d618052143",
+    "headSha": "03441b4aa97c0225ec82d31cd8571df6ac219fb2",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 612,
+     "mergeMs": 0,
+     "pushMs": 226,
+     "totalMs": 838
+    },
+    "workerMs": 838,
+    "clientMs": 1015
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "553c41fddc6dd84a492c43d0bcc1a8786fc1fad6",
+    "baseSha": "1d6b312f1bca889b7a29a046b91266487be96830",
+    "headSha": "7bf9320e8cb2c00e74b0e7fa3fe74660bf7acefd",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 558,
+     "mergeMs": 0,
+     "pushMs": 214,
+     "totalMs": 772
+    },
+    "workerMs": 772,
+    "clientMs": 1029
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "e4f12bcee5a12d86c8906bb65c481cbca90fcb9b",
+    "baseSha": "553c41fddc6dd84a492c43d0bcc1a8786fc1fad6",
+    "headSha": "6a4152fcb0de14d08dff6eb18f8f41e22d09d56a",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 949,
+     "mergeMs": 0,
+     "pushMs": 217,
+     "totalMs": 1166
+    },
+    "workerMs": 1166,
+    "clientMs": 1426
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "7c35594dc696facefe2114ee64c4b97c1e3d9668",
+    "baseSha": "e4f12bcee5a12d86c8906bb65c481cbca90fcb9b",
+    "headSha": "9ea36ecfa2d43751ae7e51bcf81846a3f2b318bf",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 590,
+     "mergeMs": 0,
+     "pushMs": 174,
+     "totalMs": 764
+    },
+    "workerMs": 764,
+    "clientMs": 938
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "50f34db6eb323c55562fbf01e040877afd4382cb",
+    "baseSha": "7c35594dc696facefe2114ee64c4b97c1e3d9668",
+    "headSha": "209a2942450cbba94d8aef005d9f74396406626f",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 437,
+     "mergeMs": 0,
+     "pushMs": 181,
+     "totalMs": 618
+    },
+    "workerMs": 618,
+    "clientMs": 787
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "025dd0f55c0cd7bfe4d0d49d2d431d2917355fb3",
+    "baseSha": "50f34db6eb323c55562fbf01e040877afd4382cb",
+    "headSha": "d54c8bc3d96b3431c341313623eb0e26ed121f16",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 596,
+     "mergeMs": 0,
+     "pushMs": 230,
+     "totalMs": 826
+    },
+    "workerMs": 826,
+    "clientMs": 1075
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "e24b7082bcfa23a89192923c0b322c1350d4a400",
+    "baseSha": "025dd0f55c0cd7bfe4d0d49d2d431d2917355fb3",
+    "headSha": "7d771d1a2c04a0c4834c0397b244549f17b37754",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 844,
+     "mergeMs": 0,
+     "pushMs": 368,
+     "totalMs": 1212
+    },
+    "workerMs": 1212,
+    "clientMs": 1360
+   }
+  ],
+  "remote_main_matches_last_land": true
+ },
+ "races": [
+  {
+   "winners": [
+    "a"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "8df282ef2cb9062015bb67f3a97baff1ca913b18",
+    "baseSha": "e24b7082bcfa23a89192923c0b322c1350d4a400",
+    "headSha": "65f5b14e20145cccf80d32ae1a9d1d521af2e3e8",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 692,
+     "mergeMs": 0,
+     "pushMs": 207,
+     "totalMs": 899
+    },
+    "workerMs": 899,
+    "clientMs": 1088
+   },
+   "b": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "GitPushError: One or more branches were not updated: \n  - refs/heads/main: stale ref",
+    "baseSha": "e24b7082bcfa23a89192923c0b322c1350d4a400",
+    "headSha": "6eff836fd2039e24f08ec9a2ea0bb6028bb6b70e",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 725,
+     "mergeMs": 0,
+     "pushMs": 227,
+     "totalMs": 952
+    },
+    "workerMs": 952,
+    "clientMs": 1161
+   }
+  },
+  {
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "PushRejectedError: Push rejected because it was not a simple fast-forward. Use \"force: true\" to override.",
+    "baseSha": "8df282ef2cb9062015bb67f3a97baff1ca913b18",
+    "headSha": "560a036105be6a7c0644b3f810e35eb9fe48e169",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 1173,
+     "mergeMs": 0,
+     "pushMs": 106,
+     "totalMs": 1279
+    },
+    "workerMs": 1279,
+    "clientMs": 1747
+   },
+   "b": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "035d056815cf6b1cf70ae78f6bf78e51d2b6346f",
+    "baseSha": "8df282ef2cb9062015bb67f3a97baff1ca913b18",
+    "headSha": "b28ae4f611e4fcc305acf8c5ac7a350e51cbd372",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 602,
+     "mergeMs": 0,
+     "pushMs": 154,
+     "totalMs": 756
+    },
+    "workerMs": 756,
+    "clientMs": 908
+   }
+  },
+  {
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "GitPushError: One or more branches were not updated: \n  - refs/heads/main: stale ref",
+    "baseSha": "035d056815cf6b1cf70ae78f6bf78e51d2b6346f",
+    "headSha": "b401e9cb2f2b23a284289fded07956ce8703bbf6",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 938,
+     "mergeMs": 0,
+     "pushMs": 200,
+     "totalMs": 1138
+    },
+    "workerMs": 1146,
+    "clientMs": 1343
+   },
+   "b": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "6aa5d21cee59c88ef44a4e82404b2ab977ccba81",
+    "baseSha": "035d056815cf6b1cf70ae78f6bf78e51d2b6346f",
+    "headSha": "523246274d0ef9bb5c0686eed8e67374fb58c8a5",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "clone",
+     "fetchMs": 857,
+     "mergeMs": 0,
+     "pushMs": 207,
+     "totalMs": 1064
+    },
+    "workerMs": 1065,
+    "clientMs": 1325
+   }
+  },
+  {
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "GitPushError: One or more branches were not updated: \n  - refs/heads/main: stale ref",
+    "baseSha": "6aa5d21cee59c88ef44a4e82404b2ab977ccba81",
+    "headSha": "fbac27189e92ffe568ae459a1a3fc12d7cd752f8",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 693,
+     "mergeMs": 0,
+     "pushMs": 235,
+     "totalMs": 928
+    },
+    "workerMs": 928,
+    "clientMs": 1096
+   },
+   "b": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "ba0e6dc1ce41452aa30a9e1f53ba2a7976994871",
+    "baseSha": "6aa5d21cee59c88ef44a4e82404b2ab977ccba81",
+    "headSha": "d3bf615c22cedc9e1312c1386006cf6e52a51d0d",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 668,
+     "mergeMs": 0,
+     "pushMs": 185,
+     "totalMs": 853
+    },
+    "workerMs": 853,
+    "clientMs": 1009
+   }
+  },
+  {
+   "winners": [
+    "a"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "4c42abf78d8166f7983b58b73679d9e15543d80a",
+    "baseSha": "ba0e6dc1ce41452aa30a9e1f53ba2a7976994871",
+    "headSha": "035249495eefe213b983649044c63c96929934cc",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 598,
+     "mergeMs": 0,
+     "pushMs": 160,
+     "totalMs": 758
+    },
+    "workerMs": 758,
+    "clientMs": 904
+   },
+   "b": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "PushRejectedError: Push rejected because it was not a simple fast-forward. Use \"force: true\" to override.",
+    "baseSha": "ba0e6dc1ce41452aa30a9e1f53ba2a7976994871",
+    "headSha": "5de18846232e4861f0fb5adfbe56ee3ac92afe5d",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 659,
+     "mergeMs": 0,
+     "pushMs": 88,
+     "totalMs": 747
+    },
+    "workerMs": 747,
+    "clientMs": 1057
+   }
+  },
+  {
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "GitPushError: One or more branches were not updated: \n  - refs/heads/main: stale ref",
+    "baseSha": "4c42abf78d8166f7983b58b73679d9e15543d80a",
+    "headSha": "efe1a9785fb092329ee045db8a1f68d6334c3e11",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 696,
+     "mergeMs": 0,
+     "pushMs": 248,
+     "totalMs": 944
+    },
+    "workerMs": 944,
+    "clientMs": 1105
+   },
+   "b": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "2ea3c383ff85c50fd8a68248bf4de354c88b9a6c",
+    "baseSha": "4c42abf78d8166f7983b58b73679d9e15543d80a",
+    "headSha": "7ea56a401942f93ec511769b1a491dcd0152d349",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 668,
+     "mergeMs": 0,
+     "pushMs": 184,
+     "totalMs": 852
+    },
+    "workerMs": 852,
+    "clientMs": 1032
+   }
+  },
+  {
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "PushRejectedError: Push rejected because it was not a simple fast-forward. Use \"force: true\" to override.",
+    "baseSha": "2ea3c383ff85c50fd8a68248bf4de354c88b9a6c",
+    "headSha": "ed29658eef90abab2987c955f6a91ae193b50f20",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 845,
+     "mergeMs": 0,
+     "pushMs": 90,
+     "totalMs": 935
+    },
+    "workerMs": 935,
+    "clientMs": 1186
+   },
+   "b": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "9d01fc8ca31d3e9b0ca01edc04874a6c8e420971",
+    "baseSha": "2ea3c383ff85c50fd8a68248bf4de354c88b9a6c",
+    "headSha": "0b08a8d0ed10d3eba6949430d76d9da7ec29b07f",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 735,
+     "mergeMs": 0,
+     "pushMs": 137,
+     "totalMs": 872
+    },
+    "workerMs": 872,
+    "clientMs": 1026
+   }
+  },
+  {
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "PushRejectedError: Push rejected because it was not a simple fast-forward. Use \"force: true\" to override.",
+    "baseSha": "9d01fc8ca31d3e9b0ca01edc04874a6c8e420971",
+    "headSha": "fcae01d0577d7cfce37e50403c5639559ce2dbd8",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 659,
+     "mergeMs": 0,
+     "pushMs": 379,
+     "totalMs": 1038
+    },
+    "workerMs": 1038,
+    "clientMs": 1423
+   },
+   "b": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "d3a79c2e4848987e68d63914ce2ad6f5a04c2ae1",
+    "baseSha": "9d01fc8ca31d3e9b0ca01edc04874a6c8e420971",
+    "headSha": "01cad846e0a6dc2c05fa3d553aa028194f24e065",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 635,
+     "mergeMs": 0,
+     "pushMs": 472,
+     "totalMs": 1107
+    },
+    "workerMs": 1107,
+    "clientMs": 1248
+   }
+  },
+  {
+   "winners": [
+    "a"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "b40df272c060955315568e2a312b459b69c5166e",
+    "baseSha": "d3a79c2e4848987e68d63914ce2ad6f5a04c2ae1",
+    "headSha": "2b6dc9666ed609a8300cdf3e76b888585670a7e0",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 875,
+     "mergeMs": 0,
+     "pushMs": 208,
+     "totalMs": 1083
+    },
+    "workerMs": 1083,
+    "clientMs": 1273
+   },
+   "b": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "GitPushError: One or more branches were not updated: \n  - refs/heads/main: stale ref",
+    "baseSha": "d3a79c2e4848987e68d63914ce2ad6f5a04c2ae1",
+    "headSha": "8cb4334d4c4d54128ec90451ecc06405754bb9a9",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 908,
+     "mergeMs": 0,
+     "pushMs": 230,
+     "totalMs": 1138
+    },
+    "workerMs": 1138,
+    "clientMs": 1290
+   }
+  },
+  {
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "ok": true,
+    "landed": false,
+    "refused": "push",
+    "pushErr": "PushRejectedError: Push rejected because it was not a simple fast-forward. Use \"force: true\" to override.",
+    "baseSha": "b40df272c060955315568e2a312b459b69c5166e",
+    "headSha": "04ddc7e4c84cd332ff943d2685e7c142bdc8a845",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 688,
+     "mergeMs": 0,
+     "pushMs": 127,
+     "totalMs": 815
+    },
+    "workerMs": 815,
+    "clientMs": 1053
+   },
+   "b": {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "8c2a769ab726db1cdfda9ddcb54a3c5ad601925e",
+    "baseSha": "b40df272c060955315568e2a312b459b69c5166e",
+    "headSha": "0cdd95f3d28d738361f597f09bdd573ca9f47ecc",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "{\"refs/heads/main\":{\"ok\":true,\"error\":\"\"}}",
+    "timing": {
+     "sync": "fetch",
+     "fetchMs": 655,
+     "mergeMs": 0,
+     "pushMs": 148,
+     "totalMs": 803
+    },
+    "workerMs": 803,
+    "clientMs": 970
+   }
+  }
+ ]
+}
