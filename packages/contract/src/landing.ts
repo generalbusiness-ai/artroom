@@ -149,9 +149,11 @@ export type LandOp = LandOpFields &
         readonly integration: Sha;
         readonly evidence: readonly ActId[];
         /**
-         * Digest of the land-rule input evaluated at `ready`; reservation rebuilds
-         * and compares it (R-LAND-7). Null on a configuration-recovery lane, where
-         * land rules are not evaluated (R-ADMIN-5).
+         * The `digest` of the prospective reservation input that passed the land
+         * rules during preparation (`RetainedLandInput`, R-LAND-4). The room keeps
+         * its canonical bytes; reservation compares bytes, not this digest
+         * (R-LAND-7). Null on a configuration-recovery lane, where land rules are
+         * not evaluated (R-ADMIN-5).
          */
         readonly landInput: Digest | null;
       }

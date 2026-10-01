@@ -35,11 +35,12 @@ import type {
   RuleKind,
   TeamId,
   LanePurpose,
+  RetainedLandInput,
 } from "@generalbusiness/artroom-contract";
 import { actMeter, evaluate, type ActMeter, type Meter } from "./evaluator.ts";
 import { prepareInput, type PreparedInput } from "./values.ts";
 import { PolicyEvalError, type RefusalCode } from "./errors.ts";
-import { digestJson } from "./integrity.ts";
+import { canonicalize, digestJson } from "./integrity.ts";
 import { STAMP } from "./profile.ts";
 import { matching, matchGlob } from "./glob.ts";
 import { checkConditions, reviewConditions, type CarryFacts, type CarryInput, type Invariant } from "./carry.ts";
@@ -147,13 +148,12 @@ function rulesOf<K extends RuleKind>(doc: PolicyDocument, kind: K): Extract<Rule
   return doc.rules.filter((r): r is Extract<Rule, { readonly kind: K }> => r.kind === kind);
 }
 
-/** Options for the evaluate functions that run before or at admission. */
+/**
+ * Options for the evaluate functions that run before or at admission. The
+ * lane purpose comes from `input.lane.purpose`; on a `config-recovery` lane,
+ * `refuse`, `require`, `carry` and `land` rules are not evaluated (R-ADMIN-5).
+ */
 export interface BudgetOptions {
-  /**
-   * The lane's purpose. On a `config-recovery` lane, `refuse`, `require`,
-   * `carry` and `land` rules are not evaluated (R-ADMIN-5).
-   */
-  readonly purpose?: LanePurpose;
   /**
    * The act's shared budget (ACT_BUDGET). Pass the same meter to every
    * evaluate call for one act, for example `refuse` and `require` on a
@@ -183,7 +183,7 @@ export interface RefuseResult extends Explained {
 /** `refuse` rules, when an act of a listed kind arrives (R-POL-2). The first refusal stops evaluation. */
 export async function evaluateRefuse(policy: ActivePolicy, input: InputOf<"refuse">, opts: RefuseOptions = {}): Promise<RefuseResult> {
   const budget = opts.budget ?? actMeter();
-  const ctx = own<Ctx<"refuse">>({ kind: "refuse", input, budget: budgetState(budget), purpose: opts.purpose ?? "ordinary", recoveryKey: opts.recoveryKey ?? false });
+  const ctx = own<Ctx<"refuse">>({ kind: "refuse", input, budget: budgetState(budget), purpose: input.lane.purpose, recoveryKey: opts.recoveryKey ?? false });
   return runRefuse(policy, ctx, budget);
 }
 
@@ -236,7 +236,7 @@ export interface RequireResult extends Explained {
 /** `require` rules, on `propose` and at activation (R-POL-3, R-OBL-5). */
 export async function evaluateRequire(policy: ActivePolicy, input: InputOf<"require">, opts: RequireOptions = {}): Promise<RequireResult> {
   const budget = opts.budget ?? actMeter();
-  const ctx = own<Ctx<"require">>({ kind: "require", input, budget: budgetState(budget), purpose: opts.purpose ?? "ordinary" });
+  const ctx = own<Ctx<"require">>({ kind: "require", input, budget: budgetState(budget), purpose: input.lane.purpose });
   return runRequire(policy, ctx, budget);
 }
 
@@ -318,7 +318,12 @@ const CARRIED_TEXT = "carried: reviewed and declared paths unchanged";
  * The platform conditions run first, in plain TypeScript. Only evidence that
  * meets them reaches the policy's `carry` rules, which can only stop it.
  */
-export async function evaluateCarry(policy: ActivePolicy, input: CarryInput, facts: CarryFacts = {}, opts: BudgetOptions = {}): Promise<CarryResult> {
+export interface CarryOptions extends BudgetOptions {
+  /** The lane's purpose. The carry input has no lane, so the room passes it (R-ADMIN-5). Default `ordinary`. */
+  readonly purpose?: LanePurpose;
+}
+
+export async function evaluateCarry(policy: ActivePolicy, input: CarryInput, facts: CarryFacts = {}, opts: CarryOptions = {}): Promise<CarryResult> {
   const budget = opts.budget ?? actMeter();
   const ctx = own<Ctx<"carry">>({
     kind: "carry",
@@ -395,17 +400,24 @@ export type LandOptions = BudgetOptions;
 
 export interface LandResult extends Explained {
   readonly refusal: Refusal | null;
+  /**
+   * Set when the prospective reservation input (`stage: "reservation"`)
+   * passed: what preparation retains for reservation's byte comparison
+   * (R-LAND-4, R-LAND-7). Null at stage `land`, on a refusal, and on a
+   * configuration-recovery lane.
+   */
+  readonly retained: RetainedLandInput | null;
 }
 
 /** `land` rules, on `land`, at `ready` and at reservation (R-POL-6). The first block stops evaluation. */
 export async function evaluateLand(policy: ActivePolicy, input: InputOf<"land">, opts: LandOptions = {}): Promise<LandResult> {
   const budget = opts.budget ?? actMeter();
-  const ctx = own<Ctx<"land">>({ kind: "land", input, budget: budgetState(budget), purpose: opts.purpose ?? "ordinary" });
+  const ctx = own<Ctx<"land">>({ kind: "land", input, budget: budgetState(budget), purpose: input.lane.purpose });
   return runLand(policy, ctx, budget);
 }
 
 async function runLand(policy: ActivePolicy, ctx: Ctx<"land">, caller?: ActMeter): Promise<LandResult> {
-  if (skipsPolicy(ctx.purpose)) return { refusal: null, evaluations: [], invariants: [RECOVERY_LANE] };
+  if (skipsPolicy(ctx.purpose)) return { refusal: null, retained: null, evaluations: [], invariants: [RECOVERY_LANE] };
   const s = await open(policy, ctx);
   const evaluations: RuleEvaluation[] = [];
   let refusal: Refusal | null = null;
@@ -424,8 +436,26 @@ async function runLand(policy: ActivePolicy, ctx: Ctx<"land">, caller?: ActMeter
     evaluations.push(evaluation(s, rule, { result: "pass" }, answer.usage, `${rule.id} does not block landing`));
   }
   settle(caller, s);
-  return { refusal, evaluations, invariants: [] };
+  let retained: RetainedLandInput | null = null;
+  if (refusal === null && ctx.input.stage === "reservation") {
+    const canonical = canonicalize(ctx.input as never);
+    retained = { stage: "reservation", canonical, digest: await digestJson(ctx.input as never) };
+  }
+  return { refusal, retained, evaluations, invariants: [] };
 }
+
+/**
+ * The reservation guard (R-LAND-7): synchronous, with no hashing and no
+ * evaluation, so it can run inside the no-await reservation transaction.
+ * True when the land input rebuilt now, with `stage: "reservation"`, is
+ * byte-for-byte the input whose evaluation passed during preparation.
+ */
+export function matchesRetainedLandInput(retained: RetainedLandInput, rebuilt: InputOf<"land">): boolean {
+  if (rebuilt.stage !== "reservation" || retained.stage !== "reservation") return false;
+  return canonicalize(rebuilt as never) === retained.canonical;
+}
+
+
 
 // ------------------------------------------------------------------ notify
 

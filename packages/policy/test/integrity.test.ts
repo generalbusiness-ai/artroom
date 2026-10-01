@@ -13,7 +13,7 @@ describe("integrity with WebCrypto (R-EVAL-7)", () => {
   });
   test("the installed jsonata is the pinned version", () => {
     expect(jsonataPackage.version).toBe(JSONATA_VERSION);
-    expect(STAMP).toEqual({ profile: "artroom-jsonata-v1", jsonata: "2.2.2" });
+    expect(STAMP).toEqual({ profile: "artroom-jsonata-v1", jsonata: "2.2.2", accounting: "artroom-act-budget-v1" });
     expect(PROFILE.id).toBe("artroom-jsonata-v1");
   });
   test("the engine fingerprint matches the pinned one", async () => {
