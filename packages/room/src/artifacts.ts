@@ -96,6 +96,8 @@ export class ArtifactsAdapter implements ArtifactsPort {
   async canonicalRemote(): Promise<string> {
     if (this.remoteCache) return this.remoteCache;
     const info = await (await this.canonical()).info();
+    // The repository the room is bound to, and no other (R-GEN-13).
+    if (info.name !== this.name) throw new Error(`the binding answered for ${info.name}, not ${this.name}`);
     this.remoteCache = info.remote;
     return info.remote;
   }
@@ -225,7 +227,7 @@ export class ArtifactsAdapter implements ArtifactsPort {
     return r.kind === "clean" ? { kind: "clean", base: r.base as Sha, integration: r.integration as Sha } : { kind: "conflict", base: r.base as Sha, paths: r.paths };
   }
 
-  async snapshot(commit: Sha, inputs: readonly Glob[]): Promise<{ readonly digest: `sha256:${string}`; readonly files: number } | null> {
+  async snapshot(commit: Sha, inputs: readonly Glob[]): Promise<{ readonly digest: `sha256:${string}`; readonly files: number; readonly entries: readonly SnapshotEntry[] } | null> {
     const repo = await this.canonical();
     const c = await repo.readCommit(commit);
     if (!c) throw new Error(`commit ${commit} is missing`);
@@ -244,6 +246,6 @@ export class ArtifactsAdapter implements ArtifactsPort {
     };
     if (!(await walk(c.treeHash, ""))) return null;
     const kept = filterSnapshot(entries, inputs);
-    return { digest: (await snapshotDigest(kept)) as `sha256:${string}`, files: kept.length };
+    return { digest: (await snapshotDigest(kept)) as `sha256:${string}`, files: kept.length, entries: kept };
   }
 }

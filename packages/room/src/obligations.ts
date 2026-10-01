@@ -30,6 +30,7 @@ import { matchGlob } from "./glob.ts";
 import { evidenceByAct, evidenceOn, generationRow, type EvidenceRow, type GenerationRow } from "./model.ts";
 import type { ObligationSpec, Sql } from "./ports.ts";
 import { activeAdmins, revocationOf } from "./roster.ts";
+import { getMeta, one, str } from "./store.ts";
 
 export const ADMIN_APPROVAL: ObligationId = "obl_admin-approval";
 export const ADMIN_SCOPE = ".artroom/**";
@@ -141,6 +142,15 @@ export function latestReviews(rows: readonly EvidenceRow[]): EvidenceRow[] {
   return [...latest.values()];
 }
 
+/**
+ * The integration a check's `integration` stands for: itself, or, for a
+ * scoped checker's snapshot commit the room recorded, the integration it was
+ * built from (R-CARRY-9).
+ */
+export function underlyingIntegration(sql: Sql, commit: string): string {
+  return str(one(sql, "SELECT integration FROM check_snapshots WHERE commit_sha = ?", commit), "integration") ?? commit;
+}
+
 export type Status = Obligation & { readonly evidenceActs: readonly ActId[] };
 
 /**
@@ -200,15 +210,17 @@ export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationS
     if (r.kind !== "check") continue;
     const b = r.body as CheckBody;
     if (!b.ok || qualification(opts.doc, spec, r, opts.checkers) !== true) continue;
-    if (opts.integration && b.integration !== opts.integration) continue;
+    if (opts.integration && underlyingIntegration(sql, b.integration) !== opts.integration) continue;
     if (!valid(r)) continue;
     acts.push(r.act);
     evidence.push({ basis: "here", act: r.act, kind: "check", generation: gen.generation, head: gen.head });
   }
   // Checks carried onto an integration of this generation (R-CARRY-6 to 10), still valid evidence (R-REV-1).
+  // A carry counts only on the integration and under the policy version that judged it (review a711f7b6).
+  const version = getMeta(sql, "policy");
   const carriedRows = opts.integration
-    ? sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ? AND integration = ?", gen.lane, gen.generation, spec.id, opts.integration)
-    : sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ?", gen.lane, gen.generation, spec.id);
+    ? sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ? AND integration = ? AND policy = ?", gen.lane, gen.generation, spec.id, opts.integration, version)
+    : sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ? AND policy = ?", gen.lane, gen.generation, spec.id, version);
   for (const c of carriedRows) {
     const r = evidenceByAct(sql, c["act"] as string);
     if (!r || exclude.has(r.act) || acts.includes(r.act) || !valid(r)) continue;

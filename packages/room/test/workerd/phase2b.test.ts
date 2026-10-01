@@ -255,8 +255,12 @@ describe("policy activation and recompute, scoped check carry and filtered check
     expect(await op(r, l.op.id)).toMatchObject({ state: "landed" });
   });
 
-  async function carryCase(cfg: CheckerConfig, mainChange: Record<string, string>) {
+  /** The runner every test check reports, attested as the one that would run now. */
+  const RUNNER = `sha256:${"0".repeat(64)}`;
+
+  async function carryCase(cfg: CheckerConfig, mainChange: Record<string, string>, attested: string | null = RUNNER) {
     const { r, doc, alice, ci } = await checkRoom(cfg);
+    r.world.runnerDigest = () => attested;
     const bob = await addMember(r, "@bob", "member");
     // Bob's landing moves main first; Alice's is prepared on the old main.
     const other = await proposed(r, bob, Object.keys(mainChange).map((p) => p.split("/")[0] + "/**"), mainChange);
@@ -275,7 +279,7 @@ describe("policy activation and recompute, scoped check carry and filtered check
     await tick(r, 4);
     expect(await op(r, first.op.id)).toMatchObject({ state: "landed" });
     const after = await op(r, l.op.id);
-    return { r, l, after, i1, check, mine };
+    return { r, l, after, i1, check, mine, doc };
   }
 
   it("a scoped check carries onto the new integration when main moved outside its inputs: snapshot-identical, and the landing completes", async () => {

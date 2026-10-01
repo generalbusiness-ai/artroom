@@ -140,6 +140,8 @@ export interface World {
   readonly bounds: { -readonly [K in keyof DiffBounds]?: DiffBounds[K] };
   /** Lane B's landing fault points: a test may throw from one, as a crash would. */
   landingFault: ((point: FaultPoint, op: string) => void) | null;
+  /** The runner environment attested now, by checker; none (the default) means checks do not carry. */
+  runnerDigest: ((checker: string) => string | null) | null;
 }
 
 const worlds = new Map<string, World>();
@@ -178,7 +180,7 @@ function newWorld(): World {
       return host.put(gitObject("commit", encodeCommit({ tree: root, parents: parent ? [parent] : [], author: who, committer: who, message: "not the room\n" })));
     },
   };
-  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null };
+  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, runnerDigest: null };
   (world as { instrument?: unknown }).instrument = (a: ArtifactsPort): ArtifactsPort =>
     new Proxy(a, {
       get(target, prop, receiver) {
@@ -209,6 +211,7 @@ setServicesFactory((_env, objectId) => {
   const host = world.artifacts;
   return {
     policy: world.policy,
+    runnerDigest: (checker: string) => (world.runnerDigest?.(checker) ?? null) as never,
     remotes: {
       artifacts: host.binding,
       get namespace() {

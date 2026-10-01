@@ -53,11 +53,12 @@ import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
 import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
-import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions } from "./obligations.ts";
+import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, underlyingIntegration } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedFile, RoomServices, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, Workspaces, canonicalTokens } from "@generalbusiness/artroom-git";
+import { ContainerPublisher, Landing, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type RepoLocation } from "./artifacts.ts";
+import { snapshotCommit } from "./snapshot.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
@@ -147,6 +148,8 @@ export class RoomCore {
   readonly committed: () => void;
   readonly bound: CoreOptions["bound"];
   readonly remotes: Remotes;
+  /** The runner environment digest attested now for a checker; none means checks do not carry. */
+  private readonly runnerDigest: (checker: string) => Digest | null;
   /** Lane B's landing engine, on this room's SQLite. */
   readonly landing: Landing;
   private wsCache: Workspaces | null = null;
@@ -175,6 +178,7 @@ export class RoomCore {
   constructor(opts: CoreOptions) {
     this.sql = opts.sql;
     this.remotes = opts.services.remotes;
+    this.runnerDigest = opts.services.runnerDigest ?? (() => null);
     this.clock = opts.clock;
     this.leaseMs = opts.leaseMs;
     this.defer = opts.defer;
@@ -199,7 +203,10 @@ export class RoomCore {
         return self.location().name;
       },
       get remote() {
-        return getMeta(self.sql, "canonical_remote") ?? "";
+        const remote = getMeta(self.sql, "canonical_remote");
+        // Resolved and stored before any landing work (`canonicalRemoteReady`); never a guess.
+        if (!remote) throw artroomError("unavailable", "The canonical repository's remote is not known yet.");
+        return remote;
       },
     };
     this.landing = new Landing({
@@ -218,6 +225,20 @@ export class RoomCore {
     const loc = identity ? locate(identity, this.remotes.namespace) : null;
     if (!loc) throw artroomError("unavailable", identity ? "This deployment has no Artifacts binding for the room's repository namespace." : "This room has not been founded.");
     return loc;
+  }
+
+  /**
+   * The canonical repository's git remote, which lane B's publisher needs.
+   * A room founded before it was stored (review a711f7b6) resolves it from
+   * the bound repository identity itself, and stores it; an outage throws
+   * and the work that needed it is retried.
+   */
+  async canonicalRemoteReady(): Promise<string> {
+    const kept = getMeta(this.sql, "canonical_remote");
+    if (kept) return kept;
+    const remote = await this.ports.artifacts.canonicalRemote();
+    setMeta(this.sql, "canonical_remote", remote);
+    return remote;
   }
 
   /** Lane B's workspaces (forks and lease tokens), on this room's SQLite. */
@@ -771,8 +792,8 @@ export class RoomCore {
         return { reason: "evidence-invalid", fix: "Evidence this landing relied on no longer counts. Get a new review or check, then land again." };
       }
     }
-    if (obligations.some((o) => o.kind === "review" && o.state !== "met"))
-      return { reason: "obligation-open", fix: "A review obligation is open again. Meet it, then land again." };
+    if (obligations.some((o) => o.state !== "met"))
+      return { reason: "obligation-open", fix: "An obligation is open again on this integration. Meet it, then land again." };
     if (lane?.purpose !== "config-recovery") {
       // R-LAND-7: rebuild the reservation-stage land input now and compare its canonical
       // bytes with the bytes the engine retained at `ready`. No hashing or evaluation here.
@@ -838,6 +859,7 @@ export class RoomCore {
         };
     }
     await this.carryChecks(op, integration, policy);
+    await this.recordSnapshots(op, integration, policy);
     const obligations = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration });
     const openReview = obligations.find((o) => o.kind === "review" && o.state !== "met");
     if (openReview) return { kind: "retry", reason: "obligation-open", fix: `The obligation ${openReview.id} is open again. Meet it, then land again.` };
@@ -845,7 +867,11 @@ export class RoomCore {
     for (const o of obligations) {
       if (o.kind !== "check" || o.state === "met") continue;
       const failed = evidenceOn(this.sql, op.lane, op.generation).find(
-        (e) => e.kind === "check" && (e.body as { obligation: string; integration: string; ok: boolean }).obligation === o.id && (e.body as { integration: string }).integration === integration && !(e.body as { ok: boolean }).ok,
+        (e) =>
+          e.kind === "check" &&
+          (e.body as { obligation: string }).obligation === o.id &&
+          underlyingIntegration(this.sql, (e.body as { integration: string }).integration) === integration &&
+          !(e.body as { ok: boolean }).ok,
       );
       if (failed) return { kind: "failed", reason: { code: "check-failed", check: failed.act } };
       waiting.push(o.id);
@@ -900,28 +926,35 @@ export class RoomCore {
 
   /**
    * Carry checks onto a new integration (R-CARRY-6 to 10): for each open
-   * check obligation, an earlier check of the same obligation and checker on
-   * this lane counts here if policy's `carry` keeps it, judged on the tree,
-   * or the filtered snapshot for a scoped checker, of both integrations.
+   * check obligation, an earlier passing check of the same obligation and
+   * checker on this lane counts on the new integration if lane C's platform
+   * conditions hold, judged on the tree, or the filtered snapshot for a
+   * scoped checker, of both integrations, and on the runner environment
+   * attested now. The judgment is stored bound to this integration and to
+   * the active policy version: a later activation leaves it uncounted, and
+   * readiness judges again under the new policy (review a711f7b6).
+   *
+   * It fails closed, carrying nothing, when: the policy turns check carrying
+   * off; a `carry` rule applies to checks (no event can seal its decision
+   * yet: amendment 3); or no runner environment is attested for the checker.
    */
   async carryChecks(op: LandRecord, integration: Sha, policy: ActivePolicyFull): Promise<void> {
     const gen = generationRow(this.sql, op.lane, op.generation);
     if (!gen || !policy.doc.carry.checks) return;
-    // Policy `carry` rules may only stop evidence carrying, and there is no event to seal a check's carry decision
-    // in (contract gap): with any carry rule in force, checks do not carry and rerun instead.
-    if (policy.doc.rules.some((r) => r.kind === "carry")) return;
+    if (policy.doc.rules.some((r) => r.kind === "carry" && (r.evidence === "check" || r.evidence === "any"))) return;
     const statuses = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration });
     for (const spec of gen.obligations) {
       if (spec.kind !== "check" || statuses.find((s) => s.id === spec.id)?.state === "met") continue;
       const cfg = policy.checkers[spec.check];
-      if (!cfg) continue;
+      const runner = this.runnerDigest(spec.check);
+      if (!cfg || !runner) continue;
       // Earlier passing checks of this obligation and checker on this lane, on another integration, newest first.
       const candidates = this.sql
-        .all("SELECT * FROM evidence WHERE lane = ? AND kind = 'check' AND generation <= ? ORDER BY seq DESC", op.lane, op.generation)
+        .all("SELECT act FROM evidence WHERE lane = ? AND kind = 'check' AND generation <= ? ORDER BY seq DESC", op.lane, op.generation)
         .map((r) => evidenceByAct(this.sql, str(r, "act")!)!)
         .filter((e) => {
-          const b = e.body as { obligation: string; check: string; ok: boolean; integration: string };
-          return b.ok && b.obligation === spec.id && b.check === spec.check && b.integration !== integration;
+          const b = e.body as { obligation: string; check: string; ok: boolean; integration: Sha };
+          return b.ok && b.obligation === spec.id && b.check === spec.check && underlyingIntegration(this.sql, b.integration) !== integration;
         });
       if (!candidates.length) continue;
       const inputs = checkerInputs(cfg.config.inputs, policy.doc.carry);
@@ -944,7 +977,7 @@ export class RoomCore {
           revoked: revoked?.reason ?? null,
           check: {
             before: { integration: b.integration, config: b.config, runner: b.runner, input: b.input },
-            now: { integration, tree, snapshot, config: cfg.digest, runner: b.runner },
+            now: { integration, tree, snapshot, config: cfg.digest, runner },
             volatile: cfg.config.volatile,
           },
         };
@@ -955,16 +988,47 @@ export class RoomCore {
         const text = basis.code === "tree-identical" ? "carried: the integration's tree is identical" : "carried: the filtered snapshot is identical";
         const carried: Carried = { basis: "carried", act: ev.act, kind: "check", from: input.evidence.from, reason: { ...basis, text } as Carried["reason"], rules: [] };
         this.sql.all(
-          "INSERT INTO check_carries (lane, generation, integration, obligation, act, evidence) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+          "INSERT INTO check_carries (lane, generation, integration, obligation, act, evidence, policy) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (lane, generation, integration, obligation) DO UPDATE SET act = excluded.act, evidence = excluded.evidence, policy = excluded.policy",
           op.lane,
           op.generation,
           integration,
           spec.id,
           ev.act,
           JSON.stringify(carried),
+          policy.version,
         );
         break;
       }
+    }
+  }
+
+  /**
+   * Record the filtered snapshot commit of an integration for each scoped
+   * checker an open check obligation waits on: what a job for that check is
+   * built from, and what a contract-shaped scoped check binds as its
+   * `integration` (R-OBL-3, R-CARRY-9; review a711f7b6).
+   */
+  async recordSnapshots(op: LandRecord, integration: Sha, policy: ActivePolicyFull): Promise<void> {
+    const gen = generationRow(this.sql, op.lane, op.generation);
+    if (!gen) return;
+    for (const spec of gen.obligations) {
+      if (spec.kind !== "check") continue;
+      const cfg = policy.checkers[spec.check];
+      const inputs = cfg ? checkerInputs(cfg.config.inputs, policy.doc.carry) : null;
+      if (!cfg || !inputs) continue;
+      if (one(this.sql, "SELECT 1 AS x FROM check_snapshots WHERE integration = ? AND checker = ? AND config = ?", integration, spec.check, cfg.digest)) continue;
+      const snap = await this.ports.artifacts.snapshot(integration, inputs);
+      if (!snap) continue;
+      const { commit } = snapshotCommit(snap.entries, spec.check, snap.digest);
+      this.sql.all(
+        "INSERT INTO check_snapshots (integration, checker, config, paths, digest, commit_sha) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+        integration,
+        spec.check,
+        cfg.digest,
+        canonicalize([...inputs].sort()),
+        snap.digest,
+        commit,
+      );
     }
   }
 
@@ -1082,17 +1146,42 @@ export class RoomCore {
   /** Workspaces whose lease has ended: release, expiry (sealed or only due), take-over or fencing (R-WS-3). */
   endedWorkspaces(): { lane: LaneId; lease: number }[] {
     return this.sql
-      .all("SELECT lane, lease_gen FROM ws_leases WHERE state = 'open'")
+      .all("SELECT lane, lease_gen FROM ws_leases WHERE state IN ('open', 'legacy')")
       .map((r) => ({ lane: str(r, "lane") as LaneId, lease: num(r, "lease_gen")! }))
       .filter((w) => !this.leaseCurrent(w.lane, w.lease));
   }
 
-  /** End the workspace access of every lease that has ended: lane B revokes its token and sweeps the fork (R-WS-3, R-LANE-8). */
+  /**
+   * End the workspace access of every lease that has ended (R-WS-3, R-LANE-8).
+   * Lane B revokes the token it minted for the lease and sweeps the fork.
+   * Access opened before lane B's workspaces (`ws_legacy`: recorded token IDs,
+   * and an inventory for any mint whose answer was never recorded) becomes
+   * lane B's durable cleanup duties, in the transaction that marks the lease
+   * ended, so it is owed until Artifacts confirms it (review a711f7b6).
+   */
   async revokeEndedTokens(): Promise<void> {
+    let imported = false;
     for (const w of this.endedWorkspaces()) {
       await this.workspaces.revoke(w.lane, w.lease);
-      this.sql.all("UPDATE ws_leases SET state = 'ended' WHERE lane = ? AND lease_gen = ?", w.lane, w.lease);
+      const fork = forkName(this.location().name, w.lane);
+      this.sql.transaction(() => {
+        for (const r of this.sql.all("SELECT token FROM ws_legacy WHERE lane = ? AND lease_gen = ?", w.lane, w.lease)) {
+          const token = str(r, "token")!;
+          this.sql.all(
+            "INSERT INTO artroom_ws_duty (fork, kind, token_id, reason, state, started_at, expires_at, next_at) VALUES (?, ?, ?, 'migrated', 'owed', ?, NULL, ?)",
+            fork,
+            token ? "token" : "inventory",
+            token || null,
+            this.now(),
+            this.now(),
+          );
+          imported = true;
+        }
+        this.sql.all("DELETE FROM ws_legacy WHERE lane = ? AND lease_gen = ?", w.lane, w.lease);
+        this.sql.all("UPDATE ws_leases SET state = 'ended' WHERE lane = ? AND lease_gen = ?", w.lane, w.lease);
+      });
     }
+    if (imported) await this.workspaces.reconcile();
   }
 
   /**
@@ -1363,6 +1452,7 @@ export class RoomCore {
     if (!this.founded) return;
     // R-PUB-10: canonical write tokens are minted, and main is pushed, only for the bound room.
     if (!(await this.isBound())) return;
+    await this.canonicalRemoteReady();
     // An abort attempt is carried out at once, even while a push is in flight (R-REV-5): not behind the engine's queue.
     await this.landing.enforceAbort();
     for (const r of this.sql.all("SELECT op FROM land_reeval ORDER BY rowid")) {

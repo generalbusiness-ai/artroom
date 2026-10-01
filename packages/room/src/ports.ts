@@ -185,7 +185,7 @@ export interface ArtifactsPort {
    * `[path, mode, blob]` triples matching `inputs` (R-CARRY-9); null when the
    * tree is over the diff bounds.
    */
-  snapshot(commit: Sha, inputs: readonly Glob[]): Promise<{ readonly digest: Digest; readonly files: number } | null>;
+  snapshot(commit: Sha, inputs: readonly Glob[]): Promise<{ readonly digest: Digest; readonly files: number; readonly entries: readonly import("@generalbusiness/artroom-policy").SnapshotEntry[] } | null>;
 }
 
 // ---------------------------------------------------------------- log publication
@@ -242,6 +242,13 @@ export interface Remotes {
 export interface RoomServices {
   readonly policy: PolicyPort;
   readonly remotes: Remotes;
+  /**
+   * The runner environment digest attested now for a checker, or null. A
+   * check carries onto a new integration only if the runner that would run
+   * it now is attested to be the earlier check's (R-CARRY-6). No deployment
+   * attests one yet, so checks do not carry (review a711f7b6; amendment 3).
+   */
+  readonly runnerDigest?: (checker: string) => Digest | null;
 }
 
 /** The ports the Room's code uses, built by the Room over its services. */

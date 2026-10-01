@@ -188,6 +188,29 @@ export const ROOM_MIGRATIONS: readonly Migration[] = [
         act TEXT NOT NULL, evidence TEXT NOT NULL, PRIMARY KEY (lane, generation, integration, obligation))`);
     },
   },
+  {
+    version: 7,
+    name: "review a711f7b6: earlier workspace access into lane B's cleanup; carries bound to a policy",
+    up: (sql) => {
+      // Access opened before lane B's workspaces: the lease is `legacy` until its end imports the cleanup it is owed
+      // (each recorded token, and an inventory of the fork for any mint whose answer was never recorded) into lane B's
+      // durable duties. Version 6 marked these `ended` without any cleanup; that is undone here.
+      // `token` '' stands for "an inventory of the fork is owed".
+      sql.all("CREATE TABLE IF NOT EXISTS ws_legacy (lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, token TEXT NOT NULL, PRIMARY KEY (lane, lease_gen, token))");
+      sql.all("UPDATE ws_leases SET state = 'legacy' WHERE state = 'ended' AND EXISTS (SELECT 1 FROM workspaces w WHERE w.lane = ws_leases.lane AND w.lease_gen = ws_leases.lease_gen)");
+      sql.all("INSERT OR IGNORE INTO ws_leases (lane, lease_gen, state) SELECT lane, lease_gen, 'legacy' FROM workspaces");
+      sql.all("INSERT OR IGNORE INTO ws_legacy (lane, lease_gen, token) SELECT lane, lease_gen, '' FROM workspaces");
+      sql.all("INSERT OR IGNORE INTO ws_legacy (lane, lease_gen, token) SELECT lane, lease_gen, id FROM fork_tokens WHERE revoked = 0");
+      sql.all("INSERT OR IGNORE INTO ws_leases (lane, lease_gen, state) SELECT lane, lease_gen, 'legacy' FROM fork_tokens WHERE revoked = 0");
+      // A carried check counts only under the policy version that judged it (R-POL-9). Earlier rows have none, and never count.
+      const cols = new Set(sql.all("SELECT name FROM pragma_table_info('check_carries')").map((r) => r["name"] as string));
+      if (!cols.has("policy")) sql.all("ALTER TABLE check_carries ADD COLUMN policy TEXT");
+      // A scoped checker's snapshot commit for an integration, as the Room derived it when it asked for the check (R-CARRY-9).
+      sql.all(`CREATE TABLE IF NOT EXISTS check_snapshots (integration TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, paths TEXT NOT NULL,
+        digest TEXT NOT NULL, commit_sha TEXT NOT NULL, PRIMARY KEY (integration, checker, config))`);
+      sql.all("CREATE INDEX IF NOT EXISTS check_snapshots_commit ON check_snapshots (commit_sha)");
+    },
+  },
 ];
 
 export function createSchema(sql: Sql): void {
