@@ -175,7 +175,7 @@ export interface PublishedLayout {
   readonly "artroom-log/v1/genesis.json": Genesis;
   /** Entries `first`..`first + 999` as JCS lines. */
   readonly [segment: `artroom-log/v1/segments/${string}.jsonl`]: string;
-  /** Retained policy inputs, by digest. */
+  /** Retained replay contexts (R-EVAL-8), by digest. */
   readonly [input: `artroom-log/v1/inputs/${string}.json`]: unknown;
   /** Every activated policy document and checker configuration, by digest. */
   readonly [policy: `artroom-log/v1/policies/${string}.json`]: unknown;

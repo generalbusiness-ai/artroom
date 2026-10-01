@@ -39,6 +39,8 @@ sections 4 to 11 and 13.
 22. Open points
 23. Acceptance cases and the rules they test
 24. Review 45431cd9
+25. Review d12b67d6
+26. Policy amendment (81c31bc7)
 
 ## 1. Terms
 
@@ -298,7 +300,9 @@ is the grantor's member, limited to the delegation.
 - the invitation exists, is unused and has not expired by the room clock;
 - the SHA-256 of the revealed secret equals the invitation's `secretHash`;
 - the signing key is not already a key of any member, and has never been
-  revoked. Otherwise the refusal is `key-in-use`.
+  revoked. Otherwise the refusal is `key-in-use`;
+- the invitation's custody matches the admission path (R-ADM-12).
+  Otherwise the refusal is `custody-mismatch`.
 
 The invitation binds the signing key at redemption. It names no key in
 advance. The authority is the invited member, with the invitation's role
@@ -339,14 +343,40 @@ full signed envelope and the decisions that led to them. The returned
 never recorded. So only an authenticated, authorized, well-formed and
 secret-free envelope ever reaches the log.
 
-**R-ADM-9.** A runtime failure records nothing. Examples are a Worker CPU
-limit, running out of memory, a storage error or an engine fault. The caller
-receives a retryable `ArtroomError`.
+**R-ADM-9.** A runtime failure during admission records nothing. Examples
+are a Worker CPU limit, running out of memory, a storage error or an engine
+fault. The caller receives a retryable `ArtroomError`. The one exception is
+`notify`, which runs after the act is committed: a runtime failure there
+leaves the act recorded and is retried (R-LOG-13).
 
 **R-ADM-10.** The room answers an act only after its SQLite write commits.
 
 **R-ADM-11.** An accepted act by the lane holder on its lane renews the
 lease (R-LANE-5). A recorded refusal does not.
+
+**R-ADM-12. Invitation custody is enforced by the admission path.** There
+is one join admission (case (c) of R-ADM-3). Its caller passes the
+admission path (`AdmissionPath`), which the room's own code sets. The path
+is never read from the envelope, the route, the body, or any other caller
+input.
+
+| Path | Who uses it | Invitations it may consume |
+|---|---|---|
+| `submitted` | `submit` over RPC, `POST /v1/rooms/:room/acts`, and `redeem` with `custody: "client"` | `custody: "client"` only |
+| `room-redemption` | Only the room's own handling of `redeem` with `custody: "room"`. It signs the `join` with a key it has just generated and holds | `custody: "room"` only |
+
+- A `join` against a room-custody invitation on the `submitted` path is
+  refused with `custody-mismatch`. So is a room redemption of a
+  client-custody invitation.
+- A refused join records nothing and does not consume the invitation.
+- Every other join check still applies on both paths: signature, invitation
+  state, secret hash, unbound key, and single consumption.
+- The receipt's authority records the invitation's custody (`custody` in
+  the `join` case). `artroom verify` checks it equals the invitation's.
+  For `room`, the joined key's custody is `room`.
+
+So a room-custody member's key never leaves the room, and that member acts
+only through the bounded session delegation of R-CRED-3.
 
 ## 6. Idempotency (R-IDEM)
 
@@ -390,7 +420,9 @@ only by the user, and redeems the invitation. The CLI signs each envelope.
 **R-CRED-3. MCP.** An invitation with `custody: "room"` works like this:
 1. The caller sends the invitation ID and secret to `redeem` (R-CRED-9),
    with no other credential. The room makes the member's key and keeps it.
-   It records the `join`, signed by that key (case (c) of R-ADM-3).
+   It records the `join`, signed by that key, on the `room-redemption` path
+   (case (c) of R-ADM-3, R-ADM-12). No other path can redeem this
+   invitation.
 2. For each bearer session, the room makes a session key. It records a
    `delegate` act from the member key to the session key, with the
    invitation's `session` kinds and lifetime.
@@ -437,11 +469,14 @@ It is never recorded.
 credential. It is `RoomWire.redeem` over RPC and `POST
 /v1/rooms/:room/redeem` over HTTPS.
 - `custody: "client"`: the body is a signed `join` envelope. The room
-  admits it like any act, by case (c) of R-ADM-3. It returns `Joined`, with
-  a read session.
+  admits it like any act, by case (c) of R-ADM-3, on the `submitted` path.
+  It returns `Joined`, with a read session.
 - `custody: "room"`: the body is the invitation ID and secret. The room
-  makes the member key, records the `join`, makes a session key, records the
+  makes the member key, and admits the `join` it signs with that key on the
+  `room-redemption` path. It then makes a session key, records the
   `delegate`, and returns `Redeemed`, with the bearer token shown once.
+- The body's `custody` only selects the branch. The join admission checks
+  the invitation's recorded custody against the path (R-ADM-12).
 - A refused redemption records nothing and does not consume the invitation.
 - Redemption is rate-limited per client address and per invitation.
 
@@ -675,6 +710,9 @@ verdict's reviewed `scope`.
 
 **R-CARRY-2.** And no such path matches the verdict's `dependsOn`, or the
 default `dependsOn` that policy gives for the areas of the reviewed scope.
+A policy default applies when its key pattern may overlap a pattern of the
+reviewed scope (R-PATH-3); its globs are then added to the verdict's
+declared `dependsOn` (`CarrySettings.dependsOn`).
 
 **R-CARRY-3.** And no such path is a global input. Global inputs are the
 platform's list plus the policy's additions. Policy cannot remove a platform
@@ -807,8 +845,12 @@ R-LAND-6.
 2. Meet the check obligations on that integration: carry where R-CARRY
    allows, otherwise request the checks. A failing required check ends in
    `failed` with code `check-failed`.
-3. Evaluate the land rules and record the digest of their input as
-   `landInput`.
+3. Evaluate the land rules on the prospective reservation input: the land
+   `RuleInput` with `stage: "reservation"`, built from current state as
+   reservation will rebuild it. If a rule blocks, the operation fails with
+   the rule's ID and fix. If all pass, retain the input's canonical bytes
+   and their SHA-256 digest (`RetainedLandInput`), separately from the
+   evaluation's replay context, and record the digest as `landInput`.
 4. Move to `ready`, listing the evidence.
 
 **R-LAND-5.** When main moves, every operation in `preparing` or `ready`
@@ -840,7 +882,12 @@ that transaction the room:
    - every piece of evidence is valid under R-REV-1, judged against the
      authority recorded at its admission;
    - main, as the room last recorded it, equals `expectedMain`;
-   - the land-rule input, rebuilt now, has the digest `landInput`.
+   - the land `RuleInput` with `stage: "reservation"`, rebuilt now from
+     current state and canonicalized synchronously, is byte-for-byte equal
+     to the retained `RetainedLandInput.canonical`. The comparison is of
+     bytes, not of a digest: SHA-256 through WebCrypto is asynchronous, so no
+     hashing and no rule evaluation happen inside this transaction. Equal
+     bytes mean the land rules already passed on exactly this input.
 
    On any mismatch, the operation goes to `retryable`.
 2. Records the operation as `publishing`, with the next publication
@@ -947,7 +994,9 @@ does not reopen it.
 
 **R-REV-2. Retired.** After a `retired` revocation, the key's new acts are
 refused (R-ADM-4). Its earlier verdicts and checks stay valid, unless the
-policy says `retiredEvidence: "reopens"`.
+policy says `retiredEvidence: "reopens"`. Then such evidence does not carry
+(`NotCarried` code `key-retired`), and an obligation it met reopens
+(`Reopened` because `key-retired`).
 
 **R-REV-3. Compromised.** After a `compromised` revocation:
 - the key's earlier verdicts and checks stop counting as evidence. So do
@@ -1010,7 +1059,12 @@ active admin (R-GEN-9), that admin may:
 - the UI shows the flag on the proposal and in the policy history;
 - the exception applies only while there is exactly one active admin. At
   reservation, a flagged approval counts only if that is still true.
-  Otherwise the obligation reopens.
+  Otherwise the obligation reopens (`Reopened` because `sole-admin-ended`).
+
+Whether any approval qualified for `obl_admin-approval` is judged by the
+authority recorded at its admission (R-REV-1): a later demotion or removal
+does not reopen it, and a later promotion cannot upgrade an earlier review.
+Only a flagged self-approval depends on the current number of admins.
 
 **R-ADMIN-3. The fixed recovery boundary.** Admins can always change the
 roster and the policy, whatever the active policy says:
@@ -1087,11 +1141,24 @@ evidence that meets the platform's carry conditions. It can only narrow
 committed. Its decisions are recorded in a later `notified` entry, never in
 the act's receipt (R-LOG-13). It puts the act in the targets' attention
 queues with the rule's `why`. It never changes the act. A deterministic
-error is recorded as a decision, and nobody is notified.
+error is recorded as a decision, and nobody is notified. Targets are
+expanded with a `NotifyDirectory` that the room builds when it queues the
+evaluation: active members by role for `role:<role>`, and the proposal's
+qualifying reviewers for `reviewers`. `owners` uses the proposal's
+`PathOwners`; `holder` the lane's holder. The directory is part of the
+replay context (R-EVAL-8), and a retry reuses the same context.
 
-**R-POL-6. `land`.** Evaluated on `land` and at `ready`. Reservation
-re-checks its input digest (R-LAND-7). If `block` is true, the landing is
-refused, or the operation fails, with the rule's ID and fix.
+**R-POL-6. `land`.** Evaluated twice, with different `stage` values:
+- when the `land` act is admitted, on the input with `stage: "land"`. If
+  `block` is true, the act is refused;
+- during preparation, before the operation becomes `ready`, on the
+  prospective reservation input with `stage: "reservation"` (R-LAND-4). If
+  `block` is true, the operation fails.
+
+Reservation rebuilds the `stage: "reservation"` input and compares its
+canonical bytes with those retained (R-LAND-7). It never evaluates rules,
+and the room never substitutes `stage: "land"` to make inputs match. So a
+rule that blocks only at reservation cannot be bypassed.
 
 **R-POL-7. Default policy.** With no policy file the room uses:
 - no owners and no `require` rules;
@@ -1101,6 +1168,8 @@ refused, or the operation fails, with the rule's ID and fix.
 - `retiredEvidence: "counts"`;
 - the land rule `objection-open`. It blocks while any qualifying reviewer's
   latest verdict on this generation, reviewed here or carried, is `object`.
+  The land `RuleInput`'s `reviews` holds exactly those latest verdicts: one
+  entry per qualifying reviewer.
 
 The `policy()` helper includes `objection-open` unless the policy defines
 its own rule with that ID.
@@ -1118,6 +1187,12 @@ default. From activation:
 - landing operations prepared under the old version go back to
   `preparing` (R-LAND-5).
 
+If a `require` rule fails deterministically while obligations are
+recomputed for an open proposal, the proposal keeps the recorded refusal
+(`policy-budget-exceeded` or `policy-type-error`). Its `land` is refused with
+that refusal until a new generation is proposed or another policy activates.
+It never continues with fewer obligations.
+
 **R-POL-10.** Policy cannot override sections 7 to 11 of the plan, or the
 rules in this document marked as platform rules. In particular, policy
 cannot:
@@ -1128,8 +1203,14 @@ cannot:
 - change who may sign which kind.
 
 **R-POL-11.** Every decision records the rule ID, the kind, the policy
-version, the profile and `jsonata` version, the digest of its input, the
-outcome and the budget used.
+version, the profile, `jsonata` and accounting versions (`ProfileStamp`), the
+digest of its replay context (R-EVAL-8), the outcome and the budget used.
+
+**R-POL-12. The active policy is supplied, pinned.** For every evaluation the
+room supplies the active `PolicyDocument`, immutable, and its version: the ID
+of the `policy-activated` event. It retains each activated document by that
+version (R-LOG-7), so that any decision can be replayed with the document it
+was made under.
 
 ## 17. The policy evaluator (R-EVAL)
 
@@ -1159,13 +1240,28 @@ admitted.
 | One intermediate result | 1 MiB |
 | Cumulative inspected bytes | 16 MiB |
 
+Added for Artroom, across all evaluations for one act (R-EVAL-9):
+
+| Bound | Value |
+|---|---|
+| Steps per act | 25,000 |
+| Inspected bytes per act | 4 MiB (4,194,304) |
+
+These come from the room-core spike's deployed measurements. The spike
+estimated 3 to 9 microseconds of CPU per step on the rules it sampled; that
+is an estimate, not a bound for every program or host.
+
 **R-EVAL-3.** Each kind's expression receives `RuleInput` for that kind:
-plain JSON with safe integers. `refuse`, `land`'s `block`, `carry`'s
+plain JSON with safe integers. No rule input is keyed by a repository path:
+ownership is a list of `PathOwners` pairs, so any legal path, including
+`constructor`, `prototype`, `__proto__` and `_jsonata_cache`, appears only as a
+string value. `refuse`, `land`'s `block`, `carry`'s
 `allow`, and the optional `when` must return a boolean. Any other result is
 `policy-type-error`.
 
-**R-EVAL-4.** The room pins the `jsonata` version and the profile version,
-and records both with every decision. A dependency update needs a new
+**R-EVAL-4.** The room pins the `jsonata` version, the profile version and
+the accounting version (`artroom-act-budget-v1`), and records all three with
+every decision. A dependency update needs a new
 profile version, or an independently reviewed claim that the old profile is
 unchanged, backed by the full conformance corpus.
 
@@ -1178,15 +1274,35 @@ unchanged, backed by the full conformance corpus.
   - for `notify`, nobody is notified, and the `notified` entry records the
     error.
 - **A runtime failure** is a Worker CPU limit, running out of memory, or an
-  engine fault. It is infrastructure. Nothing is recorded, and the caller
-  receives a retryable `ArtroomError` `policy-runtime`. The Worker CPU limit
-  is a backstop, not the budget.
+  engine fault. It is infrastructure. During admission nothing is recorded,
+  and the caller receives a retryable `ArtroomError` `policy-runtime`. For
+  `notify`, which runs after the act is committed, the act stays recorded
+  and evaluation is retried (R-LOG-13). The Worker CPU limit is a backstop,
+  not the budget.
 
-**R-EVAL-6.** Replaying a recorded decision, with its retained input, the
-same policy version and the same profile, gives the same outcome.
+**R-EVAL-6.** Replaying a recorded decision, with its retained replay
+context (R-EVAL-8), the same policy version and the same profile, gives the
+same outcome.
 
 **R-EVAL-7.** Integrity checks use WebCrypto, not atseq's Node-only
 adapter.
+
+**R-EVAL-8. The replay context.** Each evaluation of a rule kind for one act
+is decided by one `ReplayContext`: the rule input; the act budget's
+accounting version, limits and the usage already spent (`BudgetState`); the
+lane purpose; for `refuse`, whether the recovery key signed; for `carry`, the
+platform facts (`CarryFactsRecord`: revocation and check binding); for
+`notify`, the `NotifyDirectory`. The evaluator copies and freezes it before
+any asynchronous work, and hashes, evaluates and retains that same copy.
+`Decision.input` is the SHA-256 digest of its canonical JSON. Nothing
+outside the context, the policy and the profile may change an outcome.
+
+**R-EVAL-9. One meter per act, in order.** One act's evaluations (for
+example `refuse` then `require` on a propose, or `carry` and `land`) run in
+order and share one act meter. Each records the meter's usage when it
+starts. Distinct acts may evaluate concurrently, each with its own meter.
+Running out of the act budget is `policy-budget-exceeded`. `notify` runs
+after the act with its own fresh meter, never the act's.
 
 ## 18. Execution isolation (R-EXEC)
 
@@ -1295,7 +1411,8 @@ signature, except genesis, which also carries the first admin's.
 made before sealing (`refuse`, `require`, `carry`, `land`), the effects,
 the flags and, while a slot is held, `after`.
 
-**R-LOG-7.** Retained policy inputs. Every decision's input is kept as
+**R-LOG-7.** Retained policy inputs. Every decision's replay context
+(R-EVAL-8) is kept as
 canonical JSON under its digest. Every activated policy document and checker
 configuration is kept the same way. Both are published with the log.
 
@@ -1568,6 +1685,22 @@ safest reading. Each needs confirmation by review.
     secret is the credential. It is rate-limited, and a failed attempt does
     not consume the invitation. Whether failed attempts should eventually
     disable an invitation is open.
+29. **A lost redemption response.** If a room-custody redemption succeeds
+    but its response is lost, the bearer token cannot be shown again. The
+    admin issues a new room-custody invitation for the same member, which
+    adds a key and a session, and may revoke the unused delegation. Lane E
+    tests refused, partial and lost-response redemptions, and that none
+    leaks a bearer token.
+30. **No `$glob` in the profile.** Expressions cannot match globs; `require`
+    rules' `paths` cover the common case. Adding a path function needs a new
+    profile version, and it must charge steps in proportion to its work.
+31. **The genesis pins profile and `jsonata`, not accounting.**
+    `Genesis.profile` is unchanged. For `artroom-jsonata-v1` the accounting
+    is always `artroom-act-budget-v1`; a different accounting needs a new
+    profile version.
+32. **Notify reviewers are in the directory, not the rule input.** A
+    `notify` expression cannot read the reviewer list; the `reviewers`
+    target uses the `NotifyDirectory` (R-POL-5).
 
 ## 23. Acceptance cases and the rules they test
 
@@ -1608,8 +1741,13 @@ must pass it.
 | A requests the token with an old lease generation; after its key is revoked; after it is removed; under an expired delegation | Refused `lease-fenced`, `key-revoked`, `not-member`, `delegation-invalid` | R-WS-2 |
 | A token appears in no attention item, update, log entry, `explain`, error or cached response | Verified by scanning every output for the token | R-WS-4 |
 | **Scoped checker, new test.** A checker with inputs `src/**` passed on generation 1. Generation 2 leaves `src/**` unchanged and adds a failing `tests/login.test.ts` | The filtered snapshot contains the new file, so its digest changes; the check reruns and fails; it is not carried | R-CARRY-3, R-CARRY-8, R-CARRY-9 |
+| **Stage-specific land rule.** A land rule blocks when `stage = "reservation"`. Separately, a rule that passes, with state unchanged and then changed between `ready` and reservation | The `land` act is admitted (stage `land`); preparation evaluates stage `reservation`, so the operation fails and never becomes `ready`. With the passing rule, reservation rebuilds byte-equal canonical input and proceeds; after a change such as a new objection, the bytes differ and the operation goes to `retryable` | R-POL-6, R-LAND-4, R-LAND-7 |
 | **Browser join.** A browser key redeems a client-custody invitation | `Joined`; the key is bound at redemption; a second `join` with the same invitation is refused `invitation-invalid`; a `join` by an already-bound key is refused `key-in-use` | R-ADM-3 (c), R-CRED-9 |
-| **MCP redemption.** An agent redeems a room-custody invitation with no credential | `Redeemed`, with a bearer token shown once; the log holds the `join` and the `delegate`, not the token | R-CRED-3, R-CRED-9, R-SEC-5 |
+| **MCP redemption.** An agent redeems a room-custody invitation with no credential | `Redeemed`, with a bearer token shown once; the log holds the `join` (authority `custody: "room"`, key custody `room`) and the `delegate`, not the token; the member's acts are bounded by the session delegation's kinds and lifetime | R-CRED-3, R-CRED-9, R-ADM-12, R-SEC-5 |
+| **Room-custody invitation, self-signed join on `/acts`.** The recipient makes its own key and posts a signed `join` with the invitation's secret to `POST /v1/rooms/:room/acts` | Refused `custody-mismatch`; nothing recorded; the invitation stays unused | R-ADM-12 |
+| **Room-custody invitation, self-signed join over RPC.** The same `join` sent to `RoomWire.submit` | Refused `custody-mismatch`; nothing recorded; the invitation stays unused | R-ADM-12 |
+| **Room-custody invitation, client redemption.** The same `join` sent to `redeem` with `custody: "client"` | Refused `custody-mismatch`; nothing recorded | R-ADM-12, R-CRED-9 |
+| **Client-custody invitation, room redemption.** `redeem` with `custody: "room"` and a client-custody invitation's ID and secret | Refused `custody-mismatch`; no key made; nothing recorded; the invitation stays unused | R-ADM-12, R-CRED-9 |
 | **Unjoined Worker.** A member delegates `check` and `note` to a key that never joined; the Worker signs a `note` under it | Admitted with authority `via: "delegation"`, the grantor as member. After the grantor's key is revoked, the next act is refused `delegation-invalid` | R-ADM-3 (b), R-CRED-4 |
 | **Recovery key.** The recovery key signs `set-role` while no admin can act | Admitted with authority `via: "recovery"` and the flag `recovery-key`; a `claim` signed by it is refused `role-forbids` | R-ADM-3 (d), R-GEN-3 |
 | **Log construction.** A new claim, its `notified` event, and the first two publications | Built in the order of section 20's worked example; `artroom verify` accepts both commits | R-LOG-2, R-LOG-8, R-LOG-12, R-LOG-13 |
@@ -1627,3 +1765,54 @@ it is answered:
 | P1.3 Authority cases, redemption, onboarding | R-ADM-3 split into cases (a)–(d); R-ADM-5; R-GEN-6; R-CRED-1, R-CRED-3, R-CRED-4, R-CRED-5; new R-CRED-9 | `Authority` is a union on `via`; `JoinEnvelope`; `Redemption`, `Joined`, `Redeemed`; `RoomWire.redeem`; `POST /v1/rooms/:room/redeem`; declared `join()`, `redeem()`; refusal `key-in-use` | `onboarding.ts` |
 | P1.4 Workspace credentials | New R-WS-1 to R-WS-5; R-CRED-5; R-API-9 | `WorkspaceDetail` has no token; new `WorkspaceGrant`; `RoomApi.workspaceToken()`; request kind `workspace-token`; MCP `workspace` returns `{ op, grant }`; refusal `workspace-not-ready` | `workspace-visibility.ts`, `demo-loop.ts` |
 | P2.1 Tests as global inputs | R-CARRY-3 list extended | — | Section 23, "Scoped checker, new test" |
+
+## 25. Review d12b67d6
+
+Checker's review of `845c7fd7` found the five earlier findings resolved,
+and one remaining P1.
+
+| Finding | Rules changed or added | Types | Examples |
+|---|---|---|---|
+| P1 Enforce invitation custody at every join | R-ADM-3 (c) adds the custody condition; new R-ADM-12; R-CRED-9 | `AdmissionPath` (internal, never on the wire); `Authority` `join` case gains `custody`; refusal `custody-mismatch`; custody documented on `Invitation`, `Redemption`, `RoomWire.submit` and `POST /acts` | `onboarding.ts`; section 23, four cross-custody cases with the bounded MCP case |
+| Non-blocking: runtime failure wording | R-ADM-9 and R-EVAL-5 name the post-commit `notify` exception of R-LOG-13 | — | — |
+| Non-blocking: Lane E redemption tests | Open point 29 | — | — |
+
+## 26. Policy amendment (81c31bc7)
+
+Checker's approval 81c31bc7 of the policy runtime required these contract
+changes before the Room integrates it. Each is listed with what other
+lanes must change.
+
+| Change | Rules | Types | Who adapts |
+|---|---|---|---|
+| Ownership as pairs | R-EVAL-3 | `PolicyProposal.owners` is `readonly PathOwners[]` (was a map keyed by path); new `PathOwners` | Room: build `owners` as pairs, one per path in `paths` |
+| Lane purpose in rule inputs | R-ADMIN-5 | `PolicyLane.purpose: LanePurpose` (new, required) | Room: set it from `Lane.purpose` |
+| Replay context | R-EVAL-6, new R-EVAL-8, R-LOG-7, R-POL-11 | new `ReplayContext`, `BudgetState`, `Usage`, `NotifyDirectory`, `CarryFactsRecord`; `Decision.input` is the context's digest | Room: retain contexts, not bare inputs; store a notify context with each queued notification |
+| Per-act budget | R-EVAL-2, R-EVAL-4, new R-EVAL-9 | `PolicyProfile` gains `actSteps`, `actInspectedBytes`, `accounting`; `ProfileStamp` gains `accounting` | Room: one meter per act, in order |
+| Pinned active policy | new R-POL-12 | — | Room: pass the immutable document and its version; retain each version |
+| Check carry facts | R-CARRY-6 to 10 | new `CheckCarryFacts` (`before` reuses `CheckBinding` with `input`) | Room, checkers |
+| Retired evidence | R-REV-2 | `NotCarried.code` gains `key-retired`; `Reopened` gains `key-retired` | UI: show the new codes |
+| Sole-admin reopening | R-ADMIN-2 | `Reopened` gains `sole-admin-ended` | Room, UI |
+| Default `dependsOn` | R-CARRY-2 | comment on `CarrySettings.dependsOn` | — |
+| Latest verdict per reviewer | R-POL-7 | comment on the land `RuleInput.reviews` | Room: one entry per qualifying reviewer |
+| Require failure at activation | R-POL-9 | — | Room: block `land` with the recorded refusal |
+| `landInput` | R-LAND-4, R-LAND-7, R-POL-6 | `ready.landInput` is the digest of the retained prospective reservation input; new room-internal `RetainedLandInput` (see "Review 09c01bf9") | Room, landing operation |
+| Kept open | Open points 30 to 32 | — | — |
+
+### Review 09c01bf9
+
+Checker's review of `95fbdefd` kept every change above and found one P1:
+the contract did not say which `stage` preparation evaluates, or how a
+synchronous reservation compares a digest it cannot compute without an
+`await`.
+
+| Finding | Rules changed | Types | Who adapts |
+|---|---|---|---|
+| P1 Prospective reservation input and synchronous comparison | R-POL-6 rewritten; R-LAND-4 step 3; R-LAND-7 compares bytes | New room-internal `RetainedLandInput` (`stage: "reservation"`, `canonical`, `digest`); comments on `RuleInput` `stage` and `ready.landInput`. `ready.landInput` keeps its type, `Digest \| null`, and is now the digest of the retained reservation-stage input | Landing operation (lane B): evaluate stage `reservation` during preparation, retain bytes and digest, compare bytes in the reservation transaction. Room (lane A): evaluate stage `land` at admission |
+
+Acceptance case, added to section 23: a land rule `stage = "reservation"`
+passes the `land` act but fails preparation, so the operation never becomes
+`ready` and the rule cannot be bypassed. With a rule that passes, unchanged
+state rebuilds byte-equal input at reservation, and a change to that state,
+such as a new objection, fails the byte comparison and sends the operation
+to `retryable`.

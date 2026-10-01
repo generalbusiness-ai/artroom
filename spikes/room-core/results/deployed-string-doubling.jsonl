@@ -1,0 +1,2 @@
+{"at":"2026-10-01T16:55Z","request":{"op":"patho","rule":"string-doubling, then $contains","guard":"steps"},"result":{"error":"engine_error","message":"Cannot create property 'position' on string 'RangeError'"},"worker_ms":22}
+{"at":"2026-10-01T16:55Z","request":{"op":"patho","rule":"string-doubling, then $contains","guard":"memo"},"result":{"error":"value_bytes","message":"Value exceeds 1048576 bytes"},"worker_ms":51}

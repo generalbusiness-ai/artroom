@@ -25,6 +25,7 @@ export type PlatformRule =
   | "secret-detected" //        R-SEC-2
   | "invitation-invalid" //     unknown, expired, already used, or the secret does not match (R-GEN-6)
   | "key-in-use" //             a `join` signed by a key that is already bound or revoked (R-ADM-3c)
+  | "custody-mismatch" //       a `join` admitted by a path that does not match the invitation's custody (R-ADM-3c)
   // Lanes and leases (R-LANE)
   | "lane-unknown"
   | "lane-held" //              take-over of a lane that has a holder
