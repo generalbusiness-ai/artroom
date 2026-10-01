@@ -142,6 +142,8 @@ export interface World {
   landingFault: ((point: FaultPoint, op: string) => void) | null;
   /** The runner environment attested now, by checker; none (the default) means checks do not carry. */
   runnerDigest: ((checker: string) => string | null) | null;
+  /** The most one log push may carry; lane L's default when null. */
+  logTransfer: { objects: number; bytes: number } | null;
 }
 
 const worlds = new Map<string, World>();
@@ -180,7 +182,7 @@ function newWorld(): World {
       return host.put(gitObject("commit", encodeCommit({ tree: root, parents: parent ? [parent] : [], author: who, committer: who, message: "not the room\n" })));
     },
   };
-  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, runnerDigest: null };
+  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, runnerDigest: null, logTransfer: null };
   (world as { instrument?: unknown }).instrument = (a: ArtifactsPort): ArtifactsPort =>
     new Proxy(a, {
       get(target, prop, receiver) {
@@ -221,6 +223,9 @@ setServicesFactory((_env, objectId) => {
       // The production log remote, over the fake binding and the fake sandbox's pushLog and readLogRef.
       logRemote: async (loc) => artifactsLogRemote(host.binding as unknown as ArtifactsBinding, host.logStub, loc),
       sleep: async () => {},
+      get logTransfer(): { objects: number; bytes: number } | undefined {
+        return world.logTransfer ?? undefined;
+      },
       bounds: world.bounds,
       wrapArtifacts: (world as unknown as { instrument: (a: ArtifactsPort) => ArtifactsPort }).instrument,
       landingFault: (point, op) => world.landingFault?.(point, op),

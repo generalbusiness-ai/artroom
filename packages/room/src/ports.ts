@@ -228,6 +228,8 @@ export interface Remotes {
   readonly publisher: import("@generalbusiness/artroom-git").PublisherStub;
   /** Lane L's git remote for `refs/artroom/log` on the room's repository. */
   readonly logRemote: (repo: import("./artifacts.ts").RepoLocation) => Promise<import("@generalbusiness/artroom-log").GitRemote>;
+  /** The most one log push may carry (lane L's `maxTransfer`); default lane L's `LOG_TRANSFER_LIMITS`. */
+  readonly logTransfer?: { readonly objects: number; readonly bytes: number } | undefined;
   /** Waits between remote retries. Tests make them instant. */
   readonly sleep?: (ms: number) => Promise<void>;
   /** Diff bounds (R-PROP-6), when not lane B's defaults. */
