@@ -111,3 +111,29 @@ export function globsOverlap(a: Glob, b: Glob): boolean {
   }
   return at(0, 0);
 }
+
+/**
+ * Conservative containment: true only when every path that matches `inner`
+ * also matches `outer`. It may say no wrongly; it never says yes wrongly.
+ * An inner `**` is covered only by an outer `**`. Other inner segments are
+ * read as literal text, so an outer `*` absorbs an inner `*`.
+ */
+export function globCovers(outer: Glob, inner: Glob): boolean {
+  const o = outer.split("/");
+  const n = inner.split("/");
+  const memo = new Map<number, boolean>();
+  function at(i: number, j: number): boolean {
+    const key = i * (n.length + 1) + j;
+    const known = memo.get(key);
+    if (known !== undefined) return known;
+    let result: boolean;
+    if (j === n.length) result = o.slice(i).every((s) => s === "**");
+    else if (i === o.length) result = false;
+    else if (o[i] === "**") result = at(i + 1, j) || at(i, j + 1);
+    else if (n[j] === "**") result = false;
+    else result = segmentMatches(n[j]!, o[i]!) && at(i + 1, j + 1);
+    memo.set(key, result);
+    return result;
+  }
+  return at(0, 0);
+}
