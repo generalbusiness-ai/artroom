@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review lane E revision 4 at exact head 946a52eaf8e056f648f796a796a1e3cab750d006: all 69 artifacts, journal ownership fencing and workspace identity across recovery, with Architecture, Security and Simplification conclusions."}
+{"kind":"artifact","text":"notes/2026-10-01-laneB-token-inflight.md at exact f57b6c8f0830e04a6dcf1ea1bbdcb999abe099c6 on request/laneB-git, under promise git:sha1…1626171 on request git:sha1…0e051fa","body":{"commit":"f57b6c8f0830e04a6dcf1ea1bbdcb999abe099c6","path":"notes/2026-10-01-laneB-token-inflight.md"}}
