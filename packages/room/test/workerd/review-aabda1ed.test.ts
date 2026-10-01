@@ -354,6 +354,21 @@ describe("P1.4: after a policy activation, obligations are re-judged under the n
     expect(p2.notCarried.some((n) => n.code === "policy-rejected")).toBe(true);
   });
 
+  it("a carried verdict is re-qualified under the new requirement even when carry still allows it", async () => {
+    const r = await makeRoom({ policy: policy(requireReview({ id: "rv", paths: "src/**", from: "@bob" })) });
+    const bob = await addMember(r, "@bob", "maintainer");
+    await addMember(r, "@carol", "maintainer");
+    const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    const h1 = pushChange(r, c.lane, { "src/a/x.ts": "1" });
+    await r.admin.ok("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head: h1, summary: "g1" });
+    await bob.ok("review", { lane: c.lane, generation: 1 }, { head: h1, verdict: "approve", scope: ["src/a/**"], text: "ok" });
+    const h2 = pushChange(r, c.lane, { "src/b/y.ts": "2" }, h1);
+    await r.admin.ok("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 1, head: h2, summary: "g2" });
+    expect((await proposal(r, c.lane, 2)).obligations[0]!.state).toBe("met");
+    await activate(r, policy(requireReview({ id: "rv", paths: "src/**", from: "@carol" })));
+    expect((await proposal(r, c.lane, 2)).obligations[0]).toMatchObject({ from: ["@carol"], state: "open", evidence: [] });
+  });
+
   it("a landing prepared before the activation cannot land on the old evidence", async () => {
     const r = await makeRoom({ policy: policy(requireReview({ id: "same-id", paths: "src/**", from: "@bob" })) });
     const bob = await addMember(r, "@bob", "maintainer");
@@ -502,6 +517,8 @@ describe("P2.6: pending workspaces are durable alarm work (R-WS)", () => {
     await r.admin.ok("release", { lane: c.lane }, { lease: 1 });
     await tick(r);
     expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({ state: "failed" });
+    // No fork is created for a lease that has already ended.
+    expect(r.world.artifacts.calls.get("ensureFork") ?? 0).toBe(0);
     expectRefusal(await r.admin.request({ kind: "workspace-token", lane: c.lane, lease: 1 }), "not-holder");
   });
 });
