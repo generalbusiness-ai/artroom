@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d500d4f38a1a62ee8f0a205593501a72cf51b320","text":"Replaced by the review request for exact head fbc73fc7146c391912d4b6d96e10a52b8f423e5c; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"promise","text":"I will independently review the Sandbox spike repairs at fbc73fc7146c391912d4b6d96e10a52b8f423e5c, all 24 artifacts, actual candidate integrity under concurrency and definite versus unknown push outcomes."}
