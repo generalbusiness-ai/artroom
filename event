@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/git/README.md at exact e50b7b7de1d7e99b57a821f2969a13214cb6f2f2 on request/laneB-git, under promise git:sha1…1626171 on request git:sha1…0e051fa","body":{"commit":"e50b7b7de1d7e99b57a821f2969a13214cb6f2f2","path":"packages/git/README.md"}}
+{"kind":"artifact","text":"packages/git/container/Dockerfile at exact e50b7b7de1d7e99b57a821f2969a13214cb6f2f2 on request/laneB-git, under promise git:sha1…1626171 on request git:sha1…0e051fa","body":{"commit":"e50b7b7de1d7e99b57a821f2969a13214cb6f2f2","path":"packages/git/container/Dockerfile"}}
