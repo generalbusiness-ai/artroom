@@ -18,9 +18,10 @@ It depends on `@generalbusiness/artroom-contract` (lane 0) for its types.
 |---|---|---|
 | Landing operation | `src/landing/` | The durable state machine of plan section 8: one SQLite record per landing, reservation in one synchronous transaction, one publication slot, complete-forward recovery, abort attempts |
 | Workspaces | `src/workspace/workspaces.ts` | One Artifacts fork per lane; one write token per lease generation, scoped to the fork and expiring with the lease; revoked on release, expiry or take-over |
-| Pinning and previews | `src/publisher/client.ts` | Copies a proposed head into the canonical repo and pins it at `refs/artroom/heads/<lane>/<generation>`; merge previews |
+| Pinning and previews | `src/publisher/client.ts` | Copies a proposed head into the canonical repo and pins it at `refs/artroom/heads/<lane>/<generation>`; merge previews, with the integration commit the landing would push |
 | Path diffs | `src/diff/treediff.ts` | Changed paths through the Artifacts binding: bounded, cached by tree hash, with merge bases, exact renames, and the overlap test that decides whether a preview needs the sandbox |
 | Publisher sandbox | `src/publisher/container.ts`, `gitops.ts` | A Durable Object that owns a container with git only. Every git command is hardened; no repository code runs |
+| Log push | `src/publisher/container.ts` (`pushLog`), `log-push.ts` | Pushes lane L's log commit to `refs/artroom/log` under a lease and answers with lane L's `PushOutcome` |
 | Gateway and ref fence | `src/publisher/container.ts`, `ref-fence.ts` | The container's only way out. It adds each operation's token and lets a push through only if every ref update is the one that operation allows |
 | Harness Worker | `src/worker.ts`, `wrangler.jsonc` | Worker `artroom-lb-git`: the publisher, plus a key-protected stand-in Room for live tests |
 | Container image | `container/` | `image.sh` copies `alpine/git` into Cloudflare's registry (no Docker needed); `Dockerfile` for machines with Docker |
@@ -36,7 +37,11 @@ accepted → preparing → ready → publishing → landed
 
 - **Preparation runs in parallel.** `prepare` builds the integration commit
   in the publisher sandbox: the head itself if it fast-forwards main,
-  otherwise a merge commit. The commit is stored in the canonical repo at
+  otherwise a merge commit with parents (main, head), the message
+  `Land <lane> generation <g>`, and both dates at the later parent's commit
+  time. Every input is fixed by (main, head, lane, generation), so a
+  preview, a retry and a fresh sandbox all build the same commit. The
+  commit is stored in the canonical repo at
   `refs/artroom/integration/<op>/<attempt>`, so checkers and every later
   push use exactly that commit. The Room then answers `readiness`: are the
   obligations met, and do the land rules pass on the prospective
@@ -113,6 +118,45 @@ the log inside the engine's transaction. After a check arrives, the Room
 calls `await landing.evaluate(op.id)`. `publisher` is `ContainerPublisher` in a Worker, or
 `GitPublisher` over local git in tests. `tokens` is `canonicalTokens(…)`.
 
+## Previews
+
+`Pinning.preview(lane, generation, head)` runs the same planner as the
+landing in the sandbox. A clean answer carries `integration`: the head
+itself when it fast-forwards main, otherwise the merge commit, which the
+preview stores at `refs/artroom/objects/<integration>` (so the preview's
+token is a write token, allowed to create exactly that ref). If main has
+not moved when the operation is prepared, the landing builds and pushes
+that same commit.
+
+## Log push (lane L)
+
+The publisher's `pushLog` is lane L's `GitRemote.push`, as lane A's log
+remote calls it (`LogPushStub`):
+
+```ts
+pushLog({ canonical: { remote, token }, objects: [{ type, data /* unpadded base64url */ }], ref: "refs/artroom/log", next, lease })
+  → { ok: true } | { ok: false, reason: "lease-mismatch", current } | { ok: false, reason: "unknown", detail }
+```
+
+The caller mints a write token of at most 60 seconds and revokes it after.
+The sandbox checks the request (only `refs/artroom/log`, commit IDs, at
+most 100,000 objects and 64 MiB), writes the objects, and sends nothing
+unless `next` is a commit whose only parent is `lease` (none when `lease`
+is null) and whose whole history is present. It then pushes through the
+same lease push as `main`, and the gateway lets through only
+`refs/artroom/log: lease → next`. The answer maps the publisher's push
+outcome conservatively: only a confirmed push is `ok`; a lease refusal
+whose current value was read back is `lease-mismatch`; everything else,
+including a request refused before git, is `unknown`, so lane L reads the
+ref back. Revocation or elapsed time never proves an unresolved push did
+not land.
+
+Reading the ref back: live, the Artifacts binding's
+`log({ ref: "refs/artroom/log" })` returns nothing even when the ref is
+there (it resolves branches, tags and commit IDs). `git ls-remote` with a
+read token sees it, and `readCommit`, `readTree` and `readBlob` read the
+objects by ID.
+
 ## Workspaces
 
 ```ts
@@ -175,6 +219,7 @@ cd packages/git
 npm run typecheck            # wrangler types, then tsc for src and for the Node tests
 npm test                     # Node: real git and node:sqlite
 npm run test:workers         # workerd: Durable Object SQLite, alarms, instance aborts
+npm run test:log             # lane L's LogPublisher and verifier through pushLog (vitest, Node)
 ```
 
 The Node tests build real repositories with git and run the publisher's
@@ -195,9 +240,10 @@ printf 'LB_KEY=%s\n' "$(cat ~/.artroom-lb-key)" > /tmp/lb-secrets
 env -u CLOUDFLARE_API_TOKEN npx wrangler deploy --secrets-file /tmp/lb-secrets
 node measure/live.mjs            # forks, tokens, pinning, diffs, previews, two landings, a conflict, release
 node measure/token-inflight.mjs  # does revoking or expiring a token stop a push in flight?
+node measure/pushlog-live.mjs    # pushLog: two publications, lease mismatches, refusals, read back with git
 ```
 
-Both scripts make their own repos in the `gitseq-spike` namespace, revoke
+The scripts make their own repos in the `gitseq-spike` namespace, revoke
 every token they mint, and delete their repos. Results are saved, with
 tokens redacted, in `measure/results/`.
 
@@ -250,8 +296,9 @@ meanwhile:
    activation re-prepares it. The engine re-prepares for those two, and
    makes the operation `retryable` for every other mismatch.
 7. **A preview decided by paths has no integration.** `PreviewOp.clean`
-   requires `integration`, but when the paths are disjoint no sandbox runs
-   (`previewPlan` returns `disjoint`).
+   requires `integration`. The sandbox preview now carries it, but when
+   the paths are disjoint and main has moved, `previewPlan` alone cannot
+   name the merge commit; the Room must call `Pinning.preview` for it.
 8. **Ref names beyond the pinned ref.** `refs/artroom/objects/<head>` is in
    R-PROP-1; `refs/artroom/integration/<op>/<attempt>` (where an integration
    commit is stored for checkers and for publication) is not in the
