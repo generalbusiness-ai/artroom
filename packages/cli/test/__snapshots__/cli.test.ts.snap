@@ -86,7 +86,7 @@ Next: artroom attention, then artroom land --wait when everything is met."
 
 exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > release 1`] = `
 "Released lane act_3_HASH, with a handover note.
-Removed the workspace credential from this repository."
+Removed the workspace credential for lane act_3_HASH from TMP/repo/.git/artroom/credentials."
 `;
 
 exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > review 1`] = `

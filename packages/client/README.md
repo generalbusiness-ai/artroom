@@ -133,3 +133,14 @@ removed.
 `npm test` runs the Node tests against a fake room (in `test/support`)
 that implements the HTTPS routes and `RoomWire`, and the signing vectors
 inside workerd. Tests name the rules they check.
+
+## Review f7c79158
+
+The checker's third review confirmed the earlier fixes and asked for one
+more change, in the CLI. `packages/cli/test/review-f7c79158.test.ts`
+names each case.
+
+| Finding | Change | Tests |
+|---|---|---|
+| P2 Fence recovered local steps against newer work | Before it is sent, each act records the local change it owns, and the state it expects, with its journal entry (`LocalIntent`). One function, `applyLocal`, makes that change for a fresh answer and a recovered one alike. A claim selects its lane, and a land is followed, only if the selection is still the one expected; otherwise the newer one is kept and the output says so. A release removes only the credential `artroom workspace` wrote for that lane, at the path it recorded. Each credential file names its lane on its first line, so a credential that a newer workspace replaced is kept, wherever the command runs. The room's receipt is still recovered without new authority | cli: "repro 1: an older release, recovered after a newer lane's workspace replaced its credential…", "recovery from another directory removes the released lane's own credential, and only that", "repro 2: an older claim, recovered after a newer claim finished…", "an older landing, recovered after a newer one is followed…"; the crash cases in review-17013617 still pass |
+

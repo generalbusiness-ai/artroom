@@ -35,9 +35,12 @@ artroom release -m "Landed; nothing left."
 ```
 
 `workspace` adds a git remote named `artroom` and writes the write token
-to `.git/artroom/credentials`, readable only by you. The repository config
+to `.git/artroom/credentials`, readable only by you. The file names the
+lane it belongs to, and the CLI records where it wrote it. The repository config
 includes that file, so `git push artroom` sends the token as a header. The
-token is never a command argument and never printed. `release` removes it.
+token is never a command argument and never printed. `release` removes
+that lane's credential, from wherever you run it, and leaves a credential
+that a newer workspace for another lane has written.
 
 `land` records the landing operation it starts. `artroom wait` follows
 that operation (or one you name) until it finishes; it never starts a new
@@ -58,6 +61,9 @@ finish, run the same command again:
 - `redeem` finishes from the saved result, and never sends a one-time
   redemption twice. If the room may have received it but the answer was
   lost, the CLI says to ask for a new invitation;
+- finishing never undoes newer work: if you chose another lane, or
+  started another landing, after the act was sent, the CLI keeps that and
+  says so;
 - an act that failed prints the `--idempotency-key` to use. With it, the
   CLI finishes from the kept answer, or sends the very act it signed
   before, straight to the room. Neither needs a read session or current

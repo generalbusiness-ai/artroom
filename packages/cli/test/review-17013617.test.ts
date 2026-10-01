@@ -11,7 +11,7 @@
  *   the same command, with no preflight and no second act.
  */
 
-import { mkdirSync, readFileSync, rmdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, rmdirSync, rmSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 import { connect } from "@generalbusiness/artroom-client";
@@ -186,8 +186,10 @@ describe("P2: the act journal outlives the local steps after the room's answer",
     const dir = repo();
     await login(home, "@alice");
     await cli(home, ["claim", "src/**", "--goal", "g"], dir);
-    // A credential path that cannot be removed as a file: removal throws.
+    await cli(home, ["workspace"], dir);
+    // The recorded credential path now cannot be read or removed as a file: the local step throws.
     const cred = join(dir, ".git", "artroom", "credentials");
+    rmSync(cred);
     mkdirSync(cred, { recursive: true });
     const argv = ["release", "--idempotency-key", "rel-disk"];
     const first = await cli(home, argv, dir);

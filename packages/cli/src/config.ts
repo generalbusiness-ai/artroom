@@ -26,7 +26,23 @@ export interface RoomConfig {
   invitation?: string;
   /** The landing operation `artroom wait` follows, from the last `land`. */
   landing?: { readonly op: OpId; readonly lane: LaneId };
+  /** Where `artroom workspace` wrote each lane's credential, so `release` removes that one file, wherever it runs. */
+  workspaces?: Record<LaneId, string>;
 }
+
+/**
+ * What an act changes locally once the room answers, and the local state it
+ * expects to find then. Recorded with the act before it is sent, so a
+ * recovery later changes only what this act owns (see `applyLocal` in main.ts).
+ */
+export type LocalIntent =
+  | { readonly kind: "none" }
+  /** `claim`: select the claimed lane, if the selection is still `expect`. */
+  | { readonly kind: "select-lane"; readonly expect: LaneId | null }
+  /** `land`: follow the started landing, if the followed landing is still `expect`. */
+  | { readonly kind: "follow-landing"; readonly expect: OpId | null }
+  /** `release`: forget this lane locally, and remove the credential written for it at `credential`, if it is still that lane's. */
+  | { readonly kind: "release-lane"; readonly lane: LaneId; readonly credential: string | null };
 
 export interface Config {
   current?: RoomId;
@@ -63,6 +79,8 @@ export type JournalEntry =
       /** `prepared`: sent, or about to be, with no answer kept. `answered`: the room's answer is kept; local steps remain. */
       readonly state: "prepared" | "answered";
       readonly prepared: PreparedAct;
+      /** The local change this act owns, fixed before it was sent. */
+      readonly local: LocalIntent;
       readonly result?: unknown;
     }
   | {
