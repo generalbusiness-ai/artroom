@@ -13,7 +13,18 @@ import { evaluateCarry, evaluateLand, evaluateRefuse, evaluateRequire } from "..
 import { validatePolicy } from "../src/validate.ts";
 import { act, active, actor, carryInput, landInput, lane, refuseInput, requireInput, V1, V2 } from "./support/fixtures.ts";
 
-const approve = { reviewer: "@root" as const, role: "admin" as const, verdict: "approve" as const, authors: ["@root" as const] };
+import type { AdminApprovalFacts } from "../src/admin.ts";
+import { judgeInitiator } from "../src/admin.ts";
+
+/** A self-approval by @root, who was an admin at admission, with no revocations. */
+const approve: Omit<AdminApprovalFacts, "activeAdmins"> = {
+  verdict: "approve",
+  admission: { member: "@root", role: "admin" },
+  authors: ["@root"],
+  revoked: {},
+  retiredEvidence: "counts",
+};
+const by = (member: `@${string}`, role: "admin" | "maintainer" | "member" = "admin") => ({ admission: { member, role } });
 
 describe("admin boundary and sole-admin bootstrap (R-ADMIN-1 to 9)", () => {
   test("sole admin changes policy: the self-approval counts and is flagged", () => {
@@ -25,12 +36,42 @@ describe("admin boundary and sole-admin bootstrap (R-ADMIN-1 to 9)", () => {
   });
 
   test("another admin's approval counts without the flag", () => {
-    expect(judgeAdminApproval({ ...approve, reviewer: "@other", activeAdmins: 2 }, "admission")).toMatchObject({ counts: true, flag: null });
+    expect(judgeAdminApproval({ ...approve, ...by("@other"), activeAdmins: 2 }, "admission")).toMatchObject({ counts: true, flag: null });
   });
 
   test("a non-admin cannot meet obl_admin-approval, and an objection is not an approval", () => {
-    expect(judgeAdminApproval({ ...approve, reviewer: "@bob", role: "maintainer", activeAdmins: 1 }, "admission")).toMatchObject({ counts: false, rule: "admin-required" });
+    expect(judgeAdminApproval({ ...approve, ...by("@bob", "maintainer"), activeAdmins: 1 }, "admission")).toMatchObject({ counts: false, rule: "admin-required" });
     expect(judgeAdminApproval({ ...approve, verdict: "object", activeAdmins: 1 }, "admission")).toMatchObject({ counts: false });
+  });
+
+  test("R-REV-1: a non-self admin approval still counts after the reviewer is demoted, removed or retired", () => {
+    // The facts carry only admission authority and key validity; the reviewer's current role is not an input.
+    const other = { ...approve, ...by("@other"), activeAdmins: 1 };
+    expect(judgeAdminApproval(other, "reservation")).toMatchObject({ counts: true, flag: null });
+    expect(judgeAdminApproval({ ...other, revoked: { signer: "retired" } }, "reservation")).toMatchObject({ counts: true });
+  });
+
+  test("R-REV-1: a member's old review cannot become an admin approval after promotion", () => {
+    const old = { ...approve, ...by("@bob", "member"), activeAdmins: 2 };
+    expect(judgeAdminApproval(old, "reservation")).toMatchObject({ counts: false, rule: "admin-required" });
+  });
+
+  test("R-REV-3: a compromised signer or grantor key reopens an admin approval", () => {
+    const other = { ...approve, ...by("@other"), activeAdmins: 2 };
+    expect(judgeAdminApproval({ ...other, revoked: { signer: "compromised" } }, "reservation")).toMatchObject({ counts: false, rule: "evidence-invalid", reopens: true });
+    expect(judgeAdminApproval({ ...other, revoked: { grantor: "compromised" } }, "reservation")).toMatchObject({ counts: false, reopens: true });
+  });
+
+  test("R-REV-2: a retired key reopens the approval only under retiredEvidence: reopens", () => {
+    const other = { ...approve, ...by("@other"), activeAdmins: 2, revoked: { signer: "retired" as const } };
+    expect(judgeAdminApproval(other, "reservation")).toMatchObject({ counts: true });
+    expect(judgeAdminApproval({ ...other, retiredEvidence: "reopens" }, "reservation")).toMatchObject({ counts: false, reopens: true });
+  });
+
+  test("the land initiator's current admin authority is checked separately", () => {
+    expect(judgeInitiator({ member: "@root", role: "admin", active: true })).toEqual({ ok: true });
+    expect(judgeInitiator({ member: "@root", role: "maintainer", active: true })).toMatchObject({ ok: false, rule: "admin-required" });
+    expect(judgeInitiator({ member: "@root", role: "admin", active: false })).toMatchObject({ ok: false });
   });
 
   test("at reservation a flagged approval counts only while there is still exactly one admin", () => {

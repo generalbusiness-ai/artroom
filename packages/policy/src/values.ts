@@ -114,7 +114,8 @@ export function jsonCopy(value: unknown, maxBytes?: number, engineArrays = false
 /** Recorded sizes of the containers in one frozen, owned rule input. */
 export type SizeMemo = WeakMap<object, { readonly bytes: number; readonly height: number }>;
 
-function deepFreeze<T>(value: T): T {
+/** Freeze a value and everything inside it. */
+export function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
     for (const v of Object.values(value)) deepFreeze(v);

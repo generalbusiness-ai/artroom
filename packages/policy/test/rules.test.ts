@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "vitest";
 import { carry, lanes, owners, policy, requireCheck, requireReview, rule } from "../src/helpers.ts";
-import { evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire } from "../src/rules.ts";
+import { evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, replay } from "../src/rules.ts";
 import { actMeter } from "../src/evaluator.ts";
 import { explain } from "../src/explain.ts";
 import { digestJson } from "../src/integrity.ts";
@@ -27,7 +27,7 @@ describe("refuse (R-POL-2)", () => {
     expect(r.refusal).toEqual({ refused: true, rule: "claim-before-propose", reason: "Policy rule claim-before-propose refused this act.", fix: "Claim the paths first." });
     const d = r.evaluations[0]!.decision;
     expect(d).toMatchObject({ rule: "claim-before-propose", kind: "refuse", policy: V1, stamp: STAMP, outcome: { result: "refuse" } });
-    expect(d.input).toBe(await digestJson(r.evaluations[0]!.input));
+    expect(d.input).toBe(await digestJson(r.evaluations[0]!.context as never));
     expect(d.usage.steps).toBeGreaterThan(0);
   });
 
@@ -156,10 +156,10 @@ describe("notify (R-POL-5)", () => {
 });
 
 describe("determinism and replay (R-EVAL-5, R-EVAL-6)", () => {
-  test("replaying the retained input gives identical decisions", async () => {
+  test("replaying the retained context gives identical decisions", async () => {
     const input = requireInput(plan, ["src/api/login.ts", "migrations/001.sql"]);
     const first = await evaluateRequire(active(plan), input);
-    const replayed = await evaluateRequire(active(plan), JSON.parse(JSON.stringify(first.evaluations[0]!.input)));
+    const replayed = await replay(active(plan), JSON.parse(JSON.stringify(first.evaluations[0]!.context)));
     expect(replayed.evaluations.map((e) => e.decision)).toEqual(first.evaluations.map((e) => e.decision));
   });
 
@@ -191,7 +191,7 @@ describe("budgets on Workers (room-core spike 2026-10-01)", () => {
     expect(outcome).toMatchObject({ result: "error", code: "policy-budget-exceeded" });
     expect(outcome.result === "error" && outcome.detail.split(":")[0]).toBe("act_inspection_budget");
     // Pinned: the Node and workerd runs must both give exactly this usage.
-    expect(r.evaluations[0]!.decision.usage).toEqual({ steps: 932, inspectedBytes: 4203669 });
+    expect(r.evaluations[0]!.decision.usage).toEqual({ steps: 775, inspectedBytes: 4200107 });
   });
 
   test("without the act budget, the per-evaluation atseq budget still refuses the cubic rule", async () => {
@@ -240,7 +240,7 @@ describe("explain() data", () => {
       ["check-tests", "obligation"],
       ["review-src-api", "obligation"],
     ]);
-    for (const d of e.decisions) expect(e.inputs[d.input]).toBeDefined();
+    for (const d of e.decisions) expect(e.contexts[d.input]).toBeDefined();
     expect(e.lines).toContain("claim-before-propose did not refuse the act");
     expect(e.invariants).toContainEqual(expect.objectContaining({ rule: "R-PROP-5" }));
   });

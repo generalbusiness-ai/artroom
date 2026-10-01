@@ -75,11 +75,50 @@ Platform code is plain TypeScript. Policy cannot change it (R-POL-10).
   rule input from the room that is not plain JSON. Worker CPU and memory
   limits are runtime failures too; they end the isolate, so nothing is
   written.
-- `notify` runs after the act is sealed (R-LOG-13). If `evaluateNotify`
-  throws, the act stays recorded and the room retries the call before it
-  seals the `notified` entry.
+- `notify` runs after the act is sealed (R-LOG-13), with its own fresh act
+  budget, never the act's meter. The room builds the context once with
+  `notifyContext(input, directory)` and stores it with the queue entry. If
+  evaluation throws, the act stays recorded and the room retries with
+  `replay(policy, context)` before it seals the `notified` entry.
 - A rule that fails is never treated as "did not apply". A failed `require`
   rule refuses the propose and returns no obligations.
+
+## Replay contexts
+
+Every evaluate call first copies and freezes, synchronously, one
+`ReplayContext` (`src/context.ts`). It holds the rule input and every side
+input that decides the outcome:
+
+- the act budget: accounting version (`artroom-act-budget-v1`), limits, and
+  the usage already spent by earlier calls for the same act;
+- the lane purpose, and for `refuse` whether the recovery key signed;
+- for `carry`, the platform facts (key revocation, check binding);
+- for `notify`, the directory that expands roles and reviewers.
+
+`Decision.input` is the SHA-256 digest of the canonical context. The digest,
+the evaluated input and the retained `RuleEvaluation.context` are the same
+owned value, so a caller who changes its objects later, or while the call is
+pending, changes nothing. `replay(policy, context)` reconstructs the call and
+returns the same decisions (R-EVAL-6). `explain()` returns each context by
+its digest.
+
+## Path-safe rule inputs
+
+Ownership in rule inputs is a list of `{ path, owners }` pairs
+(`ProposalInput`, `src/inputs.ts`), not a map keyed by path. Paths are
+string values, never object keys, so legal paths such as `constructor`,
+`prototype`, `_jsonata_cache` and `__proto__` work without widening the
+profile. A rule reads them as `proposal.owners[path = "x"].owners`.
+
+## Admin approval evidence
+
+`judgeAdminApproval` judges whether a review qualified by its recorded
+admission authority, and whether it is still valid by the current state of
+its signer and grantor keys (R-REV-1 to 3). A later demotion, removal, or
+retirement under the default policy does not reopen it; a later promotion
+cannot upgrade a member's review. Only a flagged sole-admin self-approval
+depends on the current number of admins. The land initiator's or recovery
+holder's current admin authority is a separate check, `judgeInitiator`.
 
 ## Configuration-recovery lanes
 
@@ -105,7 +144,11 @@ Three additions come from the room-core spike's measurements on Cloudflare
 
 - **A per-act budget** (`ACT_BUDGET`): 25,000 steps and 4 MiB inspected,
   shared by every rule evaluated for one act. Pass one `actMeter()` to every
-  evaluate call for that act. The per-evaluation budgets still apply.
+  evaluate call for that act, in order. The per-evaluation budgets still
+  apply. The spike estimated 3 to 9 microseconds of deployed CPU per step on
+  the rules it sampled, so 25,000 steps is an estimated 75 to 225 ms for
+  such rules. That is an estimate, not a bound for every program or host.
+  The accounting is versioned and recorded in each replay context.
 - **Measured inputs.** Each rule input is copied, frozen and measured once.
   A rule that reads it again is charged the recorded size without a second
   walk. The charge is exactly what a walk would charge; the corpus's exact
@@ -140,6 +183,8 @@ Artroom's cases:
   budget and interleaving;
 - `test/faults.test.ts`: an injected engine fault in each rule kind gives a
   retryable error that records nothing;
+- `test/review-dd2a995b.test.ts`: checker review dd2a995b's reproductions,
+  asserting the repaired behaviour;
 - `test/helpers.test.ts`: the plan's section 5 policy example, the default
   policy, validation and globs.
 
@@ -181,9 +226,9 @@ cycle.
 These are added in this package or decided here. Each needs a decision in
 the contract.
 
-1. **Per-act budget.** `PolicyProfile` has no per-act budget. `ACT_BUDGET`
-   and the codes `act_step_budget` and `act_inspection_budget` are added
-   here.
+1. **Per-act budget.** See "Required contract changes" below. The codes
+   `act_step_budget` and `act_inspection_budget` are details inside
+   `policy-budget-exceeded`.
 2. **Default `dependsOn`.** The comment on `CarrySettings.dependsOn` says a
    changed path that matches a key adds that key's values. R-CARRY-2 says the
    defaults apply to "the areas of the reviewed scope". This package follows
@@ -195,14 +240,12 @@ the contract.
    returns `reopens: true` with a text.
 5. **Notify targets.** `Decision.outcome.to` holds only members and teams,
    and the notify `RuleInput` has no reviewers. The room passes a
-   `NotifyDirectory` (members by role, and reviewers) to expand `role:`
-   principals, `owners` and `reviewers`.
+   `NotifyDirectory`, which is recorded in the replay context.
 6. **Land reviews.** The land `RuleInput` does not say that `reviews` holds
    each qualifying reviewer's latest verdict. The default `objection-open`
    rule assumes it does.
 7. **Check carry facts.** The carry `RuleInput` has no check binding. The
-   room passes `CarryFacts` (earlier binding, new tree or snapshot, config and
-   runner digests, `volatile`).
+   room passes `CarryFacts`, which are recorded in the replay context.
 8. **Require errors at activation.** An open proposal cannot be refused
    after it is recorded. `activate()` returns a `refusal` for that proposal,
    which should block its landing until a new generation or policy.
@@ -210,11 +253,90 @@ the contract.
    so expressions cannot match globs; `require` rules' `paths` cover the
    common case. If one is added, it must charge steps for its work.
 10. **Lane purpose in rule inputs.** `PolicyLane` has no `purpose`, so the
-    room passes it as an option (`purpose`) rather than in the recorded input.
+    room passes it as an option. It is recorded in the replay context.
 
 Resolved by the contract repair `845c7fd`: tests, fixtures and test and build
 configuration are now platform global inputs (R-CARRY-3). This package uses
 that list verbatim.
+
+## Required contract changes
+
+This branch does not edit `packages/contract`. These shapes are defined in
+this package and should move into the contract:
+
+1. **Path-safe ownership** (review dd2a995b P2.1). In `policy.ts`:
+
+   ```ts
+   export interface PathOwners { readonly path: RepoPath; readonly owners: readonly Principal[] }
+   // PolicyProposal: replace
+   //   readonly owners: Readonly<Record<RepoPath, readonly Principal[]>>;
+   // with
+   readonly owners: readonly PathOwners[]; // one entry per path in `paths`, same order
+   ```
+
+2. **Replay context** (P1.1, P1.2). In `policy.ts`, and change the comment
+   on `Decision.input` to "Digest of the canonical `ReplayContext`; the
+   context itself is retained with the log (R-LOG-7)":
+
+   ```ts
+   export interface Usage { readonly steps: number; readonly inspectedBytes: number }
+   export interface BudgetState {
+     readonly accounting: "artroom-act-budget-v1";
+     readonly limits: Usage;
+     readonly start: Usage; // spent by earlier calls for the same act
+   }
+   export interface NotifyDirectory {
+     readonly roles: Readonly<Partial<Record<Role, readonly MemberId[]>>>;
+     readonly reviewers: readonly MemberId[];
+   }
+   export interface CarryFactsRecord {
+     readonly revoked: RevocationReason | null;
+     readonly check: {
+       readonly before: { readonly integration: Sha; readonly input: CheckInput; readonly config: Digest; readonly runner: Digest };
+       readonly now: { readonly integration: Sha; readonly tree: Sha; readonly snapshot: Digest | null; readonly config: Digest; readonly runner: Digest };
+       readonly volatile: boolean;
+     } | null;
+   }
+   type In<K extends RuleKind> = Extract<RuleInput, { readonly kind: K }>;
+   export type ReplayContext =
+     | { readonly kind: "refuse"; readonly input: In<"refuse">; readonly budget: BudgetState; readonly purpose: LanePurpose; readonly recoveryKey: boolean }
+     | { readonly kind: "require"; readonly input: In<"require">; readonly budget: BudgetState; readonly purpose: LanePurpose }
+     | { readonly kind: "carry"; readonly input: In<"carry">; readonly budget: BudgetState; readonly purpose: LanePurpose; readonly facts: CarryFactsRecord }
+     | { readonly kind: "land"; readonly input: In<"land">; readonly budget: BudgetState; readonly purpose: LanePurpose }
+     | { readonly kind: "notify"; readonly input: In<"notify">; readonly budget: BudgetState; readonly directory: NotifyDirectory };
+   ```
+
+3. **Versioned act budget** (P1.1). Add to `PolicyProfile`, and to
+   R-EVAL-2's table:
+
+   ```ts
+   readonly actSteps: 25_000;
+   readonly actInspectedBytes: 4_194_304;
+   readonly accounting: "artroom-act-budget-v1";
+   ```
+
+   and to `ProfileStamp`: `readonly accounting: "artroom-act-budget-v1";`.
+   Until then, the accounting version and limits are in every replay
+   context, so they are covered by `Decision.input`.
+
+4. **Admin evidence facts** (P1.3). No new contract type is needed: the
+   facts come from `Review.by: Authority` (its `member` and `role`) and the
+   roster's key states. R-ADMIN-2's text could say that only a flagged
+   self-approval depends on the current admin count.
+
+## Review dd2a995b
+
+| Finding | Fix | Tests |
+|---|---|---|
+| P1.1 Hidden budget and directory inputs | One digested `ReplayContext` per call, with budget accounting, limits and starting usage, lane purpose, carry facts and notify directory. `replay()` reconstructs a call. Notify always starts a fresh budget; `notifyContext()` gives the queue a stored context | `test/review-dd2a995b.test.ts` P1.1: default-budget refuse-then-require replay, notify directory replay, notify retry |
+| P1.2 Retained input aliased the caller | The context is copied and frozen synchronously before any await; digest, evaluation and retention use that one value | P1.2: mutation after return and while pending; oversized input still refused and replayed |
+| P1.3 Admin evidence judged by current role | Judged by recorded admission authority and current key validity; `judgeInitiator` checks the initiator now | `test/admin.test.ts`: demotion or retirement still counts, promotion cannot upgrade, compromised signer or grantor reopens, retired under `reopens`, second admin reopens a flagged approval |
+| P2.1 Reserved and prototype path keys | Ownership as `{ path, owners }` pairs; profile unchanged | P2.1: ownership, require, notify, refuse and replay for `constructor`, `prototype`, `_jsonata_cache`, `__proto__` |
+| "At most 225 ms" | Described as an estimate for sampled rules | — |
+
+All of these run in Node and in workerd. The pinned usage of the spike's
+cubic rule changed (775 steps, 4,200,107 bytes, from 932 and 4,203,669),
+because ownership pairs change the input's size.
 
 ## Not done
 

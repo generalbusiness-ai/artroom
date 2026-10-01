@@ -8,13 +8,12 @@ import type {
   PolicyActor,
   PolicyDocument,
   PolicyLane,
-  PolicyProposal,
   PolicyVersion,
   RepoPath,
   Role,
-  RuleInput,
   Sha,
 } from "@generalbusiness/artroom-contract";
+import type { InputOf, ProposalInput } from "../../src/inputs.ts";
 import type { ActivePolicy } from "../../src/rules.ts";
 import type { CarryInput } from "../../src/carry.ts";
 import { ownersFor } from "../../src/rules.ts";
@@ -34,30 +33,30 @@ export function lane(holder: MemberId | null = "@alice", claimed = true): Policy
   return { id: act(10), claimed, holder, scope: ["src/**"], generation: 1 };
 }
 
-export function proposal(doc: PolicyDocument, paths: readonly RepoPath[], generation = 1): PolicyProposal {
+export function proposal(doc: PolicyDocument, paths: readonly RepoPath[], generation = 1): ProposalInput {
   const changed: PathChange[] = paths.map((path) => ({ status: "modified", path }));
   return { generation, head: sha("b"), base: sha("a"), changed, paths, owners: ownersFor(doc, paths) };
 }
 
 export const room = { admins: 1, members: 3 };
 
-export function refuseInput(_doc: PolicyDocument, kind: Extract<RuleInput, { kind: "refuse" }>["act"]["kind"], over: Partial<Extract<RuleInput, { kind: "refuse" }>> = {}): Extract<RuleInput, { kind: "refuse" }> {
+export function refuseInput(_doc: PolicyDocument, kind: InputOf<"refuse">["act"]["kind"], over: Partial<InputOf<"refuse">> = {}): InputOf<"refuse"> {
   return { kind: "refuse", act: { kind, target: null, body: {} }, actor: actor("@alice"), lane: lane(), proposal: null, room, ...over };
 }
 
-export function requireInput(doc: PolicyDocument, paths: readonly RepoPath[]): Extract<RuleInput, { kind: "require" }> {
+export function requireInput(doc: PolicyDocument, paths: readonly RepoPath[]): InputOf<"require"> {
   return { kind: "require", actor: actor("@alice"), lane: lane(), proposal: proposal(doc, paths), room };
 }
 
 export function landInput(
   doc: PolicyDocument,
   paths: readonly RepoPath[],
-  reviews: Extract<RuleInput, { kind: "land" }>["reviews"] = [],
-): Extract<RuleInput, { kind: "land" }> {
+  reviews: InputOf<"land">["reviews"] = [],
+): InputOf<"land"> {
   return { kind: "land", actor: actor("@alice"), lane: lane(), proposal: proposal(doc, paths, 2), obligations: [], reviews, stage: "land" };
 }
 
-export function notifyInput(doc: PolicyDocument, kind: Extract<RuleInput, { kind: "notify" }>["act"]["kind"], paths: readonly RepoPath[] | null): Extract<RuleInput, { kind: "notify" }> {
+export function notifyInput(doc: PolicyDocument, kind: InputOf<"notify">["act"]["kind"], paths: readonly RepoPath[] | null): InputOf<"notify"> {
   return { kind: "notify", act: { id: act(20), kind, target: null, body: {} }, actor: actor("@alice"), lane: lane(), proposal: paths ? proposal(doc, paths) : null };
 }
 

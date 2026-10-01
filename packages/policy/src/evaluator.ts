@@ -148,7 +148,9 @@ export interface Meter {
 
 /**
  * The budget left for one act, shared by every rule evaluated for it.
- * Create one per act with `actMeter()` and pass it to each evaluation.
+ * Create one per act with `actMeter()` and pass it to each evaluate call
+ * for that act. Each call records the meter's state when it starts in its
+ * replay context (context.ts), so it replays alone.
  */
 export interface ActMeter {
   steps: number;
@@ -157,7 +159,7 @@ export interface ActMeter {
 }
 
 export function actMeter(limits: ActMeter["limits"] = ACT_BUDGET): ActMeter {
-  return { steps: 0, inspectedBytes: 0, limits };
+  return { steps: 0, inspectedBytes: 0, limits: { steps: limits.steps, inspectedBytes: limits.inspectedBytes } };
 }
 
 export interface Evaluation {

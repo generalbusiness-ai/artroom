@@ -14,10 +14,10 @@ import type {
   PolicyDocument,
   RepoPath,
   RevocationReason,
-  RuleInput,
   Sha,
 } from "@generalbusiness/artroom-contract";
 import { globsOverlap, matchesAny, matching } from "./glob.ts";
+import type { InputOf } from "./inputs.ts";
 
 /**
  * The platform's global inputs (R-CARRY-3, as revised for review 45431cd9),
@@ -114,7 +114,7 @@ export interface CheckCarryFacts {
   readonly volatile: boolean;
 }
 
-export type CarryInput = Extract<RuleInput, { readonly kind: "carry" }>;
+export type CarryInput = InputOf<"carry">;
 
 /** The outcome of the platform conditions alone. */
 export type PlatformCarry =

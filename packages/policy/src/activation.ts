@@ -15,17 +15,17 @@ import type {
   ObligationId,
   Refusal,
   Reopened,
-  RuleInput,
 } from "@generalbusiness/artroom-contract";
 import type { CarryFacts, CarryInput, Invariant } from "./carry.ts";
 import { actMeter } from "./evaluator.ts";
 import { evaluateCarry, evaluateRequire, type ActivePolicy, type ObligationSpec, type RuleEvaluation } from "./rules.ts";
 import { validatePolicy } from "./validate.ts";
+import type { InputOf } from "./inputs.ts";
 
 export interface OpenProposal {
   readonly lane: LaneId;
   readonly generation: Generation;
-  readonly require: Extract<RuleInput, { readonly kind: "require" }>;
+  readonly require: InputOf<"require">;
   readonly purpose: LanePurpose;
   /** Obligation IDs before activation. */
   readonly obligations: readonly ObligationId[];

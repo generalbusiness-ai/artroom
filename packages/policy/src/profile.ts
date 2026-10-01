@@ -34,13 +34,21 @@ export const STAMP: ProfileStamp = Object.freeze({ profile: PROFILE.id, jsonata:
 
 /**
  * A budget across all rules evaluated for one act, added on top of the
- * per-evaluation budgets above, which stay atseq's. The values come from the
- * room-core spike's deployed measurements (2026-10-01): 3 to 9 microseconds
- * per step on Workers, so 25,000 steps is at most about 225 ms of CPU. A
- * 99-path propose used 2,772 steps across 7 rules. JSONata's own `timeout`
- * option never fires on Workers, so these counts are the only guard.
+ * per-evaluation budgets above, which stay atseq's. The room-core spike
+ * (2026-10-01) estimated 3 to 9 microseconds of deployed CPU per step on
+ * the rules it sampled, so 25,000 steps is an estimated 75 to 225 ms for
+ * those rules. That is an estimate, not a bound for every admitted program
+ * or host. A 99-path propose used 2,772 steps across 7 rules. JSONata's own
+ * `timeout` option never fires on Workers, so these counts are the only
+ * guard.
+ *
+ * The accounting is versioned as `ACCOUNTING` and recorded, with the limits
+ * and the usage already spent, in every replay context (context.ts).
  */
 export const ACT_BUDGET = Object.freeze({
   steps: 25_000,
   inspectedBytes: 4 * 1024 * 1024,
 });
+
+/** The version of the per-act accounting: what is counted, and how calls share it. */
+export const ACCOUNTING = "artroom-act-budget-v1";

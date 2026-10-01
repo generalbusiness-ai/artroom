@@ -8,7 +8,7 @@
 
 import { describe, expect, test, vi } from "vitest";
 import { policy, rule } from "../src/helpers.ts";
-import { evaluateCarry, evaluateLand, evaluateNotify, evaluateRefuse } from "../src/rules.ts";
+import { evaluateCarry, evaluateLand, evaluateNotify, evaluateRefuse, replay } from "../src/rules.ts";
 import { carry } from "../src/helpers.ts";
 import { PolicyRuntimeFailure } from "../src/errors.ts";
 import { active, carryInput, landInput, notifyInput, refuseInput, requireInput } from "./support/fixtures.ts";
@@ -58,7 +58,7 @@ describe("runtime failures record nothing", () => {
     const p = policy(rule({ id: "cubic", on: "propose", refuse: cubic, fix: "x" }));
     const big = refuseInput(p, "propose", { proposal: requireInput(p, Array.from({ length: 150 }, (_, i) => `f${i}`)).proposal });
     const first = await evaluateRefuse(active(p), big);
-    const again = await evaluateRefuse(active(p), JSON.parse(JSON.stringify(first.evaluations[0]!.input)));
+    const again = await replay(active(p), JSON.parse(JSON.stringify(first.evaluations[0]!.context)));
     expect(first.refusal?.rule).toBe("policy-budget-exceeded");
     expect(again.evaluations.map((e) => e.decision)).toEqual(first.evaluations.map((e) => e.decision));
   });
