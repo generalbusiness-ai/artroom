@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, test } from "vitest";
-import type { Digest, PolicyDocument } from "@generalbusiness/artroom-contract";
+import type { Digest, PathChange, PolicyDocument } from "@generalbusiness/artroom-contract";
 import demo from "../../../examples/demo-repo/.artroom/policy.ts";
 import demoJson from "../../../examples/demo-repo/.artroom/policy.json" with { type: "json" };
 import { PACK, starterPolicy } from "../src/pack.ts";
@@ -18,6 +18,7 @@ import { checkerInputs, filterSnapshot } from "../src/carry.ts";
 import { snapshotDigest, type SnapshotEntry } from "../src/integrity.ts";
 import { ACT_BUDGET } from "../src/profile.ts";
 import { matchesAny } from "../src/glob.ts";
+import { ownersFor } from "../src/rules.ts";
 import { act, active, actor, carryInput, lane, landInput, notifyInput, recoveryLane, refuseInput, requireInput, sha } from "./support/fixtures.ts";
 
 const P: PolicyDocument = demo;
@@ -45,43 +46,73 @@ describe("refuse rules", () => {
   const JJ = {
     refused: true,
     rule: "jj-conflicts",
-    reason: "This proposal contains unresolved jj conflicts: it has .jjconflict-base-* or .jjconflict-side-* directories at the root of its tree.",
-    fix: "Resolve the jj conflicts, then propose again.",
+    reason: "This proposal introduces or changes jj conflict data: it adds or modifies .jjconflict-base-* or .jjconflict-side-* paths at the root of its tree.",
+    fix: "Resolve the jj conflicts, so the proposal no longer adds or changes .jjconflict-* paths, then propose again.",
   };
-  const propose = (paths: string[], over: Partial<Parameters<typeof refuseInput>[2]> = {}) =>
-    evaluateRefuse(A, refuseInput(P, "propose", { proposal: requireInput(P, paths).proposal, ...over }));
+  /** A proposal with these changes; `paths` lists old and new paths, as the room builds it (R-PROP-3). */
+  const changes = (changed: PathChange[]) => {
+    const paths = [...new Set(changed.flatMap((c) => (c.status === "renamed" ? [c.from, c.path] : [c.path])))];
+    return { ...requireInput(P, paths).proposal, changed, paths, owners: ownersFor(P, paths) };
+  };
+  const propose = (changed: PathChange[], over: Partial<Parameters<typeof refuseInput>[2]> = {}) =>
+    evaluateRefuse(A, refuseInput(P, "propose", { proposal: changes(changed), ...over }));
+  const conflictTree = [".jjconflict-base-0/src/app.ts", ".jjconflict-side-0/src/app.ts", ".jjconflict-side-1/src/app.ts"];
 
-  test("jj-conflicts: a proposal adding .jjconflict-side-0/ is refused with jj-conflicts, not outside-claim", async () => {
+  test("jj-conflicts: adding new conflict directories is refused with jj-conflicts, not outside-claim", async () => {
     // The lane claims src/**, so R-PROP-4 would refuse these paths as outside-claim. For propose,
     // refuse rules run before the claim check (R-ADM-1 step 8), so the author sees the real cause.
     const claim = lane().scope;
-    for (const paths of [
-      [".jjconflict-side-0/src/app.ts"],
-      ["src/app.ts", ".jjconflict-base-0/src/app.ts", ".jjconflict-side-0/src/app.ts", ".jjconflict-side-1/src/app.ts"],
-      [".jjconflict-base-12/README.md"],
-    ]) {
-      expect(paths.some((p) => !matchesAny(p, claim)), paths.join()).toBe(true);
-      const r = await propose(paths);
-      expect(r.refusal, paths.join()).toEqual(JJ);
-      expect(r.refusal?.rule).not.toBe("outside-claim");
+    for (const changed of [
+      [{ status: "added", path: ".jjconflict-side-0/src/app.ts" }],
+      [{ status: "modified", path: "src/app.ts" }, ...conflictTree.map((path) => ({ status: "added", path }) as const)],
+      [{ status: "added", path: ".jjconflict-base-12/README.md" }],
+    ] satisfies PathChange[][]) {
+      const label = changed.map((c) => c.path).join();
+      expect(changed.some((c) => !matchesAny(c.path, claim)), label).toBe(true);
+      const r = await propose(changed);
+      expect(r.refusal, label).toEqual(JJ);
     }
   });
 
+  test("jj-conflicts: modifying an existing conflict file, or renaming a file into a conflict directory, is refused", async () => {
+    expect((await propose([{ status: "modified", path: ".jjconflict-side-1/src/app.ts" }])).refusal).toEqual(JJ);
+    expect((await propose([{ status: "renamed", from: "src/app.ts", path: ".jjconflict-side-0/src/app.ts" }])).refusal).toEqual(JJ);
+  });
+
+  test("jj-conflicts: removing all conflict data from an imported conflict tree is accepted", async () => {
+    // A clean child of a conflicted head: the conflict directories are deleted and the resolved file is written.
+    const r = await propose([...conflictTree.map((path) => ({ status: "deleted", path }) as const), { status: "modified", path: "src/app.ts" }]);
+    expect(r.refusal).toBeNull();
+  });
+
+  test("jj-conflicts: renaming a file out of a conflict directory is accepted", async () => {
+    const r = await propose([{ status: "renamed", from: ".jjconflict-side-0/src/app.ts", path: "src/app.ts" }, { status: "deleted", path: ".jjconflict-base-0/src/app.ts" }]);
+    expect(r.refusal).toBeNull();
+  });
+
+  test("jj-conflicts, known limit: an unrelated change on top of untouched conflict data is accepted", async () => {
+    // The conflict directories are in the head but not in the changes, so the rule cannot see them.
+    // A whole-head check needs a Room-owned fact about the head's root entries (docs/policy-pack.md).
+    const r = await propose([{ status: "modified", path: "docs/guide.md" }]);
+    expect(r.refusal).toBeNull();
+  });
+
   test("jj-conflicts: fires first among the pack's refuse rules, even on an unclaimed lane", async () => {
-    const r = await propose([".jjconflict-side-0/src/app.ts"], { lane: lane(null, false) });
+    const r = await propose([{ status: "added", path: ".jjconflict-side-0/src/app.ts" }], { lane: lane(null, false) });
     expect(r.refusal).toEqual(JJ);
     expect(r.evaluations.map((e) => e.decision.rule)).toEqual(["jj-conflicts"]);
   });
 
   test("jj-conflicts: a name that merely contains jjconflict below the root, or lacks the prefix at the root, is not refused", async () => {
-    for (const paths of [
-      ["src/.jjconflict-side-0/app.ts"],
-      ["docs/jjconflict-notes.md", "src/a.jjconflict-base-1.ts"],
-      ["jjconflict-side-0/app.ts", ".jjconflict/app.ts", ".jjconflict-left-0/app.ts"],
-    ]) {
-      const r = await propose(paths);
-      expect(r.refusal, paths.join()).toBeNull();
+    for (const path of ["src/.jjconflict-side-0/app.ts", "docs/jjconflict-notes.md", "src/a.jjconflict-base-1.ts", "jjconflict-side-0/app.ts", ".jjconflict/app.ts", ".jjconflict-left-0/app.ts"]) {
+      for (const status of ["added", "modified"] as const) expect((await propose([{ status, path }])).refusal, `${status} ${path}`).toBeNull();
     }
+  });
+
+  test("jj-conflicts: a configuration-recovery lane still skips policy", async () => {
+    const r = await propose([{ status: "added", path: ".jjconflict-side-0/.artroom/policy.json" }], { lane: recoveryLane(), actor: actor("@root", "admin") });
+    expect(r.refusal).toBeNull();
+    expect(r.evaluations).toEqual([]);
   });
 
   test("claim-before-propose: refuses an unclaimed lane, passes a claimed one", async () => {
@@ -310,11 +341,11 @@ describe("budget: the pack on a 500-path proposal", () => {
 
 /** Measured on Node and workerd; both runs must give exactly these (docs/policy-pack.md). */
 /** Propose at 1,461 paths: jj-conflicts and claim-before-propose. */
-const LARGEST_PROPOSE = { steps: 11700, inspectedBytes: 413749 };
+const LARGEST_PROPOSE = { steps: 14622, inspectedBytes: 511636 };
 
 const MEASURED = {
-  propose: { steps: 4012, inspectedBytes: 139286 },
-  jjConflicts: { steps: 4007, inspectedBytes: 139159 },
+  propose: { steps: 5012, inspectedBytes: 172286 },
+  jjConflicts: { steps: 5007, inspectedBytes: 172159 },
   land: { steps: 3546, inspectedBytes: 148055 },
   reservation: { steps: 3546, inspectedBytes: 148055 },
   freshApproval: { steps: 3532, inspectedBytes: 147708 },

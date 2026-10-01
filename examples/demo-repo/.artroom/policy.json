@@ -34,13 +34,13 @@
     {
       "id": "jj-conflicts",
       "kind": "refuse",
-      "description": "A proposal must not contain unresolved jj conflicts, which jj pushes as .jjconflict-* directories.",
+      "description": "A proposal must not introduce or change jj conflict data: .jjconflict-base-* or .jjconflict-side-* paths at the tree root.",
       "on": [
         "propose"
       ],
-      "refuse": "$count(proposal.paths[$substring($, 0, 12) = \".jjconflict-\" and $substring($, 12, 5) in [\"base-\", \"side-\"]]) > 0",
-      "reason": "This proposal contains unresolved jj conflicts: it has .jjconflict-base-* or .jjconflict-side-* directories at the root of its tree.",
-      "fix": "Resolve the jj conflicts, then propose again."
+      "refuse": "$count(proposal.changed[$substring(path, 0, 12) = \".jjconflict-\" and $substring(path, 12, 5) in [\"base-\", \"side-\"] and status != \"deleted\"]) > 0",
+      "reason": "This proposal introduces or changes jj conflict data: it adds or modifies .jjconflict-base-* or .jjconflict-side-* paths at the root of its tree.",
+      "fix": "Resolve the jj conflicts, so the proposal no longer adds or changes .jjconflict-* paths, then propose again."
     },
     {
       "id": "claim-before-propose",

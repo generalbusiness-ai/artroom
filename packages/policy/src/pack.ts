@@ -19,10 +19,16 @@ import { globCovers } from "./glob.ts";
 // ------------------------------------------------------------------ refuse
 
 /**
- * Refuse a proposal that contains jj conflict directories. jj stores a
+ * Refuse a proposal that introduces or changes jj conflict data. jj stores a
  * conflicted commit, pushed with `--allow-conflicts`, as a Git tree with
  * `.jjconflict-base-*` and `.jjconflict-side-*` directories at its root.
- * The proposal paths are matched by prefix, so only the tree root counts.
+ * The rule reads `proposal.changed`: an added or modified path, or a rename
+ * destination, that starts with one of those prefixes. Deletions and rename
+ * sources do not count, so removing conflict data is never refused.
+ *
+ * It does not prove the head is conflict-free: conflict data that the
+ * proposal leaves untouched is not in its changes. That would need a
+ * Room-owned, bounded fact about the head's root entries (docs/policy-pack.md).
  * For `propose`, refuse rules run before the claim check (R-ADM-1), so the
  * author sees this cause, not `outside-claim`.
  */
@@ -30,11 +36,12 @@ export const jjConflicts = (): PolicyPart =>
   rule({
     id: "jj-conflicts",
     kind: "refuse",
-    description: "A proposal must not contain unresolved jj conflicts, which jj pushes as .jjconflict-* directories.",
+    description: "A proposal must not introduce or change jj conflict data: .jjconflict-base-* or .jjconflict-side-* paths at the tree root.",
     on: ["propose"],
-    refuse: '$count(proposal.paths[$substring($, 0, 12) = ".jjconflict-" and $substring($, 12, 5) in ["base-", "side-"]]) > 0',
-    reason: "This proposal contains unresolved jj conflicts: it has .jjconflict-base-* or .jjconflict-side-* directories at the root of its tree.",
-    fix: "Resolve the jj conflicts, then propose again.",
+    refuse:
+      '$count(proposal.changed[$substring(path, 0, 12) = ".jjconflict-" and $substring(path, 12, 5) in ["base-", "side-"] and status != "deleted"]) > 0',
+    reason: "This proposal introduces or changes jj conflict data: it adds or modifies .jjconflict-base-* or .jjconflict-side-* paths at the root of its tree.",
+    fix: "Resolve the jj conflicts, so the proposal no longer adds or changes .jjconflict-* paths, then propose again.",
   });
 
 /** Refuse a proposal on a lane nobody has claimed. */

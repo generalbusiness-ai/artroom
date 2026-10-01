@@ -376,9 +376,9 @@ The first failing step decides the outcome.
 
 For `propose`, `refuse` rules run before the claim check so that a rule
 can name a cause that would otherwise show only as `outside-claim`, such
-as jj conflict directories at the root of the tree. Moving them earlier
-only adds refusals: every platform invariant is still checked, and a
-configuration-recovery lane still skips them. They share the act's budget
+as a proposal that adds jj conflict directories at the root of the tree.
+Moving them earlier only adds refusals: every platform invariant is still
+checked, and a configuration-recovery lane still skips them. They share the act's budget
 meter with the `require` rules that follow (R-EVAL-9).
 
 Admission is the act's place in the room's order. The room clock at
@@ -2399,3 +2399,9 @@ Under R-ADM-1 as written, platform invariants (step 8) ran before policy
 | Change | Rules | Types | Who adapts |
 |---|---|---|---|
 | For `propose`, `refuse` rules run inside step 8: after R-PROP-1, R-PROP-3 and R-PROP-6, before R-PROP-4 and the remaining invariants. `require` rules stay at step 9 | R-ADM-1 | — | Room (lane A): evaluate `refuse` rules for `propose` before the claim check, with the same act meter as `require` |
+
+Not part of this amendment: the rule sees only the proposal's changes, so
+conflict data left untouched on the lane's base is not refused. A check of
+the whole head would need a Room-owned, bounded fact about the proposed
+head's root entries in the `refuse` rule input. That is a candidate for a
+later amendment.
