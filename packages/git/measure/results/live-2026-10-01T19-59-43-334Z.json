@@ -1,0 +1,788 @@
+{
+  "steps": [
+    {
+      "route": "create",
+      "status": 200,
+      "clientMs": 2710,
+      "result": {
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra.git",
+        "ms": 2260
+      }
+    },
+    {
+      "route": "init",
+      "status": 200,
+      "clientMs": 431,
+      "result": {
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra.git",
+        "main": "d6826290c840c7ba8e6ad7eee8b521e072ba0d21",
+        "revoked": 1,
+        "ms": 226
+      }
+    },
+    {
+      "route": "workspace",
+      "status": 200,
+      "clientMs": 1882,
+      "result": {
+        "view": {
+          "id": "op_ws_act_1001_abcdef01_1",
+          "kind": "workspace",
+          "lane": "act_1001_abcdef01",
+          "updatedAt": "2026-10-01T19:59:05.177Z",
+          "state": "ready",
+          "detail": {
+            "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra--act_1001_abcdef01.git",
+            "leaseGeneration": 1
+          }
+        },
+        "grant": {
+          "op": "op_ws_act_1001_abcdef01_1",
+          "lane": "act_1001_abcdef01",
+          "leaseGeneration": 1,
+          "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra--act_1001_abcdef01.git",
+          "token": "<token>",
+          "expiresAt": "2026-10-01T20:13:58.246Z"
+        },
+        "fork": "artroom-lb-live-mupyj8ra--act_1001_abcdef01",
+        "ms": 1766
+      }
+    },
+    {
+      "route": "workspace",
+      "status": 200,
+      "clientMs": 1729,
+      "result": {
+        "view": {
+          "id": "op_ws_act_1002_abcdef02_1",
+          "kind": "workspace",
+          "lane": "act_1002_abcdef02",
+          "updatedAt": "2026-10-01T19:59:08.230Z",
+          "state": "ready",
+          "detail": {
+            "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra--act_1002_abcdef02.git",
+            "leaseGeneration": 1
+          }
+        },
+        "grant": {
+          "op": "op_ws_act_1002_abcdef02_1",
+          "lane": "act_1002_abcdef02",
+          "leaseGeneration": 1,
+          "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra--act_1002_abcdef02.git",
+          "token": "<token>",
+          "expiresAt": "2026-10-01T20:14:01.279Z"
+        },
+        "fork": "artroom-lb-live-mupyj8ra--act_1002_abcdef02",
+        "ms": 1615
+      }
+    },
+    {
+      "route": "workspace",
+      "status": 200,
+      "clientMs": 1956,
+      "result": {
+        "view": {
+          "id": "op_ws_act_1003_abcdef03_1",
+          "kind": "workspace",
+          "lane": "act_1003_abcdef03",
+          "updatedAt": "2026-10-01T19:59:11.264Z",
+          "state": "ready",
+          "detail": {
+            "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra--act_1003_abcdef03.git",
+            "leaseGeneration": 1
+          }
+        },
+        "grant": {
+          "op": "op_ws_act_1003_abcdef03_1",
+          "lane": "act_1003_abcdef03",
+          "leaseGeneration": 1,
+          "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra--act_1003_abcdef03.git",
+          "token": "<token>",
+          "expiresAt": "2026-10-01T20:14:04.296Z"
+        },
+        "fork": "artroom-lb-live-mupyj8ra--act_1003_abcdef03",
+        "ms": 1856
+      }
+    },
+    {
+      "route": "propose",
+      "status": 200,
+      "clientMs": 3088,
+      "result": {
+        "pinned": [
+          {
+            "kind": "pinned",
+            "already": false
+          },
+          {
+            "kind": "pinned",
+            "already": false
+          }
+        ],
+        "diff": {
+          "kind": "ok",
+          "changes": [
+            {
+              "status": "modified",
+              "path": "src/a.txt"
+            }
+          ],
+          "stats": {
+            "treeReads": 4,
+            "cacheHits": 0,
+            "entries": 48,
+            "commitReads": 3
+          },
+          "bases": [
+            "d6826290c840c7ba8e6ad7eee8b521e072ba0d21"
+          ]
+        },
+        "plan": "disjoint",
+        "preview": null,
+        "ms": {
+          "pinObjects": 2447,
+          "pinRef": 397,
+          "diff": 46,
+          "plan": 32,
+          "preview": 0,
+          "total": 2981
+        }
+      }
+    },
+    {
+      "route": "propose",
+      "status": 200,
+      "clientMs": 1986,
+      "result": {
+        "pinned": [
+          {
+            "kind": "pinned",
+            "already": false
+          },
+          {
+            "kind": "pinned",
+            "already": false
+          }
+        ],
+        "diff": {
+          "kind": "ok",
+          "changes": [
+            {
+              "status": "modified",
+              "path": "src/b.txt"
+            }
+          ],
+          "stats": {
+            "treeReads": 2,
+            "cacheHits": 2,
+            "entries": 48,
+            "commitReads": 3
+          },
+          "bases": [
+            "d6826290c840c7ba8e6ad7eee8b521e072ba0d21"
+          ]
+        },
+        "plan": "disjoint",
+        "preview": null,
+        "ms": {
+          "pinObjects": 1207,
+          "pinRef": 521,
+          "diff": 79,
+          "plan": 44,
+          "preview": 0,
+          "total": 1921
+        }
+      }
+    },
+    {
+      "route": "propose",
+      "status": 200,
+      "clientMs": 905,
+      "result": {
+        "refused": {
+          "kind": "head-unknown"
+        },
+        "ms": 862
+      }
+    },
+    {
+      "route": "land",
+      "status": 200,
+      "clientMs": 1084,
+      "result": {
+        "op": {
+          "id": "op_land_act_1001_abcdef01_1",
+          "kind": "land",
+          "updatedAt": "2026-10-01T19:59:19.669Z",
+          "lane": "act_1001_abcdef01",
+          "generation": 1,
+          "head": "8052b6efc61986779cea0df5c169785d3755cbc1",
+          "act": "act_900001_00000000",
+          "leaseGeneration": 1,
+          "expectedMain": "d6826290c840c7ba8e6ad7eee8b521e072ba0d21",
+          "policyVersion": "act_0_00000000",
+          "attempts": 1,
+          "integration": "8052b6efc61986779cea0df5c169785d3755cbc1",
+          "evidence": [],
+          "publication": 1,
+          "reservedAt": 1,
+          "state": "landed",
+          "receipt": "act_2_7343b2e8"
+        },
+        "reserve": {
+          "kind": "reserved",
+          "publication": 1,
+          "reservedAt": 1
+        },
+        "ms": {
+          "prepare": 440,
+          "publish": 503,
+          "total": 987
+        }
+      }
+    },
+    {
+      "route": "land",
+      "status": 200,
+      "clientMs": 141,
+      "result": {
+        "op": {
+          "id": "op_land_act_1002_abcdef02_1",
+          "kind": "land",
+          "updatedAt": "2026-10-01T19:59:19.792Z",
+          "lane": "act_1002_abcdef02",
+          "generation": 1,
+          "head": "3afde30a94584185f08bd6e0900f1224412c6acd",
+          "act": "act_900001_00000000",
+          "leaseGeneration": 1,
+          "expectedMain": "8052b6efc61986779cea0df5c169785d3755cbc1",
+          "policyVersion": "act_0_00000000",
+          "attempts": 0,
+          "state": "accepted"
+        },
+        "ms": 35
+      }
+    },
+    {
+      "route": "view",
+      "status": 200,
+      "clientMs": 40,
+      "result": {
+        "op": {
+          "id": "op_land_act_1002_abcdef02_1",
+          "kind": "land",
+          "updatedAt": "2026-10-01T19:59:20.684Z",
+          "lane": "act_1002_abcdef02",
+          "generation": 1,
+          "head": "3afde30a94584185f08bd6e0900f1224412c6acd",
+          "act": "act_900001_00000000",
+          "leaseGeneration": 1,
+          "expectedMain": "8052b6efc61986779cea0df5c169785d3755cbc1",
+          "policyVersion": "act_0_00000000",
+          "attempts": 1,
+          "integration": "b45ad5cf70651eaa5bcd36042daa252fa56733c2",
+          "evidence": [],
+          "publication": 2,
+          "reservedAt": 3,
+          "state": "publishing",
+          "pushes": 1
+        },
+        "slot": {
+          "state": "held",
+          "op": "op_land_act_1002_abcdef02_1",
+          "publication": 2,
+          "reservedAt": 3
+        },
+        "status": {
+          "op": "op_land_act_1002_abcdef02_1",
+          "lane": "act_1002_abcdef02",
+          "state": "publishing",
+          "publication": 2,
+          "reservedAt": 3,
+          "integration": "b45ad5cf70651eaa5bcd36042daa252fa56733c2",
+          "expectedMain": "8052b6efc61986779cea0df5c169785d3755cbc1",
+          "since": null,
+          "readBack": null,
+          "unexpectedWriter": false,
+          "aborting": false,
+          "pushes": [
+            {
+              "n": 1,
+              "outcome": "in-flight-or-lost",
+              "tokenRevoked": false
+            }
+          ],
+          "nextAttemptAt": "2026-10-01T19:59:21.595Z",
+          "lastError": null
+        },
+        "active": [
+          {
+            "id": "op_land_act_1002_abcdef02_1",
+            "kind": "land",
+            "updatedAt": "2026-10-01T19:59:20.684Z",
+            "lane": "act_1002_abcdef02",
+            "generation": 1,
+            "head": "3afde30a94584185f08bd6e0900f1224412c6acd",
+            "act": "act_900001_00000000",
+            "leaseGeneration": 1,
+            "expectedMain": "8052b6efc61986779cea0df5c169785d3755cbc1",
+            "policyVersion": "act_0_00000000",
+            "attempts": 1,
+            "integration": "b45ad5cf70651eaa5bcd36042daa252fa56733c2",
+            "evidence": [],
+            "publication": 2,
+            "reservedAt": 3,
+            "state": "publishing",
+            "pushes": 1
+          }
+        ]
+      }
+    },
+    {
+      "route": "view",
+      "status": 200,
+      "clientMs": 44,
+      "result": {
+        "op": {
+          "id": "op_land_act_1002_abcdef02_1",
+          "kind": "land",
+          "updatedAt": "2026-10-01T19:59:21.082Z",
+          "lane": "act_1002_abcdef02",
+          "generation": 1,
+          "head": "3afde30a94584185f08bd6e0900f1224412c6acd",
+          "act": "act_900001_00000000",
+          "leaseGeneration": 1,
+          "expectedMain": "8052b6efc61986779cea0df5c169785d3755cbc1",
+          "policyVersion": "act_0_00000000",
+          "attempts": 1,
+          "integration": "b45ad5cf70651eaa5bcd36042daa252fa56733c2",
+          "evidence": [],
+          "publication": 2,
+          "reservedAt": 3,
+          "state": "landed",
+          "receipt": "act_4_dc5585e7"
+        },
+        "slot": {
+          "state": "free",
+          "last": 2
+        },
+        "status": null,
+        "active": []
+      }
+    },
+    {
+      "route": "propose",
+      "status": 200,
+      "clientMs": 2285,
+      "result": {
+        "pinned": [
+          {
+            "kind": "pinned",
+            "already": false
+          },
+          {
+            "kind": "pinned",
+            "already": false
+          }
+        ],
+        "diff": {
+          "kind": "ok",
+          "changes": [
+            {
+              "status": "modified",
+              "path": "src/a.txt"
+            }
+          ],
+          "stats": {
+            "treeReads": 2,
+            "cacheHits": 2,
+            "entries": 48,
+            "commitReads": 6
+          },
+          "bases": [
+            "d6826290c840c7ba8e6ad7eee8b521e072ba0d21"
+          ]
+        },
+        "plan": "overlap",
+        "preview": {
+          "kind": "conflict",
+          "base": "b45ad5cf70651eaa5bcd36042daa252fa56733c2",
+          "paths": [
+            "src/a.txt"
+          ]
+        },
+        "ms": {
+          "pinObjects": 1019,
+          "pinRef": 424,
+          "diff": 100,
+          "plan": 89,
+          "preview": 455,
+          "total": 2154
+        }
+      }
+    },
+    {
+      "route": "land",
+      "status": 200,
+      "clientMs": 562,
+      "result": {
+        "op": {
+          "id": "op_land_act_1003_abcdef03_1",
+          "kind": "land",
+          "updatedAt": "2026-10-01T19:59:26.408Z",
+          "lane": "act_1003_abcdef03",
+          "generation": 1,
+          "head": "3f4f823f3491bee5ef328964a7e79c033296911b",
+          "act": "act_900001_00000000",
+          "leaseGeneration": 1,
+          "expectedMain": "b45ad5cf70651eaa5bcd36042daa252fa56733c2",
+          "policyVersion": "act_0_00000000",
+          "attempts": 1,
+          "state": "failed",
+          "reason": {
+            "code": "conflict",
+            "paths": [
+              "src/a.txt"
+            ]
+          },
+          "receipt": "act_5_2330b86a"
+        },
+        "reserve": {
+          "kind": "not-ready",
+          "state": "failed"
+        },
+        "ms": {
+          "prepare": 442,
+          "publish": 0,
+          "total": 498
+        }
+      }
+    },
+    {
+      "route": "workspace",
+      "status": 200,
+      "clientMs": 2319,
+      "result": {
+        "view": {
+          "id": "op_ws_act_1004_abcdef04_1",
+          "kind": "workspace",
+          "lane": "act_1004_abcdef04",
+          "updatedAt": "2026-10-01T19:59:28.763Z",
+          "state": "ready",
+          "detail": {
+            "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra--act_1004_abcdef04.git",
+            "leaseGeneration": 1
+          }
+        },
+        "grant": {
+          "op": "op_ws_act_1004_abcdef04_1",
+          "lane": "act_1004_abcdef04",
+          "leaseGeneration": 1,
+          "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-live-mupyj8ra--act_1004_abcdef04.git",
+          "token": "<token>",
+          "expiresAt": "2026-10-01T20:14:20.802Z"
+        },
+        "fork": "artroom-lb-live-mupyj8ra--act_1004_abcdef04",
+        "ms": 2288
+      }
+    },
+    {
+      "route": "propose",
+      "status": 200,
+      "clientMs": 2213,
+      "result": {
+        "pinned": [
+          {
+            "kind": "pinned",
+            "already": false
+          },
+          {
+            "kind": "pinned",
+            "already": false
+          }
+        ],
+        "diff": {
+          "kind": "ok",
+          "changes": [
+            {
+              "status": "modified",
+              "path": "pkg0/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg1/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg10/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg11/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg12/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg13/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg14/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg15/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg16/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg17/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg18/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg19/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg2/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg3/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg4/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg5/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg6/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg7/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg8/f0.txt"
+            },
+            {
+              "status": "modified",
+              "path": "pkg9/f0.txt"
+            }
+          ],
+          "stats": {
+            "treeReads": 41,
+            "cacheHits": 1,
+            "entries": 1044,
+            "commitReads": 5
+          },
+          "bases": [
+            "b45ad5cf70651eaa5bcd36042daa252fa56733c2"
+          ]
+        },
+        "plan": "disjoint",
+        "preview": null,
+        "ms": {
+          "pinObjects": 1385,
+          "pinRef": 416,
+          "diff": 145,
+          "plan": 54,
+          "preview": 0,
+          "total": 2047
+        }
+      }
+    },
+    {
+      "route": "diff",
+      "status": 200,
+      "clientMs": 276,
+      "result": {
+        "kind": "ok",
+        "changes": 22,
+        "stats": {
+          "treeReads": 44,
+          "cacheHits": 0,
+          "entries": 1048,
+          "commitReads": 6
+        },
+        "bound": null,
+        "ms": 176
+      }
+    },
+    {
+      "route": "diff",
+      "status": 200,
+      "clientMs": 127,
+      "result": {
+        "kind": "ok",
+        "changes": 22,
+        "stats": {
+          "treeReads": 0,
+          "cacheHits": 44,
+          "entries": 1048,
+          "commitReads": 6
+        },
+        "bound": null,
+        "ms": 60
+      }
+    },
+    {
+      "route": "diff",
+      "status": 200,
+      "clientMs": 175,
+      "result": {
+        "kind": "too-large",
+        "changes": null,
+        "stats": {
+          "treeReads": 12,
+          "cacheHits": 0,
+          "entries": 144,
+          "commitReads": 6
+        },
+        "bound": "entries",
+        "ms": 94
+      }
+    },
+    {
+      "route": "release",
+      "status": 200,
+      "clientMs": 463,
+      "result": {
+        "invalidated": [],
+        "cleanupOwed": 0,
+        "after": null,
+        "ms": 429
+      }
+    },
+    {
+      "route": "log",
+      "status": 200,
+      "clientMs": 45,
+      "result": {
+        "0": {
+          "seq": 1,
+          "act": "act_1_50cbeaa0",
+          "event": {
+            "type": "land-reserved",
+            "op": "op_land_act_1001_abcdef01_1",
+            "lane": "act_1001_abcdef01",
+            "generation": 1,
+            "integration": "8052b6efc61986779cea0df5c169785d3755cbc1",
+            "expectedMain": "d6826290c840c7ba8e6ad7eee8b521e072ba0d21",
+            "evidence": [],
+            "publication": 1
+          }
+        },
+        "1": {
+          "seq": 2,
+          "act": "act_2_7343b2e8",
+          "event": {
+            "type": "land-outcome",
+            "op": "op_land_act_1001_abcdef01_1",
+            "outcome": {
+              "state": "landed",
+              "commit": "8052b6efc61986779cea0df5c169785d3755cbc1",
+              "publication": 1
+            }
+          }
+        },
+        "2": {
+          "seq": 3,
+          "act": "act_3_fe42b1b4",
+          "event": {
+            "type": "land-reserved",
+            "op": "op_land_act_1002_abcdef02_1",
+            "lane": "act_1002_abcdef02",
+            "generation": 1,
+            "integration": "b45ad5cf70651eaa5bcd36042daa252fa56733c2",
+            "expectedMain": "8052b6efc61986779cea0df5c169785d3755cbc1",
+            "evidence": [],
+            "publication": 2
+          }
+        },
+        "3": {
+          "seq": 4,
+          "act": "act_4_dc5585e7",
+          "event": {
+            "type": "land-outcome",
+            "op": "op_land_act_1002_abcdef02_1",
+            "outcome": {
+              "state": "landed",
+              "commit": "b45ad5cf70651eaa5bcd36042daa252fa56733c2",
+              "publication": 2
+            }
+          }
+        },
+        "4": {
+          "seq": 5,
+          "act": "act_5_2330b86a",
+          "event": {
+            "type": "land-outcome",
+            "op": "op_land_act_1003_abcdef03_1",
+            "outcome": {
+              "state": "failed",
+              "reason": {
+                "code": "conflict",
+                "paths": [
+                  "src/a.txt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "route": "reset",
+      "status": 200,
+      "clientMs": 115,
+      "result": {
+        "wasRunning": true
+      }
+    }
+  ],
+  "mainHasBoth": true,
+  "releasedTokenRefused": true,
+  "log": [
+    {
+      "seq": 1,
+      "type": "land-reserved",
+      "outcome": null
+    },
+    {
+      "seq": 2,
+      "type": "land-outcome",
+      "outcome": "landed"
+    },
+    {
+      "seq": 3,
+      "type": "land-reserved",
+      "outcome": null
+    },
+    {
+      "seq": 4,
+      "type": "land-outcome",
+      "outcome": "landed"
+    },
+    {
+      "seq": 5,
+      "type": "land-outcome",
+      "outcome": "failed"
+    }
+  ]
+}
