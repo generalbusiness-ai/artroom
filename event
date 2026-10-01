@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/policy/tsconfig.test.json","body":{"commit":"0d8f04cf173969e6cb38772922fc9ed6086c1c26","path":"packages/policy/tsconfig.test.json"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0a1b39caa5781e1a151b3bbe5a9c83b88dd4a039","text":"Merge retired a covered predecessor; the successor is at packages/policy/src/index.ts."}
