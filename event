@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/policy/src/index.ts at exact 22bffba347583c2329d0f62e3b2e58b5dee3227e on request/laneD-pack, under promise git:sha1…94c4adf on request git:sha1…68a115b","body":{"commit":"22bffba347583c2329d0f62e3b2e58b5dee3227e","path":"packages/policy/src/index.ts"}}
+{"kind":"artifact","text":"packages/policy/src/pack.ts at exact 22bffba347583c2329d0f62e3b2e58b5dee3227e on request/laneD-pack, under promise git:sha1…94c4adf on request git:sha1…68a115b","body":{"commit":"22bffba347583c2329d0f62e3b2e58b5dee3227e","path":"packages/policy/src/pack.ts"}}
