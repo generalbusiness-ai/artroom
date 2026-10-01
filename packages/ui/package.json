@@ -1,0 +1,29 @@
+{
+  "name": "@generalbusiness/artroom-ui",
+  "version": "0.0.0",
+  "description": "Artroom's web UI: Needs you, Room, Proposal and Policy over one data adapter (mock scenario or live room).",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p ../policy/tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir .types/policy && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "screenshots": "playwright test --update-snapshots"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-contract": "0.0.0",
+    "@generalbusiness/artroom-policy": "0.0.0",
+    "preact": "^11.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@testing-library/preact": "^3.2.4",
+    "happy-dom": "^20.14.5",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.3"
+  }
+}

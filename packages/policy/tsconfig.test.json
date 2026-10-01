@@ -1,7 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "rootDir": "../.."
   },
-  "include": ["src", "test", "vitest.config.ts", "vitest.workers.config.ts"]
+  "include": [
+    "src",
+    "test",
+    "vitest.config.ts",
+    "vitest.workers.config.ts",
+    "../../examples/demo-repo/.artroom/policy.ts"
+  ]
 }

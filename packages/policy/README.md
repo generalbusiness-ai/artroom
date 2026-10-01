@@ -221,6 +221,23 @@ named test fail. Examples:
 | A broad catch turns engine faults into outcomes | an engine fault throws a retryable error |
 | Recovery lanes evaluate policy, or allow paths outside `.artroom/**` | policy lockout; recovery-scope |
 
+## The default policy pack
+
+`src/pack.ts` (exported as `@generalbusiness/artroom-policy/pack`) holds
+eleven named rules built with the helpers, and `starterPolicy()`. The demo
+repository's policy is `examples/demo-repo/.artroom/policy.ts`. Compile it
+from the repository root with:
+
+```sh
+npm run compile-policy --workspace @generalbusiness/artroom-policy -- examples/demo-repo/.artroom
+```
+
+The compiler resolves its argument against the directory npm was run from
+(`INIT_CWD`), or the current directory when run with `node` directly. It
+refuses an invalid policy and one that fails `ownerCoverage()`.
+`docs/policy-pack.md` explains what each rule replaces; `test/pack.test.ts`
+is its corpus.
+
 ## The authoring helpers
 
 `src/helpers.ts` implements the functions that the contract's `/policy`
@@ -275,6 +292,23 @@ All of these run in Node and in workerd. The pinned usage of the spike's
 cubic rule changed with each input shape change: 932 steps and 4,203,669
 bytes before review dd2a995b; 775 and 4,200,107 with ownership pairs; 775
 and 4,202,795 once `PolicyLane.purpose` joined the input.
+
+## Review 4df45987
+
+| Finding | Fix | Tests |
+|---|---|---|
+| P1 The starter's owner review applied to `**`, but its owners covered only `src/api/**`, `src/**` and `docs/**`. `README.md`, `package.json`, `tests/**`, `wrangler.jsonc` and `.artroom/**` got an owner-review obligation nobody could meet (R-OBL-2) | A fallback owner: the demo and `starterPolicy()` callers give `**` an owner (`"**": "@maintainers"`). `ownerCoverage()` in `src/pack.ts` lists each glob of an owners-only review rule that no single owners pattern covers, using the new conservative `globCovers()` in `src/glob.ts`. `starterPolicy()` throws and the compiler refuses with a message that names the rule, the glob and the fix. Room admission (R-POL-1) is unchanged, and admin obligations stay separate from owner review | `test/review-4df45987.test.ts`: owners and qualifying reviewers for root files, `tests/`, deploy files, `.artroom` files and a mixed proposal; a partial map leaves `README.md` with nobody and is refused by `starterPolicy()`; owned-only scoping passes; `globCovers` cases; on Node, the compiler refuses a partial map and writes nothing |
+| P2 The documented compile command failed from the repository root, because npm runs the script in `packages/policy` | The compiler resolves its argument against `INIT_CWD`. The guide, `policy.ts` and this README give the same command, run from the repository root | On Node, the compiler test runs with `INIT_CWD` set to another directory. The documented command was run from the root and left `policy.json` unchanged (`git diff --exit-code`) |
+
+The fallback owner is a union, not a `CODEOWNERS` override: `@maintainers`
+also owns `src/api/**`. `docs/policy-pack.md` says so. The pinned budget
+figures for `land` and `fresh-approval` rose by 7,500 inspected bytes (15
+per path) because every path now has one more owner.
+
+Three mutations, each run under Node only, made named tests fail:
+`ownerCoverage()` never reporting (4 tests); the compiler ignoring
+`INIT_CWD` (the compiler test); `globCovers()` letting a plain segment
+cover an inner `**` (4 tests).
 
 ## Not done
 
