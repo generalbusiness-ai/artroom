@@ -121,8 +121,10 @@ async function run() {
   const p4 = await push("no lease onto an existing log", orphan, null);
   const p5 = await push("not the next commit (parent is not the lease)", orphan, c2.commit);
   const p6 = await push("another ref", c3, c2.commit, { ref: "refs/heads/main" });
+  const emptyTree = object("tree", Buffer.alloc(0));
+  const p8 = await push("a tree, not a commit, as the next head", { commit: emptyTree.sha, objects: [{ type: "tree", data: "" }] }, c2.commit);
   const p7 = await push("third, on the second", c3, c2.commit);
-  const all = [p1, p2, p3, p4, p5, p6, p7];
+  const all = [p1, p2, p3, p4, p5, p6, p8, p7];
   // The whole log, fetched and checked by git.
   const check = mkdtempSync(join(tmpdir(), "lb-pushlog-check-"));
   let fsck = false;
@@ -143,6 +145,7 @@ async function run() {
     leaseMismatch: p3.outcome.reason === "lease-mismatch" && p3.outcome.current === c2.commit && p4.outcome.reason === "lease-mismatch" && p4.outcome.current === c2.commit,
     notNextSendsNothing: p5.outcome.reason === "unknown" && /nothing was sent/.test(p5.outcome.detail) && p5.readBack === c2.commit,
     otherRefRefused: p6.outcome.reason === "unknown" && p6.readBack === c2.commit,
+    treeRefused: p8.outcome.reason === "unknown" && /is not a commit/.test(p8.outcome.detail) && p8.readBack === c2.commit,
     everyTokenRevoked: all.every((p) => p.revoked === true && p.activeTokens === 0),
     historyExact: JSON.stringify(history) === JSON.stringify([c1.commit, c2.commit, c3.commit]) && fsck,
   };

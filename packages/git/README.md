@@ -144,9 +144,13 @@ readLogRef({ canonical: { remote, token }, ref: "refs/artroom/log" })
 For each call the caller mints a token of at most 60 seconds (write for
 `pushLog`, read for `readLogRef`) and revokes it after.
 The sandbox checks the request (only `refs/artroom/log`, commit IDs, at
-most 100,000 objects and 64 MiB), writes the objects, and sends nothing
-unless `next` is a commit whose only parent is `lease` (none when `lease`
-is null) and whose whole history is present. It then pushes through the
+most 100,000 objects and 64 MiB in one push: `LOG_PUSH_LIMITS`), writes
+the objects, and sends nothing unless `next` is a commit, checked by its
+exact type, whose only parent is `lease` (none when `lease` is null) and
+whose whole history is present. The bound is on one push, not on the
+log: lane L's publisher sends only the objects its lease does not hold,
+and refuses a cohort over the same bound itself (`cohort-too-large`). It
+then pushes through the
 same lease push as `main`, and the gateway lets through only
 `refs/artroom/log: lease → next`. The answer maps the publisher's push
 outcome conservatively: only a confirmed push is `ok`; a lease refusal

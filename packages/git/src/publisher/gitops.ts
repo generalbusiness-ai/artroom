@@ -462,6 +462,9 @@ export class GitOps {
           const w = await this.git(["-C", dir, "hash-object", "-w", "-t", o.type, "--stdin"], {}, o.data);
           if (w.code !== 0) throw new GitError("hash-object", w);
         }
+        // The exact type first: rev-list accepts a tree or blob with an empty answer, which would pass as "no parent".
+        const type = await this.git(["-C", dir, "cat-file", "-t", next]);
+        if (type.code !== 0 || type.stdout.trim() !== "commit") throw new Error(`${next} is not a commit`);
         const parents = (await this.ok("rev-list", ["-C", dir, "rev-list", "--parents", "-n", "1", next])).split(" ").slice(1);
         if (parents.join(" ") !== (lease ?? "")) throw new Error(`${next} does not have exactly the lease as its parent`);
         const connected = await this.git(["-C", dir, "rev-list", "--objects", next]);

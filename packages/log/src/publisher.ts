@@ -28,7 +28,13 @@ export type PublishErrorCode =
   /** The ref holds a commit this publisher did not write. It stops; an admin must look. */
   | "unexpected-writer"
   /** Retries ran out with no clear answer. Call `publish` again with the same input: it completes forward. */
-  | "unresolved";
+  | "unresolved"
+  /**
+   * The objects this publication adds exceed one transfer
+   * (`PublisherOptions.maxTransfer`). Nothing was pushed. Publish a smaller
+   * cohort: fewer new entries, or fewer new retained files.
+   */
+  | "cohort-too-large";
 
 export class PublishError extends Error {
   override readonly name = "PublishError";
@@ -57,7 +63,12 @@ export interface PublisherOptions {
   readonly attempts?: number;
   /** Waits between attempts. Default: none (tests); the Room passes a backoff. */
   readonly sleep?: (attempt: number) => Promise<void>;
+  /** The most one push may send. Default `LOG_TRANSFER_LIMITS`, the publisher sandbox's bound (lane B, `LOG_PUSH_LIMITS`). */
+  readonly maxTransfer?: { readonly objects: number; readonly bytes: number };
 }
+
+/** One push's bound: objects and decoded bytes. The publisher sandbox refuses more. */
+export const LOG_TRANSFER_LIMITS = { objects: 100_000, bytes: 64 * 1024 * 1024 } as const;
 
 /** Seconds since the epoch for an RFC 3339 time, for the commit's author line. */
 function epoch(at: string): number {
@@ -94,7 +105,14 @@ export class LogPublisher {
   readonly ref: string;
   private readonly attempts: number;
   private readonly sleep: (attempt: number) => Promise<void>;
+  private readonly maxTransfer: { readonly objects: number; readonly bytes: number };
   private lastCommit: Sha | null = null;
+  /**
+   * The tree and blob objects of `lastCommit`'s tree. The remote has them
+   * (they are reachable from the lease), so a push sends only the others.
+   * Empty when unknown: then everything is sent.
+   */
+  private present: ReadonlySet<string> = new Set();
   /** The canonical line of every published entry, by seq. */
   private published: readonly string[] = [];
   /** The retained files of the last log commit, by path. Content-addressed, so never changed. */
@@ -105,6 +123,7 @@ export class LogPublisher {
     this.ref = opts.ref ?? LOG_REF;
     this.attempts = opts.attempts ?? 5;
     this.sleep = opts.sleep ?? (async () => {});
+    this.maxTransfer = opts.maxTransfer ?? LOG_TRANSFER_LIMITS;
   }
 
   /** Resume from the ref: read the last log commit, the entries it published and its retained files. */
@@ -116,6 +135,9 @@ export class LogPublisher {
       p.lastCommit = head;
       p.published = publishedLines(files);
       p.retained = new Map([...files].filter(([path]) => isRetainedPath(path)).map(([path, bytes]) => [path, fromUtf8(bytes)]));
+      // The head's tree objects, rebuilt from its files; used only if they rebuild exactly that tree.
+      const rebuilt = buildTree(Object.fromEntries(files));
+      if (rebuilt.root === parseCommit((await remote.readObject(head)).data).tree) p.present = new Set(rebuilt.objects.map((o) => o.sha));
     }
     return p;
   }
@@ -151,18 +173,26 @@ export class LogPublisher {
 
     const lease = this.lastCommit;
     const { commit, all } = build(lease, cohort);
+    // Send only what the lease does not already hold: the new trees and blobs, and the commit.
+    const send = all.filter((o) => o === commit || !this.present.has(o.sha));
+    const bytes = send.reduce((n, o) => n + o.data.length, 0);
+    if (send.length > this.maxTransfer.objects || bytes > this.maxTransfer.bytes)
+      throw new PublishError(
+        "cohort-too-large",
+        `this publication adds ${send.length} objects, ${bytes} bytes; one push carries at most ${this.maxTransfer.objects} objects, ${this.maxTransfer.bytes} bytes. Nothing was pushed; publish a smaller cohort`,
+      );
 
     for (let attempt = 1; attempt <= this.attempts; attempt++) {
       if (attempt > 1) await this.sleep(attempt);
-      const outcome = await this.remote.push(all, this.ref, commit.sha, lease);
+      const outcome = await this.remote.push(send, this.ref, commit.sha, lease);
       if (outcome.ok || outcome.reason !== "lease-mismatch") {
         // Read back: the only proof of where the ref is (R-LOG-8 step 5).
         const now = await this.remote.readRef(this.ref);
-        if (now === commit.sha) return this.done(cohort, commit.sha, attempt);
+        if (now === commit.sha) return this.done(cohort, commit, all, attempt);
         if (now === lease) continue; // not applied: push the same commit again
         throw new PublishError("unexpected-writer", `${this.ref} is at ${now ?? "nothing"}, which this publisher did not write`);
       }
-      if (outcome.current === commit.sha) return this.done(cohort, commit.sha, attempt);
+      if (outcome.current === commit.sha) return this.done(cohort, commit, all, attempt);
       throw new PublishError("unexpected-writer", `${this.ref} is at ${outcome.current ?? "nothing"}, not the lease ${lease ?? "nothing"}`);
     }
     throw new PublishError("unresolved", `no clear answer after ${this.attempts} attempts; publish again with the same entries`);
@@ -211,11 +241,12 @@ export class LogPublisher {
     return { lines, through: last.seq, hash: last.hash, checkpoint: text, at: cp.at, retained: files };
   }
 
-  private done(cohort: Cohort, commit: Sha, attempts: number): PublishResult {
-    this.lastCommit = commit;
+  private done(cohort: Cohort, commit: GitObject, all: readonly GitObject[], attempts: number): PublishResult {
+    this.lastCommit = commit.sha;
     this.published = cohort.lines;
     this.retained = cohort.retained;
-    return { commit, through: cohort.through, hash: cohort.hash, publishedThrough: cohort.through, attempts };
+    this.present = new Set(all.filter((o) => o !== commit).map((o) => o.sha));
+    return { commit: commit.sha, through: cohort.through, hash: cohort.hash, publishedThrough: cohort.through, attempts };
   }
 }
 
