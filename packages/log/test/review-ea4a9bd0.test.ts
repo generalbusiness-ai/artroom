@@ -11,13 +11,13 @@ import { describe, expect, test } from "vitest";
 import type { Authority, Checkpoint, LogEntry, PolicyVersion } from "@generalbusiness/artroom-contract";
 import { policy, rule } from "@generalbusiness/artroom-policy";
 import { MemoryGit, type GitObject, type PushOutcome } from "../src/git.ts";
-import { ROOT, contentOf, entryId, makeCheckpoint, retain, retainedPath, segmentPath, type Retained } from "../src/entries.ts";
+import { ROOT, contentOf, entryId, makeCheckpoint, retain, retainedPath, type Retained } from "../src/entries.ts";
 import { LogPublisher, readLogFiles, readPublishedEntries } from "../src/publisher.ts";
 import { canonicalize, utf8 } from "../src/canonical.ts";
 import { digestJson, keyPairFromSeed, sha256Hex } from "../src/crypto.ts";
 import { verifyLog } from "../src/verify.ts";
-import { DEMO_POLICY, RoomSim, keys, memberAuthority, seed } from "./support/room-sim.ts";
-import { alice, base, bobAuth, expectReason, publishAs, publishFiles, reseal } from "./support/logs.ts";
+import { DEMO_POLICY, RoomSim, checkBody, keys, memberAuthority, seed } from "./support/room-sim.ts";
+import { alice, base, bobAuth, expectReason, lines, publishAs, publishLines, reseal } from "./support/logs.ts";
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
@@ -114,7 +114,7 @@ function setRole(sim: RoomSim, role: Authority["role"]) {
 
 function underDelegation(sim: RoomSim, delegation: string, kind: "check" | "note" | "claim", role: Authority["role"]) {
   const target = kind === "claim" ? null : { act: entryId(5, sim.entries[5]!.hash) };
-  const body = kind === "claim" ? { goal: "Work on it", scope: ["lib/**"] } : kind === "check" ? { result: "pass" } : { text: "hi" };
+  const body = kind === "claim" ? { goal: "Work on it", scope: ["lib/**"] } : kind === "check" ? checkBody() : { text: "hi" };
   const act = sim.envelope(carol, kind, target, body, delegation as never);
   return sim.accept(act, { via: "delegation", member: "@bob", role, key: carol.key, delegation, grantor: keys.bob.key } as Authority);
 }
@@ -175,28 +175,6 @@ describe("finding 2: R-ADM-5 is judged when the delegation is granted", () => {
 
 // ----------------------------------------------------------------- finding 3
 
-/** Publish raw segment lines (and optional extra files) with the base room's genesis and a checkpoint on its last entry. */
-async function publishLines(sim: RoomSim, lines: (string | Uint8Array)[], extra: Record<string, string | Uint8Array> = {}, checkpoint: string = canonicalize(sim.checkpoint())) {
-  const parts = lines.map((l) => (typeof l === "string" ? utf8(l) : l));
-  const segment = new Uint8Array(parts.reduce((n, p) => n + p.length + 1, -1));
-  let at = 0;
-  for (const [i, p] of parts.entries()) {
-    if (i) segment[at++] = 0x0a;
-    segment.set(p, at);
-    at += p.length;
-  }
-  const files: Record<string, string | Uint8Array> = {
-    [`${ROOT}/genesis.json`]: canonicalize(sim.genesis),
-    [segmentPath(0)]: segment,
-    [`${ROOT}/checkpoint.json`]: checkpoint,
-    ...Object.fromEntries(sim.retained.map((r) => [retainedPath(r), r.body])),
-    ...extra,
-  };
-  return publishFiles(files);
-}
-
-const lines = (entries: readonly LogEntry[]) => entries.map((e) => canonicalize(e));
-
 describe("finding 3: malformed log content is a named failure with the last valid prefix", () => {
   test('a first entry {"seq":0} is malformed at entry 0; verify does not throw', async () => {
     const sim = await base();
@@ -250,7 +228,7 @@ describe("finding 3: malformed log content is a named failure with the last vali
 
   test("a roster body outside the contract is malformed", async () => {
     const sim = await base();
-    sim.accept(sim.envelope(keys.bob, "roster", null, { op: "delegate", to: carol.key, kinds: ["roster"], lanes: "*", expiresAt: sim.at(5000) }), bobAuth); // 6
+    sim.accept(sim.envelope(keys.bob, "roster", null, { op: "delegate", to: carol.key, kinds: ["bogus"], lanes: "*", expiresAt: sim.at(5000) }), bobAuth); // 6
     await expectReason(await publishLines(sim, lines(sim.entries)), "malformed", 6);
   });
 

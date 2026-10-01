@@ -3,8 +3,8 @@
 import { expect } from "vitest";
 import type { LogEntry } from "@generalbusiness/artroom-contract";
 import { MemoryGit, buildTree, encodeCommit, gitObject } from "../../src/git.ts";
-import { LOG_REF, contentOf, entryId, logFiles, makeCheckpoint, seal, type Retained } from "../../src/entries.ts";
-import { utf8 } from "../../src/canonical.ts";
+import { LOG_REF, ROOT, contentOf, entryId, logFiles, makeCheckpoint, retainedPath, seal, segmentPath, type Retained } from "../../src/entries.ts";
+import { canonicalize, utf8 } from "../../src/canonical.ts";
 import { b64url, sha256Hex } from "../../src/crypto.ts";
 import { verifyLog, type VerifyReason } from "../../src/verify.ts";
 import { keys, memberAuthority, RoomSim } from "./room-sim.ts";
@@ -61,3 +61,25 @@ export async function expectReason(git: MemoryGit, reason: VerifyReason, seq?: n
   }
   return r;
 }
+
+/** Publish raw segment lines (and optional extra files) with the base room's genesis and a checkpoint on its last entry. */
+export async function publishLines(sim: RoomSim, lines: (string | Uint8Array)[], extra: Record<string, string | Uint8Array> = {}, checkpoint: string = canonicalize(sim.checkpoint())) {
+  const parts = lines.map((l) => (typeof l === "string" ? utf8(l) : l));
+  const segment = new Uint8Array(parts.reduce((n, p) => n + p.length + 1, -1));
+  let at = 0;
+  for (const [i, p] of parts.entries()) {
+    if (i) segment[at++] = 0x0a;
+    segment.set(p, at);
+    at += p.length;
+  }
+  const files: Record<string, string | Uint8Array> = {
+    [`${ROOT}/genesis.json`]: canonicalize(sim.genesis),
+    [segmentPath(0)]: segment,
+    [`${ROOT}/checkpoint.json`]: checkpoint,
+    ...Object.fromEntries(sim.retained.map((r) => [retainedPath(r), r.body])),
+    ...extra,
+  };
+  return publishFiles(files);
+}
+
+export const lines = (entries: readonly LogEntry[]) => entries.map((e) => canonicalize(e));

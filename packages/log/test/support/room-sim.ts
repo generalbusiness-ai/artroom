@@ -9,6 +9,8 @@
 import type {
   ActId,
   Authority,
+  CheckerConfig,
+  CheckerDigest,
   Decision,
   Envelope,
   EntryContent,
@@ -21,10 +23,11 @@ import type {
   RefusalReceipt,
   RoomId,
   RuleInput,
+  Sha,
   SignedEnvelope,
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
-import { evaluateNotify, evaluateRefuse, policy, rule, type ActivePolicy, type RuleEvaluation } from "@generalbusiness/artroom-policy";
+import { evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, ownersFor, policy, rule, type ActivePolicy, type RuleEvaluation } from "@generalbusiness/artroom-policy";
 import { digestJson, keyPairFromSeed, sign, type KeyPair } from "../../src/crypto.ts";
 import { entryId, makeCheckpoint, retain, roomIdOf, seal, type Retained } from "../../src/entries.ts";
 import { LogPublisher, type PublishResult } from "../../src/publisher.ts";
@@ -45,6 +48,26 @@ export const DEMO_POLICY: PolicyDocument = policy(
   rule({ id: "holder-sees-claims", kind: "notify", on: ["claim"], to: ["holder"], why: "You claimed this lane." }),
 );
 
+/** The demo policy's one checker configuration (R-POL-9): named by `policy-activated`, retained under policies/. */
+export const DEMO_CHECKERS: Readonly<Record<string, CheckerConfig>> = {
+  test: { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 600 },
+};
+
+/** A `check` body naming `checker` with `config` (by default the demo checker's digest). */
+export function checkBody(config: string = digestJson(DEMO_CHECKERS["test"]), checker = "test") {
+  return {
+    obligation: "obl_test",
+    check: checker,
+    integration: "a".repeat(40),
+    input: { kind: "tree", tree: "b".repeat(40) },
+    config,
+    runner: `sha256:${"c".repeat(64)}`,
+    volatile: false,
+    ok: true,
+    detail: "",
+  };
+}
+
 const T0 = Date.parse("2026-10-01T12:00:00Z");
 
 export class RoomSim {
@@ -55,7 +78,14 @@ export class RoomSim {
   policy!: ActivePolicy;
   private idem = 0;
 
-  constructor(admin: KeyPair = keys.alice, adminHandle: MemberId = "@alice") {
+  /**
+   * `onboarding`: found on an imported repository, with a grant signed by
+   * `operator` (or by `signer`, to tamper), naming `repo` and `admin` (by
+   * default the genesis's).
+   */
+  constructor(admin: KeyPair = keys.alice, adminHandle: MemberId = "@alice", opts: { onboarding?: { operator: KeyPair; signer?: KeyPair; repo?: string; admin?: KeyId } } = {}) {
+    const o = opts.onboarding;
+    const grant = o && { v: 1 as const, repo: o.repo ?? "demo-repo", admin: o.admin ?? admin.key, operator: o.operator.key, notAfter: new Date(T0 + 86_400_000).toISOString() };
     this.genesis = {
       format: "artroom-log-v1",
       name: "demo/repo",
@@ -65,10 +95,11 @@ export class RoomSim {
       roomKey: keys.room.key,
       profile: { policy: "artroom-jsonata-v1", jsonata: "2.2.2" },
       createdAt: new Date(T0).toISOString(),
+      ...(grant ? { onboarding: { grant, sig: sign((o!.signer ?? o!.operator).seed, "artroom-onboarding-v1", grant) } } : {}),
     };
     this.room = roomIdOf(this.genesis);
     this.system({ type: "genesis", genesis: this.genesis, sig: sign(admin.seed, "artroom-genesis-v1", this.genesis) });
-    this.activate(DEMO_POLICY);
+    this.activate(DEMO_POLICY, DEMO_CHECKERS);
   }
 
   /** Room clock: one second per entry. */
@@ -91,9 +122,16 @@ export class RoomSim {
     return this.seal({ type: "system", event });
   }
 
-  activate(doc: PolicyDocument): ActId {
+  /** Activate `doc` with its checker configurations by name; they are retained under policies/ (R-POL-9, R-LOG-9). */
+  activate(doc: PolicyDocument, checkers: Readonly<Record<string, CheckerConfig>> = {}): ActId {
     this.retained.push(retain("policy", doc));
-    const e = this.system({ type: "policy-activated", policy: digestJson(doc), commit: null, previous: this.policy?.version ?? null, recomputed: { proposals: 0, reopened: 0, fenced: [] } });
+    const named: CheckerDigest[] = Object.keys(checkers)
+      .sort()
+      .map((name) => {
+        this.retained.push(retain("policy", checkers[name]));
+        return { name, config: digestJson(checkers[name]) };
+      });
+    const e = this.system({ type: "policy-activated", policy: digestJson(doc), checkers: named, commit: null, previous: this.policy?.version ?? null, recomputed: { proposals: 0, reopened: 0, fenced: [] } });
     const id = entryId(e.seq, e.hash);
     this.policy = { doc, version: id };
     return id;
@@ -176,6 +214,18 @@ export class RoomSim {
     return this.system({ type: "notified", entry: of, decisions: this.keep(r.evaluations), to });
   }
 
+  /** A proposal's obligations recomputed under the active policy (R-POL-9), as an `obligations-recomputed` event. */
+  async recomputed(lane: ActId, paths: readonly string[], named: ActId = this.policy.version): Promise<LogEntry> {
+    const r = await evaluateRequire(this.policy, { kind: "require", actor: policyActor, lane: policyLane(lane), proposal: proposalOf(this.policy.doc, paths), room: { admins: 1, members: 2 } });
+    return this.system({ type: "obligations-recomputed", policy: named, lane, generation: 1, decisions: this.keep(r.evaluations), obligations: r.obligations.map((o) => o.id), reopened: [] });
+  }
+
+  /** Land rules evaluated on the prospective reservation input (R-LAND-4), as a `land-evaluated` event. */
+  async landEvaluated(lane: ActId, paths: readonly string[], under: ActivePolicy = this.policy): Promise<LogEntry> {
+    const r = await evaluateLand(under, { kind: "land", actor: policyActor, lane: policyLane(lane), proposal: proposalOf(this.policy.doc, paths), obligations: [], reviews: [], stage: "reservation" });
+    return this.system({ type: "land-evaluated", op: `op_land_${this.entries.length}`, integration: "a".repeat(40) as Sha, landInput: r.retained?.digest ?? digestJson(null), decisions: this.keep(r.evaluations) });
+  }
+
   checkpoint() {
     return makeCheckpoint(this.room, keys.room.key, keys.room.seed, this.last, this.at(this.entries.length));
   }
@@ -186,6 +236,12 @@ export class RoomSim {
     this.system({ type: "checkpoint", through: r.through, hash: r.hash, commit: r.commit });
     return r;
   }
+}
+
+const policyActor = { member: "@alice" as MemberId, role: "admin" as const, teams: [], delegated: false };
+const policyLane = (id: ActId) => ({ id, claimed: true, holder: "@alice" as MemberId, scope: ["src/**"], generation: 1, purpose: "ordinary" as const });
+function proposalOf(doc: PolicyDocument, paths: readonly string[]) {
+  return { generation: 1, head: "b".repeat(40) as Sha, base: "a".repeat(40) as Sha, changed: paths.map((path) => ({ status: "modified" as const, path })), paths, owners: ownersFor(doc, paths) };
 }
 
 export const memberAuthority = (handle: MemberId, key: KeyId, role: Authority["role"] = "admin"): Authority =>

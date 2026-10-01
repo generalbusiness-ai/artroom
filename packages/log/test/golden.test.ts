@@ -56,7 +56,7 @@ describe("protocol section 20: a claim, its notification and two publications", 
       "artroom-log/v1/segments/000000000000.jsonl",
     ]);
     expect(paths.some((p) => p.startsWith("artroom-log/v1/inputs/"))).toBe(true);
-    expect(paths.filter((p) => p.startsWith("artroom-log/v1/policies/"))).toHaveLength(1);
+    expect(paths.filter((p) => p.startsWith("artroom-log/v1/policies/"))).toHaveLength(2); // the policy and its checker configuration
   });
 });
 

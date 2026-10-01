@@ -13,8 +13,8 @@
  * check signatures or digests: verify does that on the decoded value.
  */
 
-import type { Checkpoint, LogEntry, PolicyDocument, ReplayContext } from "@generalbusiness/artroom-contract";
-import { validatePolicy } from "@generalbusiness/artroom-policy";
+import type { CheckerConfig, Checkpoint, LogEntry, PolicyDocument, ReplayContext } from "@generalbusiness/artroom-contract";
+import { validateCheckerConfig, validatePolicy } from "@generalbusiness/artroom-policy";
 import { fromUtf8, parseStrict } from "./canonical.ts";
 import { hex } from "./crypto.ts";
 
@@ -65,7 +65,9 @@ type Field =
   | "envelope" | "v" | "actor" | "idempotencyKey" | "body" | "authority" | "effects" | "flags" | "refusal"
   // roster ops
   | "op" | "member" | "role" | "custody" | "expiresAt" | "secretHash" | "invitation" | "secret" | "reason"
-  | "team" | "members" | "kinds" | "lanes" | "delegation";
+  | "team" | "members" | "kinds" | "lanes" | "delegation"
+  // amendment 2: checker configurations, checks and onboarding grants
+  | "checkers" | "name" | "config" | "check" | "onboarding" | "grant" | "repo" | "operator" | "notAfter";
 type Obj = { readonly [K in Field]?: unknown } & Readonly<Record<string, unknown>>;
 
 const bad = (path: string, what: string): never => {
@@ -88,7 +90,6 @@ const starOr = (v: unknown, path: string, item: (v: unknown, path: string) => un
 
 const FORMAT = ["artroom-log-v1"] as const;
 const ENVELOPE_KINDS = ["claim", "propose", "note", "review", "check", "land", "release", "renew", "roster"] as const;
-const DELEGABLE = ["claim", "propose", "note", "review", "check", "land", "release", "renew"] as const;
 const ROLES = ["admin", "maintainer", "member", "agent", "checker"] as const;
 const CUSTODY = ["client", "room"] as const;
 const REVOCATION = ["retired", "compromised"] as const;
@@ -98,6 +99,8 @@ const SYSTEM_EVENTS = [
   "genesis",
   "lease-expired",
   "policy-activated",
+  "obligations-recomputed",
+  "land-evaluated",
   "land-reserved",
   "abort-attempt",
   "publication-unresolved",
@@ -127,6 +130,14 @@ function genesis(v: unknown, path: string): void {
   const admin = obj(g.admin, `${path}.admin`);
   str(admin.handle, `${path}.admin.handle`);
   str(admin.key, `${path}.admin.key`);
+  str(g.repo, `${path}.repo`);
+  if ("onboarding" in g) {
+    const o = obj(g.onboarding, `${path}.onboarding`);
+    str(o.sig, `${path}.onboarding.sig`);
+    const grant = obj(o.grant, `${path}.onboarding.grant`);
+    if (grant.v !== 1) bad(`${path}.onboarding.grant.v`, "is not 1");
+    for (const k of ["repo", "admin", "operator", "notAfter"] as const) str(grant[k], `${path}.onboarding.grant.${k}`);
+  }
   str(g.recovery, `${path}.recovery`);
   str(g.roomKey, `${path}.roomKey`);
   const profile = obj(g.profile, `${path}.profile`);
@@ -141,8 +152,24 @@ function systemEvent(v: unknown, path: string): void {
       genesis(ev.genesis, `${path}.genesis`);
       str(ev.sig, `${path}.sig`);
       break;
-    case "policy-activated":
+    case "policy-activated": {
       str(ev.policy, `${path}.policy`);
+      let previous: string | null = null;
+      arr(ev.checkers, `${path}.checkers`).forEach((c, i) => {
+        const q = `${path}.checkers[${i}]`;
+        const name = str(obj(c, q).name, `${q}.name`);
+        str((c as Obj).config, `${q}.config`);
+        if (previous !== null && !(previous < name)) bad(`${q}.name`, "is not in strictly ascending order");
+        previous = name;
+      });
+      break;
+    }
+    case "obligations-recomputed":
+      str(ev.policy, `${path}.policy`);
+      decisions(ev.decisions, `${path}.decisions`);
+      break;
+    case "land-evaluated":
+      decisions(ev.decisions, `${path}.decisions`);
       break;
     case "notified":
       str(ev.entry, `${path}.entry`);
@@ -193,7 +220,8 @@ function rosterOp(v: unknown, path: string): void {
       break;
     case "delegate":
       str(b.to, p("to"));
-      starOr(b.kinds, p("kinds"), (x, q) => oneOf(x, q, DELEGABLE));
+      // Any kind is well formed here; R-ADM-5 (roster, or beyond the role) is judged by the roster replay.
+      starOr(b.kinds, p("kinds"), (x, q) => oneOf(x, q, ENVELOPE_KINDS));
       starOr(b.lanes, p("lanes"), str);
       str(b.expiresAt, p("expiresAt"));
       break;
@@ -220,6 +248,11 @@ function signedEnvelope(v: unknown, path: string): void {
   str(env.idempotencyKey, p("idempotencyKey"));
   optional(env, "delegation", str, `${path}.envelope`);
   if (kind === "roster") rosterOp(env.body, p("body"));
+  if (kind === "check") {
+    const b = obj(env.body, p("body"));
+    str(b.check, p("body.check"));
+    str(b.config, p("body.config"));
+  }
 }
 
 /** One sealed log entry from a segment line. */
@@ -276,26 +309,44 @@ export function decodeCheckpoint(bytes: Uint8Array): Checkpoint {
   return v as Checkpoint;
 }
 
+export function decodeRetained(kind: "json", bytes: Uint8Array): unknown;
 export function decodeRetained(kind: "input", bytes: Uint8Array): ReplayContext;
 export function decodeRetained(kind: "policy", bytes: Uint8Array): PolicyDocument;
-/** A retained replay context or policy document. */
-export function decodeRetained(kind: "input" | "policy", bytes: Uint8Array): ReplayContext | PolicyDocument {
+export function decodeRetained(kind: "checker", bytes: Uint8Array): CheckerConfig;
+/**
+ * A retained file. Under `inputs/` it is a replay context. Under
+ * `policies/` it is a policy document or a checker configuration, which
+ * only the `policy-activated` event naming it tells apart; `json` checks
+ * only that it is strict JSON.
+ */
+export function decodeRetained(kind: "json" | "input" | "policy" | "checker", bytes: Uint8Array): unknown {
   const text = textOf(bytes);
   if (text === null) throw new Malformed(`the retained ${kind} is not UTF-8`);
   let v: unknown;
   try {
     v = parseStrict(text);
   } catch (e) {
-    throw new Malformed(`the retained ${kind} is not strict JSON: ${(e as Error).message}`);
+    throw new Malformed(`the retained file is not strict JSON: ${(e as Error).message}`);
   }
-  if (kind === "policy") {
-    const checked = validatePolicy(v);
-    if (!checked.ok) throw new Malformed(`the retained policy is not a policy document: ${checked.problems[0]}`);
-    return checked.value;
+  switch (kind) {
+    case "json":
+      return v;
+    case "policy": {
+      const checked = validatePolicy(v);
+      if (!checked.ok) throw new Malformed(`the retained policy is not a policy document: ${checked.problems[0]}`);
+      return checked.value;
+    }
+    case "checker": {
+      const checked = validateCheckerConfig(v);
+      if (!checked.ok) throw new Malformed(`the retained checker configuration is not one: ${checked.problems[0]}`);
+      return checked.value;
+    }
+    case "input": {
+      const c = obj(v, "context");
+      oneOf(c.kind, "context.kind", CONTEXT_KINDS);
+      obj(c.input, "context.input");
+      obj(c.budget, "context.budget");
+      return v;
+    }
   }
-  const c = obj(v, "context");
-  oneOf(c.kind, "context.kind", CONTEXT_KINDS);
-  obj(c.input, "context.input");
-  obj(c.budget, "context.budget");
-  return v as unknown as ReplayContext;
 }
