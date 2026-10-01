@@ -93,7 +93,10 @@ export function canonicalTokens(repo: () => Promise<RepoHandle>, opts: { readonl
 
 /** Main on a repo, read through the binding. */
 export async function readMainVia(repo: RepoHandle): Promise<string> {
-  const [top] = await repo.log({ ref: "refs/heads/main", limit: 1 });
-  if (!top) throw new Error("main is missing");
-  return top.hash;
+  // The binding's `log` takes a branch name; a full ref name is tried as well.
+  for (const ref of ["main", "refs/heads/main"]) {
+    const [top] = await repo.log({ ref, limit: 1 });
+    if (top) return top.hash;
+  }
+  throw new Error("main is missing");
 }

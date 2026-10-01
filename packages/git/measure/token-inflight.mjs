@@ -177,6 +177,7 @@ function startProxy(state, events) {
     ev.bodyBytes = sent;
     ev.bodyDone = Date.now();
     up.end();
+    if (ev.kind === "push-body" && state.afterBody) state.afterBody();
   });
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve({ server, port: server.address().port })));
 }
@@ -188,6 +189,7 @@ const CASES = {
   B: { what: "token expires while the push body is uploading (POST started ~5 s after minting; 60 s token)", ttl: 60, rate: 25_000, revokeAt: null },
   C: { what: "POST authenticates ~5 s before the 60 s token expires and ends ~30 s after", ttl: 60, rate: 70_000, holdUntilAge: 55_000, revokeAt: null },
   D: { what: "control: the same push with a live token and the same throttle", ttl: 600, rate: 70_000, revokeAt: null },
+  E: { what: "token revoked the moment the last byte of the push body is sent, while the receiver processes it", ttl: 600, rate: 400_000, revokeAt: "after-body" },
 };
 
 async function runCase(name, c, repo, remote, work) {
@@ -211,6 +213,16 @@ async function runCase(name, c, repo, remote, work) {
     };
   }
   if (c.holdUntilAge) state.holdUntil = () => tok.at + c.holdUntilAge;
+  let revokeDoneAt = null;
+  if (c.revokeAt === "after-body") {
+    state.afterBody = () => {
+      revokedAt = Date.now();
+      revoke(tok.id).then((ok) => {
+        revokeDoneAt = Date.now();
+        log(`revoke after body: ${ok}`);
+      });
+    };
+  }
   const { server, port } = await startProxy(state, events);
   const url = `http://127.0.0.1:${port}/git/${NS}/${repo}.git`;
   let timer = null;
@@ -243,6 +255,7 @@ async function runCase(name, c, repo, remote, work) {
     timesSinceMintS: {
       expiresAt: rel(expiresAt),
       revokedAt: rel(revokedAt),
+      revokeAnsweredAt: rel(revokeDoneAt),
       postForwarded: rel(post?.forwarded),
       postBodyDone: rel(post?.bodyDone),
       postResponse: rel(post?.responseAt),

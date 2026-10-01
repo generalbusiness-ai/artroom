@@ -261,6 +261,19 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
         const r = await changedPaths(repo, String(body["from"]), String(body["to"]), { cache, ...(body["bounds"] ? { bounds: body["bounds"] as object } : {}) });
         return { kind: r.kind, changes: r.kind === "ok" ? r.changes.length : null, stats: r.stats, bound: r.kind === "too-large" ? r.bound : null, ms: Date.now() - d0 };
       }
+      case "probe": {
+        // How the binding resolves main: for diagnosing read-back.
+        const repo = await this.env.ARTIFACTS.get(String(body["repo"]));
+        const tryLog = async (o?: { ref?: string; limit?: number }) => {
+          try {
+            return (await repo.log(o)).map((c) => c.hash);
+          } catch (e) {
+            return `error: ${e instanceof Error ? e.message : String(e)}`;
+          }
+        };
+        const info = await repo.info();
+        return { defaultBranch: info.defaultBranch, lastPushAt: info.lastPushAt, none: await tryLog({ limit: 1 }), main: await tryLog({ ref: "main", limit: 1 }), full: await tryLog({ ref: "refs/heads/main", limit: 1 }), head: await tryLog({ ref: "HEAD", limit: 1 }) };
+      }
       case "reset": {
         const repo = this.need(this.meta("repo"), "repo");
         return { wasRunning: await (this.env.PUBLISHER.getByName(repo) as unknown as { reset(): Promise<boolean> }).reset() };
