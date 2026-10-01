@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:88b83e3f9d27d00947cf452d7e0174d1609b135f","text":"Republished at 73cb4f6f075de4d52184b4c4e13708e4049c5a07; the successor stands at packages/policy/src/integrity.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d538ea67717968f60e308232128238fd8e48eb45","text":"Republished at 73cb4f6f075de4d52184b4c4e13708e4049c5a07, which no longer changes packages/policy/src/values.ts: the pointer is withdrawn with no successor."}
