@@ -1,0 +1,29 @@
+// The spike's Worker as the workerd test pool runs it (vitest.config.ts):
+// lane A's Room and Registry Durable Objects, and the spike's Agent Durable
+// Object, which hosts a pi-durable Harness on its own SQLite. ARTROOM is a
+// service binding to this Worker's own default entrypoint (lane A's
+// `ArtroomService`), so the agent reaches the Room the way a separate
+// Worker would. Not deployed: the Room's fake remotes exist only in tests.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "artroom-spike-pd",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" },
+      { "name": "REGISTRY", "class_name": "Registry" },
+      { "name": "AGENTS", "class_name": "Agent" },
+      { "name": "SCRATCH", "class_name": "Scratch" }
+    ]
+  },
+  "services": [{ "binding": "ARTROOM", "service": "artroom-spike-pd" }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Registry", "Agent", "Scratch"] }],
+  "vars": {
+    "LEASE_SECONDS": "1800",
+    "PUBLIC_URL": "https://artroom.test",
+    "PUBLIC_NAMESPACE": "artroom-public",
+    "OPERATOR_KEYS": ""
+  }
+}

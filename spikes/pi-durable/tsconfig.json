@@ -1,0 +1,21 @@
+{
+  // The spike's own type check (`npm run check`). It is outside the root
+  // workspaces, so the root `npm run typecheck` does not include it.
+  "extends": "./vendor/artroom/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "ESNext.Disposable"],
+    "types": ["@cloudflare/vitest-pool-workers/types"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@generalbusiness/artroom-contract": ["./vendor/artroom/packages/contract/src/index.ts"],
+      "@generalbusiness/artroom-client": ["./vendor/artroom/packages/client/src/index.ts"],
+      "@generalbusiness/artroom-room": ["./vendor/artroom/packages/room/src/index.ts"],
+      "@generalbusiness/artroom-git": ["./vendor/artroom/packages/git/src/index.ts"],
+      "@generalbusiness/artroom-log": ["./vendor/artroom/packages/log/src/index.ts"],
+      "@generalbusiness/artroom-policy": ["./vendor/artroom/packages/policy/src/index.ts"],
+      "@generalbusiness/artroom-policy/helpers": ["./vendor/artroom/packages/policy/src/helpers.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

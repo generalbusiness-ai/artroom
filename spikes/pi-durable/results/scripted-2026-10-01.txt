@@ -1,0 +1,42 @@
+ ↓ test/live.test.ts > live: openai/gpt-4.1-mini on OpenRouter claims, proposes and lands through a reset after propose
+ ✓ test/agent.test.ts > a pi-durable agent through claim, propose and land > runs the task end to end: one act of each kind, landed on main, the lane document matching the receipts
+ ✓ test/do-sqlite.test.ts > Durable Object SQLite transactions > refuse SAVEPOINT in SQL, and roll back an async storage.transaction() across awaits
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > reserves ID 1 for the immutable root conversation
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > commits mixed table writes atomically and rolls all of them back on failure
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > detaches retained writes and every returned record
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > detaches prototype-like JSON keys without changing object prototypes
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > indexes entries committed out of ID order
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > continues an entry cursor below its last item after a newer commit
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > paginates conversations by opaque cursor in ascending ID order
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > filters and pages conversations by durable owner edges
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > scans deep fork history newest-first through every ancestor cap
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > replaces complete task records and pages filtered task scans
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > stores owners and scans waiting and completing tasks by status
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > indexes request IDs per conversation and replaces complete submission records
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > stores passive write submissions without input-only lifecycle states
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > reconstructs rewindable documents and preserves half-open incarnations
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > streams long document tails across root replacement deltas
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > copies stored document bases independently and rejects ambiguous sources
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > uses bases for version transitions and rejects historical reads of current-only documents
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > indexes logical addresses and exact-scope scans independently
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > keeps document lifecycle failures atomic and gives create-plus-retire an empty lifetime
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > rolls back record tables and secondary indexes when a document command fails
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > keeps indexed string identities lossless
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > keeps one global record ID namespace and rejects exhausted ID minting
+ ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > rejects every operation after close
+ ✓ test/agent.test.ts > a pi-durable agent through claim, propose and land > the same request ID after the run finished returns the same answer and sends nothing
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at claim:before-send: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at claim:after-send: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at claim:after-receipt: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at write:after-push: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at propose:before-send: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at propose:after-send: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at propose:after-receipt: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at land:before-send: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at land:after-send: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at land:after-receipt: the run resumes, each act is admitted once, no refusal, the landing lands
+ ✓ test/agent.test.ts > ablations: each half of the rule is needed > without replay (pi-durable's default, unsafe): after a reset past the room, the model is told the call was interrupted; the act stands in the room, unknown to the conversation
+ ✓ test/agent.test.ts > ablations: each half of the rule is needed > without the stored envelope: the rerun rebuilds the act from fresh reads, the bytes differ, and the room refuses it as idempotency-mismatch
+ ✓ test/agent.test.ts > ablation: neither half > without the stored envelope and with a fresh key per attempt: the rerun's propose is a second act, admitted as generation 2
+ Test Files  2 passed | 1 skipped (3)
+      Tests  39 passed | 1 skipped (40)

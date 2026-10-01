@@ -1,0 +1,24 @@
+{
+  "name": "artroom-spike-pi-durable",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "setup": "sh scripts/setup.sh",
+    "test": "vitest run --config vitest.config.ts",
+    "check": "sh scripts/check.sh"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.0.0",
+    "@earendil-works/pi-ai": "1.0.0",
+    "@earendil-works/pi-durable": "1.0.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "jsonata": "2.2.2"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "vitest": "4.1.11",
+    "wrangler": "4.146.0"
+  }
+}
