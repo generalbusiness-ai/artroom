@@ -70,19 +70,21 @@ export function fromCursor(c: string | undefined, kind: string): number | null {
   return c ? decodeCursor(c, kind)["n"]! : null;
 }
 
-/** An attention item's position: the entry that made it, and its order among that entry's items. */
-export interface Position {
-  readonly seq: Seq;
-  readonly n: number;
-}
-
 const END = Number.MAX_SAFE_INTEGER;
 
-/** An attention position from a cursor. A cursor with only a seq (the earlier format) means "after every item of that seq". */
-function attentionPosition(c: string | undefined, kind: string, seqField: string, nField: string): Position | null {
-  if (!c) return null;
-  const v = decodeCursor(c, kind);
-  return { seq: v[seqField] ?? v["n"]!, n: v[nField] ?? END };
+/**
+ * An attention position: `pos`, which increases with every item made (review
+ * 8faa2ef9). An earlier cursor carries (seq, n), or only a seq. It is read as
+ * the position just before the first item after that point, so no item after
+ * it is skipped; an item made later about an earlier entry may come again.
+ */
+function attentionPos(core: RoomCore, v: Record<string, number>, seqField: string, nField: string): number {
+  if (v["p"] !== undefined) return v["p"];
+  const seq = v[seqField] ?? v["n"]!;
+  const n = v[nField] ?? END;
+  const first = num(one(core.sql, "SELECT MIN(pos) AS p FROM attention WHERE seq > ? OR (seq = ? AND n > ?)", seq, seq, n), "p");
+  if (first !== null) return first - 1;
+  return num(one(core.sql, "SELECT MAX(pos) AS p FROM attention"), "p") ?? 0;
 }
 
 function limitOf(page: PageRequest | undefined): number {
@@ -213,39 +215,32 @@ function stillOpen(core: RoomCore, item: AttentionItem): boolean {
   return item.open;
 }
 
-/** Items for a member after a position, in (seq, n) order, up to `maxSeq`. */
-export function attentionItems(core: RoomCore, member: MemberId, after: Position, limit: number, maxSeq: Seq = END): AttentionItem[] {
+/** Items for a member after a position, in the order they were made, up to `maxSeq`. */
+export function attentionItems(core: RoomCore, member: MemberId, afterPos: number, limit: number, maxSeq: Seq = END): (AttentionItem & { readonly pos: number })[] {
   const ps = principalsOf(core, member);
   const marks = ps.map(() => "?").join(", ");
   return core.sql
-    .all(
-      `SELECT id, seq, n, lane, item, open FROM attention WHERE principal IN (${marks}) AND (seq > ? OR (seq = ? AND n > ?)) AND seq <= ? ORDER BY seq, n LIMIT ?`,
-      ...ps,
-      after.seq,
-      after.seq,
-      after.n,
-      maxSeq,
-      limit,
-    )
+    .all(`SELECT id, seq, pos, lane, item, open FROM attention WHERE principal IN (${marks}) AND pos > ? AND seq <= ? ORDER BY pos LIMIT ?`, ...ps, afterPos, maxSeq, limit)
     .map((r) => {
       const item = { ...(JSON.parse(str(r, "item")!) as object), id: str(r, "id")!, seq: num(r, "seq")!, ...(str(r, "lane") ? { lane: str(r, "lane") } : {}), open: num(r, "open") === 1 } as AttentionItem;
-      return { ...item, open: stillOpen(core, item) };
+      return Object.assign({ ...item, open: stillOpen(core, item) }, { pos: num(r, "pos")! });
     });
 }
 
-function positionOf(core: RoomCore, item: AttentionItem): Position {
-  return { seq: item.seq, n: num(one(core.sql, "SELECT n FROM attention WHERE id = ?", item.id), "n") ?? 0 };
+/** Strip the internal position from items before they are returned. */
+function shown(items: readonly (AttentionItem & { readonly pos: number })[]): AttentionItem[] {
+  return items.map(({ pos, ...item }) => (void pos, item as AttentionItem));
 }
 
 function attention(core: RoomCore, member: MemberId, page: PageRequest | undefined): AttentionPage {
-  const start = attentionPosition(page?.cursor, "attention", "n", "i") ?? { seq: -1, n: END };
+  const start = page?.cursor ? attentionPos(core, decodeCursor(page.cursor, "attention"), "n", "i") : 0;
   const limit = limitOf(page);
   const items = attentionItems(core, member, start, limit + 1);
   const more = items.length > limit;
-  const shown = items.slice(0, limit);
-  const last = shown.length ? positionOf(core, shown[shown.length - 1]!) : start;
+  const page1 = items.slice(0, limit);
+  const last = page1.length ? page1[page1.length - 1]! : null;
   // R-API-9: the page carries publishedThrough from the same read.
-  return { items: shown, cursor: cursor("attention", last.seq, { i: last.n }), more, publishedThrough: publishedThrough(core) };
+  return { items: shown(page1), cursor: cursor("attention", last ? last.seq : -1, { p: last ? last.pos : start }), more, publishedThrough: publishedThrough(core) };
 }
 
 // ------------------------------------------------------------ the log (R-API-7, R-LOG-11)
@@ -306,10 +301,9 @@ export function summary(e: LogEntry): EntrySummary {
   return { id: idOf(e), seq: e.seq, type: x.type, kind: env.kind, ...(lane ? { lane } : {}), by: x.receipt.authority.member, at: e.at };
 }
 
-/** A cursor at the live tail: the current head. A subscription fixes it once, when it starts. */
+/** A cursor at the live tail: the current head and the latest attention position. A subscription fixes it once, when it starts. */
 export function liveCursor(core: RoomCore): Cursor {
-  const head = core.headSeq();
-  return cursor("updates", head, { as: head, an: END });
+  return cursor("updates", core.headSeq(), { p: num(one(core.sql, "SELECT MAX(pos) AS p FROM attention"), "p") ?? 0 });
 }
 
 /** At most this many entries, and this many attention items, per update. */
@@ -318,18 +312,21 @@ export const UPDATE_LIMIT = 100;
 /**
  * The next update after a cursor. Entries and attention items each keep
  * their own position, so a full page of either never moves the cursor past
- * an item the reader has not seen (P2.8 of review aabda1ed).
+ * an item the reader has not seen; an item made later, even about an entry
+ * already delivered, comes after the cursor (reviews aabda1ed and 8faa2ef9).
  */
 export function updateAfter(core: RoomCore, member: MemberId, c: string | undefined): Update {
-  const from = c ?? liveCursor(core);
-  const v = decodeCursor(from, "updates");
+  const v = decodeCursor(c ?? liveCursor(core), "updates");
   const after = v["n"]!;
-  const att: Position = { seq: v["as"] ?? after, n: v["an"] ?? END };
+  const att = attentionPos(core, v, "as", "an");
   const entries = entriesAfter(core.sql, after, UPDATE_LIMIT);
   const last = entries.length ? entries[entries.length - 1]!.seq : after;
-  const attention = attentionItems(core, member, att, UPDATE_LIMIT, last);
-  const lastAtt = attention.length ? positionOf(core, attention[attention.length - 1]!) : att;
-  return { cursor: cursor("updates", last, { as: lastAtt.seq, an: lastAtt.n }), entries: entries.map(summary), attention, publishedThrough: publishedThrough(core) };
+  // In position order, up to the first item whose entry this update does not deliver yet.
+  const all = attentionItems(core, member, att, UPDATE_LIMIT);
+  const stop = all.findIndex((a) => a.seq > last);
+  const items = stop < 0 ? all : all.slice(0, stop);
+  const lastPos = items.length ? items[items.length - 1]!.pos : att;
+  return { cursor: cursor("updates", last, { p: lastPos }), entries: entries.map(summary), attention: shown(items), publishedThrough: publishedThrough(core) };
 }
 
 export { memberRow };

@@ -53,7 +53,7 @@ import { iso, roomIdOf } from "./ids.ts";
 import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions } from "./obligations.ts";
-import type { ActivePolicy, Evaluation, LandingHost, LandingPort, LandRecordLike, ObligationSpec, Ports, PublisherPort, Readiness, Sql } from "./ports.ts";
+import type { ActivePolicy, Evaluation, LandingHost, LandingPort, LandRecordLike, ObligationSpec, Ports, PublisherPort, Readiness, RetainedFile, Sql } from "./ports.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
@@ -94,6 +94,8 @@ export class Moved extends Error {
 export interface PendingPublication {
   /** The expected parent: the last log commit the Room confirmed. */
   readonly parent: Sha | null;
+  /** The exact commit the publisher makes of this cohort on `parent`. */
+  readonly expected: Sha;
   readonly through: Seq;
   readonly hash: Digest;
   readonly checkpoint: Checkpoint;
@@ -606,7 +608,8 @@ export class RoomCore {
   attend(principal: string, seq: Seq, lane: LaneId | null, item: Record<string, unknown> & { why: string }, text: string): void {
     const n = num(one(this.sql, "SELECT COUNT(*) AS n FROM attention WHERE seq = ?", seq), "n") ?? 0;
     this.sql.all(
-      "INSERT INTO attention (id, seq, n, principal, lane, item, open) VALUES (?, ?, ?, ?, ?, ?, 1)",
+      // pos increases with every item made, so an item made later is never behind an issued cursor.
+      "INSERT INTO attention (id, seq, n, pos, principal, lane, item, open) VALUES (?, ?, ?, (SELECT COALESCE(MAX(pos), 0) + 1 FROM attention), ?, ?, ?, 1)",
       `att_${seq}_${n}`,
       seq,
       n,
@@ -930,14 +933,21 @@ export class RoomCore {
       const id = str(r, "id")!;
       const laneId = str(r, "lane") as LaneId;
       const leaseGen = num(r, "lease_gen")!;
+      // The lease is current: held, the same lease generation, and not past its deadline by the
+      // room clock now. A lease that ran out without its expiry sealed yet is fenced too (review 8faa2ef9).
       const current = () => {
         const l = laneRow(this.sql, laneId);
-        return !!l && l.state === "held" && l.leaseGen === leaseGen;
+        return !!l && l.state === "held" && l.leaseGen === leaseGen && (l.expiresMs ?? 0) > this.now();
       };
       const finish = (body: Record<string, unknown>) =>
         this.sql.all("UPDATE workspaces SET state = ?, body = ?, updated_ms = ? WHERE id = ? AND state = 'pending'", body["state"] as string, JSON.stringify(body), this.now(), id);
       const base = { id, kind: "workspace", updatedAt: iso(this.now()), lane: laneId };
-      const fenced = () => finish({ ...base, state: "failed", error: artroomError("forbidden", "The lease ended before the workspace was ready.") });
+      const fenced = () => {
+        finish({ ...base, state: "failed", error: artroomError("forbidden", "The lease ended before the workspace was ready.") });
+        // Seal any expiry that is due, and revoke what it ended, as durable work.
+        this.run("leases");
+        this.run("tokens");
+      };
       if (!current()) {
         fenced();
         continue;
@@ -1070,43 +1080,42 @@ export class RoomCore {
     if (this.publishing) return null;
     this.publishing = true;
     try {
-      let pending = this.pendingPublication();
-      if (!pending) {
+      if (!this.pendingPublication()) {
         if (this.headSeq() <= Number(getMeta(this.sql, "published_through") ?? "-1")) return null;
         if (!force && !this.publicationDue()) return null;
-        pending = this.sql.transaction(() => {
-          const n = this.headSeq();
-          const through = entryAt(this.sql, n)!;
-          const p: PendingPublication = {
-            parent: (getMeta(this.sql, "log_commit") as Sha | null) ?? null,
-            through: n,
-            hash: through.hash,
-            checkpoint: checkpoint(this.roomId, this.genesis.roomKey, this.seed(), through, iso(this.now())),
-            retained: this.sql.all("SELECT digest FROM retained ORDER BY digest").map((r) => str(r, "digest") as Digest),
-          };
-          setMeta(this.sql, "pending_publication", JSON.stringify(p));
-          return p;
-        });
       }
       // R-PUB-10: publish only for the room the registry binds to this repository.
       if (!(await this.isBound())) throw artroomError("forbidden", "The registry does not bind this repository to this room; nothing is published.");
-      const cohort = pending;
-      const retained = cohort.retained.map((d) => {
-        const r = one(this.sql, "SELECT kind, body FROM retained WHERE digest = ?", d)!;
-        return { kind: str(r, "kind") === "input" ? ("input" as const) : ("policy" as const), body: str(r, "body")! };
-      });
       let result: Awaited<ReturnType<PublisherPort["publish"]>>;
+      let cohort: PendingPublication;
       try {
         this.publisherCache ??= this.ports.log();
         const publisher = await this.publisherCache;
-        // The Room's own fence: the ref holds either the last commit it confirmed, or a commit
-        // that publishes exactly this pending cohort (a push whose reply was lost). Anything
-        // else is another writer, and publication stops; it is never built on (R-LOG-8).
-        const confirmed = getMeta(this.sql, "log_commit") as Sha | null;
-        const confirmedThrough = Number(getMeta(this.sql, "published_through") ?? "-1");
-        if (publisher.head !== confirmed && !(publisher.publishedThrough === cohort.through && cohort.through > confirmedThrough))
-          throw Object.assign(new Error("the log ref holds a commit the room did not confirm"), { code: "unexpected-writer" });
-        result = await publisher.publish(entriesAfter(this.sql, -1, cohort.through + 1), cohort.checkpoint, retained);
+        // The cohort and its exact commit are fixed and stored before any remote write: the
+        // entries through N, the signed checkpoint, the retained files, the confirmed parent, and
+        // the commit the publisher's own serialization makes of them (review 8faa2ef9).
+        cohort =
+          this.pendingPublication() ??
+          this.sql.transaction(() => {
+            const n = this.headSeq();
+            const through = entryAt(this.sql, n)!;
+            const parent = (getMeta(this.sql, "log_commit") as Sha | null) ?? null;
+            const cp = checkpoint(this.roomId, this.genesis.roomKey, this.seed(), through, iso(this.now()));
+            const digests = this.sql.all("SELECT digest FROM retained ORDER BY digest").map((r) => str(r, "digest") as Digest);
+            const expected = publisher.commitFor(parent, entriesAfter(this.sql, -1, n + 1), cp, this.retainedFiles(digests));
+            const p: PendingPublication = { parent, expected, through: n, hash: through.hash, checkpoint: cp, retained: digests };
+            setMeta(this.sql, "pending_publication", JSON.stringify(p));
+            return p;
+          });
+        const entries = entriesAfter(this.sql, -1, cohort.through + 1);
+        const retained = this.retainedFiles(cohort.retained);
+        // The Room's own fence: the ref holds the parent it confirmed, or exactly the pending
+        // commit (a push whose reply was lost). Anything else, even with the same entries, is
+        // another writer, and publication stops; it is never built on (R-LOG-8).
+        if (publisher.head !== cohort.parent && publisher.head !== cohort.expected)
+          throw Object.assign(new Error("the log ref holds a commit the room did not write"), { code: "unexpected-writer" });
+        result = await publisher.publish(entries, cohort.checkpoint, retained);
+        if (result.commit !== cohort.expected) throw Object.assign(new Error("the publisher confirmed a commit other than the pending one"), { code: "unexpected-writer" });
       } catch (e) {
         // Reopen from the ref next time: the read-back decides what happened.
         this.publisherCache = null;
@@ -1119,23 +1128,33 @@ export class RoomCore {
               this.attendAdmins(this.headSeq(), null, { why: "publication-unresolved", op: "op_log", since: iso(this.now()) }, "Another writer moved refs/artroom/log. Publication of the log has stopped.");
           }),
         );
+        // Wake subscriptions: the admins' item is new even though no entry is.
+        this.committed();
         throw artroomError("unavailable", `The log could not be published (${code}); the same cohort is retried.`);
       }
+      const done = cohort;
       await this.serial(async () =>
         this.sql.transaction(() => {
           const now = this.pendingPublication();
-          if (!now || now.through !== cohort.through) return;
-          this.sealSystem({ type: "checkpoint", through: cohort.through, hash: cohort.hash, commit: result.commit });
-          setMeta(this.sql, "published_through", String(cohort.through));
+          if (!now || now.through !== done.through || now.expected !== result.commit) return;
+          this.sealSystem({ type: "checkpoint", through: done.through, hash: done.hash, commit: result.commit });
+          setMeta(this.sql, "published_through", String(done.through));
           setMeta(this.sql, "log_commit", result.commit);
           this.sql.all("DELETE FROM meta WHERE k IN ('pending_publication', 'publication_error')");
         }),
       );
       this.committed();
-      return { through: cohort.through, commit: result.commit };
+      return { through: done.through, commit: result.commit };
     } finally {
       this.publishing = false;
     }
+  }
+
+  private retainedFiles(digests: readonly Digest[]): RetainedFile[] {
+    return digests.map((d) => {
+      const r = one(this.sql, "SELECT kind, body FROM retained WHERE digest = ?", d)!;
+      return { kind: str(r, "kind") === "input" ? ("input" as const) : ("policy" as const), body: str(r, "body")! };
+    });
   }
 
   // ------------------------------------------------------------ durable alarm work

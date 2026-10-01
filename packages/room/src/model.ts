@@ -178,7 +178,8 @@ function evidenceFrom(r: SqlRow): EvidenceRow {
     qualifies: JSON.parse(r["qualifies"] as string) as ObligationId[],
     flags: JSON.parse(r["flags"] as string) as Flag[],
     authority: body.authority,
-    admission: body.admission ?? { teams: [], author: false },
+    // Migration 4 records these for earlier evidence; a missing record is judged as an author, which can only take eligibility away.
+    admission: body.admission ?? { teams: [], author: true },
     body: body.body,
   };
 }

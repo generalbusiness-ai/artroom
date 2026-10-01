@@ -290,6 +290,15 @@ export interface PublisherPort {
   /** The last entry the ref is known to publish, or -1. */
   readonly publishedThrough: Seq;
   readonly head: Sha | null;
+  /**
+   * The exact commit `publish` would write for this cohort on top of
+   * `parent`: pure, synchronous and deterministic, with the publisher's own
+   * git serialization. The Room stores it before any remote write and accepts
+   * a read-back only at the confirmed parent or at this commit (review
+   * 8faa2ef9). Lane L's `LogPublisher` builds this commit inside `publish`;
+   * exposing it as this method is the adapter's one requirement.
+   */
+  commitFor(parent: Sha | null, entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly RetainedFile[]): Sha;
   publish(
     entries: readonly LogEntry[],
     checkpoint: Checkpoint,

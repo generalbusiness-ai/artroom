@@ -9,8 +9,11 @@
  */
 
 import type { Digest, Seq } from "@generalbusiness/artroom-contract";
+import type { Role } from "@generalbusiness/artroom-contract";
 import type { Sql, SqlRow, SqlValue } from "./ports.ts";
+import { delegableBy } from "./roster.ts";
 
+/** Version 1: the schema as first released. Later versions are migrations below. */
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
   // The log (R-LOG-1): one canonical LogEntry per row.
@@ -57,30 +60,122 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS previews (id TEXT PRIMARY KEY, lane TEXT NOT NULL, generation INTEGER NOT NULL, head TEXT NOT NULL,
      state TEXT NOT NULL, body TEXT NOT NULL, main TEXT, updated_ms INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, state TEXT NOT NULL,
-     body TEXT NOT NULL, updated_ms INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0)`,
+     body TEXT NOT NULL, updated_ms INTEGER NOT NULL)`,
   // Workspace tokens by ID only; the token text is never stored (R-WS-4).
   `CREATE TABLE IF NOT EXISTS fork_tokens (id TEXT PRIMARY KEY, lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, revoked INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS pins (ref TEXT PRIMARY KEY, head TEXT NOT NULL, done INTEGER NOT NULL)`,
   // Policy versions (R-POL-9), and `.artroom/` configuration read from integrations.
   `CREATE TABLE IF NOT EXISTS policies (version TEXT PRIMARY KEY, seq INTEGER NOT NULL, digest TEXT NOT NULL, doc TEXT NOT NULL, checkers TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS configs (commit_sha TEXT PRIMARY KEY, body TEXT NOT NULL)`,
-  // Recomputations after a policy activation (R-POL-9): the decisions and the new obligations, per proposal.
-  `CREATE TABLE IF NOT EXISTS recomputations (version TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL, body TEXT NOT NULL,
-     PRIMARY KEY (version, lane, generation))`,
   `CREATE TABLE IF NOT EXISTS land_evals (op TEXT NOT NULL, digest TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY (op, digest))`,
   // R-LOG-13: notify runs after commit, from this durable queue.
   `CREATE TABLE IF NOT EXISTS notify_queue (seq INTEGER PRIMARY KEY, entry TEXT NOT NULL, policy TEXT NOT NULL, context TEXT NOT NULL,
      attempts INTEGER NOT NULL, next_ms INTEGER NOT NULL, last_error TEXT)`,
-  // An item's position is (seq, n): n orders the items one entry produced.
-  `CREATE TABLE IF NOT EXISTS attention (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, n INTEGER NOT NULL DEFAULT 0, principal TEXT NOT NULL, lane TEXT,
+  `CREATE TABLE IF NOT EXISTS attention (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, principal TEXT NOT NULL, lane TEXT,
      item TEXT NOT NULL, open INTEGER NOT NULL)`,
-  `CREATE INDEX IF NOT EXISTS attention_position ON attention (principal, seq, n)`,
+  `CREATE INDEX IF NOT EXISTS attention_principal ON attention (principal, seq)`,
   `CREATE INDEX IF NOT EXISTS evidence_lane ON evidence (lane, generation)`,
   `CREATE INDEX IF NOT EXISTS keys_member ON keys (member)`,
 ];
 
+function columns(sql: Sql, table: string): Set<string> {
+  return new Set(sql.all("SELECT name FROM pragma_table_info(?)", table).map((r) => r["name"] as string));
+}
+
+/** One schema step: idempotent, so a step that ran without recording its version runs again harmlessly. */
+export interface Migration {
+  readonly version: number;
+  readonly name: string;
+  readonly up: (sql: Sql) => void;
+}
+
+/**
+ * Bring a store to the latest version. Each step runs in its own transaction
+ * with the version it records, so a crash leaves a store at a whole version.
+ * Every opening of the store calls it; a store already current does nothing.
+ */
+export function migrate(sql: Sql, steps: readonly Migration[]): number {
+  sql.all("CREATE TABLE IF NOT EXISTS schema_version (id INTEGER PRIMARY KEY CHECK (id = 1), v INTEGER NOT NULL)");
+  let v = num(one(sql, "SELECT v FROM schema_version WHERE id = 1"), "v") ?? 0;
+  for (const step of steps) {
+    if (step.version <= v) continue;
+    sql.transaction(() => {
+      step.up(sql);
+      sql.all("INSERT INTO schema_version (id, v) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET v = excluded.v", step.version);
+    });
+    v = step.version;
+  }
+  return v;
+}
+
+/** The Room's migrations. A new table, column or index is added only here. */
+export const ROOM_MIGRATIONS: readonly Migration[] = [
+  { version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) },
+  {
+    version: 2,
+    name: "review aabda1ed: workspace attempts, recomputations",
+    up: (sql) => {
+      if (!columns(sql, "workspaces").has("attempts")) sql.all("ALTER TABLE workspaces ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0");
+      sql.all(`CREATE TABLE IF NOT EXISTS recomputations (version TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL, body TEXT NOT NULL,
+        PRIMARY KEY (version, lane, generation))`);
+    },
+  },
+  {
+    version: 3,
+    name: "review 8faa2ef9: monotonic attention positions",
+    up: (sql) => {
+      const cols = columns(sql, "attention");
+      // n: an item's order within its entry, from its ID `att_<seq>_<n>`.
+      if (!cols.has("n")) {
+        sql.all("ALTER TABLE attention ADD COLUMN n INTEGER NOT NULL DEFAULT 0");
+        sql.all("UPDATE attention SET n = CAST(substr(id, instr(substr(id, 5), '_') + 5) AS INTEGER)");
+      }
+      // pos: one position per item, increasing in the order items were made, so an item made later
+      // is never behind a cursor already issued. Existing items keep their (seq, n) order.
+      if (!cols.has("pos")) {
+        sql.all("ALTER TABLE attention ADD COLUMN pos INTEGER");
+        sql.all("UPDATE attention SET pos = (SELECT COUNT(*) FROM attention b WHERE b.seq < attention.seq OR (b.seq = attention.seq AND b.n <= attention.n))");
+      }
+      sql.all("CREATE UNIQUE INDEX IF NOT EXISTS attention_pos ON attention (pos)");
+      sql.all("CREATE INDEX IF NOT EXISTS attention_principal_pos ON attention (principal, pos)");
+    },
+  },
+  {
+    version: 4,
+    name: "review 8faa2ef9: admission facts for earlier evidence",
+    up: (sql) => {
+      // Evidence admitted before these facts were recorded gets them conservatively: an author if the
+      // member proposed that generation or ever claimed the lane before the evidence; no teams. Both
+      // can only take eligibility away, never give it (R-REV-1, R-OBL-2).
+      for (const r of sql.all("SELECT act, seq, lane, generation, member, body FROM evidence")) {
+        const body = JSON.parse(r["body"] as string) as { admission?: unknown };
+        if (body.admission) continue;
+        const proposer = str(one(sql, "SELECT proposer FROM generations WHERE lane = ? AND generation = ?", r["lane"] as string, r["generation"] as number), "proposer");
+        const claimed = sql
+          .all("SELECT body FROM entries WHERE seq < ? AND (id = ? OR lane = ?) AND type = 'act' AND kind = 'claim'", r["seq"] as number, r["lane"] as string, r["lane"] as string)
+          .some((e) => (JSON.parse(e["body"] as string) as { entry: { receipt?: { authority: { member: string | null } } } }).entry.receipt?.authority.member === r["member"]);
+        const admission = { teams: [], author: proposer === r["member"] || claimed };
+        sql.all("UPDATE evidence SET body = ? WHERE act = ?", JSON.stringify({ ...body, admission }), r["act"] as string);
+      }
+    },
+  },
+  {
+    version: 5,
+    name: "review 8faa2ef9: '*' delegations fixed at the grant",
+    up: (sql) => {
+      // A "*" grant covers the kinds the grantor's role could sign when it was granted: the role
+      // recorded in the grant's own receipt (R-ADM-5, R-LOG-10).
+      for (const r of sql.all("SELECT id FROM delegations WHERE kinds = '\"*\"'")) {
+        const entry = one(sql, "SELECT body FROM entries WHERE id = ?", r["id"] as string);
+        const role = entry ? (JSON.parse(str(entry, "body")!) as { entry: { receipt?: { authority: { role: Role | null } } } }).entry.receipt?.authority.role : null;
+        sql.all("UPDATE delegations SET kinds = ? WHERE id = ?", JSON.stringify(role ? delegableBy(role) : []), r["id"] as string);
+      }
+    },
+  },
+];
+
 export function createSchema(sql: Sql): void {
-  for (const s of SCHEMA) sql.all(s);
+  migrate(sql, ROOM_MIGRATIONS);
 }
 
 export function one(sql: Sql, query: string, ...b: SqlValue[]): SqlRow | undefined {

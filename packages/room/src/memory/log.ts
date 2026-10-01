@@ -92,6 +92,17 @@ export class MemoryLogPublisher implements PublisherPort {
     return this.last;
   }
 
+  /** The files and commit of a cohort on a parent: the stand-in's one serialization. */
+  private build(parent: Sha | null, entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly RetainedFile[]) {
+    const genesis = (entries[0]!.entry as unknown as { event: { genesis: never } }).event.genesis;
+    const files = publicationFiles(genesis, entries, retained.map((r) => ({ digest: `sha256:${sha256Hex(utf8(r.body))}`, kind: r.kind, body: r.body })), checkpoint);
+    return { files, commit: sha256Hex(utf8(canonicalize({ parent, files }))).slice(0, 40) as Sha };
+  }
+
+  commitFor(parent: Sha | null, entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly RetainedFile[]): Sha {
+    return this.build(parent, entries, checkpoint, retained).commit;
+  }
+
   async publish(entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly RetainedFile[]) {
     const lines = entries.map((e) => canonicalize(e));
     for (let i = 0; i < this.lines.length; i++)
@@ -104,10 +115,8 @@ export class MemoryLogPublisher implements PublisherPort {
       return { commit, through: last.seq, hash: last.hash as Digest, publishedThrough: last.seq };
     };
     if (last.seq === this.publishedThrough && this.last) return done(this.last);
-    const genesis = (entries[0]!.entry as unknown as { event: { genesis: never } }).event.genesis;
-    const files = publicationFiles(genesis, entries, retained.map((r) => ({ digest: `sha256:${sha256Hex(utf8(r.body))}`, kind: r.kind, body: r.body })), checkpoint);
     const lease = this.last;
-    const commit = sha256Hex(utf8(canonicalize({ parent: lease, files }))).slice(0, 40) as Sha;
+    const { files, commit } = this.build(lease, entries, checkpoint, retained);
     for (let attempt = 1; attempt <= 3; attempt++) {
       let outcome: Awaited<ReturnType<MemoryLogRemote["push"]>> | null = null;
       try {

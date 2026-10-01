@@ -10,6 +10,19 @@ import { DurableObject } from "cloudflare:workers";
 import type { RoomId, RoomRef } from "@generalbusiness/artroom-contract";
 import type { RoomEnv } from "./config.ts";
 import { artroomError, wire, type Wire } from "./errors.ts";
+import type { Sql } from "./ports.ts";
+import { migrate, type Migration } from "./store.ts";
+
+/** The registry's migrations, through the same mechanism as the Room's. */
+export const REGISTRY_MIGRATIONS: readonly Migration[] = [
+  {
+    version: 1,
+    name: "bindings",
+    up: (sql) => {
+      sql.all("CREATE TABLE IF NOT EXISTS bindings (repo TEXT PRIMARY KEY, room TEXT NOT NULL UNIQUE, name TEXT NOT NULL UNIQUE)");
+    },
+  },
+];
 
 export interface Binding {
   readonly repo: string;
@@ -20,9 +33,11 @@ export interface Binding {
 export class Registry extends DurableObject<RoomEnv> {
   constructor(ctx: DurableObjectState, env: RoomEnv) {
     super(ctx, env);
-    ctx.storage.sql.exec(
-      "CREATE TABLE IF NOT EXISTS bindings (repo TEXT PRIMARY KEY, room TEXT NOT NULL UNIQUE, name TEXT NOT NULL UNIQUE)",
-    );
+    const sql: Sql = {
+      all: (q, ...b) => ctx.storage.sql.exec(q, ...b).toArray() as ReturnType<Sql["all"]>,
+      transaction: (fn) => ctx.storage.transactionSync(fn),
+    };
+    migrate(sql, REGISTRY_MIGRATIONS);
   }
 
   private row(query: string, value: string): Binding | null {

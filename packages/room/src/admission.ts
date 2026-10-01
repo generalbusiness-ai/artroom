@@ -968,11 +968,12 @@ async function review(ctx: Ctx, laneId: LaneId, generation: Generation, body: Re
   const statusOpts = { doc: ctx.policy.doc, checkers: ctx.policy.checkers };
   const before = statusesOf(core.sql, g, statusOpts);
   const after = statusesOf(core.sql, g, { ...statusOpts, extra: [prospective(`act_${core.headSeq() + 1}_00000000`, core.headSeq() + 1)] });
-  const { met: metNow } = transitions(before, after);
+  // Both directions: an approval can meet an obligation, and an objection can reopen one (review 8faa2ef9).
+  const moved = transitions(before, after);
   return {
     t: "accept",
     ctx,
-    effects: metNow.length ? [{ type: "obligations", lane: laneId, generation, opened: [], met: metNow }] : [],
+    effects: moved.opened.length || moved.met.length ? [{ type: "obligations", lane: laneId, generation, opened: moved.opened, met: moved.met }] : [],
     notify: { lane: laneId, proposal: core.proposalInput(ctx.policy.doc, g) },
     apply: (entry, id) => {
       core.sql.all(
@@ -1064,11 +1065,11 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   const r = await policyRefuse(ctx, lane);
   if (r) return refused(ctx, r);
   const statusOpts = { doc: ctx.policy.doc, checkers: ctx.policy.checkers };
-  const { met } = transitions(statusesOf(core.sql, g, statusOpts), statusesOf(core.sql, g, { ...statusOpts, extra: [prospective(`act_${core.headSeq() + 1}_00000000`, core.headSeq() + 1)] }));
+  const moved = transitions(statusesOf(core.sql, g, statusOpts), statusesOf(core.sql, g, { ...statusOpts, extra: [prospective(`act_${core.headSeq() + 1}_00000000`, core.headSeq() + 1)] }));
   return {
     t: "accept",
     ctx,
-    effects: met.length ? [{ type: "obligations", lane: laneId, generation, opened: [], met }] : [],
+    effects: moved.opened.length || moved.met.length ? [{ type: "obligations", lane: laneId, generation, opened: moved.opened, met: moved.met }] : [],
     notify: { lane: laneId, proposal: core.proposalInput(ctx.policy.doc, g) },
     apply: (entry, id) => {
       core.sql.all(
@@ -1359,7 +1360,8 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
             id,
             ctx.env.actor,
             op.to,
-            JSON.stringify(op.kinds),
+            // R-ADM-5, R-LOG-10: "*" is fixed at the grant to the kinds the grantor's role may sign now.
+            JSON.stringify(op.kinds === "*" ? delegableBy(ctx.authority.role!) : op.kinds),
             JSON.stringify(op.lanes),
             op.expiresAt,
             exp,
