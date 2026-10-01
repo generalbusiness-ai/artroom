@@ -64,7 +64,21 @@ export type AttentionItem = AttentionWhy & {
   readonly open: boolean;
 };
 
-/** One live update. Over RPC a stream of these; over HTTPS a long poll; over MCP, `attention` with a cursor. */
+/**
+ * A page of the attention queue, with the publication point (R-LOG-11,
+ * R-API-9). `publishedThrough` comes from the same read as the items, so a
+ * caller never needs a second read of the log to learn it.
+ */
+export type AttentionPage = Page<AttentionItem> & {
+  /** The highest seq published to `refs/artroom/log` (R-LOG-8). */
+  readonly publishedThrough: Seq;
+};
+
+/**
+ * One live update. Over RPC, one line of a newline-delimited JSON byte
+ * stream; over HTTPS, a long poll or one WebSocket message; over MCP,
+ * `attention` with a cursor (R-API-8).
+ */
 export interface Update {
   readonly cursor: Cursor;
   readonly entries: readonly EntrySummary[];
