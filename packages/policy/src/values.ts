@@ -134,10 +134,13 @@ const tokenSize = (text: string) => encoder.encode(text).length;
  * 2026-10-01: 6 to 11 times faster deployed, identical outputs.)
  */
 export class PreparedInput {
-  constructor(
-    readonly value: Json,
-    readonly memo: SizeMemo,
-  ) {}
+  readonly value: Json;
+  readonly memo: SizeMemo;
+  // Plain fields, not parameter properties, so Node can run this file by stripping types.
+  constructor(value: Json, memo: SizeMemo) {
+    this.value = value;
+    this.memo = memo;
+  }
 }
 
 export function prepareInput(input: unknown): PreparedInput {

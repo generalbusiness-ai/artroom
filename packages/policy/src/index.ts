@@ -24,7 +24,7 @@ export { budgetState, meterFrom, own, type BudgetState, type CarryFactsRecord, t
 export { ownersFor, type InputOf } from "./inputs.ts";
 export { PreparedInput, prepareInput } from "./values.ts";
 export { canonicalize, digestJson, sha256Hex, snapshotDigest, type SnapshotEntry } from "./integrity.ts";
-export { globProblem, globsOverlap, isGlob, matchGlob, matchesAny, matching } from "./glob.ts";
+export { globCovers, globProblem, globsOverlap, isGlob, matchGlob, matchesAny, matching } from "./glob.ts";
 export {
   PLATFORM_GLOBAL_INPUTS,
   checkConditions,
