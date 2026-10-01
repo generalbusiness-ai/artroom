@@ -59,9 +59,17 @@ serveArtroomStdio(room); // room: any RoomApi, for example from connect()
 
 - `claim` takes two forms (a new lane, or an existing lane). MCP clients
   handle a single object schema best, so the schema lists every property
-  and requires only `scope`; the tool checks the rest.
-- `attention` adds `publishedThrough`, which it reads from the log.
-- `explain` returns `null` for an unknown act. MCP structured content must
-  be an object, so a `null` result is text only.
+  and requires only `scope`; the tool checks the rest. Both forms, and
+  `propose`, pass `because` through unchanged.
+- `attention` returns the room's page as it is, with `publishedThrough`.
+- `explain` returns `{ act, outcome: "not-found" }` for an unknown act,
+  because MCP structured content must be an object.
+- Tool names and input keys are checked as own properties, so names such
+  as `constructor` or `__proto__` are never tools or fields.
 - The input validator is small and has no code generation, so it runs in
   Workers.
+
+On Workers, `room()` usually builds the handle with
+`connect(env.ARTROOM, roomId, { kind: "bearer", token: bearer })` from
+`@generalbusiness/artroom-client`, which sends acts to `bearerAct` and
+workspace requests to `bearerRequest` (R-CRED-10).

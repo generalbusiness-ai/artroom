@@ -11,7 +11,7 @@ import {
   type ActOptions,
   type ActRecord,
   type ArtroomError,
-  type AttentionItem,
+  type AttentionPage,
   type Check,
   type CheckActInput,
   type Claim,
@@ -61,6 +61,7 @@ import {
   type RosterRecord,
   type Session,
   type Subscription,
+  type ByteStream,
   type Update,
   type UpdateStream,
   type WaitOptions,
@@ -70,7 +71,7 @@ import {
 import { artroomError } from "./errors.ts";
 import { buildEnvelope, checkIdempotencyKey, signEnvelope, signRequest, type Identity } from "./envelope.ts";
 import { newIdempotencyKey } from "./keys.ts";
-import type { BearerActs } from "./bearer.ts";
+import type { BearerActor } from "./bearer.ts";
 import type { ClientOptions, HttpWire, RequestResult, RpcWire, Wire } from "./wire.ts";
 
 type Obj = Record<string, unknown>;
@@ -134,11 +135,11 @@ abstract class RoomCore {
   protected readonly wire: Wire & { redactor: import("./errors.ts").Redactor };
   protected readonly creds: Credentials;
   protected readonly opts: ClientOptions;
-  protected readonly bearer: BearerActs | undefined;
+  protected readonly bearer: BearerActor | undefined;
   #session: Session | undefined;
   #sessionPending: Promise<Session> | undefined;
 
-  constructor(wire: Wire & { redactor: import("./errors.ts").Redactor }, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActs) {
+  constructor(wire: Wire & { redactor: import("./errors.ts").Redactor }, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActor) {
     this.wire = wire;
     this.creds = creds;
     this.id = id;
@@ -347,7 +348,8 @@ abstract class RoomCore {
     }
   }
 
-  attention(page?: PageRequest): Promise<Page<AttentionItem>> {
+  /** The attention queue, with `publishedThrough` from the same read (R-API-9). */
+  attention(page?: PageRequest): Promise<AttentionPage> {
     return this.read(page === undefined ? { q: "attention" } : { q: "attention", page });
   }
 
@@ -375,7 +377,7 @@ export class HttpRoomClient extends RoomCore implements HttpRoom {
   readonly #http: HttpWire;
   readonly #watches = new Set<WatchSubscription>();
 
-  constructor(wire: HttpWire, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActs) {
+  constructor(wire: HttpWire, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActor) {
     super(wire, creds, id, name, opts, bearer);
     this.#http = wire;
   }
@@ -557,14 +559,65 @@ class WatchSubscription implements Watch {
 export class RpcRoomClient extends RoomCore implements Room {
   readonly #rpc: RpcWire;
 
-  constructor(wire: RpcWire, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions) {
-    super(wire, creds, id, name, opts);
+  constructor(wire: RpcWire, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActor) {
+    super(wire, creds, id, name, opts, bearer);
     this.#rpc = wire;
   }
 
+  /** The room's newline-delimited JSON bytes, decoded into updates (R-API-8). */
   async subscribe(cursor?: Cursor): Promise<UpdateStream> {
-    return this.#rpc.subscribe(await this.auth(), cursor);
+    return decodeUpdates(await this.#rpc.subscribe(await this.auth(), cursor));
   }
+}
+
+/**
+ * Decodes a `ByteStream` of UTF-8, newline-delimited JSON `Update`s into an
+ * `UpdateStream` (R-API-8). A line may arrive across several chunks; a
+ * chunk may hold several lines. A line that is not an update is an error,
+ * not a silent gap.
+ */
+export function decodeUpdates(bytes: ByteStream): UpdateStream {
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let buffer = "";
+  const queue: Update[] = [];
+  let ended = false;
+  const reader = bytes.getReader();
+  const parse = (line: string) => {
+    if (line.trim() === "") return;
+    let u: unknown;
+    try {
+      u = JSON.parse(line);
+    } catch {
+      throw artroomError("internal", "The room's update stream held a line that is not JSON.");
+    }
+    if (typeof u !== "object" || u === null || typeof (u as Update).cursor !== "string") throw artroomError("internal", "The room's update stream held a line that is not an update.");
+    queue.push(u as Update);
+  };
+  return {
+    getReader: () => ({
+      read: async () => {
+        while (queue.length === 0 && !ended) {
+          const chunk = await reader.read();
+          if (chunk.done) {
+            ended = true;
+            buffer += decoder.decode();
+            if (buffer.length > 0) parse(buffer);
+            buffer = "";
+            break;
+          }
+          buffer += decoder.decode(chunk.value, { stream: true });
+          for (let nl = buffer.indexOf("\n"); nl >= 0; nl = buffer.indexOf("\n")) {
+            parse(buffer.slice(0, nl));
+            buffer = buffer.slice(nl + 1);
+          }
+        }
+        const next = queue.shift();
+        return next === undefined ? { done: true as const } : { done: false as const, value: next };
+      },
+      releaseLock: () => reader.releaseLock(),
+    }),
+    cancel: (reason?: unknown) => bytes.cancel(reason),
+  };
 }
 
 export type { ActRecord };

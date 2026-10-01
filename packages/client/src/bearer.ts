@@ -1,12 +1,19 @@
 /**
- * Acts under a bearer token (R-CRED-3). The client holds no key: the room
- * signs with the session key under the bearer's delegation. Over HTTPS the
- * only route that accepts a bearer for acts is the MCP endpoint, `POST
- * /v1/rooms/:room/mcp`, so each act becomes one call of the MCP tool with
- * the same name (R-API-9).
+ * Acts under a bearer token (R-CRED-3, R-CRED-10). The client holds no key:
+ * the room signs with the session key under the bearer's delegation.
  *
- * `check` and `roster` have no MCP tool, so a bearer session cannot sign
- * them over HTTPS.
+ * - Over HTTPS the only route that accepts a bearer for acts is the MCP
+ *   endpoint, `POST /v1/rooms/:room/mcp`, so each act becomes one call of
+ *   the MCP tool with the same name (R-API-9) (`McpBearer`). `check` and
+ *   `roster` have no tool, so the handle refuses them with `forbidden`
+ *   before it sends anything.
+ * - Over RPC, acts go to `RoomWire.bearerAct` and workspace requests to
+ *   `RoomWire.bearerRequest` (`RpcBearer`). `roster` is refused locally,
+ *   because no delegation can grant it (R-ADM-5).
+ *
+ * A retry sends the same act and idempotency key. While the token is valid
+ * the room returns the original result; after it is revoked or expires the
+ * room throws `unauthenticated`, and there is nothing to replay (R-CRED-10).
  */
 
 import {
@@ -14,6 +21,9 @@ import {
   isRefusal,
   type ActRecord,
   type ArtroomError,
+  type BearerAct,
+  type RoomWire,
+  type SessionToken,
   type EnvelopeKind,
   type McpToolName,
   type RequestBody,
@@ -29,7 +39,14 @@ type Obj = Record<string, unknown>;
 /** The MCP protocol revision the client speaks: one stateless POST per call. */
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
 
-export class BearerActs {
+/** How a handle acts for a bearer session. */
+export interface BearerActor {
+  act(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey: string): Promise<Result<ActRecord>>;
+  request(req: RequestBody): Promise<Result<RequestResult>>;
+}
+
+/** Bearer acts over HTTPS, through the MCP endpoint's tools. */
+export class McpBearer implements BearerActor {
   readonly #wire: HttpWire;
   readonly #token: string;
   readonly #fetch: typeof fetch;
@@ -96,9 +113,8 @@ export class BearerActs {
         if (b["purpose"] !== undefined) {
           throw artroomError("forbidden", "A configuration-recovery claim needs the admin's own key, not a delegation (R-ADMIN-5).");
         }
-        const { because, ...rest } = b;
-        out = await this.tool("claim", target === null ? { ...b, ...key } : { lane: t["lane"], ...rest, ...key });
-        void because;
+        // Both forms keep `because` (R-API-9).
+        out = await this.tool("claim", target === null ? { ...b, ...key } : { lane: t["lane"], ...b, ...key });
         break;
       }
       case "propose":
@@ -108,6 +124,7 @@ export class BearerActs {
           head: b["head"],
           expectedGeneration: b["expectedGeneration"],
           summary: b["summary"],
+          because: b["because"],
           ...key,
         });
         break;
@@ -181,3 +198,29 @@ function parseRpc(text: string, id: number): Obj | undefined {
   }
   return undefined;
 }
+
+/** Bearer acts over a service binding: `RoomWire.bearerAct` and `bearerRequest` (R-CRED-10). */
+export class RpcBearer implements BearerActor {
+  readonly #wire: RoomWire;
+  readonly #token: string;
+  readonly #clean: <T>(f: () => Promise<T>) => Promise<T>;
+
+  constructor(wire: RoomWire, token: string, guard: <T>(f: () => Promise<T>) => Promise<T>) {
+    this.#wire = wire;
+    this.#token = token;
+    this.#clean = guard;
+  }
+
+  async act(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey: string): Promise<Result<ActRecord>> {
+    if (kind === "roster") throw artroomError("forbidden", "A bearer session cannot sign roster acts: no delegation grants them (R-ADM-5).");
+    const act = { kind, target, body, idempotencyKey } as BearerAct;
+    return this.#clean(() => this.#wire.bearerAct(this.#token, act));
+  }
+
+  async request(req: RequestBody): Promise<Result<RequestResult>> {
+    if (req.kind === "session") throw artroomError("bad-request", "A bearer token is already a read credential.");
+    return this.#clean(() => this.#wire.bearerRequest(this.#token, req));
+  }
+}
+
+export type { SessionToken };

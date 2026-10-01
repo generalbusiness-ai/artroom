@@ -44,12 +44,12 @@ describe("P1: credentials never reach the output", () => {
     const agent = join(h.tmp, "agent");
     expect((await cli(agent, ["redeem", await link("@builder", { role: "agent", custody: "room" })])).code).toBe(EXIT.ok);
     const [bearer] = h.room.exposure.bearers;
-    const echo = { name: "ArtroomError", code: "unauthenticated", message: `token ${bearer} refused`, retryable: false };
-    h.room.faults.push({ route: "GET /log", kind: "status", status: 401, body: echo });
+    const echo = { name: "ArtroomError", code: "forbidden", message: `token ${bearer} refused`, retryable: false };
+    h.room.faults.push({ route: "GET /log", kind: "status", status: 403, body: echo });
     const first = await cli(agent, ["attention"]);
     expect(first.code).toBe(EXIT.failed);
     expect(first.err).toContain("[redacted]");
-    h.room.faults.push({ route: "GET /attention", kind: "status", status: 401, body: echo });
+    h.room.faults.push({ route: "GET /attention", kind: "status", status: 403, body: echo });
     const later = await cli(agent, ["attention", "--json"]);
     expect(later.out).toContain("[redacted]");
     expect(first.out + first.err + later.out + later.err).not.toContain(bearer!);
@@ -236,5 +236,37 @@ describe("P5: the landing follow-up waits on the operation already started", () 
     expect(norm(res.out)).toMatchSnapshot(`wait ${outcome}`);
     expect(config(alice).rooms[h.room.id].landing).toBeUndefined();
     expect(acts("land")).toHaveLength(1);
+  });
+});
+
+describe("amendment 2 in the CLI: R-CRED-10 and R-CRED-11", () => {
+  test("after its token is revoked, an unfinished bearer act is not resent; the CLI says so and forgets it", async () => {
+    const agent = join(h.tmp, "agent");
+    await cli(agent, ["redeem", await link("@builder", { role: "agent", custody: "room" })]);
+    h.room.faults.push({ route: "POST /mcp", kind: "drop", times: 4 });
+    const lost = await cli(agent, ["claim", "src/**", "--goal", "g"]);
+    expect(lost.code).toBe(EXIT.failed);
+    const key = /--idempotency-key ([A-Za-z0-9_-]+)/.exec(lost.err)![1]!;
+    const delegation = config(agent).rooms[h.room.id];
+    expect(delegation.custody).toBe("room");
+    for (const d of h.room.delegations.values()) h.room.revokeDelegation(d.id);
+    const again = await cli(agent, ["claim", "src/**", "--goal", "g", "--idempotency-key", key]);
+    expect(again.code).toBe(EXIT.failed);
+    expect(again.err).toMatch(/^Error \(unauthenticated\): The bearer token is no longer valid, so 1 unfinished act\(s\) cannot be sent again/);
+    expect(again.err).not.toMatch(/--idempotency-key/);
+    expect(journal(agent)).toEqual([]);
+  });
+
+  test("a link with the secret in the query instead of the fragment is refused (R-CRED-11)", async () => {
+    const { invitation, secret } = await h.room.invite("@alice");
+    const res = await cli(join(h.tmp, "x"), ["login", `${h.room.url}/rooms/${h.room.id}/join?i=${invitation}&s=${secret}`]);
+    expect(res.code).toBe(EXIT.usage);
+    expect(h.room.requests.filter((r) => r.route === "/redeem")).toHaveLength(0);
+  });
+
+  test("a link with a path prefix uses the origin and the prefix as the endpoint (R-CRED-11)", async () => {
+    const { parseInvitation } = await import("../src/link.ts");
+    const out = parseInvitation(`https://example.com/artroom/rooms/${h.room.id}/join#i=act_3_0c1d2e3f&s=${"A".repeat(43)}`);
+    expect(out).toMatchObject({ url: "https://example.com/artroom", room: h.room.id, invitation: "act_3_0c1d2e3f" });
   });
 });

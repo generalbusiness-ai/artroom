@@ -31,13 +31,11 @@ export function useHarness() {
     h.room = await FakeRoom.create();
     await h.room.start();
     const room = h.room;
-    room.mcp = (request) =>
-      createMcpFetch<unknown>({
-        async room(_r, _e, bearer) {
-          const s = await room.bearerSession(bearer);
-          return s ? connect({ room: async () => room.wire() }, room.id, { kind: "delegation", signer: s.signer, as: s.delegation }) : null;
-        },
-      })(request, {});
+    // The deployment's MCP Worker: a bearer handle on RoomWire (bearerAct, bearerRequest), null for a bad token.
+    const mcp = createMcpFetch<unknown>({
+      room: (_r, _e, bearer) => connect({ room: async () => room.wire() }, room.id, { kind: "bearer", token: bearer }).catch(() => null),
+    });
+    room.mcp = (request) => mcp(request, {});
     h.tmp = mkdtempSync(join(tmpdir(), "artroom-cli-"));
   });
   afterEach(async () => {

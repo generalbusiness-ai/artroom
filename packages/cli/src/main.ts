@@ -188,9 +188,21 @@ async function open(ctx: Ctx): Promise<{ api: HttpRoomClient; id: RoomId; room: 
     ctx.secrets.add(token); // registered before any request
     creds = { kind: "bearer" as const, token };
   } else creds = { kind: "key" as const, signer: await signerFromJwk(ctx.store.loadKey(id).jwk) };
-  // connect() over HTTPS returns the client's HttpRoomClient, which can also replay a journaled act.
-  const api = (await connect({ url: room.url }, id, creds, clientOptions(ctx))) as HttpRoomClient;
-  return { api, id, room };
+  try {
+    // connect() over HTTPS returns the client's HttpRoomClient, which can also replay a journaled act.
+    const api = (await connect({ url: room.url }, id, creds, clientOptions(ctx))) as HttpRoomClient;
+    return { api, id, room };
+  } catch (e) {
+    if (isArtroomError(e) && e.code === "unauthenticated" && room.custody === "room") {
+      // A refused bearer can never resend an unsigned act (R-CRED-10): forget them, and say what to do.
+      const dropped = ctx.store.forgetBearerActs(id);
+      throw {
+        ...e,
+        message: `The bearer token is no longer valid${dropped > 0 ? `, so ${dropped} unfinished act(s) cannot be sent again` : ""}. Ask an admin for a new MCP invitation. If an act was recorded, a member with a read session can find it with artroom log.`,
+      };
+    }
+    throw e;
+  }
 }
 
 /** Reads, changes and writes the config in one step. */
@@ -238,7 +250,20 @@ async function journaled<T>(ctx: Ctx, api: HttpRoomClient, room: RoomId, command
   let out: Result<T>;
   if (saved !== undefined) {
     if (saved.command !== command) throw new UsageError(`The idempotency key ${key} belongs to an unfinished artroom ${saved.command}. Repeat that command with it.`);
-    out = (await api.replay(saved.prepared)) as Result<T>;
+    try {
+      out = (await api.replay(saved.prepared)) as Result<T>;
+    } catch (e) {
+      // A bearer act has no signed envelope to keep: once the token is refused, there is nothing to resend (R-CRED-10).
+      if (isArtroomError(e) && e.code === "unauthenticated" && saved.prepared.signed === undefined) {
+        ctx.store.finish(room, "act", key);
+        ctx.act = undefined;
+        throw {
+          ...e,
+          message: "The bearer token is no longer valid, so this act cannot be sent again. If the room recorded it, a member with a read session can find it with artroom log.",
+        };
+      }
+      throw e;
+    }
   } else {
     out = await start({
       idempotencyKey: key,

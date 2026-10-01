@@ -14,6 +14,7 @@ import {
   type HttpRoom,
   type InvitationId,
   type Joined,
+  type LogPage,
   type JoinEnvelope,
   type Redeemed,
   type Result,
@@ -26,7 +27,7 @@ import { digestOf } from "./canonical.ts";
 import { buildEnvelope, signEnvelope } from "./envelope.ts";
 import { artroomError, Redactor } from "./errors.ts";
 import { newIdempotencyKey } from "./keys.ts";
-import { BearerActs } from "./bearer.ts";
+import { McpBearer, RpcBearer } from "./bearer.ts";
 import { HttpRoomClient, RpcRoomClient, withRetries } from "./room.ts";
 import { endpointUrl, HttpWire, RpcWire, type ClientOptions } from "./wire.ts";
 
@@ -41,6 +42,14 @@ export async function roomIdOf(genesis: Genesis): Promise<RoomId> {
   return `room_${(await digestOf(genesis)).slice("sha256:".length, "sha256:".length + 32)}`;
 }
 
+function genesisOf(page: LogPage): Genesis {
+  const first = page.acts[0];
+  if (first?.entry.type !== "system" || first.entry.event.type !== "genesis") {
+    throw artroomError("internal", "The room's log does not start with its genesis entry.");
+  }
+  return first.entry.event.genesis;
+}
+
 /** Connect to a room over a service binding (RPC). */
 export function connect(
   service: ArtroomService,
@@ -48,6 +57,11 @@ export function connect(
   credentials: Extract<Credentials, { kind: "key" | "delegation" }>,
   options?: ClientOptions,
 ): Promise<Room>;
+/**
+ * Connect over a service binding as a bearer session: the adapter the MCP
+ * endpoint's Worker needs (R-CRED-10). Not in the contract's declaration.
+ */
+export function connect(service: ArtroomService, room: RoomName | RoomId, credentials: Extract<Credentials, { kind: "bearer" }>, options?: ClientOptions): Promise<Room>;
 /** Connect to a room over HTTPS. */
 export function connect(endpoint: Endpoint, room: RoomName | RoomId, credentials: Credentials, options?: ClientOptions): Promise<HttpRoom>;
 export async function connect(
@@ -61,7 +75,17 @@ export async function connect(
   // from any request, including the first, can carry it out (R-WS-4).
   if (credentials.kind === "bearer") redactor.add(credentials.token);
   if (isService(endpoint)) {
-    if (credentials.kind === "bearer") throw artroomError("bad-request", "A service binding signs with a key or a delegation, not a bearer token.");
+    if (credentials.kind === "bearer") {
+      // The MCP endpoint's adapter: acts to `bearerAct`, workspace requests to `bearerRequest`,
+      // reads with the token (R-CRED-10). The room signs, so a name is enough; genesis gives the ID.
+      const target = await endpoint.room(room);
+      const wire = new RpcWire(target, redactor);
+      const page = await wire.read(credentials.token, { q: "log", req: { limit: 1 } });
+      const genesis = genesisOf(page);
+      const id = await roomIdOf(genesis);
+      if (isRoomId(room) && room !== id) throw artroomError("unauthenticated", `The service's genesis is for ${id}, not ${room}.`);
+      return new RpcRoomClient(wire, credentials, id, genesis.name, options, new RpcBearer(target, credentials.token, (f) => wire.guard(f).then((r) => (isRefusal(r) ? (redactor.refusal(r) as typeof r) : r))));
+    }
     if (!isRoomId(room)) throw artroomError("bad-request", "Connect by room ID: envelopes are signed with it, and a name can be reused (R-ID-3).");
     const wire = new RpcWire(await endpoint.room(room), redactor);
     return withName(new RpcRoomClient(wire, credentials, room, room, options), room);
@@ -72,15 +96,11 @@ export async function connect(
     // The room signs for a bearer session, so the client does not need the room ID; it learns it from genesis.
     const wire = new HttpWire(base, room, options, redactor);
     const page = await wire.read(credentials.token, { q: "log", req: { limit: 1 } });
-    const first = page.acts[0];
-    if (first?.entry.type !== "system" || first.entry.event.type !== "genesis") {
-      throw artroomError("internal", "The room's log does not start with its genesis entry.");
-    }
-    const genesis = first.entry.event.genesis;
+    const genesis = genesisOf(page);
     const id = await roomIdOf(genesis);
     if (isRoomId(room) && room !== id) throw artroomError("unauthenticated", `The server's genesis is for ${id}, not ${room}.`);
     const bound = new HttpWire(base, id, options, redactor);
-    return new HttpRoomClient(bound, credentials, id, genesis.name, options, new BearerActs(bound, credentials.token, options.fetch));
+    return new HttpRoomClient(bound, credentials, id, genesis.name, options, new McpBearer(bound, credentials.token, options.fetch));
   }
 
   if (!isRoomId(room)) throw artroomError("bad-request", "Connect by room ID: envelopes are signed with it, and a name can be reused (R-ID-3).");

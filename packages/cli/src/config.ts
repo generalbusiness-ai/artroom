@@ -5,7 +5,7 @@
  * (0700). Nothing secret is ever printed.
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { KeyId, LaneId, MemberId, OpId, Redeemed, RoomId, Role } from "@generalbusiness/artroom-contract";
@@ -149,6 +149,22 @@ export class Store {
   entry<T extends JournalEntry["type"]>(room: RoomId, type: T, id: string): Extract<JournalEntry, { type: T }> | undefined {
     const path = this.#entryPath(room, type, id);
     return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Extract<JournalEntry, { type: T }>) : undefined;
+  }
+
+  /** Removes every unfinished act a bearer session prepared for this room, and says how many. */
+  forgetBearerActs(room: RoomId): number {
+    const dir = join(this.dir, "journal", room);
+    if (!existsSync(dir)) return 0;
+    let n = 0;
+    for (const file of readdirSync(dir)) {
+      if (!file.startsWith("act-")) continue;
+      const entry = JSON.parse(readFileSync(join(dir, file), "utf8")) as JournalEntry;
+      if (entry.type === "act" && entry.prepared.signed === undefined) {
+        rmSync(join(dir, file), { force: true });
+        n++;
+      }
+    }
+    return n;
   }
 
   /** Removes the entry once its work is finished, locally as well as in the room. */

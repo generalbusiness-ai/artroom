@@ -183,7 +183,7 @@ const propose = {
   ].join(" "),
   inputSchema: {
     type: "object",
-    properties: { lane, lease, head: sha, expectedGeneration, summary: text("What changed and why, for reviewers."), idempotencyKey },
+    properties: { lane, lease, head: sha, expectedGeneration, summary: text("What changed and why, for reviewers."), because, idempotencyKey },
     required: ["lane", "lease", "head", "expectedGeneration", "summary"],
     additionalProperties: false,
   },
@@ -283,10 +283,20 @@ const explain = {
   method: "explain",
   description: [
     "Explain an act or a recorded refusal by its ID: the rules applied, their inputs and outcomes, and the evidence for a proposal.",
-    "Use it when a refusal or an outcome surprises you. Returns null for an unknown ID.",
+    "Use it when a refusal or an outcome surprises you. For an ID the room does not have, it returns `{ act, outcome: \"not-found\" }`: check the ID.",
   ].join(" "),
   inputSchema: { type: "object", properties: { act: id("The act or refusal ID, `act_<seq>_<hash>`.") }, required: ["act"], additionalProperties: false },
-  outputSchema: { oneOf: [{ type: "object", required: ["act", "kind", "outcome", "entry", "decisions", "invariants", "published"] }, { type: "null" }] },
+  outputSchema: {
+    oneOf: [
+      { type: "object", required: ["act", "kind", "outcome", "entry", "decisions", "invariants", "published"] },
+      {
+        type: "object",
+        description: "The room has no such act.",
+        properties: { act: { type: "string" }, outcome: { type: "string", enum: ["not-found"] } },
+        required: ["act", "outcome"],
+      },
+    ],
+  },
 } as const satisfies McpToolDescriptor<"explain">;
 
 /** The ten tools, in the order an agent meets them. */

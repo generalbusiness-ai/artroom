@@ -257,7 +257,8 @@ export class RpcWire implements Wire {
     return isRefusal(value) ? (this.redactor.refusal(value) as Refusal) : value;
   }
 
-  async #guard<T>(f: () => Promise<T>): Promise<T> {
+  /** Runs a call on the binding: refusals stay values; thrown errors become redacted `ArtroomError`s. */
+  async guard<T>(f: () => Promise<T>): Promise<T> {
     try {
       return await f();
     } catch (e) {
@@ -266,23 +267,23 @@ export class RpcWire implements Wire {
   }
 
   submit(act: SignedEnvelope): Promise<Result<ActRecord>> {
-    return this.#guard(async () => this.#clean(await this.#wire.submit(act)));
+    return this.guard(async () => this.#clean(await this.#wire.submit(act)));
   }
 
   request(req: SignedRequest): Promise<Result<RequestResult>> {
-    return this.#guard(async () => this.#clean(await this.#wire.request(req)));
+    return this.guard(async () => this.#clean(await this.#wire.request(req)));
   }
 
   redeem(redemption: Redemption): Promise<Result<Joined | Redeemed>> {
-    return this.#guard(async () => this.#clean(await this.#wire.redeem(redemption)));
+    return this.guard(async () => this.#clean(await this.#wire.redeem(redemption)));
   }
 
   read<Q extends ReadQuery>(auth: string, query: Q): Promise<ReadResults[Q["q"]]> {
-    return this.#guard(() => this.#wire.read(auth as SessionToken, query));
+    return this.guard(() => this.#wire.read(auth as SessionToken, query));
   }
 
   subscribe(auth: string, cursor?: Cursor) {
-    return this.#guard(() => this.#wire.subscribe(auth as SessionToken, cursor));
+    return this.guard(() => this.#wire.subscribe(auth as SessionToken, cursor));
   }
 
   dispose(): void {

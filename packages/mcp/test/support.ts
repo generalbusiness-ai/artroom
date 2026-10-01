@@ -7,19 +7,32 @@ export { FakeRoom };
 export type Url = `https://${string}`;
 
 /** A fake room whose `POST /mcp` route is this package's Worker handler. */
-export async function roomWithMcp(): Promise<{ room: FakeRoom; url: Url }> {
+export async function roomWithMcp(): Promise<{ room: FakeRoom; url: Url; reads: Record<string, number> }> {
   const room = await FakeRoom.create();
   const url = (await room.start()) as Url;
+  const reads: Record<string, number> = {};
+  // The room as a service binding, counting the reads made through it.
+  const service = {
+    room: async () => {
+      const wire = room.wire();
+      return {
+        ...wire,
+        read: (session: never, query: { q: string }) => {
+          reads[query.q] = (reads[query.q] ?? 0) + 1;
+          return wire.read(session, query as never);
+        },
+      } as typeof wire;
+    },
+  };
   const fetchMcp = createMcpFetch<unknown>({
-    // What the room Worker does: check the bearer, then act with its session key under its delegation (R-CRED-3).
+    // What the deployment's Worker does: a handle for the bearer, built on RoomWire. Acts go to bearerAct,
+    // workspace requests to bearerRequest, reads use the token (R-CRED-10). A bad token yields null.
     async room(_request, _env, bearer) {
-      const session = await room.bearerSession(bearer);
-      if (!session) return null;
-      return connect({ room: async () => room.wire() }, room.id, { kind: "delegation", signer: session.signer, as: session.delegation });
+      return connect(service, room.id, { kind: "bearer", token: bearer }).catch(() => null);
     },
   });
   room.mcp = (request) => fetchMcp(request, {});
-  return { room, url };
+  return { room, url, reads };
 }
 
 export async function agent(room: FakeRoom, url: Url, handle: `@${string}` = "@builder"): Promise<Redeemed> {

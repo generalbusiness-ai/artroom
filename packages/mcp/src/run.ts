@@ -106,7 +106,8 @@ const RUN: { readonly [T in McpToolName]: Runner<T> } = {
   },
 
   async propose(room, input) {
-    return room.propose(await held(room, input), { head: input.head, expectedGeneration: input.expectedGeneration, summary: input.summary }, key(input));
+    // `because` passes through unchanged (R-API-9).
+    return room.propose(await held(room, input), opt({ head: input.head, expectedGeneration: input.expectedGeneration, summary: input.summary, because: input.because }), key(input));
   },
 
   async note(room, input) {
@@ -135,14 +136,13 @@ const RUN: { readonly [T in McpToolName]: Runner<T> } = {
   },
 
   async attention(room, input) {
-    const page = await room.attention(opt({ cursor: input.cursor, limit: input.limit }));
-    // Attention pages do not carry the publication point; an empty log read does (R-LOG-11).
-    const log = await room.log({ after: Number.MAX_SAFE_INTEGER - 1, limit: 1 });
-    return { ...page, publishedThrough: log.publishedThrough };
+    // The page carries publishedThrough from the same read (R-API-9).
+    return room.attention(opt({ cursor: input.cursor, limit: input.limit }));
   },
 
   async explain(room, input) {
-    return room.explain(input.act);
+    // MCP structured content must be an object, so an unknown act is `ExplainNotFound`, never null (R-API-9).
+    return (await room.explain(input.act)) ?? { act: input.act, outcome: "not-found" as const };
   },
 };
 
@@ -154,6 +154,7 @@ function refusalOf(rule: string, reason: string, fix: string) {
 function headline(name: McpToolName, out: unknown): string {
   if (isRefusal(out)) return `Refused (${out.rule}): ${out.reason}${out.fix ? ` Fix: ${out.fix}` : ""}`;
   if (out === null) return "Nothing found.";
+  if ((out as { outcome?: unknown }).outcome === "not-found") return `The room has no act ${String((out as { act: unknown }).act)}. Check the ID.`;
   const o = out as Record<string, unknown>;
   switch (name) {
     case "claim":

@@ -20,6 +20,9 @@ import {
   type ActRecord,
   type ArtroomError,
   type AttentionItem,
+  type BearerAct,
+  type BearerRequest,
+  type ByteStream,
   type Authority,
   type Claim,
   type Cursor,
@@ -61,7 +64,6 @@ import {
   type SignedRequest,
   type Signer,
   type Update,
-  type UpdateStream,
   type WorkspaceGrant,
   type WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
@@ -75,6 +77,7 @@ import {
   randomToken,
   roomIdOf,
   signEnvelope,
+  signRequest,
   signValue,
   STATUS,
   verifyValue,
@@ -865,8 +868,9 @@ export class FakeRoom {
         return this.#publicOp(this.ops.get(query.op)!);
       }
       case "attention": {
+        // The page carries the publication point from the same read (R-API-9).
         const mine = this.attentionItems.filter((a) => a.to === me).map((a) => a.item);
-        return page(mine, query.page?.cursor, query.page?.limit, "a");
+        return { ...page(mine, query.page?.cursor, query.page?.limit, "a"), publishedThrough: this.publishedThrough };
       }
       case "log": {
         const after = query.req?.after ?? -1;
@@ -950,17 +954,27 @@ export class FakeRoom {
       request: (req) => this.request(req),
       redeem: (r) => this.redeem(r, `${this.url}/v1/rooms/${this.id}/mcp`),
       read: (session, query) => this.read(session, query),
-      subscribe: async (session: SessionToken, cursor?: Cursor): Promise<UpdateStream> => {
+      // Newline-delimited JSON updates as UTF-8 bytes; each update may be split across chunks (R-API-8).
+      subscribe: async (session: SessionToken, cursor?: Cursor): Promise<ByteStream> => {
         const me = await this.reader(session);
         let at = cursor ?? this.update(me, undefined).cursor;
         let cancelled = false;
+        const pending: Uint8Array[] = [];
+        const encoder = new TextEncoder();
         return {
           getReader: () => ({
             read: async () => {
-              if (cancelled) return { done: true as const };
-              const u = await this.subscribe(session, at, 5_000);
-              at = u.cursor;
-              return { done: false as const, value: u };
+              while (pending.length === 0) {
+                if (cancelled) return { done: true as const };
+                const u = await this.subscribe(session, at, 5_000);
+                if (u.entries.length === 0 && u.attention.length === 0) continue;
+                at = u.cursor;
+                const bytes = encoder.encode(`${JSON.stringify(u)}\n`);
+                // Split each line in two chunks, so the decoder must join them.
+                const cut = Math.floor(bytes.length / 2);
+                pending.push(bytes.slice(0, cut), bytes.slice(cut));
+              }
+              return { done: false as const, value: pending.shift()! };
             },
             releaseLock: () => {},
           }),
@@ -968,6 +982,18 @@ export class FakeRoom {
             cancelled = true;
           },
         };
+      },
+      bearerAct: async (bearer: string, act: BearerAct) => {
+        const s = await this.bearerSession(bearer);
+        // The token is judged before an envelope is built, so a revoked one replays nothing (R-CRED-10).
+        if (!s) throw artroomError("unauthenticated", "The bearer token is unknown, expired or revoked.");
+        const env = buildEnvelope(this.id, { signer: s.signer, delegation: s.delegation }, act.kind, act.target, act.body, act.idempotencyKey);
+        return this.admit((await signEnvelope(env, s.signer)) as SignedEnvelope, "submitted");
+      },
+      bearerRequest: async (bearer: string, req: BearerRequest) => {
+        const s = await this.bearerSession(bearer);
+        if (!s) throw artroomError("unauthenticated", "The bearer token is unknown, expired or revoked.");
+        return (await this.request(await signRequest(this.id, { signer: s.signer, delegation: s.delegation }, req, this.now()))) as Result<WorkspaceOp | WorkspaceGrant>;
       },
       [Symbol.dispose]: () => {},
     };
@@ -1033,9 +1059,9 @@ export class FakeRoom {
       return;
     }
     this.#wss!.handleUpgrade(req, socket, head, (ws) => {
-      const state = ws as WsSocket & { artroom?: { me: MemberId; cursor: Cursor } };
+      const state = ws as WsSocket & { artroom?: { me: MemberId; cursor: Cursor; token: string } };
       const start = url.searchParams.get("cursor");
-      state.artroom = { me, cursor: (start ?? this.update(me, undefined).cursor) as Cursor };
+      state.artroom = { me, cursor: (start ?? this.update(me, undefined).cursor) as Cursor, token: token! };
       this.#sockets.add(ws);
       ws.on("close", () => this.#sockets.delete(ws));
       void this.#pushSockets();
@@ -1044,8 +1070,15 @@ export class FakeRoom {
 
   async #pushSockets(): Promise<void> {
     for (const ws of this.#sockets) {
-      const s = (ws as WsSocket & { artroom?: { me: MemberId; cursor: Cursor } }).artroom;
+      const s = (ws as WsSocket & { artroom?: { me: MemberId; cursor: Cursor; token: string } }).artroom;
       if (!s || ws.readyState !== ws.OPEN) continue;
+      // Before each update, the token is judged again; an ended one closes the socket with 1008 (R-API-12).
+      try {
+        await this.reader(s.token);
+      } catch {
+        ws.close(1008, "credential ended");
+        continue;
+      }
       const u = this.update(s.me, s.cursor);
       if (u.entries.length === 0 && u.attention.length === 0) continue;
       s.cursor = u.cursor;

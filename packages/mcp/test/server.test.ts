@@ -80,12 +80,12 @@ describe("results: refusals are values, failures are tool errors (R-API-1)", () 
     expect(unknown.body.result.structuredContent.message).toMatch(/There is no tool named "merge"/);
   });
 
-  test("explain of an unknown act returns null as text, with no structured content", async () => {
+  test("explain of an unknown act returns the structured not-found result (R-API-9)", async () => {
     const a = await agent(room, url);
     const res = await call(a, "explain", { act: "act_999_00000000" });
-    expect(res.body.result.isError).toBeFalsy();
-    expect(res.body.result.structuredContent).toBeUndefined();
-    expect(res.body.result.content[0].text).toBe("Nothing found.\nnull");
+    expect(res.body.result.isError).toBe(false);
+    expect(res.body.result.structuredContent).toEqual({ act: "act_999_00000000", outcome: "not-found" });
+    expect(res.body.result.content[0].text.split("\n")[0]).toBe("The room has no act act_999_00000000. Check the ID.");
   });
 });
 

@@ -30,7 +30,7 @@ artroom workspace                 # sets up the "artroom" git remote
 git push artroom HEAD
 artroom propose -m "Adds a token bucket to /api/login."
 artroom attention                 # reviews, notes and outcomes that need you
-artroom land --wait
+artroom land --wait               # or: artroom land, then artroom wait
 artroom release -m "Landed; nothing left."
 ```
 
@@ -39,8 +39,26 @@ to `.git/artroom/credentials`, readable only by you. The repository config
 includes that file, so `git push artroom` sends the token as a header. The
 token is never a command argument and never printed. `release` removes it.
 
+`land` records the landing operation it starts. `artroom wait` follows
+that operation (or one you name) until it finishes; it never starts a new
+landing. Only a finished landing that did not land suggests a new
+`artroom land`.
+
 Other commands: `renew`, `note`, `review`, `explain`, `log`, `agents-md`
 and `mcp`. Run `artroom help` for all of them.
+
+## When something fails part way
+
+The CLI writes each act, login and redemption to a journal in its config
+directory before it sends anything, and removes the entry only when every
+local step is done. To finish, run the same command again:
+- `login` reuses the same key and the same join;
+- `redeem` finishes from the saved result, and never sends a one-time
+  redemption twice. If the room may have received it but the answer was
+  lost, the CLI says to ask for a new invitation;
+- an act that failed prints the `--idempotency-key` to use. With it, the
+  CLI sends the very act it signed before, even if HEAD, the lane or the
+  lease has changed since, and the room returns the original result.
 
 ## Output
 
@@ -55,9 +73,6 @@ and `mcp`. Run `artroom help` for all of them.
 | 2 | The command line is wrong |
 | 3 | Refused: the room said no; the output says why and what to do |
 
-If an error says the act may have been recorded, repeat the command with
-the `--idempotency-key` it names. The room then returns the original
-result instead of acting twice.
 
 ## Agents
 

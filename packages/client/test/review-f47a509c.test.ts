@@ -85,6 +85,20 @@ describe("P2: watch reconnects with a valid credential, or stops observably", ()
     sub.close();
   });
 
+  test("when the room closes the socket with 1008 because the session ended, the watch replaces it and delivers the update", async () => {
+    const alice = await joinAs(room, "@alice");
+    const bob = await joinAs(room, "@bob");
+    const start = (await bob.api.subscribe(undefined, { waitMs: 0 })).cursor;
+    const seen: Update[] = [];
+    const sub = (bob.api as HttpRoomClient).watch(start, (u) => seen.push(u));
+    await until(() => room.socketCount === 1);
+    room.endSessions();
+    const claim = await alice.api.claim({ goal: "a", scope: ["a/**"] });
+    await until(() => seen.length > 0);
+    expect(seen.flatMap((u) => u.entries.map((e) => e.id))).toEqual([isRefusal(claim) ? "" : claim.id]);
+    sub.close();
+  });
+
   test("a revoked bearer stops the watch with an error, once, and it stops trying", async () => {
     const b = await bearer();
     const api = await connect({ url }, room.id, { kind: "bearer", token: b.bearer });
