@@ -518,9 +518,25 @@ export class Workspaces {
    * which keep their scheduled inventories without blocking a new lease.
    */
   private async cleanFork(name: string): Promise<number> {
+    const runStart = this.now();
+    try {
+      return await this.cleanForkNow(name, runStart);
+    } finally {
+      // Whatever path this run took (busy, an error, an answer still settling),
+      // no open duty that was due is left due: each gets its next check on the
+      // capped backoff, so a Room alarm set from nextDue() never spins.
+      const stale = this.open_(name).filter((d) => this.nextAt(d.id) <= runStart);
+      this.recheck(stale.map((d) => d.id));
+    }
+  }
+
+  private nextAt(id: number): number {
+    return Number(this.sql.all("SELECT next_at FROM artroom_ws_duty WHERE id = ?", id)[0]?.["next_at"] ?? 0);
+  }
+
+  private async cleanForkNow(name: string, runStart: number): Promise<number> {
     const duties = this.open_(name);
     if (duties.length === 0) return 0;
-    const runStart = this.now();
     const blocking = () => this.open_(name).filter((d) => d.state !== "in-flight").length;
     let state: Awaited<ReturnType<Workspaces["forkState"]>>;
     try {
@@ -534,6 +550,7 @@ export class Workspaces {
       this.defer(duties.map((d) => d.id), String(e));
       return blocking();
     }
+    // Busy (the fork is being created) is never a completion: every duty stays open, checked again later.
     if (state.kind === "busy") return blocking();
     const inFlight = duties.filter((d) => d.state === "in-flight");
     if (state.kind === "absent") {
@@ -598,7 +615,10 @@ export class Workspaces {
     const forks = this.sql
       .all("SELECT DISTINCT fork FROM artroom_ws_duty WHERE state != 'done' AND next_at <= ?", this.now())
       .map((r) => text(r, "fork")!);
-    for (const f of forks) await this.exclusive(f, () => this.cleanFork(f));
+    for (const f of forks) {
+      // One fork's unexpected failure must not stop the others; its duties were advanced by cleanFork.
+      await this.exclusive(f, () => this.cleanFork(f)).catch(() => undefined);
+    }
     return this.pendingCleanup();
   }
 

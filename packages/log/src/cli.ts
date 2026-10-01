@@ -1,0 +1,46 @@
+#!/usr/bin/env node
+/**
+ * artroom verify <remote> [--ref <ref>] [--json] [--no-replay]
+ *
+ * Fetch refs/artroom/log from a git remote and verify it offline
+ * (R-LOG-10). Exit status: 0 verified, 1 a check failed, 2 usage or fetch
+ * error.
+ */
+
+import { GitCli, redact } from "./gitcli.ts";
+import { verifyLog } from "./verify.ts";
+import { LOG_REF } from "./entries.ts";
+
+const args = process.argv.slice(2);
+if (args[0] === "verify") args.shift();
+const json = args.includes("--json");
+const replay = !args.includes("--no-replay");
+const refAt = args.indexOf("--ref");
+const ref = refAt >= 0 ? args[refAt + 1] : LOG_REF;
+const remote = args.find((a, i) => !a.startsWith("--") && (refAt < 0 || i !== refAt + 1));
+
+if (!remote || !ref) {
+  console.error("usage: artroom verify <remote> [--ref <ref>] [--json] [--no-replay]");
+  process.exit(2);
+}
+
+try {
+  const git = GitCli.open(remote);
+  await git.fetch(ref);
+  const report = await verifyLog(git, { ref, replayDecisions: replay });
+  if (json) console.log(JSON.stringify(report, null, 2));
+  else {
+    console.log(report.ok ? "Verified." : "Verification failed.");
+    console.log(`Room: ${report.room ?? "unknown"}`);
+    console.log(`Log commit: ${report.head ?? "none"} (${report.commits} commits)`);
+    console.log(`Published through entry ${report.publishedThrough}; verified through entry ${report.verifiedThrough}${report.last ? ` (${report.last.id})` : ""}.`);
+    console.log(`Policy decisions replayed: ${report.decisionsReplayed}.`);
+    for (const f of report.failures)
+      console.log(`  ${f.reason}${f.seq !== undefined ? ` at entry ${f.seq}` : ""}${f.commit ? ` in ${f.commit}` : ""}: ${f.detail}`);
+    for (const c of report.cannotProve) console.log(`Cannot prove: ${c}`);
+  }
+  process.exit(report.ok ? 0 : 1);
+} catch (e) {
+  console.error(`artroom verify: ${redact((e as Error).message)}`);
+  process.exit(2);
+}
