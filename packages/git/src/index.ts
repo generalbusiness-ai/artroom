@@ -42,7 +42,7 @@ export type { DiffBounds, DiffResult, DiffStats, TreeEntry, TreeReader } from ".
 export { ContainerPublisher, Pinning } from "./publisher/client.ts";
 export type { PublisherClientOptions, PublisherStub } from "./publisher/client.ts";
 export { GitOps, HARDENING, integrationRef, objectsRef, pinnedRef } from "./publisher/gitops.ts";
-export type { Exec, ExecResult, BuildResult, PinResult, PreviewResult } from "./publisher/gitops.ts";
+export type { Exec, ExecResult, BuildResult, PinResult, PreviewResult, SnapshotFile } from "./publisher/gitops.ts";
 export { GitPublisher, landMessage } from "./publisher/git-publisher.ts";
 export { classifyGitPush, definitelyNotApplied } from "./publisher/push-outcome.ts";
 export type { PushOutcome } from "./publisher/push-outcome.ts";

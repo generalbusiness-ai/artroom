@@ -112,6 +112,9 @@ export interface IntegrateRequest {
     readonly committedAt: number;
   }
 
+/** One file of a snapshot: path, git mode and blob SHA (the order R-CARRY-9 digests). */
+export type SnapshotFile = readonly [path: string, mode: string, blob: string];
+
 export interface IntegrateHooks {
   /** Called with the new merge commit before it is pushed to `storeRef`, so the gateway can allow exactly that update. */
   readonly beforeStore?: (integration: string) => Promise<void>;
@@ -338,6 +341,65 @@ export class GitOps {
    * (R-PUB-4). Fetches the integration from `integrationRef` if this sandbox
    * no longer has it. The outcome is landed, rejected, error or unknown.
    */
+  // ------------------------------------------------------------ filtered snapshots (R-CARRY-9, R-EXEC-7)
+
+  /** Every file in a commit's tree as `[path, mode, blob]`: regular files, executables and symlinks. */
+  listTree(canonical: string, commit: string): Promise<SnapshotFile[]> {
+    return this.exclusive(canonical, async () => {
+      const dir = await this.repo(canonical);
+      if (!(await this.hasCommit(dir, commit))) await this.fetch(dir, canonical, [assertSha(commit)]);
+      const out = await this.ok("ls-tree", ["-C", dir, "ls-tree", "-r", "-z", "--full-tree", assertSha(commit)]);
+      const files: SnapshotFile[] = [];
+      for (const rec of out.split("\0").filter(Boolean)) {
+        const tab = rec.indexOf("\t");
+        const [mode, type, sha] = rec.slice(0, tab).split(" ");
+        if (type !== "blob" || !mode || !sha) continue; // submodules (commit entries) are never included
+        files.push([rec.slice(tab + 1), mode, assertSha(sha, "blob")]);
+      }
+      return files;
+    });
+  }
+
+  /**
+   * Write a filtered snapshot: a root commit (no parents, no history) whose
+   * tree has exactly `files`, pushed to `storeRef` in `store`, a repository
+   * that holds only snapshots for one checker. The runner reads only that
+   * repository, so it can see nothing else (R-CARRY-9).
+   */
+  writeSnapshot(
+    req: { readonly canonical: string; readonly store: string; readonly storeRef: string; readonly files: readonly SnapshotFile[]; readonly message: string },
+    hooks: IntegrateHooks = {},
+  ): Promise<string> {
+    return this.exclusive(req.canonical, async () => {
+      const dir = await this.repo(req.canonical);
+      const index = `${dir}/snapshot-index-${Math.random().toString(36).slice(2, 10)}`;
+      const env = { GIT_INDEX_FILE: index };
+      try {
+        await this.ok("read-tree", ["-C", dir, "read-tree", "--empty"], env);
+        for (let i = 0; i < req.files.length; i += 200) {
+          // `--cacheinfo mode,sha,path` splits at the first two commas, so a comma in a path is safe.
+          const args = req.files.slice(i, i + 200).flatMap(([path, mode, blob]) => {
+            if (!/^(100644|100755|120000)$/.test(mode)) throw new Error(`mode ${mode} cannot be in a snapshot`);
+            return ["--add", "--cacheinfo", `${mode},${assertSha(blob, "blob")},${path}`];
+          });
+          await this.ok("update-index", ["-C", dir, "update-index", ...args], env);
+        }
+        const tree = assertSha(await this.ok("write-tree", ["-C", dir, "write-tree"], env), "tree");
+        const date = "@0 +0000";
+        const commit = assertSha(
+          await this.ok("commit-tree", ["-C", dir, "commit-tree", tree, "-m", req.message], { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }),
+          "snapshot",
+        );
+        await hooks.beforeStore?.(commit);
+        const stored = await this.createRef(dir, req.store, commit, assertRef(req.storeRef));
+        if (stored.kind !== "pinned") throw new Error(`could not store the snapshot at ${req.storeRef}`);
+        return commit;
+      } finally {
+        await this.opts.exec(["rm", "-f", index], { env: {} }).catch(() => undefined);
+      }
+    });
+  }
+
   pushMain(canonical: string, integration: string, expectedMain: string, fromRef: string): Promise<PushOutcome> {
     return this.exclusive(canonical, () => this.pushMainNow(canonical, integration, expectedMain, fromRef));
   }

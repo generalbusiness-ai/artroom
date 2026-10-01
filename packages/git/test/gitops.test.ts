@@ -187,3 +187,25 @@ test("preview: clean with a tree, or the conflicting paths", async (t) => {
   const ok = await f.ops.preview(f.canonical, fine, pinnedRef(lane, 2));
   assert.equal(ok.kind, "clean");
 });
+
+test("filtered snapshot: a root commit with exactly the chosen files, stored in a separate repository", async (t) => {
+  const f = await new Fixture().init({ "src/a.ts": "a\n", "src/secret.ts": "s\n", "package.json": "{}\n", "tests/a.test.ts": "t\n" });
+  t.after(() => f.dispose());
+  const files = await f.ops.listTree(f.canonical, f.main);
+  assert.deepEqual(files.map((x) => x[0]).sort(), ["package.json", "src/a.ts", "src/secret.ts", "tests/a.test.ts"]);
+  const chosen = files.filter(([p]) => p !== "src/secret.ts");
+  const store = join(f.root, "snapshots.git");
+  await sh(f.root, "init", "-q", "--bare", store);
+  const commit = await f.ops.writeSnapshot({ canonical: f.canonical, store, storeRef: "refs/artroom/snapshots/x", files: chosen, message: "snapshot\n" });
+  assert.equal(await sh(f.root, "--git-dir", store, "rev-parse", "refs/artroom/snapshots/x"), commit);
+  assert.equal(await sh(f.root, "--git-dir", store, "rev-list", "--count", commit), "1", "no history");
+  const listed = (await sh(f.root, "--git-dir", store, "ls-tree", "-r", "--name-only", commit)).split("\n").sort();
+  assert.deepEqual(listed, ["package.json", "src/a.ts", "tests/a.test.ts"]);
+  // The excluded file's blob never reached the snapshot repository.
+  const secretBlob = files.find(([p]) => p === "src/secret.ts")![2];
+  const has = await localExec(["git", "--git-dir", store, "cat-file", "-e", secretBlob], { env: {} });
+  assert.notEqual(has.code, 0);
+  // Same files, same commit: the snapshot is deterministic.
+  const again = await f.ops.writeSnapshot({ canonical: f.canonical, store, storeRef: "refs/artroom/snapshots/y", files: [...chosen].reverse(), message: "snapshot\n" });
+  assert.equal(again, commit);
+});
