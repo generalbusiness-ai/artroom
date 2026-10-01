@@ -50,15 +50,19 @@ and `mcp`. Run `artroom help` for all of them.
 ## When something fails part way
 
 The CLI writes each act, login and redemption to a journal in its config
-directory before it sends anything, and removes the entry only when every
-local step is done. To finish, run the same command again:
+directory before it sends anything. For an act, the entry then keeps the
+room's answer until the local steps after it (the config, the landing to
+wait for, the workspace credential) are done; only then is it removed. To
+finish, run the same command again:
 - `login` reuses the same key and the same join;
 - `redeem` finishes from the saved result, and never sends a one-time
   redemption twice. If the room may have received it but the answer was
   lost, the CLI says to ask for a new invitation;
 - an act that failed prints the `--idempotency-key` to use. With it, the
-  CLI sends the very act it signed before, even if HEAD, the lane or the
-  lease has changed since, and the room returns the original result.
+  CLI finishes from the kept answer, or sends the very act it signed
+  before, straight to the room. Neither needs a read session or current
+  state, so it works even if HEAD, the lane or the lease has changed, or
+  your key was retired since. The room returns the original result.
 
 ## Output
 

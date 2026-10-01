@@ -572,17 +572,75 @@ export class RpcRoomClient extends RoomCore implements Room {
 
 /**
  * Decodes a `ByteStream` of UTF-8, newline-delimited JSON `Update`s into an
- * `UpdateStream` (R-API-8). A line may arrive across several chunks; a
- * chunk may hold several lines. A line that is not an update is an error,
- * not a silent gap.
+ * `UpdateStream` (R-API-8), with standard streams: the bytes are piped
+ * through a `TextDecoderStream` and a line-splitting `TransformStream`. A
+ * line may arrive across several chunks; a chunk may hold several lines.
+ *
+ * Ownership: the pipe owns the source; the caller owns the decoded stream.
+ * `cancel()` ends the subscription whether or not the caller holds a
+ * reader: a pending read resolves as done, and the cancel reaches the
+ * source. Every failure, whether a bad byte, a line that is not an update,
+ * or a failing source, rejects with an `ArtroomError`, never a raw error.
  */
 export function decodeUpdates(bytes: ByteStream): UpdateStream {
-  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const updates = asReadable(bytes).pipeThrough(new TextDecoderStream("utf-8", { fatal: true }) as unknown as ReadableWritablePair<string, Uint8Array>).pipeThrough(splitUpdates());
+  let active: ReadableStreamDefaultReader<Update> | undefined;
+  return {
+    getReader: () => {
+      const reader = updates.getReader();
+      active = reader;
+      return {
+        read: async () => {
+          try {
+            const r = await reader.read();
+            return r.done ? { done: true as const } : { done: false as const, value: r.value };
+          } catch (e) {
+            throw streamError(e);
+          }
+        },
+        releaseLock: () => {
+          if (active === reader) active = undefined;
+          reader.releaseLock();
+        },
+      };
+    },
+    cancel: async (reason?: unknown) => {
+      try {
+        if (active !== undefined) {
+          const reader = active;
+          active = undefined;
+          await reader.cancel(reason); // resolves pending reads as done, and cancels back through the pipe
+          reader.releaseLock();
+        } else if (!updates.locked) await updates.cancel(reason);
+      } catch (e) {
+        throw streamError(e);
+      }
+    },
+  };
+}
+
+/** A native `ReadableStream` as it is; a structural `ByteStream` wrapped, taking its reader only on the first pull. */
+function asReadable(bytes: ByteStream): ReadableStream<Uint8Array> {
+  if (typeof (bytes as Partial<ReadableStream>).pipeThrough === "function") return bytes as unknown as ReadableStream<Uint8Array>;
+  let reader: ReturnType<ByteStream["getReader"]> | undefined;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      reader ??= bytes.getReader();
+      const r = await reader.read();
+      if (r.done) controller.close();
+      else controller.enqueue(r.value);
+    },
+    async cancel(reason) {
+      reader?.releaseLock();
+      await bytes.cancel(reason);
+    },
+  });
+}
+
+/** Splits decoded text into lines and parses each as an `Update`. */
+function splitUpdates(): TransformStream<string, Update> {
   let buffer = "";
-  const queue: Update[] = [];
-  let ended = false;
-  const reader = bytes.getReader();
-  const parse = (line: string) => {
+  const parse = (line: string, controller: TransformStreamDefaultController<Update>) => {
     if (line.trim() === "") return;
     let u: unknown;
     try {
@@ -591,33 +649,27 @@ export function decodeUpdates(bytes: ByteStream): UpdateStream {
       throw artroomError("internal", "The room's update stream held a line that is not JSON.");
     }
     if (typeof u !== "object" || u === null || typeof (u as Update).cursor !== "string") throw artroomError("internal", "The room's update stream held a line that is not an update.");
-    queue.push(u as Update);
+    controller.enqueue(u as Update);
   };
-  return {
-    getReader: () => ({
-      read: async () => {
-        while (queue.length === 0 && !ended) {
-          const chunk = await reader.read();
-          if (chunk.done) {
-            ended = true;
-            buffer += decoder.decode();
-            if (buffer.length > 0) parse(buffer);
-            buffer = "";
-            break;
-          }
-          buffer += decoder.decode(chunk.value, { stream: true });
-          for (let nl = buffer.indexOf("\n"); nl >= 0; nl = buffer.indexOf("\n")) {
-            parse(buffer.slice(0, nl));
-            buffer = buffer.slice(nl + 1);
-          }
-        }
-        const next = queue.shift();
-        return next === undefined ? { done: true as const } : { done: false as const, value: next };
-      },
-      releaseLock: () => reader.releaseLock(),
-    }),
-    cancel: (reason?: unknown) => bytes.cancel(reason),
-  };
+  return new TransformStream<string, Update>({
+    transform(chunk, controller) {
+      buffer += chunk;
+      for (let nl = buffer.indexOf("\n"); nl >= 0; nl = buffer.indexOf("\n")) {
+        parse(buffer.slice(0, nl), controller);
+        buffer = buffer.slice(nl + 1);
+      }
+    },
+    flush(controller) {
+      parse(buffer, controller);
+    },
+  });
+}
+
+/** Any failure inside the update stream, as an `ArtroomError` whose message holds no stream content. */
+function streamError(e: unknown): ArtroomError {
+  if (isArtroomError(e)) return e;
+  if (e instanceof TypeError && /encod|decod|utf/i.test(e.message)) return artroomError("internal", "The room's update stream held bytes that are not valid UTF-8.");
+  return artroomError("unavailable", "The room's update stream failed. Subscribe again from your last cursor.");
 }
 
 export type { ActRecord };

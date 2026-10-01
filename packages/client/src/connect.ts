@@ -13,6 +13,7 @@ import {
   type Genesis,
   type HttpRoom,
   type InvitationId,
+  type ActRecord,
   type Joined,
   type LogPage,
   type JoinEnvelope,
@@ -21,6 +22,7 @@ import {
   type Room,
   type RoomId,
   type RoomName,
+  type SignedEnvelope,
   type Signer,
 } from "@generalbusiness/artroom-contract";
 import { digestOf } from "./canonical.ts";
@@ -150,6 +152,18 @@ export async function join(
   } finally {
     wire.dispose();
   }
+}
+
+/**
+ * Sends a retained signed act straight to the room, unchanged: no new
+ * signature, no read session and no read of current state. The room returns
+ * the original result if it recorded the act, even after the signing key
+ * was retired or revoked (R-IDEM-2). Only the act's own room is accepted.
+ */
+export async function resubmit(endpoint: Endpoint, room: RoomId, signed: SignedEnvelope, options: ClientOptions = {}): Promise<Result<ActRecord>> {
+  if (signed.envelope.room !== room) throw artroomError("bad-request", "This act was signed for another room.");
+  const wire = new HttpWire(endpointUrl(endpoint.url), room, options, new Redactor());
+  return withRetries(() => wire.submit(signed), options.retries ?? 3, signed.envelope.idempotencyKey);
 }
 
 /** What a lost room-custody redemption means, and what to do (section 22, point 29). */

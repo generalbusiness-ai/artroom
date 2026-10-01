@@ -26,6 +26,7 @@ import {
   newIdempotencyKey,
   redeem,
   signerFromJwk,
+  resubmit,
   type ClientActOptions,
   type ClientOptions,
   type HttpRoomClient,
@@ -36,13 +37,19 @@ import type {
   Held,
   HttpRoom,
   LandOp,
+  Landing,
   Lane,
   LaneId,
+  Note,
   NoteAnchor,
   OpId,
+  Proposal,
   Reason,
   Refusal,
+  Release,
+  Renewal,
   Result,
+  Review,
   RoomId,
   Sha,
 } from "@generalbusiness/artroom-contract";
@@ -119,6 +126,7 @@ interface Ctx {
   readonly secrets: Set<string>;
   /** The act this run journaled, so a failure can say how to finish it. */
   act?: { readonly room: RoomId; readonly key: string } | undefined;
+  opened?: Promise<Opened>;
   step(name: string): void;
 }
 
@@ -180,7 +188,15 @@ function clientOptions(ctx: Ctx): ClientOptions {
   };
 }
 
-async function open(ctx: Ctx): Promise<{ api: HttpRoomClient; id: RoomId; room: RoomConfig }> {
+type Opened = { api: HttpRoomClient; id: RoomId; room: RoomConfig };
+
+/** Connects once per run, with the full checks; only work that needs a session or new signatures calls it. */
+function open(ctx: Ctx): Promise<Opened> {
+  ctx.opened ??= connectRoom(ctx);
+  return ctx.opened;
+}
+
+async function connectRoom(ctx: Ctx): Promise<Opened> {
   const { id, room } = roomOf(ctx);
   let creds;
   if (room.custody === "room") {
@@ -235,48 +251,80 @@ async function held(api: HttpRoom, lane: LaneId, me: string): Promise<Extract<La
   return l;
 }
 
+/** One act command: how to start new work, the local steps after the room's answer, and what to print. */
+interface ActSpec<T> {
+  readonly command: string;
+  /** Resolves the act from current state and sends it. Runs only for new work, never for a journaled act. */
+  start(api: HttpRoomClient, room: RoomConfig, opts: ClientActOptions): Promise<Result<T>>;
+  /** Local steps after an accepted answer. Each must be safe to repeat. Returns lines to print. */
+  complete?(out: T, id: RoomId): string[];
+}
+
 /**
- * Runs one act through the journal. With an `--idempotency-key` the journal
- * holds, it sends that prepared act again, unchanged and without any
- * preflight reads, so the room returns the original result (R-IDEM-2).
- * Otherwise `start` resolves the act from current state, and the client
- * hands back the prepared act, which is journaled before it is first sent.
+ * Runs one act through the journal, whose entry moves from `prepared` to
+ * `answered` and is removed only after the local steps are done.
+ *
+ * - New work: `start` resolves the act from current state; the client hands
+ *   back the prepared act, which is journaled before it is first sent.
+ * - `prepared` (sent, no answer kept): a signed act goes straight back to
+ *   the room with `resubmit`, needing no read session, new signature or
+ *   current state, so a retired key still gets its receipt (R-IDEM-2). An
+ *   unsigned bearer act needs its token judged first (R-CRED-10).
+ * - `answered`: nothing is sent; the local steps run again from the kept
+ *   answer.
  */
-async function journaled<T>(ctx: Ctx, api: HttpRoomClient, room: RoomId, command: string, start: (opts: ClientActOptions) => Promise<Result<T>>): Promise<Result<T>> {
+async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T>; extra: string[] }> {
+  const { id, room } = roomOf(ctx);
   const key = str(ctx.values, "idempotency-key") ?? newIdempotencyKey();
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(key)) throw new UsageError("An idempotency key is 1 to 64 characters from A-Z, a-z, 0-9, '_' and '-'.");
-  ctx.act = { room, key };
-  const saved = ctx.store.entry(room, "act", key);
-  let out: Result<T>;
-  if (saved !== undefined) {
-    if (saved.command !== command) throw new UsageError(`The idempotency key ${key} belongs to an unfinished artroom ${saved.command}. Repeat that command with it.`);
-    try {
-      out = (await api.replay(saved.prepared)) as Result<T>;
-    } catch (e) {
-      // A bearer act has no signed envelope to keep: once the token is refused, there is nothing to resend (R-CRED-10).
-      if (isArtroomError(e) && e.code === "unauthenticated" && saved.prepared.signed === undefined) {
-        ctx.store.finish(room, "act", key);
-        ctx.act = undefined;
-        throw {
-          ...e,
-          message: "The bearer token is no longer valid, so this act cannot be sent again. If the room recorded it, a member with a read session can find it with artroom log.",
-        };
-      }
-      throw e;
-    }
-  } else {
-    out = await start({
-      idempotencyKey: key,
-      onPrepared: (prepared) => {
-        const entry: JournalEntry = { v: 1, type: "act", id: key, room, command, prepared };
-        ctx.store.journal(entry);
-        ctx.step("act-journaled");
-      },
-    });
+  ctx.act = { room: id, key };
+  let entry: Extract<JournalEntry, { type: "act" }> | undefined = ctx.store.entry(id, "act", key);
+  if (entry !== undefined && entry.command !== spec.command) {
+    throw new UsageError(`The idempotency key ${key} belongs to an unfinished artroom ${entry.command}. Repeat that command with it.`);
   }
-  ctx.store.finish(room, "act", key);
+  let out: Result<T>;
+  if (entry?.state === "answered") out = entry.result as Result<T>;
+  else {
+    if (entry === undefined) {
+      const { api } = await open(ctx);
+      out = await spec.start(api, room, {
+        idempotencyKey: key,
+        onPrepared: (prepared) => {
+          entry = { v: 1, type: "act", id: key, room: id, command: spec.command, state: "prepared", prepared };
+          ctx.store.journal(entry);
+          ctx.step("act-journaled");
+        },
+      });
+      // A preflight refusal or usage error never prepared anything: there is nothing to finish.
+      if (entry === undefined) {
+        ctx.act = undefined;
+        return { out, extra: [] };
+      }
+    } else if (entry.prepared.signed !== undefined) {
+      out = (await resubmit({ url: room.url }, id, entry.prepared.signed, clientOptions(ctx))) as Result<T>;
+    } else {
+      const { api } = await open(ctx);
+      try {
+        out = (await api.replay(entry.prepared)) as Result<T>;
+      } catch (e) {
+        // A bearer act has no signed envelope to keep: once the token is refused, there is nothing to resend (R-CRED-10).
+        if (isArtroomError(e) && e.code === "unauthenticated") {
+          ctx.store.finish(id, "act", key);
+          ctx.act = undefined;
+          throw { ...e, message: "The bearer token is no longer valid, so this act cannot be sent again. If the room recorded it, a member with a read session can find it with artroom log." };
+        }
+        throw e;
+      }
+    }
+    entry = { ...entry!, state: "answered", result: out };
+    ctx.store.journal(entry);
+    ctx.step("act-answered");
+  }
+  const extra = !isRefusal(out) && spec.complete ? spec.complete(out as T, id) : [];
+  ctx.step("act-completed");
+  ctx.store.finish(id, "act", key);
   ctx.act = undefined;
-  return out;
+  return { out, extra };
 }
 
 function parseReason(ref: string): Reason {
@@ -455,25 +503,31 @@ const COMMANDS: Record<string, Command> = {
     options: { goal: { type: "string" }, plan: { type: "string" }, because: { type: "string", multiple: true }, expect: { type: "string" } },
     async run(ctx) {
       if (ctx.args.length === 0) throw new UsageError('Give the paths to claim, for example: artroom claim "src/api/**" --goal "Rate-limit login"');
-      const { api, id, room } = await open(ctx);
       const because = list(ctx.values, "because").map(parseReason);
       const plan = str(ctx.values, "plan");
       const goal = str(ctx.values, "goal");
       const target = str(ctx.values, "lane") as LaneId | undefined;
       if (target === undefined && goal === undefined) throw new UsageError('Say what you will do: --goal "..."');
-      const out = await journaled(ctx, api, id, "claim", async (opts) => {
-        if (target === undefined) return api.claim({ goal: goal!, scope: ctx.args, ...(plan ? { plan } : {}), ...(because.length ? { because } : {}) }, opts);
-        const lane = await api.lane(target);
-        const expectedGeneration = int(ctx.values, "expect") ?? lane?.generation ?? 0;
-        const mine = lane?.state === "held" && lane.lease.holder === room.member;
-        const body = { scope: ctx.args, expectedGeneration, ...(goal ? { goal } : {}), ...(plan ? { plan } : {}), ...(because.length ? { because } : {}) };
-        return api.claim(mine ? { ...body, lane: lane as Held } : { ...body, lane: target }, opts);
+      const { out } = await journaled<Claim>(ctx, {
+        command: "claim",
+        async start(api, room, opts) {
+          if (target === undefined) return api.claim({ goal: goal!, scope: ctx.args, ...(plan ? { plan } : {}), ...(because.length ? { because } : {}) }, opts);
+          const lane = await api.lane(target);
+          const expectedGeneration = int(ctx.values, "expect") ?? lane?.generation ?? 0;
+          const mine = lane?.state === "held" && lane.lease.holder === room.member;
+          const body = { scope: ctx.args, expectedGeneration, ...(goal ? { goal } : {}), ...(plan ? { plan } : {}), ...(because.length ? { because } : {}) };
+          return api.claim(mine ? { ...body, lane: lane as Held } : { ...body, lane: target }, opts);
+        },
+        complete(claim, id) {
+          updateRoom(ctx, id, (r) => {
+            r.lane = claim.lane;
+          });
+          ctx.step("config-written");
+          return [];
+        },
       });
       if (isRefusal(out)) return refused(ctx, out);
-      updateRoom(ctx, id, (r) => {
-        r.lane = out.lane;
-      });
-      return print(ctx, out, () => claimText(out as Claim));
+      return print(ctx, out, () => claimText(out));
     },
   },
 
@@ -509,13 +563,15 @@ const COMMANDS: Record<string, Command> = {
     async run(ctx) {
       const summary = str(ctx.values, "message");
       if (summary === undefined) throw new UsageError('Say what changed and why: -m "..."');
-      const { api, id, room } = await open(ctx);
-      const out = await journaled(ctx, api, id, "propose", async (opts) => {
-        const sha = str(ctx.values, "head") ?? gitHead(ctx.io.cwd);
-        if (sha === undefined || !/^[0-9a-f]{40}$/.test(sha)) throw new UsageError("Give the commit to propose with --head SHA, or run this inside the repository.");
-        const h = await held(api, laneOf(ctx, room), room.member);
-        if (isRefusal(h)) return h;
-        return api.propose(h, { head: sha as Sha, expectedGeneration: int(ctx.values, "expect") ?? h.generation, summary }, opts);
+      const { out } = await journaled<Proposal>(ctx, {
+        command: "propose",
+        async start(api, room, opts) {
+          const sha = str(ctx.values, "head") ?? gitHead(ctx.io.cwd);
+          if (sha === undefined || !/^[0-9a-f]{40}$/.test(sha)) throw new UsageError("Give the commit to propose with --head SHA, or run this inside the repository.");
+          const h = await held(api, laneOf(ctx, room), room.member);
+          if (isRefusal(h)) return h;
+          return api.propose(h, { head: sha as Sha, expectedGeneration: int(ctx.values, "expect") ?? h.generation, summary }, opts);
+        },
       });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => proposalText(out));
@@ -525,24 +581,31 @@ const COMMANDS: Record<string, Command> = {
   land: {
     options: { wait: { type: "boolean" }, timeout: { type: "string" }, generation: { type: "string" } },
     async run(ctx) {
-      const { api, id, room } = await open(ctx);
-      const landing = await journaled(ctx, api, id, "land", async (opts) => {
-        const h = await held(api, laneOf(ctx, room), room.member);
-        if (isRefusal(h)) return h;
-        const generation = int(ctx.values, "generation") ?? h.generation;
-        if (generation === 0) throw new UsageError("Nothing is proposed on this lane yet. Run artroom propose first.");
-        const proposal = await api.proposal({ lane: h.lane, generation });
-        if (proposal === null) throw new UsageError(`Lane ${h.lane} has no generation ${generation}.`);
-        return api.land(h, proposal, opts);
+      const { out: landing } = await journaled<Landing>(ctx, {
+        command: "land",
+        async start(api, room, opts) {
+          const h = await held(api, laneOf(ctx, room), room.member);
+          if (isRefusal(h)) return h;
+          const generation = int(ctx.values, "generation") ?? h.generation;
+          if (generation === 0) throw new UsageError("Nothing is proposed on this lane yet. Run artroom propose first.");
+          const proposal = await api.proposal({ lane: h.lane, generation });
+          if (proposal === null) throw new UsageError(`Lane ${h.lane} has no generation ${generation}.`);
+          return api.land(h, proposal, opts);
+        },
+        complete(l, id) {
+          // `artroom wait` follows this operation; it must be saved before the journal forgets the landing.
+          updateRoom(ctx, id, (r) => {
+            r.landing = { op: l.op.id, lane: l.lane };
+          });
+          ctx.step("config-written");
+          return [];
+        },
       });
       if (isRefusal(landing)) return refused(ctx, landing);
-      updateRoom(ctx, id, (r) => {
-        r.landing = { op: landing.op.id, lane: landing.lane };
-      });
-      ctx.step("landing-saved");
       if (ctx.values["wait"] !== true) {
         return print(ctx, landing, () => [`Landing ${landing.op.id} started for generation ${landing.generation} of lane ${landing.lane}.`, "Next: artroom wait"]);
       }
+      const { api, id } = await open(ctx);
       return waitLanding(ctx, api, id, landing.op.id, (int(ctx.values, "timeout") ?? 120) * 1000);
     },
   },
@@ -561,10 +624,12 @@ const COMMANDS: Record<string, Command> = {
   renew: {
     options: {},
     async run(ctx) {
-      const { api, id, room } = await open(ctx);
-      const out = await journaled(ctx, api, id, "renew", async (opts) => {
-        const h = await held(api, laneOf(ctx, room), room.member);
-        return isRefusal(h) ? h : api.renew(h, opts);
+      const { out } = await journaled<Renewal>(ctx, {
+        command: "renew",
+        async start(api, room, opts) {
+          const h = await held(api, laneOf(ctx, room), room.member);
+          return isRefusal(h) ? h : api.renew(h, opts);
+        },
       });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => [`Renewed lane ${out.lane}: lease ${out.lease.generation} until ${out.lease.expiresAt}.`]);
@@ -574,21 +639,26 @@ const COMMANDS: Record<string, Command> = {
   release: {
     options: { message: { type: "string", short: "m" } },
     async run(ctx) {
-      const { api, id, room } = await open(ctx);
       const note = str(ctx.values, "message");
-      const out = await journaled(ctx, api, id, "release", async (opts) => {
-        const h = await held(api, laneOf(ctx, room), room.member);
-        return isRefusal(h) ? h : api.release(h, note === undefined ? {} : { note }, opts);
+      const { out, extra } = await journaled<Release>(ctx, {
+        command: "release",
+        async start(api, room, opts) {
+          const h = await held(api, laneOf(ctx, room), room.member);
+          return isRefusal(h) ? h : api.release(h, note === undefined ? {} : { note }, opts);
+        },
+        complete(r, id) {
+          const cleared = clearWorkspace(ctx.io.cwd);
+          ctx.step("credential-removed");
+          updateRoom(ctx, id, (room) => {
+            if (room.lane === r.lane) delete room.lane;
+            if (room.landing?.lane === r.lane) delete room.landing;
+          });
+          ctx.step("config-written");
+          return cleared ? ["Removed the workspace credential from this repository."] : [];
+        },
       });
       if (isRefusal(out)) return refused(ctx, out);
-      const cleared = clearWorkspace(ctx.io.cwd);
-      updateRoom(ctx, id, (r) => {
-        if (r.lane === out.lane) delete r.lane;
-      });
-      return print(ctx, out, () => [
-        `Released lane ${out.lane}${out.note === undefined ? "" : ", with a handover note"}.`,
-        ...(cleared ? ["Removed the workspace credential from this repository."] : []),
-      ]);
+      return print(ctx, out, () => [`Released lane ${out.lane}${out.note === undefined ? "" : ", with a handover note"}.`, ...extra]);
     },
   },
 
@@ -600,17 +670,19 @@ const COMMANDS: Record<string, Command> = {
       const target = ctx.args[0] ?? "";
       const m = /^(act_\d+_[0-9a-f]{8})#(\d+):(.+):(\d+)(?:-(\d+))?$/.exec(target);
       if (!/^act_\d+_[0-9a-f]{8}$/.test(target) && !m) throw new UsageError("Anchor the note on an act ID, or on LANE#GENERATION:PATH:LINE.");
-      const { api, id } = await open(ctx);
       const replyTo = str(ctx.values, "reply-to") as ActId | undefined;
-      const out = await journaled(ctx, api, id, "note", async (opts) => {
-        let anchor: NoteAnchor;
-        if (m === null) anchor = { act: target as ActId };
-        else {
-          const p = await api.proposal({ lane: m[1] as LaneId, generation: Number(m[2]) });
-          if (p === null) throw new UsageError(`There is no proposal ${m[1]}#${m[2]}.`);
-          anchor = { lane: p.lane, generation: p.generation, head: p.head, path: m[3]!, line: Number(m[4]), ...(m[5] ? { endLine: Number(m[5]) } : {}) };
-        }
-        return api.note(anchor, { text, ...(replyTo ? { replyTo } : {}) }, opts);
+      const { out } = await journaled<Note>(ctx, {
+        command: "note",
+        async start(api, _room, opts) {
+          let anchor: NoteAnchor;
+          if (m === null) anchor = { act: target as ActId };
+          else {
+            const p = await api.proposal({ lane: m[1] as LaneId, generation: Number(m[2]) });
+            if (p === null) throw new UsageError(`There is no proposal ${m[1]}#${m[2]}.`);
+            anchor = { lane: p.lane, generation: p.generation, head: p.head, path: m[3]!, line: Number(m[4]), ...(m[5] ? { endLine: Number(m[5]) } : {}) };
+          }
+          return api.note(anchor, { text, ...(replyTo ? { replyTo } : {}) }, opts);
+        },
       });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => [`Noted ${out.id}.`]);
@@ -634,13 +706,15 @@ const COMMANDS: Record<string, Command> = {
       if (scope.length === 0) throw new UsageError('Say what you read: --scope "src/api/**" (repeat for more).');
       const text = str(ctx.values, "message");
       if (text === undefined) throw new UsageError('Give your reasons: -m "..."');
-      const { api, id } = await open(ctx);
       const dependsOn = list(ctx.values, "depends-on");
-      const out = await journaled(ctx, api, id, "review", async (opts) => {
-        const p = await api.proposal(ref);
-        if (p === null) throw new UsageError(`There is no proposal ${ref.lane}#${ref.generation}.`);
-        const headSha = (str(ctx.values, "head") ?? p.head) as Sha;
-        return api.review({ ...ref, head: headSha }, { verdict: approve ? "approve" : "object", scope, ...(dependsOn.length ? { dependsOn } : {}), text }, opts);
+      const { out } = await journaled<Review>(ctx, {
+        command: "review",
+        async start(api, _room, opts) {
+          const p = await api.proposal(ref);
+          if (p === null) throw new UsageError(`There is no proposal ${ref.lane}#${ref.generation}.`);
+          const headSha = (str(ctx.values, "head") ?? p.head) as Sha;
+          return api.review({ ...ref, head: headSha }, { verdict: approve ? "approve" : "object", scope, ...(dependsOn.length ? { dependsOn } : {}), text }, opts);
+        },
       });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => [

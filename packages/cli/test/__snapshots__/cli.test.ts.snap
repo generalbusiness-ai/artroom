@@ -7,8 +7,6 @@ exports[`joining > a lost login response is finished by running the same command
 
 exports[`joining > a lost redemption says what to do, and saves no token > redeem lost 1`] = `"Error (unavailable): The redemption may have succeeded, but its response was lost, and the bearer token cannot be shown again. Do not retry this invitation. Ask an admin for a new MCP (room-custody) invitation for the same member, and ask them to revoke the unused delegation."`;
 
-exports[`joining > a lost redemption says what to do, and saves nothing > redeem lost 1`] = `"Error (unavailable): The redemption may have succeeded, but its response was lost, and the bearer token cannot be shown again. Do not retry this invitation. Ask an admin for a new MCP (room-custody) invitation for the same member, and ask them to revoke the unused delegation."`;
-
 exports[`joining > a refused login leaves no key behind > login refused 1`] = `
 "Refused: invitation-invalid
   Reason: The invitation secret does not match."

@@ -47,13 +47,24 @@ export interface KeyFile {
  * Running the same command again reads it and finishes the work with the
  * same key, the same request and the same receipt, instead of starting over.
  *
- * - `act`: an act, prepared and signed, under its idempotency key (R-IDEM-2).
+ * - `act`: an act, prepared and signed, under its idempotency key (R-IDEM-2);
+ *   then the room's answer, until the local steps after it are done.
  * - `login`: the new key and the join's idempotency key, then the join's result.
  * - `redeem`: that a one-time redemption was sent, then its result. The bearer
  *   token stays here (0600) only until it is in its own file and the config.
  */
 export type JournalEntry =
-  | { readonly v: 1; readonly type: "act"; readonly id: string; readonly room: RoomId; readonly command: string; readonly prepared: PreparedAct }
+  | {
+      readonly v: 1;
+      readonly type: "act";
+      readonly id: string;
+      readonly room: RoomId;
+      readonly command: string;
+      /** `prepared`: sent, or about to be, with no answer kept. `answered`: the room's answer is kept; local steps remain. */
+      readonly state: "prepared" | "answered";
+      readonly prepared: PreparedAct;
+      readonly result?: unknown;
+    }
   | {
       readonly v: 1;
       readonly type: "login";
@@ -159,7 +170,7 @@ export class Store {
     for (const file of readdirSync(dir)) {
       if (!file.startsWith("act-")) continue;
       const entry = JSON.parse(readFileSync(join(dir, file), "utf8")) as JournalEntry;
-      if (entry.type === "act" && entry.prepared.signed === undefined) {
+      if (entry.type === "act" && entry.state === "prepared" && entry.prepared.signed === undefined) {
         rmSync(join(dir, file), { force: true });
         n++;
       }

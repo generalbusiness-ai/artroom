@@ -11,7 +11,7 @@
  *   if (isRefusal(claim)) show(claim.rule, claim.reason, claim.fix);
  */
 
-export { connect, join, redeem, roomIdOf, LOST_REDEMPTION } from "./connect.ts";
+export { connect, join, redeem, resubmit, roomIdOf, LOST_REDEMPTION } from "./connect.ts";
 export { HttpRoomClient, RpcRoomClient, WS_PROTOCOL, WS_TOKEN_PREFIX, type Watch, type PreparedAct, type ClientActOptions } from "./room.ts";
 export type { ClientOptions } from "./wire.ts";
 export { canonicalize, canonicalBytes, digestOf } from "./canonical.ts";

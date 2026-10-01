@@ -76,9 +76,13 @@ After the token is revoked or expires, the room refuses it with
 ## Finishing an act after a restart
 
 Act methods also take `onPrepared`, which receives the act once it is
-resolved and, for a key, signed. Save it, and `replay(act)` sends it again
-later, unchanged, from any handle for the same room. The CLI uses this for
-its journal.
+resolved and, for a key, signed. Save it. Later, `resubmit({ url }, roomId,
+signed)` sends the signed envelope straight back to the room, unchanged.
+It needs no handle, read session or new signature, so it works even after
+the key is retired or revoked, and the room returns the original result
+(R-IDEM-2). It refuses an envelope signed for another room. An unsigned
+bearer act is sent again with a connected handle's `replay(act)`, which
+needs a valid token (R-CRED-10). The CLI uses both for its journal.
 
 ## Choices this package makes
 
@@ -107,6 +111,22 @@ The checker's review asked for six changes. Each is answered here, and
 | P2 (security) Own-property checks in MCP | Only the ten tools' own names are tools. The validator reads only own keys, and the runner gets a JSON copy of its input. Everything stays inside the boundary that never throws | mcp: "%s is not a tool…", "an input key %s is not allowed…", "values smuggled in through __proto__ are never used…" |
 
 The cli package's `exports` now names its real entry point, `src/main.ts`.
+(Review 17013617 later removed it: the package is a command only.)
+
+## Review 17013617
+
+The checker's second review confirmed the six findings above and the
+amendment 2 edits, and asked for three more changes. `test/review-17013617.test.ts`
+in the client and cli packages names each case.
+
+| Finding | Change | Tests |
+|---|---|---|
+| P2 A retained signed act must not need a new read session | The CLI sends a journaled signed act with `resubmit`, before and without connecting: no session, genesis read, new signature or lane read. New work still connects with the full checks. An unsigned bearer act still has its token judged first | cli: "after the key is %s and sessions end, the same command returns the original claim", "a failing session request and a failing genesis read do not block the receipt", "a recorded refusal whose answer was lost is returned again…", "an envelope signed for another room is refused before anything is sent" |
+| P2 Keep an act's journal until its local steps are durable | An act's entry moves from `prepared` to `answered`, which keeps the room's answer. It is removed only after the local steps (config, landing, workspace credential) are done. The same command finishes them from the kept answer, with no preflight and no second act | cli: "land interrupted after %s…", "a failed config write after the land was admitted…", "a claim interrupted after the answer…", "release interrupted after %s…", "release whose credential removal fails…", "a bearer act whose answer was kept finishes from it…" |
+| P2 RPC update decoder lifecycle | `decodeUpdates` pipes the bytes through a `TextDecoderStream` and a line-splitting `TransformStream`. The pipe owns the source; `cancel()` works with or without a reader, ends a pending read, and reaches the source. Bad bytes, bad lines and a failing source all reject with an `ArtroomError` | client: "before any read…", "during a pending read…", "after the caller released its reader…", "invalid UTF-8 rejects with an ArtroomError…", "a failing source rejects…", "lines split across chunks…" |
+
+Also: the cli package has no library export, and an obsolete snapshot is
+removed.
 
 ## Tests
 

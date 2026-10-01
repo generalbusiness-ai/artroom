@@ -7,9 +7,6 @@
   "bin": {
     "artroom": "./bin/artroom.js"
   },
-  "exports": {
-    ".": "./src/main.ts"
-  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "test": "vitest run",
