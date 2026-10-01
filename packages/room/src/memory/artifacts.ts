@@ -182,16 +182,22 @@ export class FakeRepo implements GitRemote {
     const d = this.object(hash, "commit");
     if (!d) return null;
     const c = parseCommit(d);
-    const at = Number(/ (\d+) [+-]\d{4}$/.exec(c.committer)?.[1] ?? 0);
+    // Decoded as the binding decodes it: identities split, times in seconds, one trailing newline removed.
+    const who = (line: string) => {
+      const m = /^(.*) <(.*)> (\d+) [+-]\d{4}$/.exec(line);
+      return { name: m?.[1] ?? "", email: m?.[2] ?? "", at: Number(m?.[3] ?? 0) };
+    };
+    const a = who(c.author);
+    const k = who(c.committer);
     return {
       hash,
       treeHash: c.tree,
       parents: [...c.parents],
-      committedAt: at,
-      authoredAt: at,
-      message: c.message,
-      author: { name: "Test", email: "test@example.invalid" },
-      committer: { name: "Test", email: "test@example.invalid" },
+      committedAt: k.at,
+      authoredAt: a.at,
+      message: c.message.endsWith("\n") ? c.message.slice(0, -1) : c.message,
+      author: { name: a.name, email: a.email },
+      committer: { name: k.name, email: k.email },
     };
   }
 

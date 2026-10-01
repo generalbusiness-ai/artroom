@@ -12,11 +12,19 @@ import { policy, requireCheck, requireReview } from "@generalbusiness/artroom-po
 import { checkerInputs, filterSnapshot, snapshotDigest, type SnapshotEntry } from "@generalbusiness/artroom-policy";
 import { forkName } from "@generalbusiness/artroom-git";
 import { verifyLog } from "@generalbusiness/artroom-log";
+import { env } from "cloudflare:workers";
+import type { Genesis } from "@generalbusiness/artroom-contract";
+import { artifactsLogRemote } from "../../src/logremote.ts";
+import type { ArtifactsBinding } from "../../src/artifacts.ts";
+import type { RoomEnv } from "../../src/config.ts";
+import { draftRoom, foundRoom } from "../../src/founding.ts";
+import { roomIdOf } from "../../src/ids.ts";
+import { hex } from "../../src/crypto.ts";
 import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
 import { obligationsFor } from "../../src/obligations.ts";
 import { artifactsErrors } from "../../src/memory/artifacts.ts";
-import { addMember, advance, call, clock, Client, expectOk, expectRefusal, iso, makeRoom, openedWorkspace, pushChange, tick, tokenLive, type TestRoom } from "./support.ts";
+import { addMember, advance, call, clock, Client, expectOk, expectRefusal, grant, iso, makeRoom, newKeyPair, openedWorkspace, placeRepo, pushChange, randomBytes, sign, tick, tokenLive, worldFor, type TestRoom } from "./support.ts";
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const entries = async (r: TestRoom): Promise<LogEntry[]> => [...(await r.admin.read({ q: "log", req: { limit: 500 } })).acts];
@@ -327,3 +335,73 @@ describe("offline replay of the produced log (lane L's verifyLog, R-LOG-10)", ()
   });
 });
 
+
+// ------------------------------------------------------------------ the production adapters' own guards
+
+describe("the adapters' boundaries", () => {
+  it("a repository identity in a namespace this deployment has no Artifacts binding for: found is unavailable, and nothing is read", async () => {
+    const admin = newKeyPair();
+    const repo = `elsewhere/${hex(randomBytes(16))}`;
+    const input = { name: `nb-${hex(randomBytes(6))}`, repo: { kind: "import", grant: grant(repo, admin.key) }, admin: { handle: "@founder", key: admin.key }, recovery: newKeyPair().key };
+    const d = await draftRoom(env as unknown as RoomEnv, input, clock.now);
+    const world = worldFor(roomIdOf(d.genesis as Genesis));
+    placeRepo(world, `test-import/${repo.split("/")[1]}`);
+    world.artifacts.main = world.artifacts.commit(null, { "README.md": "# here\n" });
+    await expect(foundRoom(env as unknown as RoomEnv, d.genesis, sign(admin.seed, "artroom-genesis-v1", d.genesis), d.draft)).rejects.toMatchObject({ code: "unavailable" });
+    expect(world.artifacts.remoteCalls.get("log") ?? 0).toBe(0);
+  });
+
+  it("a repository at the lane's fork name that is not a fork of the room's repository is never read as the lane's fork", async () => {
+    const r = await makeRoom();
+    const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    const a = r.world.artifacts;
+    const head = a.commit(a.main, { "src/app.ts": "v2" });
+    // Someone else's repository, at the fork's name, holding the head.
+    await a.binding.create(forkName(a.canonical, c.lane));
+    const imposter = a.repo(forkName(a.canonical, c.lane));
+    for (const o of a.closure(head)) imposter.objects.add(o);
+    expectRefusal(await r.admin.act("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" }), "head-unknown");
+  });
+
+  it("the production log remote reads the published log exactly through the binding, so verifyLog runs over it; it pushes only through the sandbox", async () => {
+    const r = await makeRoom();
+    await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
+    await call(r.stub.publishLog());
+    const a = r.world.artifacts;
+    const loc = { namespace: a.namespace, name: a.canonical };
+    const remote = artifactsLogRemote(a.binding as unknown as ArtifactsBinding, {}, loc);
+    expect(await verifyLog(remote)).toMatchObject({ ok: true, failures: [] });
+    // A binding that decodes a blob differently: the object does not hash to what was asked, and is refused.
+    const lying = {
+      ...a.binding,
+      get: async (name: string) => {
+        const repo = await a.binding.get(name);
+        return Object.assign(Object.create(repo), { readBlob: async () => new Blob(["not what was stored"]) });
+      },
+    } as unknown as ArtifactsBinding;
+    await expect(verifyLog(artifactsLogRemote(lying, {}, loc))).rejects.toThrow(/could not be read exactly/);
+    await expect(remote.push([], "refs/artroom/log", "0".repeat(40) as never, null)).rejects.toThrow(/pushLog/);
+  });
+
+  it("with a policy carry rule in force, a check does not carry: it reruns", async () => {
+    const scopedCfg: CheckerConfig = { format: "artroom-checker-v1", inputs: ["src/**"], volatile: false, timeoutSeconds: 60 };
+    const base = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
+    const doc: PolicyDocument = { ...base, rules: [...base.rules, { id: "keep", kind: "carry", evidence: "check", allow: "true" }] };
+    const r = await makeRoom({ policy: doc, files: { ".artroom/checkers/unit.json": JSON.stringify(scopedCfg) } });
+    const alice = await addMember(r, "@alice", "member");
+    const bob = await addMember(r, "@bob", "member");
+    const ci = await addMember(r, "@ci", "checker");
+    const other = await proposed(r, bob, ["docs/**"], { "docs/guide.md": "more" });
+    await bob.ok<Landing>("land", { lane: other.lane, generation: 1 }, { lease: 1, head: other.head });
+    const mine = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    const l = await alice.ok<Landing>("land", { lane: mine.lane, generation: 1 }, { lease: 1, head: mine.head });
+    await tick(r);
+    const i1 = (await op(r, l.op.id)).integration!;
+    const paths = checkerInputs(scopedCfg.inputs, doc.carry)!;
+    const entries: SnapshotEntry[] = [...r.world.artifacts.blobs(i1 as never)].map(([p, b]) => [p, "100644", b] as const);
+    const snapshot = await snapshotDigest(filterSnapshot(entries, paths));
+    await ci.ok("check", { lane: mine.lane, generation: 1 }, { obligation: "obl_unit-tests", check: "unit", integration: i1, input: { kind: "filtered", snapshot, paths }, config: digestJson(scopedCfg), runner: `sha256:${"0".repeat(64)}`, volatile: false, ok: true, detail: "ok" });
+    await tick(r, 4);
+    expect(await op(r, l.op.id)).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
+  });
+});
