@@ -7,6 +7,8 @@
  * - `HttpRoom`: the handle over HTTPS, for browsers, the CLI and scripts.
  * - `McpTools`: the ten MCP tools, mapped one to one to `RoomApi` methods.
  * - `ArtroomService`, `RoomWire`, `HttpRoutes`: the wire beneath the handles.
+ * - `ArtroomFounder`, `RoomDraft`, `Founding`, `RoomRef`: founding a room and
+ *   finding its ID from its name (R-GEN-10, R-GEN-11, R-API-11).
  */
 
 import type {
@@ -27,7 +29,6 @@ import type {
   Reason,
   RoomId,
   RoomName,
-  Seq,
   Sha,
   Timestamp,
 } from "./ids.ts";
@@ -55,10 +56,10 @@ import type {
 } from "./acts.ts";
 import type { Held, Lane, LaneFilter } from "./lanes.ts";
 import type { OpByKind, OpKind, OpRef, OpState, Reached, WaitOptions, WorkspaceGrant, WorkspaceOp } from "./landing.ts";
-import type { AttentionItem, LogPage, LogRequest, Page, PageRequest, Update } from "./pagination.ts";
-import type { Role, Roster, RosterOp } from "./roster.ts";
+import type { AttentionPage, LogPage, LogRequest, Page, PageRequest, Update } from "./pagination.ts";
+import type { Genesis, Role, Roster, RosterOp } from "./roster.ts";
 import type { Result } from "./errors.ts";
-import type { JoinEnvelope, SignedEnvelope, SignedRequest } from "./envelope.ts";
+import type { Envelope, JoinEnvelope, RequestBody, SignedEnvelope, SignedRequest } from "./envelope.ts";
 import type { Decision } from "./policy.ts";
 import type { Evidence, NotCarried } from "./evidence.ts";
 import type { LogEntry } from "./log.ts";
@@ -131,6 +132,52 @@ export interface Redeemed {
   readonly mcp: `https://${string}`;
 }
 
+/**
+ * An invitation link (R-CRED-11). The room ID is in the path; the invitation
+ * ID and the secret are only in the fragment, which is never sent in an HTTP
+ * request. The API endpoint is the link's origin and any path before `/rooms/`.
+ */
+export type InvitationLink = `https://${string}/rooms/${RoomId}/join#i=${InvitationId}&s=${string}`;
+
+// ----------------------------------------------------------------- founding
+
+/** Founding, step 1: what the first admin asks the deployment for (R-GEN-10). */
+export interface RoomDraft {
+  /** 1 to 128 characters, never in the form of a room ID (R-GEN-11). */
+  readonly name: RoomName;
+  /** The canonical repository's Artifacts name. */
+  readonly repo: string;
+  readonly admin: { readonly handle: MemberId; readonly key: KeyId };
+  readonly recovery: KeyId;
+}
+
+/** The genesis object to sign, with a room key the deployment made, and the draft value that names that key. */
+export interface DraftedRoom {
+  readonly genesis: Genesis;
+  /** Not a secret. The deployment uses it to recover the room key at `found`. */
+  readonly draft: string;
+}
+
+/** Founding, step 2: the genesis, signed by the first admin key (R-GEN-1, R-SIG-1), and the draft value. */
+export interface Founding {
+  readonly genesis: Genesis;
+  readonly sig: Base64Url;
+  readonly draft: string;
+}
+
+/** A room's ID and its name (R-API-11). */
+export interface RoomRef {
+  readonly room: RoomId;
+  readonly name: RoomName;
+}
+
+/** Founding over a service binding: methods on the Worker's entrypoint, beside `ArtroomService` (R-GEN-10). */
+export interface ArtroomFounder {
+  draft(input: RoomDraft): Promise<DraftedRoom>;
+  /** Returns the new room's ID. Repeating it with the same genesis returns the same ID. */
+  found(genesis: Genesis, sig: Base64Url, draft: string): Promise<RoomId>;
+}
+
 /** Options every act method accepts. */
 export interface ActOptions {
   /** Reuse it to retry safely after a timeout (R-IDEM). Default: a fresh random key per call. */
@@ -184,7 +231,8 @@ export interface RoomApi {
   op<K extends OpKind>(ref: OpRef<K>): Promise<OpByKind[K]>;
   /** Resolves when the operation reaches one of `until`. Throws `timeout` otherwise. */
   wait<K extends OpKind, const S extends OpState<K>>(op: OpRef<K>, opts: WaitOptions<S>): Promise<Reached<K, S>>;
-  attention(page?: PageRequest): Promise<Page<AttentionItem>>;
+  /** The attention queue, with `publishedThrough` (R-API-9). */
+  attention(page?: PageRequest): Promise<AttentionPage>;
   log(req?: LogRequest): Promise<LogPage>;
   explain(act: ActId): Promise<Explanation | null>;
   members(): Promise<Roster>;
@@ -202,9 +250,24 @@ export interface UpdateStream {
   cancel(reason?: unknown): Promise<void>;
 }
 
+/**
+ * A structural subset of the Streams API `ReadableStream<Uint8Array>`, so
+ * this package needs no DOM or Workers lib. Workers RPC streams carry bytes.
+ */
+export interface ByteStream {
+  getReader(): {
+    read(): Promise<{ readonly done: false; readonly value: Uint8Array } | { readonly done: true; readonly value?: undefined }>;
+    releaseLock(): void;
+  };
+  cancel(reason?: unknown): Promise<void>;
+}
+
 /** The handle over a Workers service binding. `using` releases the client stub only. */
 export interface Room extends RoomApi, Disposable {
-  /** A stream of updates from `cursor` (the start of the live tail when absent). */
+  /**
+   * A stream of updates from `cursor` (the start of the live tail when
+   * absent). The handle decodes `RoomWire.subscribe`'s bytes (R-API-8).
+   */
   subscribe(cursor?: Cursor): Promise<UpdateStream>;
 }
 
@@ -218,7 +281,10 @@ export interface Subscription extends Disposable {
 export interface HttpRoom extends RoomApi, Disposable {
   /** Long poll: resolves with the next update after `cursor`, or an empty one after `waitMs`. */
   subscribe(cursor?: Cursor, opts?: { readonly waitMs?: number }): Promise<Update>;
-  /** Browser only: a hibernating WebSocket that calls `onUpdate` for each update. */
+  /**
+   * A hibernating WebSocket that calls `onUpdate` for each update. The read
+   * token travels as a subprotocol, never in the URL (R-API-12).
+   */
   watch(cursor: Cursor | undefined, onUpdate: (update: Update) => void): Subscription;
 }
 
@@ -240,11 +306,23 @@ export interface ReadResults {
   readonly lanes: Page<Lane>;
   readonly proposal: Proposal | null;
   readonly op: OpByKind[OpKind];
-  readonly attention: Page<AttentionItem>;
+  readonly attention: AttentionPage;
   readonly log: LogPage;
   readonly explain: Explanation | null;
   readonly members: Roster;
 }
+
+type Unsigned<E> = E extends Envelope ? Pick<E, "kind" | "target" | "body" | "idempotencyKey"> : never;
+
+/**
+ * An act for the room to sign under a bearer session (R-CRED-3, R-CRED-10):
+ * an envelope without `v`, `room`, `actor` and `delegation`, which the room
+ * sets. Never `roster`: a delegation cannot grant it (R-ADM-5).
+ */
+export type BearerAct = Unsigned<Exclude<Envelope, { readonly kind: "roster" }>>;
+
+/** The unrecorded requests a bearer session may make: the workspace and its token (R-CRED-10). */
+export type BearerRequest = Exclude<RequestBody, { readonly kind: "session" }>;
 
 /** The per-room RPC target beneath `Room`. Every method is stateless on the server. */
 export interface RoomWire extends Disposable {
@@ -254,17 +332,34 @@ export interface RoomWire extends Disposable {
   request(req: SignedRequest): Promise<Result<WorkspaceOp | WorkspaceGrant | Session>>;
   /** Redeem an invitation. Needs no session (R-CRED-9). */
   redeem(redemption: Redemption): Promise<Result<Joined | Redeemed>>;
+  /**
+   * An act for an MCP agent, signed by the room with the bearer's session key
+   * under its delegation, on the `submitted` path (R-CRED-3 step 4, R-CRED-10).
+   * An unknown, expired or revoked bearer throws `unauthenticated`.
+   */
+  bearerAct(bearer: string, act: BearerAct): Promise<Result<ActRecord>>;
+  /** `workspace` or `workspace-token` for a bearer session, judged as R-CRED-5 and R-WS-2 judge a signed request (R-CRED-10). */
+  bearerRequest(bearer: string, req: BearerRequest): Promise<Result<WorkspaceOp | WorkspaceGrant>>;
+  /** `session` is a session token or a bearer token (R-API-3). */
   read<Q extends ReadQuery>(session: SessionToken, query: Q): Promise<ReadResults[Q["q"]]>;
-  subscribe(session: SessionToken, cursor?: Cursor): Promise<UpdateStream>;
+  /** Newline-delimited JSON `Update`s, as UTF-8 bytes (R-API-8). `session` is a session or bearer token. */
+  subscribe(session: SessionToken, cursor?: Cursor): Promise<ByteStream>;
 }
 
 /** The Workers service binding, `env.ARTROOM`. */
 export interface ArtroomService {
+  /** By ID, or by name (R-GEN-11). A Worker that signs acts needs the ID, because envelopes carry it (R-ID-3). */
   room(room: RoomName | RoomId): Promise<RoomWire>;
 }
 
 /** HTTPS routes (R-API-3). `ok` is the 200 body; refusals are 409 with a `Refusal` body. */
 export interface HttpRoutes {
+  /** Founding, step 1. No credential (R-GEN-10). */
+  "POST /v1/rooms": { readonly body: RoomDraft; readonly ok: DraftedRoom };
+  /** Founding, step 2. No credential; the signed genesis is the proof (R-GEN-10). */
+  "POST /v1/rooms/found": { readonly body: Founding; readonly ok: { readonly room: RoomId } };
+  /** `:room` is a name or an ID. No credential (R-API-11). */
+  "GET /v1/rooms/:room": { readonly ok: RoomRef };
   /** Path `submitted`: a `join` here can redeem only a client-custody invitation (R-ADM-12). */
   "POST /v1/rooms/:room/acts": { readonly body: SignedEnvelope; readonly ok: ActRecord };
   /** Responses carrying a `WorkspaceGrant` are sent with `Cache-Control: no-store` (R-WS-4). */
@@ -275,14 +370,28 @@ export interface HttpRoutes {
   "GET /v1/rooms/:room/lanes/:lane": { readonly ok: Lane };
   "GET /v1/rooms/:room/lanes/:lane/:generation": { readonly ok: Proposal };
   "GET /v1/rooms/:room/ops/:op": { readonly query: { readonly until?: string; readonly timeoutMs?: number }; readonly ok: OpByKind[OpKind] };
-  "GET /v1/rooms/:room/attention": { readonly query: PageRequest; readonly ok: Page<AttentionItem> };
+  "GET /v1/rooms/:room/attention": { readonly query: PageRequest; readonly ok: AttentionPage };
   "GET /v1/rooms/:room/log": { readonly query: LogRequest; readonly ok: LogPage };
   "GET /v1/rooms/:room/explain/:act": { readonly ok: Explanation };
   "GET /v1/rooms/:room/members": { readonly ok: Roster };
   "GET /v1/rooms/:room/subscribe": { readonly query: { readonly cursor?: Cursor; readonly waitMs?: number }; readonly ok: Update };
-  "GET /v1/rooms/:room/ws": { readonly upgrade: "websocket"; readonly message: Update };
+  /**
+   * `?cursor=` is optional. The client offers the subprotocols `artroom.v1`
+   * and `artroom.token.<token>`; the room answers `artroom.v1` (R-API-12).
+   */
+  "GET /v1/rooms/:room/ws": {
+    readonly query: { readonly cursor?: Cursor };
+    readonly upgrade: "websocket";
+    readonly protocols: readonly [WsProtocol, WsTokenProtocol];
+    readonly message: Update;
+  };
   "POST /v1/rooms/:room/mcp": { readonly mcp: "streamable-http" };
 }
+
+/** The WebSocket subprotocol the room selects (R-API-12). */
+export type WsProtocol = "artroom.v1";
+/** The subprotocol that carries a session or bearer token. The room never selects it or echoes it. */
+export type WsTokenProtocol = `artroom.token.${string}`;
 
 /** Connect to a room. Declared here; implemented by the client package. */
 export declare function connect(
@@ -339,6 +448,7 @@ export interface McpTools {
             readonly scope: readonly Glob[];
             readonly goal?: string;
             readonly plan?: string;
+            readonly because?: readonly Reason[];
           }
       );
     readonly output: Result<Claim>;
@@ -354,7 +464,8 @@ export interface McpTools {
   readonly renew: { readonly input: McpHeld & McpCommon; readonly output: Result<Renewal> };
   readonly release: { readonly input: McpHeld & McpCommon & { readonly note?: string }; readonly output: Result<Release> };
   readonly propose: {
-    readonly input: McpHeld & McpCommon & { readonly head: Sha; readonly expectedGeneration: Generation; readonly summary: string };
+    readonly input: McpHeld &
+      McpCommon & { readonly head: Sha; readonly expectedGeneration: Generation; readonly summary: string; readonly because?: readonly Reason[] };
     readonly output: Result<Proposal>;
   };
   readonly note: {
@@ -376,9 +487,16 @@ export interface McpTools {
     readonly input: McpHeld & McpCommon & { readonly generation: Generation; readonly head: Sha; readonly waitMs?: number };
     readonly output: Result<Landing>;
   };
-  /** Also the MCP form of `subscribe`: call again with the returned cursor. */
-  readonly attention: { readonly input: PageRequest; readonly output: Page<AttentionItem> & { readonly publishedThrough: Seq } };
-  readonly explain: { readonly input: { readonly act: ActId }; readonly output: Explanation | null };
+  /** Also the MCP form of `subscribe`: call again with the returned cursor. The page is `RoomApi.attention`'s, unchanged. */
+  readonly attention: { readonly input: PageRequest; readonly output: AttentionPage };
+  /** An unknown act is `ExplainNotFound`, because MCP structured content must be an object (R-API-9). */
+  readonly explain: { readonly input: { readonly act: ActId }; readonly output: Explanation | ExplainNotFound };
+}
+
+/** The MCP `explain` result for an act the room does not have. `outcome` tells it apart from an `Explanation`. */
+export interface ExplainNotFound {
+  readonly act: ActId;
+  readonly outcome: "not-found";
 }
 
 export type McpToolName = keyof McpTools;

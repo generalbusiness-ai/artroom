@@ -326,7 +326,8 @@ export async function agentOverMcp(): Promise<void> {
   const queue = await callTool("attention", { limit: 20 });
   show(`${queue.items.length} items; published through ${queue.publishedThrough}`);
   const why = await callTool("explain", { act: p.id });
-  if (why) show(`${why.decisions.length} decisions`);
+  if (why.outcome === "not-found") show(`no act ${why.act}`);
+  else show(`${why.decisions.length} decisions`);
 }
 
 /** A `Claim` record is a `Held`: the compiler checks it here. */

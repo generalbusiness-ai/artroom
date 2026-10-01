@@ -7,6 +7,7 @@
 import type {
   ActId,
   Base64Url,
+  CheckerName,
   Digest,
   Generation,
   KeyId,
@@ -77,11 +78,56 @@ export type SystemEvent =
   | {
       readonly type: "policy-activated";
       readonly policy: Digest;
+      /**
+       * Every checker configuration active from this version, as name and
+       * digest pairs sorted by name; empty when there are none. Each digest
+       * names a file under `artroom-log/v1/policies/` (R-LOG-9). A check's
+       * `config` must equal its checker's digest here (R-OBL-3).
+       */
+      readonly checkers: readonly CheckerDigest[];
       /** The landed commit that carried the policy change; null for the initial policy. */
       readonly commit: Sha | null;
       readonly previous: PolicyVersion | null;
-      /** Recomputed obligations, re-evaluated carried evidence, fenced landing operations (R-POL-9). */
-      readonly recomputed: { readonly proposals: number; readonly reopened: number; readonly fenced: readonly OpId[] };
+      /**
+       * Known when the event is sealed (R-POL-9): `proposals` is the number of
+       * open proposals to recompute, `fenced` the landing operations sent back
+       * to `preparing`. `reopened` is always 0: recomputation needs policy
+       * evaluation, which runs after this entry, so each proposal's result is a
+       * later `obligations-recomputed` event.
+       */
+      readonly recomputed: { readonly proposals: number; readonly reopened: 0; readonly fenced: readonly OpId[] };
+    }
+  /**
+   * One open proposal's obligations, recomputed under a newly active policy
+   * (R-POL-9). Sealed after the `policy-activated` event it names.
+   */
+  | {
+      readonly type: "obligations-recomputed";
+      /** The `policy-activated` entry that caused the recomputation. */
+      readonly policy: PolicyVersion;
+      readonly lane: LaneId;
+      readonly generation: Generation;
+      /** The `require` and `carry` decisions made while recomputing. */
+      readonly decisions: readonly Decision[];
+      /** The proposal's obligations under the new policy. */
+      readonly obligations: readonly ObligationId[];
+      /** Obligations that were met before and are open now. */
+      readonly reopened: readonly ObligationId[];
+      /** Present when a `require` rule failed deterministically; `land` is refused with it (R-POL-9). */
+      readonly blocked?: Omit<Refusal, "act">;
+    }
+  /**
+   * The land rules evaluated during preparation on the prospective
+   * reservation input (R-LAND-4 step 3). One event per evaluation. When a
+   * rule blocks, the operation's `failed` outcome follows.
+   */
+  | {
+      readonly type: "land-evaluated";
+      readonly op: OpId;
+      readonly integration: Sha;
+      /** `RetainedLandInput.digest`: the digest of the `stage: "reservation"` input evaluated. */
+      readonly landInput: Digest;
+      readonly decisions: readonly Decision[];
     }
   | {
       readonly type: "land-reserved";
@@ -123,6 +169,12 @@ export type SystemEvent =
     }
   /** A confirmed publication: names the log commit, which never contains this event (R-LOG-8). */
   | { readonly type: "checkpoint"; readonly through: Seq; readonly hash: Digest; readonly commit: Sha };
+
+/** A checker configuration named by `policy-activated`: the checker's name and the digest of its configuration. */
+export interface CheckerDigest {
+  readonly name: CheckerName;
+  readonly config: Digest;
+}
 
 /**
  * The hashed content of an entry, before it is sealed. Built in this order
