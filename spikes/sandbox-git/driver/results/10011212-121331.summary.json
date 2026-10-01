@@ -1,0 +1,349 @@
+{
+ "cold_small_default": {
+  "clientMs": {
+   "n": 10,
+   "p50": 1114,
+   "max": 2012,
+   "min": 907
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 1020,
+   "max": 1876,
+   "min": 800
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 823,
+   "max": 1410,
+   "min": 632
+  },
+  "timing.startMs": {
+   "n": 10,
+   "p50": 350,
+   "max": 528,
+   "min": 223
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 398,
+   "max": 811,
+   "min": 345
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 8,
+   "max": 17,
+   "min": 5
+  }
+ },
+ "cold_small_standard1": {
+  "clientMs": {
+   "n": 10,
+   "p50": 1036,
+   "max": 1293,
+   "min": 937
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 904,
+   "max": 1199,
+   "min": 827
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 718,
+   "max": 1020,
+   "min": 666
+  },
+  "timing.startMs": {
+   "n": 10,
+   "p50": 268,
+   "max": 373,
+   "min": 256
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 354,
+   "max": 655,
+   "min": 322
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 10,
+   "max": 23,
+   "min": 6
+  }
+ },
+ "cold_medium_default": {
+  "clientMs": {
+   "n": 10,
+   "p50": 2850,
+   "max": 3227,
+   "min": 2649
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 2736,
+   "max": 3132,
+   "min": 2528
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 2548,
+   "max": 2800,
+   "min": 2354
+  },
+  "timing.startMs": {
+   "n": 10,
+   "p50": 307,
+   "max": 675,
+   "min": 230
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 2127,
+   "max": 2420,
+   "min": 1945
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 10,
+   "max": 24,
+   "min": 6
+  }
+ },
+ "warm_small": {
+  "cand/clean": {
+   "clientMs": {
+    "n": 10,
+    "p50": 339,
+    "max": 356,
+    "min": 289
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 220,
+    "max": 253,
+    "min": 202
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 207,
+    "max": 234,
+    "min": 185
+   },
+   "timing.startMs": {
+    "n": 10,
+    "p50": 14,
+    "max": 16,
+    "min": 11
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 146,
+    "max": 183,
+    "min": 130
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 10,
+    "max": 13,
+    "min": 8
+   }
+  },
+  "cand/conflict": {
+   "clientMs": {
+    "n": 10,
+    "p50": 387,
+    "max": 463,
+    "min": 329
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 284,
+    "max": 348,
+    "min": 229
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 266,
+    "max": 307,
+    "min": 212
+   },
+   "timing.startMs": {
+    "n": 10,
+    "p50": 14,
+    "max": 22,
+    "min": 11
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 197,
+    "max": 252,
+    "min": 165
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 11,
+    "max": 20,
+    "min": 10
+   }
+  }
+ },
+ "warm_medium": {
+  "cand/clean": {
+   "clientMs": {
+    "n": 10,
+    "p50": 340,
+    "max": 381,
+    "min": 304
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 224,
+    "max": 247,
+    "min": 207
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 212,
+    "max": 234,
+    "min": 195
+   },
+   "timing.startMs": {
+    "n": 10,
+    "p50": 11,
+    "max": 18,
+    "min": 10
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 162,
+    "max": 176,
+    "min": 154
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 10,
+    "max": 15,
+    "min": 7
+   }
+  },
+  "cand/conflict": {
+   "clientMs": {
+    "n": 10,
+    "p50": 322,
+    "max": 1123,
+    "min": 275
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 215,
+    "max": 942,
+    "min": 189
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 204,
+    "max": 932,
+    "min": 170
+   },
+   "timing.startMs": {
+    "n": 10,
+    "p50": 12,
+    "max": 17,
+    "min": 9
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 152,
+    "max": 884,
+    "min": 128
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 9,
+    "max": 13,
+    "min": 8
+   }
+  }
+ },
+ "land": {
+  "clientMs": {
+   "n": 10,
+   "p50": 628,
+   "max": 721,
+   "min": 549
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 523,
+   "max": 584,
+   "min": 411
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 509,
+   "max": 570,
+   "min": 389
+  },
+  "timing.startMs": {
+   "n": 10,
+   "p50": 10,
+   "max": 13,
+   "min": 7
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 267,
+   "max": 302,
+   "min": 162
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 8,
+   "max": 16,
+   "min": 6
+  },
+  "timing.pushMs": {
+   "n": 10,
+   "p50": 195,
+   "max": 216,
+   "min": 177
+  }
+ },
+ "refusals": {
+  "conflict": "conflict",
+  "stale": "main-moved",
+  "main_unchanged": true
+ },
+ "races": {
+  "synced": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "unsynced": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "all_main_is_winner": true
+ },
+ "land_remote_main_matches": true
+}

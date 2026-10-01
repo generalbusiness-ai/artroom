@@ -1,0 +1,298 @@
+{
+ "fresh_small": {
+  "clientMs": {
+   "n": 10,
+   "p50": 693,
+   "max": 1669,
+   "min": 490
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 516,
+   "max": 965,
+   "min": 363
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 516,
+   "max": 965,
+   "min": 363
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 516,
+   "max": 965,
+   "min": 363
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 0,
+   "max": 0,
+   "min": 0
+  }
+ },
+ "cached_small_cand/clean": {
+  "clientMs": {
+   "n": 10,
+   "p50": 549,
+   "max": 939,
+   "min": 420
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 423,
+   "max": 704,
+   "min": 284
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 423,
+   "max": 704,
+   "min": 284
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 423,
+   "max": 704,
+   "min": 284
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 0,
+   "max": 0,
+   "min": 0
+  }
+ },
+ "cached_small_cand/conflict": {
+  "clientMs": {
+   "n": 10,
+   "p50": 524,
+   "max": 829,
+   "min": 421
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 386,
+   "max": 721,
+   "min": 281
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 386,
+   "max": 721,
+   "min": 281
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 386,
+   "max": 721,
+   "min": 281
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 0,
+   "max": 0,
+   "min": 0
+  }
+ },
+ "fresh_medium": {
+  "clientMs": {
+   "n": 10,
+   "p50": 5978,
+   "max": 7718,
+   "min": 5566
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 4197,
+   "max": 4857,
+   "min": 3712
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 4197,
+   "max": 4857,
+   "min": 3712
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 4197,
+   "max": 4857,
+   "min": 3712
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 0,
+   "max": 0,
+   "min": 0
+  }
+ },
+ "cached_medium_cand/clean": {
+  "clientMs": {
+   "n": 10,
+   "p50": 6274,
+   "max": 7925,
+   "min": 5286
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 4346,
+   "max": 5563,
+   "min": 3874
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 4346,
+   "max": 5563,
+   "min": 3874
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 4346,
+   "max": 5563,
+   "min": 3874
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 0,
+   "max": 0,
+   "min": 0
+  }
+ },
+ "cached_medium_cand/conflict": {
+  "clientMs": {
+   "n": 10,
+   "p50": 6170,
+   "max": 8341,
+   "min": 5022
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 4163,
+   "max": 5654,
+   "min": 3408
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 4163,
+   "max": 5654,
+   "min": 3408
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 4163,
+   "max": 5654,
+   "min": 3408
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 0,
+   "max": 0,
+   "min": 0
+  }
+ },
+ "land": {
+  "clientMs": {
+   "n": 10,
+   "p50": 1022,
+   "max": 1631,
+   "min": 787
+  },
+  "workerMs": {
+   "n": 10,
+   "p50": 799,
+   "max": 1402,
+   "min": 618
+  },
+  "timing.totalMs": {
+   "n": 10,
+   "p50": 799,
+   "max": 1402,
+   "min": 618
+  },
+  "timing.fetchMs": {
+   "n": 10,
+   "p50": 593,
+   "max": 1127,
+   "min": 437
+  },
+  "timing.mergeMs": {
+   "n": 10,
+   "p50": 0,
+   "max": 0,
+   "min": 0
+  },
+  "timing.pushMs": {
+   "n": 10,
+   "p50": 216,
+   "max": 368,
+   "min": 174
+  }
+ },
+ "cached_syncs": {
+  "cached_small_cand/clean": [
+   "fetch",
+   "clone",
+   "fetch",
+   "fetch",
+   "fetch",
+   "clone",
+   "fetch",
+   "clone",
+   "fetch",
+   "fetch"
+  ],
+  "cached_small_cand/conflict": [
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch"
+  ],
+  "cached_medium_cand/clean": [
+   "fetch",
+   "clone",
+   "fetch",
+   "clone",
+   "fetch",
+   "fetch",
+   "clone",
+   "fetch",
+   "clone",
+   "clone"
+  ],
+  "cached_medium_cand/conflict": [
+   "fetch",
+   "fetch",
+   "clone",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch",
+   "fetch"
+  ]
+ },
+ "races": {
+  "winners": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "all_main_is_winner": true
+ },
+ "land_remote_main_matches": true
+}

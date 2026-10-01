@@ -1,0 +1,2983 @@
+{
+ "run": "10011212-121331",
+ "url": "https://artroom-spike-sandbox-git.inguz.workers.dev",
+ "runs": 10,
+ "started": "2026-10-01T12:13:31-0400",
+ "cold_small_default": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 1114,
+    "max": 2012,
+    "min": 907
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 1020,
+    "max": 1876,
+    "min": 800
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 823,
+    "max": 1410,
+    "min": 632
+   },
+   "timing.startMs": {
+    "n": 10,
+    "p50": 350,
+    "max": 528,
+    "min": 223
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 398,
+    "max": 811,
+    "min": 345
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 8,
+    "max": 17,
+    "min": 5
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 528,
+     "interceptMs": 13,
+     "sync": "clone",
+     "fetchMs": 764,
+     "mergeMs": 11,
+     "totalMs": 1410
+    },
+    "workerMs": 1618,
+    "clientMs": 1723
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 438,
+     "interceptMs": 12,
+     "sync": "clone",
+     "fetchMs": 811,
+     "mergeMs": 8,
+     "totalMs": 1332
+    },
+    "workerMs": 1876,
+    "clientMs": 2012
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 420,
+     "interceptMs": 14,
+     "sync": "clone",
+     "fetchMs": 355,
+     "mergeMs": 5,
+     "totalMs": 852
+    },
+    "workerMs": 1062,
+    "clientMs": 1183
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 334,
+     "interceptMs": 23,
+     "sync": "clone",
+     "fetchMs": 409,
+     "mergeMs": 5,
+     "totalMs": 819
+    },
+    "workerMs": 1016,
+    "clientMs": 1115
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 376,
+     "interceptMs": 17,
+     "sync": "clone",
+     "fetchMs": 695,
+     "mergeMs": 13,
+     "totalMs": 1171
+    },
+    "workerMs": 1323,
+    "clientMs": 1426
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 286,
+     "interceptMs": 16,
+     "sync": "clone",
+     "fetchMs": 387,
+     "mergeMs": 13,
+     "totalMs": 772
+    },
+    "workerMs": 942,
+    "clientMs": 1047
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 344,
+     "interceptMs": 13,
+     "sync": "clone",
+     "fetchMs": 376,
+     "mergeMs": 8,
+     "totalMs": 805
+    },
+    "workerMs": 1023,
+    "clientMs": 1113
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 295,
+     "interceptMs": 16,
+     "sync": "clone",
+     "fetchMs": 414,
+     "mergeMs": 7,
+     "totalMs": 783
+    },
+    "workerMs": 969,
+    "clientMs": 1087
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 223,
+     "interceptMs": 9,
+     "sync": "clone",
+     "fetchMs": 345,
+     "mergeMs": 7,
+     "totalMs": 632
+    },
+    "workerMs": 800,
+    "clientMs": 907
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 355,
+     "interceptMs": 11,
+     "sync": "clone",
+     "fetchMs": 373,
+     "mergeMs": 17,
+     "totalMs": 827
+    },
+    "workerMs": 972,
+    "clientMs": 1072
+   }
+  ]
+ },
+ "cold_small_standard1": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 1036,
+    "max": 1293,
+    "min": 937
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 904,
+    "max": 1199,
+    "min": 827
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 718,
+    "max": 1020,
+    "min": 666
+   },
+   "timing.startMs": {
+    "n": 10,
+    "p50": 268,
+    "max": 373,
+    "min": 256
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 354,
+    "max": 655,
+    "min": 322
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 10,
+    "max": 23,
+    "min": 6
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 266,
+     "interceptMs": 13,
+     "sync": "clone",
+     "fetchMs": 395,
+     "mergeMs": 9,
+     "totalMs": 742
+    },
+    "workerMs": 881,
+    "clientMs": 1142
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 276,
+     "interceptMs": 9,
+     "sync": "clone",
+     "fetchMs": 322,
+     "mergeMs": 8,
+     "totalMs": 666
+    },
+    "workerMs": 878,
+    "clientMs": 1036
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 259,
+     "interceptMs": 11,
+     "sync": "clone",
+     "fetchMs": 405,
+     "mergeMs": 9,
+     "totalMs": 742
+    },
+    "workerMs": 945,
+    "clientMs": 1087
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 311,
+     "interceptMs": 9,
+     "sync": "clone",
+     "fetchMs": 326,
+     "mergeMs": 6,
+     "totalMs": 699
+    },
+    "workerMs": 892,
+    "clientMs": 1009
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 259,
+     "interceptMs": 9,
+     "sync": "clone",
+     "fetchMs": 347,
+     "mergeMs": 9,
+     "totalMs": 678
+    },
+    "workerMs": 925,
+    "clientMs": 1035
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 312,
+     "interceptMs": 7,
+     "sync": "clone",
+     "fetchMs": 359,
+     "mergeMs": 10,
+     "totalMs": 738
+    },
+    "workerMs": 894,
+    "clientMs": 994
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 271,
+     "interceptMs": 12,
+     "sync": "clone",
+     "fetchMs": 655,
+     "mergeMs": 16,
+     "totalMs": 1020
+    },
+    "workerMs": 1199,
+    "clientMs": 1293
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 260,
+     "interceptMs": 10,
+     "sync": "clone",
+     "fetchMs": 350,
+     "mergeMs": 14,
+     "totalMs": 693
+    },
+    "workerMs": 827,
+    "clientMs": 937
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 373,
+     "interceptMs": 14,
+     "sync": "clone",
+     "fetchMs": 436,
+     "mergeMs": 23,
+     "totalMs": 961
+    },
+    "workerMs": 1194,
+    "clientMs": 1289
+   },
+   {
+    "ok": true,
+    "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+    "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 256,
+     "interceptMs": 12,
+     "sync": "clone",
+     "fetchMs": 344,
+     "mergeMs": 12,
+     "totalMs": 685
+    },
+    "workerMs": 913,
+    "clientMs": 1006
+   }
+  ]
+ },
+ "cold_medium_default": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 2850,
+    "max": 3227,
+    "min": 2649
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 2736,
+    "max": 3132,
+    "min": 2528
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 2548,
+    "max": 2800,
+    "min": 2354
+   },
+   "timing.startMs": {
+    "n": 10,
+    "p50": 307,
+    "max": 675,
+    "min": 230
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 2127,
+    "max": 2420,
+    "min": 1945
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 10,
+    "max": 24,
+    "min": 6
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 304,
+     "interceptMs": 12,
+     "sync": "clone",
+     "fetchMs": 2420,
+     "mergeMs": 9,
+     "totalMs": 2800
+    },
+    "workerMs": 3132,
+    "clientMs": 3227
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 273,
+     "interceptMs": 12,
+     "sync": "clone",
+     "fetchMs": 2305,
+     "mergeMs": 6,
+     "totalMs": 2653
+    },
+    "workerMs": 2786,
+    "clientMs": 2889
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 310,
+     "interceptMs": 36,
+     "sync": "clone",
+     "fetchMs": 2108,
+     "mergeMs": 16,
+     "totalMs": 2531
+    },
+    "workerMs": 2669,
+    "clientMs": 2763
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 315,
+     "interceptMs": 12,
+     "sync": "clone",
+     "fetchMs": 2124,
+     "mergeMs": 9,
+     "totalMs": 2529
+    },
+    "workerMs": 2687,
+    "clientMs": 2811
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 279,
+     "interceptMs": 10,
+     "sync": "clone",
+     "fetchMs": 2057,
+     "mergeMs": 10,
+     "totalMs": 2447
+    },
+    "workerMs": 2600,
+    "clientMs": 2703
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 323,
+     "interceptMs": 16,
+     "sync": "clone",
+     "fetchMs": 2310,
+     "mergeMs": 12,
+     "totalMs": 2751
+    },
+    "workerMs": 2929,
+    "clientMs": 3043
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 292,
+     "interceptMs": 8,
+     "sync": "clone",
+     "fetchMs": 2130,
+     "mergeMs": 9,
+     "totalMs": 2502
+    },
+    "workerMs": 2629,
+    "clientMs": 2724
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 230,
+     "interceptMs": 31,
+     "sync": "clone",
+     "fetchMs": 2040,
+     "mergeMs": 8,
+     "totalMs": 2354
+    },
+    "workerMs": 2528,
+    "clientMs": 2649
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 331,
+     "interceptMs": 10,
+     "sync": "clone",
+     "fetchMs": 2139,
+     "mergeMs": 15,
+     "totalMs": 2565
+    },
+    "workerMs": 2809,
+    "clientMs": 2925
+   },
+   {
+    "ok": true,
+    "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+    "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+    "clean": true,
+    "conflicts": [],
+    "timing": {
+     "cold": true,
+     "startMs": 675,
+     "interceptMs": 26,
+     "sync": "clone",
+     "fetchMs": 1945,
+     "mergeMs": 24,
+     "totalMs": 2784
+    },
+    "workerMs": 3045,
+    "clientMs": 3183
+   }
+  ]
+ },
+ "warm_small": {
+  "first": {
+   "ok": true,
+   "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+   "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+   "clean": true,
+   "conflicts": [],
+   "timing": {
+    "cold": true,
+    "startMs": 268,
+    "interceptMs": 12,
+    "sync": "clone",
+    "fetchMs": 359,
+    "mergeMs": 13,
+    "totalMs": 713
+   },
+   "workerMs": 949,
+   "clientMs": 1061
+  },
+  "cand/clean": {
+   "summary": {
+    "clientMs": {
+     "n": 10,
+     "p50": 339,
+     "max": 356,
+     "min": 289
+    },
+    "workerMs": {
+     "n": 10,
+     "p50": 220,
+     "max": 253,
+     "min": 202
+    },
+    "timing.totalMs": {
+     "n": 10,
+     "p50": 207,
+     "max": 234,
+     "min": 185
+    },
+    "timing.startMs": {
+     "n": 10,
+     "p50": 14,
+     "max": 16,
+     "min": 11
+    },
+    "timing.fetchMs": {
+     "n": 10,
+     "p50": 146,
+     "max": 183,
+     "min": 130
+    },
+    "timing.mergeMs": {
+     "n": 10,
+     "p50": 10,
+     "max": 13,
+     "min": 8
+    }
+   },
+   "rows": [
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 14,
+      "interceptMs": 6,
+      "sync": "fetch",
+      "fetchMs": 183,
+      "mergeMs": 10,
+      "totalMs": 234
+     },
+     "workerMs": 253,
+     "clientMs": 356
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 16,
+      "interceptMs": 6,
+      "sync": "fetch",
+      "fetchMs": 143,
+      "mergeMs": 9,
+      "totalMs": 198
+     },
+     "workerMs": 211,
+     "clientMs": 356
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 15,
+      "interceptMs": 6,
+      "sync": "fetch",
+      "fetchMs": 149,
+      "mergeMs": 13,
+      "totalMs": 216
+     },
+     "workerMs": 231,
+     "clientMs": 354
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 11,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 169,
+      "mergeMs": 10,
+      "totalMs": 215
+     },
+     "workerMs": 227,
+     "clientMs": 349
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 12,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 130,
+      "mergeMs": 12,
+      "totalMs": 185
+     },
+     "workerMs": 202,
+     "clientMs": 289
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 12,
+      "interceptMs": 7,
+      "sync": "fetch",
+      "fetchMs": 144,
+      "mergeMs": 8,
+      "totalMs": 191
+     },
+     "workerMs": 207,
+     "clientMs": 316
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 15,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 140,
+      "mergeMs": 12,
+      "totalMs": 199
+     },
+     "workerMs": 214,
+     "clientMs": 308
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 13,
+      "interceptMs": 6,
+      "sync": "fetch",
+      "fetchMs": 142,
+      "mergeMs": 10,
+      "totalMs": 193
+     },
+     "workerMs": 214,
+     "clientMs": 316
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 13,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 169,
+      "mergeMs": 10,
+      "totalMs": 219
+     },
+     "workerMs": 238,
+     "clientMs": 351
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b952cb3483ff7d461b7b2c3b6c91f874bbf0a3c0",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 16,
+      "interceptMs": 6,
+      "sync": "fetch",
+      "fetchMs": 161,
+      "mergeMs": 12,
+      "totalMs": 221
+     },
+     "workerMs": 238,
+     "clientMs": 329
+    }
+   ]
+  },
+  "cand/conflict": {
+   "summary": {
+    "clientMs": {
+     "n": 10,
+     "p50": 387,
+     "max": 463,
+     "min": 329
+    },
+    "workerMs": {
+     "n": 10,
+     "p50": 284,
+     "max": 348,
+     "min": 229
+    },
+    "timing.totalMs": {
+     "n": 10,
+     "p50": 266,
+     "max": 307,
+     "min": 212
+    },
+    "timing.startMs": {
+     "n": 10,
+     "p50": 14,
+     "max": 22,
+     "min": 11
+    },
+    "timing.fetchMs": {
+     "n": 10,
+     "p50": 197,
+     "max": 252,
+     "min": 165
+    },
+    "timing.mergeMs": {
+     "n": 10,
+     "p50": 11,
+     "max": 20,
+     "min": 10
+    }
+   },
+   "rows": [
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 16,
+      "interceptMs": 7,
+      "sync": "fetch",
+      "fetchMs": 249,
+      "mergeMs": 10,
+      "totalMs": 304
+     },
+     "workerMs": 316,
+     "clientMs": 407
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 12,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 170,
+      "mergeMs": 11,
+      "totalMs": 224
+     },
+     "workerMs": 243,
+     "clientMs": 351
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 13,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 165,
+      "mergeMs": 15,
+      "totalMs": 219
+     },
+     "workerMs": 239,
+     "clientMs": 336
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 14,
+      "interceptMs": 6,
+      "sync": "fetch",
+      "fetchMs": 171,
+      "mergeMs": 11,
+      "totalMs": 224
+     },
+     "workerMs": 238,
+     "clientMs": 329
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 11,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 165,
+      "mergeMs": 10,
+      "totalMs": 212
+     },
+     "workerMs": 229,
+     "clientMs": 329
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 12,
+      "interceptMs": 7,
+      "sync": "fetch",
+      "fetchMs": 252,
+      "mergeMs": 11,
+      "totalMs": 307
+     },
+     "workerMs": 348,
+     "clientMs": 447
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 12,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 215,
+      "mergeMs": 11,
+      "totalMs": 268
+     },
+     "workerMs": 289,
+     "clientMs": 415
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 16,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 204,
+      "mergeMs": 18,
+      "totalMs": 272
+     },
+     "workerMs": 294,
+     "clientMs": 392
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 22,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 207,
+      "mergeMs": 15,
+      "totalMs": 274
+     },
+     "workerMs": 290,
+     "clientMs": 463
+    },
+    {
+     "ok": true,
+     "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+     "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+     "clean": false,
+     "conflicts": [
+      "a.txt",
+      "c.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 18,
+      "interceptMs": 8,
+      "sync": "fetch",
+      "fetchMs": 190,
+      "mergeMs": 20,
+      "totalMs": 263
+     },
+     "workerMs": 278,
+     "clientMs": 382
+    }
+   ]
+  }
+ },
+ "warm_medium": {
+  "first": {
+   "ok": true,
+   "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+   "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+   "clean": true,
+   "conflicts": [],
+   "timing": {
+    "cold": true,
+    "startMs": 300,
+    "interceptMs": 7,
+    "sync": "clone",
+    "fetchMs": 1920,
+    "mergeMs": 9,
+    "totalMs": 2293
+   },
+   "workerMs": 2498,
+   "clientMs": 2614
+  },
+  "cand/clean": {
+   "summary": {
+    "clientMs": {
+     "n": 10,
+     "p50": 340,
+     "max": 381,
+     "min": 304
+    },
+    "workerMs": {
+     "n": 10,
+     "p50": 224,
+     "max": 247,
+     "min": 207
+    },
+    "timing.totalMs": {
+     "n": 10,
+     "p50": 212,
+     "max": 234,
+     "min": 195
+    },
+    "timing.startMs": {
+     "n": 10,
+     "p50": 11,
+     "max": 18,
+     "min": 10
+    },
+    "timing.fetchMs": {
+     "n": 10,
+     "p50": 162,
+     "max": 176,
+     "min": 154
+    },
+    "timing.mergeMs": {
+     "n": 10,
+     "p50": 10,
+     "max": 15,
+     "min": 7
+    }
+   },
+   "rows": [
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 10,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 154,
+      "mergeMs": 12,
+      "totalMs": 202
+     },
+     "workerMs": 226,
+     "clientMs": 381
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 11,
+      "interceptMs": 7,
+      "sync": "fetch",
+      "fetchMs": 157,
+      "mergeMs": 9,
+      "totalMs": 211
+     },
+     "workerMs": 223,
+     "clientMs": 330
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 10,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 154,
+      "mergeMs": 11,
+      "totalMs": 195
+     },
+     "workerMs": 207,
+     "clientMs": 304
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 12,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 166,
+      "mergeMs": 10,
+      "totalMs": 219
+     },
+     "workerMs": 229,
+     "clientMs": 339
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 11,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 172,
+      "mergeMs": 7,
+      "totalMs": 212
+     },
+     "workerMs": 224,
+     "clientMs": 324
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 11,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 156,
+      "mergeMs": 15,
+      "totalMs": 216
+     },
+     "workerMs": 225,
+     "clientMs": 340
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 18,
+      "interceptMs": 6,
+      "sync": "fetch",
+      "fetchMs": 176,
+      "mergeMs": 9,
+      "totalMs": 229
+     },
+     "workerMs": 246,
+     "clientMs": 363
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 15,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 173,
+      "mergeMs": 14,
+      "totalMs": 234
+     },
+     "workerMs": 247,
+     "clientMs": 371
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 15,
+      "interceptMs": 6,
+      "sync": "fetch",
+      "fetchMs": 158,
+      "mergeMs": 11,
+      "totalMs": 209
+     },
+     "workerMs": 221,
+     "clientMs": 323
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "a6b29744b17e333f39383c188af24765abd19197",
+     "clean": true,
+     "conflicts": [],
+     "timing": {
+      "cold": false,
+      "startMs": 11,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 169,
+      "mergeMs": 9,
+      "totalMs": 212
+     },
+     "workerMs": 223,
+     "clientMs": 345
+    }
+   ]
+  },
+  "cand/conflict": {
+   "summary": {
+    "clientMs": {
+     "n": 10,
+     "p50": 322,
+     "max": 1123,
+     "min": 275
+    },
+    "workerMs": {
+     "n": 10,
+     "p50": 215,
+     "max": 942,
+     "min": 189
+    },
+    "timing.totalMs": {
+     "n": 10,
+     "p50": 204,
+     "max": 932,
+     "min": 170
+    },
+    "timing.startMs": {
+     "n": 10,
+     "p50": 12,
+     "max": 17,
+     "min": 9
+    },
+    "timing.fetchMs": {
+     "n": 10,
+     "p50": 152,
+     "max": 884,
+     "min": 128
+    },
+    "timing.mergeMs": {
+     "n": 10,
+     "p50": 9,
+     "max": 13,
+     "min": 8
+    }
+   },
+   "rows": [
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 11,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 884,
+      "mergeMs": 11,
+      "totalMs": 932
+     },
+     "workerMs": 942,
+     "clientMs": 1123
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 10,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 128,
+      "mergeMs": 9,
+      "totalMs": 170
+     },
+     "workerMs": 190,
+     "clientMs": 275
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 11,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 137,
+      "mergeMs": 10,
+      "totalMs": 180
+     },
+     "workerMs": 189,
+     "clientMs": 295
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 10,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 160,
+      "mergeMs": 9,
+      "totalMs": 203
+     },
+     "workerMs": 216,
+     "clientMs": 342
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 13,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 172,
+      "mergeMs": 8,
+      "totalMs": 215
+     },
+     "workerMs": 228,
+     "clientMs": 324
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 13,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 151,
+      "mergeMs": 12,
+      "totalMs": 206
+     },
+     "workerMs": 215,
+     "clientMs": 303
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 16,
+      "interceptMs": 4,
+      "sync": "fetch",
+      "fetchMs": 151,
+      "mergeMs": 13,
+      "totalMs": 211
+     },
+     "workerMs": 232,
+     "clientMs": 333
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 13,
+      "interceptMs": 7,
+      "sync": "fetch",
+      "fetchMs": 154,
+      "mergeMs": 8,
+      "totalMs": 205
+     },
+     "workerMs": 215,
+     "clientMs": 325
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 9,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 160,
+      "mergeMs": 8,
+      "totalMs": 201
+     },
+     "workerMs": 215,
+     "clientMs": 321
+    },
+    {
+     "ok": true,
+     "baseSha": "98b796ba1bdbc19e34c39c5e78961f837160d61f",
+     "headSha": "6f3244c1adc6c69faba58a1ccaadb75d96ff0f3c",
+     "clean": false,
+     "conflicts": [
+      "pkg00/file00.txt"
+     ],
+     "timing": {
+      "cold": false,
+      "startMs": 17,
+      "interceptMs": 5,
+      "sync": "fetch",
+      "fetchMs": 150,
+      "mergeMs": 9,
+      "totalMs": 201
+     },
+     "workerMs": 214,
+     "clientMs": 301
+    }
+   ]
+  }
+ },
+ "land": {
+  "summary": {
+   "clientMs": {
+    "n": 10,
+    "p50": 628,
+    "max": 721,
+    "min": 549
+   },
+   "workerMs": {
+    "n": 10,
+    "p50": 523,
+    "max": 584,
+    "min": 411
+   },
+   "timing.totalMs": {
+    "n": 10,
+    "p50": 509,
+    "max": 570,
+    "min": 389
+   },
+   "timing.startMs": {
+    "n": 10,
+    "p50": 10,
+    "max": 13,
+    "min": 7
+   },
+   "timing.fetchMs": {
+    "n": 10,
+    "p50": 267,
+    "max": 302,
+    "min": 162
+   },
+   "timing.mergeMs": {
+    "n": 10,
+    "p50": 8,
+    "max": 16,
+    "min": 6
+   },
+   "timing.pushMs": {
+    "n": 10,
+    "p50": 195,
+    "max": 216,
+    "min": 177
+   }
+  },
+  "rows": [
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "31daca2e86c7dbb2cb06a29f0ad46ba61e476001",
+    "baseSha": "72a9b07f22c77be49fb2a05ca57c990350c9406f",
+    "headSha": "535bf2f7b8497d5f7cfd7ae8160eddb80666dd66",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t31daca2e86c7dbb2cb06a29f0ad46ba61e476001:refs/heads/main\t72a9b07..31daca2\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 7,
+     "interceptMs": 1,
+     "sync": "fetch",
+     "fetchMs": 162,
+     "mergeMs": 7,
+     "commitMs": 7,
+     "waitedMs": 0,
+     "pushMs": 192,
+     "totalMs": 389
+    },
+    "workerMs": 411,
+    "clientMs": 549
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "7cfff54d05fac6d3558dd21d00110181bb7d16fa",
+    "baseSha": "31daca2e86c7dbb2cb06a29f0ad46ba61e476001",
+    "headSha": "638e7626acf27656730cbee5284c1cff6ef5d47e",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t7cfff54d05fac6d3558dd21d00110181bb7d16fa:refs/heads/main\t31daca2..7cfff54\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 12,
+     "interceptMs": 7,
+     "sync": "fetch",
+     "fetchMs": 255,
+     "mergeMs": 6,
+     "commitMs": 5,
+     "waitedMs": 0,
+     "pushMs": 184,
+     "totalMs": 488
+    },
+    "workerMs": 505,
+    "clientMs": 604
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "6c4235c1c4377933834127d7ed7db50ee89e944e",
+    "baseSha": "7cfff54d05fac6d3558dd21d00110181bb7d16fa",
+    "headSha": "535b7cd86339c90808dea77241f796dcf37b04ed",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t6c4235c1c4377933834127d7ed7db50ee89e944e:refs/heads/main\t7cfff54..6c4235c\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 11,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 267,
+     "mergeMs": 8,
+     "commitMs": 8,
+     "waitedMs": 0,
+     "pushMs": 204,
+     "totalMs": 518
+    },
+    "workerMs": 533,
+    "clientMs": 626
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "52cfada42f013d212ed3ed6102312bd3da0cb635",
+    "baseSha": "6c4235c1c4377933834127d7ed7db50ee89e944e",
+    "headSha": "afdb68e3c243a506881bf4800008cbef8825646a",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t52cfada42f013d212ed3ed6102312bd3da0cb635:refs/heads/main\t6c4235c..52cfada\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 10,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 257,
+     "mergeMs": 16,
+     "commitMs": 12,
+     "waitedMs": 0,
+     "pushMs": 205,
+     "totalMs": 525
+    },
+    "workerMs": 539,
+    "clientMs": 635
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "2f01e8849c453811d727d9f20c61c71f5884b833",
+    "baseSha": "52cfada42f013d212ed3ed6102312bd3da0cb635",
+    "headSha": "c0f0177eb9abf82208c7ebb8c3b13ea65efd3dc9",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t2f01e8849c453811d727d9f20c61c71f5884b833:refs/heads/main\t52cfada..2f01e88\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 13,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 272,
+     "mergeMs": 8,
+     "commitMs": 5,
+     "waitedMs": 0,
+     "pushMs": 216,
+     "totalMs": 533
+    },
+    "workerMs": 545,
+    "clientMs": 646
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "87127654e481f189648cf2cd0b2c5b5ab61c43ae",
+    "baseSha": "2f01e8849c453811d727d9f20c61c71f5884b833",
+    "headSha": "fc9d8ea34690b5b36229a83beeb175d3c326f600",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t87127654e481f189648cf2cd0b2c5b5ab61c43ae:refs/heads/main\t2f01e88..8712765\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 11,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 302,
+     "mergeMs": 8,
+     "commitMs": 8,
+     "waitedMs": 0,
+     "pushMs": 215,
+     "totalMs": 570
+    },
+    "workerMs": 584,
+    "clientMs": 721
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "c0836f57d06723a97a7efe43e308000e4e015227",
+    "baseSha": "87127654e481f189648cf2cd0b2c5b5ab61c43ae",
+    "headSha": "e48e5d9923f87a2bc0046da1dd77164010900f47",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \tc0836f57d06723a97a7efe43e308000e4e015227:refs/heads/main\t8712765..c0836f5\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 13,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 266,
+     "mergeMs": 8,
+     "commitMs": 8,
+     "waitedMs": 0,
+     "pushMs": 177,
+     "totalMs": 497
+    },
+    "workerMs": 510,
+    "clientMs": 631
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "a4381e8132bf5ae63d84d67d676833daae859f9c",
+    "baseSha": "c0836f57d06723a97a7efe43e308000e4e015227",
+    "headSha": "814669fd97056d9797da151f5820d67bfc3175d5",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \ta4381e8132bf5ae63d84d67d676833daae859f9c:refs/heads/main\tc0836f5..a4381e8\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 7,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 302,
+     "mergeMs": 10,
+     "commitMs": 7,
+     "waitedMs": 0,
+     "pushMs": 198,
+     "totalMs": 539
+    },
+    "workerMs": 555,
+    "clientMs": 700
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "c65b8512616d19f3cd063da183875c5e434d74fb",
+    "baseSha": "a4381e8132bf5ae63d84d67d676833daae859f9c",
+    "headSha": "8b50f301fc2efa3d62d11117c04a98c3f1406045",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \tc65b8512616d19f3cd063da183875c5e434d74fb:refs/heads/main\ta4381e8..c65b851\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 8,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 267,
+     "mergeMs": 9,
+     "commitMs": 7,
+     "waitedMs": 0,
+     "pushMs": 187,
+     "totalMs": 500
+    },
+    "workerMs": 513,
+    "clientMs": 625
+   },
+   {
+    "ok": true,
+    "landed": true,
+    "refused": null,
+    "commit": "741796553846f2e3a1c543515efe254cfd767b7c",
+    "baseSha": "c65b8512616d19f3cd063da183875c5e434d74fb",
+    "headSha": "ec30289b57b8d1962ca89ef3677b9c3c35986261",
+    "clean": true,
+    "conflicts": [],
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t741796553846f2e3a1c543515efe254cfd767b7c:refs/heads/main\tc65b851..7417965\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 8,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 269,
+     "mergeMs": 8,
+     "commitMs": 7,
+     "waitedMs": 0,
+     "pushMs": 187,
+     "totalMs": 493
+    },
+    "workerMs": 507,
+    "clientMs": 604
+   }
+  ],
+  "warmup": {
+   "ok": true,
+   "baseSha": "72a9b07f22c77be49fb2a05ca57c990350c9406f",
+   "headSha": "535bf2f7b8497d5f7cfd7ae8160eddb80666dd66",
+   "clean": true,
+   "conflicts": [],
+   "timing": {
+    "cold": true,
+    "startMs": 258,
+    "interceptMs": 6,
+    "sync": "clone",
+    "fetchMs": 340,
+    "mergeMs": 8,
+    "totalMs": 663
+   },
+   "workerMs": 880,
+   "clientMs": 999
+  },
+  "remote_main_matches_last_land": true
+ },
+ "refusals": {
+  "conflict": {
+   "ok": true,
+   "landed": false,
+   "refused": "conflict",
+   "baseSha": "a41e815bcb08aaa4dc57b37f12cc7b078a5bd16e",
+   "headSha": "b32b201cef5f824b810303954c7b63623a6eb506",
+   "clean": false,
+   "conflicts": [
+    "a.txt",
+    "c.txt"
+   ],
+   "timing": {
+    "cold": false,
+    "startMs": 7,
+    "interceptMs": 2,
+    "sync": "fetch",
+    "fetchMs": 300,
+    "mergeMs": 6,
+    "totalMs": 326
+   },
+   "workerMs": 339,
+   "clientMs": 470
+  },
+  "stale_expect": {
+   "ok": true,
+   "landed": false,
+   "refused": "main-moved",
+   "baseSha": "741796553846f2e3a1c543515efe254cfd767b7c",
+   "headSha": "744c29705f8290b5b1a1f049ca2e0a6189ff6dd1",
+   "clean": true,
+   "conflicts": [],
+   "timing": {
+    "cold": false,
+    "startMs": 6,
+    "interceptMs": 2,
+    "sync": "fetch",
+    "fetchMs": 276,
+    "mergeMs": 11,
+    "totalMs": 310
+   },
+   "workerMs": 323,
+   "clientMs": 427
+  },
+  "main_unchanged": true
+ },
+ "races": [
+  {
+   "i": 1,
+   "synced": true,
+   "winners": [
+    "a"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \td7d1df53334fe3742402c2155b35ae0815a9ff53:refs/heads/main\t7417965..d7d1df5\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 13,
+     "interceptMs": 6,
+     "sync": "fetch",
+     "fetchMs": 208,
+     "mergeMs": 15,
+     "commitMs": 11,
+     "waitedMs": 3616,
+     "pushMs": 267,
+     "totalMs": 4163
+    },
+    "error": null
+   },
+   "b": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\tfe2beea7e506fcb0d7355f551958e6748d323852:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 9,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 188,
+     "mergeMs": 7,
+     "commitMs": 6,
+     "waitedMs": 3609,
+     "pushMs": 298,
+     "totalMs": 4132
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 2,
+   "synced": true,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\tbce28ce2f952de1271f693f067c6e2e2e2ff92a1:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 14,
+     "interceptMs": 4,
+     "sync": "fetch",
+     "fetchMs": 395,
+     "mergeMs": 10,
+     "commitMs": 9,
+     "waitedMs": 3448,
+     "pushMs": 251,
+     "totalMs": 4150
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t45147e7b05a3446f7806d44bbe7c2e4ab7cce3c1:refs/heads/main\td7d1df5..45147e7\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 7,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 403,
+     "mergeMs": 6,
+     "commitMs": 5,
+     "waitedMs": 3470,
+     "pushMs": 200,
+     "totalMs": 4105
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 3,
+   "synced": true,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t72f664fd53932c71a54ca2d716d7070aaa0fbc5b:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 10,
+     "interceptMs": 4,
+     "sync": "fetch",
+     "fetchMs": 347,
+     "mergeMs": 11,
+     "commitMs": 11,
+     "waitedMs": 3493,
+     "pushMs": 238,
+     "totalMs": 4131
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t7f82f9c328fc23a1ebee496d33627c48edd5222f:refs/heads/main\t45147e7..7f82f9c\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 12,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 349,
+     "mergeMs": 7,
+     "commitMs": 5,
+     "waitedMs": 3525,
+     "pushMs": 215,
+     "totalMs": 4128
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 4,
+   "synced": true,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t20c85f96ab1c226378c066f9990bb0589fc7318c:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 12,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 377,
+     "mergeMs": 10,
+     "commitMs": 10,
+     "waitedMs": 3438,
+     "pushMs": 250,
+     "totalMs": 4121
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \tff6bdaa8e228ca985636bbc7c6eedb14b0ab7684:refs/heads/main\t7f82f9c..ff6bdaa\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 5,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 376,
+     "mergeMs": 10,
+     "commitMs": 6,
+     "waitedMs": 3487,
+     "pushMs": 226,
+     "totalMs": 4126
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 5,
+   "synced": true,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\ta5ff1051be68faa61a81cf63e3396a55a4309ac6:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 10,
+     "interceptMs": 4,
+     "sync": "fetch",
+     "fetchMs": 296,
+     "mergeMs": 7,
+     "commitMs": 8,
+     "waitedMs": 3552,
+     "pushMs": 396,
+     "totalMs": 4293
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t3f4c5a41a90f8154518a2a829a958445ef235233:refs/heads/main\tff6bdaa..3f4c5a4\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 6,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 320,
+     "mergeMs": 6,
+     "commitMs": 4,
+     "waitedMs": 3564,
+     "pushMs": 363,
+     "totalMs": 4275
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 6,
+   "synced": true,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t1f5788e06b5703935bfb54fdc7696cf6668f9822:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 14,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 371,
+     "mergeMs": 12,
+     "commitMs": 14,
+     "waitedMs": 3462,
+     "pushMs": 327,
+     "totalMs": 4226
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t513ed71ce398d849f3d5113df2b074ad954cf8c2:refs/heads/main\t3f4c5a4..513ed71\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 8,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 387,
+     "mergeMs": 8,
+     "commitMs": 5,
+     "waitedMs": 3477,
+     "pushMs": 290,
+     "totalMs": 4192
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 7,
+   "synced": true,
+   "winners": [
+    "a"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t104aa89bfddf1594c385e3b77d07070e8e94fa2f:refs/heads/main\t513ed71..104aa89\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 13,
+     "interceptMs": 6,
+     "sync": "fetch",
+     "fetchMs": 765,
+     "mergeMs": 11,
+     "commitMs": 11,
+     "waitedMs": 3073,
+     "pushMs": 729,
+     "totalMs": 4633
+    },
+    "error": null
+   },
+   "b": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t4f321e7dc674facc2a958eea38b766a03adab1be:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 9,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 604,
+     "mergeMs": 8,
+     "commitMs": 7,
+     "waitedMs": 3266,
+     "pushMs": 769,
+     "totalMs": 4674
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 8,
+   "synced": true,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t39c6bc50c0954d6f8c98cf882c8b225eb84c5657:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 12,
+     "interceptMs": 4,
+     "sync": "fetch",
+     "fetchMs": 446,
+     "mergeMs": 10,
+     "commitMs": 9,
+     "waitedMs": 3401,
+     "pushMs": 257,
+     "totalMs": 4156
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t17fd48ff44ae7d7f7c0aa6ebd9e13f456c093274:refs/heads/main\t104aa89..17fd48f\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 7,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 422,
+     "mergeMs": 7,
+     "commitMs": 4,
+     "waitedMs": 3452,
+     "pushMs": 239,
+     "totalMs": 4143
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 9,
+   "synced": true,
+   "winners": [
+    "a"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t2659041d1e7f49712e8db9faaf7e1eb0714f15b7:refs/heads/main\t17fd48f..2659041\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 9,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 347,
+     "mergeMs": 13,
+     "commitMs": 17,
+     "waitedMs": 3449,
+     "pushMs": 247,
+     "totalMs": 4110
+    },
+    "error": null
+   },
+   "b": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t2a5dec3575ce575d7107f3792387dd36e45921b9:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 9,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 354,
+     "mergeMs": 13,
+     "commitMs": 7,
+     "waitedMs": 3471,
+     "pushMs": 274,
+     "totalMs": 4152
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 10,
+   "synced": true,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t519d949fe059eee2b9e2aed689345ee02e2aaab3:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 12,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 400,
+     "mergeMs": 10,
+     "commitMs": 9,
+     "waitedMs": 3448,
+     "pushMs": 221,
+     "totalMs": 4123
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \tbc0f53e80c51332344de6dcc6b8a2967863dabbd:refs/heads/main\t2659041..bc0f53e\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 8,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 386,
+     "mergeMs": 7,
+     "commitMs": 6,
+     "waitedMs": 3473,
+     "pushMs": 195,
+     "totalMs": 4092
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 11,
+   "synced": false,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t1c716bfc667691e30140e73c8ca23acf147df563:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 10,
+     "interceptMs": 4,
+     "sync": "fetch",
+     "fetchMs": 424,
+     "mergeMs": 11,
+     "commitMs": 11,
+     "waitedMs": 0,
+     "pushMs": 242,
+     "totalMs": 721
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t7897e0ed021ee62fa8a07c316f41193b634b5aa1:refs/heads/main\tbc0f53e..7897e0e\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 6,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 424,
+     "mergeMs": 8,
+     "commitMs": 7,
+     "waitedMs": 0,
+     "pushMs": 236,
+     "totalMs": 697
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 12,
+   "synced": false,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t1664a6cd917b5e23108e37b8f7d17ee83558bb45:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 15,
+     "interceptMs": 4,
+     "sync": "fetch",
+     "fetchMs": 396,
+     "mergeMs": 12,
+     "commitMs": 8,
+     "waitedMs": 0,
+     "pushMs": 261,
+     "totalMs": 719
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t9650e3f9b81cf98a5feb9182c2138dfdc226bfa7:refs/heads/main\t7897e0e..9650e3f\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 14,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 361,
+     "mergeMs": 8,
+     "commitMs": 5,
+     "waitedMs": 0,
+     "pushMs": 274,
+     "totalMs": 674
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 13,
+   "synced": false,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t75f7974b6442e2bff7ae626e44ebccf0a6a34f5a:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 15,
+     "interceptMs": 4,
+     "sync": "fetch",
+     "fetchMs": 368,
+     "mergeMs": 11,
+     "commitMs": 9,
+     "waitedMs": 0,
+     "pushMs": 415,
+     "totalMs": 844
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \td11766fe105664b60c785f2be0a4ff86f646df78:refs/heads/main\t9650e3f..d11766f\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 16,
+     "interceptMs": 6,
+     "sync": "fetch",
+     "fetchMs": 365,
+     "mergeMs": 8,
+     "commitMs": 6,
+     "waitedMs": 0,
+     "pushMs": 405,
+     "totalMs": 829
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 14,
+   "synced": false,
+   "winners": [
+    "a"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \tef9a8a1f6245d905bfda04beec00edfa7b9c96d3:refs/heads/main\td11766f..ef9a8a1\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 11,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 440,
+     "mergeMs": 8,
+     "commitMs": 9,
+     "waitedMs": 0,
+     "pushMs": 191,
+     "totalMs": 681
+    },
+    "error": null
+   },
+   "b": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\tebee7a98a347ed9bb16a6ebb81cce5493faf5501:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 11,
+     "interceptMs": 4,
+     "sync": "fetch",
+     "fetchMs": 443,
+     "mergeMs": 12,
+     "commitMs": 7,
+     "waitedMs": 0,
+     "pushMs": 207,
+     "totalMs": 708
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 15,
+   "synced": false,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\tcd9098c8f83b61a0d30289bd897185ea12ec4a48:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 9,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 408,
+     "mergeMs": 11,
+     "commitMs": 11,
+     "waitedMs": 0,
+     "pushMs": 225,
+     "totalMs": 687
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \tc3140d440d08e1b85980744ec44d8427ff103c17:refs/heads/main\tef9a8a1..c3140d4\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 8,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 385,
+     "mergeMs": 11,
+     "commitMs": 11,
+     "waitedMs": 0,
+     "pushMs": 215,
+     "totalMs": 658
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 16,
+   "synced": false,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t1f349b6672b048be93e294f1953ebd0f88cf8f75:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 11,
+     "interceptMs": 7,
+     "sync": "fetch",
+     "fetchMs": 395,
+     "mergeMs": 13,
+     "commitMs": 11,
+     "waitedMs": 0,
+     "pushMs": 251,
+     "totalMs": 712
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t7fc731159ae862e5ff06005032e5afdf15aae8fb:refs/heads/main\tc3140d4..7fc7311\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 7,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 425,
+     "mergeMs": 10,
+     "commitMs": 6,
+     "waitedMs": 0,
+     "pushMs": 232,
+     "totalMs": 697
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 17,
+   "synced": false,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t421770b0a44cc78b9a4e30857d6836d209deb006:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 15,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 488,
+     "mergeMs": 10,
+     "commitMs": 10,
+     "waitedMs": 0,
+     "pushMs": 258,
+     "totalMs": 805
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t313600c7212b5232d72fa4e6c8692266b4db0b78:refs/heads/main\t7fc7311..313600c\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 9,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 534,
+     "mergeMs": 8,
+     "commitMs": 5,
+     "waitedMs": 0,
+     "pushMs": 233,
+     "totalMs": 802
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 18,
+   "synced": false,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t42c94715813e39dfba69bc43bc9d50ae912c764a:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 14,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 406,
+     "mergeMs": 12,
+     "commitMs": 9,
+     "waitedMs": 0,
+     "pushMs": 255,
+     "totalMs": 722
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t0b5e3d048c68f13a9990ea47680753b26f0100e6:refs/heads/main\t313600c..0b5e3d0\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 7,
+     "interceptMs": 2,
+     "sync": "fetch",
+     "fetchMs": 415,
+     "mergeMs": 14,
+     "commitMs": 9,
+     "waitedMs": 0,
+     "pushMs": 245,
+     "totalMs": 705
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 19,
+   "synced": false,
+   "winners": [
+    "a"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \t4398691c50f5d0eae4fdcf7479e85e1d9c46119f:refs/heads/main\t0b5e3d0..4398691\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 12,
+     "interceptMs": 6,
+     "sync": "fetch",
+     "fetchMs": 450,
+     "mergeMs": 17,
+     "commitMs": 14,
+     "waitedMs": 0,
+     "pushMs": 264,
+     "totalMs": 795
+    },
+    "error": null
+   },
+   "b": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\t9941ea631e6ccbc431cbb0d019c39da29c0ae5ac:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 7,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 464,
+     "mergeMs": 31,
+     "commitMs": 18,
+     "waitedMs": 0,
+     "pushMs": 292,
+     "totalMs": 837
+    },
+    "error": null
+   }
+  },
+  {
+   "i": 20,
+   "synced": false,
+   "winners": [
+    "b"
+   ],
+   "main_is_winner": true,
+   "a": {
+    "landed": false,
+    "refused": "lease",
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n!\tdf38573ab1ebaedcffe55fd389c4b06556763605:refs/heads/main\t[remote rejected] (stale ref)\nDone",
+    "pushErr": "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git'",
+    "timing": {
+     "cold": false,
+     "startMs": 12,
+     "interceptMs": 5,
+     "sync": "fetch",
+     "fetchMs": 431,
+     "mergeMs": 11,
+     "commitMs": 8,
+     "waitedMs": 0,
+     "pushMs": 250,
+     "totalMs": 734
+    },
+    "error": null
+   },
+   "b": {
+    "landed": true,
+    "refused": null,
+    "pushOut": "To https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-sbx-small-10011212.git\n \tf3febd974254582211d49c1b9964d41e6269ce13:refs/heads/main\t4398691..f3febd9\nDone",
+    "pushErr": "",
+    "timing": {
+     "cold": false,
+     "startMs": 16,
+     "interceptMs": 3,
+     "sync": "fetch",
+     "fetchMs": 429,
+     "mergeMs": 8,
+     "commitMs": 6,
+     "waitedMs": 0,
+     "pushMs": 235,
+     "totalMs": 712
+    },
+    "error": null
+   }
+  }
+ ],
+ "boxes": [
+  "cold-sd-10011212-121331-0",
+  "cold-sd-10011212-121331-1",
+  "cold-sd-10011212-121331-2",
+  "cold-sd-10011212-121331-3",
+  "cold-sd-10011212-121331-4",
+  "cold-sd-10011212-121331-5",
+  "cold-sd-10011212-121331-6",
+  "cold-sd-10011212-121331-7",
+  "cold-sd-10011212-121331-8",
+  "cold-sd-10011212-121331-9",
+  "cold-s1-10011212-121331-0",
+  "cold-s1-10011212-121331-1",
+  "cold-s1-10011212-121331-2",
+  "cold-s1-10011212-121331-3",
+  "cold-s1-10011212-121331-4",
+  "cold-s1-10011212-121331-5",
+  "cold-s1-10011212-121331-6",
+  "cold-s1-10011212-121331-7",
+  "cold-s1-10011212-121331-8",
+  "cold-s1-10011212-121331-9",
+  "cold-md-10011212-121331-0",
+  "cold-md-10011212-121331-1",
+  "cold-md-10011212-121331-2",
+  "cold-md-10011212-121331-3",
+  "cold-md-10011212-121331-4",
+  "cold-md-10011212-121331-5",
+  "cold-md-10011212-121331-6",
+  "cold-md-10011212-121331-7",
+  "cold-md-10011212-121331-8",
+  "cold-md-10011212-121331-9",
+  "warm-s-10011212-121331",
+  "warm-m-10011212-121331",
+  "land-10011212-121331",
+  "race-a-10011212-121331",
+  "race-b-10011212-121331"
+ ],
+ "finished": "2026-10-01T12:16:06-0400"
+}
