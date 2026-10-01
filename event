@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/ui/test/screens.test.tsx at exact 5cc8c17ba84618165f45ecaa1851bb056a32108b on request/laneF-ui, under promise git:sha1…8055dc1 on request git:sha1…caee869","body":{"commit":"5cc8c17ba84618165f45ecaa1851bb056a32108b","path":"packages/ui/test/screens.test.tsx"}}
+{"kind":"artifact","text":"packages/ui/tsconfig.json at exact 5cc8c17ba84618165f45ecaa1851bb056a32108b on request/laneF-ui, under promise git:sha1…8055dc1 on request git:sha1…caee869","body":{"commit":"5cc8c17ba84618165f45ecaa1851bb056a32108b","path":"packages/ui/tsconfig.json"}}
