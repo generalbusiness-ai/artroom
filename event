@@ -1,1 +1,1 @@
-{"kind":"roster","text":"planner begins the workroom","body":{"actor":"20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517","kind":"human","name":"planner","role":"operator"}}
+{"kind":"roster","text":"builder joins as agent","body":{"actor":"feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de","kind":"agent","name":"builder","role":"participant"}}
