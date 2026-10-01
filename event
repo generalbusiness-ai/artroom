@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bb658d17bdc016089b705a4f092a8880d81119b3","text":"Republished at 45c7946ffd53de2d9ee3021c9e32924ec3c24586, which no longer changes packages/room/src/memory/log.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9e481e30dcc2020702222c869428a62c72bb6c7d","text":"Republished at 45c7946ffd53de2d9ee3021c9e32924ec3c24586; the successor stands at packages/room/src/model.ts."}
