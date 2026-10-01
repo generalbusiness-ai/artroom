@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c153909c43ddef536a8a7f4c6acaac41c4e8cbc9","text":"Republished at 45c7946ffd53de2d9ee3021c9e32924ec3c24586, which no longer changes packages/room/src/verify.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:709ef487e6bac9bdd12983e8bc8263820a80b31a","text":"Republished at 45c7946ffd53de2d9ee3021c9e32924ec3c24586; the successor stands at packages/room/src/worker.ts."}
