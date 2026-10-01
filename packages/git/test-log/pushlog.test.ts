@@ -32,7 +32,7 @@ function git(dir: string, ...args: string[]): string {
   return r.stdout.trim();
 }
 
-/** Lane L's GitRemote, as lane A's log remote builds it: reads from the repository, pushes through the publisher's pushLog. */
+/** Lane L's GitRemote, as lane A's log remote builds it: the ref through the publisher's readLogRef, objects by ID from the repository, pushes through pushLog. */
 class SandboxRemote implements GitRemote {
   readonly reader: GitCli;
   readonly ops: GitOps;
@@ -41,10 +41,11 @@ class SandboxRemote implements GitRemote {
   constructor(url: string, ops: GitOps) {
     this.url = url;
     this.ops = ops;
-    this.reader = GitCli.open(url);
+    this.reader = new GitCli(url, url); // objects by ID straight from the repository, as the binding reads them
   }
   readRef(ref: string) {
-    return this.reader.readRef(ref);
+    // The sandbox's readLogRef, as lane A's log remote calls it.
+    return this.ops.readLogRef(this.url, ref) as Promise<Sha | null>;
   }
   readObject(sha: Sha) {
     return this.reader.readObject(sha);
@@ -60,7 +61,7 @@ function setup() {
   const root = mkdtempSync(join(tmpdir(), "artroom-pushlog-"));
   const remote = join(root, "remote");
   mkdirSync(remote);
-  git(remote, "init", "--quiet");
+  git(remote, "init", "--quiet", "--bare");
   const sandbox = (n: string) => {
     mkdirSync(join(root, n));
     return new GitOps({ exec, workdir: join(root, n), config: ["protocol.file.allow=always"] });
@@ -82,6 +83,11 @@ describe("lane L's log through pushLog", () => {
     await reader.fetch(LOG_REF);
     const report = await verifyLog(reader);
     expect(report.failures).toEqual([]);
+    // The same check through the sandbox's read-back: readLogRef for the ref, objects by ID.
+    const viaSandbox = await verifyLog(new SandboxRemote(remote, sandbox("verifier")));
+    expect(viaSandbox.failures).toEqual([]);
+    expect(viaSandbox).toMatchObject({ ok: true, head: c3.commit, commits: 3, verifiedThrough: report.verifiedThrough });
+    expect(report).toMatchObject({ ok: true, head: c3.commit, commits: 3 });
   });
 
   test("the commit pushed is the one commitFor computes; a fresh sandbox after a restart continues on top", async () => {

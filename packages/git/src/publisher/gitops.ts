@@ -240,6 +240,17 @@ export class GitOps {
   }
 
   /** Main of a remote, read with ls-remote. Null if it has no main. */
+  /**
+   * Where lane L's log ref is on `canonical` (R-LOG-8), or null when it does
+   * not exist. Read with `git ls-remote`, which sees refs outside
+   * `refs/heads/` (the Artifacts binding's `log({ ref })` does not). Throws
+   * when the remote cannot be read: unreadable is never reported as absent.
+   */
+  readLogRef(canonical: string, ref: string = LOG_REF): Promise<string | null> {
+    if (ref !== LOG_REF) return Promise.reject(new Error(`readLogRef reads only ${LOG_REF}`));
+    return this.lsRemote(canonical, LOG_REF);
+  }
+
   async lsRemote(remote: string, ref: string): Promise<string | null> {
     const out = await this.ok("ls-remote", ["ls-remote", remote, assertRef(ref)]);
     const line = out.split("\n").find((l) => l.endsWith(`\t${ref}`));

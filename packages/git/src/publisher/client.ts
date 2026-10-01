@@ -37,13 +37,16 @@ export interface PublisherStub {
 }
 
 /**
- * The sandbox's log push (R-LOG-8), as lane A's log remote calls it:
- * `canonical.token` is a write token of at most 60 s that the caller
- * revokes afterwards. Separate from `PublisherStub`, which is what the
- * landing and pinning clients call.
+ * The sandbox's log remote (R-LOG-8), as lane A's log remote calls it. For
+ * each call the caller mints a token of at most 60 s on the canonical repo
+ * (write for `pushLog`, read for `readLogRef`) and revokes it afterwards.
+ * Separate from `PublisherStub`, which is what the landing and pinning
+ * clients call.
  */
-export interface LogPushStub {
+export interface LogRemoteStub {
   pushLog(req: LogPushRequest & { canonical: RemoteAccess }): Promise<LogPushOutcome>;
+  /** `refs/artroom/log`'s commit, or null if it does not exist; throws if it cannot be read. */
+  readLogRef(req: { canonical: RemoteAccess; ref: string }): Promise<Sha | null>;
 }
 
 export interface PublisherClientOptions {

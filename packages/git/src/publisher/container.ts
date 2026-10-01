@@ -246,6 +246,17 @@ export class Publisher extends DurableObject<PublisherEnv> {
     );
   }
 
+  /**
+   * Lane L's log read-back: where `refs/artroom/log` is, or null when it does
+   * not exist (lane L's `GitReader.readRef`). `canonical.token` is a read
+   * token of at most 60 s that the caller revokes; the gateway allows no ref
+   * update. Throws when the ref cannot be read, so lane L never takes
+   * "unreadable" for "absent".
+   */
+  readLogRef(req: { readonly canonical: RemoteAccess; readonly ref: string }): Promise<string | null> {
+    return this.withRoute([[req.canonical, null]], () => this.ops.readLogRef(req.canonical.remote, req.ref));
+  }
+
   /** R-LAND-4 step 1. The write token may only create `storeRef`, at the commit just built. */
   integrate(req: {
     readonly canonical: RemoteAccess;

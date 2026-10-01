@@ -391,3 +391,18 @@ test("a lease refusal at the push itself (the ref moved after the check) reads b
   assert.equal(r.outcome.outcome, "rejected");
   assert.deepEqual(toLogOutcome(r), { ok: false, reason: "lease-mismatch", current: other.commit });
 });
+
+test("readLogRef: the log ref's commit, null when it does not exist, and an error (never null) when the remote cannot be read", async (t) => {
+  const f = await new Fixture().init();
+  t.after(() => f.dispose());
+  assert.equal(await f.ops.readLogRef(f.canonical), null);
+  const c1 = logCommit("first", null);
+  await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
+  assert.equal(await f.ops.readLogRef(f.canonical), c1.commit);
+  // A fresh sandbox reads it too: ls-remote sees refs outside refs/heads/.
+  mkdirSync(join(f.root, "reader"));
+  const fresh = new GitOps({ exec: localExec, workdir: join(f.root, "reader"), config: ["protocol.file.allow=always"] });
+  assert.equal(await fresh.readLogRef(f.canonical, LOG_REF), c1.commit);
+  await assert.rejects(f.ops.readLogRef(f.canonical, "refs/heads/main"), /only refs\/artroom\/log/);
+  await assert.rejects(f.ops.readLogRef(join(f.root, "no-such-repo.git")));
+});

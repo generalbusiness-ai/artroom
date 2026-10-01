@@ -14,7 +14,8 @@
     "typecheck": "npm run types && tsc -p tsconfig.json && tsc -p test/tsconfig.json",
     "test": "node --test --test-concurrency=1 --test-timeout=60000 'test/*.test.ts'",
     "test:workers": "vitest run --config vitest.config.ts",
-    "test:log": "vitest run --config vitest.log.config.ts"
+    "test:log": "vitest run --config vitest.log.config.ts",
+    "test:live": "LB_LIVE=1 vitest run --config vitest.live.config.ts"
   },
   "dependencies": {
     "@generalbusiness/artroom-contract": "*"

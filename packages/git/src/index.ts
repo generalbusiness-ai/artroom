@@ -40,7 +40,7 @@ export {
 } from "./diff/treediff.ts";
 export type { DiffBounds, DiffResult, DiffStats, TreeEntry, TreeReader } from "./diff/treediff.ts";
 export { ContainerPublisher, Pinning } from "./publisher/client.ts";
-export type { LogPushStub, PublisherClientOptions, PublisherStub } from "./publisher/client.ts";
+export type { LogRemoteStub, PublisherClientOptions, PublisherStub } from "./publisher/client.ts";
 export { GitOps, HARDENING, LOG_REF, integrationMessage, integrationRef, objectsRef, pinnedRef } from "./publisher/gitops.ts";
 export { decodeLogPush, fromB64url, toB64url, toLogOutcome, LOG_PUSH_LIMITS } from "./publisher/log-push.ts";
 export type { LogPushOutcome, LogPushRequest } from "./publisher/log-push.ts";
