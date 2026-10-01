@@ -45,7 +45,7 @@ class FakeRepo implements RepoHandle {
     return t;
   }
   async revokeToken(tokenOrId: string) {
-    if (this.ns.failRevoke) throw new ArtifactsError("INTERNAL_ERROR", 10400);
+    if (this.ns.failRevoke || this.ns.failRevokeOnly) throw new ArtifactsError("INTERNAL_ERROR", 10400);
     for (const [id, t] of this.tokens) {
       if ((id === tokenOrId || t.plaintext === tokenOrId) && t.state === "active") {
         t.state = "revoked";
@@ -108,6 +108,8 @@ class FakeNamespace implements ArtifactsNamespace {
   /** Each call of createToken first awaits the next of these, if any. */
   readonly mintDelays: (() => Promise<void>)[] = [];
   failRevoke = false;
+  /** Revocation fails, listing works. */
+  failRevokeOnly = false;
   constructor(clock: Clock) {
     this.clock = clock;
     this.repos.set("canon", new FakeRepo(this, "canon", null));
@@ -503,4 +505,37 @@ test("renewing the lease while its token is being minted: the token is checked a
   assert.equal((await ws.provision(lane)).state, "ready");
   const g = ws.grant(lane, 1);
   assert.ok(!("refused" in g) && Date.parse(g.expiresAt) <= renewed);
+});
+
+test("the alarm's cleanup waits for a token being installed: it never revokes the token a lease is about to receive", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  await ws.revoke(lane, 1);
+  ws.open(lane, 2, clock.t + LEASE_MS);
+  let go!: () => void;
+  ns.mintAfter.push(() => new Promise<void>((r) => (go = r))); // lease 2's token exists; its answer is slow
+  const provisioning = ws.provision(lane);
+  while (!go) await new Promise((r) => setTimeout(r, 2));
+  const alarm = ws.sweep(); // the Room's alarm fires during the mint
+  await new Promise((r) => setTimeout(r, 5));
+  go();
+  await Promise.all([provisioning, alarm]);
+  const g = ws.grant(lane, 2);
+  assert.ok(!("refused" in g));
+  assert.deepEqual(fork().live().map((id) => fork().tokens.get(id)!.plaintext), [!("refused" in g) ? g.token : ""], "the granted token is the one live token");
+});
+
+test("an orphan the inventory finds but cannot revoke stays owed by its ID until it is revoked", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  const orphan = fork().mintRaw("write", 600);
+  ns.failRevokeOnly = true; // listing works; revoking does not
+  assert.ok((await ws.revoke(lane, 1)) > 0);
+  assert.ok((await ws.sweep()) > 0);
+  assert.equal(fork().tokens.get(orphan.id)?.state, "active");
+  ns.failRevokeOnly = false;
+  assert.equal(await ws.sweep(), 0);
+  assert.deepEqual(fork().live(), []);
 });

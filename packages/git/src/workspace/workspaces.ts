@@ -443,19 +443,17 @@ export class Workspaces {
         const keep = new Set(
           this.sql.all("SELECT token_id FROM artroom_ws WHERE fork = ? AND state = 'ready' AND token_id IS NOT NULL", name).map((r) => text(r, "token_id")!),
         );
-        let failed = false;
         for (const t of tokens) {
           if (t.state !== "active" || keep.has(t.id)) continue;
           try {
             await withRetry(() => fork.revokeToken(t.id), this.retryOpts());
           } catch (e) {
-            failed = true;
-            this.owe(name, "token", "inventory", t.id);
-            this.deferCleanup([Number(this.sql.all("SELECT last_insert_rowid() AS id")[0]?.["id"])], String(e));
+            // Owed by ID from now on, so the inventory itself is done.
+            const id = this.owe(name, "token", "inventory", t.id);
+            this.deferCleanup([id], String(e));
           }
         }
-        if (!failed) this.resolve(inventory.map((o) => o.id));
-        else this.deferCleanup(inventory.map((o) => o.id), "a revocation failed");
+        this.resolve(inventory.map((o) => o.id));
       } catch (e) {
         this.deferCleanup(inventory.map((o) => o.id), String(e));
       }
