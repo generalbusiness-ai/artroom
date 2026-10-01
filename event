@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2f4aa87708ddd699a3115dd8ce6bf87793a47c5d","text":"Merge retired a covered predecessor; the successor is at packages/ui/screenshots/policy-light.png."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3098153685f7e740b6971ff5f6043b12a59c28fd","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/ui/WhyDialog.tsx."}
