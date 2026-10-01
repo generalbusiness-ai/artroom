@@ -196,6 +196,7 @@ printf 'LB_KEY=%s\n' "$(cat ~/.artroom-lb-key)" > /tmp/lb-secrets
 env -u CLOUDFLARE_API_TOKEN npx wrangler deploy --secrets-file /tmp/lb-secrets
 node measure/live.mjs            # forks, tokens, pinning, diffs, previews, two landings, a conflict, release
 node measure/token-inflight.mjs  # does revoking or expiring a token stop a push in flight?
+node measure/jj-change-id.mjs    # does a jj change-id header survive fork, pinning and landing?
 ```
 
 Both scripts make their own repos in the `gitseq-spike` namespace, revoke
@@ -203,6 +204,21 @@ every token they mint, and delete their repos. Results are saved, with
 tokens redacted, in `measure/results/`.
 
 To remove the Worker: `env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-lb-git`.
+
+## jj change IDs
+
+jj writes a `change-id` header into each commit. It survives the whole lane
+path unchanged: the push to the lane's fork, pinning at
+`refs/artroom/heads/<lane>/<generation>`, and the landing. Nothing on the
+path rewrites a commit: pinning copies objects, and a landing either
+fast-forwards main to the head or makes a merge commit whose second parent
+is the head. `test/jj-change-id.test.ts` checks the raw commit bytes at each
+step, for a commit written by jj and one built with `git hash-object`, with
+both kinds of landing. It uses real git and the real pinning, landing
+engine and publisher code; the fork and canonical repo are local bare repos,
+and the Room and tokens are fakes. `measure/jj-change-id.mjs` runs the same
+check against real Artifacts through the deployed Worker; it held on
+2026-10-01 (`measure/results/jj-change-id-*.json`).
 
 ## Limits and choices
 
