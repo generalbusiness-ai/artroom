@@ -11,6 +11,7 @@
  */
 
 import type { MemberId } from "../contract.ts";
+import { SCENARIO_COMMITS } from "./commits.ts";
 import type { World } from "./world.ts";
 
 export interface Step {
@@ -146,7 +147,8 @@ export const STEPS: readonly Step[] = [
     run: (w) =>
       w.propose("@birch", "L2", {
         head: "L2/1",
-        summary: "Moves cookie reading and verification into requireSession(). check.ts and the whoami endpoint call it.",
+        headSha: SCENARIO_COMMITS.heads["L2/1"]!,
+        summary: "Moves cookie reading and verification into requireSession(). check.ts and the whoami endpoint call it. Three jj changes.",
         changed: [
           { status: "modified", path: "src/lib/authz/check.ts" },
           { status: "added", path: "src/lib/authz/session.ts" },
@@ -279,13 +281,15 @@ export const STEPS: readonly Step[] = [
     run: (w) =>
       w.propose("@cedar", "L2", {
         head: "L2/2",
-        summary: "Recut of @birch's generation 1 on the new main. Keeps the new rateKey() and moves session reading into requireSession().",
+        headSha: SCENARIO_COMMITS.heads["L2/2"]!,
+        summary: "Recut of @birch's generation 1 on the new main. Keeps the new rateKey(), refuses expired cookies, drops the debug logging and adds a test.",
         changed: [
           { status: "modified", path: "src/lib/authz/check.ts" },
+          { status: "added", path: "src/lib/authz/session.test.ts" },
           { status: "added", path: "src/lib/authz/session.ts" },
           { status: "modified", path: "src/api/session.ts" },
         ],
-        since: ["src/lib/authz/check.ts"],
+        since: ["src/lib/authz/check.ts", "src/lib/authz/session.test.ts", "src/lib/authz/session.ts"],
       }),
   },
   { minute: 42, label: "@ci: tests pass on the recut", run: (w) => w.check("@ci", "L2", 2, true, "16 passed, 0 failed (2.2 s)") },

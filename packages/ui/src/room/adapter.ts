@@ -12,6 +12,7 @@
  * UI-defined here and listed in README.md under "Contract gaps".
  */
 
+import type { ChangeHistory } from "./changes.ts";
 import type {
   ActId,
   AttentionItem,
@@ -137,6 +138,8 @@ export interface RoomSnapshot {
   readonly source: { readonly kind: "mock" | "live"; readonly status: "live" | "connecting" | "offline"; readonly note?: string };
 }
 
+export type { ChangeEntry, ChangeHistory, FileInterdiff, Interdiff } from "./changes.ts";
+
 // ------------------------------------------------------------------ diffs
 
 export interface DiffLine {
@@ -255,6 +258,13 @@ export interface RoomAdapter {
 
   /** The proposal's diff from its base to its head. Null when the transport cannot provide it. */
   diff(ref: ProposalRef): Promise<readonly FileDiff[] | null>;
+  /**
+   * Author-supplied: how this generation's jj changes (commits with a
+   * `change-id` header) relate to the previous generation's. Null when no
+   * commit in either carries a header, or the transport cannot read commits.
+   * It never affects obligations, evidence or carrying.
+   */
+  changeHistory(ref: ProposalRef): Promise<ChangeHistory | null>;
   /** Paths that changed between the previous generation's head and this one's. */
   changedSince(ref: ProposalRef): readonly RepoPath[] | null;
   explain(act: ActId): Promise<Why | null>;

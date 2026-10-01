@@ -29,7 +29,7 @@ import type {
   Subscription,
 } from "../contract.ts";
 import { holdsSlot } from "../contract.ts";
-import type { DraftRule, DryRunResult, FileDiff, Person, PolicyOutcome, ReviewDraft, RoomAdapter, RoomSnapshot, Why } from "../adapter.ts";
+import type { ChangeHistory, DraftRule, DryRunResult, FileDiff, Person, PolicyOutcome, ReviewDraft, RoomAdapter, RoomSnapshot, Why } from "../adapter.ts";
 import { describeEntry, entryId, withRecovery } from "./describe.ts";
 
 export class LiveRoom implements RoomAdapter {
@@ -180,6 +180,15 @@ export class LiveRoom implements RoomAdapter {
 
   async diff(_ref: ProposalRef): Promise<readonly FileDiff[] | null> {
     return null; // No diff read in the contract yet.
+  }
+
+  /**
+   * The contract has no read for a generation's commits or their headers, so
+   * the live room shows no per-change history yet (README, "What the Room must
+   * expose").
+   */
+  async changeHistory(_ref: ProposalRef): Promise<ChangeHistory | null> {
+    return null;
   }
 
   changedSince(_ref: ProposalRef) {

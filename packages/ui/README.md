@@ -6,7 +6,7 @@ The web interface for Artroom: four screens over one data adapter.
 |---|---|
 | **Needs you** | The viewer's attention queue. Each item says what to do, why it is theirs, and offers one action. |
 | **Room** | Claims and their overlaps (before any code exists), lanes and leases, the landing operations, the publication slot, and how far the log is published. Live. |
-| **Proposal** | One generation: the diff, notes anchored to path, line and head, the obligations as a checklist, each piece of evidence marked *reviewed here*, *carried* (with the reason) or *stale* (with the reason), and "why" links. |
+| **Proposal** | One generation: the diff, notes anchored to path, line and head, the obligations as a checklist, each piece of evidence marked *reviewed here*, *carried* (with the reason) or *stale* (with the reason), and "why" links. When commits carry jj `change-id` headers, also which changes the generation rewrote, added or dropped, with an interdiff for each rewritten one. |
 | **Policy** | The rules in plain English, recent outcomes, and a dry run of a draft rule against the room's history. |
 
 It is built with Preact and Vite, with hand-written CSS. It has no component
@@ -18,7 +18,8 @@ approved lane 0 contract (`940e2dca`) with the policy-runtime amendment
 (path/owner pairs, replay contexts, the per-act budget in `ProfileStamp`,
 check carry facts). It also uses the policy runtime
 (`@generalbusiness/artroom-policy`) for glob matching, carry decisions and
-the policy dry run.
+the policy dry run, and lane B's git engine (`@generalbusiness/artroom-git`)
+for the bounded tree diff behind the per-change history.
 
 ## Run it
 
@@ -65,6 +66,7 @@ asked for `ui/screenshots`; they are in `packages/ui/screenshots`:
 - `room-light.png`, `room-dark.png`
 - `proposal-light.png`, `proposal-dark.png`, `proposal-phone.png`
 - `policy-light.png`, `policy-dark.png`
+- `proposal-changes-light.png`, `proposal-changes-dark.png`: the per-change history of the session lane's recut
 
 Laptop screenshots are 1280 pixels wide; phone screenshots are 390. The clock
 is UTC and motion is reduced, so the screenshots are reproducible.
@@ -89,6 +91,9 @@ src/room/refuse-claim.ts the refuse-claim draft compiled to a profile expression
 src/room/mock/           MockRoom: a small deterministic room model and the scripted scenario
 src/room/live/           LiveRoom: a stub over the contract's HttpRoom and its WebSocket watch
 src/room/dryrun.ts       the policy dry run, through the policy runtime
+src/room/changes.ts      per-change history and interdiffs from jj change-id headers
+src/room/mock/repo.ts    an in-memory git object store, read through lane B's TreeReader
+src/ui/ChangeHistory.tsx the per-change view on the Proposal screen
 src/screens/             the four screens
 src/ui/landing.tsx       what each landing state means, from its recorded facts
 src/ui/                  shell pieces: icons, badges, router, the "why" dialog, the demo bar
@@ -97,7 +102,7 @@ src/ui/                  shell pieces: icons, badges, router, the "why" dialog, 
 Screens read a `RoomSnapshot` and call the adapter. They never touch a
 transport. Contract records (`Lane`, `Proposal`, `LandOp`, `AttentionItem`,
 `Refusal`, `Evidence`) pass through unchanged, so a change in the contract
-(lane 0, `845c7fd7`, still under review) is absorbed in `src/room`.
+(lane 0) is absorbed in `src/room`.
 
 **The scenario.** Three agents (@ash, @birch, @cedar), two people (@maya,
 security; @sam, platform and admin) and a checker (@ci) work in `acme/web`
@@ -113,7 +118,9 @@ for 44 minutes, in 37 steps:
    unresolved, so it keeps the slot and the second waits, ready. The push
    completes forward; main moves; the second prepares again and lands.
 5. @birch's lease expires with no handover note. Its proposal now conflicts
-   with main. @cedar takes the lane over and recuts it.
+   with main. @cedar takes the lane over and recuts it. @birch worked in jj,
+   so the recut's page shows the per-change history: one change rewritten
+   with a real edit, one only rebased, one added and one dropped.
 
 The mock applies the platform's rules to the viewer's actions too: approve or
 object from the Proposal screen, reply to notes, or run a dry run. A review
@@ -129,6 +136,43 @@ link, visible focus rings, focus moved to the page on navigation, and
 `prefers-reduced-motion`. Status colours always come with words. The colour
 pairs used for text meet WCAG AA contrast (checked by calculation for the
 main token pairs in both themes; no automated audit has been run).
+
+## Per-change history (request d0cbb26d)
+
+When a generation's commits carry jj `change-id` headers, the Proposal
+screen lists, by change ID, which changes the generation rewrote, added or
+dropped compared with the previous generation. Each rewritten change has an
+interdiff: the change's own edits in each version, compared line by line, so
+changes underneath it (main moving) do not show. A change only rebased or
+reworded says so. When no commit in either generation has a header, the
+screen shows nothing extra. Commits without a header beside ones with a
+header are counted, not followed. The same change ID twice in a generation
+is shown as divergent and not matched.
+
+The view is labelled **author-supplied**. A header proves nothing, so it is
+never an input to obligations, evidence or the carry rule, which stay
+path-based. A test checks that no change ID reaches those records.
+
+**Bounds.** Each commit's own diff runs through lane B's bounded tree diff
+(`treeDiff` with `DEFAULT_BOUNDS`: depth 64, 100,000 entries), and a
+generation of more than 2,000 commits (`maxCommits`) is not compared. A diff
+over a bound is shown as too large, as a proposal's diff would be refused.
+Lane B bounds paths, not file contents, so the line comparison adds one bound
+of its own: 2,000 lines per version of a file (`LINE_LIMIT`).
+
+**What the live Room must expose.** The contract has no read for a
+generation's commits, so `LiveRoom.changeHistory` returns null and the live
+screen shows nothing extra. To support it, the Room would need to serve, per
+proposal generation:
+1. the commits from the generation's base to its head, oldest first, each
+   with its ID, parent and message subject, and its raw `change-id` header
+   when present;
+2. read access to those commits' trees and blobs in the canonical repository
+   (the pinned heads' objects), as lane B's `TreeReader` plus a blob read, or
+   the per-change interdiffs computed server-side under the same bounds.
+
+`src/room/changes.ts` takes exactly these (`CommitInfo[]` and a
+`CommitStore`), so either form plugs into the existing adapter.
 
 ## Contract gaps
 

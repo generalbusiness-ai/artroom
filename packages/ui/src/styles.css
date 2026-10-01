@@ -403,6 +403,14 @@ a.lane-goal:hover { text-decoration: underline; }
 .choice label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .choice input { accent-color: var(--accent); }
 
+.change-entry { padding: 12px 14px; display: grid; gap: 6px; }
+.change-id { font-family: var(--mono); font-size: 12.5px; color: var(--muted); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.patch { margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; border: 1px solid var(--border); border-radius: 6px; padding: 6px 0; background: var(--surface); }
+.patch > span { display: block; padding: 0 10px; }
+.patch > span.add { background: var(--diff-add); }
+.patch > span.del { background: var(--diff-del); }
+#changes-h + .badge, .section-head > .badge { align-self: center; }
+
 /* ------------------------------------------------------------ policy */
 
 .rules { display: grid; gap: 10px; }

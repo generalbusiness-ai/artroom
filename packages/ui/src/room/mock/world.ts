@@ -141,6 +141,8 @@ export interface History {
 
 export interface ProposeSpec {
   head: string;
+  /** The head commit, when the scenario's commit store has one; otherwise derived from `head`. */
+  headSha?: Sha;
   summary: string;
   changed: PathChange[];
   /** Paths changed since the previous generation's head. */
@@ -436,7 +438,7 @@ export class World {
     }
     const generation = lane.generation + 1;
     const prev = this.prop(tag, lane.generation);
-    const head = fakeSha(spec.head);
+    const head = spec.headSha ?? fakeSha(spec.head);
     const requireInput: InputOf<"require"> = {
       kind: "require",
       actor: this.policyActor(by),
