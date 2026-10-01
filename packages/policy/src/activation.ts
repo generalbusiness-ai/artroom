@@ -26,6 +26,7 @@ export interface OpenProposal {
   readonly lane: LaneId;
   readonly generation: Generation;
   readonly require: InputOf<"require">;
+  /** Must equal `require.lane.purpose`; used for carry questions, whose input has no lane. */
   readonly purpose: LanePurpose;
   /** Obligation IDs before activation. */
   readonly obligations: readonly ObligationId[];
@@ -58,7 +59,7 @@ export async function activate(policy: ActivePolicy, proposals: readonly OpenPro
   const results: ActivationResult[] = [];
   for (const p of proposals) {
     const budget = actMeter();
-    const req = await evaluateRequire(policy, p.require, { purpose: p.purpose, budget });
+    const req = await evaluateRequire(policy, p.require, { budget });
     const ids = req.obligations.map((o) => o.id);
     const evaluations: RuleEvaluation[] = [...req.evaluations];
     const invariants: Invariant[] = [{ rule: "R-POL-9", held: true, detail: `obligations recomputed under ${policy.version}` }, ...req.invariants];

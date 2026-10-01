@@ -24,13 +24,16 @@ export const PROFILE: PolicyProfile = Object.freeze({
     "abs", "ceil", "floor", "round", "count", "sum", "min", "max", "length",
     "exists", "not", "lookup", "append", "merge", "contains", "substring",
   ] as const),
+  actSteps: 25_000,
+  actInspectedBytes: 4_194_304,
+  accounting: "artroom-act-budget-v1",
 });
 
 /** The pinned interpreter. package.json pins the same exact version (R-EVAL-4). */
 export const JSONATA_VERSION = "2.2.2";
 
 /** Recorded with every decision (R-EVAL-4, R-POL-11). */
-export const STAMP: ProfileStamp = Object.freeze({ profile: PROFILE.id, jsonata: JSONATA_VERSION });
+export const STAMP: ProfileStamp = Object.freeze({ profile: PROFILE.id, jsonata: JSONATA_VERSION, accounting: PROFILE.accounting });
 
 /**
  * A budget across all rules evaluated for one act, added on top of the
@@ -42,13 +45,14 @@ export const STAMP: ProfileStamp = Object.freeze({ profile: PROFILE.id, jsonata:
  * `timeout` option never fires on Workers, so these counts are the only
  * guard.
  *
- * The accounting is versioned as `ACCOUNTING` and recorded, with the limits
- * and the usage already spent, in every replay context (context.ts).
+ * The limits and accounting version are part of the contract's
+ * `PolicyProfile` and `ProfileStamp`, and every replay context records them
+ * with the usage already spent (R-EVAL-2, R-EVAL-8, R-EVAL-9).
  */
 export const ACT_BUDGET = Object.freeze({
-  steps: 25_000,
-  inspectedBytes: 4 * 1024 * 1024,
+  steps: PROFILE.actSteps,
+  inspectedBytes: PROFILE.actInspectedBytes,
 });
 
-/** The version of the per-act accounting: what is counted, and how calls share it. */
-export const ACCOUNTING = "artroom-act-budget-v1";
+/** The version of the per-act accounting: what is counted, and how calls share it (R-EVAL-9). */
+export const ACCOUNTING = PROFILE.accounting;
