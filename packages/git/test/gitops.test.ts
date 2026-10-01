@@ -406,3 +406,21 @@ test("readLogRef: the log ref's commit, null when it does not exist, and an erro
   await assert.rejects(f.ops.readLogRef(f.canonical, "refs/heads/main"), /only refs\/artroom\/log/);
   await assert.rejects(f.ops.readLogRef(join(f.root, "no-such-repo.git")));
 });
+
+for (const type of ["tree", "blob"] as const) {
+  test(`pushLog refuses a ${type} as the log head, with or without a lease, and the ref does not move`, async (t) => {
+    const f = await new Fixture().init();
+    t.after(() => f.dispose());
+    const empty = object(type, new Uint8Array());
+    const r0 = await f.ops.pushLog(f.canonical, [{ type, data: empty.data }], empty.sha, null);
+    assert.equal(r0.outcome.outcome, "error");
+    assert.match(r0.outcome.detail, /is not a commit/);
+    assert.deepEqual(toLogOutcome(r0).ok, false);
+    assert.equal(await f.ops.readLogRef(f.canonical), null, "no log ref was created");
+    const c1 = logCommit("first", null);
+    await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
+    const r1 = await f.ops.pushLog(f.canonical, [{ type, data: empty.data }], empty.sha, c1.commit);
+    assert.equal(r1.outcome.outcome, "error");
+    assert.equal(await f.ops.readLogRef(f.canonical), c1.commit, "the ref did not move");
+  });
+}
