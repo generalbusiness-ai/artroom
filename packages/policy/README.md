@@ -221,6 +221,14 @@ named test fail. Examples:
 | A broad catch turns engine faults into outcomes | an engine fault throws a retryable error |
 | Recovery lanes evaluate policy, or allow paths outside `.artroom/**` | policy lockout; recovery-scope |
 
+## The default policy pack
+
+`src/pack.ts` (exported as `@generalbusiness/artroom-policy/pack`) holds
+eleven named rules built with the helpers, and `starterPolicy()`. The demo
+repository's policy is `examples/demo-repo/.artroom/policy.ts`, compiled
+with `npm run compile-policy -- <dir>`. `docs/policy-pack.md` explains what
+each rule replaces; `test/pack.test.ts` is its corpus.
+
 ## The authoring helpers
 
 `src/helpers.ts` implements the functions that the contract's `/policy`

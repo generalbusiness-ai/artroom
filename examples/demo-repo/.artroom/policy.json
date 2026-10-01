@@ -1,0 +1,166 @@
+{
+  "format": "artroom-policy-v1",
+  "profile": "artroom-jsonata-v1",
+  "owners": {
+    "src/api/**": [
+      "@security"
+    ],
+    "src/**": [
+      "@app"
+    ],
+    "docs/**": [
+      "@docs"
+    ]
+  },
+  "carry": {
+    "verdicts": true,
+    "checks": true,
+    "globalInputs": [
+      "config/**"
+    ],
+    "dependsOn": {
+      "src/api/**": [
+        "src/lib/**",
+        "src/db/**"
+      ]
+    }
+  },
+  "lanes": "by-scope",
+  "retiredEvidence": "counts",
+  "rules": [
+    {
+      "id": "claim-before-propose",
+      "kind": "refuse",
+      "description": "Work is proposed only on a claimed lane, so everyone can see who is changing what.",
+      "on": [
+        "propose"
+      ],
+      "refuse": "$not(lane.claimed)",
+      "reason": "This lane has no claim, so nobody can see who is changing these paths.",
+      "fix": "Claim the paths you are changing, then propose again."
+    },
+    {
+      "id": "narrow-claims",
+      "kind": "refuse",
+      "description": "Claims name the paths a lane will change; only an admin may claim the whole repository.",
+      "on": [
+        "claim"
+      ],
+      "refuse": "\"**\" in act.body.scope and actor.role != \"admin\"",
+      "reason": "A claim on ** covers the whole repository and would overlap every other lane.",
+      "fix": "Claim only the directories or files you will change, for example src/api/**."
+    },
+    {
+      "id": "owner-review",
+      "kind": "require",
+      "paths": [
+        "**"
+      ],
+      "obligation": {
+        "type": "review",
+        "from": [
+          "owners"
+        ],
+        "count": 1,
+        "allowSelf": false
+      }
+    },
+    {
+      "id": "check-tests",
+      "kind": "require",
+      "paths": [
+        "src/**",
+        "tests/**",
+        "test/**"
+      ],
+      "obligation": {
+        "type": "check",
+        "check": "tests",
+        "by": [
+          "@ci"
+        ]
+      }
+    },
+    {
+      "id": "check-types",
+      "kind": "require",
+      "paths": [
+        "**/*.ts",
+        "**/*.tsx",
+        "**/tsconfig*.json"
+      ],
+      "obligation": {
+        "type": "check",
+        "check": "types",
+        "by": [
+          "@ci"
+        ]
+      }
+    },
+    {
+      "id": "deploy-config-review",
+      "kind": "require",
+      "paths": [
+        ".github/**",
+        "wrangler.*",
+        "**/wrangler.*",
+        "Dockerfile",
+        "**/Dockerfile"
+      ],
+      "obligation": {
+        "type": "review",
+        "from": [
+          "role:admin"
+        ],
+        "count": 1,
+        "allowSelf": false
+      }
+    },
+    {
+      "id": "stale-approval",
+      "kind": "carry",
+      "evidence": "review",
+      "allow": "$count(changedSince) <= 25"
+    },
+    {
+      "id": "fresh-approval",
+      "kind": "land",
+      "description": "A change under src/api/ lands only with an approval made on this generation.",
+      "block": "$count(proposal.paths[$substring($, 0, 8) = \"src/api/\"]) > 0 and $count(reviews[verdict = \"approve\" and basis = \"here\"]) = 0",
+      "reason": "This proposal changes src/api/ and its approvals were all carried from earlier generations.",
+      "fix": "Ask an owner to review this generation."
+    },
+    {
+      "id": "notify-owners",
+      "kind": "notify",
+      "on": [
+        "propose"
+      ],
+      "to": [
+        "owners"
+      ],
+      "why": "You own a path this proposal changes."
+    },
+    {
+      "id": "notify-holder",
+      "kind": "notify",
+      "on": [
+        "review",
+        "check"
+      ],
+      "when": "(act.kind = \"review\" and act.body.verdict = \"object\") or (act.kind = \"check\" and act.body.ok = false)",
+      "to": [
+        "holder"
+      ],
+      "why": "Someone objected to your proposal, or a required check failed."
+    },
+    {
+      "id": "objection-open",
+      "kind": "land",
+      "description": "Blocks while any qualifying reviewer's latest verdict on this generation is an objection.",
+      "block": "$count(reviews[verdict = \"object\"]) > 0",
+      "reason": "A qualifying reviewer's latest verdict on this generation is an objection.",
+      "fix": "Resolve the objection, or ask the reviewer to approve a new generation."
+    }
+  ]
+}
