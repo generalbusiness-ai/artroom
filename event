@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at spikes/sandbox-git/wrangler.jsonc","body":{"commit":"5b23bc914c729687b42336e6c280377a3689606b","path":"spikes/sandbox-git/wrangler.jsonc"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:12b88515e7716e9667110bfbb131f595667c81b5","text":"Merge retired a covered predecessor; the successor is at spikes/sandbox-git/wrangler.jsonc."}
