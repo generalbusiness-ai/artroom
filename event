@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f2ab15db0965a69e72409677bd4022517e78ad68","text":"Merge retired a covered predecessor; the successor is at packages/ui/playwright.config.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f313fb264d2aa7442f444c4d2793d152a2873623","text":"Merge retired a covered predecessor; the successor is at packages/ui/.gitignore."}
