@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a92a61a16ad92bb0c3e635524622545c5162f1a8","text":"Merge retired a covered predecessor; the successor is at packages/log/scripts/live-roundtrip.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b10ff2e8095a2db1e39bf0f5a9187f6dd21063d8","text":"Merge retired a covered predecessor; the successor is at packages/log/test/amendment-2.test.ts."}
