@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Accept request git:sha1…e6510cb: Builder: spike git operations in a Cloudflare Sandbox container against Artifacts: clone a candidate head, preview a merge onto main, report conflicts, and land…","body":{"branch":"request/spike-sandbox-git"}}
+{"kind":"promise","text":"Accept request git:sha1…70482e8: Builder: spike the Room Durable Object core: restricted JSONata policy evaluation, Ed25519 signature checks, and path-level diffs through the Artifacts binding,…","body":{"branch":"request/spike-room-core"}}
