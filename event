@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review production log push and merged preview adapters at exact b013d648, including ref fencing, object integrity, token boundaries, and Room integration interfaces."}
+{"kind":"artifact","text":"docs/policy-pack.md at exact 6b995c5e227f7fa5ff235bfcc301fd7863361df2 on request/jj-refuse, under promise git:sha1…7028381 on request git:sha1…f462724","body":{"commit":"6b995c5e227f7fa5ff235bfcc301fd7863361df2","path":"docs/policy-pack.md"}}
