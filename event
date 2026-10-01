@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:20b645de40b6c2e892dbf710d44fa5d9ed813e01","text":"Merge retired a covered predecessor; the successor is at packages/ui/test/mock-room.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:26489bbed1996fee29dc9135a963d7c220f5944e","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/room/mock/mock-room.ts."}
