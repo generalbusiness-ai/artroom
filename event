@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c21ee3a8d77c9ebb77d6aad9b27cfe66544d82ea","text":"Replaced by the review request for exact head fcadbb228a7d0245fb2c94559e3672c9b55dc89c; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"promise","text":"I will review exact revision 3 head fcadbb228a7d0245fb2c94559e3672c9b55dc89c, focusing on publication ordering, check input coverage and admission-time revocation, while preserving the complete scope."}
