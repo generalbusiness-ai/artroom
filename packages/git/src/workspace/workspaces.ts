@@ -37,6 +37,8 @@ export interface WorkspacesOptions {
   readonly artifacts: ArtifactsNamespace;
   /** The canonical repo's name in the namespace. */
   readonly canonical: string;
+  /** The Artifacts namespace of the canonical repo. A fork's source must be exactly `artifacts:<namespace>/<canonical>`. */
+  readonly namespace: string;
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
 }
@@ -55,7 +57,14 @@ function workspaceOpId(lane: LaneId, lease: LeaseGeneration): OpId {
   return `op_ws_${lane}_${lease}`;
 }
 
+/** A repository at the lane's fork name that is not a fork of this canonical repo. It is never used, changed or deleted. */
+export class NotOurFork extends Error {}
+
+/** Seconds kept back from a token's lifetime, so clock differences cannot carry it past the lease. */
+export const TOKEN_MARGIN_S = 5;
+
 function failure(e: unknown): ArtroomError {
+  if (e instanceof NotOurFork) return { name: "ArtroomError", code: "forbidden", message: e.message.slice(0, 300), retryable: false };
   const code = artifactsCode(e);
   return {
     name: "ArtroomError",
@@ -82,6 +91,7 @@ export class Workspaces {
   private readonly sql: Sql;
   private readonly artifacts: ArtifactsNamespace;
   private readonly canonical: string;
+  private readonly namespace: string;
   private readonly now: () => number;
   private readonly sleep: ((ms: number) => Promise<void>) | undefined;
   private readonly inFlight = new Map<LaneId, Promise<WorkspaceOp>>();
@@ -90,6 +100,7 @@ export class Workspaces {
     this.sql = opts.sql;
     this.artifacts = opts.artifacts;
     this.canonical = opts.canonical;
+    this.namespace = opts.namespace;
     this.now = opts.now ?? Date.now;
     this.sleep = opts.sleep;
     this.sql.all(
@@ -98,6 +109,8 @@ export class Workspaces {
     );
     // Secrets live apart from the public row, so no read of the row can carry one.
     this.sql.all("CREATE TABLE IF NOT EXISTS artroom_ws_secret (lane TEXT PRIMARY KEY, lease INTEGER NOT NULL, token TEXT NOT NULL)");
+    // Tokens that must be revoked but could not be yet: retried by `sweep`.
+    this.sql.all("CREATE TABLE IF NOT EXISTS artroom_ws_revoke (token_id TEXT PRIMARY KEY, fork TEXT NOT NULL)");
   }
 
   private row(lane: LaneId): Row | null {
@@ -202,25 +215,20 @@ export class Workspaces {
     let fork: RepoHandle;
     let remote: string;
     try {
+      await this.sweep();
       ({ fork, remote } = await this.ensureFork(start.fork));
-      const ttl = Math.floor((start.leaseExpiresAt - this.now()) / 1000);
-      if (ttl < MIN_TOKEN_TTL_S) throw new Error("the lease ends in less than a minute");
       // A previous token for this lease (a renewal) is replaced, not kept.
-      if (start.tokenId) await withRetry(() => fork.revokeToken(start.tokenId!), this.retryOpts());
-      const token = await withRetry(() => fork.createToken("write", ttl), this.retryOpts());
-      // R-LAND-3 style re-check: the lease may have ended while we waited.
-      const still = this.row(lane);
-      if (!still || still.lease !== start.lease || still.state !== "pending") {
-        await fork.revokeToken(token.id).catch(() => false);
-        return this.view(lane) ?? this.fail(lane, new Error("the lease ended"));
-      }
+      if (start.tokenId) await this.revokeOrRemember(start.fork, fork, start.tokenId);
+      const minted = await this.mintWithinLease(lane, start.lease, start.fork, fork);
+      if (!minted) return this.view(lane) ?? this.fail(lane, new Error("the lease ended"));
+      const { token, expiresAt, still } = minted;
       this.sql.transaction(() => {
         this.put({
           ...still,
           state: "ready",
           remote,
           tokenId: token.id,
-          tokenExpiresAt: Date.parse(token.expiresAt) || this.now() + ttl * 1000,
+          tokenExpiresAt: expiresAt,
         });
         this.sql.all(
           "INSERT INTO artroom_ws_secret (lane, lease, token) VALUES (?, ?, ?) ON CONFLICT (lane) DO UPDATE SET lease = excluded.lease, token = excluded.token",
@@ -233,6 +241,58 @@ export class Workspaces {
     } catch (e) {
       return this.fail(lane, e);
     }
+  }
+
+  /**
+   * Mint a write token that ends no later than the lease (R-CRED-8). The
+   * lease is read again after every await: a token minted for an ended or
+   * changed lease, or one whose actual expiry runs past the lease, is
+   * revoked. An overlong token is replaced by one for the time that is left,
+   * if Artifacts' minimum lifetime still fits. Null if the lease ended.
+   */
+  private async mintWithinLease(lane: LaneId, lease: LeaseGeneration, forkName: string, fork: RepoHandle) {
+    for (let i = 0; i < 3; i++) {
+      const before = this.row(lane);
+      if (!before || before.lease !== lease || before.state !== "pending") return null;
+      const ttl = Math.floor((before.leaseExpiresAt - this.now()) / 1000) - TOKEN_MARGIN_S;
+      if (ttl < MIN_TOKEN_TTL_S) throw new Error("the lease ends too soon for a workspace token; renew it first");
+      const token = await withRetry(() => fork.createToken("write", ttl), this.retryOpts());
+      const still = this.row(lane);
+      const expiresAt = Date.parse(token.expiresAt);
+      const current = !!still && still.lease === lease && still.state === "pending";
+      if (current && Number.isFinite(expiresAt) && expiresAt <= still.leaseExpiresAt && expiresAt > this.now()) {
+        return { token, expiresAt, still };
+      }
+      await this.revokeOrRemember(forkName, fork, token.id);
+      if (!current) return null;
+    }
+    throw new Error("could not mint a workspace token that ends within the lease");
+  }
+
+  /** Revoke a token; if Artifacts cannot be reached, remember it so `sweep` revokes it later. */
+  private async revokeOrRemember(forkName: string, fork: RepoHandle, tokenId: string): Promise<void> {
+    this.sql.all("INSERT OR IGNORE INTO artroom_ws_revoke (token_id, fork) VALUES (?, ?)", tokenId, forkName);
+    try {
+      await withRetry(() => fork.revokeToken(tokenId), this.retryOpts());
+      this.sql.all("DELETE FROM artroom_ws_revoke WHERE token_id = ?", tokenId);
+    } catch {
+      // Left for sweep().
+    }
+  }
+
+  /** Revoke every token whose revocation failed earlier. The Room's alarm calls it too. Returns how many remain. */
+  async sweep(): Promise<number> {
+    for (const r of this.sql.all("SELECT token_id, fork FROM artroom_ws_revoke")) {
+      const id = text(r, "token_id")!;
+      try {
+        const got = await this.getFork(text(r, "fork")!);
+        if (got) await withRetry(() => got.fork.revokeToken(id), this.retryOpts());
+        this.sql.all("DELETE FROM artroom_ws_revoke WHERE token_id = ?", id);
+      } catch {
+        // Try again next time.
+      }
+    }
+    return Number(this.sql.all("SELECT COUNT(*) AS n FROM artroom_ws_revoke")[0]?.["n"] ?? 0);
   }
 
   private retryOpts() {
@@ -273,8 +333,9 @@ export class Workspaces {
     try {
       const fork = await this.artifacts.get(name);
       const info = await fork.info();
-      if (info.source !== null && !info.source.endsWith(`/${this.canonical}`)) {
-        throw new Error(`repo ${name} exists but is not a fork of ${this.canonical}`);
+      // Positive provenance: exactly a fork of this canonical repo, in this namespace.
+      if (info.source !== `artifacts:${this.namespace}/${this.canonical}`) {
+        throw new NotOurFork(`A repository named ${name} exists but is not a fork of ${this.namespace}/${this.canonical}. It was not used or changed.`);
       }
       return { fork, remote: info.remote };
     } catch (e) {
@@ -293,6 +354,9 @@ export class Workspaces {
     if (r && r.lease !== lease) {
       return { refused: true, rule: "lease-fenced", reason: "That lease generation is not current.", current: { leaseGeneration: r.lease } };
     }
+    if (r && r.leaseExpiresAt <= this.now()) {
+      return { refused: true, rule: "lease-fenced", reason: "The lease has expired.", fix: "Claim the lane again." };
+    }
     const secret = this.sql.all("SELECT token FROM artroom_ws_secret WHERE lane = ? AND lease = ?", lane, lease)[0];
     const token = text(secret, "token");
     if (!r || r.state !== "ready" || !r.remote || !token || r.tokenExpiresAt === null || r.tokenExpiresAt <= this.now()) {
@@ -309,7 +373,7 @@ export class Workspaces {
       leaseGeneration: lease,
       remote: r.remote as `https://${string}`,
       token,
-      expiresAt: iso(Math.min(r.tokenExpiresAt, r.leaseExpiresAt)),
+      expiresAt: iso(r.tokenExpiresAt),
     };
   }
 
@@ -323,16 +387,28 @@ export class Workspaces {
     if (!r) return 0;
     this.sql.transaction(() => {
       this.sql.all("DELETE FROM artroom_ws_secret WHERE lane = ?", lane);
+      // Remembered until revoked, so an Artifacts outage cannot leave it live unnoticed.
+      if (r.tokenId) this.sql.all("INSERT OR IGNORE INTO artroom_ws_revoke (token_id, fork) VALUES (?, ?)", r.tokenId, r.fork);
       this.put({ ...r, state: "revoked", tokenId: null, tokenExpiresAt: null });
     });
-    const fork = await this.getFork(r.fork);
+    let fork: { fork: RepoHandle; remote: string } | null;
+    try {
+      fork = await this.getFork(r.fork);
+    } catch (e) {
+      if (e instanceof NotOurFork) return 0; // never touch a repository that is not ours
+      throw e;
+    }
     if (!fork) return 0;
-    const { tokens } = await withRetry(() => fork.fork.listTokens(), this.retryOpts());
+    const f = fork.fork;
+    const { tokens } = await withRetry(() => f.listTokens(), this.retryOpts());
     let n = 0;
     for (const t of tokens) {
       if (t.state !== "active") continue;
-      if (await withRetry(() => fork.fork.revokeToken(t.id), this.retryOpts())) n++;
+      await this.revokeOrRemember(r.fork, f, t.id);
+      const left = Number(this.sql.all("SELECT COUNT(*) AS n FROM artroom_ws_revoke WHERE token_id = ?", t.id)[0]?.["n"] ?? 0);
+      if (left === 0) n++;
     }
+    await this.sweep();
     return n;
   }
 }

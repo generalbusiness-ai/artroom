@@ -221,7 +221,7 @@ export class LandingCore {
     for (const op of this.active()) {
       if (op.state === "publishing" || op.state === "unresolved") at(op.nextAt ?? this.now());
       else if (op.state === "accepted") at(this.now());
-      else if (op.state === "preparing" && (op.integration === undefined || op.readinessPending)) at(op.retryAt ?? this.now());
+      else if ((op.state === "preparing" && op.integration === undefined) || (op.integration !== undefined && op.readinessPending)) at(op.retryAt ?? this.now());
       else if (op.state === "ready" && this.slotRaw().state === "free") at(this.now());
     }
     return due;
@@ -408,22 +408,31 @@ export class LandingCore {
   }
 
   /**
-   * What `readiness` must be asked about now: an operation whose integration
-   * is built. Returns the attempt and integration its answer must match.
+   * Start a readiness evaluation of an operation whose integration is built
+   * (R-LAND-4). It durably takes the next evaluation revision and marks the
+   * answer pending; only the answer to the latest revision is ever applied.
+   * `force` starts one even if none is due (the Room calls it when evidence
+   * changes). Returns what the answer must match, or null.
    */
-  readinessDue(id: OpId, force = false): { readonly attempt: number; readonly integration: Sha } | null {
-    const op = this.get(id);
-    if (!op || (op.state !== "preparing" && op.state !== "ready") || op.integration === undefined) return null;
-    if (!force && !op.readinessPending) return null;
-    if (!force && (op.retryAt ?? 0) > this.now()) return null;
-    return { attempt: op.attempts, integration: op.integration };
+  startEvaluation(id: OpId, force = false): { readonly attempt: number; readonly integration: Sha; readonly rev: number } | null {
+    return this.tx(() => {
+      const op = this.get(id);
+      if (!op || (op.state !== "preparing" && op.state !== "ready") || op.integration === undefined) return null;
+      if (!force && !op.readinessPending) return null;
+      if (!force && (op.retryAt ?? 0) > this.now()) return null;
+      const rev = (op.evaluation ?? 0) + 1;
+      op.evaluation = rev;
+      op.readinessPending = true;
+      this.save(op);
+      return { attempt: op.attempts, integration: op.integration, rev };
+    });
   }
 
   /** The Room's readiness could not be computed (for example a policy runtime failure). Try again later. */
-  readinessFailed(id: OpId, attempt: number, error: string): void {
+  readinessFailed(id: OpId, attempt: number, rev: number, error: string): void {
     this.tx(() => {
       const op = this.get(id);
-      if (!op || op.attempts !== attempt || (op.state !== "preparing" && op.state !== "ready")) return;
+      if (!op || op.attempts !== attempt || op.evaluation !== rev || (op.state !== "preparing" && op.state !== "ready")) return;
       const wait = op.prepareBackoffMs ?? PREPARE_BACKOFF.firstMs;
       op.retryAt = this.now() + wait;
       op.prepareBackoffMs = Math.min(wait * 2, PREPARE_BACKOFF.maxMs);
@@ -436,12 +445,14 @@ export class LandingCore {
   /**
    * Apply the Room's readiness answer (R-LAND-4 steps 2 to 4). It is dropped
    * if the operation moved on while the Room was answering: another
-   * attempt, another integration, a lane change (R-LAND-3).
+   * attempt, another integration, a newer evaluation, a lane change
+   * (R-LAND-3). So an older answer can never replace a newer one.
    */
-  applyReadiness(id: OpId, attempt: number, integration: Sha, r: Readiness): LandRecord | null {
+  applyReadiness(id: OpId, attempt: number, integration: Sha, rev: number, r: Readiness): LandRecord | null {
     return this.tx(() => {
       const op = this.get(id);
       if (!op || (op.state !== "preparing" && op.state !== "ready") || op.attempts !== attempt || op.integration !== integration) return op;
+      if (op.evaluation !== rev) return op;
       const mismatch = this.laneMismatch(op);
       if (mismatch) {
         this.retryable(op, mismatch, FIX[mismatch]);
@@ -530,6 +541,8 @@ export class LandingCore {
     return this.tx((): ReserveResult => {
       const op = this.get(id);
       if (!op || op.state !== "ready") return { kind: "not-ready", state: op?.state ?? null };
+      // A newer evaluation is still out: wait for its answer.
+      if (op.readinessPending) return { kind: "not-ready", state: op.state };
       const slot = this.slotRaw();
       if (slot.state === "held") return { kind: "slot-held", by: slot.op };
 

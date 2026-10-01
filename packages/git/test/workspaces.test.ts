@@ -2,7 +2,7 @@
 // against a fake Artifacts namespace with the binding's shape.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Workspaces, forkName } from "../src/workspace/workspaces.ts";
+import { TOKEN_MARGIN_S, Workspaces, forkName } from "../src/workspace/workspaces.ts";
 import type { ArtifactsNamespace, MintedToken, RepoHandle, TokenInfo } from "../src/artifacts.ts";
 import { Clock, deferred, laneId, nodeSql } from "./support.ts";
 
@@ -28,6 +28,7 @@ class FakeRepo implements RepoHandle {
   }
   mintRaw(scope: "read" | "write", ttl: number): MintedToken {
     const id = `tid_${++this.ns.counter}`;
+    this.ns.minted.push(id);
     const plaintext = `art_v1_${id}${"a".repeat(30)}?expires=${ttl}`;
     const expiresAt = this.ns.clock.t + ttl * 1000;
     this.tokens.set(id, { plaintext, scope, state: "active", expiresAt, ttl });
@@ -35,9 +36,12 @@ class FakeRepo implements RepoHandle {
   }
   async createToken(scope: "write" | "read" = "write", ttl = 86400) {
     if (ttl < 60) throw new ArtifactsError("INVALID_TTL", 10003);
+    const delay = this.ns.mintDelays.shift();
+    if (delay) await delay();
     return this.mintRaw(scope, ttl);
   }
   async revokeToken(tokenOrId: string) {
+    if (this.ns.failRevoke) throw new ArtifactsError("INTERNAL_ERROR", 10400);
     for (const [id, t] of this.tokens) {
       if ((id === tokenOrId || t.plaintext === tokenOrId) && t.state === "active") {
         t.state = "revoked";
@@ -47,6 +51,7 @@ class FakeRepo implements RepoHandle {
     return false;
   }
   async listTokens() {
+    if (this.ns.failRevoke) throw new ArtifactsError("INTERNAL_ERROR", 10400);
     const tokens = [...this.tokens].map(([id, t]) => ({ id, scope: t.scope, state: t.state, expiresAt: new Date(t.expiresAt).toISOString() }));
     return { tokens, total: tokens.length };
   }
@@ -57,12 +62,12 @@ class FakeRepo implements RepoHandle {
     this.ns.forkCalls++;
     const failure = this.ns.forkFailures.shift();
     if (failure === "lost-after-create") {
-      this.ns.repos.set(name, new FakeRepo(this.ns, name, `artifacts:ns/${this.name}`));
+      this.ns.repos.set(name, new FakeRepo(this.ns, name, `artifacts:${this.ns.namespace}/${this.name}`));
       throw new ArtifactsError("INTERNAL_ERROR", 10400);
     }
     if (failure) throw failure;
     if (this.ns.repos.has(name)) throw new ArtifactsError("ALREADY_EXISTS", 10409);
-    const repo = new FakeRepo(this.ns, name, `artifacts:ns/${this.name}`);
+    const repo = new FakeRepo(this.ns, name, `artifacts:${this.ns.namespace}/${this.name}`);
     this.ns.repos.set(name, repo);
     const t = repo.mintRaw("write", 86400);
     return { name, remote: (await repo.info()).remote, token: t.plaintext };
@@ -88,6 +93,11 @@ class FakeNamespace implements ArtifactsNamespace {
   readonly repos = new Map<string, FakeRepo>();
   readonly clock: Clock;
   createGate: Promise<void> | null = null;
+  readonly namespace = "ns";
+  readonly minted: string[] = [];
+  /** Each call of createToken first awaits the next of these, if any. */
+  readonly mintDelays: (() => Promise<void>)[] = [];
+  failRevoke = false;
   constructor(clock: Clock) {
     this.clock = clock;
     this.repos.set("canon", new FakeRepo(this, "canon", null));
@@ -103,7 +113,7 @@ class FakeNamespace implements ArtifactsNamespace {
 function setup() {
   const clock = new Clock();
   const ns = new FakeNamespace(clock);
-  const ws = new Workspaces({ sql: nodeSql(), artifacts: ns, canonical: "canon", now: clock.now, sleep: async () => {} });
+  const ws = new Workspaces({ sql: nodeSql(), artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
   const lane = laneId(1);
   return { clock, ns, ws, lane, fork: () => ns.repos.get(forkName("canon", lane))! };
 }
@@ -120,12 +130,13 @@ test("a workspace is a fork with one write token, scoped to it and expiring with
   assert.ok(!("refused" in g));
   if ("refused" in g) return;
   assert.match(g.remote, /canon--act_1001_/);
-  assert.equal(Date.parse(g.expiresAt), clock.t + LEASE_MS);
+  // The token ends a few seconds inside the lease, so clock differences cannot carry it past.
+  assert.equal(Date.parse(g.expiresAt), clock.t + LEASE_MS - TOKEN_MARGIN_S * 1000);
   const live = fork().live();
   assert.equal(live.length, 1, "only the lease's token is live");
   const t = fork().tokens.get(live[0]!)!;
   assert.equal(t.scope, "write");
-  assert.equal(t.ttl, LEASE_MS / 1000);
+  assert.equal(t.ttl, LEASE_MS / 1000 - TOKEN_MARGIN_S);
   assert.equal(t.plaintext, g.token);
 });
 
@@ -225,4 +236,106 @@ test("a lease with under a minute left gets no token; a lease that ends during p
   await Promise.all([provisioning, revoking]);
   assert.deepEqual(fork().live(), []);
   assert.ok("refused" in ws.grant(lane, 2));
+});
+
+// ------------------------------------------------------------------ review 50104b16, P1.2: provenance
+
+test("a repository at the fork's name that is not a fork of this canonical repo is never used, changed or deleted", async () => {
+  for (const source of [null, "artifacts:ns/other-canon", "artifacts:ns2/canon", "github:someone/canon"]) {
+    const { clock, ns, ws, lane } = setup();
+    const name = forkName("canon", lane);
+    const squatter = new FakeRepo(ns, name, source);
+    const theirs = squatter.mintRaw("write", 3600);
+    ns.repos.set(name, squatter);
+    ws.open(lane, 1, clock.t + LEASE_MS);
+    const v = await ws.provision(lane);
+    assert.equal(v.state, "failed", String(source));
+    assert.ok(v.state === "failed" && v.error.code === "forbidden" && v.error.retryable === false);
+    assert.equal(ns.repos.get(name), squatter, "not replaced");
+    assert.deepEqual(squatter.live(), [theirs.id], "no token minted on it, and its own left alone");
+    assert.ok("refused" in ws.grant(lane, 1));
+    assert.equal(await ws.revoke(lane), 0);
+    assert.deepEqual(squatter.live(), [theirs.id], "release does not touch it either");
+  }
+});
+
+test("a fork of this canonical repo whose creation response was lost is reused", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ns.forkFailures.push("lost-after-create");
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "ready");
+  assert.equal(fork().source, "artifacts:ns/canon");
+});
+
+// ------------------------------------------------------------------ review 50104b16, P1.3: tokens within the lease
+
+test("a mint delayed 30 s past a 120 s lease's start: the overlong token is revoked and replaced by one that ends within the lease", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const leaseEnd = clock.t + 120_000;
+  ws.open(lane, 1, leaseEnd);
+  ns.mintDelays.push(async () => clock.advance(30_000));
+  assert.equal((await ws.provision(lane)).state, "ready");
+  const g = ws.grant(lane, 1);
+  assert.ok(!("refused" in g) && Date.parse(g.expiresAt) <= leaseEnd, "the grant ends within the lease");
+  const live = fork().live();
+  assert.equal(live.length, 1, "only the valid token is live");
+  assert.ok(fork().tokens.get(live[0]!)!.expiresAt <= leaseEnd, "the token itself ends within the lease");
+});
+
+test("a mint delayed 180 s past a 120 s lease's start: no token survives and no grant is given", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + 120_000);
+  ns.mintDelays.push(async () => clock.advance(180_000));
+  const v = await ws.provision(lane);
+  assert.equal(v.state, "failed");
+  assert.deepEqual(fork().live(), []);
+  const g = ws.grant(lane, 1);
+  assert.ok("refused" in g && g.rule === "lease-fenced");
+});
+
+test("a new lease generation while the old one's token is being minted: the old token is revoked, the new holder gets its own", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane); // the fork exists
+  await ws.revoke(lane);
+  ws.open(lane, 2, clock.t + LEASE_MS);
+  let handoff!: () => void;
+  ns.mintDelays.push(() => new Promise<void>((r) => (handoff = r)));
+  const first = ws.provision(lane);
+  while (!handoff) await new Promise((r) => setTimeout(r, 2));
+  ws.open(lane, 3, clock.t + LEASE_MS); // taken over while lease 2's token is minted
+  handoff();
+  await first;
+  const lease2Token = ns.minted[ns.minted.length - 1]!;
+  assert.equal(fork().tokens.get(lease2Token)?.state, "revoked", "the token minted for lease 2 is revoked, not handed to lease 3");
+  assert.equal((await ws.provision(lane)).state, "ready");
+  const g = ws.grant(lane, 3);
+  assert.ok(!("refused" in g) && g.leaseGeneration === 3);
+  assert.equal(fork().live().length, 1, "only lease 3's token is live");
+  assert.notEqual(fork().live()[0], lease2Token);
+  assert.ok("refused" in ws.grant(lane, 2));
+});
+
+test("a revocation that fails is remembered, never granted again, and revoked by sweep", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  ns.failRevoke = true;
+  await ws.revoke(lane).catch(() => 0);
+  assert.equal(await ws.sweep(), 1, "one revocation is still owed");
+  assert.equal(fork().live().length, 1);
+  assert.ok("refused" in ws.grant(lane, 1));
+  ns.failRevoke = false;
+  assert.equal(await ws.sweep(), 0);
+  assert.deepEqual(fork().live(), []);
+});
+
+test("grant refuses once the lease has expired, even with a token on record", async () => {
+  const { clock, ws, lane } = setup();
+  ws.open(lane, 1, clock.t + 120_000);
+  await ws.provision(lane);
+  assert.ok(!("refused" in ws.grant(lane, 1)));
+  clock.advance(121_000);
+  const g = ws.grant(lane, 1);
+  assert.ok("refused" in g && g.rule === "lease-fenced");
 });

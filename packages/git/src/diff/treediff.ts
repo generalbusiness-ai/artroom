@@ -131,92 +131,84 @@ export async function treeDiff(
   const cache = opts.cache ?? new TreeCache();
   const stats: DiffStats = { treeReads: 0, cacheHits: 0, entries: 0, commitReads: 0 };
   const limit = limiter(b.concurrency);
-  const pending = new Map<string, Promise<readonly TreeEntry[]>>();
-  let stop: TooLarge | null = null;
 
-  const read = (hash: string): Promise<readonly TreeEntry[]> => {
-    if (hash === EMPTY_TREE) return Promise.resolve([]);
+  const read = async (hash: string): Promise<readonly TreeEntry[]> => {
+    if (hash === EMPTY_TREE) return [];
     const hit = cache.get(hash);
     if (hit) {
       stats.cacheHits++;
-      return Promise.resolve(hit);
+      return hit;
     }
-    let p = pending.get(hash);
-    if (!p) {
-      p = limit(async () => {
-        if (stop) throw stop;
-        stats.treeReads++;
-        const entries = await reader.readTree(hash);
-        if (!entries) throw new Error(`tree ${hash} not found`);
-        cache.set(hash, entries);
-        return entries;
-      });
-      pending.set(hash, p);
-    }
-    return p;
-  };
-  const count = (n: number) => {
-    stats.entries += n;
-    if (stats.entries > b.maxEntries) throw (stop ??= new TooLarge("entries", b.maxEntries));
-  };
-  const deep = (depth: number) => {
-    if (depth > b.maxDepth) throw (stop ??= new TooLarge("depth", b.maxDepth));
+    return limit(async () => {
+      stats.treeReads++;
+      const entries = await reader.readTree(hash);
+      if (!entries) throw new Error(`tree ${hash} not found`);
+      cache.set(hash, entries);
+      return entries;
+    });
   };
 
   const added = new Map<RepoPath, Leaf>();
   const deleted = new Map<RepoPath, Leaf>();
   const modified = new Set<RepoPath>();
 
-  const all = async (hash: string, prefix: string, depth: number, into: Map<RepoPath, Leaf>): Promise<void> => {
-    deep(depth);
-    const entries = await read(hash);
-    count(entries.length);
-    await Promise.all(
-      entries.map((e) => (e.type === "tree" ? all(e.hash, `${prefix}${e.name}/`, depth + 1, into) : void into.set(prefix + e.name, e))),
-    );
-  };
+  // One unit of work: compare two trees, or list every file of a tree that exists on one side only.
+  type Item =
+    | { readonly kind: "walk"; readonly a: string; readonly b: string; readonly prefix: string }
+    | { readonly kind: "all"; readonly tree: string; readonly prefix: string; readonly into: "added" | "deleted" };
 
-  const walk = async (ha: string, hb: string, prefix: string, depth: number): Promise<void> => {
-    if (ha === hb) return;
-    deep(depth);
-    const [ea, eb] = await Promise.all([read(ha), read(hb)]);
-    count(ea.length + eb.length);
-    const mb = new Map(eb.map((e) => [e.name, e]));
-    const work: Promise<void>[] = [];
-    for (const x of ea) {
-      const y = mb.get(x.name);
-      mb.delete(x.name);
-      const p = prefix + x.name;
-      if (y && x.hash === y.hash && x.mode === y.mode) continue;
-      const xt = x.type === "tree";
-      const yt = y?.type === "tree";
-      if (y && xt && yt) work.push(walk(x.hash, y.hash, `${p}/`, depth + 1));
-      else if (y && !xt && !yt) modified.add(p);
-      else {
-        if (xt) work.push(all(x.hash, `${p}/`, depth + 1, deleted));
-        else deleted.set(p, x);
-        if (y) {
-          if (yt) work.push(all(y.hash, `${p}/`, depth + 1, added));
-          else added.set(p, y);
+  // Level by level. Each level's trees are read in parallel, but entries
+  // are counted and the bounds checked in a fixed order (by path), after the
+  // whole level is read. So the same two trees give the same answer, and the
+  // same refusal, whatever the cache holds and whichever read finishes first.
+  let level: Item[] = fromTree === toTree ? [] : [{ kind: "walk", a: fromTree, b: toTree, prefix: "" }];
+  for (let depth = 0; level.length > 0; depth++) {
+    if (depth > b.maxDepth) return { kind: "too-large", bound: "depth", limit: b.maxDepth, stats };
+    const order = (x: Item) => `${x.prefix}\u0000${x.kind === "all" ? x.into : "walk"}`;
+    level.sort((x, y) => cmp(order(x), order(y)));
+    const trees = await Promise.all(
+      level.map((it) => (it.kind === "walk" ? Promise.all([read(it.a), read(it.b)]) : read(it.tree).then((e) => [e, [] as readonly TreeEntry[]] as const))),
+    );
+    const next: Item[] = [];
+    for (let k = 0; k < level.length; k++) {
+      const it = level[k]!;
+      const [ea, eb] = trees[k]!;
+      stats.entries += ea.length + eb.length;
+      if (stats.entries > b.maxEntries) return { kind: "too-large", bound: "entries", limit: b.maxEntries, stats };
+      if (it.kind === "all") {
+        const into = it.into === "added" ? added : deleted;
+        for (const e of ea) {
+          if (e.type === "tree") next.push({ kind: "all", tree: e.hash, prefix: `${it.prefix}${e.name}/`, into: it.into });
+          else into.set(it.prefix + e.name, e);
+        }
+        continue;
+      }
+      const mb = new Map(eb.map((e) => [e.name, e]));
+      for (const x of ea) {
+        const y = mb.get(x.name);
+        mb.delete(x.name);
+        const p = it.prefix + x.name;
+        if (y && x.hash === y.hash && x.mode === y.mode) continue;
+        const xt = x.type === "tree";
+        const yt = y?.type === "tree";
+        if (y && xt && yt) next.push({ kind: "walk", a: x.hash, b: y.hash, prefix: `${p}/` });
+        else if (y && !xt && !yt) modified.add(p);
+        else {
+          if (xt) next.push({ kind: "all", tree: x.hash, prefix: `${p}/`, into: "deleted" });
+          else deleted.set(p, x);
+          if (y) {
+            if (yt) next.push({ kind: "all", tree: y.hash, prefix: `${p}/`, into: "added" });
+            else added.set(p, y);
+          }
         }
       }
+      for (const [name, y] of mb) {
+        const p = it.prefix + name;
+        if (y.type === "tree") next.push({ kind: "all", tree: y.hash, prefix: `${p}/`, into: "added" });
+        else added.set(p, y);
+      }
     }
-    for (const [name, y] of mb) {
-      const p = prefix + name;
-      if (y.type === "tree") work.push(all(y.hash, `${p}/`, depth + 1, added));
-      else added.set(p, y);
-    }
-    // Wait for every branch, then report the first failure.
-    const settled = await Promise.allSettled(work);
-    const failed = settled.find((s): s is PromiseRejectedResult => s.status === "rejected");
-    if (failed) throw failed.reason;
-  };
-
-  try {
-    await walk(fromTree, toTree, "", 0);
-  } catch (e) {
-    if (e instanceof TooLarge) return { kind: "too-large", bound: e.bound, limit: e.limit, stats };
-    throw e;
+    level = next;
   }
   return { kind: "ok", changes: pairRenames(added, deleted, modified), stats };
 }
@@ -306,8 +298,23 @@ export async function mergeBases(
         insert(p);
       }
     }
-    // Drop a result that another result's walk marked stale (it is an ancestor of it).
-    return results.filter((h) => !((flags.get(h) ?? 0) & STALE) || results.length === 1).sort();
+    if (results.length < 2) return results;
+    // Remove every candidate that is an ancestor of another candidate. The
+    // walk above is ordered by commit time, so with clock skew it can report
+    // such a candidate before reaching the commit that makes it redundant.
+    // This check uses only parent links, never time, and is bounded by the
+    // same commit budget.
+    const candidates = new Set(results);
+    const reached = new Set<string>();
+    const queue2: string[] = [];
+    for (const r of results) for (const p of (await load(r)).parents) queue2.push(p);
+    while (queue2.length > 0) {
+      const h = queue2.pop()!;
+      if (reached.has(h)) continue;
+      reached.add(h);
+      for (const p of (await load(h)).parents) if (!reached.has(p)) queue2.push(p);
+    }
+    return [...candidates].filter((h) => !reached.has(h)).sort();
   } catch (e) {
     if (e instanceof TooLarge) return { kind: "too-large", bound: e.bound, limit: e.limit };
     throw e;

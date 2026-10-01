@@ -714,3 +714,94 @@ test("core: no push starts after an abort attempt, or once another writer is see
   v.clock.advance(3_600_000);
   assert.equal(v.engine.core.beginPush(), null);
 });
+
+// ------------------------------------------------------- overlapping readiness evaluations (review 50104b16, P1.1)
+
+/** A readiness function whose calls each wait for the test to answer them. */
+function scriptedReadiness(w: World, id: OpId) {
+  const calls: { answer: (r: import("../src/landing/types.ts").Readiness) => void }[] = [];
+  w.room.readinessOf.set(id, () => new Promise((resolve) => calls.push({ answer: resolve })));
+  const ready = { kind: "ready" as const, evidence: [actId(50)], retained: null };
+  const waiting = { kind: "waiting" as const, obligations: ["obl_tests" as const] };
+  const until = async (n: number) => {
+    for (let i = 0; calls.length < n; i++) {
+      if (i > 1000) throw new Error(`readiness was asked ${calls.length} times, not ${n}`);
+      await new Promise((r) => setTimeout(r, 2));
+    }
+  };
+  return { calls, ready, waiting, until };
+}
+
+test("readiness: an older 'waiting' answer that arrives after a newer 'ready' one is dropped, and the landing proceeds", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  const s = scriptedReadiness(w, id);
+  const preparing = w.engine.prepare(id); // evaluation 1, based on old evidence
+  await s.until(1);
+  const evaluating = w.engine.evaluate(id); // evidence arrived: evaluation 2
+  await s.until(2);
+  s.calls[1]!.answer(s.ready);
+  await evaluating;
+  assert.equal(w.engine.view(id)?.state, "ready");
+  s.calls[0]!.answer(s.waiting); // the older answer, late
+  await preparing;
+  assert.equal(w.engine.view(id)?.state, "ready", "the older answer did not replace the newer one");
+  await w.engine.settle();
+  assert.equal(w.engine.view(id)?.state, "landed");
+});
+
+test("readiness: an older 'ready' answer that arrives after a newer 'waiting' one is dropped", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  const s = scriptedReadiness(w, id);
+  const preparing = w.engine.prepare(id);
+  await s.until(1);
+  const evaluating = w.engine.evaluate(id); // evidence was withdrawn: evaluation 2
+  await s.until(2);
+  s.calls[1]!.answer(s.waiting);
+  await evaluating;
+  s.calls[0]!.answer(s.ready);
+  await preparing;
+  const v = w.engine.view(id);
+  assert.equal(v?.state, "preparing");
+  assert.deepEqual(v?.state === "preparing" ? v.waiting : null, ["obl_tests"]);
+  assert.equal(w.room.events("land-reserved").length, 0);
+});
+
+test("readiness: a ready operation with a newer evaluation still out is not reserved until it answers", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  const s = scriptedReadiness(w, id);
+  const preparing = w.engine.prepare(id);
+  await s.until(1);
+  s.calls[0]!.answer(s.ready);
+  await preparing;
+  const evaluating = w.engine.evaluate(id);
+  await s.until(2);
+  assert.deepEqual(w.engine.reserve(id), { kind: "not-ready", state: "ready" });
+  s.calls[1]!.answer(s.ready);
+  await evaluating;
+  assert.equal(w.engine.reserve(id).kind, "reserved");
+});
+
+test("readiness: a restart while an evaluation is out asks again; the dead instance's late answer changes nothing", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  const s = scriptedReadiness(w, id);
+  const preparing = w.engine.prepare(id).catch((e: unknown) => e);
+  await s.until(1);
+  const restarted = w.make(); // the first instance is gone
+  const reconciling = restarted.reconcile();
+  await s.until(2);
+  s.calls[1]!.answer(s.ready);
+  await reconciling;
+  s.calls[0]!.answer(s.waiting);
+  await preparing;
+  assert.equal(restarted.view(id)?.state === "ready" || restarted.view(id)?.state === "publishing" || restarted.view(id)?.state === "landed", true);
+  await restarted.settle();
+  assert.equal(restarted.view(id)?.state, "landed");
+});
