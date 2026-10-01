@@ -1,0 +1,29 @@
+{
+  "name": "@generalbusiness/artroom-room",
+  "version": "0.0.0",
+  "description": "Artroom's Room: the Worker and the SQLite-backed Durable Object that sequences one repository's acts.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "types": "wrangler types --include-env=false src/worker-runtime.d.ts >/dev/null",
+    "typecheck": "npm run types && tsc -p tsconfig.json && tsc -p test/tsconfig.json",
+    "test": "npm run test:node && npm run test:workerd",
+    "test:node": "vitest run --config vitest.node.config.ts",
+    "test:workerd": "vitest run --config vitest.workers.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-contract": "*",
+    "@generalbusiness/artroom-policy": "*",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "vitest": "4.1.11",
+    "wrangler": "^4.146.0"
+  }
+}

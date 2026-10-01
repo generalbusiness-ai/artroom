@@ -1,0 +1,24 @@
+// The Room Worker. Not deployed by this lane: `wrangler deploy` needs the
+// Artifacts binding and the lane B publisher wired in first (see README).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "artroom-room",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" },
+      { "name": "NAMES", "class_name": "RoomNames" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "RoomNames"] }],
+  "vars": {
+    // The lease length in seconds (R-LANE-5).
+    "LEASE_SECONDS": "1800",
+    // The public base URL, used for the MCP endpoint in `Redeemed`.
+    "PUBLIC_URL": "https://artroom.example.workers.dev"
+  }
+  // Secrets (set with `wrangler secret put`, never in this file):
+  //   ROOM_KEY_SECRET  derives each new room's signing key at genesis.
+}
