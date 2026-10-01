@@ -77,7 +77,7 @@ describe("results: refusals are values, failures are tool errors (R-API-1)", () 
     expect(res.body.result.structuredContent).toMatchObject({ name: "ArtroomError", code: "bad-request", retryable: false });
     expect(res.body.result.structuredContent.message).toMatch(/lease: is required.*head: does not match/);
     const unknown = await call(a, "merge", {});
-    expect(unknown.body.result.structuredContent.message).toMatch(/There is no tool named merge/);
+    expect(unknown.body.result.structuredContent.message).toMatch(/There is no tool named "merge"/);
   });
 
   test("explain of an unknown act returns null as text, with no structured content", async () => {

@@ -48,9 +48,11 @@ export function validate(schema: JsonSchema, value: unknown, path = "input"): st
   }
   if (typeOf(value) === "object") {
     const obj = value as Record<string, unknown>;
-    for (const key of schema.required ?? []) if (obj[key] === undefined) errors.push(`${path}.${key}: is required`);
+    // Own properties only, on both sides: an input key like `toString` or `__proto__` must not
+    // find a schema through the prototype chain, and an inherited value never satisfies `required`.
+    for (const key of schema.required ?? []) if (!Object.hasOwn(obj, key) || obj[key] === undefined) errors.push(`${path}.${key}: is required`);
     for (const [key, v] of Object.entries(obj)) {
-      const sub = schema.properties?.[key];
+      const sub = schema.properties !== undefined && Object.hasOwn(schema.properties, key) ? schema.properties[key] : undefined;
       if (sub !== undefined) {
         if (v !== undefined) errors.push(...validate(sub, v, `${path}.${key}`));
       } else if (schema.additionalProperties === false) errors.push(`${path}.${key}: is not allowed`);

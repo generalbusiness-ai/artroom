@@ -6,6 +6,6 @@
  */
 
 export { TOOLS, TOOL_LIST, INSTRUCTIONS, type Tools } from "./tools.ts";
-export { callTool, toolResult, errorResult, type ToolResult } from "./run.ts";
+export { callTool, isToolName, toolResult, errorResult, type ToolResult } from "./run.ts";
 export { validate } from "./validate.ts";
 export { createArtroomServer, listedTools, SERVER_INFO } from "./server.ts";

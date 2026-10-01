@@ -23,7 +23,7 @@ export function createArtroomServer(room: RoomApi | (() => Promise<RoomApi>)): S
   server.setRequestHandler("tools/list", async () => ({ tools: listedTools() as never }));
   server.setRequestHandler("tools/call", async (request) => {
     const { name, arguments: args } = request.params;
-    return (await callTool(await api(), name, args ?? {})) as never;
+    return (await callTool(api, name, args ?? {})) as never;
   });
   return server;
 }

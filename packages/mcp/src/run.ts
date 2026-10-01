@@ -187,15 +187,24 @@ export function errorResult(e: ArtroomError): ToolResult {
 }
 
 /** Validates the input, runs the tool, and shapes the result. Never throws. */
-export async function callTool(room: RoomApi, name: string, args: unknown): Promise<ToolResult> {
-  if (!(name in TOOLS)) return errorResult(error("bad-request", `There is no tool named ${name}. The tools are ${Object.keys(TOOLS).join(", ")}.`));
-  const tool = name as McpToolName;
-  const input = args ?? {};
-  const problems = validate(TOOLS[tool].inputSchema, input);
-  if (problems.length > 0) return errorResult(error("bad-request", `The input does not fit the ${tool} tool: ${problems.join("; ")}.`));
+/** True only for the ten tools' own names: never `constructor`, `__proto__` or another inherited name. */
+export function isToolName(name: unknown): name is McpToolName {
+  return typeof name === "string" && Object.hasOwn(TOOLS, name) && Object.hasOwn(RUN, name);
+}
+
+/** Validates the input, runs the tool, and shapes the result. Never throws. */
+export async function callTool(room: RoomApi | (() => Promise<RoomApi>), name: unknown, args: unknown): Promise<ToolResult> {
   try {
-    return toolResult(tool, await (RUN[tool] as Runner<McpToolName>)(room, input as never));
+    if (!isToolName(name)) {
+      return errorResult(error("bad-request", `There is no tool named ${JSON.stringify(String(name)).slice(0, 80)}. The tools are ${Object.keys(TOOLS).join(", ")}.`));
+    }
+    // A JSON round trip keeps only own data properties: nothing reaches the runner through a prototype.
+    const input: unknown = args === undefined || args === null ? {} : JSON.parse(JSON.stringify(args));
+    const problems = validate(TOOLS[name].inputSchema, input);
+    if (problems.length > 0) return errorResult(error("bad-request", `The input does not fit the ${name} tool: ${problems.join("; ")}.`));
+    const api = typeof room === "function" ? await room() : room;
+    return toolResult(name, await (RUN[name] as Runner<McpToolName>)(api, input as never));
   } catch (e) {
-    return errorResult(isArtroomError(e) ? e : error("internal", `The ${tool} tool failed.`, true));
+    return errorResult(isArtroomError(e) ? e : error("internal", "The tool failed.", true));
   }
 }
