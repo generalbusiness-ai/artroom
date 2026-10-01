@@ -236,6 +236,12 @@ export type RuleInput =
        * here or carried: one entry per reviewer (R-POL-7).
        */
       readonly reviews: readonly { readonly act: ActId; readonly verdict: Verdict; readonly by: PolicyActor; readonly basis: "here" | "carried" }[];
+      /**
+       * `land` when the `land` act is admitted. `reservation` when preparation
+       * evaluates the prospective reservation input, and when reservation
+       * rebuilds it (R-POL-6, R-LAND-4, R-LAND-7). Policy may treat them
+       * differently; the room never evaluates the reservation stage as `land`.
+       */
       readonly stage: "land" | "reservation";
     }
   | {
@@ -281,6 +287,20 @@ export interface ProfileStamp {
   readonly jsonata: string;
   /** The per-act budget accounting (R-EVAL-9). */
   readonly accounting: "artroom-act-budget-v1";
+}
+
+/**
+ * What preparation retains from the land rules' passing evaluation of the
+ * prospective reservation input (R-LAND-4). Room-internal, never on the wire.
+ * It is separate from that evaluation's `ReplayContext`, which is retained
+ * for replay as usual (R-LOG-7).
+ */
+export interface RetainedLandInput {
+  readonly stage: "reservation";
+  /** The canonical JSON (RFC 8785) of the land `RuleInput`, as UTF-8 text. */
+  readonly canonical: string;
+  /** SHA-256 of `canonical`; it is `ready.landInput`. */
+  readonly digest: Digest;
 }
 
 // ---------------------------------------------------------- replay context

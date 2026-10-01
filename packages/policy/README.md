@@ -104,6 +104,16 @@ pending, changes nothing. `replay(policy, context)` reconstructs the call and
 returns the same decisions (R-EVAL-6). `explain()` returns each context by
 its digest.
 
+## Land stages and the reservation guard
+
+The `land` act is evaluated with `stage: "land"`. Preparation evaluates the
+prospective reservation input, with `stage: "reservation"`, before the
+operation becomes ready; when it passes, `LandResult.retained` holds its
+canonical bytes and digest (`RetainedLandInput`). Inside the no-await
+reservation transaction, `matchesRetainedLandInput(retained, rebuilt)`
+compares the rebuilt input's canonical bytes synchronously; it never hashes
+or evaluates (R-POL-6, R-LAND-4, R-LAND-7).
+
 ## Path-safe rule inputs
 
 Ownership in rule inputs is a list of `{ path, owners }` pairs
@@ -187,6 +197,8 @@ Artroom's cases:
   retryable error that records nothing;
 - `test/review-dd2a995b.test.ts`: checker review dd2a995b's reproductions,
   asserting the repaired behaviour;
+- `test/review-09c01bf9.test.ts`: land stages and the reservation byte
+  guard;
 - `test/helpers.test.ts`: the plan's section 5 policy example, the default
   policy, validation and globs.
 

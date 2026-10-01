@@ -27,6 +27,7 @@ export type {
   NotifyDirectory,
   PathOwners,
   ReplayContext,
+  RetainedLandInput,
   Usage,
   CarryRule,
   CarrySettings,

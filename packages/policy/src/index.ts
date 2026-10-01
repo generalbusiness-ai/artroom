@@ -45,6 +45,7 @@ export {
   evaluateNotify,
   evaluateRefuse,
   evaluateRequire,
+  matchesRetainedLandInput,
   notifyContext,
   replay,
   type ActivePolicy,

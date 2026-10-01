@@ -845,8 +845,12 @@ R-LAND-6.
 2. Meet the check obligations on that integration: carry where R-CARRY
    allows, otherwise request the checks. A failing required check ends in
    `failed` with code `check-failed`.
-3. Evaluate the land rules and record the digest of their input as
-   `landInput`.
+3. Evaluate the land rules on the prospective reservation input: the land
+   `RuleInput` with `stage: "reservation"`, built from current state as
+   reservation will rebuild it. If a rule blocks, the operation fails with
+   the rule's ID and fix. If all pass, retain the input's canonical bytes
+   and their SHA-256 digest (`RetainedLandInput`), separately from the
+   evaluation's replay context, and record the digest as `landInput`.
 4. Move to `ready`, listing the evidence.
 
 **R-LAND-5.** When main moves, every operation in `preparing` or `ready`
@@ -878,9 +882,12 @@ that transaction the room:
    - every piece of evidence is valid under R-REV-1, judged against the
      authority recorded at its admission;
    - main, as the room last recorded it, equals `expectedMain`;
-   - the land-rule input, rebuilt now, has the digest `landInput`. This is
-     the digest of the land `RuleInput` alone, not of the replay context,
-     whose starting usage differs between `ready` and reservation.
+   - the land `RuleInput` with `stage: "reservation"`, rebuilt now from
+     current state and canonicalized synchronously, is byte-for-byte equal
+     to the retained `RetainedLandInput.canonical`. The comparison is of
+     bytes, not of a digest: SHA-256 through WebCrypto is asynchronous, so no
+     hashing and no rule evaluation happen inside this transaction. Equal
+     bytes mean the land rules already passed on exactly this input.
 
    On any mismatch, the operation goes to `retryable`.
 2. Records the operation as `publishing`, with the next publication
@@ -1141,9 +1148,17 @@ qualifying reviewers for `reviewers`. `owners` uses the proposal's
 `PathOwners`; `holder` the lane's holder. The directory is part of the
 replay context (R-EVAL-8), and a retry reuses the same context.
 
-**R-POL-6. `land`.** Evaluated on `land` and at `ready`. Reservation
-re-checks its input digest (R-LAND-7). If `block` is true, the landing is
-refused, or the operation fails, with the rule's ID and fix.
+**R-POL-6. `land`.** Evaluated twice, with different `stage` values:
+- when the `land` act is admitted, on the input with `stage: "land"`. If
+  `block` is true, the act is refused;
+- during preparation, before the operation becomes `ready`, on the
+  prospective reservation input with `stage: "reservation"` (R-LAND-4). If
+  `block` is true, the operation fails.
+
+Reservation rebuilds the `stage: "reservation"` input and compares its
+canonical bytes with those retained (R-LAND-7). It never evaluates rules,
+and the room never substitutes `stage: "land"` to make inputs match. So a
+rule that blocks only at reservation cannot be bypassed.
 
 **R-POL-7. Default policy.** With no policy file the room uses:
 - no owners and no `require` rules;
@@ -1726,6 +1741,7 @@ must pass it.
 | A requests the token with an old lease generation; after its key is revoked; after it is removed; under an expired delegation | Refused `lease-fenced`, `key-revoked`, `not-member`, `delegation-invalid` | R-WS-2 |
 | A token appears in no attention item, update, log entry, `explain`, error or cached response | Verified by scanning every output for the token | R-WS-4 |
 | **Scoped checker, new test.** A checker with inputs `src/**` passed on generation 1. Generation 2 leaves `src/**` unchanged and adds a failing `tests/login.test.ts` | The filtered snapshot contains the new file, so its digest changes; the check reruns and fails; it is not carried | R-CARRY-3, R-CARRY-8, R-CARRY-9 |
+| **Stage-specific land rule.** A land rule blocks when `stage = "reservation"`. Separately, a rule that passes, with state unchanged and then changed between `ready` and reservation | The `land` act is admitted (stage `land`); preparation evaluates stage `reservation`, so the operation fails and never becomes `ready`. With the passing rule, reservation rebuilds byte-equal canonical input and proceeds; after a change such as a new objection, the bytes differ and the operation goes to `retryable` | R-POL-6, R-LAND-4, R-LAND-7 |
 | **Browser join.** A browser key redeems a client-custody invitation | `Joined`; the key is bound at redemption; a second `join` with the same invitation is refused `invitation-invalid`; a `join` by an already-bound key is refused `key-in-use` | R-ADM-3 (c), R-CRED-9 |
 | **MCP redemption.** An agent redeems a room-custody invitation with no credential | `Redeemed`, with a bearer token shown once; the log holds the `join` (authority `custody: "room"`, key custody `room`) and the `delegate`, not the token; the member's acts are bounded by the session delegation's kinds and lifetime | R-CRED-3, R-CRED-9, R-ADM-12, R-SEC-5 |
 | **Room-custody invitation, self-signed join on `/acts`.** The recipient makes its own key and posts a signed `join` with the invitation's secret to `POST /v1/rooms/:room/acts` | Refused `custody-mismatch`; nothing recorded; the invitation stays unused | R-ADM-12 |
@@ -1780,5 +1796,23 @@ lanes must change.
 | Default `dependsOn` | R-CARRY-2 | comment on `CarrySettings.dependsOn` | — |
 | Latest verdict per reviewer | R-POL-7 | comment on the land `RuleInput.reviews` | Room: one entry per qualifying reviewer |
 | Require failure at activation | R-POL-9 | — | Room: block `land` with the recorded refusal |
-| `landInput` | R-LAND-7 | — (digest of the land `RuleInput` alone) | — |
+| `landInput` | R-LAND-4, R-LAND-7, R-POL-6 | `ready.landInput` is the digest of the retained prospective reservation input; new room-internal `RetainedLandInput` (see "Review 09c01bf9") | Room, landing operation |
 | Kept open | Open points 30 to 32 | — | — |
+
+### Review 09c01bf9
+
+Checker's review of `95fbdefd` kept every change above and found one P1:
+the contract did not say which `stage` preparation evaluates, or how a
+synchronous reservation compares a digest it cannot compute without an
+`await`.
+
+| Finding | Rules changed | Types | Who adapts |
+|---|---|---|---|
+| P1 Prospective reservation input and synchronous comparison | R-POL-6 rewritten; R-LAND-4 step 3; R-LAND-7 compares bytes | New room-internal `RetainedLandInput` (`stage: "reservation"`, `canonical`, `digest`); comments on `RuleInput` `stage` and `ready.landInput`. `ready.landInput` keeps its type, `Digest \| null`, and is now the digest of the retained reservation-stage input | Landing operation (lane B): evaluate stage `reservation` during preparation, retain bytes and digest, compare bytes in the reservation transaction. Room (lane A): evaluate stage `land` at admission |
+
+Acceptance case, added to section 23: a land rule `stage = "reservation"`
+passes the `land` act but fails preparation, so the operation never becomes
+`ready` and the rule cannot be bypassed. With a rule that passes, unchanged
+state rebuilds byte-equal input at reservation, and a change to that state,
+such as a new objection, fails the byte comparison and sends the operation
+to `retryable`.

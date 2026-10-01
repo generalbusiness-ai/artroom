@@ -35,11 +35,12 @@ import type {
   RuleKind,
   TeamId,
   LanePurpose,
+  RetainedLandInput,
 } from "@generalbusiness/artroom-contract";
 import { actMeter, evaluate, type ActMeter, type Meter } from "./evaluator.ts";
 import { prepareInput, type PreparedInput } from "./values.ts";
 import { PolicyEvalError, type RefusalCode } from "./errors.ts";
-import { digestJson } from "./integrity.ts";
+import { canonicalize, digestJson } from "./integrity.ts";
 import { STAMP } from "./profile.ts";
 import { matching, matchGlob } from "./glob.ts";
 import { checkConditions, reviewConditions, type CarryFacts, type CarryInput, type Invariant } from "./carry.ts";
@@ -399,6 +400,13 @@ export type LandOptions = BudgetOptions;
 
 export interface LandResult extends Explained {
   readonly refusal: Refusal | null;
+  /**
+   * Set when the prospective reservation input (`stage: "reservation"`)
+   * passed: what preparation retains for reservation's byte comparison
+   * (R-LAND-4, R-LAND-7). Null at stage `land`, on a refusal, and on a
+   * configuration-recovery lane.
+   */
+  readonly retained: RetainedLandInput | null;
 }
 
 /** `land` rules, on `land`, at `ready` and at reservation (R-POL-6). The first block stops evaluation. */
@@ -409,7 +417,7 @@ export async function evaluateLand(policy: ActivePolicy, input: InputOf<"land">,
 }
 
 async function runLand(policy: ActivePolicy, ctx: Ctx<"land">, caller?: ActMeter): Promise<LandResult> {
-  if (skipsPolicy(ctx.purpose)) return { refusal: null, evaluations: [], invariants: [RECOVERY_LANE] };
+  if (skipsPolicy(ctx.purpose)) return { refusal: null, retained: null, evaluations: [], invariants: [RECOVERY_LANE] };
   const s = await open(policy, ctx);
   const evaluations: RuleEvaluation[] = [];
   let refusal: Refusal | null = null;
@@ -428,8 +436,26 @@ async function runLand(policy: ActivePolicy, ctx: Ctx<"land">, caller?: ActMeter
     evaluations.push(evaluation(s, rule, { result: "pass" }, answer.usage, `${rule.id} does not block landing`));
   }
   settle(caller, s);
-  return { refusal, evaluations, invariants: [] };
+  let retained: RetainedLandInput | null = null;
+  if (refusal === null && ctx.input.stage === "reservation") {
+    const canonical = canonicalize(ctx.input as never);
+    retained = { stage: "reservation", canonical, digest: await digestJson(ctx.input as never) };
+  }
+  return { refusal, retained, evaluations, invariants: [] };
 }
+
+/**
+ * The reservation guard (R-LAND-7): synchronous, with no hashing and no
+ * evaluation, so it can run inside the no-await reservation transaction.
+ * True when the land input rebuilt now, with `stage: "reservation"`, is
+ * byte-for-byte the input whose evaluation passed during preparation.
+ */
+export function matchesRetainedLandInput(retained: RetainedLandInput, rebuilt: InputOf<"land">): boolean {
+  if (rebuilt.stage !== "reservation" || retained.stage !== "reservation") return false;
+  return canonicalize(rebuilt as never) === retained.canonical;
+}
+
+
 
 // ------------------------------------------------------------------ notify
 
