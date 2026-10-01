@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7e737d04b10cde30ac66b6d18cf316ffbabad190"}
+{"kind":"promise","text":"Review lane F revision 2 at exact head c5cf189f88aa75ea74855cac96e8decf1275e2e9, all 56 artifacts; verify six prior findings and policy runtime equivalence, uncertain landing and publication projections, historic anchors, asynchronous explain, and Architecture, Security, Simplification."}
