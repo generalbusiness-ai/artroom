@@ -61,6 +61,11 @@ The publisher follows these rules:
 
   When retries run out, the error is `unresolved` and retryable. Calling
   `publish` again with the same input completes forward.
+- **The commit, in advance.** `commitFor(parent, entries, checkpoint,
+  retained)` returns the exact commit `publish` would write for that
+  cohort on `parent`, without pushing. Both use the same owned copy and the
+  same git serialization. The Room stores it before any remote write
+  (lane A, `PublisherPort.commitFor`).
 - **State.** The publisher records `publishedThrough`. `lag(head)` gives
   `head − publishedThrough` (R-LOG-11). `publicationDue` decides when a
   batch is due, by lag or by delay. `LogPublisher.open` resumes from the ref
@@ -99,7 +104,11 @@ time can never pass an expiry check.
 - the commit has one parent, the previous log commit;
 - every earlier entry and every full segment is unchanged;
 - every retained file matches its digest (`retained-digest`), and decodes
-  (`malformed`). Each distinct file is decoded once, by digest;
+  under its directory's contract (`malformed`): a replay context under
+  `inputs/`, JSON under `policies/`. A file under `policies/` is decoded
+  again as a policy document or a checker configuration where a
+  `policy-activated` event names it. Each decoding, good or bad, is reused
+  only for the same contract and digest;
 - it publishes every retained file that its own verified entries need, so
   each published prefix can be replayed alone. A missing file fails that
   commit (`policy-missing`, `checker-missing` or `input-missing`, with
@@ -202,6 +211,8 @@ entries of the last consistent commit.
 - `test/amendment-2.test.ts` covers the lane L edits of contract
   amendment 2 (see below).
 - `test/review-07d3150e.test.ts` covers the findings of review 07d3150e
+  (see below).
+- `test/review-a454cbaf.test.ts` covers review a454cbaf and `commitFor`
   (see below).
 
 - `test/gitcli.node.test.ts` (Node only) publishes to a real local git
@@ -429,3 +440,50 @@ named test failed.
    retained digest in an earlier commit is reported even after a child
    removes it"; "a malformed retained file in an earlier commit is
    reported even after a child removes it".
+
+## Review a454cbaf
+
+The checker confirmed both findings of review 07d3150e and every
+amendment 2 edit, and found one more defect. Lane A also asked for
+`commitFor`. All tests are in `test/review-a454cbaf.test.ts`. Each new
+guard was broken on purpose and a named test failed.
+
+1. **P2: distinguish retained-file decoding by directory and type, as
+   well as digest.** The same bytes have a different contract under
+   `inputs/` (a replay context), under `policies/` (JSON), and as the policy
+   document or checker configuration a `policy-activated` event names.
+   Verify skipped a file whose digest it had already decoded in another
+   directory, so the verdict depended on which commit added the bytes.
+   Fix: decodings, good or bad, are cached by contract and digest, never
+   by digest alone. A file that does not decode under its directory's
+   contract fails each commit that publishes it, whether or not an entry
+   needs it. An entry that needs it also fails, at its `seq`.
+   Tests:
+   - "a policy's bytes added under inputs/ by a child are a malformed input
+     at that commit"
+   - "the same bytes as a malformed input and a valid policy, in one
+     commit: the input fails, the policy still activates"
+   - "a malformed input in a parent does not poison the same bytes as a
+     policy a child activates"
+   - "a valid replay context in a parent does not stand for the same bytes
+     named as a policy: malformed at the activation"
+   - "a policy document decoded as a policy does not stand for the same
+     bytes named as a checker: malformed at the activation"
+   - "positives: the same bytes under inputs/ and policies/ where each
+     contract allows them"
+   - "positives: repeated identical content where each contract allows it"
+     (one checker configuration under two names, the same policy activated
+     again, and two claims sharing one replay context)
+2. **`commitFor`, for lane A.** `LogPublisher.commitFor(parent, entries,
+   checkpoint, retained)` matches `PublisherPort.commitFor` in lane A's
+   `packages/room/src/ports.ts`. It uses the same owned copy as `publish`
+   and one `build` function, so the two cannot drift. When `parent` is the
+   commit the publisher last wrote, it includes that commit's retained
+   files, as `publish` does. For any other parent it uses only `retained`.
+   A Room that passes every retained file it holds gets the same commit
+   either way.
+   Tests: "a root commit, then a child with retained files, then after a
+   restart" (`commitFor` equals the commit `publish` writes, for a root
+   commit, a non-root parent with every retained file, a parent with only
+   the new retained file, and after `LogPublisher.open`; nothing is pushed
+   by `commitFor`); "the parent is part of the commit".

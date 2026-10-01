@@ -273,10 +273,11 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
 
   // Retained files are named by their digest (R-LOG-7), and decoded at the boundary.
   // Every inspected commit is checked, not only the one whose entries are verified:
-  // each file's digest in each commit, and each distinct file decoded once, by digest.
-  // A malformed one is reported where an entry needs it, so the verified prefix stops there.
-  // Files under policies/ are policy documents or checker configurations; the
-  // policy-activated event that names one says which, so it is decoded there.
+  // each file's digest, and its decoding, in each commit that publishes it.
+  // The same bytes have a different contract in each place: a replay context under
+  // inputs/; a policy document or a checker configuration under policies/, as the
+  // policy-activated event that names it says. So a decoding, good or bad, is reused
+  // only for the same contract and digest, never across contracts.
   const RETAINED = /^artroom-log\/v1\/(inputs|policies)\/([0-9a-f]{64})\.json$/;
   const inputPath = (digest: Digest) => `${ROOT}/inputs/${digest.slice(7)}.json`;
   const policyPath = (digest: Digest) => `${ROOT}/policies/${digest.slice(7)}.json`;
@@ -285,9 +286,25 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     const bytes = v.files.get(path);
     return bytes !== undefined && sha256Hex(bytes) === RETAINED.exec(path)?.[2];
   };
-  const inputs = new Map<Digest, ReplayContext>();
-  const policyFiles = new Map<Digest, Uint8Array>();
-  const malformed = new Map<Digest, { path: string; detail: string; reported: boolean }>();
+  type Contract = "input" | "json" | "policy" | "checker";
+  type Decoded = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly detail: string };
+  const decodings = new Map<`${Contract} ${Digest}`, Decoded>();
+  /** `bytes`, named by `digest`, decoded under `contract`; once per contract and digest. */
+  const decodeAs = (contract: Contract, digest: Digest, bytes: Uint8Array): Decoded => {
+    const key = `${contract} ${digest}` as const;
+    let d = decodings.get(key);
+    if (!d) {
+      try {
+        d = { ok: true, value: contract === "input" ? decodeRetained("input", bytes) : contract === "json" ? decodeRetained("json", bytes) : contract === "policy" ? decodeRetained("policy", bytes) : decodeRetained("checker", bytes) };
+      } catch (e) {
+        d = { ok: false, detail: (e as Error).message };
+      }
+      decodings.set(key, d);
+    }
+    return d;
+  };
+  /** Retained files that do not decode under their directory's contract, by path. */
+  const malformed = new Map<string, string>();
   for (const v of views)
     for (const [path, bytes] of v.files) {
       const m = RETAINED.exec(path);
@@ -296,17 +313,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         fail({ reason: "retained-digest", commit: v.sha, detail: `${path} does not match its digest` });
         continue;
       }
-      const digest: Digest = `sha256:${m[2]}`;
-      if (inputs.has(digest) || policyFiles.has(digest) || malformed.has(digest)) continue;
-      try {
-        if (m[1] === "inputs") inputs.set(digest, decodeRetained("input", bytes));
-        else {
-          decodeRetained("json", bytes);
-          policyFiles.set(digest, bytes);
-        }
-      } catch (e) {
-        malformed.set(digest, { path, detail: (e as Error).message, reported: false });
-      }
+      const d = decodeAs(m[1] === "inputs" ? "input" : "json", `sha256:${m[2]}`, bytes);
+      if (!d.ok) malformed.set(path, d.detail);
     }
   /**
    * The retained files each verified entry needed. Each earlier commit must
@@ -314,22 +322,18 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
    * replayable on its own (R-LOG-9).
    */
   const needs: { seq: Seq; path: string; reason: "input-missing" | "policy-missing" | "checker-missing" }[] = [];
-  /** The failure for a retained file that is missing or malformed. */
-  const absent = (digest: Digest, missing: "input-missing" | "policy-missing" | "checker-missing", what: string): { reason: VerifyReason; detail: string } => {
-    const m = malformed.get(digest);
-    if (!m || !holds(top, m.path)) return { reason: missing, detail: `${what} ${digest} is not published` };
-    m.reported = true;
-    return { reason: "malformed", detail: `${m.path}: ${m.detail}` };
-  };
-  /** A policy document or checker configuration named by a `policy-activated` event, decoded as that. */
-  const named = <K extends "policy" | "checker">(digest: Digest, kind: K, missing: "policy-missing" | "checker-missing") => {
-    const bytes = holds(top, policyPath(digest)) ? policyFiles.get(digest) : undefined;
-    if (!bytes) return { ok: false as const, ...absent(digest, missing, kind === "policy" ? "policy" : "checker configuration") };
-    try {
-      return { ok: true as const, value: kind === "policy" ? decodeRetained("policy", bytes) : decodeRetained("checker", bytes) };
-    } catch (e) {
-      return { ok: false as const, reason: "malformed" as VerifyReason, detail: `${policyPath(digest)}: ${(e as Error).message}` };
-    }
+  /**
+   * The retained file an entry needs, from the latest consistent commit only,
+   * decoded under `contract`; or the failure: missing or malformed.
+   */
+  const lookup = (contract: "input" | "policy" | "checker", digest: Digest, missing: "input-missing" | "policy-missing" | "checker-missing"):
+    | { readonly ok: true; readonly value: unknown }
+    | { readonly ok: false; readonly reason: VerifyReason; readonly detail: string } => {
+    const path = contract === "input" ? inputPath(digest) : policyPath(digest);
+    const what = contract === "input" ? "the replay context" : contract === "policy" ? "policy" : "checker configuration";
+    if (!holds(top, path)) return { ok: false, reason: missing, detail: `${what} ${digest} is not published` };
+    const d = decodeAs(contract, digest, top.files.get(path)!);
+    return d.ok ? d : { ok: false, reason: "malformed", detail: `${path}: ${d.detail}` };
   };
 
   // -------------------------------------------------------------- entries
@@ -371,16 +375,16 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           return false;
         }
       }
-      const context = holds(top, inputPath(digest)) ? inputs.get(digest) : undefined;
-      if (context === undefined) {
-        fail({ seq, ...absent(digest, "input-missing", "the replay context") });
+      const context = lookup("input", digest, "input-missing");
+      if (!context.ok) {
+        fail({ seq, reason: context.reason, detail: context.detail });
         return false;
       }
       needs.push({ seq, path: inputPath(digest), reason: "input-missing" });
       const policy = policyByVersion.get(version!)!;
       let replayed: readonly Decision[];
       try {
-        const result = await replay({ doc: policy.doc, version: version! }, context);
+        const result = await replay({ doc: policy.doc, version: version! }, context.value as ReplayContext);
         replayed = result.evaluations.map((e) => e.decision);
       } catch (e) {
         fail({ reason: "policy-decision-mismatch", seq, detail: `replay failed: ${(e as Error).message}` });
@@ -449,13 +453,13 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           operator = grant.operator;
         }
       } else if (ev.type === "policy-activated") {
-        const doc = named(ev.policy, "policy", "policy-missing");
+        const doc = lookup("policy", ev.policy, "policy-missing");
         if (!doc.ok) {
           bad(doc.reason, doc.detail);
           break;
         }
         // Every checker configuration it names is published, and is one (R-POL-9, R-LOG-9).
-        const missing = ev.checkers.map((c) => ({ c, r: named(c.config, "checker", "checker-missing") })).find((x) => !x.r.ok);
+        const missing = ev.checkers.map((c) => ({ c, r: lookup("checker", c.config, "checker-missing") })).find((x) => !x.r.ok);
         if (missing && !missing.r.ok) {
           bad(missing.r.reason, `checker ${missing.c.name}: ${missing.r.detail}`);
           break;
@@ -560,8 +564,9 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   const verifiedThrough = Math.min(entries.length - 1, firstBad - 1);
 
   // An unused malformed file fails each commit that publishes it, not the prefix.
-  for (const m of malformed.values())
-    if (!m.reported) for (const v of views) if (holds(v, m.path)) fail({ reason: "malformed", commit: v.sha, detail: `${m.path}: ${m.detail}` });
+  // A retained file that does not decode under its directory's contract fails each
+  // commit that publishes it, whether or not an entry needs it.
+  for (const [path, detail] of malformed) for (const v of views) if (holds(v, path)) fail({ reason: "malformed", commit: v.sha, detail: `${path}: ${detail}` });
 
   // Each earlier commit must publish the evidence its own verified entries need.
   // The entries themselves verify against the latest consistent commit, so this

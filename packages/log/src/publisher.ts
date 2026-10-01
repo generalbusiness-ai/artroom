@@ -142,28 +142,15 @@ export class LogPublisher {
    */
   async publish(entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly Retained[] = []): Promise<PublishResult> {
     // Synchronous, before any await: from here on only the owned cohort is read.
-    const cohort = this.own(entries, checkpoint, retained);
+    const cohort = this.own(entries, checkpoint, retained, this.retained);
     for (let seq = 0; seq < this.published.length; seq++)
       if (cohort.lines[seq] !== this.published[seq])
         throw new PublishError("would-rewrite", `entry ${seq} differs from the published entry; published history is never rewritten`);
     if (cohort.through === this.publishedThrough && this.lastCommit)
       return { commit: this.lastCommit, through: cohort.through, hash: cohort.hash, publishedThrough: cohort.through, attempts: 0 };
 
-    const files = layout(cohort.lines, cohort.retained, cohort.checkpoint);
-    const { root, objects } = buildTree(Object.fromEntries(Object.entries(files).map(([p, t]) => [p, utf8(t)])));
-    const who = identity(cohort.at);
-    const commit = gitObject(
-      "commit",
-      encodeCommit({
-        tree: root,
-        parents: this.lastCommit ? [this.lastCommit] : [],
-        author: who,
-        committer: who,
-        message: `artroom log through ${cohort.through}\n\nhash ${cohort.hash}\n`,
-      }),
-    );
-    const all: GitObject[] = [...objects, commit];
     const lease = this.lastCommit;
+    const { commit, all } = build(lease, cohort);
 
     for (let attempt = 1; attempt <= this.attempts; attempt++) {
       if (attempt > 1) await this.sleep(attempt);
@@ -181,8 +168,24 @@ export class LogPublisher {
     throw new PublishError("unresolved", `no clear answer after ${this.attempts} attempts; publish again with the same entries`);
   }
 
-  /** Copy and check the caller's arguments. Synchronous. */
-  private own(entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly Retained[]): Cohort {
+  /**
+   * The exact commit `publish` writes for this cohort on top of `parent`,
+   * without pushing: the same owned copy and the same git serialization.
+   * Pure, synchronous and deterministic. The Room stores it before any
+   * remote write (lane A, `PublisherPort.commitFor`).
+   *
+   * `publish` keeps the retained files of the commit it last wrote. So when
+   * `parent` is that commit, they are included here too; for any other
+   * parent, only `retained` is. A Room that passes every retained file it
+   * holds gets the same commit either way.
+   */
+  commitFor(parent: Sha | null, entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly Retained[]): Sha {
+    const cohort = this.own(entries, checkpoint, retained, parent === this.lastCommit ? this.retained : new Map());
+    return build(parent, cohort).commit.sha;
+  }
+
+  /** Copy and check the caller's arguments, adding the retained files in `kept`. Synchronous. */
+  private own(entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly Retained[], kept: ReadonlyMap<string, string>): Cohort {
     const lines: string[] = [];
     let last: { seq: Seq; hash: Digest } | null = null;
     for (const [i, e] of entries.entries()) {
@@ -200,7 +203,7 @@ export class LogPublisher {
     const { sig, ...unsigned } = cp;
     if (!verifySig(cp.roomKey, sig, "artroom-checkpoint-v1", unsigned))
       throw new PublishError("invalid-input", "the checkpoint's signature is not valid");
-    const files = new Map(this.retained);
+    const files = new Map(kept);
     for (const r of retained) {
       const body = r.body;
       files.set(retainedPath({ kind: r.kind, body }), body);
@@ -214,6 +217,24 @@ export class LogPublisher {
     this.retained = cohort.retained;
     return { commit, through: cohort.through, hash: cohort.hash, publishedThrough: cohort.through, attempts };
   }
+}
+
+/** The one git serialization of a cohort on `parent`: its tree's objects and its commit. */
+function build(parent: Sha | null, cohort: Cohort): { commit: GitObject; all: GitObject[] } {
+  const files = layout(cohort.lines, cohort.retained, cohort.checkpoint);
+  const { root, objects } = buildTree(Object.fromEntries(Object.entries(files).map(([p, t]) => [p, utf8(t)])));
+  const who = identity(cohort.at);
+  const commit = gitObject(
+    "commit",
+    encodeCommit({
+      tree: root,
+      parents: parent ? [parent] : [],
+      author: who,
+      committer: who,
+      message: `artroom log through ${cohort.through}\n\nhash ${cohort.hash}\n`,
+    }),
+  );
+  return { commit, all: [...objects, commit] };
 }
 
 /** When to publish: once the lag reaches `maxLag` entries, or `maxDelayMs` after the oldest unpublished entry. */
