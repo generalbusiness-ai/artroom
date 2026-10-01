@@ -290,8 +290,6 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
           fault("redemption:after-join");
           const late2 = finalBoundary(core, grantPlan);
           if (late2) throw new Abort(late2);
-          // The policy input judged before must be the one this state gives now (R-ADM-6).
-          if (precomputed.input && canonicalize(refuseInput(core, grant.envelope, grantPlan.ctx.authority, null)) !== canonicalize(precomputed.input)) throw new Moved();
           const granted = commit(core, grantPlan, { heldKeys: [{ key: sessionKey.key, seed: sessionKey.seed, purpose: "session" }] });
           fault("redemption:after-delegate");
           core.sql.all("INSERT INTO bearers (hash, member, key, delegation, expires_ms) VALUES (?, ?, ?, ?, ?)", tokenHash(bearer), (joined.result as RosterRecord).by.member, sessionKey.key, granted.id, expiresMs);

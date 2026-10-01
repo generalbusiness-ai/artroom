@@ -479,6 +479,22 @@ describe("P2.6: pending workspaces are durable alarm work (R-WS)", () => {
     expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({ state: "ready" });
   });
 
+  it("fencing: a lease that ends while the fork is being created fails the op", async () => {
+    const r = await makeRoom();
+    const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    const id = await pendingWorkspace(r, c.lane);
+    const sql = await inDO(r, (room) => room.core.sql);
+    const real = r.world.artifacts.ensureFork.bind(r.world.artifacts);
+    r.world.artifacts.ensureFork = async (lane) => {
+      const out = await real(lane);
+      // The lease ends during the await: a take-over moved the lease generation.
+      sql.all("UPDATE lanes SET lease_gen = lease_gen + 2 WHERE id = ?", c.lane);
+      return out;
+    };
+    await tick(r);
+    expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({ state: "failed" });
+  });
+
   it("fencing: a lease that ended before the resume fails the op; the old holder gets no token", async () => {
     const r = await makeRoom();
     const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
