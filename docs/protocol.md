@@ -133,6 +133,7 @@ Ed25519), 64 bytes, encoded as unpadded base64url.
 | `artroom-request-v1` | A request envelope (R-CRED-5) | The `actor` key |
 | `artroom-entry-v1` | The entry's `hash` string, as UTF-8 | The room key |
 | `artroom-checkpoint-v1` | A checkpoint, without `sig` | The room key |
+| `artroom-onboarding-v1` | An onboarding grant (R-GEN-12) | An operator key the deployment trusts |
 
 **R-SIG-2.** Canonical bytes are the UTF-8 encoding of the JSON
 Canonicalization Scheme (RFC 8785) form of the object.
@@ -172,7 +173,8 @@ The values are initial values (section 22, point 9).
 **R-GEN-1.** Genesis is entry 0. It is a system entry that holds the
 genesis object and the first admin key's signature over it. The genesis
 object names:
-- the room name and the canonical repository;
+- the room name and the canonical repository's identity (R-GEN-12), and,
+  for an imported repository, the operator's onboarding grant;
 - the first admin's handle and key;
 - the recovery key;
 - the room key;
@@ -247,50 +249,110 @@ The recovery key may still do these.
 admin is an active member with role `admin` and at least one active key.
 
 **R-GEN-10. Founding.** A room is founded in two steps. Neither step needs
-a room credential: the founder proves control of the first admin key by
-signing the genesis.
+a room credential. The founder proves control of the first admin key by
+signing the genesis. Authority over the canonical repository comes from
+R-GEN-12, never from the founder's choice.
 
 1. **Draft.** `POST /v1/rooms` with a `RoomDraft`, or `ArtroomFounder.draft`
-   over RPC. The body names the room, the repository, the first admin's
-   handle and key, and the recovery key. The deployment validates them,
-   makes the room key, and returns a `DraftedRoom`: the genesis object to
-   sign, and a `draft` value from which the deployment can recover the room
-   key. The `draft` value is not a secret. The room key's private half never
-   leaves the deployment.
+   over RPC. The body names the room, the repository source (R-GEN-12),
+   the first admin's handle and key, and the recovery key. The deployment
+   validates them, checks an import's grant as `found` will, makes the room
+   key, and returns a `DraftedRoom`: the genesis object to sign, and a
+   `draft` value from which the deployment can recover the room key and,
+   for a public founding, the repository identity. The `draft` value is not
+   a secret. The room key's private half never leaves the deployment.
+   `draft` creates, reads and binds nothing.
 2. **Found.** `POST /v1/rooms/found` with a `Founding`, or
    `ArtroomFounder.found`. The body is the genesis, the first admin key's
    signature over it (`artroom-genesis-v1`, R-SIG-1), and the `draft`
-   value. The deployment, in this order:
-   - validates every genesis field as `draft` does, including that `format`
-     is `artroom-log-v1` and that `profile` names the profile and `jsonata`
-     version the deployment runs (R-EVAL-4);
-   - checks that the genesis names the room key that the `draft` value
-     recovers;
-   - verifies the signature;
-   - binds the name to the room ID (R-GEN-11);
-   - seals the genesis as entry 0 and the initial `policy-activated` event
-     as entry 1 (R-GEN-1, R-POL-9).
+   value. The deployment takes these steps in order. Each uses only the
+   body and the deployment's own configuration, never the draft's earlier
+   answer:
+   1. validates every genesis field as `draft` does, including that
+      `format` is `artroom-log-v1` and that `profile` names the profile and
+      `jsonata` version the deployment runs (R-EVAL-4);
+   2. checks that the genesis names the room key that the `draft` value
+      recovers;
+   3. verifies the first admin's signature;
+   4. authorizes the repository (R-GEN-12);
+   5. binds the repository, the room ID and the name together in the
+      registry (R-GEN-13);
+   6. only then creates the repository (for `new`) or reads it (for
+      `import`), seals the genesis as entry 0 and the initial
+      `policy-activated` event as entry 1 (R-GEN-1, R-POL-9).
 
    It returns the room ID: `{ room }` over HTTPS, the ID itself over RPC.
 
-A failure throws `bad-request`, `unauthenticated`, `forbidden` or
-`unavailable`, and seals nothing. If it comes after the name was bound, the
-binding stays. Repeating `found` with the same genesis then completes the
-founding, or returns the same room ID if it was already complete, so a
-founder whose response was lost can retry.
+A failure in steps 1 to 5 throws `bad-request`, `unauthenticated` or
+`forbidden`. It reads no repository contents, mints no credential, seals
+nothing and binds nothing. A failure in step 6 throws `unavailable`, and the
+registry binding stays. Repeating `found` with the same genesis then
+completes the founding, or returns the same room ID if it was already
+complete, so a founder whose response was lost can retry.
 
 **R-GEN-11. Room names.**
 - A room name is 1 to 128 characters and never has the form of a room ID
   (R-ID-3). `draft` and `found` refuse any other name with `bad-request`.
   So a string in the form of a room ID, in a route's `:room` or in
   `ArtroomService.room()`, is always an ID.
-- On one deployment a name names at most one room: the first one founded
-  with it. Binding is atomic. `found` with a name already bound to a
-  different room ID throws `forbidden` and seals nothing. A name is never
-  bound again to another room.
+- On one deployment a name names at most one room. It is bound with the
+  room's repository, in one registry binding (R-GEN-13), and never bound
+  again to another room.
 - A name is a convenience for people. Envelopes, requests and invitation
   links carry the room ID (R-ID-3, R-CRED-11). A client that has only a name
   finds the ID with R-API-11.
+
+**R-GEN-12. The canonical repository.** A room's repository is named in
+the genesis by its identity (`RepoIdentity`): the storage system's stable
+identifier for one repository, such that two references to the same
+repository always give the same identity. A name, alias or URL is not an
+identity, and is refused with `bad-request`. The `RoomDraft` chooses one of
+two sources:
+- **`new`: public founding.** The deployment allocates a fresh, empty,
+  isolated repository. Its identity is derived from the `draft` value with
+  a deployment secret, inside a namespace the deployment reserves for
+  public founding. So no caller can choose it, and it never names a
+  repository that existed before. At `found` the deployment derives it
+  again and refuses, with `forbidden`, a genesis that names any other
+  repository or carries `onboarding`. The repository is created at step 6,
+  after the registry binding, so an existing repository at that identity
+  can only be this founding's own, from an earlier attempt.
+- **`import`: an existing repository.** The draft carries a
+  `SignedOnboardingGrant`, and the genesis carries it as `onboarding`, so
+  the first admin's signature covers it. At `found` the deployment checks
+  that:
+  - the grant is signed under `artroom-onboarding-v1` by an operator key in
+    the deployment's configuration;
+  - `grant.repo` equals `genesis.repo`, is an identity, and is not in the
+    namespace reserved for public founding;
+  - `grant.admin` equals `genesis.admin.key`;
+  - `notAfter` has not passed, unless the registry already binds this
+    repository to this room ID (a retry).
+
+  Otherwise it refuses with `forbidden`. How the operator confirms that
+  the requester may import the repository is outside this contract.
+
+The deployment reads a repository's contents, and mints a credential for
+it, only for the room that the registry binds to it (R-GEN-13, R-PUB-10).
+
+**R-GEN-13. The registry.** Each deployment has one registry. It holds one
+binding per repository identity: the room ID and the room's name. This
+binding is the source of the room's identity and of its publication
+authority (R-PUB-10). The name binding is part of it.
+- `found` binds the repository, the room ID and the name in one atomic
+  step, after it authorizes the repository (R-GEN-12) and before it reads
+  the repository or seals any entry.
+- If the registry already holds exactly this binding (the same
+  repository, room ID and name), the step succeeds, and founding continues
+  forward. That covers a retry after a failure at step 6.
+- If the repository or the name is bound in any other way, `found` throws
+  `forbidden` and binds nothing. So two
+  foundings of one repository, under different names, keys or grants,
+  never both proceed: the second gets no sequencer, no publication slot and
+  no credential.
+- A binding is never removed or moved to another room. Moving a
+  repository to a new room is a separate, authorized operation that this
+  version does not define (section 22, point 37).
 
 ## 5. Admission and authority (R-ADM)
 
@@ -565,6 +627,16 @@ recorded for it (R-CRED-3).
   (`BearerRequest`). The room judges it as a signed request by the session
   key under its delegation (R-CRED-5, R-WS-2). There is no bearer `session`
   request: the bearer token already is a read credential.
+- **Retries and idempotency.** The room judges the bearer token before it
+  builds an envelope. While the token is valid, a retry with the same act
+  and idempotency key builds the same envelope bytes, so it gets the
+  original result (R-IDEM-2). After the token expires, or its delegation or
+  session key is revoked, `bearerAct` throws `unauthenticated` even for such
+  a retry: there is no envelope to replay. This differs from R-IDEM-2 for a
+  signed envelope, which a client keeps and can send again after its key is
+  revoked, and which still returns its original result. A bearer client
+  that loses a receipt finds the act with `log` or `explain` while its
+  token is valid; after that, only a member with its own read session can.
 
 **R-CRED-11. Invitation links.** An invitation travels as one link:
 
@@ -1099,6 +1171,12 @@ receipt. No later operation reserves while an earlier one holds the slot.
 `.artroom/checkers/**` is followed, at the next seq, by a
 `policy-activated` event (R-POL-9).
 
+**R-PUB-10. One publisher per repository.** The deployment mints a
+canonical write token (R-PUB-3), and pushes to `main` or to
+`refs/artroom/log`, only for the room that the registry binds to that
+repository (R-GEN-13). So each canonical repository has exactly one
+sequencer, one publication slot and one log.
+
 ## 14. Revocation and the emergency rule (R-REV)
 
 **R-REV-1. Evidence validity.** A verdict or check counts as evidence only
@@ -1603,7 +1681,12 @@ the checkpoint:
   retained replay context and policy version (R-EVAL-6). That includes the
   decisions in `notified`, `obligations-recomputed` and `land-evaluated`
   events. An `obligations-recomputed` event names the active policy
-  version;
+  version. A `notified` event's decisions name the version active when the
+  notified entry was sealed, not when the `notified` event was (R-LOG-13);
+- that a genesis with `onboarding` carries a grant signed under
+  `artroom-onboarding-v1` by its `operator` key, whose `repo` and `admin`
+  equal the genesis's (R-GEN-12). Verification reports the operator key;
+  whether to trust it is the reader's decision;
 - that the policy document and every checker configuration named by each
   `policy-activated` event are published (R-LOG-9), and that every accepted
   `check` names in `config` the digest its checker has in the policy
@@ -1644,6 +1727,12 @@ the sealed one:
 runtime, the act stays recorded. The room retries from a durable queue
 until it reaches a deterministic outcome, then seals the `notified` event.
 Until then, the act's notifications are delayed, and nothing else changes.
+
+The queued evaluation is pinned to the policy version active when the
+entry was sealed. The room stores that version with the queued replay
+context (R-POL-12, R-EVAL-8), and every retry uses it, even if another
+policy activates before the `notified` event is sealed. The `notified`
+event's decisions name that version.
 
 ### Worked example: a new claim, its notification, and two publications
 
@@ -1929,13 +2018,13 @@ safest reading. Each needs confirmation by review.
 32. **Notify reviewers are in the directory, not the rule input.** A
     `notify` expression cannot read the reviewer list; the `reviewers`
     target uses the `NotifyDirectory` (R-POL-5).
-33. **Founding is open, and names are first come** (R-GEN-10, R-GEN-11).
-    Anyone who can reach the deployment can found a room, and so can take
-    an unused name first. The contract defines no founding credential: the
-    signed genesis already proves who controls the first admin key, and
-    who may create rooms is the operator's decision. A deployment may put
-    founding behind its own access control, such as Cloudflare Access, and
-    should rate-limit it.
+33. **Public founding is open, and names are first come** (R-GEN-10 to
+    R-GEN-13). Anyone who can reach the deployment can found a room on a
+    fresh, empty repository, and so can take an unused name first. That
+    gives them authority over nothing that existed before. Importing an
+    existing repository needs an operator's grant. A deployment may also
+    put public founding behind its own access control, such as Cloudflare
+    Access, and should rate-limit it.
 34. **Verification does not re-derive lanes, leases, obligations or
     landings** (R-LOG-15). Obligations come from changed paths, which come
     from git diffs of the canonical repository (R-PROP-3), and landings
@@ -1951,6 +2040,12 @@ safest reading. Each needs confirmation by review.
 36. **Unknown note anchors.** A note whose anchor names no entry is refused,
     and recorded, with `lane-unknown`, as lane A built it. This amendment
     does not add a closer rule.
+37. **No room succession.** A registry binding is never removed or moved
+    (R-GEN-13). If a room must be replaced, for example because its
+    founding never completed and the genesis is lost, or because its
+    recovery key is lost, the repository stays bound. Moving it to a new
+    room needs a separate operation, authorized by the operator and
+    recorded in both rooms' logs. This version does not define it.
 
 ## 23. Acceptance cases and the rules they test
 
@@ -2007,9 +2102,15 @@ Cases added for amendment 2 (section 27). Each is normative.
 
 | Case | Expected result | Rules |
 |---|---|---|
-| **Founding.** Draft a room, sign the genesis, found it; found it again with the same body | Entry 0 is the genesis; entry 1 is `policy-activated` with `checkers`; the second `found` returns the same room ID | R-GEN-10, R-POL-9 |
-| Found with a genesis whose `profile` or `jsonata` version differs from the deployment's, or whose room key does not match the draft | `bad-request`; nothing sealed | R-GEN-10 |
-| Found a second room with a name that is already bound; draft a room whose name has the form of a room ID | `forbidden`; `bad-request`; the first room's binding is unchanged | R-GEN-11 |
+| **Isolated public creation.** Draft with repository source `new`, sign, found; found again with the same body | `genesis.repo` is a fresh identity in the public namespace, with no `onboarding`; the repository is created empty after the registry binding; entry 0 is the genesis, entry 1 `policy-activated` with `checkers`; the second `found` returns the same room ID | R-GEN-10, R-GEN-12, R-GEN-13, R-POL-9 |
+| **Unauthorized existing repository.** Draft `import` with a grant signed by a key that is not an operator key, or with a grant for a different admin key; separately, found a `new` draft whose genesis names an existing repository | `forbidden` at `draft` and at `found`; no repository contents read, no token minted, no entry sealed, nothing bound | R-GEN-10, R-GEN-12 |
+| **Repository altered after draft.** An authorized import draft whose genesis is edited to name another repository, keeping the grant, and re-signed by the admin key | `forbidden`, because `grant.repo` differs from `genesis.repo`; nothing read, minted, sealed or bound | R-GEN-12 |
+| **Authorized import.** An operator grants repository R to admin key K; K drafts and founds | Founded; `genesis.onboarding` holds the grant; `artroom verify` checks the grant's signature and binding, and reports the operator key | R-GEN-12, R-LOG-10 |
+| **Simultaneous founding.** Two `found` calls for repository R, with different names and keys, each with a valid grant, at once | Exactly one binds and founds; the other gets `forbidden`, and no sequencer, publication slot or token | R-GEN-13, R-PUB-10 |
+| **Duplicate import.** After R is founded, a second `found` with the same grant and a new name or recovery key | `forbidden`; the first room's binding is unchanged | R-GEN-13 |
+| **Canonical-name aliases.** A grant whose `repo` is a name or URL rather than an identity; two grants that name R by its identity, used for two foundings | `bad-request`; the second founding is `forbidden` | R-GEN-12, R-GEN-13 |
+| **Recovery after binding.** Step 6 of `found` fails after the registry binding (`unavailable`); the grant then expires; the founder retries with the same body; another founder tries a different genesis for R meanwhile | The retry completes the founding; the other founder gets `forbidden` | R-GEN-10, R-GEN-13 |
+| Found with a genesis whose `profile` or `jsonata` version differs from the deployment's, or whose room key does not match the draft; draft a room whose name has the form of a room ID; found a second room with a bound name | `bad-request`; `bad-request`; `forbidden`. Nothing sealed or bound | R-GEN-10, R-GEN-11 |
 | **Name to ID.** `GET /v1/rooms/<name>` with no credential; then an unknown name | `RoomRef` with the ID whose genesis digest it is; then `not-found` | R-API-11 |
 | **Bearer roster and check.** A bearer submits a `roster` act through `bearerAct`; a bearer whose delegation lacks `check` submits a `check` | Both refused `delegation-invalid`; nothing recorded | R-CRED-10, R-ADM-5 |
 | A bearer opens its workspace with `bearerRequest`, then asks for the token; a bearer that is not the holder asks for the token | `WorkspaceOp`, then `WorkspaceGrant`; `not-holder` | R-CRED-10, R-WS-2 |
@@ -2020,6 +2121,8 @@ Cases added for amendment 2 (section 27). Each is normative.
 | **Recompute after activation.** A policy that adds a `require` rule lands while a proposal's review obligation is met | `policy-activated` with `reopened: 0`; `land` refused `obligation-open` until an `obligations-recomputed` event lists the new obligation; a `require` rule that errors gives `blocked` | R-POL-9, R-LOG-5 |
 | **Land rules in preparation.** A land rule passes during preparation; in a second operation it blocks | A `land-evaluated` event for each, with the decisions; the second is followed by a `failed` outcome | R-LAND-4 |
 | **Byte mismatch.** A new objection arrives between `ready` and reservation | `retryable` with reason `land-input-changed` | R-LAND-6, R-LAND-7 |
+| **Notify across an activation.** An entry is sealed under policy V1 and its `notify` is queued; policy V2 activates; then the `notified` event is sealed | The `notified` decisions name V1 and were evaluated with V1; `artroom verify` replays them with V1 and accepts them | R-LOG-13, R-LOG-10, R-POL-12 |
+| **Bearer receipt after revocation.** A bearer act is admitted and its response lost. The agent retries with the same act and idempotency key; then the session delegation is revoked and it retries again. Separately, a client resends a signed envelope it kept after its key is revoked | The first retry returns the original result; the second throws `unauthenticated` and records nothing; the kept envelope returns its original result | R-CRED-10, R-IDEM-2 |
 | **Verification.** A log with a `delegate` that grants a kind the grantor's role cannot sign; a `check` whose `config` differs from its checker's digest; a `policy-activated` that names an unpublished checker configuration | Each fails verification with a named reason | R-LOG-10 |
 
 ## 24. Review 45431cd9
@@ -2094,10 +2197,14 @@ built wherever it is sound. This section maps each of its eight conditions
 to what changed, then lists every edit a lane must make.
 
 Most changes adopt a lane's names, shapes and wire formats as they are.
-The contract departs from what a lane built in five places, each for
+The contract departs from what a lane built in six places, each for
 soundness:
-- **Name binding is first come** (R-GEN-11). The Room re-points a name at
-  every founding, so anyone could take over an existing room's name.
+- **Founding authorizes the repository** (R-GEN-12). The Room let the
+  founder name any repository. Public founding now always creates a fresh
+  repository; importing an existing one needs an operator's grant.
+- **One registry binds repository, room and name** (R-GEN-13, R-PUB-10).
+  The Room re-pointed a name at every founding, so anyone could take over
+  an existing room's name, and two rooms could claim one repository.
 - **`found` re-validates the genesis** (R-GEN-10). The Room validates fields
   only at `draft`, so a founder could change the profile after drafting.
 - **WebSocket authentication is checked before the upgrade, from the
@@ -2112,12 +2219,12 @@ soundness:
 
 | Condition | Rules | Types (`packages/contract`) |
 |---|---|---|
-| (1) Room lifecycle: founding, and name to ID | New R-GEN-10, R-GEN-11, R-API-11; R-ID-3 and R-API-3 amended | New `RoomDraft`, `DraftedRoom`, `Founding`, `RoomRef`, `ArtroomFounder`; `HttpRoutes` gains `POST /v1/rooms`, `POST /v1/rooms/found` and `GET /v1/rooms/:room` |
-| (2) Bearer acts | New R-CRED-10; R-API-9 amended. A bearer submits exactly the kinds its delegation grants; never `roster` (R-ADM-5); `check` only over RPC, because MCP has no `check` tool; checkers use a key | `RoomWire` gains `bearerAct` and `bearerRequest`; new `BearerAct`, `BearerRequest` |
+| (1) Room lifecycle: founding, and name to ID | New R-GEN-10 to R-GEN-13, R-PUB-10, R-API-11; R-GEN-1, R-SIG-1, R-ID-3 and R-API-3 amended; open points 33 and 37 | New `RoomDraft`, `RepoSource`, `DraftedRoom`, `Founding`, `RoomRef`, `ArtroomFounder`, `RepoIdentity`, `OnboardingGrant`, `SignedOnboardingGrant`; `Genesis` gains optional `onboarding`, and `Genesis.repo` is a `RepoIdentity`; `SigningDomain` gains `artroom-onboarding-v1`; `HttpRoutes` gains `POST /v1/rooms`, `POST /v1/rooms/found` and `GET /v1/rooms/:room` |
+| (2) Bearer acts | New R-CRED-10, including how a bearer retry differs from R-IDEM-2; R-API-9 amended. A bearer submits exactly the kinds its delegation grants; never `roster` (R-ADM-5); `check` only over RPC, because MCP has no `check` tool; checkers use a key | `RoomWire` gains `bearerAct` and `bearerRequest`; new `BearerAct`, `BearerRequest` |
 | (3) Transport | New R-API-12; R-API-8 rewritten; R-WS-4 names the `Sec-WebSocket-Protocol` header | `RoomWire.subscribe` returns `ByteStream` (was `UpdateStream`); new `ByteStream`, `WsProtocol`, `WsTokenProtocol`; the `ws` route documents its query and subprotocols. `Room.subscribe` still returns `UpdateStream` |
 | (4) MCP | R-API-9 amended | New `AttentionPage`, returned by `RoomApi.attention`, `ReadResults.attention`, the `attention` route and the MCP tool; MCP `explain` returns `Explanation \| ExplainNotFound`; MCP `propose` and the `claim` form for an existing lane gain `because` |
 | (5) Invitation link | New R-CRED-11 | New `InvitationLink` |
-| (6) Log entries and retry reason | R-POL-9, R-LAND-4, R-LAND-6, R-LAND-7, R-LOG-5, R-LOG-13 amended | `SystemEvent` gains `obligations-recomputed` and `land-evaluated`; `policy-activated.recomputed.reopened` is the literal `0`; `RetryReason` gains `land-input-changed` |
+| (6) Log entries and retry reason | R-POL-9, R-LAND-4, R-LAND-6, R-LAND-7, R-LOG-5, R-LOG-13 amended; R-LOG-13 pins a queued `notify` to the policy version at sealing | `SystemEvent` gains `obligations-recomputed` and `land-evaluated`; `policy-activated.recomputed.reopened` is the literal `0`; `RetryReason` gains `land-input-changed` |
 | (7) Lane L gaps | New R-LOG-14 (no git signature: resolved), R-LOG-15 (what verify does not prove); R-LOG-10 and R-OBL-3 amended; open points 34 and 35 | `policy-activated` gains `checkers: CheckerDigest[]`; new `CheckerDigest` |
 | (8) Additive, lane edits listed, gates | This section | `examples/lifecycle.ts` compiles every new type |
 
@@ -2146,35 +2253,52 @@ behaviour that the types cannot enforce.
 
 **Lane A (`packages/room`)**
 1. `found`: validate every genesis field again, as `draft` does, including
-   `format`, `profile` and the `jsonata` version (R-GEN-10).
-2. Names: refuse a name in the form of a room ID with `bad-request`, in
-   `draft` and `found`. Bind a name atomically and first come, before
-   sealing entry 0. `found` with a name bound to a different ID throws
-   `forbidden`. `RoomNames.set` must never overwrite (R-GEN-11).
-3. Add `GET /v1/rooms/:room`, with no credential, returning `RoomRef`
-   (R-API-11).
-4. The Worker's `RoomWire` target gains `bearerAct`, which unwraps the
+   `format`, `profile` and the `jsonata` version. Run the steps of R-GEN-10
+   in order: nothing reads the repository, mints a credential, seals an
+   entry or binds a name before the repository is authorized and bound.
+   Today `found` reads main before it binds anything, and binds the name
+   only after sealing.
+2. Repository source (R-GEN-12): `draft` takes `repo: { kind: "new" }` or
+   `{ kind: "import", grant }`, never a repository name. For `new`, derive
+   a fresh identity from the `draft` value with a deployment secret, in a
+   reserved namespace, and create the repository at step 6. For `import`,
+   check the grant (operator key from configuration, `repo`, `admin`,
+   `notAfter`) at `draft` and again at `found`, and put it in
+   `genesis.onboarding`.
+3. Registry (R-GEN-13): replace the `RoomNames` Durable Object, which
+   overwrites, with one registry that binds repository identity, room ID
+   and name in one atomic step: the same binding again succeeds, any other
+   use of the repository or name throws `forbidden`. Refuse a name in the
+   form of a room ID with `bad-request` (R-GEN-11).
+4. Mint canonical write tokens and push `main` and `refs/artroom/log` only
+   for the room the registry binds to that repository (R-PUB-10).
+5. Add `GET /v1/rooms/:room`, with no credential, returning `RoomRef` from
+   the registry (R-API-11).
+6. The Worker's `RoomWire` target gains `bearerAct`, which unwraps the
    Durable Object's existing method, and `bearerRequest`, new in the
    Durable Object: `workspace` and `workspace-token` judged under the
    bearer's delegation as R-WS-2 judges a signed request (R-CRED-10). Its
    `subscribe` already returns a `ByteStream`, so the target can implement
    `RoomWire` whole, not `Omit<RoomWire, "subscribe">`. (type)
-5. WebSocket: authenticate from the `artroom.token.<token>` subprotocol in
+7. WebSocket: authenticate from the `artroom.token.<token>` subprotocol in
    `fetch`, before accepting; answer 401 when it is missing or not valid;
    answer with `Sec-WebSocket-Protocol: artroom.v1`; read the cursor from
    `?cursor=`; keep only the token's hash in the socket attachment; stop
    authenticating by first message, and ignore client messages (R-API-12).
-6. The `attention` read returns `publishedThrough` with its page
+8. The `attention` read returns `publishedThrough` with its page
    (R-API-9).
-7. `policy-activated` names `checkers`, as name and digest pairs sorted by
+9. `policy-activated` names `checkers`, as name and digest pairs sorted by
    name (R-POL-9). (type)
-8. `recompute` seals one `obligations-recomputed` event per proposal in the
-   transaction that stores the result, with the decisions, the new
-   obligations, those reopened, and `blocked` (R-POL-9). Lane C's
-   `activation.ts` already returns which obligations reopened.
-9. `evaluateLandRules` seals a `land-evaluated` event in the transaction
-   that stores the result, whether the rules pass or block (R-LAND-4).
-10. Reservation's byte mismatch sends the operation to `retryable` with
+10. `recompute` seals one `obligations-recomputed` event per proposal in
+    the transaction that stores the result, with the decisions, the new
+    obligations, those reopened, and `blocked` (R-POL-9). Lane C's
+    `activation.ts` already returns which obligations reopened.
+11. `evaluateLandRules` seals a `land-evaluated` event in the transaction
+    that stores the result, whether the rules pass or block (R-LAND-4).
+12. A queued `notify` keeps using the policy version stored with it, even
+    after another activation (R-LOG-13). The Room already stores it; a
+    test of the "Notify across an activation" case is needed.
+13. Reservation's byte mismatch sends the operation to `retryable` with
     `land-input-changed`, not `obligation-open`. Add the reason's text to
     the in-memory landing engine's table of reasons (R-LAND-7). (type,
     for the table)
@@ -2215,11 +2339,36 @@ behaviour that the types cannot enforce.
    (`test/support/room-sim.ts`). (type)
 5. The report lists lanes, leases, obligations and landings as not proven
    (R-LOG-15).
-6. No change for log commit signing: R-LOG-14 adopts what the package
+6. `notified` decisions: compare their policy version with the one active
+   when the notified entry was sealed, not when the `notified` event was.
+   Today `replayDecisions` compares with the version active at the event,
+   which fails the "Notify across an activation" case (R-LOG-10, R-LOG-13).
+7. A genesis with `onboarding`: check the grant's signature by its
+   `operator` key and that its `repo` and `admin` equal the genesis's; name
+   the operator key in the report (R-LOG-10, R-GEN-12).
+8. No change for log commit signing: R-LOG-14 adopts what the package
    does.
 
 **Integration (no single lane).** The MCP endpoint's Worker needs a
 `RoomApi` for each bearer. Built on `RoomWire`, it sends acts to
 `bearerAct`, workspace requests to `bearerRequest`, and reads to `read`
 with the bearer token. This adapter belongs to whichever lane wires the
-deployment.
+deployment. The deployment also needs:
+- its operator keys in configuration, and a way for the operator to sign
+  onboarding grants, such as an `artroom` operator command (R-GEN-12);
+- a deployment secret and a reserved repository namespace for public
+  founding, and the Artifacts call that creates the repository at step 6
+  of `found` (R-GEN-12).
+
+### Review 152f29e8
+
+Checker's review of `b9fded01` requested two changes and two
+clarifications. Each is answered here, and the condition map and the
+required lane edits above include them.
+
+| Finding | Rules changed or added | Types | Cases (section 23) |
+|---|---|---|---|
+| P1 Founding must authorize the canonical repository | R-GEN-10 rewritten (ordered steps; nothing read, minted, sealed or bound before authorization); new R-GEN-12 (public founding always creates a fresh repository; importing needs an operator's onboarding grant, carried in the signed genesis and checked again at `found`); R-GEN-1, R-SIG-1, R-LOG-10; open point 33 | New `RepoSource`, `RepoIdentity`, `OnboardingGrant`, `SignedOnboardingGrant`; `RoomDraft.repo` is a `RepoSource` (was a name); `Genesis.onboarding`; domain `artroom-onboarding-v1` | Unauthorized existing repository; repository altered after draft; authorized import; isolated public creation |
+| P1 Serialize the repository-to-room binding | New R-GEN-13 (one registry binding per repository identity holds the room ID and the name, bound atomically and kept through an incomplete founding); R-GEN-11 derives names from it; new R-PUB-10 (one publisher per repository); open point 37 (no succession) | — | Simultaneous founding; duplicate import; canonical-name aliases; recovery after binding |
+| (a) Policy for a queued `notify` | R-LOG-13 pins it to the version active when the entry was sealed; R-LOG-10 replays it with that version | — | Notify across an activation |
+| (b) Bearer expiry versus R-IDEM-2 | R-CRED-10, "Retries and idempotency" | — | Bearer receipt after revocation |

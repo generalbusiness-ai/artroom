@@ -57,7 +57,7 @@ import type {
 import type { Held, Lane, LaneFilter } from "./lanes.ts";
 import type { OpByKind, OpKind, OpRef, OpState, Reached, WaitOptions, WorkspaceGrant, WorkspaceOp } from "./landing.ts";
 import type { AttentionPage, LogPage, LogRequest, Page, PageRequest, Update } from "./pagination.ts";
-import type { Genesis, Role, Roster, RosterOp } from "./roster.ts";
+import type { Genesis, Role, Roster, RosterOp, SignedOnboardingGrant } from "./roster.ts";
 import type { Result } from "./errors.ts";
 import type { Envelope, JoinEnvelope, RequestBody, SignedEnvelope, SignedRequest } from "./envelope.ts";
 import type { Decision } from "./policy.ts";
@@ -141,12 +141,20 @@ export type InvitationLink = `https://${string}/rooms/${RoomId}/join#i=${Invitat
 
 // ----------------------------------------------------------------- founding
 
+/**
+ * Where a new room's canonical repository comes from (R-GEN-12).
+ * - `new`: public founding. The deployment allocates a fresh, empty,
+ *   isolated repository. The caller cannot name one.
+ * - `import`: an existing repository, with an operator's grant for it and
+ *   for the first admin key.
+ */
+export type RepoSource = { readonly kind: "new" } | { readonly kind: "import"; readonly grant: SignedOnboardingGrant };
+
 /** Founding, step 1: what the first admin asks the deployment for (R-GEN-10). */
 export interface RoomDraft {
   /** 1 to 128 characters, never in the form of a room ID (R-GEN-11). */
   readonly name: RoomName;
-  /** The canonical repository's Artifacts name. */
-  readonly repo: string;
+  readonly repo: RepoSource;
   readonly admin: { readonly handle: MemberId; readonly key: KeyId };
   readonly recovery: KeyId;
 }
@@ -154,11 +162,15 @@ export interface RoomDraft {
 /** The genesis object to sign, with a room key the deployment made, and the draft value that names that key. */
 export interface DraftedRoom {
   readonly genesis: Genesis;
-  /** Not a secret. The deployment uses it to recover the room key at `found`. */
+  /** Not a secret. The deployment recovers the room key, and for `new` the repository identity, from it at `found`. */
   readonly draft: string;
 }
 
-/** Founding, step 2: the genesis, signed by the first admin key (R-GEN-1, R-SIG-1), and the draft value. */
+/**
+ * Founding, step 2: the genesis, signed by the first admin key (R-GEN-1,
+ * R-SIG-1), and the draft value. An import's grant travels inside the
+ * genesis (`Genesis.onboarding`), so the signature covers it.
+ */
 export interface Founding {
   readonly genesis: Genesis;
   readonly sig: Base64Url;

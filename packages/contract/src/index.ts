@@ -63,6 +63,7 @@ export type {
   ExplainNotFound,
   Founding,
   InvitationLink,
+  RepoSource,
   RoomDraft,
   RoomRef,
   WsProtocol,

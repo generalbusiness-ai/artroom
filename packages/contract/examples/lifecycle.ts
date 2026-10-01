@@ -1,8 +1,9 @@
 /**
  * Amendment 2, through the types only. Compiled, never run.
  *
- * 1. Found a room in two steps, and find a room's ID from its name
- *    (R-GEN-10, R-GEN-11, R-API-11).
+ * 1. Found a room in two steps, on a fresh repository or on an imported one
+ *    with an operator's grant, and find a room's ID from its name
+ *    (R-GEN-10 to R-GEN-13, R-API-11).
  * 2. Build an invitation link with the secret in the fragment (R-CRED-11).
  * 3. An MCP Worker acts for a bearer over `RoomWire` (R-CRED-10).
  * 4. Decode the RPC subscription's newline-delimited JSON (R-API-8).
@@ -22,6 +23,7 @@ import {
   type RoomId,
   type RoomRef,
   type SessionToken,
+  type SignedOnboardingGrant,
   type Signer,
   type Update,
 } from "@generalbusiness/artroom-contract";
@@ -31,10 +33,19 @@ declare function signGenesis(signer: Signer, genesis: Genesis): Promise<string>;
 declare const utf8: { decode(bytes: Uint8Array, options: { readonly stream: true }): string };
 declare function show(message: string): void;
 
-/** 1. The first admin founds a room over the service binding. */
+/** 1. Public founding: the deployment allocates a fresh, empty repository (R-GEN-12). */
 export async function foundRoom(worker: ArtroomFounder, admin: Signer, recovery: KeyId): Promise<RoomId> {
-  const { genesis, draft } = await worker.draft({ name: "acme-web", repo: "acme-web", admin: { handle: "@alice", key: admin.key }, recovery });
+  const { genesis, draft } = await worker.draft({ name: "acme-web", repo: { kind: "new" }, admin: { handle: "@alice", key: admin.key }, recovery });
   // The first admin signs exactly the genesis it was given; the room ID is its digest (R-ID-3).
+  return worker.found(genesis, await signGenesis(admin, genesis), draft);
+}
+
+/** 1a. Importing an existing repository needs an operator's grant for it and for this admin key. */
+export async function importRoom(worker: ArtroomFounder, admin: Signer, recovery: KeyId, grant: SignedOnboardingGrant): Promise<RoomId | null> {
+  if (grant.grant.admin !== admin.key) return null; // the grant names the first admin key (R-GEN-12)
+  const { genesis, draft } = await worker.draft({ name: "acme-api", repo: { kind: "import", grant }, admin: { handle: "@alice", key: admin.key }, recovery });
+  // The grant is inside the genesis, so the admin's signature covers it, and `found` checks it again.
+  if (genesis.repo !== grant.grant.repo || genesis.onboarding === undefined) return null;
   return worker.found(genesis, await signGenesis(admin, genesis), draft);
 }
 
