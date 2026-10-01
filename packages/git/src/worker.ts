@@ -311,8 +311,10 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
         }
         const pushMs = lap();
         const active = (await r.listTokens()).tokens.filter((x) => x.state === "active").length;
-        const readBack = await r.log({ ref: LOG_REF, limit: 1 }).then((c) => c[0]?.hash ?? null, (e: unknown) => `error: ${e instanceof Error ? e.message : String(e)}`);
-        return { outcome, revoked, activeTokens: active, readBack, ms: { push: pushMs, total: lap() } };
+        // How the binding resolves the log ref (lane A's readRef uses log({ ref })).
+        const viaLog = (ref: string) => r.log({ ref, limit: 1 }).then((c) => c[0]?.hash ?? null, (e: unknown) => `error: ${e instanceof Error ? e.message : String(e)}`);
+        const binding = { full: await viaLog(LOG_REF), short: await viaLog("artroom/log") };
+        return { outcome, revoked, activeTokens: active, binding, ms: { push: pushMs, total: lap() } };
       }
       case "reset": {
         const repo = this.need(this.meta("repo"), "repo");

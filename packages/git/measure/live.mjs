@@ -124,6 +124,9 @@ async function main() {
   // Land lane 1 directly; accept lane 2 and leave it to the alarm.
   const a = await h("land", { lane: lane(1) });
   log(`lane 1 land: ${a.op.state}; reserve ${a.reserve.kind}; ms`, a.ms);
+  // Contract gap 7: lane 2's clean preview on the moved main carries the merge commit the landing will push.
+  const pv = await h("propose", { lane: lane(2), generation: 1, head: l2.head, forcePreview: true });
+  log(`lane 2 preview on lane 1's main: ${pv.preview?.kind}, fastForward ${pv.preview?.fastForward}, integration ${pv.preview?.integration?.slice(0, 8)}`);
   const b = await h("land", { lane: lane(2), drive: false });
   log(`lane 2 accepted (${b.op.state}); waiting for the alarm`);
   let v;
@@ -133,6 +136,8 @@ async function main() {
     if (v.op.state === "landed" || v.op.state === "failed" || v.op.state === "retryable") break;
   }
   log(`lane 2 by alarm: ${v.op.state}, attempts ${v.op.attempts}, expectedMain ${v.op.expectedMain?.slice(0, 8)}`);
+  out.previewIntegrationLanded = pv.preview?.kind === "clean" && pv.preview.fastForward === false && v.op.integration === pv.preview.integration;
+  log(`previewed integration is the landed one: ${out.previewIntegrationLanded}`);
 
   // Check main has both changes.
   const rt = await api("POST", "/tokens", { repo: REPO, scope: "read", ttl: 60 });
