@@ -210,7 +210,7 @@ describe("R-POL-6, R-LAND-4, R-LAND-7: the stage-specific land rule", () => {
     expect((await op(room, l.op.id)).state).toBe("landed");
   });
 
-  it("section 23, Stage-specific land rule: a new objection between ready and reservation changes the bytes; the operation is retryable", async () => {
+  it("section 23, Stage-specific land rule and Byte mismatch: a new objection between ready and reservation changes the bytes; retryable with land-input-changed", async () => {
     const room = await makeRoom({ policy: withLandRule("false") });
     const { alice, lane, head } = await approved(room);
     const carol = await addMember(room, "@carol", "maintainer");
@@ -219,7 +219,7 @@ describe("R-POL-6, R-LAND-4, R-LAND-7: the stage-specific land rule", () => {
     expect((await op(room, l.op.id)).state).toBe("ready");
     await carol.ok("review", { lane, generation: 1 }, { head, verdict: "object", scope: ["src/**"], text: "no" });
     await tick(room);
-    expect(await op(room, l.op.id)).toMatchObject({ state: "retryable", reason: "obligation-open" });
+    expect(await op(room, l.op.id)).toMatchObject({ state: "retryable", reason: "land-input-changed" });
     expect(room.world.artifacts.main).not.toBe(head);
   });
 

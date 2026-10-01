@@ -6,7 +6,8 @@
  */
 
 export { default } from "./worker.ts";
-export { Room, RoomNames } from "./room.ts";
+export { Room } from "./room.ts";
+export { Registry } from "./registry.ts";
 export { RoomWireTarget } from "./worker.ts";
 export { RoomCore } from "./core.ts";
 export { setPortsFactory, setClock, setAlarmDelay, UnwiredLanding, type PortsFactory, type RoomEnv } from "./config.ts";

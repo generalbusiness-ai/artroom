@@ -6,6 +6,8 @@
 
 import { describe, expect, it } from "vitest";
 import { exports } from "cloudflare:workers";
+import { runInDurableObject } from "cloudflare:test";
+import type { Room } from "../../src/index.ts";
 import type { Claim, Explanation, LogEntry, Note, PolicyDocument, Sha, SystemEvent, Update } from "@generalbusiness/artroom-contract";
 import { policy, rule } from "@generalbusiness/artroom-policy/helpers";
 import { digestJson } from "../../src/crypto.ts";
@@ -202,29 +204,48 @@ describe("R-API-8 live updates", () => {
     await reader.cancel();
   });
 
-  it("WebSocket: the first message authenticates; each commit sends an update; no token in the URL", async () => {
+  it("section 23, WebSocket (R-API-12): token as a subprotocol, judged before the upgrade; 101 with artroom.v1 only; 401 without a token; 1008 after revocation", async () => {
     const room = await makeRoom();
-    const token = await room.admin.session();
-    const res = await exports.default.fetch(`https://artroom.test/v1/rooms/${room.id}/ws`, { headers: { Upgrade: "websocket" } });
+    const bob = await addMember(room, "@bob", "member");
+    const token = await bob.session();
+    const url = `https://artroom.test/v1/rooms/${room.id}/ws`;
+    const none = await exports.default.fetch(url, { headers: { Upgrade: "websocket", "Sec-WebSocket-Protocol": "artroom.v1" } });
+    expect(none.status).toBe(401);
+    expect(none.webSocket).toBeNull();
+    const badToken = await exports.default.fetch(url, { headers: { Upgrade: "websocket", "Sec-WebSocket-Protocol": "artroom.v1, artroom.token.ses_nope" } });
+    expect(badToken.status).toBe(401);
+    expect(JSON.stringify(await badToken.json())).not.toContain("ses_nope");
+    const res = await exports.default.fetch(url, { headers: { Upgrade: "websocket", "Sec-WebSocket-Protocol": `artroom.v1, artroom.token.${token}` } });
     expect(res.status).toBe(101);
+    expect(res.headers.get("Sec-WebSocket-Protocol")).toBe("artroom.v1");
     const ws = res.webSocket!;
     ws.accept();
-    const got: Update[] = [];
-    const next = () =>
-      new Promise<Update>((resolve) => {
-        ws.addEventListener("message", (m: MessageEvent) => {
-          const u = JSON.parse(m.data as string) as Update;
-          got.push(u);
-          resolve(u);
-        }, { once: true });
-      });
+    const closed = new Promise<number>((resolve) => ws.addEventListener("close", (e: CloseEvent) => resolve(e.code)));
+    const next = () => new Promise<Update>((resolve) => ws.addEventListener("message", (m: MessageEvent) => resolve(JSON.parse(m.data as string) as Update), { once: true }));
     const first = next();
-    ws.send(JSON.stringify({ session: token }));
-    await first;
-    const second = next();
+    ws.send("ignored by the room");
     await room.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
-    const u = await second;
-    expect(u.entries.map((e) => e.kind)).toContain("claim");
+    expect((await first).entries.map((e) => e.kind)).toContain("claim");
+    // The socket keeps only the token's hash.
+    const kept = await runInDurableObject(room.stub as unknown as DurableObjectStub<Room>, (_r: Room, state: DurableObjectState) => JSON.stringify(state.getWebSockets().map((w) => w.deserializeAttachment())));
+    expect(kept).not.toContain(token);
+    await room.admin.ok("roster", null, { op: "revoke-key", key: bob.key, reason: "retired" });
+    expect(await closed).toBe(1008);
+  });
+
+  it("R-API-12: ?cursor= resumes from that cursor", async () => {
+    const room = await makeRoom();
+    const token = await room.admin.session();
+    const start = await call<Update>(room.stub.poll(token, undefined, 0));
+    await room.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
+    const res = await exports.default.fetch(`https://artroom.test/v1/rooms/${room.id}/ws?cursor=${encodeURIComponent(start.cursor)}`, {
+      headers: { Upgrade: "websocket", "Sec-WebSocket-Protocol": `artroom.v1, artroom.token.${token}` },
+    });
+    expect(res.status).toBe(101);
+    const ws = res.webSocket!;
+    const got = new Promise<Update>((resolve) => ws.addEventListener("message", (m: MessageEvent) => resolve(JSON.parse(m.data as string) as Update), { once: true }));
+    ws.accept();
+    expect((await got).entries.map((e) => e.kind)).toEqual(["claim"]);
     ws.close();
   });
 

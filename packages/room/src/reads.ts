@@ -7,6 +7,7 @@
 import type {
   ActId,
   AttentionItem,
+  AttentionPage,
   Cursor,
   EntrySummary,
   Explanation,
@@ -236,14 +237,15 @@ function positionOf(core: RoomCore, item: AttentionItem): Position {
   return { seq: item.seq, n: num(one(core.sql, "SELECT n FROM attention WHERE id = ?", item.id), "n") ?? 0 };
 }
 
-function attention(core: RoomCore, member: MemberId, page: PageRequest | undefined): Page<AttentionItem> {
+function attention(core: RoomCore, member: MemberId, page: PageRequest | undefined): AttentionPage {
   const start = attentionPosition(page?.cursor, "attention", "n", "i") ?? { seq: -1, n: END };
   const limit = limitOf(page);
   const items = attentionItems(core, member, start, limit + 1);
   const more = items.length > limit;
   const shown = items.slice(0, limit);
   const last = shown.length ? positionOf(core, shown[shown.length - 1]!) : start;
-  return { items: shown, cursor: cursor("attention", last.seq, { i: last.n }), more };
+  // R-API-9: the page carries publishedThrough from the same read.
+  return { items: shown, cursor: cursor("attention", last.seq, { i: last.n }), more, publishedThrough: publishedThrough(core) };
 }
 
 // ------------------------------------------------------------ the log (R-API-7, R-LOG-11)

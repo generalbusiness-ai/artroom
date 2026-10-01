@@ -242,6 +242,8 @@ export type PreviewResult =
  * `ArtroomError` `unavailable` and records nothing (R-PROP-1).
  */
 export interface ArtifactsPort {
+  /** Create the room's repository for a public founding (R-GEN-12). Idempotent: an existing one can only be this founding's own. */
+  createRepo(identity: string): Promise<void>;
   readMain(): Promise<Sha | null>;
   readConfig(commit: Sha): Promise<ArtroomConfig>;
   treeOf(commit: Sha): Promise<Sha | null>;

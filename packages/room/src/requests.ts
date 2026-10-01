@@ -29,17 +29,17 @@ import type {
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { commit, decide, earlySteps, finalBoundary, refuseApplies, refuseInput, submit, type DecideOptions } from "./admission.ts";
 import { judge, refusal } from "./authority.ts";
-import { canonicalize, utf8 } from "./canonical.ts";
+import { utf8 } from "./canonical.ts";
 import { fault, Moved, type RoomCore } from "./core.ts";
 import { digestBytes, digestJson, newKeyPair, randomToken, sha256Hex, sign, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
-import { iso, opIds, parseTime } from "./ids.ts";
+import { iso, opIds, parseTime, RE } from "./ids.ts";
 import { laneRow } from "./model.ts";
 import { delegation, invitation, keyRow, memberRow, revocationOf } from "./roster.ts";
-import { checkRedemption, checkSignedRequest, ShapeError } from "./schema.ts";
+import { checkRedemption, checkSignedRequest, isPlainObject, ShapeError } from "./schema.ts";
 import { num, one, str } from "./store.ts";
 
-const tokenHash = (token: string) => sha256Hex(utf8(token));
+export const tokenHash = (token: string) => sha256Hex(utf8(token));
 
 // ------------------------------------------------------------ signed requests
 
@@ -67,7 +67,22 @@ export async function request(core: RoomCore, input: unknown): Promise<Workspace
     if ("refused" in who) return who;
     return newSession(core, who.member, r.actor, r.delegation ?? null, Math.min(body.ttlSeconds, 3600));
   }
-  // workspace, workspace-token: judged as for `propose` on that lane, now (R-CRED-5, R-WS-2).
+  return workspaceRequest(core, r.actor, r.delegation, body);
+}
+
+/**
+ * `workspace` and `workspace-token`, for a signed request or for a bearer
+ * session (R-CRED-5, R-CRED-10): judged as for `propose` on that lane, now,
+ * under the key and delegation given (R-WS-2).
+ */
+async function workspaceRequest(
+  core: RoomCore,
+  actor: KeyId,
+  delegationId: DelegationId | undefined,
+  body: Exclude<SignedRequest["request"]["request"], { kind: "session" }>,
+): Promise<WorkspaceOp | WorkspaceGrant | Refusal> {
+  const r = { actor, delegation: delegationId };
+  const now = core.now();
   const holder = workspaceAuthority(core, r.actor, r.delegation, body.lane, body.lease);
   if ("refused" in holder) return holder;
   const lane = holder.lane;
@@ -142,8 +157,12 @@ function newSession(core: RoomCore, member: MemberId, key: KeyId, delegationId: 
 
 /** The member behind a session or bearer token, judged now (R-CRED-7, R-API-3). */
 export function authenticateRead(core: RoomCore, token: string): MemberId {
+  return authenticateHash(core, tokenHash(token));
+}
+
+/** As `authenticateRead`, from the token's hash: what a WebSocket keeps (R-API-12). */
+export function authenticateHash(core: RoomCore, h: string): MemberId {
   const sql = core.sql;
-  const h = tokenHash(token);
   const now = core.now();
   const s = one(sql, "SELECT * FROM sessions WHERE hash = ?", h) ?? one(sql, "SELECT member, key, delegation, expires_ms FROM bearers WHERE hash = ?", h);
   const fail = () => artroomError("unauthenticated", "The session or bearer token is not valid.");
@@ -321,17 +340,51 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
 // ------------------------------------------------------------ bearer acts (R-CRED-3 step 4)
 
 /** An act for an MCP agent: signed by the bearer's session key, naming its delegation. */
-export async function bearerAct(
-  core: RoomCore,
-  bearer: string,
-  act: Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey">,
-): Promise<ActRecord | Refusal> {
+/**
+ * Judge a bearer token (R-CRED-10): an unknown or expired token, or a
+ * revoked delegation or session key, is `unauthenticated` and nothing is
+ * recorded. So after revocation even a retry of an earlier act is refused:
+ * there is no envelope to replay.
+ */
+function judgeBearer(core: RoomCore, bearer: unknown): { readonly key: KeyId; readonly delegation: DelegationId; readonly seed: Uint8Array } {
+  const fail = () => artroomError("unauthenticated", "The bearer token is not valid.");
+  if (typeof bearer !== "string") throw fail();
   const row = one(core.sql, "SELECT * FROM bearers WHERE hash = ?", tokenHash(bearer));
-  if (!row || num(row, "expires_ms")! <= core.now()) throw artroomError("unauthenticated", "The bearer token is not valid.");
+  if (!row || num(row, "expires_ms")! <= core.now()) throw fail();
   const key = str(row, "key") as KeyId;
+  const d = delegation(core.sql, str(row, "delegation")!);
+  if (!d || d.revoked !== undefined || d.expiresMs <= core.now() || revocationOf(core.sql, key)) throw fail();
   const seed = core.heldSeed(key);
-  if (!seed) throw artroomError("unauthenticated", "The bearer token is not valid.");
-  const env = { v: 1, room: core.roomId, actor: key, kind: act.kind, target: act.target, body: act.body, idempotencyKey: act.idempotencyKey, delegation: str(row, "delegation") as DelegationId } as Envelope;
-  void canonicalize;
-  return submit(core, { envelope: env, sig: sign(seed, "artroom-envelope-v1", env) }, "submitted");
+  if (!seed) throw fail();
+  return { key, delegation: d.id, seed };
+}
+
+/**
+ * An act for an MCP agent: the room sets `v`, its room ID, the actor (the
+ * session key) and the delegation, signs with the session key, and admits it
+ * on the `submitted` path (R-CRED-3 step 4, R-CRED-10). The same act and
+ * idempotency key build the same bytes, so a retry gets the original result.
+ */
+export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): Promise<ActRecord | Refusal> {
+  const b = judgeBearer(core, bearer);
+  if (!isPlainObject(act) || Object.keys(act).some((k) => !["kind", "target", "body", "idempotencyKey"].includes(k)))
+    throw artroomError("bad-request", "A bearer act has only kind, target, body and idempotencyKey.");
+  const a = act as Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey">;
+  const env = { v: 1, room: core.roomId, actor: b.key, kind: a.kind, target: a.target, body: a.body, idempotencyKey: a.idempotencyKey, delegation: b.delegation } as Envelope;
+  return submit(core, { envelope: env, sig: sign(b.seed, "artroom-envelope-v1", env) }, "submitted");
+}
+
+/** `workspace` or `workspace-token` for a bearer session, judged under its delegation (R-CRED-10, R-WS-2). */
+export async function bearerRequest(core: RoomCore, bearer: unknown, req: unknown): Promise<WorkspaceOp | WorkspaceGrant | Refusal> {
+  const b = judgeBearer(core, bearer);
+  const body = isPlainObject(req) ? req : {};
+  if (
+    (body["kind"] !== "workspace" && body["kind"] !== "workspace-token") ||
+    Object.keys(body).some((k) => !["kind", "lane", "lease"].includes(k)) ||
+    typeof body["lane"] !== "string" ||
+    !RE.actId.test(body["lane"]) ||
+    !Number.isSafeInteger(body["lease"])
+  )
+    throw artroomError("bad-request", "A bearer request is workspace or workspace-token, with lane and lease.");
+  return workspaceRequest(core, b.key, b.delegation, body as never);
 }

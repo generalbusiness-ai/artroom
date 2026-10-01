@@ -123,6 +123,14 @@ export class MemoryArtifacts implements ArtifactsPort {
 
   // ---------------------------------------------------------- the port
 
+  /** Repositories created by a public founding. */
+  readonly created = new Set<string>();
+
+  async createRepo(identity: string): Promise<void> {
+    this.enter("createRepo");
+    this.created.add(identity);
+  }
+
   async readMain(): Promise<Sha | null> {
     this.enter("readMain");
     return this.main;
@@ -234,6 +242,7 @@ export class UnwiredArtifacts implements ArtifactsPort {
   private fail(): never {
     throw new Error("Artifacts is not wired into this deployment yet.");
   }
+  createRepo = async (): Promise<void> => {};
   readMain = async (): Promise<Sha | null> => null;
   readConfig = async (): Promise<ArtroomConfig> => this.fail();
   treeOf = async (): Promise<Sha | null> => this.fail();

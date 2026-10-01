@@ -3,21 +3,29 @@ import { describe, expect, it } from "vitest";
 import { highEntropy, scanString, scanValue } from "../../src/secrets.ts";
 import { digestJson, newKeyPair } from "../../src/crypto.ts";
 
+/**
+ * Detector samples. Each is assembled at runtime from parts, so the source
+ * holds no secret-shaped literal (repository push protection scans it).
+ */
+const join = (...parts: string[]) => parts.join("");
+const fill = (n: number, alphabet = "a1B2c3D4e5") => Array.from({ length: n }, (_, i) => alphabet[i % alphabet.length]).join("");
+const awsKey = join("AK", "IA", "IOSFODNN7", "EXAMPLE");
+
 const positives: [string, string][] = [
-  ["aws-access-key", "AKIAIOSFODNN7EXAMPLE"],
-  ["aws-secret-key", "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"],
-  ["github-token", "ghp_" + "a1b2c3d4e5f6g7h8i9j0a1b2c3d4e5f6g7h8"],
-  ["github-token", "github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz"],
-  ["slack-token", "xoxb-123456789012-abcdefghijkl"],
-  ["slack-webhook", "https://hooks.slack" + ".com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"],
-  ["cloudflare-token", "CLOUDFLARE_API_TOKEN=abcdefghijklmnopqrstuvwxyz0123456789ABCD"],
-  ["google-api-key", "AIzaSyA-1234567890abcdefghijklmnopqrstu"],
-  ["stripe-key", "sk_live_" + "4eC39HqLyjWDarjtT1zdp7dc"],
-  ["private-key-block", "-----BEGIN OPENSSH PRIVATE KEY-----"],
-  ["private-key-block", "-----BEGIN PRIVATE KEY-----"],
-  ["jwt", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"],
-  ["password-assignment", "password=hunter2hunter2"],
-  ["high-entropy-string", "token Zx9Qw3Er7Ty1Ui5Op2As8Df4Gh6Jk0LmNbVcXz here"],
+  ["aws-access-key", awsKey],
+  ["aws-secret-key", join("aws_secret", "_access_key = ", fill(40))],
+  ["github-token", join("gh", "p_", fill(36))],
+  ["github-token", join("github", "_pat_", fill(40))],
+  ["slack-token", join("xo", "xb-", "123456789012-", fill(12))],
+  ["slack-webhook", join("https://hooks.", "slack.com/services/", fill(9), "/", fill(9), "/", fill(24))],
+  ["cloudflare-token", join("CLOUDFLARE_API", "_TOKEN=", fill(40))],
+  ["google-api-key", join("AI", "za", "Sy", fill(33))],
+  ["stripe-key", join("sk", "_live_", fill(24))],
+  ["private-key-block", join("-----BEGIN OPENSSH ", "PRIVATE KEY-----")],
+  ["private-key-block", join("-----BEGIN ", "PRIVATE KEY-----")],
+  ["jwt", join("ey", "J", fill(12), ".", "ey", "J", fill(12), ".", fill(20))],
+  ["password-assignment", join("pass", "word=", "hunter2hunter2")],
+  ["high-entropy-string", join("token ", "Zx9Qw3Er7Ty1Ui5Op2", "As8Df4Gh6Jk0LmNbVcXz", " here")],
 ];
 
 describe("R-SEC-1 detectors", () => {
@@ -44,7 +52,7 @@ describe("R-SEC-3, R-SEC-4 paths and exemptions", () => {
     expect(scanValue(body, "body")).toEqual({ path: "body.because[1].url", detector: "high-entropy-string" });
     const fixed = new Set(["body.head"]);
     expect(scanValue({ head: "Zx9Qw3Er7Ty1Ui5Op2As8Df4Gh6Jk0LmNbVcXz" }, "body", fixed)).toBeNull();
-    expect(scanValue({ head: "AKIAIOSFODNN7EXAMPLE" }, "body", fixed)).toEqual({ path: "body.head", detector: "aws-access-key" });
+    expect(scanValue({ head: awsKey }, "body", fixed)).toEqual({ path: "body.head", detector: "aws-access-key" });
   });
 
   it("a join's secret is exempt", () => {

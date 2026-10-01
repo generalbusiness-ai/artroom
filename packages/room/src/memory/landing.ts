@@ -71,6 +71,7 @@ const FIX: Record<RetryReason, string> = {
   "authority-lost": "Your authority to land is no longer current. Ask an admin, then land again.",
   "evidence-invalid": "Evidence this landing relied on no longer counts. Get a new review or check, then land again.",
   "obligation-open": "An obligation reopened. Meet it, then land again.",
+  "land-input-changed": "The reviews or obligations changed after the landing was prepared. Land again.",
 };
 
 export interface LandingControls {

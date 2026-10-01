@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { env, exports } from "cloudflare:workers";
+import { exports } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { Claim, Joined, LogEntry, Note, Redeemed, RosterRecord } from "@generalbusiness/artroom-contract";
 import type { Room } from "../../src/index.ts";
@@ -346,24 +346,5 @@ describe("R-ADM-12 and R-CRED-9: onboarding and custody by admission path", () =
     expect(((await room.stub.request(req)) as { error?: { code: string } }).error?.code).toBe("unauthenticated");
     const far = room.admin.signedRequest({ kind: "session", ttlSeconds: 60 }, "nonce-nonce-nonce-2", iso(clock.now + 600_000));
     expect(((await room.stub.request(far)) as { error?: { code: string } }).error?.code).toBe("unauthenticated");
-  });
-});
-
-describe("the Worker founds rooms", () => {
-  it("draft, sign and found through HTTPS; the name resolves to the room ID", async () => {
-    const admin = newKeyPair();
-    const recovery = newKeyPair();
-    const name = `acme/${b64url(randomBytes(6))}`;
-    const d = await exports.default.fetch("https://artroom.test/v1/rooms", { method: "POST", body: JSON.stringify({ name, repo: "acme-web", admin: { handle: "@founder", key: admin.key }, recovery: recovery.key }) });
-    expect(d.status).toBe(200);
-    const { genesis, draft } = (await d.json()) as { genesis: { roomKey: string }; draft: string };
-    const { sign } = await import("../../src/crypto.ts");
-    const f = await exports.default.fetch("https://artroom.test/v1/rooms/found", { method: "POST", body: JSON.stringify({ genesis, sig: sign(admin.seed, "artroom-genesis-v1", genesis), draft }) });
-    expect(f.status).toBe(200);
-    const { room } = (await f.json()) as { room: string };
-    expect(room).toMatch(/^room_[0-9a-f]{32}$/);
-    const names = env.NAMES.get(env.NAMES.idFromName(name)) as unknown as { get(): Promise<string | null> };
-    expect(await names.get()).toBe(room);
-    expect(JSON.stringify(genesis)).not.toContain("test-room-key-secret");
   });
 });

@@ -13,7 +13,12 @@ import type { LandingPort, LandRecordLike, Ports } from "./ports.ts";
 
 export interface RoomEnv {
   readonly ROOMS: DurableObjectNamespace;
-  readonly NAMES: DurableObjectNamespace;
+  /** The deployment's one registry (R-GEN-13). */
+  readonly REGISTRY: DurableObjectNamespace;
+  /** Operator key IDs, comma-separated, whose onboarding grants this deployment accepts (R-GEN-12). */
+  readonly OPERATOR_KEYS?: string;
+  /** The repository namespace reserved for public founding (R-GEN-12). */
+  readonly PUBLIC_NAMESPACE?: string;
   readonly LEASE_SECONDS?: string;
   readonly PUBLIC_URL?: string;
   readonly ROOM_KEY_SECRET?: string;

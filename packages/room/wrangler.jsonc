@@ -9,15 +9,19 @@
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "Room" },
-      { "name": "NAMES", "class_name": "RoomNames" }
+      { "name": "REGISTRY", "class_name": "Registry" }
     ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "RoomNames"] }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Registry"] }],
   "vars": {
     // The lease length in seconds (R-LANE-5).
     "LEASE_SECONDS": "1800",
     // The public base URL, used for the MCP endpoint in `Redeemed`.
-    "PUBLIC_URL": "https://artroom.example.workers.dev"
+    "PUBLIC_URL": "https://artroom.example.workers.dev",
+    // The repository namespace reserved for public founding (R-GEN-12).
+    "PUBLIC_NAMESPACE": "artroom-public",
+    // Operator key IDs, comma-separated, whose onboarding grants are accepted (R-GEN-12).
+    "OPERATOR_KEYS": ""
   }
   // Secrets (set with `wrangler secret put`, never in this file):
   //   ROOM_KEY_SECRET  derives each new room's signing key at genesis.

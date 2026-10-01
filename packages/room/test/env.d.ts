@@ -2,7 +2,7 @@
 declare namespace Cloudflare {
   interface Env {
     ROOMS: DurableObjectNamespace<import("../src/room.ts").Room>;
-    NAMES: DurableObjectNamespace<import("../src/room.ts").RoomNames>;
+    REGISTRY: DurableObjectNamespace<import("../src/registry.ts").Registry>;
   }
 }
 

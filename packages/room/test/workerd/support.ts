@@ -4,6 +4,8 @@
  */
 
 import { env } from "cloudflare:workers";
+import { runInDurableObject } from "cloudflare:test";
+import { entriesAfter } from "../../src/log.ts";
 import type {
   ActRecord,
   DelegationId,
@@ -12,6 +14,7 @@ import type {
   Genesis,
   KeyId,
   LaneId,
+  LogEntry,
   MemberId,
   PolicyDocument,
   ReadQuery,
@@ -23,10 +26,11 @@ import type {
   RoomId,
   Sha,
   SignedEnvelope,
+  SignedOnboardingGrant,
 } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
-import { MemoryArtifacts, MemoryLanding, MemoryLogPublisher, MemoryLogRemote, lanePolicy, setAlarmDelay, setClock, setPortsFactory, type PolicyPort, type Room } from "../../src/index.ts";
-import { b64url, digestBytes, keyPairFromSeed, newKeyPair, randomBytes, randomToken, sign, type KeyPair } from "../../src/crypto.ts";
+import { MemoryArtifacts, MemoryLanding, MemoryLogPublisher, MemoryLogRemote, lanePolicy, setAlarmDelay, setClock, setPortsFactory, type PolicyPort, type Registry, type Room } from "../../src/index.ts";
+import { b64url, digestBytes, hex, keyPairFromSeed, newKeyPair, randomBytes, randomToken, sign, type KeyPair } from "../../src/crypto.ts";
 import { iso, roomIdOf } from "../../src/ids.ts";
 import { unwire, type Wire } from "../../src/errors.ts";
 
@@ -212,6 +216,32 @@ export class Client {
   }
 }
 
+/** The world a room will use, registered before it is founded through the Worker. */
+export function worldFor(roomId: string): World {
+  const id = env.ROOMS.idFromName(roomId).toString();
+  let w = worlds.get(id);
+  if (!w) {
+    w = newWorld();
+    worlds.set(id, w);
+  }
+  return w;
+}
+
+/** A room's log, read inside its Durable Object (no session needed). */
+export async function logOf(roomId: string): Promise<LogEntry[]> {
+  const stub = env.ROOMS.get(env.ROOMS.idFromName(roomId)) as unknown as DurableObjectStub<Room>;
+  return runInDurableObject(stub, (room: Room) => entriesAfter(room.core.sql, -1, 1000));
+}
+
+/** The test operator key; its key ID is in the workerd config's OPERATOR_KEYS. */
+export const operator = keyPairFromSeed(new Uint8Array(32).fill(0x0b));
+
+/** An onboarding grant from the test operator (R-GEN-12). */
+export function grant(repo: string, admin: KeyId, notAfter = iso(clock.now + day), by: KeyPair = operator): SignedOnboardingGrant {
+  const g = { v: 1 as const, repo, admin, operator: by.key, notAfter };
+  return { grant: g, sig: sign(by.seed, "artroom-onboarding-v1", g) };
+}
+
 /** A room founded from a signed genesis, with main holding `files` (R-GEN-1). */
 export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<string, string> } = {}): Promise<TestRoom> {
   const world = newWorld();
@@ -221,10 +251,13 @@ export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<s
   const admin = newKeyPair();
   const recovery = newKeyPair();
   const seed = randomBytes(32);
+  // An imported repository, with an operator's grant (R-GEN-12), bound in the registry before founding (R-GEN-13).
+  const repo = `test-import/${hex(randomBytes(16))}`;
   const genesis: Genesis = {
     format: "artroom-log-v1",
     name: `test/${randomToken().slice(0, 8)}`,
-    repo: "test-repo",
+    repo,
+    onboarding: grant(repo, admin.key),
     admin: { handle: "@admin", key: admin.key },
     recovery: recovery.key,
     roomKey: keyPairFromSeed(seed).key,
@@ -234,6 +267,7 @@ export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<s
   const id = roomIdOf(genesis);
   const objectId = env.ROOMS.idFromName(id);
   worlds.set(objectId.toString(), world);
+  await call((env.REGISTRY.get(env.REGISTRY.idFromName("registry")) as unknown as DurableObjectStub<Registry>).bind(repo, id, genesis.name));
   const stub = env.ROOMS.get(objectId) as unknown as RoomStub;
   await call(stub.found(genesis, sign(admin.seed, "artroom-genesis-v1", genesis), b64url(seed)));
   const base = { id, stub };

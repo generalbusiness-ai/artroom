@@ -11,7 +11,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type {
   ActRecord,
-  Envelope,
   Genesis,
   Joined,
   MemberId,
@@ -29,16 +28,19 @@ import type {
 import { submit } from "./admission.ts";
 import { alarmTime, clock, portsFor, type RoomEnv } from "./config.ts";
 import { RoomCore } from "./core.ts";
+import { checkGenesis } from "./founding.ts";
+import { registry } from "./registry.ts";
 import { unb64url } from "./crypto.ts";
 import { artroomError, wire, type Wire } from "./errors.ts";
 import { liveCursor, read, updateAfter } from "./reads.ts";
-import { authenticateRead, bearerAct, redeem, request } from "./requests.ts";
+import { authenticateHash, authenticateRead, bearerAct, bearerRequest, redeem, request, tokenHash } from "./requests.ts";
 import type { Sql } from "./ports.ts";
 
 interface SocketState {
-  readonly token: string | null;
-  readonly member: MemberId | null;
-  readonly cursor: string | null;
+  /** The token's hash, never the token (R-API-12). */
+  readonly hash: string;
+  readonly member: MemberId;
+  readonly cursor: string;
 }
 
 export class Room extends DurableObject<RoomEnv> {
@@ -58,6 +60,10 @@ export class Room extends DurableObject<RoomEnv> {
       leaseMs: Number(env.LEASE_SECONDS ?? "1800") * 1000,
       defer: (p) => ctx.waitUntil(p),
       committed: () => this.onCommit(),
+      bound: async (repo, room, name) => {
+        const b = await registry(env).byRepo(repo);
+        return b !== null && b.room === room && b.name === name;
+      },
     });
   }
 
@@ -70,6 +76,7 @@ export class Room extends DurableObject<RoomEnv> {
   /** Found the room from a signed genesis (R-GEN-1). The seed is the room key's, derived by the Worker. */
   found(genesis: Genesis, sig: string, seed: string): Promise<Wire<RoomId>> {
     return wire(async () => {
+      checkGenesis(genesis);
       const raw = unb64url(seed);
       if (!raw || raw.length !== 32) throw artroomError("bad-request", "The room key seed is not 32 bytes.");
       return this.core.found(genesis, sig, raw);
@@ -89,9 +96,14 @@ export class Room extends DurableObject<RoomEnv> {
     return wire(() => redeem(this.core, redemption, address, this.mcpBase));
   }
 
-  /** An MCP agent's act, signed by the room under the bearer's delegation (R-CRED-3). */
-  bearerAct(bearer: string, act: Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey">): Promise<Wire<ActRecord | Refusal>> {
+  /** An MCP agent's act, signed by the room under the bearer's delegation (R-CRED-3, R-CRED-10). */
+  bearerAct(bearer: string, act: unknown): Promise<Wire<ActRecord | Refusal>> {
     return wire(() => bearerAct(this.core, bearer, act));
+  }
+
+  /** `workspace` or `workspace-token` for a bearer session (R-CRED-10). */
+  bearerRequest(bearer: string, req: unknown): Promise<Wire<WorkspaceOp | WorkspaceGrant | Refusal>> {
+    return wire(() => bearerRequest(this.core, bearer, req));
   }
 
   read<Q extends ReadQuery>(token: string, query: Q): Promise<Wire<ReadResults[Q["q"]]>> {
@@ -186,39 +198,44 @@ export class Room extends DurableObject<RoomEnv> {
     this.broadcast();
   }
 
-  // ------------------------------------------------------------ WebSocket (R-API-8)
+  // ------------------------------------------------------------ WebSocket (R-API-12)
 
+  /**
+   * The token travels as the `artroom.token.<token>` subprotocol and is judged
+   * before the upgrade: 401 and no socket when it is missing or not valid.
+   * The room answers `artroom.v1`, never the token subprotocol, reads the
+   * cursor from `?cursor=`, and keeps only the token's hash.
+   */
   override async fetch(req: Request): Promise<Response> {
     if (req.headers.get("Upgrade") !== "websocket") return new Response("Not found", { status: 404 });
+    const deny = (code: "unauthenticated" | "bad-request", message: string) =>
+      new Response(JSON.stringify(artroomError(code, message)), { status: code === "bad-request" ? 400 : 401, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+    const offered = (req.headers.get("Sec-WebSocket-Protocol") ?? "").split(",").map((p) => p.trim());
+    const tokenProtocol = offered.find((p) => p.startsWith("artroom.token."));
+    if (!offered.includes("artroom.v1") || !tokenProtocol) return deny("unauthenticated", "Offer the subprotocols artroom.v1 and artroom.token.<token>.");
+    const hash = tokenHash(tokenProtocol.slice("artroom.token.".length));
+    let member: MemberId;
+    try {
+      member = authenticateHash(this.core, hash);
+    } catch {
+      return deny("unauthenticated", "The session or bearer token is not valid.");
+    }
+    const cursor = new URL(req.url).searchParams.get("cursor") ?? liveCursor(this.core);
+    try {
+      updateAfter(this.core, member, cursor);
+    } catch {
+      return deny("bad-request", "The cursor is not valid.");
+    }
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ token: null, member: null, cursor: null } satisfies SocketState);
-    return new Response(null, { status: 101, webSocket: client });
+    server.serializeAttachment({ hash, member, cursor } satisfies SocketState);
+    this.sendUpdate(server);
+    return new Response(null, { status: 101, webSocket: client, headers: { "Sec-WebSocket-Protocol": "artroom.v1" } });
   }
 
-  /** The first message authenticates: `{ "session": token, "cursor"?: cursor }`. Tokens never travel in URLs. */
-  override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    let msg: { session?: unknown; cursor?: unknown };
-    try {
-      msg = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message)) as typeof msg;
-    } catch {
-      ws.close(1003, "expected JSON");
-      return;
-    }
-    if (typeof msg.session !== "string") {
-      ws.close(1008, "expected a session");
-      return;
-    }
-    try {
-      const member = authenticateRead(this.core, msg.session);
-      const cursor = typeof msg.cursor === "string" ? msg.cursor : liveCursor(this.core);
-      ws.serializeAttachment({ token: msg.session, member, cursor } satisfies SocketState);
-      this.sendUpdate(ws, true);
-    } catch {
-      ws.close(1008, "unauthenticated");
-    }
-  }
+  /** The room ignores messages from the client (R-API-12). */
+  override async webSocketMessage(): Promise<void> {}
 
   override async webSocketClose(ws: WebSocket, code: number): Promise<void> {
     try {
@@ -228,17 +245,18 @@ export class Room extends DurableObject<RoomEnv> {
     }
   }
 
-  private sendUpdate(ws: WebSocket, always = false): void {
+  /** Judge the token again, by its hash, before each update; close with 1008 when it is no longer valid. */
+  private sendUpdate(ws: WebSocket): void {
     const s = ws.deserializeAttachment() as SocketState | null;
-    if (!s?.token || !s.member) return;
+    if (!s?.hash) return;
     try {
-      authenticateRead(this.core, s.token);
+      authenticateHash(this.core, s.hash);
     } catch {
       ws.close(1008, "session ended");
       return;
     }
-    const u = updateAfter(this.core, s.member, s.cursor ?? undefined);
-    if (!u.entries.length && !u.attention.length && !always) return;
+    const u = updateAfter(this.core, s.member, s.cursor);
+    if (!u.entries.length && !u.attention.length) return;
     ws.send(JSON.stringify(u));
     ws.serializeAttachment({ ...s, cursor: u.cursor } satisfies SocketState);
   }
@@ -251,15 +269,5 @@ export class Room extends DurableObject<RoomEnv> {
         // a socket that fails is dropped by the runtime
       }
     }
-  }
-}
-
-/** Maps a room name to its current room ID. A name can be reused; an ID cannot (R-ID-3). */
-export class RoomNames extends DurableObject<RoomEnv> {
-  async get(): Promise<RoomId | null> {
-    return ((await this.ctx.storage.get<string>("room")) ?? null) as RoomId | null;
-  }
-  async set(room: RoomId): Promise<void> {
-    await this.ctx.storage.put("room", room);
   }
 }

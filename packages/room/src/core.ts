@@ -52,7 +52,7 @@ import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
 import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
-import { adminObligation, invalidity, latestReviews, obligationsFor, qualification } from "./obligations.ts";
+import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandingPort, LandRecordLike, ObligationSpec, Ports, PublisherPort, Readiness, Sql } from "./ports.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
@@ -69,6 +69,8 @@ export interface CoreOptions {
   readonly defer: (p: Promise<unknown>) => void;
   /** Called after every commit that sealed entries: wake subscribers, reschedule the alarm. */
   readonly committed: () => void;
+  /** Does the registry bind this repository to this room ID and name (R-GEN-13)? */
+  readonly bound: (repo: string, room: RoomId, name: string) => Promise<boolean>;
 }
 
 export interface ActivePolicyFull extends ActivePolicy {
@@ -128,6 +130,7 @@ export class RoomCore {
   readonly leaseMs: number;
   readonly defer: (p: Promise<unknown>) => void;
   readonly committed: () => void;
+  readonly bound: CoreOptions["bound"];
   readonly landing: LandingPort;
   private chain: Promise<unknown> = Promise.resolve();
   private seedCache: Uint8Array | null = null;
@@ -155,6 +158,7 @@ export class RoomCore {
     this.clock = opts.clock;
     this.leaseMs = opts.leaseMs;
     this.defer = opts.defer;
+    this.bound = opts.bound;
     this.committed = () => {
       opts.committed();
       for (const w of [...this.waiters]) w();
@@ -164,6 +168,21 @@ export class RoomCore {
   }
 
   // ------------------------------------------------------------ identity
+
+  private boundCache = false;
+
+  /**
+   * Does the registry bind this room's repository to this room (R-GEN-13)?
+   * Only then does the Room read the repository, mint a canonical
+   * credential for it, or publish to it (R-GEN-12, R-PUB-10). A binding never
+   * moves, so a confirmed answer is kept.
+   */
+  async isBound(genesis: Genesis = this.genesis): Promise<boolean> {
+    if (this.boundCache) return true;
+    const ok = await this.bound(genesis.repo, roomIdOf(genesis), genesis.name);
+    if (ok) this.boundCache = true;
+    return ok;
+  }
 
   get founded(): boolean {
     return getMeta(this.sql, "room") !== null;
@@ -209,14 +228,18 @@ export class RoomCore {
     if (keyPairFromSeed(roomSeed).key !== genesis.roomKey) throw artroomError("bad-request", "The genesis names a different room key.");
     if (!(await verify(genesis.admin.key, "artroom-genesis-v1", genesis, sig)))
       throw artroomError("unauthenticated", "The genesis is not signed by the first admin's key.");
-    // The initial policy: main's .artroom/policy.json at import, or the default (R-POL-9).
+    // R-GEN-10 step 6 runs only for the room the registry binds to this repository (R-GEN-13).
+    if (!(await this.isBound(genesis))) throw artroomError("forbidden", "The registry does not bind this repository to this room.");
+    // Create the repository (public founding) or read it (import). The initial policy is
+    // main's .artroom/policy.json at import, or the default (R-POL-9).
     let doc: PolicyDocument = this.ports.policy.defaultPolicy();
     let checkers: ActivePolicyFull["checkers"] = {};
     let main: Sha | null = null;
     try {
+      if (!genesis.onboarding) await this.ports.artifacts.createRepo(genesis.repo);
       main = await this.ports.artifacts.readMain();
     } catch {
-      throw artroomError("unavailable", "The canonical repository could not be read. Try again.");
+      throw artroomError("unavailable", "The canonical repository could not be created or read. Retry the same found.");
     }
     if (main !== null) {
       const cfg = await this.ports.artifacts.readConfig(main).catch(() => {
@@ -306,7 +329,17 @@ export class RoomCore {
     const fenced = this.landing.activeViews().filter((o) => o.state === "accepted" || o.state === "preparing" || o.state === "ready").map((o) => o.id);
     const open = previous ? this.openGenerations() : [];
     const entry = this.sealSystem(
-      { type: "policy-activated", policy: digest, commit, previous, recomputed: { proposals: open.length, reopened: 0, fenced } },
+      {
+        type: "policy-activated",
+        policy: digest,
+        commit,
+        previous,
+        // R-POL-9: every active checker configuration, as name and digest pairs sorted by name.
+        checkers: Object.keys(checkers)
+          .sort()
+          .map((name) => ({ name, config: checkers[name]!.digest })),
+        recomputed: { proposals: open.length, reopened: 0, fenced },
+      },
       at,
     );
     const version = idOf(entry);
@@ -417,6 +450,11 @@ export class RoomCore {
    */
   recordRecomputation(r: Recomputation): void {
     this.retainEvaluations(r.evaluations);
+    // Which obligations were met under the previous policy and are open now (R-POL-9).
+    const gen = generationRow(this.sql, r.lane, r.generation)!;
+    const prev = this.sql.all("SELECT version FROM policies WHERE seq < (SELECT seq FROM policies WHERE version = ?) ORDER BY seq DESC LIMIT 1", r.version)[0];
+    const prevPolicy = prev ? this.policyAt(prev["version"] as PolicyVersion) : null;
+    const before = prevPolicy ? statusesOf(this.sql, gen, { doc: prevPolicy.doc, checkers: prevPolicy.checkers }) : [];
     this.sql.all(
       "UPDATE generations SET obligations = ?, carried = ?, not_carried = ?, blocked = ?, recompute = NULL WHERE lane = ? AND generation = ?",
       JSON.stringify(r.obligations),
@@ -426,6 +464,21 @@ export class RoomCore {
       r.lane,
       r.generation,
     );
+    const active = this.policyAt(r.version)!;
+    const after = statusesOf(this.sql, generationRow(this.sql, r.lane, r.generation)!, { doc: active.doc, checkers: active.checkers });
+    const reopened = transitions(before, after).opened;
+    // R-POL-9, R-LOG-5: one `obligations-recomputed` event per proposal, in this transaction.
+    const blocked = r.blocked ? (({ act: _a, ...rest }) => (void _a, rest))(r.blocked) : undefined;
+    this.sealSystem({
+      type: "obligations-recomputed",
+      policy: r.version,
+      lane: r.lane,
+      generation: r.generation,
+      decisions: r.evaluations.map((e) => e.decision),
+      obligations: r.obligations.map((o) => o.id),
+      reopened,
+      ...(blocked ? { blocked } : {}),
+    });
     this.sql.all(
       "INSERT INTO recomputations (version, lane, generation, body) VALUES (?, ?, ?, ?) ON CONFLICT (version, lane, generation) DO NOTHING",
       r.version,
@@ -613,7 +666,7 @@ export class RoomCore {
   }
 
   /** R-LAND-7 step 1, the parts only the Room knows. Synchronous, inside the reservation transaction. */
-  revalidate(op: LandRecordLike): { readonly reason: "authority-lost" | "evidence-invalid" | "obligation-open"; readonly fix: string } | null {
+  revalidate(op: LandRecordLike): { readonly reason: "authority-lost" | "evidence-invalid" | "obligation-open" | "land-input-changed"; readonly fix: string } | null {
     const entry = this.landEnvelope(op);
     if (!entry || entry.type !== "act") return { reason: "authority-lost", fix: "Land again." };
     const env = entry.act.envelope;
@@ -644,7 +697,7 @@ export class RoomCore {
       const row = op.landInput ? json<{ retained: RetainedLandInput | null }>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op.id, op.landInput), "body") : null;
       const rebuilt = this.landInput(op, lane!, gen, policy, "reservation");
       if (!row?.retained || !this.ports.policy.matchesRetained(row.retained, rebuilt))
-        return { reason: "obligation-open", fix: "The reviews or obligations changed after the landing was prepared. Land again." };
+        return { reason: "land-input-changed", fix: "The reviews or obligations changed after the landing was prepared. Land again." };
     }
     return null;
   }
@@ -720,7 +773,7 @@ export class RoomCore {
     const digest = digestJson(input);
     const cached = json<{ refusal: Refusal | null; retained: RetainedLandInput | null }>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op.id, digest), "body");
     if (!cached) {
-      this.kick(`land:${op.id}:${digest}`, () => this.evaluateLandRules(op.id, input, digest, policy));
+      this.kick(`land:${op.id}:${digest}`, () => this.evaluateLandRules(op.id, integration, input, digest, policy));
       return { kind: "waiting", obligations: [] };
     }
     if (cached.refusal) return { kind: "failed", reason: { code: "refused", refusal: cached.refusal } };
@@ -738,10 +791,13 @@ export class RoomCore {
     this.landing.evaluate(op);
   }
 
-  private async evaluateLandRules(op: OpId, input: ReturnType<RoomCore["landInput"]>, digest: Digest, policy: ActivePolicyFull): Promise<void> {
+  private async evaluateLandRules(op: OpId, integration: Sha, input: ReturnType<RoomCore["landInput"]>, digest: Digest, policy: ActivePolicyFull): Promise<void> {
     const r = await this.ports.policy.land(policy, input, { budget: this.ports.policy.actBudget() });
     this.sql.transaction(() => {
+      if (one(this.sql, "SELECT 1 AS x FROM land_evals WHERE op = ? AND digest = ?", op, digest)) return;
       this.retainEvaluations(r.evaluations);
+      // R-LAND-4: the land rules evaluated during preparation, pass or block, as an entry.
+      this.sealSystem({ type: "land-evaluated", op, integration, landInput: r.retained?.digest ?? digest, decisions: r.evaluations.map((e) => e.decision) });
       this.sql.all(
         "INSERT INTO land_evals (op, digest, body) VALUES (?, ?, ?) ON CONFLICT (op, digest) DO NOTHING",
         op,
@@ -801,8 +857,10 @@ export class RoomCore {
 
   /** Recompute pending previews against main (R-PROP-7). */
   async refreshPreviews(): Promise<void> {
+    const pending = this.sql.all("SELECT id, head FROM previews WHERE state = 'pending'");
+    if (!pending.length) return;
     const main = await this.ports.artifacts.readMain();
-    for (const r of this.sql.all("SELECT id, head FROM previews WHERE state = 'pending'")) {
+    for (const r of pending) {
       const id = str(r, "id")!;
       let body: Record<string, unknown>;
       try {
@@ -1030,6 +1088,8 @@ export class RoomCore {
           return p;
         });
       }
+      // R-PUB-10: publish only for the room the registry binds to this repository.
+      if (!(await this.isBound())) throw artroomError("forbidden", "The registry does not bind this repository to this room; nothing is published.");
       const cohort = pending;
       const retained = cohort.retained.map((d) => {
         const r = one(this.sql, "SELECT kind, body FROM retained WHERE digest = ?", d)!;
@@ -1109,6 +1169,8 @@ export class RoomCore {
 
   /** Re-evaluate preparing landings (resuming their derived work), then drive the engine (R-PUB-7 first). */
   async resumeLanding(): Promise<void> {
+    // R-PUB-10: canonical write tokens are minted, and main is pushed, only for the bound room.
+    if (!(await this.isBound())) return;
     for (const op of this.landing.activeViews()) if (op.state === "preparing" && op.integration !== undefined) this.landing.evaluate(op.id);
     await this.landing.reconcile();
   }

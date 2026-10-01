@@ -6,8 +6,13 @@
 import { RpcTarget, WorkerEntrypoint } from "cloudflare:workers";
 import type {
   ActRecord,
+  ArtroomFounder,
   ArtroomService,
+  BearerAct,
+  BearerRequest,
+  ByteStream,
   Cursor,
+  DraftedRoom,
   Genesis,
   Joined,
   ReadQuery,
@@ -15,19 +20,20 @@ import type {
   Redeemed,
   Redemption,
   Refusal,
+  RoomDraft,
   RoomId,
   RoomWire,
   Session,
   SessionToken,
   SignedEnvelope,
   SignedRequest,
-  UpdateStream,
   WorkspaceGrant,
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
-import type { RoomEnv } from "./config.ts";
 import { unwire, type Wire } from "./errors.ts";
-import { draftRoom, foundRoom, roomStub, route } from "./http.ts";
+import { clock, type RoomEnv } from "./config.ts";
+import { draftRoom, foundRoom } from "./founding.ts";
+import { roomStub, route } from "./http.ts";
 import type { Room } from "./room.ts";
 
 /**
@@ -35,7 +41,7 @@ import type { Room } from "./room.ts";
  * disposing it releases only this stub (R-API-2). `subscribe` returns a byte
  * stream of newline-delimited JSON `Update`s (see README, "Contract gaps").
  */
-export class RoomWireTarget extends RpcTarget implements Omit<RoomWire, "subscribe"> {
+export class RoomWireTarget extends RpcTarget implements RoomWire {
   constructor(private readonly stub: DurableObjectStub<Room>) {
     super();
   }
@@ -48,17 +54,25 @@ export class RoomWireTarget extends RpcTarget implements Omit<RoomWire, "subscri
   async redeem(redemption: Redemption): Promise<Joined | Redeemed | Refusal> {
     return unwire((await this.stub.redeem(redemption, "service-binding")) as Wire<Joined | Redeemed | Refusal>);
   }
+  /** R-CRED-10: the room signs under the bearer's session key and delegation. */
+  async bearerAct(bearer: string, act: BearerAct): Promise<ActRecord | Refusal> {
+    return unwire((await this.stub.bearerAct(bearer, act)) as Wire<ActRecord | Refusal>);
+  }
+  async bearerRequest(bearer: string, req: BearerRequest): Promise<WorkspaceOp | WorkspaceGrant | Refusal> {
+    return unwire((await this.stub.bearerRequest(bearer, req)) as Wire<WorkspaceOp | WorkspaceGrant | Refusal>);
+  }
   async read<Q extends ReadQuery>(session: SessionToken, query: Q): Promise<ReadResults[Q["q"]]> {
     return unwire((await this.stub.read(session, query)) as Wire<ReadResults[Q["q"]]>);
   }
-  async subscribe(session: SessionToken, cursor?: Cursor): Promise<ReadableStream<Uint8Array>> {
+  /** Newline-delimited JSON `Update`s as UTF-8 bytes (R-API-8). */
+  async subscribe(session: SessionToken, cursor?: Cursor): Promise<ByteStream> {
     return (await this.stub.subscribe(session, cursor)) as ReadableStream<Uint8Array>;
   }
   [Symbol.dispose](): void {}
 }
 
-/** The default export: `fetch` serves HTTPS; RPC methods serve `env.ARTROOM` bindings. */
-export default class Artroom extends WorkerEntrypoint<RoomEnv> implements Omit<ArtroomService, "room"> {
+/** The default export: `fetch` serves HTTPS; RPC methods serve `env.ARTROOM` bindings (`ArtroomService`, `ArtroomFounder`). */
+export default class Artroom extends WorkerEntrypoint<RoomEnv> implements Omit<ArtroomService, "room">, ArtroomFounder {
   override async fetch(req: Request): Promise<Response> {
     return route(req, this.env);
   }
@@ -68,15 +82,13 @@ export default class Artroom extends WorkerEntrypoint<RoomEnv> implements Omit<A
     return new RoomWireTarget((await roomStub(this.env, room)) as unknown as DurableObjectStub<Room>);
   }
 
-  /** Founding, step 1 (an addition to the contract): the genesis to sign. */
-  async draft(input: unknown): Promise<{ readonly genesis: Genesis; readonly draft: string }> {
-    return draftRoom(this.env, input, Date.now());
+  /** Founding, step 1 (R-GEN-10). */
+  async draft(input: RoomDraft): Promise<DraftedRoom> {
+    return draftRoom(this.env, input, clock());
   }
 
-  /** Founding, step 2: the signed genesis. */
+  /** Founding, step 2 (R-GEN-10). */
   async found(genesis: Genesis, sig: string, draft: string): Promise<RoomId> {
-    return foundRoom(this.env, genesis, sig, draft);
+    return foundRoom(this.env, genesis, sig, draft, clock());
   }
 }
-
-export type { UpdateStream };
