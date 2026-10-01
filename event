@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/ui/src/ui/landing.tsx","body":{"commit":"5000a2415906f1e2439daa9b05467c3d348c0ffd","path":"packages/ui/src/ui/landing.tsx"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0348e81525290ea6b398dc017585cc739cddebe9","text":"Merge retired a covered predecessor; the successor is at packages/contract/src/transports.ts."}
