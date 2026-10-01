@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:743b42a7c8681ea5da82356418ba89e880177074","text":"Merge retired a covered predecessor; the successor is at spikes/room-core/results/deployed-string-doubling.jsonl."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7a42497b6f80246665157e7528452fe6c73c5ce0","text":"Merge retired a covered predecessor; the successor is at spikes/room-core/results/deployed-cpu-limit.jsonl."}
