@@ -207,6 +207,12 @@ export class ArtifactsAdapter implements ArtifactsPort {
     return r.kind === "ok" ? touchedPaths(r.changes) : null;
   }
 
+  /**
+   * A merge preview (R-PROP-7). A fast-forward needs no sandbox: the
+   * integration is the head itself. Otherwise lane B's sandbox runs the same
+   * planner as the landing and returns the merge commit, so a landing on the
+   * same main lands exactly this commit (lane B's `Pinning.preview`).
+   */
   async preview(lane: LaneId, generation: number, head: Sha, main: Sha | null): Promise<PreviewResult> {
     if (main === null) return { kind: "clean", base: head, integration: head };
     const repo = await this.canonical();
@@ -214,12 +220,9 @@ export class ArtifactsAdapter implements ArtifactsPort {
     if (plan.kind === "too-large") throw new Error(`the preview is over the diff bound (${plan.bound})`);
     const lb = await changedPaths(repo, main, head, { bounds: this.bounds(), cache: this.cache });
     const bases = [...(lb.bases ?? [])].sort();
-    const base = (bases[0] ?? main) as Sha;
-    // A fast-forward: the integration is the head itself.
-    const ff = bases.length === 1 && bases[0] === main;
-    if (plan.kind === "disjoint") return { kind: "clean", base, integration: ff ? head : null };
+    if (plan.kind === "disjoint" && bases.length === 1 && bases[0] === main) return { kind: "clean", base: main, integration: head };
     const r = await (await this.pinning()).preview(lane, generation, head);
-    return r.kind === "clean" ? { kind: "clean", base: r.base as Sha, integration: ff ? head : null } : { kind: "conflict", base: r.base as Sha, paths: r.paths };
+    return r.kind === "clean" ? { kind: "clean", base: r.base as Sha, integration: r.integration as Sha } : { kind: "conflict", base: r.base as Sha, paths: r.paths };
   }
 
   async snapshot(commit: Sha, inputs: readonly Glob[]): Promise<{ readonly digest: `sha256:${string}`; readonly files: number } | null> {

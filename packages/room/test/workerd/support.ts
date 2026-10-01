@@ -33,6 +33,8 @@ import type {
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { FakeArtifactsHost, lanePolicy, setAlarmDelay, setClock, setServicesFactory, type ArtifactsPort, type PolicyPort, type Registry, type Room } from "../../src/index.ts";
 import { forkName, type FaultPoint, type DiffBounds } from "@generalbusiness/artroom-git";
+import { artifactsLogRemote } from "../../src/logremote.ts";
+import type { ArtifactsBinding } from "../../src/artifacts.ts";
 import { buildTree, encodeCommit, gitObject, readLogFiles } from "@generalbusiness/artroom-log";
 import { b64url, digestBytes, hex, keyPairFromSeed, newKeyPair, randomBytes, randomToken, sign, type KeyPair } from "../../src/crypto.ts";
 import { iso, roomIdOf } from "../../src/ids.ts";
@@ -213,7 +215,8 @@ setServicesFactory((_env, objectId) => {
         return host.namespace;
       },
       publisher: host.stub,
-      logRemote: async () => host.canonicalRepo(),
+      // The production log remote, over the fake binding and the fake sandbox's pushLog and readLogRef.
+      logRemote: async (loc) => artifactsLogRemote(host.binding as unknown as ArtifactsBinding, host.logStub, loc),
       sleep: async () => {},
       bounds: world.bounds,
       wrapArtifacts: (world as unknown as { instrument: (a: ArtifactsPort) => ArtifactsPort }).instrument,

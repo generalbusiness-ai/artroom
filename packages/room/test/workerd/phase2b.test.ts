@@ -24,7 +24,7 @@ import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
 import { obligationsFor } from "../../src/obligations.ts";
 import { artifactsErrors } from "../../src/memory/artifacts.ts";
-import { addMember, advance, call, clock, Client, expectOk, expectRefusal, grant, iso, makeRoom, newKeyPair, openedWorkspace, placeRepo, pushChange, randomBytes, sign, tick, tokenLive, until, worldFor, type TestRoom } from "./support.ts";
+import { addMember, advance, call, clock, Client, expectOk, expectRefusal, failure, grant, iso, makeRoom, newKeyPair, openedWorkspace, placeRepo, pushChange, randomBytes, sign, tick, tokenLive, until, worldFor, type TestRoom } from "./support.ts";
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const entries = async (r: TestRoom): Promise<LogEntry[]> => [...(await r.admin.read({ q: "log", req: { limit: 500 } })).acts];
@@ -332,6 +332,62 @@ describe("policy activation and recompute, scoped check carry and filtered check
   });
 });
 
+// ------------------------------------------------------------------ previews
+
+describe("previews from lane B's planner (R-PROP-7)", () => {
+  const preview = async (r: TestRoom, lane: string) =>
+    ((await r.admin.read({ q: "proposal", ref: { lane: lane as never, generation: 1 } }))!.preview) as { state: string; base?: string; integration?: string };
+
+  it("a fast-forward previews the head itself, with no sandbox run", async () => {
+    const r = await makeRoom();
+    const alice = await addMember(r, "@alice", "member");
+    const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    await tick(r);
+    expect(await preview(r, lane)).toMatchObject({ state: "clean", integration: head });
+    expect(r.world.artifacts.remoteCalls.get("preview") ?? 0).toBe(0);
+  });
+
+  it("disjoint paths after main moved: the sandbox's merge commit, which the landing on that main then lands exactly", async () => {
+    const r = await makeRoom();
+    const alice = await addMember(r, "@alice", "member");
+    const bob = await addMember(r, "@bob", "member");
+    const mine = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    const other = await proposed(r, bob, ["docs/**"], { "docs/a.md": "a" });
+    const first = await bob.ok<Landing>("land", { lane: other.lane, generation: 1 }, { lease: 1, head: other.head });
+    await tick(r, 3);
+    expect(await op(r, first.op.id)).toMatchObject({ state: "landed" });
+    // Main moved: Alice's preview is recomputed by the sandbox, which stores the merge commit.
+    await tick(r);
+    const pv = await preview(r, mine.lane);
+    expect(pv.state).toBe("clean");
+    expect(pv.integration).not.toBe(mine.head);
+    expect(r.world.artifacts.parents(pv.integration as never)).toEqual([r.world.artifacts.main, mine.head]);
+    expect(r.world.artifacts.refs.get(`refs/artroom/objects/${pv.integration}`)).toBe(pv.integration);
+    // The same planner on the same main: the landing's integration is the preview's commit.
+    const l = await alice.ok<Landing>("land", { lane: mine.lane, generation: 1 }, { lease: 1, head: mine.head });
+    await tick(r, 3);
+    expect(await op(r, l.op.id)).toMatchObject({ state: "landed", integration: pv.integration });
+    expect(r.world.artifacts.main).toBe(pv.integration);
+  });
+
+  it("after main moved under them: a clean merge carries the sandbox's commit; a conflict carries its paths", async () => {
+    const r = await makeRoom({ files: { "src/a.ts": "a\n", "src/b.ts": "b\n" } });
+    const alice = await addMember(r, "@alice", "member");
+    const carol = await addMember(r, "@carol", "member");
+    const clean = await proposed(r, alice, ["src/a.ts"], { "src/a.ts": "alice\n" });
+    const clash = await proposed(r, carol, ["src/b.ts"], { "src/b.ts": "carol\n" });
+    // Main changes src/b.ts: Alice's change merges cleanly, Carol's conflicts. Previews are recomputed when main moves.
+    const a = r.world.artifacts;
+    a.main = a.commit(a.main, { "src/b.ts": "bob\n" });
+    await inDO(r, (room) => room.core.sql.all("UPDATE previews SET state = 'pending'"));
+    await tick(r);
+    const pa = await preview(r, clean.lane);
+    expect(pa.state).toBe("clean");
+    expect(a.parents(pa.integration as never)).toEqual([a.main, clean.head]);
+    expect(await preview(r, clash.lane)).toMatchObject({ state: "conflict", paths: ["src/b.ts"] });
+  });
+});
+
 // ------------------------------------------------------------------ offline replay
 
 describe("offline replay of the produced log (lane L's verifyLog, R-LOG-10)", () => {
@@ -398,15 +454,51 @@ describe("the adapters' boundaries", () => {
     expectRefusal(await r.admin.act("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" }), "head-unknown");
   });
 
-  it("the production log remote reads the published log exactly through the binding, so verifyLog runs over it; it pushes only through the sandbox", async () => {
+  it("the production log remote, as the live services behave: the ref is read by the sandbox, objects through the binding of whatever type, each hashed; verifyLog runs over it", async () => {
+    const r = await makeRoom();
+    await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
+    // Published through the same remote: pushLog under a 60-second write token.
+    const p = await call<{ commit: string }>(r.stub.publishLog());
+    const a = r.world.artifacts;
+    const loc = { namespace: a.namespace, name: a.canonical };
+    // Live, the binding's log({ ref }) returns nothing for the log ref; the sandbox's readLogRef sees it.
+    expect(await a.canonicalRepo().log({ ref: "refs/artroom/log", limit: 1 })).toEqual([]);
+    const remote = artifactsLogRemote(a.binding as unknown as ArtifactsBinding, a.logStub, loc);
+    expect(await remote.readRef("refs/artroom/log")).toBe(p.commit);
+    // Live, readCommit and readTree throw for an object of another type; every tree and blob is still read.
+    const report = await verifyLog(remote);
+    expect(report).toMatchObject({ ok: true, failures: [] });
+    expect(a.remoteCalls.get("readCommit")).toBeGreaterThan(0);
+    // Every token the remote minted (read and write, at most 60 seconds) was revoked.
+    expect(a.canonicalRepo().activeTokens()).toEqual([]);
+  });
+
+  it("a log ref that cannot be read is an error, never an absent ref", async () => {
+    const r = await makeRoom();
+    const a = r.world.artifacts;
+    const unreadable = { ...a.logStub, readLogRef: async () => Promise.reject(new Error("ls-remote failed")) };
+    const remote = artifactsLogRemote(a.binding as unknown as ArtifactsBinding, unreadable, { namespace: a.namespace, name: a.canonical });
+    await expect(remote.readRef("refs/artroom/log")).rejects.toThrow(/ls-remote failed/);
+    expect(a.canonicalRepo().activeTokens()).toEqual([]);
+    // Through the Room: publication is unavailable, nothing advances, and a later read completes it.
+    await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
+    const read = a.logStub.readLogRef;
+    (a.logStub as { readLogRef: typeof read }).readLogRef = async () => Promise.reject(new Error("ls-remote failed"));
+    try {
+      expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
+    } finally {
+      (a.logStub as { readLogRef: typeof read }).readLogRef = read;
+    }
+    expect(a.logRef).toBeNull();
+    expect((await r.admin.read({ q: "log" })).publishedThrough).toBe(-1);
+    expect((await call<{ through: number }>(r.stub.publishLog())).through).toBe(2);
+  });
+
+  it("an object the binding decodes differently does not hash to its ID, and is refused", async () => {
     const r = await makeRoom();
     await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
     await call(r.stub.publishLog());
     const a = r.world.artifacts;
-    const loc = { namespace: a.namespace, name: a.canonical };
-    const remote = artifactsLogRemote(a.binding as unknown as ArtifactsBinding, {}, loc);
-    expect(await verifyLog(remote)).toMatchObject({ ok: true, failures: [] });
-    // A binding that decodes a blob differently: the object does not hash to what was asked, and is refused.
     const lying = {
       ...a.binding,
       get: async (name: string) => {
@@ -414,8 +506,7 @@ describe("the adapters' boundaries", () => {
         return Object.assign(Object.create(repo), { readBlob: async () => new Blob(["not what was stored"]) });
       },
     } as unknown as ArtifactsBinding;
-    await expect(verifyLog(artifactsLogRemote(lying, {}, loc))).rejects.toThrow(/could not be read exactly/);
-    await expect(remote.push([], "refs/artroom/log", "0".repeat(40) as never, null)).rejects.toThrow(/pushLog/);
+    await expect(verifyLog(artifactsLogRemote(lying, a.logStub, { namespace: a.namespace, name: a.canonical }))).rejects.toThrow(/could not be read/);
   });
 
   it("with a policy carry rule in force, a check does not carry: it reruns", async () => {

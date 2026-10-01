@@ -22,10 +22,10 @@ import {
   type GitObject,
   type GitRemote,
   type ObjectType,
-  type PushOutcome as LogPushOutcome,
+  type PushOutcome as GitPushOutcome,
 } from "@generalbusiness/artroom-log";
 import type { PinResult, PreviewResult, BuildResult, PublisherStub, PushOutcome } from "@generalbusiness/artroom-git";
-import { forkName } from "@generalbusiness/artroom-git";
+import { decodeLogPush, forkName, integrationMessage, type LogPushOutcome, type LogRemoteStub } from "@generalbusiness/artroom-git";
 import { utf8 } from "../canonical.ts";
 import { randomToken } from "../crypto.ts";
 
@@ -163,6 +163,12 @@ export class FakeRepo implements GitRemote {
     return o && o.type === type ? o.data : null;
   }
 
+  /** As the live binding does: `readCommit` and `readTree` throw an internal error for an object of another type. */
+  private wrongType(sha: string, type: ObjectType): void {
+    const o = this.objects.has(sha) ? this.host.store.get(sha) : undefined;
+    if (o && o.type !== type) throw artifactsErrors.internal();
+  }
+
   async readBlob(hash: string): Promise<Blob | null> {
     this.host.enter("readBlob");
     const d = this.object(hash, "blob");
@@ -172,6 +178,7 @@ export class FakeRepo implements GitRemote {
   async readTree(hash: string) {
     this.host.enter("readTree");
     if (hash === EMPTY_TREE) return [];
+    this.wrongType(hash, "tree");
     const d = this.object(hash, "tree");
     if (!d) return null;
     return parseTree(d).map((e) => ({ name: e.name, mode: e.mode, hash: e.sha, type: e.mode === "40000" ? ("tree" as const) : ("blob" as const) }));
@@ -179,6 +186,7 @@ export class FakeRepo implements GitRemote {
 
   async readCommit(hash: string) {
     this.host.enter("readCommit");
+    this.wrongType(hash, "commit");
     const d = this.object(hash, "commit");
     if (!d) return null;
     const c = parseCommit(d);
@@ -205,7 +213,9 @@ export class FakeRepo implements GitRemote {
   async log(opts: { ref?: string; limit?: number } = {}) {
     this.host.enter("log");
     const ref = opts.ref ?? "main";
-    let at: string | undefined = this.refs.get(ref) ?? this.refs.get(`refs/heads/${ref}`) ?? (this.objects.has(ref) ? ref : undefined);
+    // As the live binding does: branches, tags and commit IDs resolve; other refs (refs/artroom/log) return nothing.
+    const named = ref.startsWith("refs/heads/") || ref.startsWith("refs/tags/") ? this.refs.get(ref) : this.refs.get(`refs/heads/${ref}`) ?? this.refs.get(`refs/tags/${ref}`);
+    let at: string | undefined = named ?? (this.objects.has(ref) ? ref : undefined);
     const out: { hash: string; treeHash: string; parents: string[]; committedAt: number }[] = [];
     while (at && out.length < (opts.limit ?? 50)) {
       const d = this.object(at, "commit");
@@ -250,7 +260,7 @@ export class FakeRepo implements GitRemote {
     return this.refs.get(ref) ?? null;
   }
 
-  async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<LogPushOutcome> {
+  async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<GitPushOutcome> {
     const log = this.host.log;
     log.pushes++;
     log.pushedSinceRead = true;
@@ -580,6 +590,25 @@ export class FakeArtifactsHost {
 
   // ------------------------------------------------------------ the publisher sandbox
 
+  /**
+   * Lane B's one planner, for previews and landings alike: the head itself
+   * when it fast-forwards main, otherwise a merge commit whose message and
+   * date depend only on its inputs (`integrationMessage`, the later parent's
+   * commit time), so a preview and a landing on the same main build the
+   * same commit.
+   */
+  build(main: Sha, head: Sha, lane: string, generation: number): { base: Sha; integration: Sha; fastForward: boolean } | { base: Sha; conflicts: RepoPath[] } {
+    if (this.ancestors(head).has(main)) return { base: main, integration: head, fastForward: true };
+    const m = this.merge(main, head);
+    if ("conflicts" in m) return m;
+    const at = Math.max(this.commitTime(main), this.commitTime(head));
+    return { base: m.base, integration: this.writeCommit([main, head], m.files, { blobs: true, at, message: integrationMessage(lane, generation) }), fastForward: false };
+  }
+
+  commitTime(sha: Sha): number {
+    return Number(/ (\d+) [+-]\d{4}$/.exec(this.commit_(sha).committer)?.[1] ?? 0);
+  }
+
   /** Push controls: hold a push in flight, or make pushes end with no answer. */
   readonly controls: PushControls = { pausePush: false, failPushes: 0, errorPushes: 0, lostPushReports: 0 };
 
@@ -617,32 +646,26 @@ export class FakeArtifactsHost {
     },
     preview: async (req): Promise<PreviewResult> => {
       this.enter("preview");
-      const canonical = this.authorized(req.canonical, "read");
+      // A merge preview stores its commit, so its token is a write token.
+      const canonical = this.authorized(req.canonical, "write");
       const main = canonical.refs.get("refs/heads/main");
-      if (!main) return { kind: "clean", base: req.head, tree: this.treeOf(req.head as Sha) };
-      const m = this.merge(main, req.head as Sha);
-      if ("conflicts" in m) return { kind: "conflict", base: m.base, paths: m.conflicts };
-      const sha = this.writeCommit([main, req.head as Sha], m.files, { blobs: true, at: 0 });
-      return { kind: "clean", base: m.base, tree: this.treeOf(sha) };
+      if (!main) return { kind: "clean", base: req.head, tree: this.treeOf(req.head as Sha), integration: req.head, fastForward: true };
+      const b = this.build(main, req.head as Sha, req.lane, req.generation);
+      if ("conflicts" in b) return { kind: "conflict", base: b.base, paths: b.conflicts };
+      if (!b.fastForward) {
+        for (const o of this.closure(b.integration)) canonical.objects.add(o);
+        canonical.refs.set(`refs/artroom/objects/${b.integration}`, b.integration);
+      }
+      return { kind: "clean", base: b.base, tree: this.treeOf(b.integration), integration: b.integration, fastForward: b.fastForward };
     },
     integrate: async (req): Promise<BuildResult> => {
       this.enter("integrate");
       const canonical = this.authorized(req.canonical, "write");
-      const head = req.head as Sha;
-      const main = req.expectedMain as Sha;
-      let integration: Sha;
-      let fastForward = false;
-      if (this.ancestors(head).has(main)) {
-        integration = head;
-        fastForward = true;
-      } else {
-        const m = this.merge(main, head);
-        if ("conflicts" in m) return { kind: "conflict", paths: m.conflicts };
-        integration = this.writeCommit([main, head], m.files, { blobs: true, at: req.committedAt, message: req.message });
-      }
-      for (const o of this.closure(integration)) canonical.objects.add(o);
-      canonical.refs.set(req.storeRef, integration);
-      return { kind: "clean", integration, ref: req.storeRef, fastForward };
+      const b = this.build(req.expectedMain as Sha, req.head as Sha, req.lane, req.generation);
+      if ("conflicts" in b) return { kind: "conflict", paths: b.conflicts };
+      for (const o of this.closure(b.integration)) canonical.objects.add(o);
+      canonical.refs.set(req.storeRef, b.integration);
+      return { kind: "clean", integration: b.integration, ref: req.storeRef, fastForward: b.fastForward };
     },
     push: async (req): Promise<PushOutcome> => {
       this.enter("push");
@@ -668,6 +691,27 @@ export class FakeArtifactsHost {
         return { outcome: "unknown", detail: "the pack was sent and the connection dropped before the report" };
       }
       return { outcome: "landed", detail: "updated" };
+    },
+  };
+
+  // ------------------------------------------------------------ the sandbox's log remote
+
+  /** Lane B's `pushLog` and `readLogRef`: each checks its token, as the sandbox's gateway does. */
+  readonly logStub: LogRemoteStub = {
+    pushLog: async (req): Promise<LogPushOutcome> => {
+      const canonical = this.authorized(req.canonical, "write");
+      const decoded = decodeLogPush(req);
+      if ("refused" in decoded) return decoded.refused;
+      return canonical.push(
+        decoded.objects.map((o) => gitObject(o.type, o.data)),
+        req.ref,
+        req.next as Sha,
+        req.lease as Sha | null,
+      ) as Promise<LogPushOutcome>;
+    },
+    readLogRef: async (req) => {
+      const canonical = this.authorized(req.canonical, "read");
+      return canonical.readRef(req.ref);
     },
   };
 

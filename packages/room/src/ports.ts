@@ -148,14 +148,9 @@ export type DiffResult =
   | { readonly kind: "ok"; readonly base: Sha; readonly changed: readonly PathChange[] }
   | { readonly kind: "too-large"; readonly base: Sha };
 
-/**
- * A merge preview. `integration` is the head itself for a fast-forward; for
- * a merge, lane B's planner builds no commit (a disjoint merge is decided by
- * paths, an overlapping one yields a tree), so it is null (contract gap:
- * `PreviewOp.clean` requires an integration).
- */
+/** A merge preview: the head itself for a fast-forward, otherwise the merge commit lane B's sandbox built. */
 export type PreviewResult =
-  | { readonly kind: "clean"; readonly base: Sha; readonly integration: Sha | null }
+  | { readonly kind: "clean"; readonly base: Sha; readonly integration: Sha }
   | { readonly kind: "conflict"; readonly base: Sha; readonly paths: readonly RepoPath[] };
 
 /**

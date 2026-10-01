@@ -24,6 +24,7 @@ import type { Room } from "../../src/index.ts";
 import { createSchema } from "../../src/store.ts";
 import { cursor } from "../../src/reads.ts";
 import { LogPublisher } from "@generalbusiness/artroom-log";
+import { forkName } from "@generalbusiness/artroom-git";
 import { delegableBy } from "../../src/roster.ts";
 import {
   addMember,
@@ -139,7 +140,9 @@ describe("2. a workspace is fenced by the lease's deadline, not only its generat
     // lease's workspace: the operation is gone from the view.
     expect((await failure(r.stub.read(await r.admin.session(), { q: "op", op: id as never }))).code).toBe("not-found");
     // No token for the lease was minted.
-    expect(r.world.artifacts.remoteCalls.get("createToken") ?? 0).toBe(0);
+    const fork = r.world.artifacts.repo(forkName(r.world.artifacts.canonical, c.lane));
+    // Only the token that came with the fork itself, which lane B's sweep revokes.
+    expect(fork.tokens.size).toBe(1);
     expect(events(await entries(r), "lease-expired").length).toBe(1);
     await tick(r);
     expect(events(await entries(r), "lease-expired").length).toBe(1);

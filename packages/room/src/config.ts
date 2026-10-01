@@ -11,7 +11,7 @@
 import type { PublisherStub } from "@generalbusiness/artroom-git";
 import type { LaneId } from "@generalbusiness/artroom-contract";
 import type { ArtifactsBinding } from "./artifacts.ts";
-import { artifactsLogRemote, type LogPushStub } from "./logremote.ts";
+import { artifactsLogRemote, type LogRemoteStub } from "./logremote.ts";
 import { lanePolicy } from "./policy.ts";
 import type { RoomServices } from "./ports.ts";
 
@@ -43,26 +43,26 @@ function missing(what: string): never {
 const productionServices: ServicesFactory = (env, roomObject) => {
   const artifacts = (env.ARTIFACTS ?? null) as ArtifactsBinding | null;
   const namespace = env.ARTIFACTS_NAMESPACE ?? env.PUBLIC_NAMESPACE ?? "artroom-public";
-  const publisher = (): PublisherStub & LogPushStub => (env.PUBLISHER ? (env.PUBLISHER.get(env.PUBLISHER.idFromName(roomObject)) as unknown as PublisherStub & LogPushStub) : missing("PUBLISHER"));
+  const publisher = (): PublisherStub & LogRemoteStub => (env.PUBLISHER ? (env.PUBLISHER.get(env.PUBLISHER.idFromName(roomObject)) as unknown as PublisherStub & LogRemoteStub) : missing("PUBLISHER"));
   const binding: ArtifactsBinding = artifacts ?? {
     get: async () => missing("ARTIFACTS"),
     create: async () => missing("ARTIFACTS"),
   };
   // The stub is resolved per call, so a deployment without the sandbox still founds rooms and admits acts that need no repository work.
-  const stub: PublisherStub & LogPushStub = {
+  const stub: PublisherStub = {
     pinObjects: (r) => publisher().pinObjects(r),
     pinRef: (r) => publisher().pinRef(r),
     preview: (r) => publisher().preview(r),
     integrate: (r) => publisher().integrate(r),
     push: (r) => publisher().push(r),
-    pushLog: (r) => {
-      const p = publisher();
-      return p.pushLog ? p.pushLog(r) : missing("publisher pushLog");
-    },
+  };
+  const logStub: LogRemoteStub = {
+    pushLog: (r) => publisher().pushLog(r),
+    readLogRef: (r) => publisher().readLogRef(r),
   };
   return {
     policy: lanePolicy(),
-    remotes: { artifacts: binding, namespace, publisher: stub, logRemote: async (repo) => artifactsLogRemote(binding, stub, repo) },
+    remotes: { artifacts: binding, namespace, publisher: stub, logRemote: async (repo) => artifactsLogRemote(binding, logStub, repo) },
   };
 };
 

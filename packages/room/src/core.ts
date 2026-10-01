@@ -1033,7 +1033,7 @@ export class RoomCore {
         const p = await this.ports.artifacts.preview(str(r, "lane") as LaneId, num(r, "generation")!, str(r, "head") as Sha, main);
         body =
           p.kind === "clean"
-            ? { state: "clean", base: p.base, ...(p.integration ? { integration: p.integration } : {}) }
+            ? { state: "clean", base: p.base, integration: p.integration }
             : { state: "conflict", base: p.base, paths: p.paths };
       } catch {
         body = { state: "failed", error: artroomError("unavailable", "The preview could not be computed.") };
