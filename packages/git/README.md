@@ -21,7 +21,7 @@ It depends on `@generalbusiness/artroom-contract` (lane 0) for its types.
 | Pinning and previews | `src/publisher/client.ts` | Copies a proposed head into the canonical repo and pins it at `refs/artroom/heads/<lane>/<generation>`; merge previews, with the integration commit the landing would push |
 | Path diffs | `src/diff/treediff.ts` | Changed paths through the Artifacts binding: bounded, cached by tree hash, with merge bases, exact renames, and the overlap test that decides whether a preview needs the sandbox |
 | Publisher sandbox | `src/publisher/container.ts`, `gitops.ts` | A Durable Object that owns a container with git only. Every git command is hardened; no repository code runs |
-| Log push | `src/publisher/container.ts` (`pushLog`), `log-push.ts` | Pushes lane L's log commit to `refs/artroom/log` under a lease and answers with lane L's `PushOutcome` |
+| Log remote | `src/publisher/container.ts` (`pushLog`, `readLogRef`), `log-push.ts` | Pushes lane L's log commit to `refs/artroom/log` under a lease, answering with lane L's `PushOutcome`; reads the ref back |
 | Gateway and ref fence | `src/publisher/container.ts`, `ref-fence.ts` | The container's only way out. It adds each operation's token and lets a push through only if every ref update is the one that operation allows |
 | Harness Worker | `src/worker.ts`, `wrangler.jsonc` | Worker `artroom-lb-git`: the publisher, plus a key-protected stand-in Room for live tests |
 | Container image | `container/` | `image.sh` copies `alpine/git` into Cloudflare's registry (no Docker needed); `Dockerfile` for machines with Docker |
@@ -128,17 +128,21 @@ token is a write token, allowed to create exactly that ref). If main has
 not moved when the operation is prepared, the landing builds and pushes
 that same commit.
 
-## Log push (lane L)
+## Log remote (lane L)
 
-The publisher's `pushLog` is lane L's `GitRemote.push`, as lane A's log
-remote calls it (`LogPushStub`):
+The publisher's `pushLog` and `readLogRef` are lane L's `GitRemote.push`
+and `GitReader.readRef`, as lane A's log remote calls them
+(`LogRemoteStub`):
 
 ```ts
 pushLog({ canonical: { remote, token }, objects: [{ type, data /* unpadded base64url */ }], ref: "refs/artroom/log", next, lease })
   → { ok: true } | { ok: false, reason: "lease-mismatch", current } | { ok: false, reason: "unknown", detail }
+readLogRef({ canonical: { remote, token }, ref: "refs/artroom/log" })
+  → the commit ID, or null when the ref does not exist; throws when it cannot be read
 ```
 
-The caller mints a write token of at most 60 seconds and revokes it after.
+For each call the caller mints a token of at most 60 seconds (write for
+`pushLog`, read for `readLogRef`) and revokes it after.
 The sandbox checks the request (only `refs/artroom/log`, commit IDs, at
 most 100,000 objects and 64 MiB), writes the objects, and sends nothing
 unless `next` is a commit whose only parent is `lease` (none when `lease`
@@ -151,11 +155,15 @@ including a request refused before git, is `unknown`, so lane L reads the
 ref back. Revocation or elapsed time never proves an unresolved push did
 not land.
 
-Reading the ref back: live, the Artifacts binding's
-`log({ ref: "refs/artroom/log" })` returns nothing even when the ref is
-there (it resolves branches, tags and commit IDs). `git ls-remote` with a
-read token sees it, and `readCommit`, `readTree` and `readBlob` read the
-objects by ID.
+Reading back: live, the Artifacts binding's `log({ ref: "refs/artroom/log" })`
+returns nothing even when the ref is there (it resolves branches, tags
+and commit IDs). `readLogRef` uses `git ls-remote`, which sees it; the
+gateway allows no ref update on that call. Objects are read by ID through
+the binding, re-encoded and accepted only if they hash to the ID. Live,
+`readCommit` and `readTree` throw (an internal error, not null) for an
+object of another type, and `readBlob` returns null for a non-blob, so a
+reader must treat a throw as "not this type" and try the next. With that,
+lane L's `verifyLog` passes over the binding (`measure/log.live.test.ts`).
 
 ## Workspaces
 
@@ -241,6 +249,7 @@ env -u CLOUDFLARE_API_TOKEN npx wrangler deploy --secrets-file /tmp/lb-secrets
 node measure/live.mjs            # forks, tokens, pinning, diffs, previews, two landings, a conflict, release
 node measure/token-inflight.mjs  # does revoking or expiring a token stop a push in flight?
 node measure/pushlog-live.mjs    # pushLog: two publications, lease mismatches, refusals, read back with git
+npm run test:live                # lane L's publisher and verifyLog through pushLog, readLogRef and the binding
 ```
 
 The scripts make their own repos in the `gitseq-spike` namespace, revoke

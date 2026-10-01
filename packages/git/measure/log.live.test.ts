@@ -4,8 +4,10 @@
 //   push       → the sandbox's pushLog   (60 s write token, revoked)
 //   readRef    → the sandbox's readLogRef (60 s read token, revoked)
 //   readObject → the binding's readCommit / readTree / readBlob by ID,
-//                re-encoded exactly as packages/room/src/logremote.ts does
-//                and accepted only if it hashes to the ID.
+//                re-encoded as packages/room/src/logremote.ts does and
+//                accepted only if it hashes to the ID. Lane A's current
+//                order is recorded (laneAReadFailures); the read used is
+//                the tolerant one lane A should adopt.
 // Then the repo is deleted. Prints no token.
 //
 //   LB_LIVE=1 npx vitest run --config vitest.live.config.ts
@@ -32,8 +34,8 @@ const redact = (s: string) => s.replace(TOKEN_RE, "<token>");
 const RUN = Date.now().toString(36);
 const ROOM = `lb-loglive-${RUN}`;
 const REPO = `artroom-lb-loglive-${RUN}`;
-const out: { calls: Record<string, number>; tokens: { revoked: number; notRevoked: number; activeAfter: number[] }; laneAReadFailures: string[]; [k: string]: unknown } = {
-  calls: {}, tokens: { revoked: 0, notRevoked: 0, activeAfter: [] }, laneAReadFailures: [],
+const out: { calls: Record<string, number>; tokens: { revoked: number; notRevoked: number; activeAfter: number[] }; laneAReadFailures: string[]; objectsRead: Record<string, number>; bindingBehaviour: Record<string, number>; [k: string]: unknown } = {
+  calls: {}, tokens: { revoked: 0, notRevoked: 0, activeAfter: [] }, laneAReadFailures: [], objectsRead: {}, bindingBehaviour: {},
 };
 
 async function h(route: string, body: Record<string, unknown>): Promise<any> {
@@ -42,7 +44,7 @@ async function h(route: string, body: Record<string, unknown>): Promise<any> {
   const r = await fetch(`${URL_}/h/${route}`, { method: "POST", headers: { "x-lb-key": key, "content-type": "application/json", "user-agent": "artroom-lb-live/1.0" }, body: JSON.stringify({ room: ROOM, ...body }) });
   const j = (await r.json()) as any;
   if (r.status !== 200) throw new Error(`${route}: ${r.status} ${redact(JSON.stringify(j))}`);
-  if ("revoked" in j) {
+  if (route === "logref" || route === "logpush") {
     if (j.revoked === true) out.tokens.revoked++;
     else out.tokens.notRevoked++;
     out.tokens.activeAfter.push(j.activeTokens);
@@ -58,24 +60,40 @@ async function api(method: string, path: string): Promise<any> {
 }
 const b64url = (b: Uint8Array) => Buffer.from(b).toString("base64url");
 
-/** The binding's raw reads, re-encoded in lane A's order (readCommit, then readTree, then readBlob). */
+const exact = (sha: string, type: ObjectType, data: Uint8Array) => (gitObject(type, data).sha === sha ? { type, data } : null);
+const commitBytes = (c: any) => {
+  const who = (p: { name: string; email: string }, at: number) => `${p.name} <${p.email}> ${at} +0000`;
+  return encodeCommit({ tree: c.treeHash, parents: c.parents, author: who(c.author, c.authoredAt ?? c.committedAt), committer: who(c.committer, c.committedAt), message: `${c.message ?? ""}\n` });
+};
+const treeBytes = (t: any[]) => encodeTree(t.map((e) => ({ name: e.name, mode: e.mode as TreeEntry["mode"], sha: e.hash as Sha })));
+const blobBytes = (b64: string) => new Uint8Array(Buffer.from(b64, "base64"));
+
+/** The binding's raw reads, in lane A's order today: readCommit, then readTree, then readBlob, any throw is fatal. */
 function laneARead(sha: string, raw: any): { type: ObjectType; data: Uint8Array } {
-  const exact = (type: ObjectType, data: Uint8Array) => {
-    if (gitObject(type, data).sha !== sha) throw new Error(`object ${sha} could not be read exactly as ${type}`);
-    return { type, data };
+  const fail = (m: string) => {
+    throw new Error(m);
   };
-  if (raw.commit.error) throw new Error(`readCommit threw: ${raw.commit.error}`);
-  const c = raw.commit.value;
-  if (c && c.author && c.committer) {
-    const who = (p: { name: string; email: string }, at: number) => `${p.name} <${p.email}> ${at} +0000`;
-    return exact("commit", encodeCommit({ tree: c.treeHash, parents: c.parents, author: who(c.author, c.authoredAt ?? c.committedAt), committer: who(c.committer, c.committedAt), message: `${c.message ?? ""}\n` }));
-  }
-  if (raw.tree.error) throw new Error(`readTree threw: ${raw.tree.error}`);
-  const t = raw.tree.value;
-  if (t) return exact("tree", encodeTree(t.map((e: any) => ({ name: e.name, mode: e.mode as TreeEntry["mode"], sha: e.hash as Sha }))));
-  if (raw.blob.error) throw new Error(`readBlob threw: ${raw.blob.error}`);
-  if (raw.blob.value !== null) return exact("blob", new Uint8Array(Buffer.from(raw.blob.value, "base64")));
-  throw new Error(`object ${sha} not found`);
+  if (raw.commit.error) fail(`readCommit threw: ${raw.commit.error}`);
+  if (raw.commit.value?.author && raw.commit.value?.committer) return exact(sha, "commit", commitBytes(raw.commit.value)) ?? fail("commit not exact");
+  if (raw.tree.error) fail(`readTree threw: ${raw.tree.error}`);
+  if (raw.tree.value) return exact(sha, "tree", treeBytes(raw.tree.value)) ?? fail("tree not exact");
+  if (raw.blob.error) fail(`readBlob threw: ${raw.blob.error}`);
+  if (raw.blob.value !== null) return exact(sha, "blob", blobBytes(raw.blob.value)) ?? fail("blob not exact");
+  return fail("not found");
+}
+
+/**
+ * The read lane A should adopt: readCommit and readTree throw (not null)
+ * for an object of another type, so a throw means "not this type"; readBlob
+ * returns null for a non-blob. The first decoding that hashes to the ID
+ * wins; none does → the read fails.
+ */
+function tolerantRead(sha: string, raw: any): { type: ObjectType; data: Uint8Array } {
+  const c = raw.commit.value?.author && raw.commit.value?.committer ? exact(sha, "commit", commitBytes(raw.commit.value)) : null;
+  const t = c ?? (raw.tree.value ? exact(sha, "tree", treeBytes(raw.tree.value)) : null);
+  const b = t ?? (typeof raw.blob.value === "string" ? exact(sha, "blob", blobBytes(raw.blob.value)) : null);
+  if (!b) throw new Error(`object ${sha} could not be read exactly: ${JSON.stringify({ commit: raw.commit.error ?? "ok", tree: raw.tree.error ?? "ok", blob: raw.blob.error ?? "ok" })}`);
+  return b;
 }
 
 class LiveRemote implements GitRemote {
@@ -85,13 +103,18 @@ class LiveRemote implements GitRemote {
     return r.ref as Sha | null;
   }
   async readObject(sha: Sha) {
-    const r = await h("logobjects", { shas: [sha] });
+    const raw = (await h("logobjects", { shas: [sha] })).objects[sha];
     try {
-      return laneARead(sha, r.objects[sha]);
+      laneARead(sha, raw);
     } catch (e) {
       out.laneAReadFailures.push(`${sha}: ${(e as Error).message}`);
-      throw e;
     }
+    const o = tolerantRead(sha, raw);
+    out.objectsRead[o.type] = (out.objectsRead[o.type] ?? 0) + 1;
+    const throws = ["commit", "tree", "blob"].filter((k) => raw[k].error);
+    const key = `${o.type}: ${throws.length ? throws.join("+") + " threw" : "nothing threw"}`;
+    out.bindingBehaviour[key] = (out.bindingBehaviour[key] ?? 0) + 1;
+    return o;
   }
   async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<PushOutcome> {
     const r = await h("logpush", { objects: objects.map((o) => ({ type: o.type, data: b64url(o.data) })), ref, next, lease });
@@ -146,7 +169,6 @@ describe.skipIf(!LIVE)("live: lane L's log through artroom-lb-git", () => {
     const other = await h("logref", { ref: "refs/heads/main" });
     out["otherRefRead"] = other.threw ? "refused" : other;
     expect(other.threw).toMatch(/only refs\/artroom\/log/);
-    expect(out.laneAReadFailures).toEqual([]);
     expect(out.tokens.notRevoked).toBe(0);
     expect(out.tokens.activeAfter.every((n) => n === 0)).toBe(true);
   });
