@@ -14,7 +14,12 @@ import type {
   RosterRecord,
   Update,
 } from "@generalbusiness/artroom-contract";
-import { policy, requireReview } from "@generalbusiness/artroom-policy/helpers";
+import {
+  policy,
+  requireCheck,
+  requireReview,
+} from "@generalbusiness/artroom-policy/helpers";
+import { digestJson } from "../../src/crypto.ts";
 import type { Room } from "../../src/index.ts";
 import { createSchema } from "../../src/store.ts";
 import { cursor } from "../../src/reads.ts";
@@ -352,6 +357,83 @@ describe("4. a review that reopens an obligation seals the reopening", () => {
         ref: { lane: c.lane, generation: 1 },
       }))!.obligations[0]!.state,
     ).toBe("open");
+  });
+});
+
+describe("4. checks use the same effect calculator", () => {
+  it("@ci passes, then fails on the same input: a check only adds evidence, so the pass keeps the obligation met and the failure seals no transition", async () => {
+    const unit = {
+      format: "artroom-checker-v1",
+      volatile: false,
+      timeoutSeconds: 60,
+    };
+    const r = await makeRoom({
+      policy: policy(
+        requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }),
+      ),
+      files: { ".artroom/checkers/unit.json": JSON.stringify(unit) },
+    });
+    const ci = await addMember(r, "@ci", "checker");
+    const c = await r.admin.ok<Claim>("claim", null, {
+      goal: "g",
+      scope: ["src/**"],
+    });
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    await r.admin.ok(
+      "propose",
+      { lane: c.lane },
+      { lease: 1, expectedGeneration: 0, head, summary: "s" },
+    );
+    await tick(r);
+    const p = (await r.admin.read({
+      q: "proposal",
+      ref: { lane: c.lane, generation: 1 },
+    }))!;
+    if (p.preview.state !== "clean") throw new Error("preview not clean");
+    const integration = p.preview.integration;
+    const tree = r.world.artifacts.commits.get(integration)!.tree;
+    const body = {
+      obligation: "obl_unit-tests",
+      check: "unit",
+      integration,
+      input: { kind: "tree", tree },
+      config: digestJson(unit),
+      runner: `sha256:${"0".repeat(64)}`,
+      volatile: false,
+      ok: true,
+      detail: "42 passed",
+    };
+    const passed = await ci.ok("check", { lane: c.lane, generation: 1 }, body);
+    const failed = await ci.ok(
+      "check",
+      { lane: c.lane, generation: 1 },
+      { ...body, ok: false, detail: "1 failed" },
+    );
+    const effects = (seq: number) =>
+      entries(r).then(
+        (l) =>
+          (
+            l.find((e) => e.seq === seq)!.entry as unknown as {
+              receipt: { effects: unknown[] };
+            }
+          ).receipt.effects,
+      );
+    expect(await effects(passed.seq)).toEqual([
+      {
+        type: "obligations",
+        lane: c.lane,
+        generation: 1,
+        opened: [],
+        met: ["obl_unit-tests"],
+      },
+    ]);
+    expect(
+      (await r.admin.read({
+        q: "proposal",
+        ref: { lane: c.lane, generation: 1 },
+      }))!.obligations[0]!.state,
+    ).toBe("met");
+    expect(await effects(failed.seq)).toEqual([]);
   });
 });
 

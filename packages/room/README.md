@@ -83,18 +83,19 @@ The Room talks to other lanes through three small interfaces in
 | `PolicyPort` | Evaluates `refuse`, `require`, `carry`, `land` and `notify` rules | **Wired.** [src/policy.ts](src/policy.ts) calls lane C's `@generalbusiness/artroom-policy`. It passes the lane purpose, the recovery-key flag, carry facts and the notify directory, so each is in the replay context. One act shares one meter. |
 | `LandingPort` and `LandingHost` | The landing state machine, and the Room's side of it | **Not wired.** The interfaces match lane B's `Landing` class and `LandingRoom` interface, so the adapter is `(sql, host) => new Landing({ sql, room: host, publisher, tokens })`. Lane B's package is not on main yet. Tests use [src/memory/landing.ts](src/memory/landing.ts), which follows lane B's state machine. |
 | `ArtifactsPort` | Repository creation at founding, forks, workspace tokens, heads, pinned refs, diffs and previews | **Not wired.** Tests use [src/memory/artifacts.ts](src/memory/artifacts.ts), a small in-memory git. |
-| `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | **Not wired.** It has lane L's `LogPublisher` contract, so the adapter is `() => LogPublisher.open(remote)`. Lane L's package is in review. Tests use a stand-in with the same contract over [src/memory/log.ts](src/memory/log.ts)'s remote, whose faults are transport faults only. |
+| `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | **Not wired.** It has lane L's `LogPublisher` contract, plus `commitFor`: the commit that `publish` would make of a cohort on a given parent, computed by the same Git serialization, with no I/O. The adapter is `() => LogPublisher.open(remote)` once lane L exposes `commitFor`. Lane L's package is in review. Tests use a stand-in with the same contract over [src/memory/log.ts](src/memory/log.ts)'s remote, whose faults are transport faults only. |
 
 The Room's side of log publication is durable. Before any remote write it
 stores the cohort: the entries through N, the signed checkpoint, the
-retained files, and the expected parent (the last commit it confirmed).
-Every attempt, even after a restart, publishes that same cohort. The
-publisher reads the ref back after an unclear answer and completes forward.
-The Room seals the `checkpoint` event and moves `publishedThrough` only
-after the publisher confirms the commit. When the publisher reopens, the
-ref must hold either the last confirmed commit or one that publishes exactly
-the pending cohort; anything else is another writer, and publication stops
-and tells the admins.
+retained files, the parent (the last commit it confirmed), and the exact
+commit the publisher's serialization makes of them (`commitFor`). Every
+attempt, even after a restart, publishes that same cohort. The publisher
+reads the ref back after an unclear answer and completes forward. The Room
+seals the `checkpoint` event and moves `publishedThrough` only when the
+publisher confirms that exact commit. When the publisher reopens, the ref
+must hold the parent or that exact commit. Anything else is another
+writer, even a commit with the same entry lines, and publication stops and
+tells the admins.
 
 A deployment without the landing, Artifacts and publisher adapters can found rooms
 and admit roster acts, claims and notes. It treats the canonical repository
@@ -145,6 +146,21 @@ table of R-API-1. Every JSON response is `Cache-Control: no-store`.
   update (closing with 1008 when it ends), and ignores client messages.
 - RPC: `subscribe(session, cursor)` returns a byte stream of
   newline-delimited JSON `Update`s.
+
+Every attention item has a position that increases in the order items are
+made. Cursors carry it, so an item made later about an earlier entry (for
+example, the admins' item when publication stops) still reaches every
+cursor issued before it. Cursors in the earlier `(seq, n)` form still
+work; nothing after their point is skipped, though an item made later about
+an earlier entry may be delivered twice.
+
+### Storage upgrades
+
+The Room's and the registry's SQLite schemas change only through numbered
+migrations ([src/store.ts](src/store.ts), [src/registry.ts](src/registry.ts)).
+Every opening runs the steps above the stored version, each in its own
+transaction with its version, so a crash leaves a whole version. Each step
+is also safe to run twice.
 
 ### Founding a room
 
@@ -317,6 +333,17 @@ lane E.
 | P2.7 Sealed effects from the calculator | yes: review-aabda1ed | B pending (landing part) | pending |
 | P2.8 Cursors at a page boundary | yes: review-aabda1ed | n/a | pending |
 
+### Review 8faa2ef9 findings
+
+| Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
+|---|---|---|---|
+| 1. Recovery accepts only the parent or the exact pending commit | yes: review-8faa2ef9 | L pending (needs `commitFor`) | pending |
+| 2. Lease deadline during fork creation | yes: review-8faa2ef9 | Artifacts pending | pending |
+| 3. Attention made later at an existing head | yes: review-8faa2ef9 | n/a | pending |
+| 4. Review reopening in sealed effects | yes: review-8faa2ef9 | n/a | pending |
+| 5. Upgrade of populated storage | yes: review-8faa2ef9 | n/a | pending |
+| `"*"` fixed at the grant | yes: review-8faa2ef9 | n/a | pending |
+
 ## Mutation spot-checks
 
 Each rule below was broken once, and the matching suite run against the
@@ -396,6 +423,31 @@ strengthened).
 The RPC subscription case ("RPC subscription", amendment2) checks that the
 stream is UTF-8 with one `Update` per line.
 
+## Review 8faa2ef9
+
+The checker's review of `a5a3406a` requested changes. Its reproductions now
+assert the correct outcomes in
+[test/workerd/review-8faa2ef9.test.ts](test/workerd/review-8faa2ef9.test.ts).
+
+| Finding | Fix | Tests (in that file) |
+|---|---|---|
+| 1. P1 Recovery accepted any commit with the same entry lines | Before any remote write the pending cohort records its parent and the exact commit (`PublisherPort.commitFor`, the publisher's one serialization). The reopen fence accepts only those two; the confirmed commit must be the exact one | a foreign commit with identical entry lines but a different checkpoint / retained / parent…; a publisher whose confirmed commit is not the expected one…; the exact pending commit is stored before any remote write, and lost-response recovery still confirms it, across a restart |
+| 2. P2 A workspace became ready after its lease ran out | The lease is current only if held, the same lease generation, and before its deadline by the clock read now; checked before fork creation and again before readiness. A fenced op runs the lease-expiry and token-revocation steps at once | a lease that runs out during fork creation…; a lease already past its deadline before the resume creates no fork |
+| 3. P2 Attention made later fell behind live cursors | A monotonic attention position; live, update and page cursors carry it; a publication error wakes subscriptions; earlier cursor forms map to the position before the first item after their point | the admins' publication-unresolved item arrives on a cursor issued before it…; pages stay lossless…; an RPC subscription opened at the live head…; cursors in the earlier (seq, n) form still read… |
+| 4. P2 Sealed effects omitted a reopening | Review and check effects carry `opened` and `met` from the one calculator; a duplicate approval still seals none. A check only adds evidence, so it cannot reopen | Bob approves, then objects…; @ci passes, then fails on the same input… |
+| 5. P2 Old storage could not reopen | Versioned, transactional, idempotent migrations for the Room and the registry. Earlier attention keeps its order and gains positions; pending workspaces keep their attempts; earlier evidence gets admission facts that can only remove eligibility; a missing fact reads as "author" | a populated store in the a5a3406a schema / fa836d61 schema reopens, twice…; a store without admission facts is judged as an author… |
+| `"*"` delegation followed the grantor's current role | `"*"` is expanded at the grant to the kinds the grantor's role could sign then; earlier `"*"` grants are expanded by migration from the role in the grant's receipt | a member grants '*', then is promoted to admin… |
+
+Each new guard was broken once and the whole workerd suite run against the
+change. 19 of 21 mutations were caught, five of them only after a test was added
+or strengthened (expiry sealed in the same alarm run; the poll woken, not
+timed out; a live subscription; a publisher whose commit differs from
+`commitFor`; migrated items whose ID text order differs from `(seq, n)`).
+Two mutations are equivalent: a check effect without `opened` (a check
+cannot reopen an obligation), and running every migration step on each
+opening (each step is idempotent by design). One guard that could not be
+reached (comparing the pending commit again when sealing) was removed.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
@@ -430,7 +482,8 @@ Phase 2b waits for lane B revision 2 and lane L revision 2 to be approved:
 
 - the real landing engine (lane B) behind `LandingPort`, replacing the
   in-memory state machine, with shared-SQLite integration tests;
-- the real publisher (lane L) behind `PublisherPort`;
+- the real publisher (lane L) behind `PublisherPort`, which needs lane L
+  to expose `commitFor` from its one Git serialization;
 - the Artifacts adapter, including repository creation at founding and the
   mapping of repository identities;
 - carrying checks across integrations, and filtered checker inputs;
