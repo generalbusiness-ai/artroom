@@ -34,6 +34,8 @@ export interface PublisherStub {
     generation: number;
   }): Promise<BuildResult>;
   push(req: { canonical: RemoteAccess; integration: string; expectedMain: string; integrationRef: string }): Promise<PushOutcome>;
+  /** Lane L's log push (R-LOG-8); `canonical.token` is a write token of at most 60 s that the caller revokes. */
+  pushLog(req: LogPushRequest & { canonical: RemoteAccess }): Promise<LogPushOutcome>;
 }
 
 export interface PublisherClientOptions {
@@ -43,6 +45,8 @@ export interface PublisherClientOptions {
   readonly canonical: { readonly name: string; readonly remote: string };
   readonly sleep?: (ms: number) => Promise<void>;
 }
+
+import type { LogPushOutcome, LogPushRequest } from "./log-push.ts";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
