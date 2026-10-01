@@ -1,0 +1,12 @@
+{"url":"/w/bench?op=compile&inner=50","outcome":"ok","cpuTime":183,"wallTime":232}
+{"url":"/w/bench?op=compile&inner=50","outcome":"ok","cpuTime":296,"wallTime":350}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=false","outcome":"ok","cpuTime":173,"wallTime":195}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=steps","outcome":"ok","cpuTime":395,"wallTime":420}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=steps","outcome":"ok","cpuTime":120,"wallTime":123}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=steps","outcome":"ok","cpuTime":358,"wallTime":392}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=memo","outcome":"ok","cpuTime":456,"wallTime":462}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=memo","outcome":"ok","cpuTime":654,"wallTime":703}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=memo","outcome":"ok","cpuTime":348,"wallTime":398}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=true","outcome":"ok","cpuTime":3304,"wallTime":3987}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=true","outcome":"ok","cpuTime":3261,"wallTime":4205}
+{"url":"/w/bench?op=patho&inner=1&size=25&guard=true","outcome":"ok","cpuTime":1472,"wallTime":1655}

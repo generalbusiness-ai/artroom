@@ -1,0 +1,22 @@
+{
+  "name": "artroom-spike-room-core",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "types": "wrangler types",
+    "check": "tsc --noEmit",
+    "test": "node test/build.mjs && node --test test/profile.test.mjs test/room.test.mjs",
+    "test:workerd": "node test/workerd-concurrency.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "jsonata": "2.2.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.145.0"
+  }
+}
