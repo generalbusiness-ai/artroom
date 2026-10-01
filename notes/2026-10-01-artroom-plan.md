@@ -1,7 +1,8 @@
 # Artroom: plan for the Cloudflare Git platform competition
 
-2026-10-01. Revision 3, answering checker's reviews `c31169e9` (of head
-`8f85a0d5`) and `8233c002` (of head `0a5864b1`). Request `7ff7a261`,
+2026-10-01. Revision 4, answering checker's reviews `c31169e9` (of head
+`8f85a0d5`), `8233c002` (of head `0a5864b1`) and `bce3646e` (of head
+`fcadbb22`). Request `7ff7a261`,
 promise `2bb1a40d`.
 
 Artroom ("artifact workroom") is a place where agents and people change
@@ -18,7 +19,7 @@ This note covers:
 
 Section 14 lists the decisions still open.
 
-### What changed in revisions 2 and 3
+### What changed in revisions 2 to 4
 
 Revision 2 answers review `c31169e9`:
 
@@ -42,6 +43,15 @@ Revision 3 answers review `8233c002`:
 | Non-blocking: sole-admin bootstrap | Section 9: "Bootstrap and recovery for a sole admin" |
 | Non-blocking: waiting for the workspace, safe runner arguments | Section 5's examples |
 | Non-blocking: measure wasted preparations | Section 8's acceptance cases |
+
+Revision 4 answers review `bce3646e`:
+
+| Review item | Where it is answered |
+|---|---|
+| P1 no time-based slot release | Section 8: "Resolving a publication: complete it forward", and the acceptance cases |
+| P2 evidence validity and the emergency rule | Section 8, reservation step 1; section 9: "The one emergency rule after reservation" and acceptance cases |
+| Non-blocking: input isolation for scoped reuse | Section 7, items 3 and 5 |
+| Non-blocking: runner example | Section 5 |
 
 ## 1. The competition
 
@@ -435,16 +445,18 @@ export class Tests extends Checker<Env> {
     await box.exec(["git", "-C", "w", "checkout", "--detach", "FETCH_HEAD"]);
     const head = await box.exec(["git", "-C", "w", "rev-parse", "HEAD"]);
     if (head.stdout.trim() !== sha) return { ok: false, detail: "checked-out head does not match" };
-    const run = await box.exec(["npm", "ci"], { cwd: "w" })
-      .then(() => box.exec(["npm", "test"], { cwd: "w" }));
+    const install = await box.exec(["npm", "ci"], { cwd: "w" });
+    if (install.exitCode !== 0) return { ok: false, detail: install.stderr.slice(-4000) };
+    const run = await box.exec(["npm", "test"], { cwd: "w" });
     return { ok: run.exitCode === 0, detail: run.stdout.slice(-4000) };
   }
 }
 ```
 
-Commands are passed as argument arrays, never as interpolated shell
-strings. The exact `exec` signature follows the Sandbox SDK and is fixed
-in lane 0.
+`box.exec([...])` here is an **Artroom wrapper**, not the Sandbox SDK's
+own signature. It takes argument arrays, never interpolated shell
+strings, and returns the exit code. Lane 0 fixes it against the real
+SDK.
 
 The `Checker` base class signs the `check` act outside the sandbox.
 
@@ -551,12 +563,21 @@ else:**
    proposal (section 9). Neither a proposal nor its author can narrow it.
 2. **Global inputs are always included.** These are manifests,
    lockfiles, build and test configuration, scripts and `.artroom/**`.
-3. **The runner receives only the declared inputs.** The publisher
-   builds a filtered tree with exactly those paths, and the runner checks
-   out that tree. A test that reads an undeclared file fails, rather
-   than passing on stale assumptions.
-4. **The check binds to the filtered tree's hash.** It is carried only
-   while that hash is unchanged.
+3. **The runner can observe only the declared inputs.** The publisher
+   builds a filtered snapshot with exactly those paths and delivers it
+   into an isolated workspace. The runner has none of the following:
+   - a token or remote for the canonical repository;
+   - unfiltered git history or object database;
+   - a shared cache or filesystem path that exposes omitted files.
+
+   A test that reads an undeclared file fails, rather than passing on
+   stale assumptions. Lane G tests attempted access to excluded data,
+   because a filtered checkout alone does not prove confinement.
+4. **The check binds to the filtered snapshot's hash.** It is carried
+   only while that hash is unchanged.
+5. **Undeclared volatile external inputs disable reuse.** Network
+   fetches, time and unpinned tools are examples. A checker that uses
+   them does not carry its checks.
 
 Every carried check shows that it was carried, and why.
 
@@ -626,9 +647,14 @@ inside it. In that transaction the Room:
 1. **Re-validates the operation against current state:**
    - the lane's generation and lease generation;
    - the active policy version;
-   - every piece of evidence;
-   - the current authority (membership, key, delegation) of every actor
-     whose act is evidence.
+   - **the land initiator's current authority** (membership, key,
+     delegation), which is judged now, like any new admission;
+   - **every piece of evidence**, judged against the authority recorded
+     when it was admitted and the room's evidence-validity rule
+     (section 9). Evidence does not need its signer to be authorized
+     today: a reviewer's later retirement, or a delegation that has
+     since expired, does not reopen an earlier review. Evidence from a
+     key revoked as `compromised` does not count.
 
    On any mismatch, the operation goes to `retryable`.
 2. **Records the operation as `publishing`, with a publication number.**
@@ -639,7 +665,9 @@ inside it. In that transaction the Room:
 to callers as "landing reserved at seq N".
 
 **Acts that arrive while a reservation is open** are admitted and ordered
-after it; they cannot cancel it. This covers a release, a new generation,
+after it; they cannot cancel it. The single exception is a
+`compromised` revocation, which starts a best-effort abort attempt
+(section 9). This covers a release, a new generation,
 an objecting review, a role or key revocation, and a policy activation.
 Each one's receipt names the reservation it follows, as `after:
 landOp`. The UI shows it, for example "objection recorded after this
@@ -657,36 +685,54 @@ publication gets its own write credential:
 - **A fresh canonical write token** with the shortest lifetime Artifacts
   allows (60 s), minted at reservation and given only to the publisher
   sandbox for that one push.
-- **One publication at a time per room.** No later operation may update
-  main while any publication is unresolved.
-- **Resolution has three outcomes:**
-  - **Landed:** the push succeeded and main equals `integration`.
-  - **Not landed:** a timeout or crash, and main equals `expectedMain`.
-    This counts only after the room has revoked the publication token,
-    and either stopped the publisher sandbox or let the token's expiry
-    pass, then read main again. Only then is the slot released, and the
-    operation becomes `retryable`.
-  - **Someone else landed:** main has another value. This should be
-    impossible while the room is the only writer. The room flags it for
-    an admin.
+- **One publication at a time per room.** The slot stays held until
+  the publication has a **confirmed terminal outcome**. No later
+  operation may reserve while it is held.
+- **No time-based release.** A push that has already authenticated may
+  finish after its token is revoked or expires. Stopping the publisher
+  sandbox need not cancel work the remote has accepted. So elapsed time,
+  token expiry and sandbox termination never count as proof that a push
+  did not happen. Artifacts documents token revocation, but not the
+  cancellation of a git operation already in flight.
 
-**Why a late push is still safe.** If an old push completes late, it can
-only move main from `expectedMain` to this operation's integration. Git's
-lease guarantees that. That is exactly what the reservation authorized,
-so reconciliation records it as landed. A later operation's push carries
-its own `expectedMain`, so it fails its lease and becomes `retryable`.
-Two operations can never both apply against the same main.
+### Resolving a publication: complete it forward
 
-### Crash and timeout recovery
+A reservation authorized the landing irrevocably (above). So the room
+never abandons a reserved publication; it **completes it forward**. When
+a push times out, fails without a clear answer, or the room restarts
+mid-publication, the room pushes the **same integration commit** again,
+with the same lease (`main` from `expectedMain`). This is safe to repeat:
 
-On restart, an alarm resolves the unresolved publication before anything
-else, following the rules above:
+- **If an earlier attempt already landed,** main equals `integration`.
+  The repeat changes nothing, and the room records `landed`.
+- **If no attempt has landed,** the repeat moves main from
+  `expectedMain` to `integration`. If an earlier attempt completes
+  afterwards, it fails its lease, because main is no longer
+  `expectedMain`.
+- **The end state is always the same:** `main = integration`. Main is
+  read back to confirm it before the receipt is written and the slot is
+  released.
 
-| Main is | Meaning | Action |
-|---|---|---|
-| `integration` | The push happened, the receipt did not | Write the `landed` receipt; no second push |
-| `expectedMain` | Not yet known whether the push will still complete | Revoke the token, stop or outlive the writer, read main again; then retry or mark `retryable` |
-| Anything else | Unexpected writer | Hold the slot; flag for an admin |
+| Main is, when read back | Outcome |
+|---|---|
+| `integration` | **Landed.** Write the receipt, release the slot |
+| `expectedMain` (the forward push itself failed, for example Artifacts is unavailable) | **Unresolved.** Keep the slot, retry forward with backoff, and show the operation to admins as "publication unresolved since …" |
+| Anything else | **Unexpected writer.** Keep the slot; flag for admins. This should be impossible while the room is the only writer |
+
+An unresolved publication is a safe, visible state. The queue waits
+behind it rather than guessing.
+
+**When the slot may be released without a landing.** Only on a confirmed
+terminal outcome of "did not and cannot land". No such evidence is
+established today. Lane B and the Sandbox spike will find out whether
+Artifacts offers one, for example a receiver-side fence or a documented
+processing bound. Until then, the only automated resolution is
+completing forward. An admin can always see the state and act on it.
+
+### Crash recovery
+
+On restart, an alarm resolves any held slot before anything else, by
+completing forward as above.
 
 ### Publication of the log
 
@@ -708,17 +754,24 @@ else, following the rules above:
   preparation**. Each invalidates the operation.
 - **The push itself is paused.** During the pause, each of these is
   submitted: a release, a new generation, an objecting review, and a
-  key revocation. Each is admitted with `after: landOp`, and the landing
-  completes.
-- **A delayed successful push after a timeout.** The room has revoked
-  the token and reconciled. Either the delayed push is refused because
-  its token was revoked, or it lands the reserved integration and is
-  recorded as landed. Either way no later operation has moved main in
-  the meantime.
-- **The revoked or expired publication token is actually refused** by
-  Artifacts for a push already started. Spike `469a7ab8` or lane B
-  measures this. If an in-flight push can outlive its revocation, the
-  safe rule is "wait for the token's expiry", and the note will say so.
+  revocation for `retired`. Each is admitted with `after: landOp`, and
+  the landing completes.
+- **The push is paused, and a key that is evidence is revoked as
+  `compromised`.** The room records an abort attempt (section 9). If
+  the paused push later completes, the outcome is `landed` and a revert
+  lane opens. If termination is established, the outcome is `aborted`.
+  Otherwise the publication stays unresolved and visible to admins.
+- **A delayed, already-authenticated push that completes after its
+  token's expiry and after a forward retry.** Main ends at `integration`.
+  The room records exactly one `landed` receipt, and no later operation
+  reserved in between.
+- **The forward retry itself fails** because Artifacts is unavailable.
+  The slot stays held, shown as unresolved, and later reservations wait.
+- **Token revocation or expiry during an in-flight push** is measured
+  (spike `469a7ab8` or lane B), including a request that authenticated
+  before expiry and ends after it. The result decides whether any
+  terminal evidence other than completing forward exists. Nothing is
+  released on elapsed time.
 - A lease race on publication: exactly one publisher wins.
 - Serial publication with rebuild on every main move, measured for wasted
   preparations. Batching may follow under the same rules.
@@ -772,12 +825,26 @@ decision with these defaults:
   as evidence, and the obligations they fulfilled reopen. Before
   reservation, a landing operation that depends on them goes to
   `retryable`.
-- **After reservation (section 8), the landing proceeds:**
-  - **A `compromised` revocation also triggers fencing:** the room
-    revokes the publication token at once, so a push that has not
-    completed is refused.
-  - **If the push already completed,** the room opens a revert lane and
-    puts it in the admins' attention queue.
+- **An expired delegation** does not invalidate evidence admitted while
+  it was valid. It only stops new admissions.
+
+**The one emergency rule after reservation.** Ordinary acts after a
+reservation follow the reserved landing (section 8). A `compromised`
+revocation of a key that is evidence, or of the land initiator's key, is
+the one exception. It triggers a recorded, best-effort **abort attempt**:
+1. The room stops completing the publication forward.
+2. The room revokes the publication token.
+3. The room records the attempt.
+
+Remote cancellation is not guaranteed, so the outcome is decided by
+what actually happens:
+- **If the publication landed** (main equals `integration`), the
+  outcome is `landed`. The room opens a revert lane and puts it in the
+  admins' attention queue.
+- **If termination without publication is established** (see section
+  8), the outcome is `aborted`.
+- **Otherwise** the publication stays `unresolved`, held and visible to
+  admins, until one of those two outcomes is confirmed.
 
 **Acceptance cases:**
 - A pre-signed act submitted after its key's revocation is refused.
@@ -785,8 +852,13 @@ decision with these defaults:
 - A byte-identical replay after revocation returns the original receipt.
 - A compromised reviewer's approval no longer counts, and the obligation
   reopens.
-- A compromised revocation during a reserved, paused push leads to the
-  push being refused or a revert lane being opened.
+- A `retired` revocation during a reserved, paused push changes
+  nothing; the landing completes.
+- A `compromised` revocation during a reserved, paused push records an
+  abort attempt. It ends as `landed` with a revert lane, `aborted`, or
+  `unresolved`, never as a guessed outcome.
+- A reviewer retired after their review: the review still counts at
+  reservation.
 
 ### Bootstrap and recovery for a sole admin
 
