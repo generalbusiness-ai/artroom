@@ -469,7 +469,10 @@ describe("the adapters' boundaries", () => {
     const report = await verifyLog(remote);
     expect(report).toMatchObject({ ok: true, failures: [] });
     expect(a.remoteCalls.get("readCommit")).toBeGreaterThan(0);
-    // Every token the remote minted (read and write, at most 60 seconds) was revoked.
+    // Every token the remote minted, read and write, lived at most 60 seconds, and was revoked.
+    const tokens = [...a.canonicalRepo().tokens.values()];
+    expect(new Set(tokens.map((t) => t.scope))).toEqual(new Set(["read", "write"]));
+    for (const t of tokens) expect(t.expiresAt - t.createdAt).toBeLessThanOrEqual(60_000);
     expect(a.canonicalRepo().activeTokens()).toEqual([]);
   });
 

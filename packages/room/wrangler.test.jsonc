@@ -1,0 +1,24 @@
+// The Room Worker as the workerd test pool runs it (vitest.workers.config.ts):
+// the Room and Registry Durable Objects only. Tests give the Room fake
+// Artifacts and sandbox remotes (src/memory/artifacts.ts), so this file has
+// no Artifacts binding and no container. Deploy with wrangler.jsonc.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "artroom-room-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" },
+      { "name": "REGISTRY", "class_name": "Registry" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Registry"] }],
+  "vars": {
+    "LEASE_SECONDS": "1800",
+    "PUBLIC_URL": "https://artroom.test",
+    "PUBLIC_NAMESPACE": "artroom-public",
+    "OPERATOR_KEYS": ""
+  }
+}

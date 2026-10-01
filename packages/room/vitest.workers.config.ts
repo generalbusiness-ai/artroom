@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       main: "./src/index.ts",
-      wrangler: { configPath: "./wrangler.jsonc" },
+      wrangler: { configPath: "./wrangler.test.jsonc" },
       miniflare: {
         bindings: { ROOM_KEY_SECRET: "test-room-key-secret", LEASE_SECONDS: "1800", PUBLIC_URL: "https://artroom.test", PUBLIC_NAMESPACE: "artroom-public", OPERATOR_KEYS: operator },
       },

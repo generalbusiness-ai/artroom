@@ -86,7 +86,7 @@ The Room's code talks to other lanes through small interfaces in
 | `LandingPort` and `LandingHost` | The landing operation, and the Room's side of it | Lane B's `Landing` and `LandingRoom`, on the Room's SQLite, with lane B's `ContainerPublisher` and `canonicalTokens`. `readiness` may await; `revalidate` compares the rebuilt reservation input with the bytes the engine retained. |
 | Workspaces | One fork per lane, one token per lease generation | Lane B's `Workspaces`, on the Room's SQLite. The Room records which leases it opened (`ws_leases`), carries renewals to the workspace's deadline, and ends a lease's access when it ends. |
 | `ArtifactsPort` | Repository creation at founding, config reads, heads, pinned refs, diffs, previews, filtered snapshots | [src/artifacts.ts](src/artifacts.ts): the Artifacts binding with lane B's `changedPaths`, `treeDiff`, `previewPlan` and `Pinning`. |
-| `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | Lane L's `LogPublisher`, opened over a git remote. In a Worker that remote is [src/logremote.ts](src/logremote.ts): reads through the binding, each object re-encoded and accepted only if it hashes to the SHA asked for; pushes through the publisher sandbox's `pushLog`, which lane B has still to add. |
+| `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | Lane L's `LogPublisher`, opened over a git remote. In a Worker that remote is [src/logremote.ts](src/logremote.ts) over lane B's `LogRemoteStub`: the ref is read by the sandbox's `readLogRef` (the binding's `log({ ref })` returns nothing for `refs/artroom/log`), and an unreadable ref is an error, never an absent one; objects are read through the binding, trying each kind in turn (the binding throws for a commit or tree read of another type), re-encoded and accepted only if they hash to the SHA asked for; pushes go through the sandbox's `pushLog`. Each sandbox call carries a token of at most 60 seconds, revoked afterwards. |
 
 A deployment gives the Room its remotes ([src/config.ts](src/config.ts)):
 the Artifacts binding for one namespace (`ARTIFACTS`, `ARTIFACTS_NAMESPACE`),
@@ -227,8 +227,22 @@ Until the Artifacts adapter (phase 2b), a repository identity has the form
 
 ## Configuration
 
-[wrangler.jsonc](wrangler.jsonc) declares the `Room` and `Registry`
-Durable Objects with SQLite storage. It is not deployed by this lane.
+[wrangler.jsonc](wrangler.jsonc) is deployable: the `Room` and `Registry`
+Durable Objects, lane B's publisher sandbox (`Publisher`, a container
+Durable Object, and its `ArtifactsGateway`, exported from
+[src/index.ts](src/index.ts)), and the Artifacts binding. `wrangler deploy
+--dry-run` bundles it with these bindings. The workerd test pool reads
+[wrangler.test.jsonc](wrangler.test.jsonc) instead, which has neither the
+remote binding nor the container; a Node test checks both files.
+
+Before the first deploy (the file's header says the same):
+
+- the Artifacts namespace (`artroom-public`) must exist on the account,
+  and `ARTIFACTS_HOST` must be that account's Artifacts host;
+- the container image is lane B's (`packages/git/container/image.sh`);
+  use the digest it prints for the account's registry;
+- `wrangler secret put ROOM_KEY_SECRET`;
+- `OPERATOR_KEYS` lists the operator keys that sign onboarding grants.
 
 | Setting | Meaning |
 |---|---|
@@ -240,11 +254,7 @@ Durable Objects with SQLite storage. It is not deployed by this lane.
 | `ARTIFACTS` (binding) | The Artifacts binding for the deployment's namespace |
 | `ARTIFACTS_NAMESPACE` | The namespace that binding reaches, default `PUBLIC_NAMESPACE` |
 | `PUBLISHER` (binding) | Lane B's `Publisher` Durable Object class (the git sandbox), one instance per room |
-
-[wrangler.jsonc](wrangler.jsonc) does not declare `ARTIFACTS` or
-`PUBLISHER` yet: the workerd test pool reads the same file, and both are
-remote or container bindings. A deployment adds them, with lane B's
-container image, as lane B's own wrangler.jsonc shows.
+| `ARTIFACTS_HOST` | The Artifacts host the sandbox's gateway lets the container reach, under `ARTIFACTS_NAMESPACE` |
 
 ## Running the tests
 
@@ -349,7 +359,9 @@ that applied but whose report was lost" and "pushes with no answer".
 | Offline replay with lane L's `verifyLog` | "a session … publishes a log that verifies, with every decision replayed"; log "Log construction" | pending |
 | Repository identity mapping | "a repository identity in a namespace this deployment has no Artifacts binding for"; founding "Isolated public creation" | pending |
 | Fork provenance | "a repository at the lane's fork name that is not a fork" | pending |
-| Production log reads | "the production log remote reads the published log exactly through the binding" | pending |
+| Production log remote (lane B's `readLogRef` and `pushLog`) | "the production log remote, as the live services behave"; "a log ref that cannot be read is an error, never an absent ref"; "an object the binding decodes differently"; every publication test, which runs the production remote over the fakes | pending |
+| Previews from lane B's planner | "a fast-forward previews the head itself"; "disjoint paths after main moved: the sandbox's merge commit, which the landing … lands exactly"; "after main moved under them: a clean merge … a conflict" | pending |
+| Deployable configuration | Node deploy.test: "binds Artifacts for ARTIFACTS_NAMESPACE, and the publisher sandbox as a container Durable Object"; "the test pool's config has no remote or container binding" | pending |
 
 ### Amendment 2 cases (section 23)
 
@@ -568,19 +580,14 @@ changed:
   `landing.nextDue()` and `workspaces.nextDue()`, so it follows lane B's
   capped backoff and never spins.
 
-What the Room needs from lane B:
-
-1. **`pushLog` on the publisher sandbox.** Lane L's `LogPublisher` needs a
-   git remote that can push in a Worker. The Room reads the log through the
-   binding, but there is no Workers-native push: the sandbox should take
-   lane L's objects, a ref, the next commit and the lease, push with
-   `--force-with-lease` under a 60-second token, and answer with lane L's
-   `PushOutcome`. Until then, production log publication fails with
-   `unavailable` and is retried.
-2. **A preview integration.** `PreviewOp.clean` requires `integration`, but
-   lane B's planner builds none for a disjoint merge, and the sandbox's
-   preview returns a tree. The Room sets `integration` only for a
-   fast-forward (the head itself). This is lane B's contract gap 7.
+Lane B's follow-up (request 090a0eca) answered what the Room needed:
+`pushLog` and `readLogRef` on the sandbox (`LogRemoteStub`), and previews
+that carry their integration: the head for a fast-forward, otherwise the
+merge commit the same planner builds for the landing, so a landing on the
+same main lands exactly the previewed commit. The fakes mirror lane B's
+live findings: the binding's `log({ ref })` returns nothing for
+`refs/artroom/log`, and `readCommit` and `readTree` throw for an object of
+another type.
 
 Each new guard was broken once and the whole workerd suite run against the
 change: all 19 mutations were caught, four after a test was strengthened
@@ -624,15 +631,12 @@ is `land-input-changed`. These remain open:
    digests, but no runner has run on the new integration when the Room
    judges the carry. The Room uses the earlier check's runner digest, so
    only a changed configuration, tree or snapshot stops a carry.
-4. **Preview integration.** See "Phase 2b", item 2.
 
 ## Not done
 
-- Deployment: wrangler bindings for `ARTIFACTS` and `PUBLISHER` (with lane
-  B's container image), an operator command to sign onboarding grants, and
+- Deployment itself, an operator command to sign onboarding grants, and
   measurements on Cloudflare. The "Deployed" column is pending for every
   case, under its own task.
-- Lane B's `pushLog` (see "Phase 2b").
 - The MCP endpoint's `RoomApi` over `bearerAct` and `bearerRequest` (lane
   E), and the client package's `connect`, `join` and `redeem`.
 - Attention is a simple projection: review and check requests, objections,
