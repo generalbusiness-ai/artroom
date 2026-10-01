@@ -5,114 +5,29 @@
  * any output (R-WS-4), and resumable login after a lost response (R-IDEM-2).
  */
 
-import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, statSync, existsSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
-import { connect } from "@generalbusiness/artroom-client";
-import { createMcpFetch } from "@generalbusiness/artroom-mcp/worker";
-import { FakeRoom } from "../../client/test/support/fake-room.ts";
+import { describe, expect, test } from "vitest";
 import { invitationLink } from "../src/link.ts";
-import { EXIT, run } from "../src/main.ts";
+import { EXIT } from "../src/main.ts";
+import { useHarness } from "./harness.ts";
 
-let room: FakeRoom;
-let tmp: string;
-const transcript: string[] = [];
-
-beforeEach(async () => {
-  room = await FakeRoom.create();
-  await room.start();
-  room.mcp = (request) =>
-    createMcpFetch<unknown>({
-      async room(_r, _e, bearer) {
-        const s = await room.bearerSession(bearer);
-        return s ? connect({ room: async () => room.wire() }, room.id, { kind: "delegation", signer: s.signer, as: s.delegation }) : null;
-      },
-    })(request, {});
-  tmp = mkdtempSync(join(tmpdir(), "artroom-cli-"));
-});
-afterEach(async () => {
-  await room.stop();
-  rmSync(tmp, { recursive: true, force: true });
-});
-
-/** Every line any command printed, in any test, for the final leak scan. */
-const allSecrets: string[] = [];
-afterAll(() => {
-  const text = transcript.join("\n");
-  for (const s of allSecrets) expect(text).not.toContain(s);
-});
-beforeAll(() => {
-  transcript.length = 0;
-});
-afterEach(() => {
-  allSecrets.push(...room.secrets());
-});
-
-interface Result {
-  code: number;
-  out: string;
-  err: string;
-}
-
-async function cli(home: string, argv: string[], cwd = tmp): Promise<Result> {
-  const out: string[] = [];
-  const err: string[] = [];
-  const code = await run(argv, { out: (l) => out.push(l), err: (l) => err.push(l), env: { ARTROOM_HOME: home, HOME: home }, cwd });
-  transcript.push(...out, ...err);
-  return { code, out: out.join("\n"), err: err.join("\n") };
-}
-
-/** Replaces values that change from run to run, so snapshots are stable. */
-function norm(text: string): string {
-  return text
-    .replaceAll(room.id, "room_ID")
-    .replaceAll(room.url, "http://ROOM")
-    .replaceAll(tmp, "TMP")
-    .replace(/act_(\d+)_[0-9a-f]{8}/g, "act_$1_HASH")
-    .replace(/key_[A-Za-z0-9_-]{43}/g, "key_ID")
-    .replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/g, "TIME")
-    .replace(/\b[0-9a-f]{40}\b/g, "SHA")
-    .replace(/\b[0-9a-f]{12}\b/g, "SHORT");
-}
-
-function git(cwd: string, ...args: string[]): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", HOME: tmp } }).trim();
-}
-
-function repo(): string {
-  const dir = join(tmp, "repo");
-  execFileSync("mkdir", ["-p", dir]);
-  git(dir, "init", "-q", "-b", "main");
-  git(dir, "config", "user.email", "a@example.com");
-  git(dir, "config", "user.name", "A");
-  writeFileSync(join(dir, "README.md"), "hello\n");
-  git(dir, "add", ".");
-  git(dir, "commit", "-q", "-m", "first");
-  return dir;
-}
-
-async function login(home: string, handle: `@${string}`, role: "member" | "agent" = "member"): Promise<Result> {
-  const { invitation, secret } = await room.invite(handle, { role });
-  return cli(home, ["login", invitationLink(room.url, room.id, invitation, secret)]);
-}
-
-const mode = (path: string) => (statSync(path).mode & 0o777).toString(8);
+const { h, cli, norm, git, repo, login, mode } = useHarness();
 
 describe("the loop, as a person types it", () => {
   test("login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release", async () => {
-    const alice = join(tmp, "alice");
-    const bob = join(tmp, "bob");
+    const alice = join(h.tmp, "alice");
+    const bob = join(h.tmp, "bob");
     const dir = repo();
 
     const joined = await login(alice, "@alice");
     expect(joined.code).toBe(EXIT.ok);
     expect(norm(joined.out)).toMatchSnapshot("login");
-    expect(mode(join(alice, "keys", `${room.id}.json`))).toBe("600");
+    expect(mode(join(alice, "keys", `${h.room.id}.json`))).toBe("600");
     expect(mode(join(alice, "keys"))).toBe("700");
     expect(mode(join(alice, "config.json"))).toBe("600");
-    expect(existsSync(join(alice, "keys", `${room.id}.pending.json`))).toBe(false);
+    expect(existsSync(join(alice, "keys", `${h.room.id}.pending.json`))).toBe(false);
 
     const claim = await cli(alice, ["claim", "src/**", "--goal", "Rate-limit login"], dir);
     expect(claim.code).toBe(EXIT.ok);
@@ -121,7 +36,7 @@ describe("the loop, as a person types it", () => {
     const ws = await cli(alice, ["workspace"], dir);
     expect(ws.code).toBe(EXIT.ok);
     expect(norm(ws.out)).toMatchSnapshot("workspace");
-    const [token] = room.exposure.grants;
+    const [token] = h.room.exposure.grants;
     const remote = git(dir, "remote", "get-url", "artroom");
     // Git itself reads the header through the include; the token is in the 0600 file only.
     expect(git(dir, "config", "--get", `http.${remote}.extraheader`)).toBe(`Authorization: Bearer ${token}`);
@@ -163,7 +78,7 @@ describe("the loop, as a person types it", () => {
   });
 
   test("--json prints the record, and a refusal as JSON with exit code 3", async () => {
-    const alice = join(tmp, "alice");
+    const alice = join(h.tmp, "alice");
     await login(alice, "@alice");
     const claim = await cli(alice, ["claim", "src/**", "--goal", "g", "--json"]);
     expect(JSON.parse(claim.out)).toMatchObject({ kind: "claim", scope: ["src/**"], lease: { generation: 1 } });
@@ -174,7 +89,7 @@ describe("the loop, as a person types it", () => {
   });
 
   test("a refusal prints rule, reason and fix on stderr with exit code 3", async () => {
-    const alice = join(tmp, "alice");
+    const alice = join(h.tmp, "alice");
     await login(alice, "@alice");
     await cli(alice, ["claim", "src/**", "--goal", "g"]);
     const stale = await cli(alice, ["propose", "-m", "s", "--head", "a".repeat(40), "--expect", "4"]);
@@ -185,65 +100,65 @@ describe("the loop, as a person types it", () => {
 
 describe("joining", () => {
   test("a refused login leaves no key behind", async () => {
-    const alice = join(tmp, "alice");
-    const { invitation, secret } = await room.invite("@alice");
-    const res = await cli(alice, ["login", invitationLink(room.url, room.id, invitation, `${secret}x`)]);
+    const alice = join(h.tmp, "alice");
+    const { invitation, secret } = await h.room.invite("@alice");
+    const res = await cli(alice, ["login", invitationLink(h.room.url, h.room.id, invitation, `${secret}x`)]);
     expect(res.code).toBe(EXIT.refused);
     expect(norm(res.err)).toMatchSnapshot("login refused");
-    expect(existsSync(join(alice, "keys", `${room.id}.json`))).toBe(false);
-    expect(existsSync(join(alice, "keys", `${room.id}.pending.json`))).toBe(false);
+    expect(existsSync(join(alice, "keys", `${h.room.id}.json`))).toBe(false);
+    expect(existsSync(join(alice, "keys", `${h.room.id}.pending.json`))).toBe(false);
   });
 
   test("a lost login response is finished by running the same command again, joining once", async () => {
-    const alice = join(tmp, "alice");
-    const { invitation, secret } = await room.invite("@alice");
-    const link = invitationLink(room.url, room.id, invitation, secret);
-    room.faults.push({ route: "POST /redeem", kind: "drop", times: 4 });
+    const alice = join(h.tmp, "alice");
+    const { invitation, secret } = await h.room.invite("@alice");
+    const link = invitationLink(h.room.url, h.room.id, invitation, secret);
+    h.room.faults.push({ route: "POST /redeem", kind: "drop", times: 4 });
     const first = await cli(alice, ["login", link]);
     expect(first.code).toBe(EXIT.failed);
     expect(norm(first.err)).toMatchSnapshot("login lost");
     const second = await cli(alice, ["login", link]);
     expect(second.code).toBe(EXIT.ok);
-    const joins = room.entries.filter((e) => e.entry.type === "act" && (e.entry.act.envelope.body as { op?: string }).op === "join");
+    const joins = h.room.entries.filter((e) => e.entry.type === "act" && (e.entry.act.envelope.body as { op?: string }).op === "join");
     expect(joins).toHaveLength(1);
     expect((await cli(alice, ["attention"])).code).toBe(EXIT.ok);
   });
 
   test("a link with a missing secret is a usage error", async () => {
-    const res = await cli(join(tmp, "x"), ["login", `${room.url}/rooms/${room.id}/join#i=act_1_00000000`]);
+    const res = await cli(join(h.tmp, "x"), ["login", `${h.room.url}/rooms/${h.room.id}/join#i=act_1_00000000`]);
     expect(res.code).toBe(EXIT.usage);
     expect(res.err).toMatch(/Copy the whole link/);
   });
 
   test("redeem saves the bearer 0600, never prints it, and the agent can then act through MCP", async () => {
-    const agent = join(tmp, "agent");
-    const { invitation, secret } = await room.invite("@builder", { role: "agent", custody: "room" });
-    const res = await cli(agent, ["redeem", invitationLink(room.url, room.id, invitation, secret)]);
+    const agent = join(h.tmp, "agent");
+    const { invitation, secret } = await h.room.invite("@builder", { role: "agent", custody: "room" });
+    const res = await cli(agent, ["redeem", invitationLink(h.room.url, h.room.id, invitation, secret)]);
     expect(res.code).toBe(EXIT.ok);
     expect(norm(res.out)).toMatchSnapshot("redeem");
-    const [bearer] = room.exposure.bearers;
-    expect(readFileSync(join(agent, "bearers", room.id), "utf8").trim()).toBe(bearer);
-    expect(mode(join(agent, "bearers", room.id))).toBe("600");
+    const [bearer] = h.room.exposure.bearers;
+    expect(readFileSync(join(agent, "bearers", h.room.id), "utf8").trim()).toBe(bearer);
+    expect(mode(join(agent, "bearers", h.room.id))).toBe("600");
     expect(res.out + res.err).not.toContain(bearer!);
     const claim = await cli(agent, ["claim", "docs/**", "--goal", "Fix typos"]);
     expect(claim.code).toBe(EXIT.ok);
     expect(claim.out).toMatch(/^Claimed lane act_/);
   });
 
-  test("a lost redemption says what to do, and saves nothing", async () => {
-    const agent = join(tmp, "agent");
-    const { invitation, secret } = await room.invite("@builder", { role: "agent", custody: "room" });
-    room.faults.push({ route: "POST /redeem", kind: "drop" });
-    const res = await cli(agent, ["redeem", invitationLink(room.url, room.id, invitation, secret)]);
+  test("a lost redemption says what to do, and saves no token", async () => {
+    const agent = join(h.tmp, "agent");
+    const { invitation, secret } = await h.room.invite("@builder", { role: "agent", custody: "room" });
+    h.room.faults.push({ route: "POST /redeem", kind: "drop" });
+    const res = await cli(agent, ["redeem", invitationLink(h.room.url, h.room.id, invitation, secret)]);
     expect(res.code).toBe(EXIT.failed);
     expect(norm(res.err)).toMatchSnapshot("redeem lost");
-    expect(existsSync(join(agent, "bearers", room.id))).toBe(false);
+    expect(existsSync(join(agent, "bearers", h.room.id))).toBe(false);
   });
 });
 
 describe("usage and agents", () => {
   test("usage errors exit 2 and say what to do", async () => {
-    const home = join(tmp, "h");
+    const home = join(h.tmp, "h");
     expect((await cli(home, ["frobnicate"])).code).toBe(EXIT.usage);
     const noRoom = await cli(home, ["claim", "src/**", "--goal", "g"]);
     expect(noRoom.code).toBe(EXIT.usage);
@@ -254,7 +169,7 @@ describe("usage and agents", () => {
   });
 
   test("agents-md prints a block under 30 lines that teaches the loop", async () => {
-    const alice = join(tmp, "alice");
+    const alice = join(h.tmp, "alice");
     await login(alice, "@alice");
     const res = await cli(alice, ["agents-md"]);
     expect(res.code).toBe(EXIT.ok);
@@ -265,7 +180,7 @@ describe("usage and agents", () => {
   });
 
   test("artroom mcp serves the ten tools over stdio from the real bin", async () => {
-    const alice = join(tmp, "alice");
+    const alice = join(h.tmp, "alice");
     await login(alice, "@alice");
     const child = spawn(process.execPath, [join(import.meta.dirname, "..", "bin", "artroom.js"), "mcp"], {
       env: { ...process.env, ARTROOM_HOME: alice },

@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`P3: login and redeem finish locally before forgetting how to resume > a failure after the join keeps the journal; the same command finishes with the same key and one join > login unfinished 1`] = `
+"Error (unavailable): The room is restarting.
+  Nothing is lost. Run the same artroom login command again to finish; it reuses the same key and request."
+`;
+
+exports[`P4: a retried act is the act first sent > a lost success response, then a separate run after HEAD, the lane and the lease changed, returns the original proposal > propose lost 1`] = `
+"Error (unavailable): The room could not be reached, or the connection closed before the response arrived.
+  To finish it, repeat the same command with --idempotency-key KEY. If the room recorded it, you get the original result."
+`;
+
+exports[`P5: the landing follow-up waits on the operation already started > a failed landing ends the wait with exit 1, and only then suggests a new land > wait failed 1`] = `
+"Landing op_land_8, generation 1: SHORT.
+The landing failed: conflict in src/a.ts.
+Next: merge main into your branch, push, and artroom propose again."
+`;
+
+exports[`P5: the landing follow-up waits on the operation already started > a retryable landing ends the wait with exit 1, and only then suggests a new land > wait retryable 1`] = `
+"Landing op_land_8, generation 1: SHORT.
+The landing stopped (generation-moved): Land the new generation.
+Next: start a new attempt with artroom land --wait"
+`;
+
+exports[`P5: the landing follow-up waits on the operation already started > a wait that runs out names the same operation, and the next wait finishes it > wait timed out 1`] = `
+"Landing op_land_8 is still accepted.
+Next: artroom wait op_land_8"
+`;
+
+exports[`P5: the landing follow-up waits on the operation already started > land without --wait starts once; artroom wait follows that operation to the end > land started 1`] = `
+"Landing op_land_8 started for generation 1 of lane act_5_HASH.
+Next: artroom wait"
+`;
+
+exports[`P5: the landing follow-up waits on the operation already started > land without --wait starts once; artroom wait follows that operation to the end > wait landed 1`] = `
+"Landing op_land_8, generation 1: SHORT.
+Landed: SHORT (reserved at seq 9).
+Next: artroom release, or artroom renew to keep working on the lane."
+`;

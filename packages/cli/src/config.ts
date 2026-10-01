@@ -8,8 +8,8 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { KeyId, LaneId, MemberId, RoomId, Role } from "@generalbusiness/artroom-contract";
-import type { PrivateJwk } from "@generalbusiness/artroom-client";
+import type { KeyId, LaneId, MemberId, OpId, Redeemed, RoomId, Role } from "@generalbusiness/artroom-contract";
+import type { PreparedAct, PrivateJwk } from "@generalbusiness/artroom-client";
 
 export interface RoomConfig {
   readonly url: `https://${string}`;
@@ -22,6 +22,10 @@ export interface RoomConfig {
   readonly mcp?: string;
   /** The lane the next command acts on, from the last `claim`. */
   lane?: LaneId;
+  /** The invitation this room was joined or redeemed with, so repeating that command reports it is done. */
+  invitation?: string;
+  /** The landing operation `artroom wait` follows, from the last `land`. */
+  landing?: { readonly op: OpId; readonly lane: LaneId };
 }
 
 export interface Config {
@@ -37,15 +41,38 @@ export interface KeyFile {
   readonly jwk: PrivateJwk;
 }
 
-/** A key made for a join that has not finished, with what is needed to repeat that join exactly. */
-export interface PendingJoin {
-  readonly v: 1;
-  readonly room: RoomId;
-  readonly invitation: string;
-  readonly idempotencyKey: string;
-  readonly key: KeyId;
-  readonly jwk: PrivateJwk;
-}
+/**
+ * The journal: one durable record per unfinished piece of work, written
+ * before the first request and removed only when every local step is done.
+ * Running the same command again reads it and finishes the work with the
+ * same key, the same request and the same receipt, instead of starting over.
+ *
+ * - `act`: an act, prepared and signed, under its idempotency key (R-IDEM-2).
+ * - `login`: the new key and the join's idempotency key, then the join's result.
+ * - `redeem`: that a one-time redemption was sent, then its result. The bearer
+ *   token stays here (0600) only until it is in its own file and the config.
+ */
+export type JournalEntry =
+  | { readonly v: 1; readonly type: "act"; readonly id: string; readonly room: RoomId; readonly command: string; readonly prepared: PreparedAct }
+  | {
+      readonly v: 1;
+      readonly type: "login";
+      readonly id: string;
+      readonly room: RoomId;
+      readonly url: `https://${string}`;
+      readonly idempotencyKey: string;
+      readonly key: KeyId;
+      readonly jwk: PrivateJwk;
+      readonly joined?: { readonly member: MemberId; readonly role: Role; readonly record: string };
+    }
+  | {
+      readonly v: 1;
+      readonly type: "redeem";
+      readonly id: string;
+      readonly room: RoomId;
+      readonly url: `https://${string}`;
+      readonly redeemed?: Redeemed;
+    };
 
 /** `$ARTROOM_HOME`, else `$XDG_CONFIG_HOME/artroom`, else `~/.config/artroom`. */
 export function configDir(env: Readonly<Record<string, string | undefined>>): string {
@@ -108,23 +135,25 @@ export class Store {
     return JSON.parse(readFileSync(this.keyPath(room), "utf8")) as KeyFile;
   }
 
-  pendingPath(room: RoomId): string {
-    return join(this.dir, "keys", `${room}.pending.json`);
+  #entryPath(room: RoomId, type: JournalEntry["type"], id: string): string {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new Error(`not a journal ID: ${id}`);
+    return join(this.dir, "journal", room, `${type}-${id}.json`);
   }
 
-  savePending(p: PendingJoin): string {
-    this.#ensure("keys");
-    writePrivate(this.pendingPath(p.room), `${JSON.stringify(p, null, 2)}\n`);
-    return this.pendingPath(p.room);
+  /** Writes the entry before the work it records goes out. */
+  journal(entry: JournalEntry): void {
+    this.#ensure(join("journal", entry.room));
+    writePrivate(this.#entryPath(entry.room, entry.type, entry.id), `${JSON.stringify(entry, null, 2)}\n`);
   }
 
-  loadPending(room: RoomId): PendingJoin | undefined {
-    const path = this.pendingPath(room);
-    return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as PendingJoin) : undefined;
+  entry<T extends JournalEntry["type"]>(room: RoomId, type: T, id: string): Extract<JournalEntry, { type: T }> | undefined {
+    const path = this.#entryPath(room, type, id);
+    return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Extract<JournalEntry, { type: T }>) : undefined;
   }
 
-  removePending(room: RoomId): void {
-    rmSync(this.pendingPath(room), { force: true });
+  /** Removes the entry once its work is finished, locally as well as in the room. */
+  finish(room: RoomId, type: JournalEntry["type"], id: string): void {
+    rmSync(this.#entryPath(room, type, id), { force: true });
   }
 
   saveBearer(room: RoomId, token: string): string {

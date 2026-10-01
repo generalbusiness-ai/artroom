@@ -26,7 +26,8 @@ export function refusalText(r: Refusal): string[] {
 }
 
 export function errorText(e: ArtroomError): string[] {
-  const lines = [`Error (${e.code}): ${e.message}`];
+  // The CLI says how to retry in its own words, with the flag to use.
+  const lines = [`Error (${e.code}): ${e.message.replace(/ Retry with idempotency key .*$/s, "")}`];
   if (e.maybeRecorded) lines.push("  The room may have recorded this. Repeat the same command with the same --idempotency-key to be sure.");
   else if (e.retryable) lines.push("  This may work if you try again.");
   return lines;
@@ -60,12 +61,13 @@ export function proposalText(p: Proposal): string[] {
   return lines;
 }
 
+/** What a landing's state means, and the next command. Only a finished, unsuccessful landing suggests a new `land`. */
 export function landText(op: LandOp): string[] {
   switch (op.state) {
     case "landed":
-      return [`Landed generation ${op.generation}: ${short(op.integration)} (reserved at seq ${op.reservedAt}).`, "Next: artroom release, or artroom renew to keep working on the lane."];
+      return [`Landed: ${short(op.integration)} (reserved at seq ${op.reservedAt}).`, "Next: artroom release, or artroom renew to keep working on the lane."];
     case "retryable":
-      return [`The landing stopped (${op.reason}): ${op.fix}`, "Next: artroom land --wait"];
+      return [`The landing stopped (${op.reason}): ${op.fix}`, "Next: start a new attempt with artroom land --wait"];
     case "failed":
       return [
         `The landing failed: ${op.reason.code === "conflict" ? `conflict in ${op.reason.paths.join(", ")}` : op.reason.code === "check-failed" ? `check ${op.reason.check} failed` : `${op.reason.refusal.rule}: ${op.reason.refusal.reason}`}.`,
@@ -74,9 +76,9 @@ export function landText(op: LandOp): string[] {
     case "aborted":
       return [`The landing was aborted after ${op.abort.trigger}.`, `Next: artroom explain ${op.abort.trigger}`];
     case "unresolved":
-      return [`The publication is unresolved since ${op.since}; the room keeps retrying.`, "Next: artroom attention"];
+      return [`The publication is unresolved since ${op.since}; the room keeps retrying.`, `Next: artroom wait ${op.id}`];
     default:
-      return [`Landing ${op.id} is ${op.state}.`, "Next: artroom land --wait, or check later with artroom attention."];
+      return [`Landing ${op.id} is ${op.state}.`, `Next: artroom wait ${op.id}`];
   }
 }
 

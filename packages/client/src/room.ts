@@ -19,6 +19,8 @@ import {
   type Credentials,
   type Cursor,
   type EnvelopeKind,
+  type IdempotencyKey,
+  type SignedEnvelope,
   type Explanation,
   type Held,
   type HttpRoom,
@@ -110,6 +112,21 @@ export async function withRetries<T>(attempt: () => Promise<T>, retries: number,
   }
 }
 
+/** An act, resolved and, for a key, signed: everything needed to send it again unchanged. */
+export interface PreparedAct {
+  readonly kind: EnvelopeKind;
+  readonly target: unknown;
+  readonly body: unknown;
+  readonly idempotencyKey: IdempotencyKey;
+  /** The signed envelope; absent for a bearer session, where the room signs. */
+  readonly signed?: SignedEnvelope;
+}
+
+/** `ActOptions`, plus a hook to persist the prepared act before it is first sent. */
+export interface ClientActOptions extends ActOptions {
+  readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
+}
+
 /** The shared core of every handle. */
 abstract class RoomCore {
   readonly id: RoomId;
@@ -197,19 +214,36 @@ abstract class RoomCore {
 
   // -------------------------------------------------------------------- acts
 
-  protected async act<T>(kind: EnvelopeKind, target: unknown, body: unknown, opts?: ActOptions): Promise<Result<T>> {
-    const key = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
-    const retries = this.opts.retries ?? 3;
-    if (this.bearer !== undefined) {
-      const bearer = this.bearer;
-      return (await withRetries(() => bearer.act(kind, target, body, key), retries, key)) as Result<T>;
-    }
-    const signed = await signEnvelope(buildEnvelope(this.id, this.identity, kind, target, body, key), this.identity.signer);
-    // The same signed bytes on every attempt: a retry is the same request (R-IDEM-1, R-IDEM-2).
-    return (await withRetries(() => this.wire.submit(signed), retries, key)) as Result<T>;
+  protected async act<T>(kind: EnvelopeKind, target: unknown, body: unknown, opts?: ClientActOptions): Promise<Result<T>> {
+    const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
+    const prepared: PreparedAct =
+      this.bearer !== undefined
+        ? { kind, target, body, idempotencyKey }
+        : { kind, target, body, idempotencyKey, signed: await signEnvelope(buildEnvelope(this.id, this.identity, kind, target, body, idempotencyKey), this.identity.signer) };
+    await opts?.onPrepared?.(prepared);
+    return (await this.replay(prepared)) as Result<T>;
   }
 
-  claim(input: ClaimInput, opts?: ActOptions): Promise<Result<Claim>> {
+  /**
+   * Sends a prepared act, unchanged: the same signed bytes, or for a bearer
+   * the same tool call, with the same idempotency key. If the room recorded
+   * it before, it returns the original result (R-IDEM-2). Use it to finish
+   * an act after a restart, without reading or rebuilding anything.
+   */
+  async replay(act: PreparedAct): Promise<Result<ActRecord>> {
+    const retries = this.opts.retries ?? 3;
+    if (act.signed === undefined) {
+      if (this.bearer === undefined) throw artroomError("bad-request", "This act was prepared for a bearer session; it has no signature.");
+      const bearer = this.bearer;
+      return withRetries(() => bearer.act(act.kind, act.target, act.body, act.idempotencyKey), retries, act.idempotencyKey);
+    }
+    if (act.signed.envelope.room !== this.id) throw artroomError("bad-request", "This act was prepared for another room.");
+    const signed = act.signed;
+    // The same signed bytes on every attempt: a retry is the same request (R-IDEM-1, R-IDEM-2).
+    return withRetries(() => this.wire.submit(signed), retries, act.idempotencyKey);
+  }
+
+  claim(input: ClaimInput, opts?: ClientActOptions): Promise<Result<Claim>> {
     const lane = (input as { lane?: LaneId | Held }).lane;
     if (lane === undefined) {
       return this.act("claim", null, pick(input, ["goal", "scope", "purpose", "plan", "because"]), opts);
@@ -219,16 +253,16 @@ abstract class RoomCore {
     return this.act("claim", { lane: lane.lane }, { ...body, lease: lane.lease.generation }, opts); // rescope (R-LANE-2)
   }
 
-  propose(held: Held, input: ProposeInput, opts?: ActOptions): Promise<Result<Proposal>> {
+  propose(held: Held, input: ProposeInput, opts?: ClientActOptions): Promise<Result<Proposal>> {
     return this.act("propose", { lane: held.lane }, { ...pick(input, ["expectedGeneration", "head", "summary", "because"]), lease: held.lease.generation }, opts);
   }
 
-  note(anchor: NoteAnchor, input: NoteInput, opts?: ActOptions): Promise<Result<Note>> {
+  note(anchor: NoteAnchor, input: NoteInput, opts?: ClientActOptions): Promise<Result<Note>> {
     const target = "act" in anchor ? { act: anchor.act } : pick(anchor, ["lane", "generation", "head", "path", "line", "endLine"]);
     return this.act("note", target, pick(input, ["text", "replyTo"]), opts);
   }
 
-  review(proposal: ProposalAt, input: ReviewInput, opts?: ActOptions): Promise<Result<Review>> {
+  review(proposal: ProposalAt, input: ReviewInput, opts?: ClientActOptions): Promise<Result<Review>> {
     return this.act(
       "review",
       { lane: proposal.lane, generation: proposal.generation },
@@ -237,7 +271,7 @@ abstract class RoomCore {
     );
   }
 
-  check(proposal: ProposalRef, input: CheckActInput, opts?: ActOptions): Promise<Result<Check>> {
+  check(proposal: ProposalRef, input: CheckActInput, opts?: ClientActOptions): Promise<Result<Check>> {
     return this.act(
       "check",
       { lane: proposal.lane, generation: proposal.generation },
@@ -246,20 +280,20 @@ abstract class RoomCore {
     );
   }
 
-  land(held: Held, proposal: ProposalAt, opts?: ActOptions): Promise<Result<Landing>> {
+  land(held: Held, proposal: ProposalAt, opts?: ClientActOptions): Promise<Result<Landing>> {
     if (held.lane !== proposal.lane) return Promise.reject(artroomError("bad-request", "The proposal is not on the held lane."));
     return this.act("land", { lane: proposal.lane, generation: proposal.generation }, { lease: held.lease.generation, head: proposal.head }, opts);
   }
 
-  release(held: Held, input?: ReleaseInput, opts?: ActOptions): Promise<Result<Release>> {
+  release(held: Held, input?: ReleaseInput, opts?: ClientActOptions): Promise<Result<Release>> {
     return this.act("release", { lane: held.lane }, { lease: held.lease.generation, ...pick(input ?? {}, ["note"]) }, opts);
   }
 
-  renew(held: Held, opts?: ActOptions): Promise<Result<Renewal>> {
+  renew(held: Held, opts?: ClientActOptions): Promise<Result<Renewal>> {
     return this.act("renew", { lane: held.lane }, { lease: held.lease.generation }, opts);
   }
 
-  roster(op: RosterOp, opts?: ActOptions): Promise<Result<RosterRecord>> {
+  roster(op: RosterOp, opts?: ClientActOptions): Promise<Result<RosterRecord>> {
     return this.act("roster", null, op, opts);
   }
 

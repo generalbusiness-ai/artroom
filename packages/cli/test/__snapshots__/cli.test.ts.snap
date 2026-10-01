@@ -1,9 +1,11 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`joining > a lost login response is finished by running the same command again, joining once > login lost 1`] = `
-"Error (unavailable): the room did not answer the join.
-  Your new key is saved. Run the same artroom login command again: it repeats the same join, so it cannot join twice."
+"Error (unavailable): The room could not be reached, or the connection closed before the response arrived.
+  Nothing is lost. Run the same artroom login command again to finish; it reuses the same key and request."
 `;
+
+exports[`joining > a lost redemption says what to do, and saves no token > redeem lost 1`] = `"Error (unavailable): The redemption may have succeeded, but its response was lost, and the bearer token cannot be shown again. Do not retry this invitation. Ask an admin for a new MCP (room-custody) invitation for the same member, and ask them to revoke the unused delegation."`;
 
 exports[`joining > a lost redemption says what to do, and saves nothing > redeem lost 1`] = `"Error (unavailable): The redemption may have succeeded, but its response was lost, and the bearer token cannot be shown again. Do not retry this invitation. Ask an admin for a new MCP (room-custody) invitation for the same member, and ask them to revoke the unused delegation."`;
 
@@ -53,8 +55,8 @@ Failed: R-LAND-1: Obligation obl_review is open."
 `;
 
 exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > land --wait 1`] = `
-"Landing op_land_9 for generation 1: SHORT.
-Landed generation 1: SHORT (reserved at seq 10).
+"Landing op_land_9, generation 1: SHORT.
+Landed: SHORT (reserved at seq 10).
 Next: artroom release, or artroom renew to keep working on the lane."
 `;
 

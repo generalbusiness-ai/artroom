@@ -720,6 +720,7 @@ export class FakeRoom {
       return;
     }
     if (op.kind === "land") {
+      if (this.landingPaused) return;
       const next: Record<string, string> = { accepted: "preparing", preparing: "ready", ready: "publishing", publishing: "landed" };
       const to = next[op.state];
       if (!to) return;
@@ -798,6 +799,24 @@ export class FakeRoom {
       if (b) return b.member;
     }
     throw artroomError("unauthenticated", "A session or bearer token is required.");
+  }
+
+  /** While true, landing operations do not advance, as when preparation is slow. */
+  landingPaused = false;
+
+  /** Ends a landing operation in a terminal state other than `landed` (R-LAND-6, R-LAND-4). */
+  finishLanding(id: string, outcome: "retryable" | "failed"): void {
+    const op = this.ops.get(id) as LandOp & Record<string, unknown>;
+    const base = pickBase(op);
+    const receipt = op["act"];
+    this.ops.set(
+      id,
+      (outcome === "retryable"
+        ? { ...base, state: "retryable", reason: "generation-moved", receipt, fix: "Land the new generation." }
+        : { ...base, state: "failed", reason: { code: "conflict", paths: ["src/a.ts"] }, receipt }) as unknown as LandOp,
+    );
+    const lane = this.lanes.get(op.lane);
+    if (lane) delete lane.landing;
   }
 
   /** Revokes a delegation, which ends every bearer session acting under it (R-CRED-3). */

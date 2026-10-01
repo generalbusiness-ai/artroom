@@ -8,7 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import type { ArtroomError, Redeemed, Update } from "@generalbusiness/artroom-contract";
-import { connect, isArtroomError, isRefusal, redeem, type Watch } from "../src/index.ts";
+import { connect, isArtroomError, isRefusal, redeem, type HttpRoomClient, type PreparedAct, type Watch } from "../src/index.ts";
 import type { FakeRoom } from "./support/fake-room.ts";
 import { joinAs, startRoom, type Url } from "./support/setup.ts";
 
@@ -67,7 +67,7 @@ describe("P2: watch reconnects with a valid credential, or stops observably", ()
     const start = (await bob.api.subscribe(undefined, { waitMs: 0 })).cursor;
     const seen: Update[] = [];
     const errors: ArtroomError[] = [];
-    const sub = bob.api.watch(start, (u) => seen.push(u), (e) => errors.push(e)) as Watch;
+    const sub = (bob.api as HttpRoomClient).watch(start, (u) => seen.push(u), (e) => errors.push(e));
     const seqs = () => seen.flatMap((u) => u.entries.map((e) => e.seq));
     await until(() => room.socketCount === 1);
     await alice.api.claim({ goal: "a", scope: ["a/**"] });
@@ -89,7 +89,7 @@ describe("P2: watch reconnects with a valid credential, or stops observably", ()
     const b = await bearer();
     const api = await connect({ url }, room.id, { kind: "bearer", token: b.bearer });
     const errors: ArtroomError[] = [];
-    const sub = api.watch(undefined, () => {}, (e) => errors.push(e)) as Watch;
+    const sub = (api as HttpRoomClient).watch(undefined, () => {}, (e) => errors.push(e));
     await until(() => room.socketCount === 1);
     room.revokeDelegation(b.delegation);
     room.dropSockets();
@@ -124,5 +124,28 @@ describe("P2: watch reconnects with a valid credential, or stops observably", ()
     expect(other.closed).toBe(true);
     await until(() => room.socketCount === 0);
     expect(room.socketCount).toBe(0);
+  });
+});
+
+describe("P4 support: a prepared act can be sent again, unchanged, by a new handle", () => {
+  test("persisted before it was sent, replayed after every response was lost, it returns the original record", async () => {
+    const alice = await joinAs(room, "@alice");
+    let prepared: PreparedAct | undefined;
+    room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    await caught((alice.api as HttpRoomClient).claim({ goal: "g", scope: ["src/**"] }, { onPrepared: (p) => void (prepared = JSON.parse(JSON.stringify(p))) }));
+    expect(prepared?.signed?.envelope.idempotencyKey).toBe(prepared?.idempotencyKey);
+    const restarted = (await connect({ url }, room.id, { kind: "key", signer: alice.signer })) as HttpRoomClient;
+    const again = await restarted.replay(prepared!);
+    const claims = room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim");
+    expect(claims).toHaveLength(1);
+    expect(isRefusal(again) ? again.rule : again.seq).toBe(claims[0]!.seq);
+  });
+
+  test("an act prepared for another room is refused before it is sent", async () => {
+    const alice = await joinAs(room, "@alice");
+    let prepared: PreparedAct | undefined;
+    await (alice.api as HttpRoomClient).renew({ lane: "act_1_00000000", lease: { holder: "@alice", generation: 1, expiresAt: "" } }, { onPrepared: (p) => void (prepared = p) });
+    const foreign = { ...prepared!, signed: { ...prepared!.signed!, envelope: { ...prepared!.signed!.envelope, room: "room_ffffffffffffffffffffffffffffffff" as const } } };
+    expect((await caught((alice.api as HttpRoomClient).replay(foreign as PreparedAct))).code).toBe("bad-request");
   });
 });

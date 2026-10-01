@@ -3,9 +3,15 @@
  * returns the exit code, so tests run it in process:
  *
  *   0  done
- *   1  failed: the room could not be reached, or another error
+ *   1  failed: the room could not be reached, a wait ran out, or another error
  *   2  usage: the command line is wrong
  *   3  refused: the room said no; the output gives the rule, reason and fix
+ *
+ * Every act, login and redemption is written to the journal (config.ts)
+ * before it goes out, and removed only when every local step is done. So a
+ * command that fails part way is finished by running it again: it repeats
+ * the same signed act, the same join, or nothing at all for a one-time
+ * redemption, and never rebuilds the request from changed state.
  */
 
 import { parseArgs, type ParseArgsConfig } from "node:util";
@@ -20,23 +26,27 @@ import {
   newIdempotencyKey,
   redeem,
   signerFromJwk,
+  type ClientActOptions,
   type ClientOptions,
+  type HttpRoomClient,
 } from "@generalbusiness/artroom-client";
 import type {
   ActId,
   Claim,
   Held,
   HttpRoom,
+  LandOp,
   Lane,
   LaneId,
   NoteAnchor,
-  Proposal,
+  OpId,
   Reason,
   Refusal,
+  Result,
   RoomId,
   Sha,
 } from "@generalbusiness/artroom-contract";
-import { Store, type Config, type RoomConfig } from "./config.ts";
+import { Store, type Config, type JournalEntry, type RoomConfig } from "./config.ts";
 import { attentionText, claimText, errorText, explainText, landText, logText, proposalText, refusalText, short } from "./format.ts";
 import { clearWorkspace, configureWorkspace, gitDir, head as gitHead, REMOTE } from "./git.ts";
 import { parseInvitation } from "./link.ts";
@@ -48,6 +58,8 @@ export interface Io {
   readonly cwd: string;
   /** For tests: the fetch the client uses. */
   readonly fetch?: typeof fetch;
+  /** For tests: called after each durable local step, by name. Throwing here simulates an interruption. */
+  readonly step?: (name: string) => void;
 }
 
 export const EXIT = { ok: 0, failed: 1, usage: 2, refused: 3 } as const;
@@ -63,7 +75,8 @@ Working on a lane
                                         To change or take over a lane: --lane LANE --expect N
   artroom workspace                     Get the lane's git remote, and set up git to push to it.
   artroom propose -m SUMMARY            Propose the pushed HEAD. [--head SHA] [--expect N]
-  artroom land [--wait] [--timeout S]   Land the latest proposal, and wait for the outcome.
+  artroom land [--wait] [--timeout S]   Start landing the latest proposal; --wait waits for the outcome.
+  artroom wait [OP] [--timeout S]       Wait for the landing you started (or OP) to finish.
   artroom renew                         Keep the lane: extend the lease.
   artroom release [-m NOTE]             Give the lane up, with a handover note.
 
@@ -79,7 +92,8 @@ Agents
   artroom mcp                           Run the MCP tools over stdio, signing with your key.
 
 Options: --json for JSON output; --room ROOM and --lane LANE to choose; --idempotency-key KEY to
-retry an act safely; --verbose to show each request. Exit codes: 0 done, 1 failed, 2 usage, 3 refused.`;
+finish an act that did not get an answer; --verbose to show each request.
+Exit codes: 0 done, 1 failed, 2 usage, 3 refused.`;
 
 class UsageError extends Error {}
 
@@ -101,20 +115,41 @@ interface Ctx {
   readonly values: Values;
   readonly args: string[];
   readonly json: boolean;
+  /** Every credential this run has seen. No line printed may contain one (R-WS-4). */
+  readonly secrets: Set<string>;
+  /** The act this run journaled, so a failure can say how to finish it. */
+  act?: { readonly room: RoomId; readonly key: string } | undefined;
+  step(name: string): void;
 }
 
 // ------------------------------------------------------------------ output
 
-function print(ctx: Ctx, json: unknown, lines: () => string[]): number {
+function scrub(secrets: ReadonlySet<string>, line: string): string {
+  let out = line;
+  for (const s of secrets) if (s.length >= 8) out = out.split(s).join("[redacted]");
+  return out;
+}
+
+function print(ctx: Ctx, json: unknown, lines: () => string[], code: number = EXIT.ok): number {
   if (ctx.json) ctx.io.out(JSON.stringify(json, null, 2));
   else for (const l of lines()) ctx.io.out(l);
-  return EXIT.ok;
+  return code;
 }
 
 function refused(ctx: Ctx, r: Refusal): number {
   if (ctx.json) ctx.io.out(JSON.stringify(r, null, 2));
   else for (const l of refusalText(r)) ctx.io.err(l);
   return EXIT.refused;
+}
+
+/** A failure part way through work the journal holds: say that running the command again finishes it. */
+function unfinished(ctx: Ctx, e: unknown, command: string): number {
+  if (ctx.json) ctx.io.out(JSON.stringify(isArtroomError(e) ? e : { error: String(e) }, null, 2));
+  else {
+    ctx.io.err(isArtroomError(e) ? errorText(e)[0]! : `artroom ${command}: ${e instanceof Error ? e.message : String(e)}`);
+    ctx.io.err(`  Nothing is lost. Run the same artroom ${command} command again to finish; it reuses the same key and request.`);
+  }
+  return EXIT.failed;
 }
 
 const str = (v: Values, k: string) => (typeof v[k] === "string" ? (v[k] as string) : undefined);
@@ -145,14 +180,26 @@ function clientOptions(ctx: Ctx): ClientOptions {
   };
 }
 
-async function open(ctx: Ctx): Promise<{ api: HttpRoom; id: RoomId; room: RoomConfig; config: Config }> {
-  const { config, id, room } = roomOf(ctx);
-  const creds =
-    room.custody === "room"
-      ? { kind: "bearer" as const, token: ctx.store.loadBearer(id) }
-      : { kind: "key" as const, signer: await signerFromJwk(ctx.store.loadKey(id).jwk) };
-  const api = await connect({ url: room.url }, id, creds, clientOptions(ctx));
-  return { api, id, room, config };
+async function open(ctx: Ctx): Promise<{ api: HttpRoomClient; id: RoomId; room: RoomConfig }> {
+  const { id, room } = roomOf(ctx);
+  let creds;
+  if (room.custody === "room") {
+    const token = ctx.store.loadBearer(id);
+    ctx.secrets.add(token); // registered before any request
+    creds = { kind: "bearer" as const, token };
+  } else creds = { kind: "key" as const, signer: await signerFromJwk(ctx.store.loadKey(id).jwk) };
+  // connect() over HTTPS returns the client's HttpRoomClient, which can also replay a journaled act.
+  const api = (await connect({ url: room.url }, id, creds, clientOptions(ctx))) as HttpRoomClient;
+  return { api, id, room };
+}
+
+/** Reads, changes and writes the config in one step. */
+function updateRoom(ctx: Ctx, id: RoomId, change: (room: RoomConfig) => void): void {
+  const config = ctx.store.read();
+  const room = config.rooms[id];
+  if (room === undefined) return;
+  change(room);
+  ctx.store.write(config);
 }
 
 function laneOf(ctx: Ctx, room: RoomConfig): LaneId {
@@ -176,9 +223,35 @@ async function held(api: HttpRoom, lane: LaneId, me: string): Promise<Extract<La
   return l;
 }
 
-function actOpts(ctx: Ctx) {
-  const key = str(ctx.values, "idempotency-key");
-  return key === undefined ? undefined : { idempotencyKey: key };
+/**
+ * Runs one act through the journal. With an `--idempotency-key` the journal
+ * holds, it sends that prepared act again, unchanged and without any
+ * preflight reads, so the room returns the original result (R-IDEM-2).
+ * Otherwise `start` resolves the act from current state, and the client
+ * hands back the prepared act, which is journaled before it is first sent.
+ */
+async function journaled<T>(ctx: Ctx, api: HttpRoomClient, room: RoomId, command: string, start: (opts: ClientActOptions) => Promise<Result<T>>): Promise<Result<T>> {
+  const key = str(ctx.values, "idempotency-key") ?? newIdempotencyKey();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(key)) throw new UsageError("An idempotency key is 1 to 64 characters from A-Z, a-z, 0-9, '_' and '-'.");
+  ctx.act = { room, key };
+  const saved = ctx.store.entry(room, "act", key);
+  let out: Result<T>;
+  if (saved !== undefined) {
+    if (saved.command !== command) throw new UsageError(`The idempotency key ${key} belongs to an unfinished artroom ${saved.command}. Repeat that command with it.`);
+    out = (await api.replay(saved.prepared)) as Result<T>;
+  } else {
+    out = await start({
+      idempotencyKey: key,
+      onPrepared: (prepared) => {
+        const entry: JournalEntry = { v: 1, type: "act", id: key, room, command, prepared };
+        ctx.store.journal(entry);
+        ctx.step("act-journaled");
+      },
+    });
+  }
+  ctx.store.finish(room, "act", key);
+  ctx.act = undefined;
+  return out;
 }
 
 function parseReason(ref: string): Reason {
@@ -195,6 +268,32 @@ function parseProposalRef(text: string | undefined): { lane: LaneId; generation:
   return { lane: m[1] as LaneId, generation: Number(m[2]) };
 }
 
+// ---------------------------------------------------------------- landing
+
+const LAND_DONE = ["landed", "aborted", "retryable", "failed", "unresolved"] as const;
+
+/**
+ * The one wait path: follows a landing operation that was already started.
+ * It never submits a `land`. Out of time, it says how to keep waiting on the
+ * same operation; a finished operation is forgotten.
+ */
+async function waitLanding(ctx: Ctx, api: HttpRoom, id: RoomId, op: OpId, timeoutMs: number): Promise<number> {
+  let reached: LandOp;
+  try {
+    reached = await api.wait({ id: op, kind: "land" }, { until: LAND_DONE, timeoutMs });
+  } catch (e) {
+    if (!(isArtroomError(e) && e.code === "timeout")) throw e;
+    const now = await api.op({ id: op, kind: "land" });
+    return print(ctx, now, () => [`Landing ${op} is still ${now.state}.`, `Next: artroom wait ${op}`], EXIT.failed);
+  }
+  if (reached.state !== "unresolved") {
+    updateRoom(ctx, id, (r) => {
+      if (r.landing?.op === op) delete r.landing;
+    });
+  }
+  return print(ctx, reached, () => [`Landing ${op}, generation ${reached.generation}: ${short(reached.head)}.`, ...landText(reached)], reached.state === "landed" ? EXIT.ok : EXIT.failed);
+}
+
 // --------------------------------------------------------------- commands
 
 type Command = { readonly options: ParseArgsConfig["options"]; run(ctx: Ctx): Promise<number> };
@@ -205,43 +304,55 @@ const COMMANDS: Record<string, Command> = {
     async run(ctx) {
       const inv = parseInvitation(ctx.args[0] ?? "");
       if (typeof inv === "string") throw new UsageError(inv);
-      // The key and the join's idempotency key are saved before redeeming. If the response is lost,
-      // running the same command again repeats the same join, and the room returns its result (R-IDEM-2).
-      let pending = ctx.store.loadPending(inv.room);
-      if (pending?.invitation !== inv.invitation) {
+      ctx.secrets.add(inv.secret);
+      const done = ctx.store.read().rooms[inv.room];
+      let entry = ctx.store.entry(inv.room, "login", inv.invitation);
+      if (entry === undefined && done?.invitation === inv.invitation) {
+        return print(ctx, { room: inv.room, name: done.name, member: done.member, role: done.role, key: done.key }, () => [
+          `Already joined ${done.name} as ${done.member} with this invitation. Nothing to do.`,
+        ]);
+      }
+      // The new key and the join's idempotency key are journaled before the join goes out (R-IDEM-2).
+      if (entry === undefined) {
         const made = await generateSigner({ extractable: true });
-        pending = { v: 1, room: inv.room, invitation: inv.invitation, idempotencyKey: newIdempotencyKey(), key: made.signer.key, jwk: made.jwk! };
-        ctx.store.savePending(pending);
+        entry = { v: 1, type: "login", id: inv.invitation, room: inv.room, url: inv.url, idempotencyKey: newIdempotencyKey(), key: made.signer.key, jwk: made.jwk! };
+        ctx.store.journal(entry);
+        ctx.step("login-journaled");
       }
-      const signer = await signerFromJwk(pending.jwk);
-      let joined;
-      try {
-        joined = await join({ url: inv.url }, inv.room, { invitation: inv.invitation, secret: inv.secret, signer }, { ...clientOptions(ctx), idempotencyKey: pending.idempotencyKey });
-      } catch (e) {
-        if (isArtroomError(e) && e.retryable) {
-          if (ctx.json) ctx.io.out(JSON.stringify(e, null, 2));
-          else {
-            ctx.io.err(`Error (${e.code}): the room did not answer the join.`);
-            ctx.io.err("  Your new key is saved. Run the same artroom login command again: it repeats the same join, so it cannot join twice.");
-          }
-          return EXIT.failed;
+      const signer = await signerFromJwk(entry.jwk);
+      if (entry.joined === undefined) {
+        let joined;
+        try {
+          joined = await join({ url: entry.url }, inv.room, { invitation: inv.invitation, secret: inv.secret, signer }, { ...clientOptions(ctx), idempotencyKey: entry.idempotencyKey });
+        } catch (e) {
+          return unfinished(ctx, e, "login");
         }
-        throw e;
+        if (isRefusal(joined)) {
+          ctx.store.finish(inv.room, "login", inv.invitation);
+          return refused(ctx, joined);
+        }
+        entry = { ...entry, joined: { member: joined.member, role: joined.role, record: joined.record.id } };
+        ctx.store.journal(entry);
+        ctx.step("joined");
       }
-      if (isRefusal(joined)) {
-        ctx.store.removePending(inv.room);
-        return refused(ctx, joined);
+      let name: string;
+      try {
+        name = (await connect({ url: entry.url }, inv.room, { kind: "key", signer }, clientOptions(ctx))).name;
+      } catch (e) {
+        return unfinished(ctx, e, "login");
       }
-      const path = ctx.store.saveKey({ v: 1, room: inv.room, member: joined.member, key: signer.key, jwk: pending.jwk });
-      ctx.store.removePending(inv.room);
-      const api = await connect({ url: inv.url }, inv.room, { kind: "key", signer }, clientOptions(ctx));
+      const { member, role, record } = entry.joined!;
+      const path = ctx.store.saveKey({ v: 1, room: inv.room, member, key: signer.key, jwk: entry.jwk });
+      ctx.step("key-saved");
       const config = ctx.store.read();
-      config.rooms[inv.room] = { url: inv.url, name: api.name, member: joined.member, role: joined.role, custody: "client", key: signer.key };
+      config.rooms[inv.room] = { url: entry.url, name, member, role, custody: "client", key: signer.key, invitation: inv.invitation };
       config.current = inv.room;
       ctx.store.write(config);
-      return print(ctx, { room: inv.room, name: api.name, member: joined.member, role: joined.role, key: joined.key, keyFile: path, record: joined.record.id }, () => [
-        `Joined ${api.name} as ${joined.member} (${joined.role}).`,
-        `Your key ${joined.key} is in ${path}, readable only by you.`,
+      ctx.step("config-written");
+      ctx.store.finish(inv.room, "login", inv.invitation);
+      return print(ctx, { room: inv.room, name, member, role, key: signer.key, keyFile: path, record }, () => [
+        `Joined ${name} as ${member} (${role}).`,
+        `Your key ${signer.key} is in ${path}, readable only by you.`,
         'Next: artroom claim <paths> --goal "<what you will do>"',
       ]);
     },
@@ -252,31 +363,65 @@ const COMMANDS: Record<string, Command> = {
     async run(ctx) {
       const inv = parseInvitation(ctx.args[0] ?? "");
       if (typeof inv === "string") throw new UsageError(inv);
-      let out;
-      try {
-        out = await redeem({ url: inv.url }, inv.room, { invitation: inv.invitation, secret: inv.secret }, clientOptions(ctx));
-      } catch (e) {
-        if (isArtroomError(e) && e.maybeRecorded) {
-          if (ctx.json) ctx.io.out(JSON.stringify(e, null, 2));
-          else ctx.io.err(`Error (${e.code}): ${LOST_REDEMPTION}`);
-          return EXIT.failed;
-        }
-        throw e;
+      ctx.secrets.add(inv.secret);
+      const done = ctx.store.read().rooms[inv.room];
+      let entry = ctx.store.entry(inv.room, "redeem", inv.invitation);
+      if (entry === undefined && done?.invitation === inv.invitation) {
+        return print(ctx, { room: inv.room, member: done.member, mcp: done.mcp, bearerFile: ctx.store.bearerPath(inv.room) }, () => [
+          `Already redeemed this invitation for ${done.member}. The token is in ${ctx.store.bearerPath(inv.room)}.`,
+        ]);
       }
-      if (isRefusal(out)) return refused(ctx, out);
-      const path = ctx.store.saveBearer(inv.room, out.bearer);
-      const { bearer: _hidden, ...shown } = out;
-      const named = await connect({ url: inv.url }, inv.room, { kind: "bearer", token: out.bearer }, clientOptions(ctx)).then((a) => a.name, () => inv.room);
+      const lost = () => {
+        if (ctx.json) ctx.io.out(JSON.stringify({ name: "ArtroomError", code: "unavailable", message: LOST_REDEMPTION, retryable: false, maybeRecorded: true }, null, 2));
+        else ctx.io.err(`Error (unavailable): ${LOST_REDEMPTION}`);
+        return EXIT.failed;
+      };
+      // A redemption is one-time: once it may have reached the room, it is never sent again.
+      if (entry !== undefined && entry.redeemed === undefined) return lost();
+      if (entry === undefined) {
+        entry = { v: 1, type: "redeem", id: inv.invitation, room: inv.room, url: inv.url };
+        ctx.store.journal(entry);
+        ctx.step("redeem-journaled");
+        let out;
+        try {
+          out = await redeem({ url: inv.url }, inv.room, { invitation: inv.invitation, secret: inv.secret }, clientOptions(ctx));
+        } catch (e) {
+          if (isArtroomError(e) && e.maybeRecorded) return lost();
+          // The room answered, and recorded nothing: the invitation is still unused.
+          ctx.store.finish(inv.room, "redeem", inv.invitation);
+          throw e;
+        }
+        if (isRefusal(out)) {
+          ctx.store.finish(inv.room, "redeem", inv.invitation);
+          return refused(ctx, out);
+        }
+        ctx.secrets.add(out.bearer);
+        // One atomic write keeps the result and the token together, because the token can never be shown again.
+        entry = { ...entry, redeemed: out };
+        ctx.store.journal(entry);
+        ctx.step("redeemed");
+      }
+      const { bearer, ...shown } = entry.redeemed!;
+      ctx.secrets.add(bearer);
+      ctx.store.saveBearer(inv.room, bearer);
+      ctx.step("bearer-saved");
+      const name = await connect({ url: entry.url }, inv.room, { kind: "bearer", token: bearer }, clientOptions(ctx)).then(
+        (a) => a.name,
+        () => inv.room,
+      );
+      const path = ctx.store.bearerPath(inv.room);
       const config = ctx.store.read();
-      config.rooms[inv.room] = { url: inv.url, name: named, member: out.member, role: out.role, custody: "room", key: out.key, mcp: out.mcp };
+      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, mcp: shown.mcp, invitation: inv.invitation };
       config.current = inv.room;
       ctx.store.write(config);
+      ctx.step("config-written");
+      ctx.store.finish(inv.room, "redeem", inv.invitation);
       return print(ctx, { ...shown, bearerFile: path }, () => [
-        `Redeemed an MCP invitation for ${out.member} (${out.role}), valid until ${out.expiresAt}.`,
+        `Redeemed an MCP invitation for ${shown.member} (${shown.role}), valid until ${shown.expiresAt}.`,
         `The bearer token is in ${path}, readable only by you. It is not shown anywhere else.`,
-        `MCP URL: ${out.mcp}`,
+        `MCP URL: ${shown.mcp}`,
         `Next: give your agent that URL with the header "Authorization: Bearer <token from the file>", for example:`,
-        `  claude mcp add --transport http artroom ${out.mcp} --header "Authorization: Bearer $(cat ${path})"`,
+        `  claude mcp add --transport http artroom ${shown.mcp} --header "Authorization: Bearer $(cat ${path})"`,
       ]);
     },
   },
@@ -285,25 +430,24 @@ const COMMANDS: Record<string, Command> = {
     options: { goal: { type: "string" }, plan: { type: "string" }, because: { type: "string", multiple: true }, expect: { type: "string" } },
     async run(ctx) {
       if (ctx.args.length === 0) throw new UsageError('Give the paths to claim, for example: artroom claim "src/api/**" --goal "Rate-limit login"');
-      const { api, id, room, config } = await open(ctx);
+      const { api, id, room } = await open(ctx);
       const because = list(ctx.values, "because").map(parseReason);
       const plan = str(ctx.values, "plan");
       const goal = str(ctx.values, "goal");
       const target = str(ctx.values, "lane") as LaneId | undefined;
-      let out;
-      if (target === undefined) {
-        if (goal === undefined) throw new UsageError('Say what you will do: --goal "..."');
-        out = await api.claim({ goal, scope: ctx.args, ...(plan ? { plan } : {}), ...(because.length ? { because } : {}) }, actOpts(ctx));
-      } else {
+      if (target === undefined && goal === undefined) throw new UsageError('Say what you will do: --goal "..."');
+      const out = await journaled(ctx, api, id, "claim", async (opts) => {
+        if (target === undefined) return api.claim({ goal: goal!, scope: ctx.args, ...(plan ? { plan } : {}), ...(because.length ? { because } : {}) }, opts);
         const lane = await api.lane(target);
         const expectedGeneration = int(ctx.values, "expect") ?? lane?.generation ?? 0;
         const mine = lane?.state === "held" && lane.lease.holder === room.member;
         const body = { scope: ctx.args, expectedGeneration, ...(goal ? { goal } : {}), ...(plan ? { plan } : {}), ...(because.length ? { because } : {}) };
-        out = await api.claim(mine ? { ...body, lane: lane as Held } : { ...body, lane: target }, actOpts(ctx));
-      }
+        return api.claim(mine ? { ...body, lane: lane as Held } : { ...body, lane: target }, opts);
+      });
       if (isRefusal(out)) return refused(ctx, out);
-      config.rooms[id]!.lane = out.lane;
-      ctx.store.write(config);
+      updateRoom(ctx, id, (r) => {
+        r.lane = out.lane;
+      });
       return print(ctx, out, () => claimText(out as Claim));
     },
   },
@@ -324,12 +468,13 @@ const COMMANDS: Record<string, Command> = {
       }
       const grant = await api.workspaceToken(h);
       if (isRefusal(grant)) return refused(ctx, grant);
+      ctx.secrets.add(grant.token);
       const file = configureWorkspace(ctx.io.cwd, grant.remote, grant.token);
       return print(ctx, { op: ready, remote: grant.remote, remoteName: REMOTE, leaseGeneration: grant.leaseGeneration, expiresAt: grant.expiresAt, credentialFile: file }, () => [
         `Workspace ready for lane ${h.lane}, lease ${grant.leaseGeneration}.`,
         `Git remote "${REMOTE}": ${grant.remote}`,
         `Git can push there until ${grant.expiresAt}. The token is in ${file}, readable only by you, and is not shown.`,
-        "Next: git push artroom HEAD, then artroom propose -m \"<what changed and why>\"",
+        'Next: git push artroom HEAD, then artroom propose -m "<what changed and why>"',
       ]);
     },
   },
@@ -339,13 +484,14 @@ const COMMANDS: Record<string, Command> = {
     async run(ctx) {
       const summary = str(ctx.values, "message");
       if (summary === undefined) throw new UsageError('Say what changed and why: -m "..."');
-      const { api, room } = await open(ctx);
-      const sha = str(ctx.values, "head") ?? gitHead(ctx.io.cwd);
-      if (sha === undefined || !/^[0-9a-f]{40}$/.test(sha)) throw new UsageError("Give the commit to propose with --head SHA, or run this inside the repository.");
-      const h = await held(api, laneOf(ctx, room), room.member);
-      if (isRefusal(h)) return refused(ctx, h);
-      const expectedGeneration = int(ctx.values, "expect") ?? h.generation;
-      const out = await api.propose(h, { head: sha as Sha, expectedGeneration, summary }, actOpts(ctx));
+      const { api, id, room } = await open(ctx);
+      const out = await journaled(ctx, api, id, "propose", async (opts) => {
+        const sha = str(ctx.values, "head") ?? gitHead(ctx.io.cwd);
+        if (sha === undefined || !/^[0-9a-f]{40}$/.test(sha)) throw new UsageError("Give the commit to propose with --head SHA, or run this inside the repository.");
+        const h = await held(api, laneOf(ctx, room), room.member);
+        if (isRefusal(h)) return h;
+        return api.propose(h, { head: sha as Sha, expectedGeneration: int(ctx.values, "expect") ?? h.generation, summary }, opts);
+      });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => proposalText(out));
     },
@@ -354,33 +500,47 @@ const COMMANDS: Record<string, Command> = {
   land: {
     options: { wait: { type: "boolean" }, timeout: { type: "string" }, generation: { type: "string" } },
     async run(ctx) {
-      const { api, room } = await open(ctx);
-      const h = await held(api, laneOf(ctx, room), room.member);
-      if (isRefusal(h)) return refused(ctx, h);
-      const generation = int(ctx.values, "generation") ?? h.generation;
-      if (generation === 0) throw new UsageError("Nothing is proposed on this lane yet. Run artroom propose first.");
-      const proposal = await api.proposal({ lane: h.lane, generation });
-      if (proposal === null) throw new UsageError(`Lane ${h.lane} has no generation ${generation}.`);
-      const landing = await api.land(h, proposal, actOpts(ctx));
+      const { api, id, room } = await open(ctx);
+      const landing = await journaled(ctx, api, id, "land", async (opts) => {
+        const h = await held(api, laneOf(ctx, room), room.member);
+        if (isRefusal(h)) return h;
+        const generation = int(ctx.values, "generation") ?? h.generation;
+        if (generation === 0) throw new UsageError("Nothing is proposed on this lane yet. Run artroom propose first.");
+        const proposal = await api.proposal({ lane: h.lane, generation });
+        if (proposal === null) throw new UsageError(`Lane ${h.lane} has no generation ${generation}.`);
+        return api.land(h, proposal, opts);
+      });
       if (isRefusal(landing)) return refused(ctx, landing);
+      updateRoom(ctx, id, (r) => {
+        r.landing = { op: landing.op.id, lane: landing.lane };
+      });
+      ctx.step("landing-saved");
       if (ctx.values["wait"] !== true) {
-        return print(ctx, landing, () => [`Landing ${landing.op.id} started for generation ${generation}: ${short(proposal.head)}.`, "Next: artroom land --wait, or artroom attention later."]);
+        return print(ctx, landing, () => [`Landing ${landing.op.id} started for generation ${landing.generation} of lane ${landing.lane}.`, "Next: artroom wait"]);
       }
-      const timeoutMs = (int(ctx.values, "timeout") ?? 120) * 1000;
-      const op = await api.wait(landing.op, { until: ["landed", "aborted", "retryable", "failed", "unresolved"], timeoutMs });
-      const code = op.state === "landed" ? EXIT.ok : EXIT.failed;
-      print(ctx, { ...landing, op }, () => [`Landing ${op.id} for generation ${generation}: ${short(proposal.head)}.`, ...landText(op)]);
-      return code;
+      return waitLanding(ctx, api, id, landing.op.id, (int(ctx.values, "timeout") ?? 120) * 1000);
+    },
+  },
+
+  wait: {
+    options: { timeout: { type: "string" } },
+    async run(ctx) {
+      const { api, id, room } = await open(ctx);
+      const op = (ctx.args[0] ?? room.landing?.op) as OpId | undefined;
+      if (op === undefined) throw new UsageError("There is no landing to wait for. Start one with artroom land, or name the operation: artroom wait op_land_N");
+      if (!/^op_[A-Za-z0-9_-]{1,64}$/.test(op)) throw new UsageError(`Not an operation ID: ${op}.`);
+      return waitLanding(ctx, api, id, op, (int(ctx.values, "timeout") ?? 120) * 1000);
     },
   },
 
   renew: {
     options: {},
     async run(ctx) {
-      const { api, room } = await open(ctx);
-      const h = await held(api, laneOf(ctx, room), room.member);
-      if (isRefusal(h)) return refused(ctx, h);
-      const out = await api.renew(h, actOpts(ctx));
+      const { api, id, room } = await open(ctx);
+      const out = await journaled(ctx, api, id, "renew", async (opts) => {
+        const h = await held(api, laneOf(ctx, room), room.member);
+        return isRefusal(h) ? h : api.renew(h, opts);
+      });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => [`Renewed lane ${out.lane}: lease ${out.lease.generation} until ${out.lease.expiresAt}.`]);
     },
@@ -389,17 +549,19 @@ const COMMANDS: Record<string, Command> = {
   release: {
     options: { message: { type: "string", short: "m" } },
     async run(ctx) {
-      const { api, id, room, config } = await open(ctx);
-      const h = await held(api, laneOf(ctx, room), room.member);
-      if (isRefusal(h)) return refused(ctx, h);
+      const { api, id, room } = await open(ctx);
       const note = str(ctx.values, "message");
-      const out = await api.release(h, note === undefined ? {} : { note }, actOpts(ctx));
+      const out = await journaled(ctx, api, id, "release", async (opts) => {
+        const h = await held(api, laneOf(ctx, room), room.member);
+        return isRefusal(h) ? h : api.release(h, note === undefined ? {} : { note }, opts);
+      });
       if (isRefusal(out)) return refused(ctx, out);
       const cleared = clearWorkspace(ctx.io.cwd);
-      if (config.rooms[id]!.lane === out.lane) delete config.rooms[id]!.lane;
-      ctx.store.write(config);
+      updateRoom(ctx, id, (r) => {
+        if (r.lane === out.lane) delete r.lane;
+      });
       return print(ctx, out, () => [
-        `Released lane ${out.lane}${note === undefined ? "" : ", with a handover note"}.`,
+        `Released lane ${out.lane}${out.note === undefined ? "" : ", with a handover note"}.`,
         ...(cleared ? ["Removed the workspace credential from this repository."] : []),
       ]);
     },
@@ -410,19 +572,21 @@ const COMMANDS: Record<string, Command> = {
     async run(ctx) {
       const text = str(ctx.values, "message");
       if (text === undefined) throw new UsageError('Give the note: -m "..."');
-      const { api } = await open(ctx);
       const target = ctx.args[0] ?? "";
-      let anchor: NoteAnchor;
-      if (/^act_\d+_[0-9a-f]{8}$/.test(target)) anchor = { act: target as ActId };
-      else {
-        const m = /^(act_\d+_[0-9a-f]{8})#(\d+):(.+):(\d+)(?:-(\d+))?$/.exec(target);
-        if (!m) throw new UsageError("Anchor the note on an act ID, or on LANE#GENERATION:PATH:LINE.");
-        const p = await api.proposal({ lane: m[1] as LaneId, generation: Number(m[2]) });
-        if (p === null) throw new UsageError(`There is no proposal ${m[1]}#${m[2]}.`);
-        anchor = { lane: p.lane, generation: p.generation, head: p.head, path: m[3]!, line: Number(m[4]), ...(m[5] ? { endLine: Number(m[5]) } : {}) };
-      }
+      const m = /^(act_\d+_[0-9a-f]{8})#(\d+):(.+):(\d+)(?:-(\d+))?$/.exec(target);
+      if (!/^act_\d+_[0-9a-f]{8}$/.test(target) && !m) throw new UsageError("Anchor the note on an act ID, or on LANE#GENERATION:PATH:LINE.");
+      const { api, id } = await open(ctx);
       const replyTo = str(ctx.values, "reply-to") as ActId | undefined;
-      const out = await api.note(anchor, { text, ...(replyTo ? { replyTo } : {}) }, actOpts(ctx));
+      const out = await journaled(ctx, api, id, "note", async (opts) => {
+        let anchor: NoteAnchor;
+        if (m === null) anchor = { act: target as ActId };
+        else {
+          const p = await api.proposal({ lane: m[1] as LaneId, generation: Number(m[2]) });
+          if (p === null) throw new UsageError(`There is no proposal ${m[1]}#${m[2]}.`);
+          anchor = { lane: p.lane, generation: p.generation, head: p.head, path: m[3]!, line: Number(m[4]), ...(m[5] ? { endLine: Number(m[5]) } : {}) };
+        }
+        return api.note(anchor, { text, ...(replyTo ? { replyTo } : {}) }, opts);
+      });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => [`Noted ${out.id}.`]);
     },
@@ -445,15 +609,17 @@ const COMMANDS: Record<string, Command> = {
       if (scope.length === 0) throw new UsageError('Say what you read: --scope "src/api/**" (repeat for more).');
       const text = str(ctx.values, "message");
       if (text === undefined) throw new UsageError('Give your reasons: -m "..."');
-      const { api } = await open(ctx);
-      const p = await api.proposal(ref);
-      if (p === null) throw new UsageError(`There is no proposal ${ref.lane}#${ref.generation}.`);
-      const headSha = (str(ctx.values, "head") ?? p.head) as Sha;
+      const { api, id } = await open(ctx);
       const dependsOn = list(ctx.values, "depends-on");
-      const out = await api.review({ ...ref, head: headSha }, { verdict: approve ? "approve" : "object", scope, ...(dependsOn.length ? { dependsOn } : {}), text }, actOpts(ctx));
+      const out = await journaled(ctx, api, id, "review", async (opts) => {
+        const p = await api.proposal(ref);
+        if (p === null) throw new UsageError(`There is no proposal ${ref.lane}#${ref.generation}.`);
+        const headSha = (str(ctx.values, "head") ?? p.head) as Sha;
+        return api.review({ ...ref, head: headSha }, { verdict: approve ? "approve" : "object", scope, ...(dependsOn.length ? { dependsOn } : {}), text }, opts);
+      });
       if (isRefusal(out)) return refused(ctx, out);
       return print(ctx, out, () => [
-        `${approve ? "Approved" : "Objected to"} ${ref.lane}#${ref.generation} at ${short(headSha)}.`,
+        `${out.verdict === "approve" ? "Approved" : "Objected to"} ${out.lane}#${out.generation} at ${short(out.head)}.`,
         ...out.fulfils.map((f) => `Met ${f.obligation}.`),
       ]);
     },
@@ -520,13 +686,16 @@ const COMMANDS: Record<string, Command> = {
   },
 };
 
-export async function run(argv: readonly string[], io: Io): Promise<number> {
+export async function run(argv: readonly string[], rawIo: Io): Promise<number> {
+  const secrets = new Set<string>();
+  // Every line goes through the scrubber, whatever printed it.
+  const io: Io = { ...rawIo, out: (l) => rawIo.out(scrub(secrets, l)), err: (l) => rawIo.err(scrub(secrets, l)) };
   const [name, ...rest] = argv;
   if (name === undefined || name === "help" || name === "--help" || name === "-h") {
     io.out(USAGE);
     return name === undefined ? EXIT.usage : EXIT.ok;
   }
-  const command = COMMANDS[name];
+  const command = Object.hasOwn(COMMANDS, name) ? COMMANDS[name] : undefined;
   if (command === undefined) {
     io.err(`artroom: there is no command "${name}". Run artroom help for the list.`);
     return EXIT.usage;
@@ -539,7 +708,15 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
     io.err("Run artroom help for the options.");
     return EXIT.usage;
   }
-  const ctx: Ctx = { io, store: new Store(io.env), values: parsed.values as Values, args: parsed.positionals, json: parsed.values["json"] === true };
+  const ctx: Ctx = {
+    io,
+    store: new Store(io.env),
+    values: parsed.values as Values,
+    args: parsed.positionals,
+    json: parsed.values["json"] === true,
+    secrets,
+    step: (s) => rawIo.step?.(s),
+  };
   if (parsed.values["help"] === true) {
     io.out(USAGE);
     return EXIT.ok;
@@ -551,14 +728,19 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
       io.err(`artroom ${name}: ${e.message}`);
       return EXIT.usage;
     }
+    // An act the journal holds can be finished: say exactly how.
+    const pending = ctx.act !== undefined && ctx.store.entry(ctx.act.room, "act", ctx.act.key) !== undefined ? ctx.act.key : undefined;
     if (isArtroomError(e)) {
-      if (ctx.json) io.out(JSON.stringify(e, null, 2));
-      else for (const l of errorText(e)) io.err(l);
+      if (ctx.json) io.out(JSON.stringify(pending ? { ...e, idempotencyKey: pending } : e, null, 2));
+      else {
+        io.err(errorText(e)[0]!);
+        if (pending) io.err(`  To finish it, repeat the same command with --idempotency-key ${pending}. If the room recorded it, you get the original result.`);
+        else for (const l of errorText(e).slice(1)) io.err(l);
+      }
       return EXIT.failed;
     }
     io.err(`artroom ${name}: ${e instanceof Error ? e.message : String(e)}`);
+    if (pending) io.err(`  To finish it, repeat the same command with --idempotency-key ${pending}.`);
     return EXIT.failed;
   }
 }
-
-export type { Proposal };

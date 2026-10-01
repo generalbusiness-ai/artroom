@@ -8,7 +8,7 @@
     "artroom": "./bin/artroom.js"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/main.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
