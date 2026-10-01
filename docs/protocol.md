@@ -2247,7 +2247,8 @@ it.
 ### Required lane edits
 
 Edits marked "(type)" fail that lane's `npm run typecheck` against the
-amended contract until they are made. This was checked by compiling each
+amended contract until they are made. Lanes A, E and L are not yet on
+main, so their edits are theirs to make. This was checked by compiling each
 lane's branch with the amended `packages/contract`. The other edits are
 behaviour that the types cannot enforce.
 
@@ -2348,6 +2349,12 @@ behaviour that the types cannot enforce.
    the operator key in the report (R-LOG-10, R-GEN-12).
 8. No change for log commit signing: R-LOG-14 adopts what the package
    does.
+
+**Lane F (`packages/ui`)**, which landed on main after this amendment was
+written:
+1. The landing screen's table of retry reasons gains `land-input-changed`
+   (R-LAND-6). (type) This branch makes that one-line edit, so main stays
+   green when it lands.
 
 **Integration (no single lane).** The MCP endpoint's Worker needs a
 `RoomApi` for each bearer. Built on `RoomWire`, it sends acts to
