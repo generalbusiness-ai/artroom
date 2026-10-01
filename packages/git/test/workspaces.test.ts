@@ -119,7 +119,11 @@ class FakeNamespace implements ArtifactsNamespace {
     this.clock = clock;
     this.repos.set("canon", new FakeRepo(this, "canon", null));
   }
+  /** Names whose lookup answers "in progress" (FORK_IN_PROGRESS or CREATE_IN_PROGRESS). */
+  readonly busy = new Map<string, string>();
   async get(name: string) {
+    const busy = this.busy.get(name);
+    if (busy) throw new ArtifactsError(busy, 10409);
     const r = this.repos.get(name);
     if (!r) throw new ArtifactsError("NOT_FOUND", 10404);
     if (this.createGate) await this.createGate;
@@ -807,4 +811,83 @@ test("a known token's debt ends once that token has expired, even if Artifacts n
   assert.equal(await ws.sweep(), 0);
   assert.ok(ws.duties().some((d) => d.kind === "token" && d.doneReason === "expired"));
   assert.deepEqual(fork().live(), []);
+});
+
+// ------------------------------------------------------------------ review 61c31068: a busy fork backs off
+
+for (const code of ["FORK_IN_PROGRESS", "CREATE_IN_PROGRESS"] as const) {
+  test(`while the fork lookup answers ${code}, cleanup backs off across repeated alarms and a restart, then finds the late tokens without disturbing the lease`, async () => {
+    const { clock, ns, ws, lane, fork } = setup();
+    const name = forkName("canon", lane);
+    const canon = ns.repos.get("canon")!;
+    const realFork = canon.fork.bind(canon);
+    const late: (() => void)[] = [];
+    canon.fork = async (n: string) => {
+      // Each attempt fails at the client; its server work is held for later.
+      late.push(() => {
+        if (!ns.repos.has(n)) void realFork(n).catch(() => undefined);
+        else ns.repos.get(n)!.mintRaw("write", 86400);
+      });
+      ns.busy.set(n, code); // from now on the name answers "in progress"
+      throw new TypeError("connection lost after request sent");
+    };
+    ws.open(lane, 1, clock.t + LEASE_MS);
+    assert.equal((await ws.provision(lane)).state, "failed");
+    const steps = ws.duties().filter((d) => d.kind === "fork-create");
+    assert.ok(steps.length >= 1 && steps.every((d) => d.state === "in-flight"));
+    // Ten alarm firings, each at nextDue: the next check moves later every time, and nothing is settled.
+    let previous = ws.nextDue()!;
+    const gaps: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      clock.t = Math.max(clock.t, ws.nextDue()!);
+      await ws.reconcile();
+      const due = ws.nextDue()!;
+      assert.ok(due > clock.t, `firing ${i}: the next check is in the future`);
+      gaps.push(due - previous);
+      previous = due;
+    }
+    assert.ok(gaps[gaps.length - 1]! > gaps[0]!, "the backoff grows");
+    assert.ok(Math.max(...gaps) <= 30 * 60_000 + 1, "and is capped at 30 minutes");
+    assert.ok(ws.duties().filter((d) => d.kind === "fork-create").every((d) => d.state === "in-flight"), "busy never completes a step");
+    // A restart: the new host's first alarm is not overdue in a loop either.
+    const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+    clock.t = Math.max(clock.t, restarted.nextDue()!);
+    await restarted.reconcile();
+    assert.ok(restarted.nextDue()! > clock.t);
+    // The name stops answering "in progress", and a lease provisions on the new host.
+    ns.busy.delete(name);
+    canon.fork = realFork;
+    restarted.open(lane, 1, clock.t + 6 * 3_600_000); // long enough to outlast the next scheduled check
+    assert.equal((await restarted.provision(lane)).state, "ready");
+    const g = restarted.grant(lane, 1);
+    assert.ok(!("refused" in g));
+    // The held attempt applies late, leaving a 24-hour token on the fork.
+    assert.equal(late.length, 1, "one attempt was sent while the name was absent");
+    late.shift()!();
+    assert.equal(fork().live().length, 2);
+    clock.t = Math.max(clock.t, restarted.nextDue()!);
+    await restarted.reconcile();
+    const live = fork().live();
+    assert.equal(live.length, 1, "the late tokens are revoked");
+    assert.equal(fork().tokens.get(live[0]!)?.plaintext, !("refused" in g) ? g.token : "", "the lease keeps its own token");
+    assert.ok(restarted.nextDue()! > clock.t, "the unresolved attempts keep being watched, on schedule");
+  });
+}
+
+test("no open duty is left due after a run, whichever way the run ends", async () => {
+  const { clock, ns, ws, lane } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  // Lookup fails with an unexpected error after the release is recorded.
+  ns.infoHooks.push(async () => {
+    throw new Error("something unexpected");
+  });
+  await ws.revoke(lane, 1);
+  assert.ok(ws.pendingCleanup() > 0);
+  assert.ok(ws.nextDue()! > clock.t, "the failed run scheduled its retry");
+  // Listing fails.
+  ns.failRevoke = true;
+  clock.t = ws.nextDue()!;
+  await ws.reconcile();
+  assert.ok(ws.nextDue()! > clock.t);
 });
