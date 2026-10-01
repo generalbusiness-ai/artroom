@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Accept request git:sha1…68a115b: Builder: lane D, the default policy pack. Ship the rules a team gets on day one, written with the policy helpers, with a corpus that proves each rule and the ca…","body":{"branch":"request/laneD-pack"}}
+{"kind":"artifact","text":"examples/demo-repo/.artroom/policy.json at exact 80b921ea4522bbf6ba77fde9076ae7edf25ca2b4 on request/laneD-pack, under promise git:sha1…94c4adf on request git:sha1…68a115b","body":{"commit":"80b921ea4522bbf6ba77fde9076ae7edf25ca2b4","path":"examples/demo-repo/.artroom/policy.json"}}
