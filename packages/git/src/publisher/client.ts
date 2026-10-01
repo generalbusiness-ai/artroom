@@ -47,10 +47,24 @@ export interface PublisherClientOptions {
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** Mint a 60 s token on a repo, run `fn` with it, and revoke it whatever happens. */
-async function withToken<T>(repo: RepoHandle, scope: "read" | "write", fn: (token: string) => Promise<T>, sleep?: (ms: number) => Promise<void>): Promise<T> {
+/** Token lifetimes, in seconds. A token that expires during an upload refuses it (notes/2026-10-01-laneB-token-inflight.md). */
+export const TOKEN_TTL = {
+  /** Staging an integration and publishing: the pushes carry one commit and its new trees. */
+  short: 60,
+  /** Pinning copies a lane's objects, which can be large. The gateway still allows only the pin's own refs. */
+  pin: 600,
+} as const;
+
+/** Mint a token on a repo, run `fn` with it, and revoke it whatever happens. */
+async function withToken<T>(
+  repo: RepoHandle,
+  scope: "read" | "write",
+  fn: (token: string) => Promise<T>,
+  sleep?: (ms: number) => Promise<void>,
+  ttl: number = TOKEN_TTL.short,
+): Promise<T> {
   const opts = sleep ? { sleep } : {};
-  const t = await withRetry(() => repo.createToken(scope, 60), opts);
+  const t = await withRetry(() => repo.createToken(scope, ttl), opts);
   try {
     return await fn(t.plaintext);
   } finally {
@@ -121,14 +135,24 @@ export class Pinning {
   /** Step 1, before admission: copy the head's objects from the lane's fork. */
   async pinObjects(fork: { readonly name: string; readonly remote: string }, head: Sha): Promise<PinResult> {
     const [forkRepo, canonical] = await Promise.all([this.get(fork.name), this.get(this.o.canonical.name)]);
-    return withToken(forkRepo, "read", (forkToken) =>
-      withToken(canonical, "write", (canonToken) =>
-        this.o.stub.pinObjects({
-          fork: { remote: fork.remote, token: forkToken },
-          canonical: { remote: this.o.canonical.remote, token: canonToken },
-          head,
-        }),
-      ),
+    return withToken(
+      forkRepo,
+      "read",
+      (forkToken) =>
+        withToken(
+          canonical,
+          "write",
+          (canonToken) =>
+            this.o.stub.pinObjects({
+              fork: { remote: fork.remote, token: forkToken },
+              canonical: { remote: this.o.canonical.remote, token: canonToken },
+              head,
+            }),
+          this.o.sleep,
+          TOKEN_TTL.pin,
+        ),
+      this.o.sleep,
+      TOKEN_TTL.pin,
     );
   }
 

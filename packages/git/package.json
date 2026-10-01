@@ -12,7 +12,7 @@
   "scripts": {
     "types": "wrangler types --include-env=false src/worker-runtime.d.ts >/dev/null",
     "typecheck": "npm run types && tsc -p tsconfig.json && tsc -p test/tsconfig.json",
-    "test": "node --test --test-concurrency=1 'test/*.test.ts'",
+    "test": "node --test --test-concurrency=1 --test-timeout=60000 'test/*.test.ts'",
     "test:workers": "vitest run --config vitest.config.ts"
   },
   "dependencies": {

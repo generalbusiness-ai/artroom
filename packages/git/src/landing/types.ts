@@ -6,7 +6,6 @@
 
 import type {
   ActId,
-  Digest,
   FailReason,
   Generation,
   KeyId,
@@ -17,6 +16,7 @@ import type {
   PolicyVersion,
   PublicationNo,
   RepoPath,
+  RetainedLandInput,
   RetryReason,
   Seq,
   Sha,
@@ -36,9 +36,15 @@ export interface LaneFacts {
   readonly holder: "held" | "released" | "expired";
 }
 
-/** What the Room says about an operation's obligations on a built integration (R-LAND-4 steps 2–3). */
+/**
+ * What the Room says about an operation on a built integration (R-LAND-4
+ * steps 2 and 3): its obligations, then its land rules evaluated on the
+ * prospective reservation input (`stage: "reservation"`). On `ready`,
+ * `retained` is that input's canonical bytes and digest; null on a
+ * configuration-recovery lane, where land rules are not evaluated.
+ */
 export type Readiness =
-  | { readonly kind: "ready"; readonly evidence: readonly ActId[]; readonly landInput: Digest | null }
+  | { readonly kind: "ready"; readonly evidence: readonly ActId[]; readonly retained: RetainedLandInput | null }
   | { readonly kind: "waiting"; readonly obligations: readonly ObligationId[] }
   | { readonly kind: "failed"; readonly reason: FailReason }
   | { readonly kind: "retry"; readonly reason: RetryReason; readonly fix: string };
@@ -53,13 +59,22 @@ export interface LandingRoom {
   /** The active policy version. */
   policyVersion(): PolicyVersion;
   /**
-   * Re-validation judged now, for the parts only the Room knows (R-LAND-7):
-   * the initiator's authority (R-ADM-3), each piece of evidence (R-REV-1,
-   * R-ADMIN-2) and the land-rule input digest. Null when all still hold.
+   * Re-validation judged now, inside the reservation transaction, for the
+   * parts only the Room knows (R-LAND-7): the initiator's authority
+   * (R-ADM-3), each piece of evidence (R-REV-1, R-ADMIN-2), and the land
+   * input. The Room rebuilds the land `RuleInput` with `stage:
+   * "reservation"` and compares its canonical bytes with `retained`
+   * (`matchesRetainedLandInput`). It must not hash, evaluate or await.
+   * Null when everything still holds.
    */
-  revalidate(op: LandRecord): { readonly reason: RetryReason; readonly fix: string } | null;
-  /** Obligations and land rules on a built integration. */
-  readiness(op: LandRecord, integration: Sha): Readiness;
+  revalidate(op: LandRecord, retained: RetainedLandInput | null): { readonly reason: RetryReason; readonly fix: string } | null;
+  /**
+   * Obligations and land rules on a built integration (R-LAND-4). Called
+   * outside any engine transaction, so it may await (policy evaluation and
+   * SHA-256 are asynchronous). Its answer is applied only if the operation
+   * has not moved on meanwhile.
+   */
+  readiness(op: LandRecord, integration: Sha): Promise<Readiness>;
   /** The changed paths of a landing, for a revert lane's scope (R-REV-6). */
   revertScope(op: LandRecord): readonly RepoPath[];
   /** Append a system event to the log, in the caller's transaction. */
@@ -113,7 +128,10 @@ export interface LandRecord {
   integrationRef?: string;
   waiting?: ObligationId[];
   evidence?: ActId[];
-  landInput?: Digest | null;
+  /** The retained prospective reservation input (R-LAND-4). Its digest is `ready.landInput`. */
+  retained?: RetainedLandInput | null;
+  /** The integration is built and the Room's readiness answer is due. */
+  readinessPending?: boolean;
   /** When a failed preparation step may run again. */
   retryAt?: number;
   prepareBackoffMs?: number;

@@ -38,13 +38,21 @@ accepted → preparing → ready → publishing → landed
   in the publisher sandbox: the head itself if it fast-forwards main,
   otherwise a merge commit. The commit is stored in the canonical repo at
   `refs/artroom/integration/<op>/<attempt>`, so checkers and every later
-  push use exactly that commit. The Room then says whether the obligations
-  are met (`readiness`).
+  push use exactly that commit. The Room then answers `readiness`: are the
+  obligations met, and do the land rules pass on the prospective
+  reservation input (`stage: "reservation"`)? That answer may await (policy
+  evaluation, SHA-256), so it runs outside any transaction and is applied
+  only if the operation has not moved on meanwhile. On `ready` the engine
+  keeps the Room's `RetainedLandInput` (canonical bytes and digest); the
+  digest is `ready.landInput`.
 - **Reservation is the one decision point** (R-LAND-7). `reserve` is one
   synchronous SQLite transaction. It re-checks the lane, the policy version
-  and main, asks the Room to re-check authority, evidence and the land input
-  (`revalidate`), takes the next publication number, holds the room's single
-  publication slot, and records `land-reserved`. After this the landing
+  and main, and asks the Room to re-check authority and evidence and to
+  compare the reservation-stage land input, rebuilt now, byte for byte with
+  the retained bytes (`revalidate(op, retained)`; the policy package's
+  `matchesRetainedLandInput`). Nothing in it hashes, evaluates policy or
+  awaits. Then it takes the next publication number, holds the room's
+  single publication slot, and records `land-reserved`. After this the landing
   cannot be cancelled by ordinary acts (R-LAND-8).
 - **Publication completes forward** (R-PUB-5). `publish` mints a 60-second
   canonical write token, records its ID, pushes
@@ -96,9 +104,10 @@ landing.status();       // for admins: "publication unresolved since …", push 
 ```
 
 `room` implements `LandingRoom` (`src/landing/types.ts`): lane facts, the
-active policy version, `revalidate` and `readiness`, `revertScope`, and
-`record`, which appends a system event to the log inside the engine's
-transaction. `publisher` is `ContainerPublisher` in a Worker, or
+active policy version, `revalidate` (synchronous) and `readiness`
+(asynchronous), `revertScope`, and `record`, which appends a system event to
+the log inside the engine's transaction. After a check arrives, the Room
+calls `await landing.evaluate(op.id)`. `publisher` is `ContainerPublisher` in a Worker, or
 `GitPublisher` over local git in tests. `tokens` is `canonicalTokens(…)`.
 
 ## Workspaces
@@ -167,3 +176,36 @@ To remove the Worker: `env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-l
 - **Pinning tokens live 10 minutes**, because a lane's objects can be large
   and an expired token refuses an upload in progress. Publication and
   staging tokens live 60 seconds; their pushes carry almost nothing.
+
+## Contract gaps
+
+Things the contract (lane 0) does not yet say, and what this package does
+meanwhile:
+
+1. **The Room–engine seam** (`LandingRoom`, `Readiness`) is defined here,
+   not in the contract.
+2. **Admin view of a held slot.** The plan asks for "publication unresolved
+   since …" with what is known. `PublicationStatus` (push attempts and their
+   outcomes, another writer seen, abort in progress, last error, next
+   attempt) is package-local; the contract has only `PublicationSlot`.
+3. **`ReadBack` cannot say "main could not be read".** The engine keeps the
+   operation's state and reports `lastError` in `PublicationStatus`.
+4. **`publishing` cannot carry an abort.** An abort attempt during
+   `publishing` shows in the `abort-attempt` event and in
+   `PublicationStatus.aborting`, and on the operation once it is
+   `unresolved`, `landed` or `aborted`.
+5. **No `RetryReason` for a changed land input at reservation.** The Room
+   chooses the reason (the tests use `obligation-open`).
+6. **Main or policy moved at reservation.** R-LAND-7 says any mismatch makes
+   the operation `retryable`; R-LAND-5 says a main move or a policy
+   activation re-prepares it. The engine re-prepares for those two, and
+   makes the operation `retryable` for every other mismatch.
+7. **A preview decided by paths has no integration.** `PreviewOp.clean`
+   requires `integration`, but when the paths are disjoint no sandbox runs
+   (`previewPlan` returns `disjoint`).
+8. **Ref names beyond the pinned ref.** `refs/artroom/objects/<head>` is in
+   R-PROP-1; `refs/artroom/integration/<op>/<attempt>` (where an integration
+   commit is stored for checkers and for publication) is not in the
+   contract.
+9. **Workspace operation IDs** are `op_ws_<lane>_<lease generation>`; fork
+   names are `<canonical>--<lane>`.

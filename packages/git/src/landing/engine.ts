@@ -30,7 +30,7 @@ import type {
 import type { Sql } from "../sql.ts";
 import type { PushOutcome } from "../publisher/push-outcome.ts";
 import { type IntegrateResult, LandingCore, toView } from "./core.ts";
-import type { AcceptInput, LandRecord, LandingRoom, PublicationStatus, ReserveResult } from "./types.ts";
+import type { AcceptInput, LandRecord, LandingRoom, PublicationStatus, Readiness, ReserveResult } from "./types.ts";
 
 /** Builds integrations, pushes them and reads main. The publisher sandbox implements it. */
 export interface PublisherPort {
@@ -96,6 +96,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export class Landing {
   readonly core: LandingCore;
+  private readonly room: LandingRoom;
   private readonly publisher: PublisherPort;
   private readonly tokens: PublicationTokens;
   private readonly fault: (point: FaultPoint, op: OpId) => void;
@@ -107,6 +108,7 @@ export class Landing {
   constructor(opts: LandingOptions) {
     this.now = opts.now ?? Date.now;
     this.core = new LandingCore(opts.sql, opts.room, this.now);
+    this.room = opts.room;
     this.publisher = opts.publisher;
     this.tokens = opts.tokens;
     this.fault = opts.fault ?? (() => {});
@@ -132,8 +134,33 @@ export class Landing {
   policyActivated(version: PolicyVersion): OpId[] {
     return this.core.policyActivated(version);
   }
-  evaluate(id: OpId): LandRecord | null {
-    return this.core.evaluate(id);
+  /**
+   * Ask the Room again whether an operation is ready, for example after a
+   * check arrives (R-LAND-4). The Room's answer may take awaits (policy
+   * evaluation, hashing); it is applied only if the operation has not moved
+   * on meanwhile.
+   */
+  async evaluate(id: OpId): Promise<LandOp | null> {
+    await this.evaluateNow(id, true);
+    return this.view(id);
+  }
+
+  private async evaluateNow(id: OpId, force = false): Promise<void> {
+    this.alive();
+    const due = this.core.readinessDue(id, force);
+    if (!due) return;
+    const op = this.core.get(id);
+    if (!op) return;
+    let r: Readiness;
+    try {
+      r = await this.room.readiness(op, due.integration);
+    } catch (e) {
+      this.alive();
+      this.core.readinessFailed(id, due.attempt, message(e));
+      return;
+    }
+    this.alive();
+    this.core.applyReadiness(id, due.attempt, due.integration, r);
   }
   reserve(id: OpId): ReserveResult {
     return this.core.reserve(id);
@@ -193,6 +220,7 @@ export class Landing {
       }
       this.alive();
       this.core.prepared(id, start.attempt, result);
+      await this.evaluateNow(id);
     } finally {
       this.preparing.delete(id);
     }
@@ -350,6 +378,9 @@ export class Landing {
       }
       const due = this.core.active().filter((o) => o.state === "accepted" || (o.state === "preparing" && o.integration === undefined));
       await Promise.all(due.map((o) => this.prepare(o.id)));
+      // A built integration whose readiness answer was lost (a crash, a failed evaluation).
+      const pending = this.core.active().filter((o) => o.state === "preparing" && o.readinessPending);
+      await Promise.all(pending.map((o) => this.evaluateNow(o.id)));
     });
   }
 
@@ -367,7 +398,7 @@ export class Landing {
   }
 
   private fingerprint(): string {
-    return JSON.stringify([this.core.slot(), this.core.active().map((o) => [o.id, o.state, o.attempts, o.integration, o.pushes?.length, o.nextAt])]);
+    return JSON.stringify([this.core.slot(), this.core.active().map((o) => [o.id, o.state, o.attempts, o.integration, o.readinessPending, o.pushes?.length, o.nextAt])]);
   }
 
   /** Every non-terminal operation, as views. */

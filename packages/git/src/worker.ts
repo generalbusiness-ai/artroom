@@ -97,8 +97,9 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
   revalidate(): null {
     return null;
   }
-  readiness(): Readiness {
-    return { kind: "ready", evidence: [], landInput: null };
+  /** No policy here: every landing is ready once built, with no land input (as on a configuration-recovery lane). */
+  async readiness(): Promise<Readiness> {
+    return { kind: "ready", evidence: [], retained: null };
   }
   revertScope(): readonly string[] {
     return [];

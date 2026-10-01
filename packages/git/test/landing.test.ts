@@ -301,7 +301,7 @@ test("R-ADMIN-8: a configuration-recovery landing has no land input and lands; a
   const w = await world();
   t.after(w.dispose);
   const a = await w.land(1, { ".artroom/policy.json": "{}\n" });
-  w.room.readinessOf.set(a.id, () => ({ kind: "ready", evidence: [actId(77)], landInput: null }));
+  w.room.readinessOf.set(a.id, () => ({ kind: "ready", evidence: [actId(77)], retained: null }));
   await w.engine.prepare(a.id);
   const v = w.engine.view(a.id);
   assert.equal(v?.state === "ready" ? v.landInput : "x", null);
@@ -309,7 +309,7 @@ test("R-ADMIN-8: a configuration-recovery landing has no land input and lands; a
   assert.equal(w.engine.view(a.id)?.state, "landed");
 
   const b = await w.land(2, { ".artroom/checkers/tests.json": "{}\n" }, { base: a.head });
-  w.room.readinessOf.set(b.id, () => ({ kind: "ready", evidence: [actId(78)], landInput: null }));
+  w.room.readinessOf.set(b.id, () => ({ kind: "ready", evidence: [actId(78)], retained: null }));
   await w.engine.prepare(b.id);
   w.room.invalid.set(b.id, { reason: "evidence-invalid", fix: "a second admin exists: the sole-admin self-approval no longer counts" });
   assert.deepEqual(w.engine.reserve(b.id), { kind: "retryable", reason: "evidence-invalid" });
@@ -335,7 +335,7 @@ test("a conflict fails the operation with the paths; a failing check fails it; w
   const waiting = w.engine.view(b.id);
   assert.deepEqual(waiting?.state === "preparing" ? waiting.waiting : null, ["obl_tests"]);
   checked = true;
-  w.engine.evaluate(b.id);
+  await w.engine.evaluate(b.id);
   assert.equal(w.engine.view(b.id)?.state, "failed");
 });
 
@@ -629,4 +629,88 @@ test("each push attempt mints its own token, and every one is revoked; a failed 
   assert.equal(w.tokens.minted, 2);
   assert.equal(w.tokens.live.size, 0);
   noTokens(w, id);
+});
+
+// ------------------------------------------------------- the retained land input (R-LAND-4, R-LAND-7)
+
+test("R-LAND-4, R-LAND-7: preparation retains the reservation-stage land input; reservation compares its bytes, without hashing, and a changed input stops it", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await w.engine.prepare(id);
+  const v = w.engine.view(id);
+  const canonical = w.room.inputOf(id);
+  const digest = `sha256:${(await import("node:crypto")).createHash("sha256").update(canonical).digest("hex")}`;
+  assert.equal(v?.state === "ready" ? v.landInput : null, digest, "ready.landInput is the retained input's digest");
+  // An objection arrives before reservation: the input rebuilt now differs.
+  w.room.inputNow.set(id, canonical.replace('"approve"', '"approve","object"'));
+  const r = w.engine.reserve(id);
+  assert.deepEqual(r, { kind: "retryable", reason: "obligation-open" });
+  assert.deepEqual(w.room.compared, [{ stage: "reservation", canonical, digest }], "the Room compared the retained bytes");
+  assert.equal(w.room.events("land-reserved").length, 0);
+});
+
+test("R-LAND-4: the Room's readiness is asked outside any transaction; an answer for an older attempt is dropped", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  const gate = (await import("./support.ts")).deferred();
+  let calls = 0;
+  w.room.readinessOf.set(id, async () => {
+    calls++;
+    if (calls === 1) await gate.promise; // the policy evaluation is slow
+    return { kind: "ready", evidence: [actId(50)], retained: null };
+  });
+  const preparing = w.engine.prepare(id);
+  while (calls < 1) await new Promise((r) => setTimeout(r, 5));
+  // Main moves while the Room is still answering.
+  const moved = await w.f.propose(laneId(9), 1, w.f.main, { "src/z.txt": "z\n" });
+  await sh(w.f.root, "--git-dir", w.f.canonical, "update-ref", "refs/heads/main", moved);
+  w.engine.core.observeMain(moved as Sha);
+  gate.resolve();
+  await preparing;
+  const v = w.engine.view(id);
+  assert.equal(v?.state, "preparing", "the late answer for attempt 1 was dropped");
+  assert.equal(v?.attempts, 2);
+  await w.engine.settle();
+  assert.equal(w.engine.view(id)?.state, "landed");
+  assert.equal(w.room.events("land-reserved")[0]?.expectedMain, moved);
+});
+
+test("a readiness answer that failed is asked again by the alarm", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  let calls = 0;
+  w.room.readinessOf.set(id, async () => {
+    if (++calls === 1) throw new Error("policy runtime unavailable");
+    return { kind: "ready", evidence: [actId(50)], retained: null };
+  });
+  await w.engine.prepare(id);
+  assert.equal(w.engine.view(id)?.state, "preparing");
+  w.clock.advance(10_000);
+  await w.engine.settle();
+  assert.equal(w.engine.view(id)?.state, "landed");
+  assert.equal(calls, 2);
+});
+
+test("core: no push starts after an abort attempt, or once another writer is seen, whatever the driver does", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const a = await w.land(1, { "src/c.txt": "c\n" });
+  await readyAndReserve(w, a.id);
+  w.engine.abort(actId(900), "key_compromised", 900);
+  assert.equal(w.engine.core.beginPush(), null);
+  w.clock.advance(3_600_000);
+  assert.equal(w.engine.core.beginPush(), null);
+
+  const v = await world();
+  t.after(v.dispose);
+  const b = await v.land(1, { "src/c.txt": "c\n" });
+  await readyAndReserve(v, b.id);
+  const plan = v.engine.core.beginPush()!;
+  v.engine.core.pushResult(b.id, plan.n, { outcome: "rejected", reason: "lease", detail: "stale" });
+  v.engine.core.readBack(b.id, "9".repeat(40) as Sha);
+  v.clock.advance(3_600_000);
+  assert.equal(v.engine.core.beginPush(), null);
 });

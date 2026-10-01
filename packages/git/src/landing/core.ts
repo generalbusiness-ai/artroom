@@ -38,6 +38,7 @@ import type {
   LandingRoom,
   PublicationStatus,
   PushAttempt,
+  Readiness,
   ReserveResult,
 } from "./types.ts";
 
@@ -220,7 +221,7 @@ export class LandingCore {
     for (const op of this.active()) {
       if (op.state === "publishing" || op.state === "unresolved") at(op.nextAt ?? this.now());
       else if (op.state === "accepted") at(this.now());
-      else if (op.state === "preparing" && op.integration === undefined) at(op.retryAt ?? this.now());
+      else if (op.state === "preparing" && (op.integration === undefined || op.readinessPending)) at(op.retryAt ?? this.now());
       else if (op.state === "ready" && this.slotRaw().state === "free") at(this.now());
     }
     return due;
@@ -259,7 +260,8 @@ export class LandingCore {
     delete op.integration;
     delete op.integrationRef;
     delete op.evidence;
-    delete op.landInput;
+    delete op.retained;
+    delete op.readinessPending;
     delete op.retryAt;
     this.save(op);
   }
@@ -395,33 +397,76 @@ export class LandingCore {
       }
       op.integration = result.integration;
       op.integrationRef = result.ref;
+      op.waiting = [];
+      op.readinessPending = true;
       delete op.lastError;
       delete op.prepareBackoffMs;
-      this.applyReadiness(op);
+      delete op.retryAt;
+      this.save(op);
       return op;
     });
   }
 
-  /** Re-evaluate obligations, for example after a check arrives. */
-  evaluate(id: OpId): LandRecord | null {
+  /**
+   * What `readiness` must be asked about now: an operation whose integration
+   * is built. Returns the attempt and integration its answer must match.
+   */
+  readinessDue(id: OpId, force = false): { readonly attempt: number; readonly integration: Sha } | null {
+    const op = this.get(id);
+    if (!op || (op.state !== "preparing" && op.state !== "ready") || op.integration === undefined) return null;
+    if (!force && !op.readinessPending) return null;
+    if (!force && (op.retryAt ?? 0) > this.now()) return null;
+    return { attempt: op.attempts, integration: op.integration };
+  }
+
+  /** The Room's readiness could not be computed (for example a policy runtime failure). Try again later. */
+  readinessFailed(id: OpId, attempt: number, error: string): void {
+    this.tx(() => {
+      const op = this.get(id);
+      if (!op || op.attempts !== attempt || (op.state !== "preparing" && op.state !== "ready")) return;
+      const wait = op.prepareBackoffMs ?? PREPARE_BACKOFF.firstMs;
+      op.retryAt = this.now() + wait;
+      op.prepareBackoffMs = Math.min(wait * 2, PREPARE_BACKOFF.maxMs);
+      op.readinessPending = true;
+      op.lastError = error.slice(0, 500);
+      this.save(op);
+    });
+  }
+
+  /**
+   * Apply the Room's readiness answer (R-LAND-4 steps 2 to 4). It is dropped
+   * if the operation moved on while the Room was answering: another
+   * attempt, another integration, a lane change (R-LAND-3).
+   */
+  applyReadiness(id: OpId, attempt: number, integration: Sha, r: Readiness): LandRecord | null {
     return this.tx(() => {
       const op = this.get(id);
-      if (!op || (op.state !== "preparing" && op.state !== "ready") || op.integration === undefined) return op;
+      if (!op || (op.state !== "preparing" && op.state !== "ready") || op.attempts !== attempt || op.integration !== integration) return op;
       const mismatch = this.laneMismatch(op);
-      if (mismatch) this.retryable(op, mismatch, FIX[mismatch]);
-      else this.applyReadiness(op);
+      if (mismatch) {
+        this.retryable(op, mismatch, FIX[mismatch]);
+        return op;
+      }
+      const main = this.main();
+      if (op.policyVersion !== this.room.policyVersion() || (main !== null && main !== op.expectedMain)) {
+        op.policyVersion = this.room.policyVersion();
+        this.rePrepare(op, main ?? op.expectedMain);
+        return op;
+      }
+      delete op.readinessPending;
+      delete op.retryAt;
+      delete op.lastError;
+      this.setReadiness(op, r);
       return op;
     });
   }
 
-  private applyReadiness(op: LandRecord): void {
-    const integration = need(op.integration, "integration");
-    const r = this.room.readiness(op, integration);
+  private setReadiness(op: LandRecord, r: Readiness): void {
     switch (r.kind) {
       case "ready":
         op.state = "ready";
         op.evidence = [...r.evidence];
-        op.landInput = r.landInput;
+        op.retained = r.retained;
         op.waiting = [];
         this.save(op);
         return;
@@ -501,7 +546,8 @@ export class LandingCore {
         this.rePrepare(op, main);
         return { kind: "re-prepare" };
       }
-      const room = this.room.revalidate(op);
+      // The Room compares the rebuilt reservation-stage input's bytes with the retained ones; no hashing here.
+      const room = this.room.revalidate(op, op.retained ?? null);
       if (room) {
         this.retryable(op, room.reason, room.fix);
         return { kind: "retryable", reason: room.reason };
@@ -829,7 +875,7 @@ export function toView(r: LandRecord): LandOp {
         state: "ready",
         integration: need(r.integration, "integration"),
         evidence: r.evidence ?? [],
-        landInput: r.landInput ?? null,
+        landInput: r.retained?.digest ?? null,
       };
     case "publishing":
       return { ...base, ...reserved(), state: "publishing", pushes: r.pushes?.length ?? 0 };

@@ -6,7 +6,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
-import type { ActId, LaneId, OpId, PolicyVersion, Sha, SystemEvent } from "@generalbusiness/artroom-contract";
+import type { ActId, LaneId, OpId, PolicyVersion, RetainedLandInput, Sha, SystemEvent } from "@generalbusiness/artroom-contract";
 import type { Sql, SqlValue, SqlRow } from "../src/sql.ts";
 import type { Exec } from "../src/publisher/gitops.ts";
 import { GitOps, pinnedRef } from "../src/publisher/gitops.ts";
@@ -165,9 +165,17 @@ export class FakeRoom implements LandingRoom {
   policy: PolicyVersion = actId(1);
   /** Per-operation re-validation failures (authority, evidence, land input). */
   readonly invalid = new Map<OpId, { reason: "authority-lost" | "evidence-invalid" | "obligation-open"; fix: string }>();
-  /** Per-operation readiness; default: ready with one approval. */
-  readonly readinessOf = new Map<OpId, (integration: Sha) => Readiness>();
+  /** Per-operation readiness; default: ready with one approval and a retained reservation input. */
+  readonly readinessOf = new Map<OpId, (integration: Sha) => Readiness | Promise<Readiness>>();
   readinessCalls = 0;
+  /** What rebuilding the reservation-stage land input gives now, per operation (default: a fixed text). */
+  readonly inputNow = new Map<OpId, string>();
+  /** The `retained` each reservation was asked to compare. */
+  readonly compared: (RetainedLandInput | null)[] = [];
+
+  inputOf(op: OpId): string {
+    return this.inputNow.get(op) ?? `{"op":"${op}","reviews":["approve"],"stage":"reservation"}`;
+  }
 
   lane(lane: LaneId): LaneFacts | null {
     return this.lanes.get(lane) ?? null;
@@ -175,13 +183,22 @@ export class FakeRoom implements LandingRoom {
   policyVersion(): PolicyVersion {
     return this.policy;
   }
-  revalidate(op: LandRecord) {
-    return this.invalid.get(op.id) ?? null;
+  /** Synchronous, like the Room's: compares bytes, never hashes (R-LAND-7). */
+  revalidate(op: LandRecord, retained: RetainedLandInput | null) {
+    this.compared.push(retained);
+    const invalid = this.invalid.get(op.id);
+    if (invalid) return invalid;
+    if (retained && retained.canonical !== this.inputOf(op.id)) {
+      return { reason: "obligation-open" as const, fix: "The land rules' input changed since preparation. Land again." };
+    }
+    return null;
   }
-  readiness(op: LandRecord, integration: Sha): Readiness {
+  async readiness(op: LandRecord, integration: Sha): Promise<Readiness> {
     this.readinessCalls++;
     const f = this.readinessOf.get(op.id);
-    return f ? f(integration) : { kind: "ready", evidence: [actId(50)], landInput: `sha256:${"0".repeat(64)}` };
+    if (f) return f(integration);
+    const canonical = this.inputOf(op.id);
+    return { kind: "ready", evidence: [actId(50)], retained: { stage: "reservation", canonical, digest: `sha256:${createHash("sha256").update(canonical).digest("hex")}` } };
   }
   revertScope(): readonly string[] {
     return ["src/**"];
