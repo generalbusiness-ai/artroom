@@ -113,4 +113,5 @@ export type SigningDomain =
   | "artroom-envelope-v1"
   | "artroom-request-v1"
   | "artroom-entry-v1"
-  | "artroom-checkpoint-v1";
+  | "artroom-checkpoint-v1"
+  | "artroom-onboarding-v1";
