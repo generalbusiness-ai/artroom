@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will independently review Room-core spike repair 375a4c32, all 29 artifacts with prior evidence retained, concurrency isolation in both modes and fail-closed deterministic rule handling versus unrecorded runtime faults."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7238ea4c4b51f2d4b54cdd8cfe125027a3869db3"}
