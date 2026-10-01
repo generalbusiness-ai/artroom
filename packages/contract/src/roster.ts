@@ -64,6 +64,11 @@ export interface Invitation {
   readonly member: MemberId;
   /** Required when `member` is new; must be absent when it adds a key to an existing member. */
   readonly role?: Role;
+  /**
+   * `client`: redeemed only by a `join` the caller signs and submits.
+   * `room`: redeemed only by the room's own redemption, with a key it
+   * generates and holds. Enforced by the admission path (R-ADM-12).
+   */
   readonly custody: KeyCustody;
   readonly expiresAt: Timestamp;
   /** sha256 of the invitation secret's bytes. The secret is revealed once, by `join` (R-GEN-6). */
