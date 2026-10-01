@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/git/test/jj-change-id.test.ts","body":{"commit":"0ad679370d50027121f51ea00c4dbc82cb670373","path":"packages/git/test/jj-change-id.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:318711901f4ed60e65369e8f21d915da5b55363a","text":"Merge retired a covered predecessor; the successor is at packages/git/test/jj-change-id.test.ts."}
