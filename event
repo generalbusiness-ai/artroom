@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will independently review Lane C at a5ac7122, all 31 artifacts, restricted evaluator conformance, Workers portability, failure semantics, rule inputs, carry and admin boundaries; distinguish its own delta from pending Lane 0 custody repair."}
+{"kind":"artifact","text":"spikes/room-core/.gitignore at exact 375a4c3287bf5cfcf3f93d63c729495ed043ae36 on request/spike-room-core, under promise git:sha1…32aab42 on request git:sha1…70482e8","body":{"commit":"375a4c3287bf5cfcf3f93d63c729495ed043ae36","path":"spikes/room-core/.gitignore"}}
