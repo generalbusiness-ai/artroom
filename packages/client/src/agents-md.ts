@@ -14,27 +14,40 @@ export const AGENTS_MD_BEGIN = "<!-- artroom:begin -->";
 export const AGENTS_MD_END = "<!-- artroom:end -->";
 
 export function agentsMd(opts: AgentsMdOptions): string {
-  const via = opts.mcp !== undefined ? `the Artroom MCP tools (${opts.mcp})` : "the `artroom` command (`artroom help`)";
-  return [
-    AGENTS_MD_BEGIN,
-    `## Artroom: how to change code in ${opts.room}`,
-    "",
-    `Every change goes through the room, using ${via}.`,
-    "",
-    "1. `claim` the paths you will change (globs such as `src/api/**`). Keep `lane` and `lease`.",
-    "2. `workspace` gives a git remote and a write token. Push your branch there with plain git.",
-    "3. `propose` the pushed head with a short summary and `expectedGeneration` (0 at first).",
-    "4. Read `attention`: it lists reviews, checks and notes that need you. Answer with `note`.",
-    "5. When the proposal's obligations are met, `land` it and wait for `landed`.",
-    "6. `release` the lane with a handover note when you stop, or `renew` it to keep working.",
+  const head = [AGENTS_MD_BEGIN, `## Artroom: how to change code in ${opts.room}`, ""];
+  const steps =
+    opts.mcp !== undefined
+      ? [
+          `Every change goes through the room, with the Artroom MCP tools at ${opts.mcp}.`,
+          "",
+          "1. `claim` the paths you will change (globs such as `src/api/**`). Keep `lane` and `lease`.",
+          "2. `workspace` gives a git remote and a write token. Push your commit there with plain git.",
+          "3. `propose` the pushed commit with a summary and `expectedGeneration` (0 at first).",
+          "4. `attention` lists the reviews, notes and outcomes that need you. Answer with `note`.",
+          "5. When the proposal's reviews and checks are met, `land` it and wait for `landed`.",
+          "6. `release` the lane with a handover note when you stop, or `renew` it to keep working.",
+        ]
+      : [
+          "Every change goes through the room, with the `artroom` command (`artroom help` lists it all).",
+          "",
+          "1. `artroom claim 'src/api/**' --goal \"...\"`: claim the paths before you change them.",
+          "2. `artroom workspace` sets up the `artroom` git remote. Then `git push artroom HEAD`.",
+          "3. `artroom propose -m \"what and why\"` proposes the pushed HEAD.",
+          "4. `artroom attention` lists the reviews, notes and outcomes that need you. Answer with `artroom note`.",
+          "5. When the proposal's reviews and checks are met, `artroom land --wait`.",
+          "6. `artroom release -m \"handover\"` when you stop, or `artroom renew` to keep the lane.",
+        ];
+  const retry = opts.mcp !== undefined ? "repeat the call with the same `idempotencyKey`" : "repeat the command with the `--idempotency-key` it names";
+  const rules = [
     "",
     "Rules:",
-    "- A refusal is an answer, not a crash. Read `rule`, `reason` and `fix`, then do the fix.",
-    "- `generation-moved`: read the lane, then propose again with the current generation.",
+    `- A refusal is an answer, not a crash${opts.mcp !== undefined ? "" : " (exit code 3)"}. Read the rule, reason and fix, then do the fix.`,
+    "- `generation-moved`: read the lane again, then propose with its current generation.",
     "- `lease-fenced` or `not-holder`: your lease ended. Claim the lane again before acting.",
     "- `outside-claim`: claim the extra paths, or drop those changes.",
-    "- After a timeout, retry with the same `idempotencyKey`. It never acts twice.",
-    "- Never print, log or commit a token. Use `explain <act>` to see why something happened.",
+    `- If an error says the act may have been recorded, ${retry}. It never acts twice.`,
+    "- Never print, log or commit a token. `explain` an act to see why something happened.",
     AGENTS_MD_END,
-  ].join("\n");
+  ];
+  return [...head, ...steps, ...rules].join("\n");
 }

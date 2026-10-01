@@ -1,0 +1,125 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`joining > a lost login response is finished by running the same command again, joining once > login lost 1`] = `
+"Error (unavailable): the room did not answer the join.
+  Your new key is saved. Run the same artroom login command again: it repeats the same join, so it cannot join twice."
+`;
+
+exports[`joining > a lost redemption says what to do, and saves nothing > redeem lost 1`] = `"Error (unavailable): The redemption may have succeeded, but its response was lost, and the bearer token cannot be shown again. Do not retry this invitation. Ask an admin for a new MCP (room-custody) invitation for the same member, and ask them to revoke the unused delegation."`;
+
+exports[`joining > a refused login leaves no key behind > login refused 1`] = `
+"Refused: invitation-invalid
+  Reason: The invitation secret does not match."
+`;
+
+exports[`joining > redeem saves the bearer 0600, never prints it, and the agent can then act through MCP > redeem 1`] = `
+"Redeemed an MCP invitation for @builder (agent), valid until TIME.
+The bearer token is in TMP/agent/bearers/room_ID, readable only by you. It is not shown anywhere else.
+MCP URL: http://ROOM/v1/rooms/room_ID/mcp
+Next: give your agent that URL with the header "Authorization: Bearer <token from the file>", for example:
+  claude mcp add --transport http artroom http://ROOM/v1/rooms/room_ID/mcp --header "Authorization: Bearer $(cat TMP/agent/bearers/room_ID)""
+`;
+
+exports[`the loop, as a person types it > a refusal prints rule, reason and fix on stderr with exit code 3 > generation-moved 1`] = `
+"Refused: generation-moved
+  Reason: The lane is at generation 0, not 4.
+  Fix: Propose again with expectedGeneration 0.
+  Recorded as act_4_HASH. For the details: artroom explain act_4_HASH"
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > alice attention 1`] = `
+"1 item needs you:
+  land-outcome       op_land_9          Generation 1 landed.
+Later, for only new items: artroom attention --cursor a1"
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > bob attention 1`] = `
+"1 item needs you:
+  review-requested   act_3_HASH#1   Review Rate-limit login (generation 1).
+Later, for only new items: artroom attention --cursor a1"
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > claim 1`] = `
+"Claimed lane act_3_HASH, lease 1, until TIME.
+Scope: src/**
+Next: artroom workspace"
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > explain 1`] = `
+"act_7_HASH: land, refused, published.
+Refused by obligation-open: Obligation obl_review is open. Fix: Wait for a review, then land again.
+Authority: member, @alice (member).
+Failed: R-LAND-1: Obligation obl_review is open."
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > land --wait 1`] = `
+"Landing op_land_9 for generation 1: SHORT.
+Landed generation 1: SHORT (reserved at seq 10).
+Next: artroom release, or artroom renew to keep working on the lane."
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > land refused 1`] = `
+"Refused: obligation-open
+  Reason: Obligation obl_review is open.
+  Fix: Wait for a review, then land again.
+  Recorded as act_7_HASH. For the details: artroom explain act_7_HASH"
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > log 1`] = `
+"    9  act_9_HASH  TIME  land by @alice
+Head 9, published through 8."
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > login 1`] = `
+"Joined acme/web as @alice (member).
+Your key key_ID is in TMP/alice/keys/room_ID.json, readable only by you.
+Next: artroom claim <paths> --goal "<what you will do>""
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > propose 1`] = `
+"Proposed generation 1 of lane act_3_HASH: SHORT.
+It needs:
+  open  obl_review: review by role:member or role:maintainer or role:admin
+Preview: pending.
+Next: artroom attention, then artroom land --wait when everything is met."
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > release 1`] = `
+"Released lane act_3_HASH, with a handover note.
+Removed the workspace credential from this repository."
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > review 1`] = `
+"Approved act_3_HASH#1 at SHORT.
+Met obl_review."
+`;
+
+exports[`the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release > workspace 1`] = `
+"Workspace ready for lane act_3_HASH, lease 1.
+Git remote "artroom": https://artifacts.example/acme/web-act_3_HASH.git
+Git can push there until TIME. The token is in TMP/repo/.git/artroom/credentials, readable only by you, and is not shown.
+Next: git push artroom HEAD, then artroom propose -m "<what changed and why>""
+`;
+
+exports[`usage and agents > agents-md prints a block under 30 lines that teaches the loop > agents-md 1`] = `
+"<!-- artroom:begin -->
+## Artroom: how to change code in acme/web
+
+Every change goes through the room, with the \`artroom\` command (\`artroom help\` lists it all).
+
+1. \`artroom claim 'src/api/**' --goal "..."\`: claim the paths before you change them.
+2. \`artroom workspace\` sets up the \`artroom\` git remote. Then \`git push artroom HEAD\`.
+3. \`artroom propose -m "what and why"\` proposes the pushed HEAD.
+4. \`artroom attention\` lists the reviews, notes and outcomes that need you. Answer with \`artroom note\`.
+5. When the proposal's reviews and checks are met, \`artroom land --wait\`.
+6. \`artroom release -m "handover"\` when you stop, or \`artroom renew\` to keep the lane.
+
+Rules:
+- A refusal is an answer, not a crash (exit code 3). Read the rule, reason and fix, then do the fix.
+- \`generation-moved\`: read the lane again, then propose with its current generation.
+- \`lease-fenced\` or \`not-holder\`: your lease ended. Claim the lane again before acting.
+- \`outside-claim\`: claim the extra paths, or drop those changes.
+- If an error says the act may have been recorded, repeat the command with the \`--idempotency-key\` it names. It never acts twice.
+- Never print, log or commit a token. \`explain\` an act to see why something happened.
+<!-- artroom:end -->"
+`;

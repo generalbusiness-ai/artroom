@@ -58,7 +58,7 @@ export class BearerActs {
         },
         body: JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }),
         signal: AbortSignal.timeout(timeoutMs),
-        redirect: "error",
+        redirect: "manual", // never follow: a redirect could carry the credential elsewhere
       });
       text = await res.text();
     } catch (e) {

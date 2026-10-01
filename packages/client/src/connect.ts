@@ -110,11 +110,12 @@ export async function join(
   endpoint: ArtroomService | Endpoint,
   room: RoomId,
   invitation: { readonly invitation: InvitationId; readonly secret: Base64Url; readonly signer: Signer },
-  options: ClientOptions = {},
+  options: ClientOptions & { readonly idempotencyKey?: string } = {},
 ): Promise<Result<Joined>> {
   const redactor = new Redactor();
   redactor.add(invitation.secret);
-  const key = newIdempotencyKey();
+  // A caller that saved its key and this key can repeat the join later with identical bytes (R-IDEM-2).
+  const key = options.idempotencyKey ?? newIdempotencyKey();
   const envelope = buildEnvelope(room, { signer: invitation.signer }, "roster", null, { op: "join", invitation: invitation.invitation, secret: invitation.secret }, key) as JoinEnvelope;
   const signed = await signEnvelope(envelope, invitation.signer);
   const wire = isService(endpoint) ? new RpcWire(await endpoint.room(room), redactor) : new HttpWire(endpointUrl(endpoint.url), room, options, redactor);

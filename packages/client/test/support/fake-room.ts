@@ -863,7 +863,10 @@ export class FakeRoom {
           outcome: e.entry.type === "act" ? "accepted" : e.entry.type === "refusal" ? "refused" : "system",
           entry: e,
           decisions: [],
-          invariants: e.entry.type === "refusal" ? [{ rule: "R-LANE-4", held: false, detail: e.entry.receipt.refusal.reason }] : [{ rule: "R-ADM-3", held: true }],
+          invariants:
+            e.entry.type === "refusal"
+              ? [{ rule: RULE_OF[e.entry.receipt.refusal.rule] ?? "R-ADM-8", held: false, detail: e.entry.receipt.refusal.reason }]
+              : [{ rule: "R-ADM-3", held: true }],
           published: e.seq <= this.publishedThrough,
         };
         return out;
@@ -1135,6 +1138,18 @@ export class FakeRoom {
     return [...this.exposure.sessions, ...this.exposure.bearers, ...this.exposure.grants];
   }
 }
+
+/** The protocol rule each platform refusal comes from, for `explain`. */
+const RULE_OF: Record<string, `R-${string}`> = {
+  "generation-moved": "R-LANE-4",
+  "lease-fenced": "R-LANE-6",
+  "not-holder": "R-LANE-3",
+  "lane-held": "R-LANE-7",
+  "obligation-open": "R-LAND-1",
+  "head-mismatch": "R-OBL-1",
+  "self-review": "R-OBL-2",
+  "glob-invalid": "R-PATH-1",
+};
 
 function refusal(rule: string, reason: string, fix?: string): Refusal {
   return { refused: true, rule, reason, ...(fix !== undefined ? { fix } : {}) };

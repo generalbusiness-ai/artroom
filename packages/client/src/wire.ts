@@ -130,7 +130,7 @@ export class HttpWire implements Wire {
         headers,
         ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
         signal: AbortSignal.timeout(init.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-        redirect: "error",
+        redirect: "manual", // never follow: a redirect could carry the credential elsewhere
       });
       status = res.status;
       const text = await res.text();
