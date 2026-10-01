@@ -10,7 +10,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { ArtroomError, Check, CheckJob, Note, Sha, SignedEnvelope } from "@generalbusiness/artroom-contract";
 import { checkJob, gitAuthEnvFor, isRefusal, type BoundJob } from "../src/job.ts";
 import { checkout } from "../src/runner.ts";
-import { generateKey, importSigner, verifyEnvelope } from "../src/signing.ts";
+import { generateKey, importSigner, signEnvelope, verifyEnvelope } from "../src/signing.ts";
 import { Ledger } from "../src/ledger.ts";
 import { TestsChecker } from "../src/checkers.ts";
 import { LlmReviewer, type Model } from "../src/llm.ts";
@@ -284,6 +284,26 @@ test("G2: two runs of one job ID on one checker each find only their own workspa
   assert.equal(checker.seen.length, 2);
   for (const [before, after] of checker.seen) assert.equal(after, before, "a run kept its own workspace");
   assert.notEqual(checker.seen[0]![0], checker.seen[1]![0], "the two runs had different runners");
+});
+
+test("G2: the room stand-in records concurrent submissions of one idempotency key once", async () => {
+  const signer = await importSigner(JSON.stringify(await generateKey()));
+  const ledger = new Ledger({ key: signer.key, member: "@ci" });
+  const c = "a".repeat(40) as Sha;
+  const j = job(c, { kind: "tree", tree: "b".repeat(40) as Sha });
+  ledger.issue(j);
+  const signed = await signEnvelope(signer, {
+    v: 1,
+    room: ROOM,
+    actor: signer.key,
+    kind: "check",
+    target: { lane: j.lane, generation: j.generation },
+    body: { obligation: j.obligation, check: "tests", integration: c, input: j.input, config: j.config, runner: j.config, volatile: false, ok: true, detail: "Machine-run check" },
+    idempotencyKey: `chk-${j.id}`,
+  });
+  const [a, b] = (await Promise.all([ledger.submit(signed), ledger.submit(signed)])) as Check[];
+  assert.equal(a!.id, b!.id);
+  assert.equal(ledger.records.length, 1);
 });
 
 // ------------------------------------------------------------------ G3
