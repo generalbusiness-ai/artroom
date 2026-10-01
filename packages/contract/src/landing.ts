@@ -90,7 +90,8 @@ export type RetryReason =
   | "released"
   | "authority-lost" //      the land initiator's membership, role, key or delegation is no longer current
   | "evidence-invalid" //    evidence no longer counts, e.g. a compromised key (R-REV-3)
-  | "obligation-open";
+  | "obligation-open"
+  | "land-input-changed"; // reservation rebuilt land-rule input whose bytes differ from those retained (R-LAND-7)
 
 /** Why a landing operation failed. A failure needs a recut or a policy fix. */
 export type FailReason =

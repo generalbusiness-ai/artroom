@@ -75,6 +75,7 @@ const FIX: Record<RetryReason, string> = {
   "authority-lost": "Your authority to land is no longer current. Ask an admin, then land again.",
   "evidence-invalid": "Evidence this landing relied on no longer counts. Get a new review or check, then land again.",
   "obligation-open": "An obligation reopened. Meet it, then land again.",
+  "land-input-changed": "Something the land rule reads changed before reservation, such as a new objection. Check the proposal, then land again.",
 };
 
 export function retryFix(reason: RetryReason): string {

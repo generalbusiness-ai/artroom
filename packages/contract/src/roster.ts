@@ -117,8 +117,14 @@ export type RosterOp =
 export interface Genesis {
   readonly format: "artroom-log-v1";
   readonly name: RoomName;
-  /** The canonical repository's Artifacts name. */
-  readonly repo: string;
+  /**
+   * The canonical repository's identity (R-GEN-12): fresh from the
+   * deployment for a public founding, or the onboarding grant's `repo` for an
+   * import. Never a name or alias the caller typed.
+   */
+  readonly repo: RepoIdentity;
+  /** Present only for an imported repository: the operator's grant, so the authorization is part of the signed genesis (R-GEN-12). */
+  readonly onboarding?: SignedOnboardingGrant;
   readonly admin: { readonly handle: MemberId; readonly key: KeyId };
   /** Can always issue roster acts; may be kept offline (R-GEN-3). */
   readonly recovery: KeyId;
@@ -126,6 +132,35 @@ export interface Genesis {
   readonly roomKey: KeyId;
   readonly profile: { readonly policy: "artroom-jsonata-v1"; readonly jsonata: string };
   readonly createdAt: Timestamp;
+}
+
+/**
+ * A canonical repository's identity (R-GEN-12): the storage system's stable
+ * identifier for one repository, such that two references to the same
+ * repository always give the same identity. A name, alias or URL is not one.
+ */
+export type RepoIdentity = string;
+
+/**
+ * An operator's permission to found a room on an existing repository
+ * (R-GEN-12). Signed under `artroom-onboarding-v1` by an operator key the
+ * deployment trusts. It names the repository and the first admin key, so
+ * only that key's holder can use it, and only for that repository.
+ */
+export interface OnboardingGrant {
+  readonly v: 1;
+  readonly repo: RepoIdentity;
+  /** The first admin key the genesis must name. */
+  readonly admin: KeyId;
+  /** The operator key that signs the grant. */
+  readonly operator: KeyId;
+  /** The grant must be unexpired when the repository is first bound (R-GEN-13). */
+  readonly notAfter: Timestamp;
+}
+
+export interface SignedOnboardingGrant {
+  readonly grant: OnboardingGrant;
+  readonly sig: Base64Url;
 }
 
 /** The roster as the room holds it at one sequence number. */
