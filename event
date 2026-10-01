@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/cli/bin/artroom.js at exact 3be00804e501e4f30e8cf653b6dd1ce8de72a25e on request/laneE-clients, under promise git:sha1…68876e3 on request git:sha1…cf2e531","body":{"commit":"3be00804e501e4f30e8cf653b6dd1ce8de72a25e","path":"packages/cli/bin/artroom.js"}}
+{"kind":"artifact","text":"packages/cli/package.json at exact 3be00804e501e4f30e8cf653b6dd1ce8de72a25e on request/laneE-clients, under promise git:sha1…68876e3 on request git:sha1…cf2e531","body":{"commit":"3be00804e501e4f30e8cf653b6dd1ce8de72a25e","path":"packages/cli/package.json"}}
