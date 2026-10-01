@@ -11,7 +11,8 @@ import { canonicalJson } from "./values.ts";
 const HEX = "0123456789abcdef";
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  // The cast satisfies both this package's Web declarations and Node's, whose `digest` wants an ArrayBuffer-backed view.
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>));
   let out = "";
   for (const byte of digest) out += HEX[byte >> 4]! + HEX[byte & 15]!;
   return out;
