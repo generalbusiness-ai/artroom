@@ -162,7 +162,7 @@ async function main() {
 
   // Release lane 1: its token is revoked; the agent can no longer push.
   const rel = await h("release", { lane: lane(1) });
-  log(`release lane 1: revoked ${rel.revoked} token(s)`);
+  log(`release lane 1: cleanup still owed: ${rel.cleanupOwed}`);
   write(l1.dir, "src/after-release.txt", "x\n");
   await must(["add", "-A"], { cwd: l1.dir });
   await must(["commit", "-q", "-m", "after release"], { cwd: l1.dir });

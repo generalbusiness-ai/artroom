@@ -119,15 +119,21 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
 
   // ------------------------------------------------ alarm
 
+  /**
+   * The alarm contract a hosting Room follows: each firing reconciles both
+   * the landing engine (a held publication first, R-PUB-7) and workspace
+   * cleanup (tokens owed revocation), then sets the next alarm to the
+   * earlier of their `nextDue()`.
+   */
   override async alarm(): Promise<void> {
-    if (!this.landing) return;
-    await this.landing.reconcile();
+    if (this.landing) await this.landing.reconcile();
+    if (this.workspaces) await this.workspaces.reconcile();
     await this.schedule();
   }
 
   private async schedule(): Promise<void> {
-    const due = this.landing?.nextDue();
-    if (due != null) await this.ctx.storage.setAlarm(Math.max(due, Date.now() + 50));
+    const dues = [this.landing?.nextDue(), this.workspaces?.nextDue()].filter((d): d is number => d != null);
+    if (dues.length > 0) await this.ctx.storage.setAlarm(Math.max(Math.min(...dues), Date.now() + 50));
   }
 
   // ------------------------------------------------ routes
@@ -171,6 +177,7 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
         if ("refused" in opened) return { refused: opened };
         const view = await ws.provision(lane);
         const grant = ws.grant(lane, lease);
+        await this.schedule();
         return { view, grant, fork: forkName(this.need(this.meta("repo"), "repo"), lane), ms: lap() };
       }
       case "propose": {
@@ -245,8 +252,10 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
         const lane = body["lane"] as LaneId;
         this.sql.all("UPDATE h_lane SET holder = 'released' WHERE lane = ?", lane);
         const invalidated = this.need(this.landing, "landing").laneChanged(lane, "released").map((o: LandRecord) => o.id);
-        const revoked = await this.need(this.workspaces, "workspaces").revoke(lane);
-        return { invalidated, revoked, after: this.landing?.after() ?? null, ms: lap() };
+        const lease = this.lane(lane)?.leaseGeneration ?? 1;
+        const owed = await this.need(this.workspaces, "workspaces").revoke(lane, lease);
+        await this.schedule();
+        return { invalidated, cleanupOwed: owed, after: this.landing?.after() ?? null, ms: lap() };
       }
       case "view": {
         const landing = this.need(this.landing, "landing");

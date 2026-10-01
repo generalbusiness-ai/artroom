@@ -116,31 +116,42 @@ calls `await landing.evaluate(op.id)`. `publisher` is `ContainerPublisher` in a 
 ## Workspaces
 
 ```ts
-const ws = new Workspaces({ sql, artifacts: env.ARTIFACTS, canonical: "acme-web" });
-ws.open(lane, leaseGeneration, leaseExpiresAt);   // public WorkspaceOp: pending
-await ws.provision(lane);                          // fork (retrying 10400), mint the lease's token
+const ws = new Workspaces({ sql, artifacts: env.ARTIFACTS, canonical: "acme-web", namespace: "acme" });
+ws.open(lane, leaseGeneration, leaseExpiresAt);   // public WorkspaceOp: pending (call again to renew)
+await ws.provision(lane);                          // fork (retrying 10400), settle cleanup owed, mint the lease's token
 ws.view(lane);                                     // ready: remote and lease generation, never a token (R-WS-1)
 ws.grant(lane, leaseGeneration);                   // the token, after the Room has judged the caller (R-WS-2)
-await ws.revoke(lane);                             // release, expiry or take-over (R-WS-3)
+await ws.revoke(lane, leaseGeneration);            // release, expiry or take-over of that lease (R-WS-3)
+
+// The Room's alarm (alongside landing.reconcile()):
+await ws.reconcile();                              // settle the token cleanup that is due
+const next = ws.nextDue();                         // set the next alarm to the earlier of this and landing.nextDue()
 ```
 
-The fork's own creation token is revoked at once. `revoke` lists the fork's
-tokens and revokes every active one, so a token minted just before a crash
-is caught too.
-
+- **One durable cleanup protocol.** Before any step that could leave a
+  token nobody records (creating a fork, which comes with a long-lived
+  token; minting a lease token; releasing a lease), a cleanup obligation is
+  written to SQLite. An obligation is resolved only after Artifacts
+  confirms it: an *inventory* lists the fork's tokens and revokes every
+  active one except the ready lease's recorded token; a *token* obligation
+  revokes one known ID. Failures are retried with backoff by
+  `reconcile()`, which the Room's alarm calls, and survive restarts.
+- **Ready means exactly one live token.** Provisioning settles any cleanup
+  owed on the fork before it mints; while any is owed, the workspace fails
+  (retryable) and no token is granted.
+- **Results are fenced by lease.** Provisioning and cleanup of one fork
+  run one at a time, so cleanup never revokes a token being installed, and
+  a late error or a late release of an old lease never changes a newer
+  lease's workspace.
 - **Only a real fork is used.** A repository at the lane's fork name is used
   only if its source is exactly `artifacts:<namespace>/<canonical>`. Any
-  other repository there (a plain repo, a fork of something else) is
-  refused, and never used, changed or deleted.
+  other repository there is refused, and cleanup never touches it.
 - **A token never outlives the lease.** The lease is read again after every
-  await. A token whose actual expiry runs past the lease, or that was minted
-  for a lease that has ended or changed hands, is revoked; a replacement is
+  await, including a renewal that arrives while the token is being minted.
+  A token whose actual expiry runs past the lease, or that was minted for a
+  lease that has ended or changed hands, is revoked; a replacement is
   minted only if Artifacts' 60-second minimum still fits. Tokens end 5
-  seconds inside the lease, so clock differences cannot carry them past it.
-  `grant` refuses an expired lease.
-- **A failed revocation is not forgotten.** It is recorded, and `sweep`
-  (also run by `provision` and `revoke`, and by the Room's alarm) retries
-  it.
+  seconds inside the lease. `grant` refuses an expired lease.
 
 ## Tests
 
@@ -184,10 +195,11 @@ To remove the Worker: `env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-l
 - **Diff bounds** (R-PROP-6): 64 levels, 100,000 tree entries, 2,000
   commits to find a merge base, 8 tree reads in flight. A diff over a bound
   is refused, the same way every time for the same trees.
-- **Refusals are stable.** The diff walks trees level by level and counts
-  entries in path order after each level is read, so the same two trees
-  give the same answer, or the same refusal, whatever the cache holds and
-  whichever read finishes first.
+- **Refusals are stable, and work is bounded.** The diff walks trees level
+  by level, in path order, reading at most `concurrency / 2` directories
+  ahead of the one being counted, and stops starting reads once a bound is
+  crossed. So the same two trees give the same answer, or the same refusal,
+  whatever the cache holds and whichever read finishes first.
 - **Merge bases** come from git's paint-down walk, then any base that is an
   ancestor of another is removed by following parent links only, so clock
   skew cannot add a redundant base.
