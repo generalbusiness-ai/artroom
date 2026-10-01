@@ -95,16 +95,23 @@ it cannot read the remote.
 
 **For each entry**, it checks:
 - seq, prev, hash, entry ID and the room signature;
-- the genesis and its first admin's signature;
+- the genesis and its first admin's signature. A genesis for an imported
+  repository carries an onboarding grant: it must be signed under
+  `artroom-onboarding-v1` by its `operator` key and name the genesis's
+  repository and first admin (R-GEN-12);
+- that each `policy-activated` event's policy document and checker
+  configurations are published, and are what they claim to be (R-POL-9);
 - for each act and recorded refusal:
   - the envelope's signature and room;
   - the recorded authority. Verify replays the roster from earlier entries
     and judges the act by the four cases of R-ADM-3, including revocations
     (R-ADM-4, R-REV-3);
-  - delegations (R-ADM-5). When a `delegate` is admitted, its kinds must be
-    ones the grantor's role may sign. `*` means all of those, fixed at the
-    grant. At each use: the grantor's current role, the expiry and
-    revocation;
+  - delegations (R-ADM-5). When a `delegate` is admitted, it must not be
+    signed under a delegation, and its kinds must be ones the grantor's role
+    may sign, never `roster`. `*` means all of those, fixed at the grant. At
+    each use: the grantor's current role, the expiry and revocation;
+  - that an accepted `check` names in `config` its checker's digest in the
+    active policy version (R-OBL-3);
   - the recovery-key flag and idempotency;
   - that no effect or event names its own lane (R-LOG-12);
 - that `notified` events name an earlier accepted act, and no act twice;
@@ -118,16 +125,21 @@ It runs `replay` from the policy package, and requires the same decisions
 exactly one policy version, chosen by event kind:
 - an act or refusal: the policy in force when it was admitted;
 - a `notified` event: the policy in force when the act it names was
-  admitted. The room pins that version when it queues the notification, so
-  later activations do not change it.
+  sealed. The room pins that version when it queues the notification, so
+  later activations do not change it (R-LOG-13);
+- an `obligations-recomputed` event: the version it names, which must be
+  the active one (R-POL-9);
+- a `land-evaluated` event: the active policy (R-LAND-4).
 
 **The report** gives:
 - the verified prefix: the last good entry and its ID;
+- for an imported repository, the operator key that signed its onboarding
+  grant (`operator`). Whether to trust that key is the reader's decision;
 - what the room has published;
 - the number of decisions replayed;
 - each failure, with a named reason;
-- what verification cannot prove. That covers acts after the last published
-  entry, lane and obligation state, and the room clock.
+- what verification cannot prove (R-LOG-15): acts after the last published
+  entry; lanes, leases, obligations and landings; and the room clock.
 
 When a later commit rewrites history, verify reports it and verifies the
 entries of the last consistent commit.
@@ -171,6 +183,8 @@ entries of the last consistent commit.
 
 - `test/review-ea4a9bd0.test.ts` covers the findings of review ea4a9bd0
   (see below).
+- `test/amendment-2.test.ts` covers the lane L edits of contract
+  amendment 2 (see below).
 
 - `test/gitcli.node.test.ts` (Node only) publishes to a real local git
   repository and checks it:
@@ -197,28 +211,22 @@ On 2026-10-01 it passed:
 
 ## Contract gaps and open points
 
-1. **Log commits carry no git signature.** Each commit's integrity rests on
-   the room-signed checkpoint in its tree and on the signed entries. A
-   `gpgsig` (SSH-format Ed25519) header could be added if git-level
-   signature checks are wanted.
-2. **Checker configurations are not named by an event.** `policy-activated`
-   names the policy document's digest, but not the checker configurations
-   that came with it. So verify cannot tell which configuration applied to
-   a check.
-3. **Lane and obligation state are not re-derived.** Verify checks
-   authority and policy decisions, not lane, lease, obligation or landing
-   transitions. These are listed under "cannot prove".
-4. **`*` in a delegation.** The contract says `*` means all delegable
-   kinds, and R-ADM-5 allows only kinds the grantor's role may sign. Verify
-   reads `*` as all kinds the grantor's role may sign at the grant. The
-   Room (lane A, `authority.ts`) instead judges `*` against the grantor's
-   current role at each use. They differ in one case: a member grants `*`,
-   is promoted to checker, and the grantee signs `check`. The Room admits
-   it; verify reports `delegation-invalid`. The contract should say which
-   is meant.
-5. **Revocation time.** The roster records revocations by log order; the
-   contract has no revocation timestamp. That is enough, because authority
-   is judged at admission order.
+Amendment 2 settled four of the five gaps this package first listed:
+log commits carry no git signature (R-LOG-14); `policy-activated` names
+checker configurations (R-POL-9); delegation grants are checked (R-LOG-10);
+no revocation timestamp is needed (open point 35). Lanes, leases,
+obligations and landings stay unproven (R-LOG-15, open point 34). One point
+is still open:
+
+1. **`*` in a delegation.** The contract says `*` means all delegable
+   kinds. R-ADM-5 and R-LOG-10 allow only kinds the grantor's role could
+   sign at the grant, but neither says what `*` means for a role that may
+   not sign every delegable kind. Verify reads `*` as all kinds the
+   grantor's role may sign at the grant. The Room (lane A, `authority.ts`)
+   instead judges `*` against the grantor's current role at each use. They
+   differ in one case: a member grants `*`, is promoted to checker, and the
+   grantee signs `check`. The Room admits it; verify reports
+   `delegation-invalid`. The contract should say which is meant.
 
 ## Not done
 
@@ -292,3 +300,66 @@ broken on purpose and a named test failed.
    does not exist"; "a notification may name only an earlier accepted
    act: naming a system entry is notified-unknown"; "an act's own
    decisions still use the policy active at its admission".
+
+## Contract amendment 2
+
+The lane L edits of `docs/protocol.md` section 27, each with its tests. All
+tests are in `test/amendment-2.test.ts` unless named otherwise. Each new
+guard was broken on purpose and a named test failed.
+
+1. **Replay `obligations-recomputed` and `land-evaluated` decisions.**
+   An `obligations-recomputed` event must name the active policy, and its
+   decisions replay under it. A `land-evaluated` event's decisions replay
+   under the active policy.
+   Tests: "both events' decisions replay under the active policy"; "a
+   wrong decision in obligations-recomputed: policy-decision-mismatch"; "a
+   wrong decision in land-evaluated: policy-decision-mismatch";
+   "obligations-recomputed must name the active policy version";
+   "land-evaluated decisions must name the active policy version".
+2. **Checker configurations.** Each checker that `policy-activated` names
+   must be published (`checker-missing`) and be a checker configuration
+   (`malformed`); the list must be sorted by name (`malformed`). An
+   accepted `check` must name its checker's digest in the active version
+   (`check-config-mismatch`). A recorded refusal is not held to it.
+   Tests: "the fixture's policy-activated names its checker configuration,
+   sorted by name"; "a checker configuration that is not published:
+   checker-missing"; "a published checker configuration that is not one:
+   malformed"; "checkers not sorted by name: malformed"; "an accepted
+   check names its checker's digest in the active version; another digest
+   or checker: check-config-mismatch"; "after an activation changes the
+   configuration, a check naming the old digest: check-config-mismatch";
+   "a recorded refusal of a check is not held to the active digest".
+3. **Each `delegate` against the grantor's role.** This was already done at
+   the grant for review ea4a9bd0. It matches the amended text: R-ADM-5 is
+   unchanged, and R-LOG-10 says "kinds its grantor's role could sign at its
+   admission, never `roster`, and was not itself signed under a
+   delegation". A `roster` kind in a grant is now `delegation-invalid`, not
+   `malformed`. The amendment does not settle `*`, so the grant-time reading
+   stays, listed under "Contract gaps and open points".
+   Tests: "a delegate that grants roster: delegation-invalid"; "a delegate
+   signed under a delegation: delegation-invalid"; and the finding 2 tests
+   in `test/review-ea4a9bd0.test.ts`.
+4. **`checkers` in the fixture.** `RoomSim.activate(doc, checkers)` names
+   them, sorted, and retains each configuration under `policies/`. The
+   demo policy has one checker, `test`.
+   Tests: the type check, and "the fixture's policy-activated names its
+   checker configuration, sorted by name". `test/golden.test.ts` now
+   expects two files under `policies/`.
+5. **The report lists lanes, leases, obligations and landings as not
+   proven.** Test: "cannotProve names each".
+6. **`notified` decisions use the version active when the notified entry
+   was sealed.** The fix for review ea4a9bd0 finding 5 already does this.
+   Tests: the finding 5 tests in `test/review-ea4a9bd0.test.ts`, which
+   include the "Notify across an activation" case.
+7. **Onboarding grants.** A genesis with `onboarding` must carry a grant
+   signed under `artroom-onboarding-v1` by its `operator` key, whose `repo`
+   and `admin` equal the genesis's (`onboarding-invalid`). The report names
+   the operator key as `operator`, or null.
+   Tests: "a grant signed by its operator key, naming the genesis's
+   repository and admin, verifies and the report names the operator"; "a
+   public founding reports no operator"; "a grant signed by another key:
+   onboarding-invalid"; "a grant for another repository, or another first
+   admin: onboarding-invalid"; "a grant without its operator field:
+   malformed".
+8. **Log commit signing.** No change: R-LOG-14 adopts what the package
+   does.
