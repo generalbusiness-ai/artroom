@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:63a10de1fadb54bc8465488cca511a26c80f59a2","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/ui/router.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6754a026f18b3f47f6bea7440b71b99f2c2c772d","text":"Merge retired a covered predecessor; the successor is at package-lock.json."}
