@@ -16,7 +16,9 @@ The findings are in [notes/2026-10-01-spike-sandbox-git.md](../../notes/2026-10-
 | File | What it is |
 |---|---|
 | `src/index.ts` | Worker `artroom-spike-sandbox-git`: the `GitBox` Durable Object, which runs git in its container, and the `ArtifactsGateway` entrypoint, which adds the repo token to git's requests |
-| `src/iso.ts`, `src/memory-fs.ts` | Worker `artroom-spike-isogit`: the same preview and land with isomorphic-git and no container, for comparison |
+| `src/push-outcome.ts` | Classifies a push as `landed`, `rejected`, `error` or `unknown` |
+| `src/iso.ts`, `src/iso-op.ts`, `src/memory-fs.ts` | Worker `artroom-spike-isogit`: the same preview and land with isomorphic-git and no container, for comparison |
+| `test/` | Node tests: same-isolate concurrent lands, and push classification against real git output (`push-samples.json`, made by `capture_push_samples.py`) |
 | `wrangler.jsonc`, `wrangler.iso.jsonc` | Configuration for the two Workers |
 | `Dockerfile` | The image to use when Docker is available |
 | `image.sh` | Copies `alpine/git` into the Cloudflare registry without Docker (what this spike used) |
@@ -32,12 +34,24 @@ The findings are in [notes/2026-10-01-spike-sandbox-git.md](../../notes/2026-10-
   "token": "<repo token>", "base": "main", "head": "cand/x", "expect": "<sha main must have>" }
 ```
 
-`op` is `preview`, `land`, `info` or `destroy`. `box` names the sandbox: one
+`op` is `preview`, `land`, `info` or `destroy`. A land response always has
+`outcome` (`landed`, `rejected`, `error` or `unknown`), `expect` and `commit`.
+After `unknown`, read back the branch before landing again: the push may have
+landed. `box` names the sandbox: one
 Durable Object and one container. The token travels in the request body and
 stays in the Worker. The container is started with no Internet access and
 reaches only the Artifacts host, through the gateway.
 
-## Rerun
+## Tests
+
+```sh
+npm install
+npm test                               # node --test test/  (no network)
+npm run typecheck                      # wrangler types && tsc --noEmit
+python3 test/capture_push_samples.py   # optional: recapture push-samples.json
+```
+
+## Rerun the measurements
 
 You need Node, Python 3, a wrangler login for account
 `6e953d231f1c9aadffbf59537a82e13a`, and either Docker or

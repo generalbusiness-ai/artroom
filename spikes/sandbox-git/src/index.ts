@@ -10,6 +10,7 @@
 // receives each git request, checks it, and adds `Authorization: Bearer`.
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
+import { classifyGitPush } from "./push-outcome.ts";
 
 interface Env {
 	GITBOX: DurableObjectNamespace<GitBox>;
@@ -60,8 +61,17 @@ export class ArtifactsGateway extends WorkerEntrypoint<Env, GatewayProps> {
 
 type Run = { code: number; out: string; err: string; ms: number };
 
+// Every land response says what happened (`outcome`), the base it expected and
+// the integration commit (null if none was made or it is not known). A result
+// without an outcome is a failure before the push: `fallback` says which kind.
+function landFields(req: OpRequest, res: Record<string, unknown>, fallback: "error" | "unknown") {
+	if (req.op !== "land") return res;
+	return { outcome: fallback, landed: false, refused: null, expect: req.expect ?? null, commit: null, ...res };
+}
+
 export class GitBox extends DurableObject<Env> {
 	private chain: Promise<unknown> = Promise.resolve();
+	private pushing = false;
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
@@ -73,7 +83,16 @@ export class GitBox extends DurableObject<Env> {
 
 	// One operation at a time per sandbox: they share one git directory.
 	async op(req: OpRequest): Promise<Record<string, unknown>> {
-		const next = this.chain.then(() => this.doOp(req));
+		const next = this.chain.then(async () => {
+			this.pushing = false;
+			try {
+				return landFields(req, await this.doOp(req), "error");
+			} catch (e) {
+				if (req.op !== "land") throw e;
+				// A failure once the push has started may have landed.
+				return landFields(req, { ok: false, error: redact(String(e)) }, this.pushing ? "unknown" : "error");
+			}
+		});
 		this.chain = next.catch(() => undefined);
 		return next;
 	}
@@ -195,35 +214,44 @@ export class GitBox extends DurableObject<Env> {
 			return { ok: true, ...preview, timing: { ...timing, totalMs: Date.now() - t0 } };
 		}
 
-		// land
+		// land. Every land response names the expected base and the integration
+		// commit (null when none was made). `outcome` is landed, rejected, error
+		// or unknown; see push-outcome.ts. After `unknown`, read back the base
+		// branch before any further land.
 		const expect = req.expect ?? baseSha;
+		const target = `refs/heads/${base}`;
 		if (baseSha !== expect) {
-			return { ok: true, landed: false, refused: "main-moved", ...preview,
-				timing: { ...timing, totalMs: Date.now() - t0 } };
+			return { ok: true, outcome: "rejected", landed: false, refused: "main-moved", expect, commit: null,
+				...preview, timing: { ...timing, totalMs: Date.now() - t0 } };
 		}
 		if (!preview.clean) {
-			return { ok: true, landed: false, refused: "conflict", ...preview,
-				timing: { ...timing, totalMs: Date.now() - t0 } };
+			return { ok: true, outcome: "rejected", landed: false, refused: "conflict", expect, commit: null,
+				...preview, timing: { ...timing, totalMs: Date.now() - t0 } };
 		}
 		const ct = await this.run([
 			"git", "-C", dir, "commit-tree", tree, "-p", baseSha, "-p", headSha,
 			"-m", `Land ${head} into ${base}`,
 		]);
-		if (ct.code !== 0) return { ok: false, error: "commit-tree", detail: ct.err };
+		if (ct.code !== 0) {
+			return { ok: false, outcome: "error", landed: false, error: "commit-tree", detail: ct.err, expect, commit: null };
+		}
 		const commit = ct.out;
 		let waitedMs = 0;
 		if (req.pushAt) {
 			waitedMs = Math.max(0, req.pushAt - Date.now());
 			if (waitedMs > 0 && waitedMs < 30000) await new Promise((r) => setTimeout(r, waitedMs));
 		}
+		this.pushing = true;
 		const push = await this.run([
 			"git", "-C", dir, "push", "--porcelain",
-			`--force-with-lease=refs/heads/${base}:${expect}`,
-			remote.href, `${commit}:refs/heads/${base}`,
+			`--force-with-lease=${target}:${expect}`,
+			remote.href, `${commit}:${target}`,
 		]);
+		const result = classifyGitPush(push.code, push.out, push.err, target);
 		return {
-			ok: true, landed: push.code === 0, refused: push.code === 0 ? null : "lease",
-			commit, ...preview, pushOut: push.out, pushErr: push.err,
+			ok: true, outcome: result.outcome, landed: result.outcome === "landed",
+			refused: result.outcome === "rejected" ? result.reason : null,
+			expect, commit, ...preview, pushExit: push.code, pushOut: push.out, pushErr: push.err,
 			timing: { ...timing, commitMs: ct.ms, waitedMs, pushMs: push.ms, totalMs: Date.now() - t0 },
 		};
 	}
@@ -240,15 +268,17 @@ export default {
 		}
 		const req = (await request.json()) as OpRequest;
 		if (!req.box || !/^[A-Za-z0-9_-]{1,64}$/.test(req.box)) {
-			return Response.json({ ok: false, error: "bad box" }, { status: 400 });
+			return Response.json(landFields(req, { ok: false, error: "bad box" }, "error"), { status: 400 });
 		}
 		const t = Date.now();
 		try {
 			const stub = env.GITBOX.getByName(req.box);
-			const res = await stub.op(req);
+			const res = (await stub.op(req)) as Record<string, unknown>;
 			return Response.json({ ...res, workerMs: Date.now() - t });
 		} catch (e) {
-			return Response.json({ ok: false, error: redact(String(e)), workerMs: Date.now() - t }, { status: 500 });
+			// The Durable Object may have pushed before the call failed.
+			const res = landFields(req, { ok: false, error: redact(String(e)) }, "unknown");
+			return Response.json({ ...res, workerMs: Date.now() - t }, { status: 500 });
 		}
 	},
 };

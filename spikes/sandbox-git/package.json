@@ -4,9 +4,14 @@
 	"type": "module",
 	"scripts": {
 		"deploy": "wrangler deploy",
-		"types": "wrangler types"
+		"deploy:iso": "wrangler deploy -c wrangler.iso.jsonc",
+		"types": "wrangler types",
+		"typecheck": "wrangler types >/dev/null && tsc --noEmit",
+		"test": "node --test test/",
+		"capture": "python3 test/capture_push_samples.py"
 	},
 	"devDependencies": {
+		"typescript": "^7.0.2",
 		"wrangler": "^4.145.0"
 	},
 	"dependencies": {
