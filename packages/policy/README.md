@@ -143,6 +143,25 @@ Artroom's cases:
 - `test/helpers.test.ts`: the plan's section 5 policy example, the default
   policy, validation and globs.
 
+## Mutation spot-checks
+
+Each budget, each carry condition and each failure rule was broken once, and
+the Node suite run against the change. All 35 mutations made at least one
+named test fail. Examples:
+
+| Mutation | A test that failed |
+|---|---|
+| AST depth limit + 1 | AST depth exact boundary at an odd level |
+| AST size, visits, nesting, sequence, program, input and output limits raised; one intermediate result limit × 4 | the matching atseq exact-boundary case |
+| Inspected-byte limit + 1 | inspected bytes exact boundary to the byte |
+| Per-act step or byte budget raised | the act budget is shared across rules; the cubic rule |
+| Shared compiled expression | evaluations of one program interleave |
+| Each carry condition (R-CARRY-1, 2, 3, 4, 6, 8, 9, 10, 12) removed | the named plan 7 or R-CARRY case |
+| `require` catches a rule error and continues | a require rule over its budget refuses the act |
+| A carry rule error carries | a carry rule that errors stops carrying |
+| A broad catch turns engine faults into outcomes | an engine fault throws a retryable error |
+| Recovery lanes evaluate policy, or allow paths outside `.artroom/**` | policy lockout; recovery-scope |
+
 ## The authoring helpers
 
 `src/helpers.ts` implements the functions that the contract's `/policy`
@@ -204,4 +223,5 @@ that list verbatim.
   covers only the dry-run case of plan section 7.
 - Overlap's `certain` flag (R-PATH-3). `globsOverlap` answers only "may
   overlap".
-- Mutation spot-checks were run under Node only.
+- Mutation spot-checks were run under Node only. The workerd suite was run
+  only on the unmutated code.

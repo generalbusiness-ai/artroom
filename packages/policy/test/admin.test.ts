@@ -15,7 +15,7 @@ import { act, active, actor, carryInput, landInput, lane, refuseInput, requireIn
 
 const approve = { reviewer: "@root" as const, role: "admin" as const, verdict: "approve" as const, authors: ["@root" as const] };
 
-describe("sole-admin bootstrap (R-ADMIN-2)", () => {
+describe("admin boundary and sole-admin bootstrap (R-ADMIN-1 to 9)", () => {
   test("sole admin changes policy: the self-approval counts and is flagged", () => {
     expect(judgeAdminApproval({ ...approve, activeAdmins: 1 }, "admission")).toMatchObject({ counts: true, flag: "sole-admin-self-approval" });
   });
