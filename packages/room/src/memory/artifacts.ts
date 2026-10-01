@@ -277,6 +277,8 @@ export interface PushControls {
   failPushes: number;
   /** Pushes that fail before anything is sent (`error`): nothing applied. */
   errorPushes: number;
+  /** Pushes that apply, and whose report is then lost (`unknown`). */
+  lostPushReports: number;
 }
 
 /**
@@ -316,6 +318,11 @@ export class FakeArtifactsHost {
     this.hooks.get(method)?.shift()?.();
     const planned = this.failures.get(method);
     if (planned?.length) throw planned.shift()!;
+  }
+
+  /** Clear every planned failure: the remote has recovered. */
+  recover(): void {
+    this.failures.clear();
   }
 
   /** Run `fn` when the next call of a remote method arrives, as something else happening meanwhile. */
@@ -568,7 +575,7 @@ export class FakeArtifactsHost {
   // ------------------------------------------------------------ the publisher sandbox
 
   /** Push controls: hold a push in flight, or make pushes end with no answer. */
-  readonly controls: PushControls = { pausePush: false, failPushes: 0, errorPushes: 0 };
+  readonly controls: PushControls = { pausePush: false, failPushes: 0, errorPushes: 0, lostPushReports: 0 };
 
   private byRemote(remote: string): FakeRepo {
     for (const r of this.repos.values()) if (r.remote === remote) return r;
@@ -650,6 +657,10 @@ export class FakeArtifactsHost {
       if (main !== req.expectedMain) return { outcome: "rejected", reason: "lease", detail: "stale info" };
       for (const o of this.closure(req.integration as Sha)) canonical.objects.add(o);
       canonical.refs.set("refs/heads/main", req.integration as Sha);
+      if (this.controls.lostPushReports > 0) {
+        this.controls.lostPushReports--;
+        return { outcome: "unknown", detail: "the pack was sent and the connection dropped before the report" };
+      }
       return { outcome: "landed", detail: "updated" };
     },
   };

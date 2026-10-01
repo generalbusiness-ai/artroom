@@ -183,6 +183,9 @@ export const ROOM_MIGRATIONS: readonly Migration[] = [
       sql.all("INSERT OR IGNORE INTO ws_leases (lane, lease_gen, state) SELECT lane, lease_gen, 'ended' FROM workspaces");
       // Landing evaluations the Room has asked for (after a check or a recomputation), run by the alarm's landing step.
       sql.all("CREATE TABLE IF NOT EXISTS land_reeval (op TEXT PRIMARY KEY)");
+      // Checks carried onto a landing's integration (R-CARRY-6 to 10): the earlier check, and why it carries.
+      sql.all(`CREATE TABLE IF NOT EXISTS check_carries (lane TEXT NOT NULL, generation INTEGER NOT NULL, integration TEXT NOT NULL, obligation TEXT NOT NULL,
+        act TEXT NOT NULL, evidence TEXT NOT NULL, PRIMARY KEY (lane, generation, integration, obligation))`);
     },
   },
 ];

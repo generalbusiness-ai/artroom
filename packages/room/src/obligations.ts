@@ -205,6 +205,17 @@ export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationS
     acts.push(r.act);
     evidence.push({ basis: "here", act: r.act, kind: "check", generation: gen.generation, head: gen.head });
   }
+  // Checks carried onto an integration of this generation (R-CARRY-6 to 10), still valid evidence (R-REV-1).
+  const carriedRows = opts.integration
+    ? sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ? AND integration = ?", gen.lane, gen.generation, spec.id, opts.integration)
+    : sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ?", gen.lane, gen.generation, spec.id);
+  for (const c of carriedRows) {
+    const r = evidenceByAct(sql, c["act"] as string);
+    if (!r || exclude.has(r.act) || acts.includes(r.act) || !valid(r)) continue;
+    if (qualification(opts.doc, spec, r, opts.checkers) !== true) continue;
+    acts.push(r.act);
+    evidence.push(JSON.parse(c["evidence"] as string) as Evidence);
+  }
   return acts.length
     ? { ...spec, state: "met", evidence, evidenceActs: acts }
     : { ...spec, state: "open", evidence, ...(reopened ? { reopened } : {}), evidenceActs: acts };

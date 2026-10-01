@@ -14,6 +14,7 @@
 
 import type {
   ActId,
+  CheckBody,
   ArtroomError,
   Authority,
   Carried,
@@ -45,7 +46,7 @@ import type {
   Sha,
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
-import { ownersFor } from "@generalbusiness/artroom-policy";
+import { checkConditions, checkerInputs, ownersFor } from "@generalbusiness/artroom-policy";
 import { canonicalize, parseStrict } from "./canonical.ts";
 import { b64url, digestJson, keyPairFromSeed, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
@@ -903,7 +904,69 @@ export class RoomCore {
    * this lane counts here if policy's `carry` keeps it, judged on the tree,
    * or the filtered snapshot for a scoped checker, of both integrations.
    */
-  async carryChecks(_op: LandRecord, _integration: Sha, _policy: ActivePolicyFull): Promise<void> {}
+  async carryChecks(op: LandRecord, integration: Sha, policy: ActivePolicyFull): Promise<void> {
+    const gen = generationRow(this.sql, op.lane, op.generation);
+    if (!gen || !policy.doc.carry.checks) return;
+    // Policy `carry` rules may only stop evidence carrying, and there is no event to seal a check's carry decision
+    // in (contract gap): with any carry rule in force, checks do not carry and rerun instead.
+    if (policy.doc.rules.some((r) => r.kind === "carry")) return;
+    const statuses = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration });
+    for (const spec of gen.obligations) {
+      if (spec.kind !== "check" || statuses.find((s) => s.id === spec.id)?.state === "met") continue;
+      const cfg = policy.checkers[spec.check];
+      if (!cfg) continue;
+      // Earlier passing checks of this obligation and checker on this lane, on another integration, newest first.
+      const candidates = this.sql
+        .all("SELECT * FROM evidence WHERE lane = ? AND kind = 'check' AND generation <= ? ORDER BY seq DESC", op.lane, op.generation)
+        .map((r) => evidenceByAct(this.sql, str(r, "act")!)!)
+        .filter((e) => {
+          const b = e.body as { obligation: string; check: string; ok: boolean; integration: string };
+          return b.ok && b.obligation === spec.id && b.check === spec.check && b.integration !== integration;
+        });
+      if (!candidates.length) continue;
+      const inputs = checkerInputs(cfg.config.inputs, policy.doc.carry);
+      const tree = await this.ports.artifacts.treeOf(integration);
+      if (!tree) return;
+      const snapshot = inputs ? ((await this.ports.artifacts.snapshot(integration, inputs))?.digest ?? null) : null;
+      for (const ev of candidates) {
+        const b = ev.body as CheckBody;
+        const evGen = generationRow(this.sql, op.lane, ev.generation);
+        const revoked = invalidity(this.sql, ev, policy.doc.retiredEvidence);
+        const input = {
+          kind: "carry" as const,
+          evidence: { act: ev.act, kind: "check" as const, verdict: null, by: this.policyActor(ev.authority), from: { generation: ev.generation, head: evGen?.head ?? gen.head }, scope: [], dependsOn: [] },
+          changedSince: [],
+          proposal: this.proposalInput(policy.doc, gen),
+          policy: { same: evGen?.policy === policy.version },
+        };
+        // R-CARRY-6, 9, 10, 12: the earlier check's binding against the new integration, under the active configuration.
+        const facts = {
+          revoked: revoked?.reason ?? null,
+          check: {
+            before: { integration: b.integration, config: b.config, runner: b.runner, input: b.input },
+            now: { integration, tree, snapshot, config: cfg.digest, runner: b.runner },
+            volatile: cfg.config.volatile,
+          },
+        };
+        const platform = checkConditions(input, policy.doc, facts);
+        if (!platform.carries) continue;
+        const basis = platform.basis;
+        if (basis.code === "paths-unchanged") continue;
+        const text = basis.code === "tree-identical" ? "carried: the integration's tree is identical" : "carried: the filtered snapshot is identical";
+        const carried: Carried = { basis: "carried", act: ev.act, kind: "check", from: input.evidence.from, reason: { ...basis, text } as Carried["reason"], rules: [] };
+        this.sql.all(
+          "INSERT INTO check_carries (lane, generation, integration, obligation, act, evidence) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+          op.lane,
+          op.generation,
+          integration,
+          spec.id,
+          ev.act,
+          JSON.stringify(carried),
+        );
+        break;
+      }
+    }
+  }
 
   /** Ask the engine to evaluate an operation again, after a check, a recomputation or new configuration. Durable. */
   requestEvaluation(op: OpId): void {

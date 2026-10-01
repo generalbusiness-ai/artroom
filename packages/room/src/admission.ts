@@ -20,6 +20,7 @@
  */
 
 import type {
+  Digest,
   ActId,
   ActRecord,
   AdmissionPath,
@@ -65,6 +66,7 @@ import type {
   SignedEnvelope,
 } from "@generalbusiness/artroom-contract";
 import type { InputOf } from "@generalbusiness/artroom-policy";
+import { checkerInputs } from "@generalbusiness/artroom-policy";
 import { canonicalize, utf8 } from "./canonical.ts";
 import { b64url, digestJson, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
@@ -111,6 +113,8 @@ export interface Pre {
   readonly since?: ReadonlyMap<Sha, readonly RepoPath[] | null>;
   /** The tree of a check's integration (R-OBL-3). */
   readonly tree?: Sha | null;
+  /** The filtered snapshot of a check's integration over the paths the check names (R-CARRY-9). */
+  readonly snapshot?: Digest | null;
 }
 
 /** Something to do inside the commit transaction with the room-held key of a room-custody join (R-CRED-3). */
@@ -384,7 +388,13 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
       }
       return { head: { inFork }, diff, main, config, since };
     }
-    if (env.kind === "check") return { tree: await a.treeOf((env.body as CheckBody).integration) };
+    if (env.kind === "check") {
+      const b = env.body as CheckBody;
+      const tree = await a.treeOf(b.integration);
+      // A scoped checker's input: the filtered snapshot of the integration over the paths it names (R-CARRY-9).
+      if (b.input?.kind === "filtered" && Array.isArray(b.input.paths)) return { tree, snapshot: (await a.snapshot(b.integration, b.input.paths))?.digest ?? null };
+      return { tree };
+    }
     if (env.kind === "land" && core.landing.core.main() === null) await core.landing.refreshMain();
     return {};
   } catch (e) {
@@ -1065,7 +1075,16 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   if (!integrations.has(body.integration)) return binding("The check does not bind an integration the room prepared for this generation.");
   const cfg = ctx.policy.checkers[body.check];
   if (!cfg || cfg.digest !== body.config) return binding("The check's configuration digest is not the active configuration's.");
-  if (body.input.kind !== "tree" || ctx.pre.tree === undefined || body.input.tree !== ctx.pre.tree) return binding("The check's input is not the integration's tree.");
+  if (body.input.kind === "tree") {
+    if (ctx.pre.tree === undefined || body.input.tree !== ctx.pre.tree) return binding("The check's input is not the integration's tree.");
+  } else {
+    // R-OBL-3, R-CARRY-8, R-CARRY-9: a scoped checker's snapshot covers exactly its declared inputs plus the global
+    // inputs, from the active configuration; the room builds the snapshot itself and compares digests.
+    const inputs = checkerInputs(cfg.config.inputs, ctx.policy.doc.carry);
+    if (!inputs || canonicalize([...body.input.paths].sort()) !== canonicalize([...inputs].sort()))
+      return binding("The check's inputs are not the checker's declared inputs plus the global inputs.");
+    if (!ctx.pre.snapshot || body.input.snapshot !== ctx.pre.snapshot) return binding("The check's input is not the room's filtered snapshot of the integration.");
+  }
   if (q !== true) return binding("The check does not bind this obligation under the active configuration.");
   const r = await policyRefuse(ctx, lane);
   if (r) return refused(ctx, r);
