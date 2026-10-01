@@ -88,7 +88,11 @@ The Room talks to other lanes through three small interfaces in
 The Room's side of log publication is durable. Before any remote write it
 stores the cohort: the entries through N, the signed checkpoint, the
 retained files, the parent (the last commit it confirmed), and the exact
-commit the publisher's serialization makes of them (`commitFor`). Every
+commit the publisher's serialization makes of them (`commitFor`). The
+stored cohort has a version. A cohort stored by the previous revision
+has no exact commit: before any further write, the Room derives it with
+`commitFor` from the cohort's recorded parent, entries, checkpoint and
+retained bytes, and stores the upgraded cohort. Every
 attempt, even after a restart, publishes that same cohort. The publisher
 reads the ref back after an unclear answer and completes forward. The Room
 seals the `checkpoint` event and moves `publishedThrough` only when the
@@ -180,9 +184,12 @@ Worker's `draft` and `found` (`ArtroomFounder`).
    4. authorizes the repository: for `new`, it must be the fresh identity
       derived from the draft value in the public namespace; for `import`,
       the grant must be signed by a configured operator key, for this
-      repository and this admin key, unexpired unless this is a retry;
+      repository and this admin key;
    5. binds repository, room ID and name in the registry, in one atomic
-      step (R-GEN-13);
+      step (R-GEN-13). For an import, the registry also judges the grant's
+      `notAfter` there, with its own clock: a first binding at or after it
+      is refused. The same binding again succeeds after it, so a retry
+      completes;
    6. only then has the room create or read the repository and seal
       entries 0 and 1. The room itself refuses to do this unless the
       registry binds it.
@@ -344,6 +351,13 @@ lane E.
 | 5. Upgrade of populated storage | yes: review-8faa2ef9 | n/a | pending |
 | `"*"` fixed at the grant | yes: review-8faa2ef9 | n/a | pending |
 
+### Review 1249097f findings
+
+| Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
+|---|---|---|---|
+| 1. Upgrade of a stored cohort without its exact commit | yes: review-1249097f | L pending (`commitFor` in lane L revision 4) | pending |
+| 2. Grant deadline at the first binding | yes: review-1249097f | n/a | pending |
+
 ## Mutation spot-checks
 
 Each rule below was broken once, and the matching suite run against the
@@ -447,6 +461,28 @@ Two mutations are equivalent: a check effect without `opened` (a check
 cannot reopen an obligation), and running every migration step on each
 opening (each step is idempotent by design). One guard that could not be
 reached (comparing the pending commit again when sealing) was removed.
+
+## Review 1249097f
+
+The checker's review of `909a3e3f` confirmed the five 8faa2ef9 findings and
+the 13 amendment 2 edits, and found two more. Its reproductions now assert
+the correct outcomes in
+[test/workerd/review-1249097f.test.ts](test/workerd/review-1249097f.test.ts).
+
+| Finding | Fix | Tests (in that file) |
+|---|---|---|
+| 1. P2 A cohort stored by the previous revision wedged publication | Stored cohorts carry `v: 2`. `publish` upgrades a cohort without a version before the fence and before any write: it derives the exact commit with the publisher's `commitFor` from the recorded parent, entries, checkpoint and retained bytes, and stores it. It infers nothing from the ref and never discards the cohort. A cohort that does not match the log, or has an unknown version, stops publication | before the push…; after an applied push whose answer was lost…; the derived commit is stored before any further write, and survives repeated reopening; a foreign commit with the same entry lines…; a stored cohort that does not match the log…; a cohort of an unknown version… |
+| 2. P2 A grant that expired during `found`'s awaits still authorized a first binding | `found` carries the grant's deadline into the registry's `bind`, which judges it with its own clock in the same step as the first binding. `found` reads no clock and no longer looks the binding up first: any time it read could be stale by the binding. The same binding again still succeeds after the deadline | a grant that expires during signature verification…; a grant that expired between draft and found…; a grant that expires while the bind is on its way…; at notAfter exactly…; after the binding, a retry … completes forward…; the registry refuses a first binding at or after its deadline… |
+
+Lane L's `commitFor` includes the stored files of its last written commit
+when that commit is the parent. The Room always passes every retained file
+it holds, so the result is the same either way.
+
+Each new guard was broken once and the whole workerd suite run against the
+change: all 10 mutations were caught. The first version of fix 2 also
+judged the deadline in `found`; those checks could not be told apart from
+the registry's in any test, so they were removed and the registry is the
+one boundary.
 
 ## Secrets
 
