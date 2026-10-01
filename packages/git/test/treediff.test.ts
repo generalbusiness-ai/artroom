@@ -315,3 +315,26 @@ test("a diff that crosses both the depth and the entry bounds is refused the sam
   // wide directory (level 1) trips the entry bound before depth 4 is reached.
   assert.deepEqual([...outcomes].sort(), ["depth", "entries"]);
 });
+
+// ------------------------------------------------------------------ review b78a837f, P2.4: bounded work
+
+test("a refusal on a wide level stops reading at once: reads stay within a small window, and the stats say what was read and counted", async (t) => {
+  const files: Record<string, string> = {};
+  for (let d = 0; d < 100; d++) for (let i = 0; i < 20; i++) files[`d${String(d).padStart(3, "0")}/f${i}.txt`] = "0\n";
+  const f = await new Fixture().init(files);
+  t.after(() => f.dispose());
+  const change: Record<string, string> = {};
+  for (let d = 0; d < 100; d++) change[`d${String(d).padStart(3, "0")}/f0.txt`] = "1\n";
+  const head = await commit(f, f.main, change);
+  const inner = gitReader(f.canonical);
+  const [ta, tb] = [(await inner.readCommit(f.main))!.treeHash, (await inner.readCommit(head))!.treeHash];
+  let reads = 0;
+  const counting: TreeReader = { readTree: (h) => (reads++, inner.readTree(h)), readCommit: (h) => inner.readCommit(h) };
+  const r = await treeDiff(counting, ta, tb, { bounds: { maxEntries: 250, concurrency: 8 } });
+  assert.deepEqual([r.kind, r.kind === "too-large" ? r.bound : null], ["too-large", "entries"]);
+  // The root (2 trees, 200 entries), then the level's first two directories (40 each) cross 250.
+  assert.equal(r.stats.entries, 280, "entries counted, in order, up to the refusal");
+  await new Promise((r) => setTimeout(r, 100)); // let any prefetched read finish
+  assert.equal(r.stats.treeReads, reads, "the stats count every read started");
+  assert.ok(reads <= 2 + 2 * 4, `${reads} tree reads; the whole level would be ${2 + 200}`);
+});

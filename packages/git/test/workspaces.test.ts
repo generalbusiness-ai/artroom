@@ -38,10 +38,14 @@ class FakeRepo implements RepoHandle {
     if (ttl < 60) throw new ArtifactsError("INVALID_TTL", 10003);
     const delay = this.ns.mintDelays.shift();
     if (delay) await delay();
-    return this.mintRaw(scope, ttl);
+    const t = this.mintRaw(scope, ttl);
+    // The token exists in Artifacts; its answer is still on the way back.
+    const after = this.ns.mintAfter.shift();
+    if (after) await after();
+    return t;
   }
   async revokeToken(tokenOrId: string) {
-    if (this.ns.failRevoke) throw new ArtifactsError("INTERNAL_ERROR", 10400);
+    if (this.ns.failRevoke || this.ns.failRevokeOnly) throw new ArtifactsError("INTERNAL_ERROR", 10400);
     for (const [id, t] of this.tokens) {
       if ((id === tokenOrId || t.plaintext === tokenOrId) && t.state === "active") {
         t.state = "revoked";
@@ -56,6 +60,8 @@ class FakeRepo implements RepoHandle {
     return { tokens, total: tokens.length };
   }
   async info() {
+    const hook = this.ns.infoHooks.shift();
+    if (hook) await hook();
     return { name: this.name, remote: `https://acct.artifacts.cloudflare.net/git/ns/${this.name}.git`, source: this.source };
   }
   async fork(name: string) {
@@ -95,9 +101,15 @@ class FakeNamespace implements ArtifactsNamespace {
   createGate: Promise<void> | null = null;
   readonly namespace = "ns";
   readonly minted: string[] = [];
+  /** Run after a token is minted, before its answer returns. */
+  readonly mintAfter: (() => Promise<void>)[] = [];
+  /** Run at the start of each info() call; may throw. */
+  readonly infoHooks: (() => Promise<void>)[] = [];
   /** Each call of createToken first awaits the next of these, if any. */
   readonly mintDelays: (() => Promise<void>)[] = [];
   failRevoke = false;
+  /** Revocation fails, listing works. */
+  failRevokeOnly = false;
   constructor(clock: Clock) {
     this.clock = clock;
     this.repos.set("canon", new FakeRepo(this, "canon", null));
@@ -186,7 +198,7 @@ test("release, expiry or take-over revokes every active token on the fork, inclu
   await ws.provision(lane);
   const orphan = fork().mintRaw("write", 600); // a crash between mint and record
   assert.equal(fork().live().length, 2);
-  assert.equal(await ws.revoke(lane), 2);
+  assert.equal(await ws.revoke(lane, 1), 0, "nothing owed");
   assert.deepEqual(fork().live(), []);
   assert.ok(fork().tokens.get(orphan.id)?.state === "revoked");
   assert.equal(ws.view(lane), null);
@@ -223,7 +235,7 @@ test("a lease with under a minute left gets no token; a lease that ends during p
 
   ws.open(lane, 1, clock.t + LEASE_MS);
   await ws.provision(lane); // the fork exists now
-  await ws.revoke(lane);
+  await ws.revoke(lane, 1);
   ws.open(lane, 2, clock.t + LEASE_MS);
   const gate = deferred();
   ns.createGate = gate.promise;
@@ -231,7 +243,7 @@ test("a lease with under a minute left gets no token; a lease that ends during p
   // The lease ends while provisioning waits on Artifacts.
   await new Promise((r) => setTimeout(r, 5));
   ns.createGate = null;
-  const revoking = ws.revoke(lane);
+  const revoking = ws.revoke(lane, 2);
   gate.resolve();
   await Promise.all([provisioning, revoking]);
   assert.deepEqual(fork().live(), []);
@@ -254,7 +266,7 @@ test("a repository at the fork's name that is not a fork of this canonical repo 
     assert.equal(ns.repos.get(name), squatter, "not replaced");
     assert.deepEqual(squatter.live(), [theirs.id], "no token minted on it, and its own left alone");
     assert.ok("refused" in ws.grant(lane, 1));
-    assert.equal(await ws.revoke(lane), 0);
+    assert.equal(await ws.revoke(lane, 1), 0);
     assert.deepEqual(squatter.live(), [theirs.id], "release does not touch it either");
   }
 });
@@ -297,7 +309,7 @@ test("a new lease generation while the old one's token is being minted: the old 
   const { clock, ns, ws, lane, fork } = setup();
   ws.open(lane, 1, clock.t + LEASE_MS);
   await ws.provision(lane); // the fork exists
-  await ws.revoke(lane);
+  await ws.revoke(lane, 1);
   ws.open(lane, 2, clock.t + LEASE_MS);
   let handoff!: () => void;
   ns.mintDelays.push(() => new Promise<void>((r) => (handoff = r)));
@@ -321,13 +333,15 @@ test("a revocation that fails is remembered, never granted again, and revoked by
   ws.open(lane, 1, clock.t + LEASE_MS);
   await ws.provision(lane);
   ns.failRevoke = true;
-  await ws.revoke(lane).catch(() => 0);
-  assert.equal(await ws.sweep(), 1, "one revocation is still owed");
+  assert.ok((await ws.revoke(lane, 1)) > 0, "Artifacts is down: cleanup is owed");
+  assert.ok((await ws.sweep()) > 0, "still owed");
+  assert.ok(ws.nextDue() !== null, "the Room's alarm has work");
   assert.equal(fork().live().length, 1);
   assert.ok("refused" in ws.grant(lane, 1));
   ns.failRevoke = false;
   assert.equal(await ws.sweep(), 0);
   assert.deepEqual(fork().live(), []);
+  assert.equal(ws.nextDue(), null);
 });
 
 test("grant refuses once the lease has expired, even with a token on record", async () => {
@@ -338,4 +352,190 @@ test("grant refuses once the lease has expired, even with a token on record", as
   clock.advance(121_000);
   const g = ws.grant(lane, 1);
   assert.ok("refused" in g && g.rule === "lease-fenced");
+});
+
+// ------------------------------------------------------------------ review b78a837f, P1: one durable cleanup protocol
+
+test("the fork's creation token: if its revocation fails, the workspace is not ready, the cleanup survives a restart, and the alarm finishes it", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  ns.failRevoke = true; // Artifacts cannot revoke or list right after the fork is made
+  const v = await ws.provision(lane);
+  assert.equal(v.state, "failed");
+  assert.ok(v.state === "failed" && v.error.retryable);
+  assert.equal(fork().live().length, 1, "the 24 h creation token is still live");
+  assert.ok("refused" in ws.grant(lane, 1));
+  // Provisioning again while cleanup is owed does not hand out a second token.
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "failed");
+  assert.equal(fork().live().length, 1);
+  // A restart: a new instance over the same storage.
+  const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  assert.ok(restarted.nextDue() !== null, "the alarm has work");
+  assert.ok((await restarted.sweep()) > 0, "still owed while Artifacts is down");
+  ns.failRevoke = false;
+  clock.advance(600_000);
+  assert.equal(await restarted.reconcile(), 0, "the alarm settles it");
+  assert.deepEqual(fork().live(), [], "the creation token is revoked");
+  restarted.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await restarted.provision(lane)).state, "ready");
+  assert.equal(fork().live().length, 1, "exactly one live token: the lease's");
+});
+
+test("a token minted just before a crash, never recorded, is found by the cleanup the mint owed", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  await ws.revoke(lane, 1);
+  ws.open(lane, 2, clock.t + LEASE_MS);
+  ns.mintAfter.push(() => new Promise<void>(() => {})); // the answer never arrives: the instance died
+  void ws.provision(lane);
+  for (let i = 0; i < 100 && ns.minted.length < 3; i++) await new Promise((r) => setTimeout(r, 2));
+  const orphan = ns.minted[ns.minted.length - 1]!;
+  assert.equal(fork().tokens.get(orphan)?.state, "active", "minted in Artifacts, unknown to the room");
+  const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  assert.equal(await restarted.reconcile(), 0);
+  assert.equal(fork().tokens.get(orphan)?.state, "revoked");
+  assert.equal((await restarted.provision(lane)).state, "ready");
+  assert.equal(fork().live().length, 1);
+});
+
+test("when the inventory on release fails, an unrecorded token is not forgotten: the cleanup stays owed until it is revoked", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  const orphan = fork().mintRaw("write", 600); // an unrecorded token, from a crash window
+  ns.failRevoke = true; // listing and revoking fail
+  assert.ok((await ws.revoke(lane, 1)) > 0);
+  assert.ok((await ws.sweep()) > 0, "not reported as settled");
+  assert.equal(fork().tokens.get(orphan.id)?.state, "active");
+  ns.failRevoke = false;
+  assert.equal(await ws.sweep(), 0);
+  assert.equal(fork().tokens.get(orphan.id)?.state, "revoked");
+  assert.deepEqual(fork().live(), []);
+});
+
+test("cleanup owed on a fork name now held by another repository drops the debt and never touches that repository", async () => {
+  const { clock, ns, ws, lane } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  ns.failRevoke = true;
+  await ws.revoke(lane, 1);
+  ns.failRevoke = false;
+  const name = forkName("canon", lane);
+  const squatter = new FakeRepo(ns, name, null);
+  const theirs = squatter.mintRaw("write", 3600);
+  ns.repos.set(name, squatter); // our fork was replaced by someone else's repository
+  assert.equal(await ws.sweep(), 0);
+  assert.deepEqual(squatter.live(), [theirs.id]);
+});
+
+// ------------------------------------------------------------------ review b78a837f, P2: results fenced by lease
+
+test("a late error from lease 1's provisioning does not fail lease 2's workspace", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  let fail!: (e: Error) => void;
+  ns.mintDelays.push(() => new Promise<void>((_r, j) => (fail = j)));
+  const old = ws.provision(lane); // lease 1 provisioning, waiting on Artifacts
+  while (!fail) await new Promise((r) => setTimeout(r, 2));
+  ws.open(lane, 2, clock.t + LEASE_MS); // taken over
+  fail(new Error("the connection to Artifacts was reset"));
+  const oldView = await old;
+  assert.equal(oldView.state, "pending", "after lease 1's late error, the workspace (now lease 2's) is still pending");
+  assert.equal(ws.view(lane)?.state, "pending", "lease 2 is not marked failed by lease 1's error");
+  assert.equal((await ws.provision(lane)).state, "ready");
+  assert.ok(!("refused" in ws.grant(lane, 2)));
+  assert.equal(fork().live().length, 1);
+});
+
+test("a late release of lease 1 never revokes lease 2's token, in either order", async () => {
+  for (const order of ["release-first", "provision-first"] as const) {
+    const { clock, ns, ws, lane, fork } = setup();
+    ws.open(lane, 1, clock.t + LEASE_MS);
+    await ws.provision(lane);
+    let go!: () => void;
+    const gate = new Promise<void>((r) => (go = r));
+    if (order === "release-first") {
+      ns.infoHooks.push(() => gate); // the release's inventory is slow
+      const releasing = ws.revoke(lane, 1);
+      ws.open(lane, 2, clock.t + LEASE_MS);
+      const provisioning = ws.provision(lane);
+      go();
+      await Promise.all([releasing, provisioning]);
+    } else {
+      ws.open(lane, 2, clock.t + LEASE_MS); // take-over first; lease 1's token is owed revocation
+      ns.mintAfter.push(() => gate); // lease 2's token exists in Artifacts; its answer is slow
+      const provisioning = ws.provision(lane);
+      await new Promise((r) => setTimeout(r, 5));
+      const releasing = ws.revoke(lane, 1); // the stale release arrives during the mint
+      go();
+      await Promise.all([releasing, provisioning]);
+      await ws.sweep();
+    }
+    const g = ws.grant(lane, 2);
+    assert.ok(!("refused" in g), order);
+    const live = fork().live();
+    assert.equal(live.length, 1, `${order}: one live token`);
+    assert.equal(fork().tokens.get(live[0]!)?.plaintext, !("refused" in g) ? g.token : "", `${order}: the granted token is the live one`);
+  }
+});
+
+// ------------------------------------------------------------------ review b78a837f, P2: renewal while pending
+
+test("renewing the lease before provisioning: the new deadline is used", async () => {
+  const { clock, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + 120_000);
+  clock.advance(61_000); // 59 s left: too short for a token
+  ws.open(lane, 1, clock.t + 15 * 60_000); // renewed
+  assert.equal((await ws.provision(lane)).state, "ready");
+  const t = fork().tokens.get(fork().live()[0]!)!;
+  assert.equal(t.ttl, 15 * 60 - TOKEN_MARGIN_S);
+});
+
+test("renewing the lease while its token is being minted: the token is checked against the new deadline", async () => {
+  const { clock, ns, ws, lane } = setup();
+  ws.open(lane, 1, clock.t + 120_000);
+  let renewed = 0;
+  ns.mintDelays.push(async () => {
+    clock.advance(30_000); // the mint is slow: the 120 s token now overruns the old deadline...
+    renewed = clock.t + 15 * 60_000;
+    ws.open(lane, 1, renewed); // ...but the lease was renewed meanwhile
+  });
+  assert.equal((await ws.provision(lane)).state, "ready");
+  const g = ws.grant(lane, 1);
+  assert.ok(!("refused" in g) && Date.parse(g.expiresAt) <= renewed);
+});
+
+test("the alarm's cleanup waits for a token being installed: it never revokes the token a lease is about to receive", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  await ws.revoke(lane, 1);
+  ws.open(lane, 2, clock.t + LEASE_MS);
+  let go!: () => void;
+  ns.mintAfter.push(() => new Promise<void>((r) => (go = r))); // lease 2's token exists; its answer is slow
+  const provisioning = ws.provision(lane);
+  while (!go) await new Promise((r) => setTimeout(r, 2));
+  const alarm = ws.sweep(); // the Room's alarm fires during the mint
+  await new Promise((r) => setTimeout(r, 5));
+  go();
+  await Promise.all([provisioning, alarm]);
+  const g = ws.grant(lane, 2);
+  assert.ok(!("refused" in g));
+  assert.deepEqual(fork().live().map((id) => fork().tokens.get(id)!.plaintext), [!("refused" in g) ? g.token : ""], "the granted token is the one live token");
+});
+
+test("an orphan the inventory finds but cannot revoke stays owed by its ID until it is revoked", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  await ws.provision(lane);
+  const orphan = fork().mintRaw("write", 600);
+  ns.failRevokeOnly = true; // listing works; revoking does not
+  assert.ok((await ws.revoke(lane, 1)) > 0);
+  assert.ok((await ws.sweep()) > 0);
+  assert.equal(fork().tokens.get(orphan.id)?.state, "active");
+  ns.failRevokeOnly = false;
+  assert.equal(await ws.sweep(), 0);
+  assert.deepEqual(fork().live(), []);
 });

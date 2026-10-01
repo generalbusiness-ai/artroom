@@ -157,22 +157,34 @@ export async function treeDiff(
     | { readonly kind: "walk"; readonly a: string; readonly b: string; readonly prefix: string }
     | { readonly kind: "all"; readonly tree: string; readonly prefix: string; readonly into: "added" | "deleted" };
 
-  // Level by level. Each level's trees are read in parallel, but entries
-  // are counted and the bounds checked in a fixed order (by path), after the
-  // whole level is read. So the same two trees give the same answer, and the
-  // same refusal, whatever the cache holds and whichever read finishes first.
+  // Level by level, and within a level in a fixed order (by path). Items are
+  // read through a small window: at most `window` items (two trees each) are
+  // fetched ahead of the one being counted, so in-flight reads and held
+  // entries stay bounded. Entries are counted and the bounds checked in that
+  // fixed order, and nothing more is started once a bound is crossed. So the
+  // same two trees give the same answer, and the same refusal, whatever the
+  // cache holds and whichever read finishes first.
+  const window = Math.max(1, Math.floor(b.concurrency / 2));
+  const fetchItem = (it: Item): Promise<readonly [readonly TreeEntry[], readonly TreeEntry[]]> =>
+    it.kind === "walk" ? Promise.all([read(it.a), read(it.b)]) : read(it.tree).then((e) => [e, []] as const);
   let level: Item[] = fromTree === toTree ? [] : [{ kind: "walk", a: fromTree, b: toTree, prefix: "" }];
   for (let depth = 0; level.length > 0; depth++) {
     if (depth > b.maxDepth) return { kind: "too-large", bound: "depth", limit: b.maxDepth, stats };
     const order = (x: Item) => `${x.prefix}\u0000${x.kind === "all" ? x.into : "walk"}`;
     level.sort((x, y) => cmp(order(x), order(y)));
-    const trees = await Promise.all(
-      level.map((it) => (it.kind === "walk" ? Promise.all([read(it.a), read(it.b)]) : read(it.tree).then((e) => [e, [] as readonly TreeEntry[]] as const))),
-    );
+    const ahead = new Map<number, Promise<readonly [readonly TreeEntry[], readonly TreeEntry[]]>>();
+    let started = 0;
     const next: Item[] = [];
     for (let k = 0; k < level.length; k++) {
+      while (started < level.length && started < k + window) {
+        const p = fetchItem(level[started]!);
+        p.catch(() => undefined); // an abandoned read must not become an unhandled rejection
+        ahead.set(started, p);
+        started++;
+      }
       const it = level[k]!;
-      const [ea, eb] = trees[k]!;
+      const [ea, eb] = await ahead.get(k)!;
+      ahead.delete(k);
       stats.entries += ea.length + eb.length;
       if (stats.entries > b.maxEntries) return { kind: "too-large", bound: "entries", limit: b.maxEntries, stats };
       if (it.kind === "all") {
