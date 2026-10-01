@@ -23,7 +23,7 @@ import { digestJson } from "../../src/crypto.ts";
 import type { Room } from "../../src/index.ts";
 import { createSchema } from "../../src/store.ts";
 import { cursor } from "../../src/reads.ts";
-import { MemoryLogPublisher } from "../../src/memory/log.ts";
+import { LogPublisher } from "@generalbusiness/artroom-log";
 import { delegableBy } from "../../src/roster.ts";
 import {
   addMember,
@@ -39,6 +39,7 @@ import {
   makeRoom,
   newKeyPair,
   pushChange,
+  openedWorkspace,
   tick,
   type TestRoom,
 } from "./support.ts";
@@ -64,8 +65,8 @@ describe("1. recovery accepts only the confirmed parent or the exact pending com
     it(`a foreign commit with identical entry lines but a different ${changed} is refused; nothing advances; the ref is never forced`, async () => {
       const r = await makeRoom();
       const own = await lostReplies(r);
-      const original = r.world.log.commits.get(own)!;
-      const files: Record<string, string> = { ...original.files };
+      const files: Record<string, string> = Object.fromEntries(await r.world.log.files(own));
+      const parent = r.world.artifacts.parents(own)[0] ?? null;
       if (changed === "checkpoint") {
         const cp = JSON.parse(
           files["artroom-log/v1/checkpoint.json"]!,
@@ -77,13 +78,7 @@ describe("1. recovery accepts only the confirmed parent or the exact pending com
       }
       if (changed === "retained")
         files[`artroom-log/v1/inputs/${"0".repeat(64)}.json`] = "{}";
-      const foreign = "f".repeat(40) as never;
-      r.world.log.commits.set(foreign, {
-        ...original,
-        files,
-        parent:
-          changed === "parent" ? ("e".repeat(40) as never) : original.parent,
-      });
+      const foreign = r.world.log.write(files, changed === "parent" ? ("e".repeat(40) as never) : parent);
       r.world.log.ref = foreign;
       expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
       expect((await r.admin.read({ q: "log" })).publishedThrough).toBe(-1);
@@ -101,12 +96,12 @@ describe("1. recovery accepts only the confirmed parent or the exact pending com
   it("a publisher whose confirmed commit is not the expected one is not sealed (its serialization must match commitFor)", async () => {
     const r = await makeRoom();
     await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
-    const real = MemoryLogPublisher.prototype.commitFor;
-    MemoryLogPublisher.prototype.commitFor = () => "d".repeat(40) as never;
+    const real = LogPublisher.prototype.commitFor;
+    LogPublisher.prototype.commitFor = () => "d".repeat(40) as never;
     try {
       expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
     } finally {
-      MemoryLogPublisher.prototype.commitFor = real;
+      LogPublisher.prototype.commitFor = real;
     }
     expect((await r.admin.read({ q: "log" })).publishedThrough).toBe(-1);
     expect(events(await entries(r), "checkpoint")).toEqual([]);
@@ -135,62 +130,29 @@ const events = (log: LogEntry[], type: string) =>
 describe("2. a workspace is fenced by the lease's deadline, not only its generation (R-WS-2, R-LANE-8)", () => {
   it("a lease that runs out during fork creation, with no generation change, fails the op, and the expiry is sealed", async () => {
     const r = await makeRoom();
-    const c = await r.admin.ok<Claim>("claim", null, {
-      goal: "g",
-      scope: ["src/**"],
-    });
-    const id = "op_ws_2_1";
-    await inside(r, (room) =>
-      room.core.sql.all(
-        "INSERT INTO workspaces (id, lane, lease_gen, state, body, updated_ms) VALUES (?, ?, 1, 'pending', ?, ?)",
-        id,
-        c.lane,
-        JSON.stringify({
-          id,
-          kind: "workspace",
-          state: "pending",
-          lane: c.lane,
-          updatedAt: iso(clock.now),
-        }),
-        clock.now,
-      ),
-    );
-    const real = r.world.artifacts.ensureFork.bind(r.world.artifacts);
-    r.world.artifacts.ensureFork = async (lane) => {
-      const out = await real(lane);
-      advance(1800 * 1000 + 1);
-      return out;
-    };
+    const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    const id = await openedWorkspace(r, c.lane);
+    // The lease's deadline passes while Artifacts creates the fork.
+    r.world.artifacts.on("fork", () => advance(1800 * 1000 + 1));
     await tick(r);
-    expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({
-      state: "failed",
-    });
-    // The expiry is sealed by the same alarm run, not left for the next one.
+    // The provision fails (no token can fit in the lease), and the same alarm run seals the expiry and ends the
+    // lease's workspace: the operation is gone from the view.
+    expect((await failure(r.stub.read(await r.admin.session(), { q: "op", op: id as never }))).code).toBe("not-found");
+    // No token for the lease was minted.
+    expect(r.world.artifacts.remoteCalls.get("createToken") ?? 0).toBe(0);
     expect(events(await entries(r), "lease-expired").length).toBe(1);
     await tick(r);
     expect(events(await entries(r), "lease-expired").length).toBe(1);
-    expect(await r.admin.read({ q: "lane", lane: c.lane })).toMatchObject({
-      state: "unheld",
-      why: "expired",
-    });
+    expect(await r.admin.read({ q: "lane", lane: c.lane })).toMatchObject({ state: "unheld", why: "expired" });
   });
 
   it("a lease already past its deadline before the resume creates no fork", async () => {
     const r = await makeRoom();
-    const c = await r.admin.ok<Claim>("claim", null, {
-      goal: "g",
-      scope: ["src/**"],
-    });
-    await inside(r, (room) =>
-      room.core.sql.all(
-        "INSERT INTO workspaces (id, lane, lease_gen, state, body, updated_ms) VALUES ('op_ws_2_1', ?, 1, 'pending', '{}', ?)",
-        c.lane,
-        clock.now,
-      ),
-    );
+    const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    await openedWorkspace(r, c.lane);
     advance(1800 * 1000 + 1);
     await inside(r, (room) => room.core.resumeWorkspaces());
-    expect(r.world.artifacts.calls.get("ensureFork") ?? 0).toBe(0);
+    expect(r.world.artifacts.remoteCalls.get("fork") ?? 0).toBe(0);
   });
 });
 
@@ -526,6 +488,9 @@ describe("5. durable storage upgrades through versioned migrations", () => {
           grant.id,
         );
         sql.all("DROP TABLE schema_version");
+        // ws_leases and land_reeval came with phase 2b (version 6); a store from these revisions has neither.
+        sql.all("DROP TABLE ws_leases");
+        sql.all("DROP TABLE land_reeval");
         createSchema(sql);
         createSchema(sql);
       });
@@ -552,12 +517,15 @@ describe("5. durable storage upgrades through versioned migrations", () => {
           )[0]!["kinds"] as string,
         ),
         version: room.core.sql.all("SELECT v FROM schema_version")[0]!["v"],
+        workspace: room.core.sql.all("SELECT state FROM ws_leases WHERE lane = ? AND lease_gen = 1", c.lane)[0]?.["state"],
       }));
       expect(migrated).toEqual({
         admission: { teams: [], author: true },
         attempts: 0,
         kinds: delegableBy("member"),
-        version: 5,
+        version: 6,
+        // The previous revision's workspace is recorded as ended; lane B sweeps its fork when the holder opens it again.
+        workspace: "ended",
       });
       expect(
         (await r.admin.read({
@@ -565,10 +533,9 @@ describe("5. durable storage upgrades through versioned migrations", () => {
           ref: { lane: c.lane, generation: 1 },
         }))!.obligations.find((o) => o.id === "obl_rv")!.state,
       ).toBe("open");
+      const reopened = expectOk(await r.admin.request<{ id: string }>({ kind: "workspace", lane: c.lane, lease: 1 }));
       await tick(r);
-      expect(
-        await r.admin.read({ q: "op", op: "op_ws_2_1" as never }),
-      ).toMatchObject({ state: "ready" });
+      expect(await r.admin.read({ q: "op", op: reopened.id as never })).toMatchObject({ state: "ready" });
       // New items are placed after the migrated ones.
       r.world.log.foreignWrite();
       await failure(r.stub.publishLog());

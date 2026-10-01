@@ -385,7 +385,7 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
       return { head: { inFork }, diff, main, config, since };
     }
     if (env.kind === "check") return { tree: await a.treeOf((env.body as CheckBody).integration) };
-    if (env.kind === "land" && core.landing.main() === null) await core.landing.refreshMain();
+    if (env.kind === "land" && core.landing.core.main() === null) await core.landing.refreshMain();
     return {};
   } catch (e) {
     void e;
@@ -513,7 +513,12 @@ function renewEffect(ctx: Ctx, lane: LaneRow): Effect {
 }
 
 function renewLease(ctx: Ctx, lane: LaneId): void {
-  ctx.core.sql.all("UPDATE lanes SET expires_ms = ? WHERE id = ? AND state = 'held'", ctx.now + ctx.core.leaseMs, lane);
+  const core = ctx.core;
+  const expires = ctx.now + core.leaseMs;
+  core.sql.all("UPDATE lanes SET expires_ms = ? WHERE id = ? AND state = 'held'", expires, lane);
+  // Lane B's workspace keeps the lease's deadline: a token is never minted past it (R-CRED-8).
+  const l = laneRow(core.sql, lane);
+  if (l?.state === "held" && one(core.sql, "SELECT 1 AS x FROM ws_leases WHERE lane = ? AND lease_gen = ? AND state = 'open'", lane, l.leaseGen)) core.workspaces.open(lane, l.leaseGen, expires);
 }
 
 function recordBase<K extends ActRecord["kind"]>(ctx: Ctx, entry: LogEntry, id: ActId, kind: K, receipt: Receipt) {
@@ -1087,7 +1092,7 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
         JSON.stringify({ authority: ctx.authority, admission, body }),
       );
       const op = core.activeLandOp(laneId);
-      if (op) core.landing.evaluate(op);
+      if (op) core.requestEvaluation(op);
       const c: Check = {
         ...recordBase(ctx, entry, id, "check", receiptOf(entry)),
         lane: laneId,
@@ -1336,7 +1341,10 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
                   keys.add(initiator.key);
                   if (initiator.via === "delegation") keys.add(initiator.grantor);
                 }
-                if (keys.has(op.key) && core.landing.abort(id, op.key, seq)) abortAttempt = held.id;
+                if (keys.has(op.key) && core.landing.abort(id, op.key, seq)) {
+                  abortAttempt = held.id;
+                  core.run("abort");
+                }
               }
             }
             // R-REV-8: completed landings that relied on the key go to the admins.

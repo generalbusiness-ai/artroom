@@ -11,7 +11,7 @@ import { roomIdOf } from "../../src/ids.ts";
 import { hex } from "../../src/crypto.ts";
 import { roomSeed } from "../../src/founding.ts";
 import { runInDurableObject } from "cloudflare:test";
-import { advance, b64url, call, clock, day, grant, iso, logOf, makeRoom, newKeyPair, operator, randomBytes, sign, worldFor, type World } from "./support.ts";
+import { advance, b64url, call, clock, day, grant, iso, logOf, makeRoom, newKeyPair, operator, randomBytes, sign, placeRepo, worldFor, type World } from "./support.ts";
 import type { Registry, Room } from "../../src/index.ts";
 
 const base = "https://artroom.test/v1/rooms";
@@ -57,6 +57,7 @@ async function foundImport(repo: string, opts: { admin?: ReturnType<typeof newKe
 /** Give the room its own in-memory Artifacts world before it is founded, with main holding files. */
 function prepareWorld(genesis: Genesis): World {
   const world = worldFor(roomIdOf(genesis));
+  placeRepo(world, genesis.repo);
   world.artifacts.main = world.artifacts.commit(null, { "README.md": "# imported\n" });
   return world;
 }
@@ -75,7 +76,9 @@ describe("R-GEN-10, R-GEN-12: public founding", () => {
     expect(f.status).toBe(200);
     const { room } = (await f.json()) as { room: RoomId };
     expect(room).toBe(roomIdOf(drafted.genesis));
-    expect(world.artifacts.created.has(drafted.genesis.repo)).toBe(true);
+    // Created in the deployment's Artifacts namespace, under the identity's name.
+    expect(world.artifacts.namespace).toBe("artroom-public");
+    expect(world.artifacts.repos.has(drafted.genesis.repo.split("/")[1]!)).toBe(true);
     expect(await reg().byRepo(drafted.genesis.repo)).toEqual({ repo: drafted.genesis.repo, room, name: drafted.genesis.name });
     const again = await post("/found", body);
     expect(((await again.json()) as { room: RoomId }).room).toBe(room);

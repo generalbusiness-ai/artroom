@@ -26,7 +26,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { submit } from "./admission.ts";
-import { alarmTime, clock, portsFor, type RoomEnv } from "./config.ts";
+import { alarmTime, clock, servicesFor, type RoomEnv } from "./config.ts";
 import { RoomCore } from "./core.ts";
 import { checkGenesis } from "./founding.ts";
 import { registry } from "./registry.ts";
@@ -55,7 +55,7 @@ export class Room extends DurableObject<RoomEnv> {
     };
     this.core = new RoomCore({
       sql,
-      ports: portsFor(env, ctx.id.toString()),
+      services: servicesFor(env, ctx.id.toString()),
       clock,
       leaseMs: Number(env.LEASE_SECONDS ?? "1800") * 1000,
       defer: (p) => ctx.waitUntil(p),

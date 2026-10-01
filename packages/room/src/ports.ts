@@ -2,11 +2,11 @@
  * The Room's ports: small interfaces for the work it does not do itself.
  *
  * - `PolicyPort`: evaluates policy rules (lane C's package).
- * - `LandingPort` and `LandingHost`: the landing engine (lane B's package)
- *   and the Room's side of it. They match lane B's `Landing` class and its
- *   `LandingRoom` interface, so the adapter is a constructor call.
- * - `ArtifactsPort`: forks, tokens, heads, diffs, previews and the log ref
- *   (Cloudflare Artifacts, through lane B's helpers).
+ * - `LandingPort` and `LandingHost`: lane B's `Landing` engine and its
+ *   `LandingRoom` interface, hosted on the Room's SQLite.
+ * - `ArtifactsPort`: the canonical repository, heads, diffs, previews and
+ *   snapshots (Cloudflare Artifacts, through lane B's helpers).
+ * - `PublisherPort`: lane L's `LogPublisher`.
  *
  * The Room keeps every platform rule itself: authority, roles, lanes and
  * leases, obligations from `.artroom/**`, custody, idempotency, secrets and
@@ -15,39 +15,29 @@
 
 import type { CarryFacts, InputOf, ObligationSpec } from "@generalbusiness/artroom-policy";
 import type {
-  ActId,
   Carried,
   Checkpoint,
   CheckerConfig,
   Decision,
   Digest,
-  FailReason,
-  Generation,
-  KeyId,
-  LandOp,
+  Glob,
   LaneId,
   LogEntry,
   LanePurpose,
-  LeaseGeneration,
   NotifyDirectory,
   MemberId,
   NotCarried,
-  ObligationId,
   OpId,
   PathChange,
-  PinnedRef,
   PolicyDocument,
   PolicyVersion,
   ProfileStamp,
-  PublicationSlot,
   Refusal,
   RepoPath,
   ReplayContext,
   RetainedLandInput,
-  RetryReason,
   Seq,
   Sha,
-  SystemEvent,
   TeamId,
 } from "@generalbusiness/artroom-contract";
 
@@ -134,91 +124,16 @@ export interface PolicyPort {
 // ------------------------------------------------------------------ landing
 
 /** The synchronous SQLite surface (lane B's `Sql`). */
-export type SqlValue = string | number | null;
-export type SqlRow = Record<string, SqlValue>;
-export interface Sql {
-  all(query: string, ...bindings: SqlValue[]): SqlRow[];
-  /** Run `fn` atomically; a throw rolls back. Nesting is allowed. */
-  transaction<T>(fn: () => T): T;
-}
-
-/** The lane as the Room sees it now (lane B's `LaneFacts`). */
-export interface LaneFacts {
-  readonly generation: Generation;
-  readonly head: Sha | null;
-  readonly leaseGeneration: LeaseGeneration;
-  readonly holder: "held" | "released" | "expired";
-}
-
-/** The landing operation fields the Room reads (a subset of lane B's `LandRecord`). */
-export interface LandRecordLike {
-  readonly id: OpId;
-  readonly lane: LaneId;
-  readonly generation: Generation;
-  readonly head: Sha;
-  readonly act: ActId;
-  readonly leaseGeneration: LeaseGeneration;
-  readonly policyVersion: PolicyVersion;
-  readonly integration?: Sha;
-  readonly evidence?: readonly ActId[];
-  readonly landInput?: Digest | null;
-}
-
-/** Lane B's `Readiness`. */
-export type Readiness =
-  | { readonly kind: "ready"; readonly evidence: readonly ActId[]; readonly landInput: Digest | null }
-  | { readonly kind: "waiting"; readonly obligations: readonly ObligationId[] }
-  | { readonly kind: "failed"; readonly reason: FailReason }
-  | { readonly kind: "retry"; readonly reason: RetryReason; readonly fix: string };
+export type { Sql, SqlRow, SqlValue } from "@generalbusiness/artroom-git";
 
 /**
- * The Room's side of the landing operation (lane B's `LandingRoom`). Every
- * method is synchronous and runs inside the engine's SQLite transaction.
+ * The landing engine is lane B's `Landing`, hosted on the Room's SQLite.
+ * The Room's side of it is lane B's `LandingRoom`: `lane`, `policyVersion`,
+ * `revalidate` and `record` are synchronous and run inside the engine's
+ * transactions; `readiness` may await (policy evaluation, hashing).
  */
-export interface LandingHost {
-  lane(lane: LaneId): LaneFacts | null;
-  policyVersion(): PolicyVersion;
-  revalidate(op: LandRecordLike): { readonly reason: RetryReason; readonly fix: string } | null;
-  readiness(op: LandRecordLike, integration: Sha): Readiness;
-  revertScope(op: LandRecordLike): readonly RepoPath[];
-  /** Seal a system event in the caller's transaction. */
-  record(event: SystemEvent): { readonly seq: Seq; readonly act: ActId };
-}
-
-/** What `accept` needs (lane B's `AcceptInput`). */
-export interface AcceptInput {
-  readonly id: OpId;
-  readonly lane: LaneId;
-  readonly generation: Generation;
-  readonly head: Sha;
-  readonly act: ActId;
-  readonly leaseGeneration: LeaseGeneration;
-  readonly policyVersion: PolicyVersion;
-}
-
-/**
- * The landing engine (lane B's `Landing`). `accept`, `laneChanged`,
- * `policyActivated`, `abort`, `evaluate` and `after` are synchronous and are
- * called inside the Room's transactions. `reconcile` is the alarm's work.
- */
-export interface LandingPort {
-  accept(input: AcceptInput): LandRecordLike | Refusal;
-  laneChanged(lane: LaneId, reason: RetryReason, fix?: string): readonly LandRecordLike[];
-  policyActivated(version: PolicyVersion): readonly OpId[];
-  abort(trigger: ActId, key: KeyId, at: Seq): LandRecordLike | null;
-  evaluate(id: OpId): LandRecordLike | null;
-  after(): { readonly op: OpId; readonly reservedAt: Seq } | null;
-  view(id: OpId): LandOp | null;
-  slot(): PublicationSlot;
-  activeViews(): readonly LandOp[];
-  nextDue(): number | null;
-  /** Main as last recorded, or null before the first read. */
-  main(): Sha | null;
-  refreshMain(): Promise<Sha>;
-  reconcile(): Promise<void>;
-}
-
-export type LandingFactory = (sql: Sql, host: LandingHost) => LandingPort;
+export type { AcceptInput, LaneFacts, LandRecord, LandingRoom as LandingHost, Readiness } from "@generalbusiness/artroom-git";
+export type { Landing as LandingPort } from "@generalbusiness/artroom-git";
 
 // ---------------------------------------------------------------- artifacts
 
@@ -233,71 +148,66 @@ export type DiffResult =
   | { readonly kind: "ok"; readonly base: Sha; readonly changed: readonly PathChange[] }
   | { readonly kind: "too-large"; readonly base: Sha };
 
+/**
+ * A merge preview. `integration` is the head itself for a fast-forward; for
+ * a merge, lane B's planner builds no commit (a disjoint merge is decided by
+ * paths, an overlapping one yields a tree), so it is null (contract gap:
+ * `PreviewOp.clean` requires an integration).
+ */
 export type PreviewResult =
-  | { readonly kind: "clean"; readonly base: Sha; readonly integration: Sha }
+  | { readonly kind: "clean"; readonly base: Sha; readonly integration: Sha | null }
   | { readonly kind: "conflict"; readonly base: Sha; readonly paths: readonly RepoPath[] };
 
 /**
- * Artifacts and git. Every method may throw; the Room turns a failure into
- * `ArtroomError` `unavailable` and records nothing (R-PROP-1).
+ * The canonical repository and lane forks, through the Artifacts binding
+ * and lane B's helpers (`artifacts.ts`). Every method may throw; the Room
+ * turns a failure into `ArtroomError` `unavailable` and records nothing
+ * (R-PROP-1). Workspaces (forks and their tokens) are lane B's
+ * `Workspaces`, hosted by the Room directly.
  */
 export interface ArtifactsPort {
-  /** Create the room's repository for a public founding (R-GEN-12). Idempotent: an existing one can only be this founding's own. */
-  createRepo(identity: string): Promise<void>;
+  /** Create the room's repository for a public founding (R-GEN-12). An existing one can only be this founding's own. */
+  createRepo(): Promise<void>;
+  /** The canonical repository's git remote. */
+  canonicalRemote(): Promise<string>;
   readMain(): Promise<Sha | null>;
   readConfig(commit: Sha): Promise<ArtroomConfig>;
   treeOf(commit: Sha): Promise<Sha | null>;
-  /** Create the lane's fork if needed. Idempotent. */
-  ensureFork(lane: LaneId): Promise<{ readonly remote: `https://${string}` }>;
-  /** A write token for the lane's fork, expiring no later than `expiresAt` (R-CRED-8). */
-  mintForkToken(lane: LaneId, lease: LeaseGeneration, expiresAt: number): Promise<{ readonly id: string; readonly token: string; readonly expiresAt: number }>;
-  revokeForkToken(lane: LaneId, id: string): Promise<void>;
-  /** Is `head` reachable in the lane's fork (R-PROP-1)? */
+  /** Is `head` in the lane's fork (R-PROP-1)? */
   headInFork(lane: LaneId, head: Sha): Promise<boolean>;
   /** Copy the head's objects to `refs/artroom/objects/<head>` (R-PROP-1 step 1). Idempotent. */
   pinObjects(lane: LaneId, head: Sha): Promise<void>;
-  /** Create the pinned ref (R-PROP-1 step 2). Idempotent; never moves an existing ref. */
-  pinRef(ref: PinnedRef, head: Sha): Promise<void>;
+  /** Create the pinned ref `refs/artroom/heads/<lane>/<generation>` (R-PROP-1 step 2). Never moves an existing ref. */
+  pinRef(lane: LaneId, generation: number, head: Sha): Promise<void>;
   /** Changed paths from the merge base of main and head, to head, bounded (R-PROP-3, R-PROP-6). */
   diff(main: Sha | null, head: Sha): Promise<DiffResult>;
   /** Paths changed between two heads, old and new, for carrying; null when too large. */
   changedBetween(from: Sha, to: Sha): Promise<readonly RepoPath[] | null>;
-  /** A merge preview of head onto main (R-PROP-7). */
-  preview(head: Sha, main: Sha | null): Promise<PreviewResult>;
+  /** A merge preview of a pinned generation onto main (R-PROP-7). */
+  preview(lane: LaneId, generation: number, head: Sha, main: Sha | null): Promise<PreviewResult>;
+  /**
+   * The filtered snapshot of a commit for a scoped checker: the digest of the
+   * `[path, mode, blob]` triples matching `inputs` (R-CARRY-9); null when the
+   * tree is over the diff bounds.
+   */
+  snapshot(commit: Sha, inputs: readonly Glob[]): Promise<{ readonly digest: Digest; readonly files: number } | null>;
 }
 
 // ---------------------------------------------------------------- log publication
 
-/** A retained file for a log commit: a replay context (`input`) or a policy or checker document (`policy`). */
-export interface RetainedFile {
-  readonly kind: "input" | "policy";
-  /** Canonical JSON text; its digest names the file. */
-  readonly body: string;
-}
+/** A retained file for a log commit (lane L's `Retained`). */
+export type { Retained as RetainedFile } from "@generalbusiness/artroom-log";
+import type { Retained as RetainedFile } from "@generalbusiness/artroom-log";
 
 /**
- * Publication of the log (R-LOG-8), shaped like lane L's `LogPublisher`, so
- * `LogPublisher.open(remote)` is the adapter. `publish` is deterministic: the
- * same entries, checkpoint and retained files always give the same commit.
- * It pushes with a lease on the previous log commit, reads the ref back after
- * an unclear answer, completes forward, never forces, and returns only once
- * the ref is confirmed at the new commit. Failures are thrown with a `code`:
- * `would-rewrite`, `invalid-input`, `unexpected-writer` or `unresolved`; any
- * other throw is a transport failure. The Room keeps the pending cohort
- * durable, so a retry, even after a restart, passes the same input.
+ * Publication of the log (R-LOG-8): lane L's `LogPublisher`, opened over a
+ * git remote for the canonical repository. The Room keeps the pending cohort
+ * durable, stores the exact commit (`commitFor`) before any remote write,
+ * and accepts a read-back only at the confirmed parent or at that commit.
  */
 export interface PublisherPort {
-  /** The last entry the ref is known to publish, or -1. */
   readonly publishedThrough: Seq;
   readonly head: Sha | null;
-  /**
-   * The exact commit `publish` would write for this cohort on top of
-   * `parent`: pure, synchronous and deterministic, with the publisher's own
-   * git serialization. The Room stores it before any remote write and accepts
-   * a read-back only at the confirmed parent or at this commit (review
-   * 8faa2ef9). Lane L's `LogPublisher` builds this commit inside `publish`;
-   * exposing it as this method is the adapter's one requirement.
-   */
   commitFor(parent: Sha | null, entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly RetainedFile[]): Sha;
   publish(
     entries: readonly LogEntry[],
@@ -306,12 +216,43 @@ export interface PublisherPort {
   ): Promise<{ readonly commit: Sha; readonly through: Seq; readonly hash: Digest; readonly publishedThrough: Seq }>;
 }
 
-// ---------------------------------------------------------------- all ports
+// ---------------------------------------------------------------- remotes
 
+/**
+ * What a deployment gives a Room: the Artifacts binding for its namespace,
+ * the publisher sandbox, and the git remote for the log ref. The Room
+ * builds the real adapters over them: its `ArtifactsAdapter`, lane B's
+ * `Landing`, `Workspaces` and `ContainerPublisher`, and lane L's
+ * `LogPublisher`. Tests give fake remotes (`memory/artifacts.ts`).
+ */
+export interface Remotes {
+  readonly artifacts: import("./artifacts.ts").ArtifactsBinding;
+  /** The Artifacts namespace the binding reaches. A repository identity in any other namespace is unavailable here. */
+  readonly namespace: string;
+  /** The room's publisher sandbox (lane B's Publisher Durable Object). */
+  readonly publisher: import("@generalbusiness/artroom-git").PublisherStub;
+  /** Lane L's git remote for `refs/artroom/log` on the room's repository. */
+  readonly logRemote: (repo: import("./artifacts.ts").RepoLocation) => Promise<import("@generalbusiness/artroom-log").GitRemote>;
+  /** Waits between remote retries. Tests make them instant. */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** Diff bounds (R-PROP-6), when not lane B's defaults. */
+  readonly bounds?: Partial<import("@generalbusiness/artroom-git").DiffBounds>;
+  /** Tests only: wrap the Artifacts adapter, to count calls or fail one at the port. */
+  readonly wrapArtifacts?: (a: ArtifactsPort) => ArtifactsPort;
+  /** Tests only: lane B's landing fault points. */
+  readonly landingFault?: (point: import("@generalbusiness/artroom-git").FaultPoint, op: OpId) => void;
+}
+
+/** What the Room is given: the policy runtime and the remotes. */
+export interface RoomServices {
+  readonly policy: PolicyPort;
+  readonly remotes: Remotes;
+}
+
+/** The ports the Room's code uses, built by the Room over its services. */
 export interface Ports {
   readonly policy: PolicyPort;
   readonly artifacts: ArtifactsPort;
-  readonly landing: LandingFactory;
   /** Open (or resume from the ref) the log publisher. */
   readonly log: () => Promise<PublisherPort>;
 }

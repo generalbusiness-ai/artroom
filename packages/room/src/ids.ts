@@ -8,7 +8,6 @@ import type {
   Generation,
   Genesis,
   LaneId,
-  LeaseGeneration,
   OpId,
   PinnedRef,
   RoomId,
@@ -57,7 +56,6 @@ export function roomIdOf(genesis: Genesis): RoomId {
 export const opIds = {
   land: (seq: Seq): OpId => `op_land_${seq}`,
   preview: (seq: Seq): OpId => `op_preview_${seq}`,
-  workspace: (laneSeq: Seq, lease: LeaseGeneration): OpId => `op_ws_${laneSeq}_${lease}`,
 };
 
 /** The pinned ref for one generation (R-PROP-1, R-PROP-2). */

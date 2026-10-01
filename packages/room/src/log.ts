@@ -10,16 +10,13 @@
 import type {
   ActId,
   Checkpoint,
-  Digest,
   EntryContent,
-  Genesis,
   KeyId,
   LaneId,
   LogEntry,
   MemberId,
   RoomId,
   Seq,
-  Sha,
 } from "@generalbusiness/artroom-contract";
 import { canonicalize } from "./canonical.ts";
 import { digestJson, sign } from "./crypto.ts";
@@ -105,45 +102,9 @@ export function entryCount(sql: Sql): number {
 
 // ------------------------------------------------------------ publication
 
-/** `first` is 12 decimal digits, zero-padded (R-LOG-9). */
-export function segmentName(first: Seq): string {
-  return `artroom-log/v1/segments/${String(first).padStart(12, "0")}.jsonl`;
-}
-
 /** The checkpoint for entries through `through` (R-LOG-8 step 2). It names no commit. */
 export function checkpoint(room: RoomId, roomKey: KeyId, seed: Uint8Array, through: LogEntry, at: string): Checkpoint {
   const unsigned = { format: "artroom-log-v1" as const, room, through: through.seq, hash: through.hash, at, roomKey };
   return { ...unsigned, sig: sign(seed, "artroom-checkpoint-v1", unsigned) };
 }
 
-/**
- * The files of one log commit (R-LOG-9): genesis, segments of 1,000 canonical
- * entries, retained inputs and policies, and the checkpoint. A full segment
- * is identical in every later commit.
- */
-export function publicationFiles(
-  genesis: Genesis,
-  entries: readonly LogEntry[],
-  retained: readonly { readonly digest: Digest; readonly kind: string; readonly body: string }[],
-  cp: Checkpoint,
-): Record<string, string> {
-  const files: Record<string, string> = {};
-  files["artroom-log/v1/genesis.json"] = canonicalize(genesis);
-  for (let first = 0; first < entries.length; first += 1000) {
-    files[segmentName(first)] = entries
-      .slice(first, first + 1000)
-      .map((e) => canonicalize(e))
-      .join("\n");
-  }
-  for (const r of retained) {
-    const dir = r.kind === "input" ? "inputs" : "policies";
-    files[`artroom-log/v1/${dir}/${r.digest.slice(7)}.json`] = r.body;
-  }
-  files["artroom-log/v1/checkpoint.json"] = canonicalize(cp);
-  return files;
-}
-
-export interface PublishState {
-  readonly lastCommit: Sha | null;
-  readonly publishedThrough: Seq;
-}

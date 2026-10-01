@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 import type { Genesis } from "@generalbusiness/artroom-contract";
 import { entryId, opIds, parseEntryId, pinnedRef, roomIdOf } from "../../src/ids.ts";
-import { segmentName } from "../../src/log.ts";
 import { digestJson } from "../../src/crypto.ts";
 
 describe("identifiers", () => {
@@ -33,12 +32,6 @@ describe("identifiers", () => {
   it("R-ID-8 operation IDs and the pinned ref", () => {
     expect(opIds.land(17)).toBe("op_land_17");
     expect(opIds.preview(9)).toBe("op_preview_9");
-    expect(opIds.workspace(7, 2)).toBe("op_ws_7_2");
     expect(pinnedRef("act_7_0c1d2e3f", 2)).toBe("refs/artroom/heads/act_7_0c1d2e3f/2");
-  });
-
-  it("R-LOG-9 segment names are 12 zero-padded digits", () => {
-    expect(segmentName(0)).toBe("artroom-log/v1/segments/000000000000.jsonl");
-    expect(segmentName(1000)).toBe("artroom-log/v1/segments/000000001000.jsonl");
   });
 });

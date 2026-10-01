@@ -11,7 +11,8 @@ import type { Room } from "../../src/index.ts";
 import type { Claim, Explanation, LogEntry, Note, PolicyDocument, Sha, SystemEvent, Update } from "@generalbusiness/artroom-contract";
 import { policy, rule } from "@generalbusiness/artroom-policy/helpers";
 import { digestJson } from "../../src/crypto.ts";
-import { verifyLogFiles } from "../../src/verify.ts";
+import { verifyLog, type GitReader } from "@generalbusiness/artroom-log";
+import { artifactsErrors } from "../../src/memory/artifacts.ts";
 import { addMember, advance, call, expectOk, makeRoom, tick, type TestRoom } from "./support.ts";
 
 const notifying = (): PolicyDocument =>
@@ -57,23 +58,29 @@ describe("section 23, Log construction (R-LOG-2, R-LOG-8, R-LOG-12, R-LOG-13)", 
     // Steps 11 to 13: the second publication; its parent is the first.
     const p2 = (await call<{ through: number; commit: Sha }>(room.stub.publishLog()))!;
     expect(p2.through).toBe(9);
-    const c1 = room.world.log.commits.get(p1.commit)!;
-    const c2 = room.world.log.commits.get(p2.commit)!;
-    expect(c2.parent).toBe(p1.commit);
+    const c1 = await room.world.log.files(p1.commit);
+    const c2 = await room.world.log.files(p2.commit);
+    expect(room.world.artifacts.parents(p2.commit)).toEqual([p1.commit]);
     expect(room.world.log.ref).toBe(p2.commit);
-    const seg1 = c1.files["artroom-log/v1/segments/000000000000.jsonl"]!.split("\n");
-    const seg2 = c2.files["artroom-log/v1/segments/000000000000.jsonl"]!.split("\n");
+    const seg1 = c1.get("artroom-log/v1/segments/000000000000.jsonl")!.split("\n");
+    const seg2 = c2.get("artroom-log/v1/segments/000000000000.jsonl")!.split("\n");
     expect(seg1.length).toBe(4);
     expect(seg2.length).toBe(10);
     expect(seg2.slice(0, 4)).toEqual(seg1);
-    // "artroom verify" (the offline checks of R-LOG-10) accepts both commits.
-    const v1 = await verifyLogFiles(c1.files);
-    expect(v1).toEqual({ ok: true, problems: [], through: 3 });
-    const v2 = await verifyLogFiles(c2.files, new Map([[p1.commit, c1.files]]));
-    expect(v2).toEqual({ ok: true, problems: [], through: 9 });
+    // `artroom verify` (lane L's verifyLog, with policy replay, R-LOG-10) accepts the log at each commit.
+    const repo = room.world.artifacts.canonicalRepo();
+    const at = (ref: Sha): GitReader => ({ readObject: (sha) => repo.readObject(sha), readRef: async () => ref });
+    const v1 = await verifyLog(at(p1.commit));
+    expect(v1).toMatchObject({ ok: true, failures: [], verifiedThrough: 3, publishedThrough: 3 });
+    const v2 = await verifyLog(at(p2.commit));
+    expect(v2).toMatchObject({ ok: true, failures: [], verifiedThrough: 9, publishedThrough: 9, commits: 2 });
+    expect(v2.decisionsReplayed).toBeGreaterThan(0);
     // A tampered entry fails verification.
-    const tampered = { ...c2.files, "artroom-log/v1/segments/000000000000.jsonl": seg2.map((l: string, i: number) => (i === 5 ? l.replace("note 0", "note X") : l)).join("\n") };
-    expect((await verifyLogFiles(tampered, new Map([[p1.commit, c1.files]]))).ok).toBe(false);
+    const files = Object.fromEntries(c2);
+    files["artroom-log/v1/segments/000000000000.jsonl"] = seg2.map((l: string, i: number) => (i === 5 ? l.replace("note 0", "note X") : l)).join("\n");
+    const tampered = room.world.log.write(files, p1.commit);
+    for (const o of room.world.artifacts.closure(tampered)) repo.objects.add(o);
+    expect((await verifyLog(at(tampered))).ok).toBe(false);
     expect((await room.admin.read({ q: "log" })).publishedThrough).toBe(9);
   });
 
@@ -82,7 +89,7 @@ describe("section 23, Log construction (R-LOG-2, R-LOG-8, R-LOG-12, R-LOG-13)", 
     await room.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
     await tick(room);
     const p = (await call<{ commit: Sha }>(room.stub.publishLog()))!;
-    const files = room.world.log.commits.get(p.commit)!.files;
+    const files = Object.fromEntries(await room.world.log.files(p.commit));
     const log = await entries(room);
     const decision = (log[3]!.entry as unknown as { event: { decisions: { input: string }[] } }).event.decisions[0]!;
     const ctx = files[`artroom-log/v1/inputs/${decision.input.slice(7)}.json`];
@@ -163,7 +170,7 @@ describe("R-API reads, cursors and explain", () => {
     const room = await makeRoom();
     const c = expectOk(await room.admin.act<Claim>("claim", null, { goal: "g", scope: ["src/**"] }));
     const ws = expectOk(await room.admin.request<{ id: string }>({ kind: "workspace", lane: c.lane, lease: 1 }));
-    room.world.artifacts.failNext("ensureFork", 1);
+    room.world.artifacts.failRemote("fork", artifactsErrors.notFound());
     const token = await room.admin.session();
     const w = (await room.stub.read(token, { q: "op", op: ws.id as never, until: ["failed"], timeoutMs: 1000 })) as { ok?: { state: string }; error?: { code: string } };
     // The workspace either already failed (the deferred open ran) or the wait times out; both are allowed outcomes of a wait.

@@ -53,7 +53,10 @@ import { iso, roomIdOf } from "./ids.ts";
 import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions } from "./obligations.ts";
-import type { ActivePolicy, Evaluation, LandingHost, LandingPort, LandRecordLike, ObligationSpec, Ports, PublisherPort, Readiness, RetainedFile, Sql } from "./ports.ts";
+import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedFile, RoomServices, Sql } from "./ports.ts";
+import { ContainerPublisher, Landing, Workspaces, canonicalTokens } from "@generalbusiness/artroom-git";
+import { LogPublisher } from "@generalbusiness/artroom-log";
+import { ArtifactsAdapter, locate, type RepoLocation } from "./artifacts.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
@@ -61,7 +64,7 @@ import { matchGlob } from "./glob.ts";
 
 export interface CoreOptions {
   readonly sql: Sql;
-  readonly ports: Ports;
+  readonly services: RoomServices;
   readonly clock: () => number;
   /** Lease length in milliseconds (R-LANE-5). */
   readonly leaseMs: number;
@@ -142,7 +145,12 @@ export class RoomCore {
   readonly defer: (p: Promise<unknown>) => void;
   readonly committed: () => void;
   readonly bound: CoreOptions["bound"];
-  readonly landing: LandingPort;
+  readonly remotes: Remotes;
+  /** Lane B's landing engine, on this room's SQLite. */
+  readonly landing: Landing;
+  private wsCache: Workspaces | null = null;
+  /** The repository identity while `found` runs, before the genesis is stored. */
+  private foundingRepo: string | null = null;
   private chain: Promise<unknown> = Promise.resolve();
   private seedCache: Uint8Array | null = null;
   /** Deferred work already started, so a kick is not repeated. */
@@ -165,7 +173,7 @@ export class RoomCore {
 
   constructor(opts: CoreOptions) {
     this.sql = opts.sql;
-    this.ports = opts.ports;
+    this.remotes = opts.services.remotes;
     this.clock = opts.clock;
     this.leaseMs = opts.leaseMs;
     this.defer = opts.defer;
@@ -175,7 +183,56 @@ export class RoomCore {
       for (const w of [...this.waiters]) w();
     };
     createSchema(this.sql);
-    this.landing = opts.ports.landing(this.sql, this.host());
+    const r = this.remotes;
+    const sleep = r.sleep ? { sleep: r.sleep } : {};
+    const adapter = new ArtifactsAdapter({ binding: r.artifacts, stub: r.publisher, location: () => this.location(), ...(r.bounds ? { bounds: r.bounds } : {}), ...sleep });
+    this.ports = {
+      policy: opts.services.policy,
+      artifacts: r.wrapArtifacts ? r.wrapArtifacts(adapter) : adapter,
+      log: async () => LogPublisher.open(await r.logRemote(this.location())),
+    };
+    // The canonical repository, read when used: a room learns it at founding.
+    const self = this;
+    const canonical = {
+      get name() {
+        return self.location().name;
+      },
+      get remote() {
+        return getMeta(self.sql, "canonical_remote") ?? "";
+      },
+    };
+    this.landing = new Landing({
+      sql: this.sql,
+      room: this.host(),
+      publisher: new ContainerPublisher({ stub: r.publisher, artifacts: r.artifacts, canonical, ...sleep }),
+      tokens: canonicalTokens(() => r.artifacts.get(this.location().name), sleep),
+      now: () => this.now(),
+      ...(r.landingFault ? { fault: r.landingFault } : {}),
+    });
+  }
+
+  /** The room's repository in this deployment's Artifacts namespace (R-GEN-12). */
+  location(): RepoLocation {
+    const identity = this.foundingRepo ?? (this.founded ? this.genesis.repo : null);
+    const loc = identity ? locate(identity, this.remotes.namespace) : null;
+    if (!loc) throw artroomError("unavailable", identity ? "This deployment has no Artifacts binding for the room's repository namespace." : "This room has not been founded.");
+    return loc;
+  }
+
+  /** Lane B's workspaces (forks and lease tokens), on this room's SQLite. */
+  get workspaces(): Workspaces {
+    if (!this.wsCache) {
+      const loc = this.location();
+      this.wsCache = new Workspaces({
+        sql: this.sql,
+        artifacts: this.remotes.artifacts,
+        canonical: loc.name,
+        namespace: loc.namespace,
+        now: () => this.now(),
+        ...(this.remotes.sleep ? { sleep: this.remotes.sleep } : {}),
+      });
+    }
+    return this.wsCache;
   }
 
   // ------------------------------------------------------------ identity
@@ -246,18 +303,26 @@ export class RoomCore {
     let doc: PolicyDocument = this.ports.policy.defaultPolicy();
     let checkers: ActivePolicyFull["checkers"] = {};
     let main: Sha | null = null;
+    let remote: string;
+    this.foundingRepo = genesis.repo;
     try {
-      if (!genesis.onboarding) await this.ports.artifacts.createRepo(genesis.repo);
+      if (!genesis.onboarding) await this.ports.artifacts.createRepo();
       main = await this.ports.artifacts.readMain();
+      remote = await this.ports.artifacts.canonicalRemote();
     } catch {
+      this.foundingRepo = null;
       throw artroomError("unavailable", "The canonical repository could not be created or read. Retry the same found.");
     }
     if (main !== null) {
       const cfg = await this.ports.artifacts.readConfig(main).catch(() => {
+        this.foundingRepo = null;
         throw artroomError("unavailable", "The canonical repository could not be read. Try again.");
       });
       const parsed = this.parseConfig(cfg.policy, cfg.checkers);
-      if (!parsed.ok) throw artroomError("bad-request", `The policy on main is invalid: ${parsed.problems[0]}`);
+      if (!parsed.ok) {
+        this.foundingRepo = null;
+        throw artroomError("bad-request", `The policy on main is invalid: ${parsed.problems[0]}`);
+      }
       if (parsed.doc) doc = parsed.doc;
       checkers = parsed.checkers;
     }
@@ -269,6 +334,7 @@ export class RoomCore {
       setMeta(this.sql, "room_seed", b64url(roomSeed));
       setMeta(this.sql, "recovery", genesis.recovery);
       setMeta(this.sql, "published_through", "-1");
+      setMeta(this.sql, "canonical_remote", remote);
       this.seedCache = roomSeed;
       const at = iso(this.now());
       seal(this.sql, roomSeed, at, { type: "system", event: { type: "genesis", genesis, sig } });
@@ -276,6 +342,7 @@ export class RoomCore {
       this.sql.all("INSERT INTO keys (key, member, custody, added, state) VALUES (?, ?, 'client', 0, 'active')", genesis.admin.key, genesis.admin.handle);
       this.activate(doc, checkers, null, at);
     });
+    this.foundingRepo = null;
     if (main !== null) await this.landing.refreshMain().catch(() => undefined);
     this.committed();
     return this.roomId;
@@ -401,7 +468,7 @@ export class RoomCore {
           this.recordRecomputation(r);
         });
         const op = this.activeLandOp(g.lane);
-        if (op) this.landing.evaluate(op);
+        if (op) this.requestEvaluation(op);
       }
     });
   }
@@ -577,7 +644,9 @@ export class RoomCore {
   kick(key: string, fn: () => Promise<void>): void {
     if (this.inFlight.has(key)) return;
     this.inFlight.add(key);
-    const p = fn()
+    // Started after the caller's synchronous transaction, never inside it.
+    const p = Promise.resolve()
+      .then(fn)
       .catch(() => undefined)
       .finally(() => {
         this.inFlight.delete(key);
@@ -655,7 +724,7 @@ export class RoomCore {
     return {
       lane: (id) => this.laneFacts(id),
       policyVersion: () => getMeta(this.sql, "policy") as PolicyVersion,
-      revalidate: (op) => this.revalidate(op),
+      revalidate: (op, retained) => this.revalidate(op, retained),
       readiness: (op, integration) => this.readiness(op, integration),
       revertScope: (op) => {
         const g = generationRow(this.sql, op.lane, op.generation);
@@ -672,13 +741,13 @@ export class RoomCore {
   }
 
   /** The land act's envelope: what reservation re-judges (R-LAND-7). */
-  landEnvelope(op: LandRecordLike): EntryContent["entry"] | null {
+  landEnvelope(op: LandRecord): EntryContent["entry"] | null {
     const r = one(this.sql, "SELECT body FROM entries WHERE id = ?", op.act);
     return r ? (JSON.parse(str(r, "body")!) as LogEntry).entry : null;
   }
 
   /** R-LAND-7 step 1, the parts only the Room knows. Synchronous, inside the reservation transaction. */
-  revalidate(op: LandRecordLike): { readonly reason: "authority-lost" | "evidence-invalid" | "obligation-open" | "land-input-changed"; readonly fix: string } | null {
+  revalidate(op: LandRecord, retained: RetainedLandInput | null): { readonly reason: "authority-lost" | "evidence-invalid" | "obligation-open" | "land-input-changed"; readonly fix: string } | null {
     const entry = this.landEnvelope(op);
     if (!entry || entry.type !== "act") return { reason: "authority-lost", fix: "Land again." };
     const env = entry.act.envelope;
@@ -705,17 +774,16 @@ export class RoomCore {
       return { reason: "obligation-open", fix: "A review obligation is open again. Meet it, then land again." };
     if (lane?.purpose !== "config-recovery") {
       // R-LAND-7: rebuild the reservation-stage land input now and compare its canonical
-      // bytes with the bytes retained at `ready`, from trusted storage. No hashing or evaluation here.
-      const row = op.landInput ? json<{ retained: RetainedLandInput | null }>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op.id, op.landInput), "body") : null;
+      // bytes with the bytes the engine retained at `ready`. No hashing or evaluation here.
       const rebuilt = this.landInput(op, lane!, gen, policy, "reservation");
-      if (!row?.retained || !this.ports.policy.matchesRetained(row.retained, rebuilt))
+      if (!retained || !this.ports.policy.matchesRetained(retained, rebuilt))
         return { reason: "land-input-changed", fix: "The reviews or obligations changed after the landing was prepared. Land again." };
     }
     return null;
   }
 
   /** The land-rule input (R-POL-6, R-LAND-4 step 3). Pure: rebuilt at reservation and compared by digest. */
-  landInput(op: Pick<LandRecordLike, "lane" | "generation" | "integration">, lane: LaneRow, gen: GenerationRow, policy: ActivePolicyFull, stage: "land" | "reservation", actor?: Authority) {
+  landInput(op: Pick<LandRecord, "lane" | "generation" | "integration">, lane: LaneRow, gen: GenerationRow, policy: ActivePolicyFull, stage: "land" | "reservation", actor?: Authority) {
     const obligations = obligationsFor(this.sql, gen.lane, gen.generation, { doc: policy.doc, checkers: policy.checkers, integration: op.integration ?? null });
     const reviews = latestReviews(evidenceOn(this.sql, gen.lane, gen.generation))
       .filter((r) => this.qualifiesAny(gen, r))
@@ -726,7 +794,7 @@ export class RoomCore {
           const row = one(this.sql, "SELECT body, verdict FROM evidence WHERE act = ?", e.act);
           if (row) reviews.push({ act: e.act, verdict: str(row, "verdict") as "approve", by: this.policyActor((JSON.parse(str(row, "body")!) as { authority: Authority }).authority), basis: "carried" as never });
         }
-    const initiator = actor ?? this.initiatorOf(op as LandRecordLike);
+    const initiator = actor ?? this.initiatorOf(op as LandRecord);
     return {
       kind: "land" as const,
       actor: initiator ? this.policyActor(initiator) : { member: null, role: null, teams: [], delegated: false },
@@ -738,34 +806,37 @@ export class RoomCore {
     };
   }
 
-  private initiatorOf(op: LandRecordLike): Authority | null {
+  private initiatorOf(op: Pick<LandRecord, "act">): Authority | null {
     const r = op.act ? one(this.sql, "SELECT body FROM entries WHERE id = ?", op.act) : undefined;
     if (!r) return null;
     const e = (JSON.parse(str(r, "body")!) as LogEntry).entry;
     return e.type === "act" ? e.receipt.authority : null;
   }
 
-  /** R-LAND-4 steps 2 to 4 on a built integration. Synchronous; deferred work re-enters through `evaluate`. */
-  readiness(op: LandRecordLike, integration: Sha): Readiness {
+  /**
+   * R-LAND-4 steps 2 to 4 on a built integration (lane B's `readiness`). It
+   * may await: reading the integration's `.artroom/` configuration, and
+   * evaluating land rules, whose decisions are sealed as `land-evaluated`.
+   * The engine applies the answer only if the operation has not moved on.
+   */
+  async readiness(op: LandRecord, integration: Sha): Promise<Readiness> {
     const lane = laneRow(this.sql, op.lane);
     const gen = generationRow(this.sql, op.lane, op.generation);
     if (!lane || !gen) return { kind: "retry", reason: "lease-changed", fix: "Claim the lane, then land again." };
     if (gen.blocked) return { kind: "failed", reason: { code: "refused", refusal: gen.blocked } };
+    // A recomputation under a newer policy is due; it asks for this evaluation again when it is recorded.
     if (gen.recompute) return { kind: "waiting", obligations: [] };
     const policy = this.activePolicy();
     // A change to .artroom/ configuration must be valid in the integration itself (R-POL-1, R-PUB-9).
     if (changedPaths(gen.changed).some(isConfigPath)) {
-      const cfg = json<{ ok: boolean; problems?: string[] }>(one(this.sql, "SELECT body FROM configs WHERE commit_sha = ?", integration), "body");
-      if (!cfg) {
-        this.kick(`config:${integration}`, () => this.loadConfig(integration, op.id));
-        return { kind: "waiting", obligations: [] };
-      }
+      const cfg = await this.integrationConfig(integration);
       if (!cfg.ok)
         return {
           kind: "failed",
           reason: { code: "refused", refusal: { refused: true, rule: "policy-invalid", reason: `The integrated configuration is invalid: ${cfg.problems?.[0] ?? "unknown problem"}.`, fix: "Correct the configuration and propose again." } },
         };
     }
+    await this.carryChecks(op, integration, policy);
     const obligations = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration });
     const openReview = obligations.find((o) => o.kind === "review" && o.state !== "met");
     if (openReview) return { kind: "retry", reason: "obligation-open", fix: `The obligation ${openReview.id} is open again. Meet it, then land again.` };
@@ -780,35 +851,40 @@ export class RoomCore {
     }
     if (waiting.length) return { kind: "waiting", obligations: waiting };
     const evidence = [...new Set(obligations.flatMap((o) => o.evidenceActs))];
-    if (lane.purpose === "config-recovery") return { kind: "ready", evidence, landInput: null };
+    if (lane.purpose === "config-recovery") return { kind: "ready", evidence, retained: null };
     const input = this.landInput({ ...op, integration }, lane, gen, policy, "reservation");
     const digest = digestJson(input);
-    const cached = json<{ refusal: Refusal | null; retained: RetainedLandInput | null }>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op.id, digest), "body");
-    if (!cached) {
-      this.kick(`land:${op.id}:${digest}`, () => this.evaluateLandRules(op.id, integration, input, digest, policy));
-      return { kind: "waiting", obligations: [] };
-    }
-    if (cached.refusal) return { kind: "failed", reason: { code: "refused", refusal: cached.refusal } };
+    const r = await this.evaluateLandRules(op.id, integration, input, digest, policy);
+    if (r.refusal) return { kind: "failed", reason: { code: "refused", refusal: r.refusal } };
     // ready.landInput is the digest of the retained reservation-stage input (R-LAND-4).
-    return { kind: "ready", evidence, landInput: cached.retained?.digest ?? digest };
+    return { kind: "ready", evidence, retained: r.retained };
   }
 
-  private async loadConfig(integration: Sha, op: OpId): Promise<void> {
+  /** The integration's `.artroom/` configuration, read once and kept. */
+  private async integrationConfig(integration: Sha): Promise<{ ok: boolean; problems?: string[] }> {
+    const kept = json<{ ok: boolean; problems?: string[] }>(one(this.sql, "SELECT body FROM configs WHERE commit_sha = ?", integration), "body");
+    if (kept) return kept;
     const cfg = await this.ports.artifacts.readConfig(integration);
     const parsed = this.parseConfig(cfg.policy, cfg.checkers);
-    const body = parsed.ok
-      ? { ok: true, policy: parsed.doc ?? null, checkers: parsed.checkers }
-      : { ok: false, problems: parsed.problems };
+    const body = parsed.ok ? { ok: true, policy: parsed.doc ?? null, checkers: parsed.checkers } : { ok: false, problems: [...parsed.problems] };
     this.sql.all("INSERT INTO configs (commit_sha, body) VALUES (?, ?) ON CONFLICT (commit_sha) DO NOTHING", integration, JSON.stringify(body));
-    this.landing.evaluate(op);
+    return body;
   }
 
-  private async evaluateLandRules(op: OpId, integration: Sha, input: ReturnType<RoomCore["landInput"]>, digest: Digest, policy: ActivePolicyFull): Promise<void> {
+  /** Land rules at the reservation stage, once per input: the decision is sealed as `land-evaluated` (R-LAND-4). */
+  private async evaluateLandRules(
+    op: OpId,
+    integration: Sha,
+    input: ReturnType<RoomCore["landInput"]>,
+    digest: Digest,
+    policy: ActivePolicyFull,
+  ): Promise<{ refusal: Refusal | null; retained: RetainedLandInput | null }> {
+    const kept = json<{ refusal: Refusal | null; retained: RetainedLandInput | null }>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op, digest), "body");
+    if (kept) return kept;
     const r = await this.ports.policy.land(policy, input, { budget: this.ports.policy.actBudget() });
     this.sql.transaction(() => {
       if (one(this.sql, "SELECT 1 AS x FROM land_evals WHERE op = ? AND digest = ?", op, digest)) return;
       this.retainEvaluations(r.evaluations);
-      // R-LAND-4: the land rules evaluated during preparation, pass or block, as an entry.
       this.sealSystem({ type: "land-evaluated", op, integration, landInput: r.retained?.digest ?? digest, decisions: r.evaluations.map((e) => e.decision) });
       this.sql.all(
         "INSERT INTO land_evals (op, digest, body) VALUES (?, ?, ?) ON CONFLICT (op, digest) DO NOTHING",
@@ -817,7 +893,22 @@ export class RoomCore {
         JSON.stringify({ refusal: r.refusal, decisions: r.evaluations.map((e) => e.decision), retained: r.retained }),
       );
     });
-    this.landing.evaluate(op);
+    this.committed();
+    return json<{ refusal: Refusal | null; retained: RetainedLandInput | null }>(one(this.sql, "SELECT body FROM land_evals WHERE op = ? AND digest = ?", op, digest), "body")!;
+  }
+
+  /**
+   * Carry checks onto a new integration (R-CARRY-6 to 10): for each open
+   * check obligation, an earlier check of the same obligation and checker on
+   * this lane counts here if policy's `carry` keeps it, judged on the tree,
+   * or the filtered snapshot for a scoped checker, of both integrations.
+   */
+  async carryChecks(_op: LandRecord, _integration: Sha, _policy: ActivePolicyFull): Promise<void> {}
+
+  /** Ask the engine to evaluate an operation again, after a check, a recomputation or new configuration. Durable. */
+  requestEvaluation(op: OpId): void {
+    this.sql.all("INSERT INTO land_reeval (op) VALUES (?) ON CONFLICT (op) DO NOTHING", op);
+    this.run("landing");
   }
 
   /** Effects of a system event recorded by the landing engine. Inside its transaction. */
@@ -869,15 +960,18 @@ export class RoomCore {
 
   /** Recompute pending previews against main (R-PROP-7). */
   async refreshPreviews(): Promise<void> {
-    const pending = this.sql.all("SELECT id, head FROM previews WHERE state = 'pending'");
+    const pending = this.sql.all("SELECT id, lane, generation, head FROM previews WHERE state = 'pending'");
     if (!pending.length) return;
     const main = await this.ports.artifacts.readMain();
     for (const r of pending) {
       const id = str(r, "id")!;
       let body: Record<string, unknown>;
       try {
-        const p = await this.ports.artifacts.preview(str(r, "head") as Sha, main);
-        body = p.kind === "clean" ? { state: "clean", base: p.base, integration: p.integration } : { state: "conflict", base: p.base, paths: p.paths };
+        const p = await this.ports.artifacts.preview(str(r, "lane") as LaneId, num(r, "generation")!, str(r, "head") as Sha, main);
+        body =
+          p.kind === "clean"
+            ? { state: "clean", base: p.base, ...(p.integration ? { integration: p.integration } : {}) }
+            : { state: "conflict", base: p.base, paths: p.paths };
       } catch {
         body = { state: "failed", error: artroomError("unavailable", "The preview could not be computed.") };
       }
@@ -916,78 +1010,61 @@ export class RoomCore {
     return due.length;
   }
 
-  /** Revoke every live workspace token of a lane whose lease ended (R-WS-3, R-LANE-8). */
-  async revokeTokens(lane: LaneId): Promise<void> {
-    const l = laneRow(this.sql, lane);
-    for (const r of this.sql.all("SELECT id, lease_gen FROM fork_tokens WHERE lane = ? AND revoked = 0", lane)) {
-      if (l && l.state === "held" && num(r, "lease_gen") === l.leaseGen) continue;
-      await this.ports.artifacts.revokeForkToken(lane, str(r, "id")!);
-      this.sql.all("UPDATE fork_tokens SET revoked = 1 WHERE id = ?", str(r, "id")!);
-    }
+  /** Is this lease the lane's current one: held, the same generation, and before its deadline by the room clock now? */
+  leaseCurrent(laneId: LaneId, leaseGen: number): boolean {
+    const l = laneRow(this.sql, laneId);
+    return !!l && l.state === "held" && l.leaseGen === leaseGen && (l.expiresMs ?? 0) > this.now();
   }
 
-  /** Revoke every token whose lease has ended, on every lane. */
+  /** Workspaces whose lease has ended: release, expiry (sealed or only due), take-over or fencing (R-WS-3). */
+  endedWorkspaces(): { lane: LaneId; lease: number }[] {
+    return this.sql
+      .all("SELECT lane, lease_gen FROM ws_leases WHERE state = 'open'")
+      .map((r) => ({ lane: str(r, "lane") as LaneId, lease: num(r, "lease_gen")! }))
+      .filter((w) => !this.leaseCurrent(w.lane, w.lease));
+  }
+
+  /** End the workspace access of every lease that has ended: lane B revokes its token and sweeps the fork (R-WS-3, R-LANE-8). */
   async revokeEndedTokens(): Promise<void> {
-    for (const lane of this.tokensToRevoke()) await this.revokeTokens(lane);
+    for (const w of this.endedWorkspaces()) {
+      await this.workspaces.revoke(w.lane, w.lease);
+      this.sql.all("UPDATE ws_leases SET state = 'ended' WHERE lane = ? AND lease_gen = ?", w.lane, w.lease);
+    }
   }
 
   /**
-   * Open the forks of pending workspace operations (R-WS). Durable: an op
-   * interrupted before or after the fork was created is resumed with the same
-   * op ID and lease. If the lease ended meanwhile, the op fails as fenced, so
-   * a stale holder never gets a ready workspace (R-WS-2, R-WS-3).
+   * Provision the workspaces of current leases (lane B's `Workspaces`), then
+   * run its due cleanup duties. Durable: a provision interrupted at any point
+   * is resumed for the same lease. A lease that ended, or ran past its
+   * deadline, is never provisioned; its expiry is sealed and its access
+   * ended as durable work (R-WS-2, R-WS-3).
    */
   async resumeWorkspaces(): Promise<void> {
-    for (const r of this.sql.all("SELECT id, lane, lease_gen, attempts FROM workspaces WHERE state = 'pending' ORDER BY updated_ms")) {
-      const id = str(r, "id")!;
+    if (!this.founded) return;
+    for (const r of this.sql.all("SELECT lane, lease_gen FROM ws_leases WHERE state = 'open' ORDER BY rowid")) {
       const laneId = str(r, "lane") as LaneId;
       const leaseGen = num(r, "lease_gen")!;
-      // The lease is current: held, the same lease generation, and not past its deadline by the
-      // room clock now. A lease that ran out without its expiry sealed yet is fenced too (review 8faa2ef9).
-      const current = () => {
-        const l = laneRow(this.sql, laneId);
-        return !!l && l.state === "held" && l.leaseGen === leaseGen && (l.expiresMs ?? 0) > this.now();
-      };
-      const finish = (body: Record<string, unknown>) =>
-        this.sql.all("UPDATE workspaces SET state = ?, body = ?, updated_ms = ? WHERE id = ? AND state = 'pending'", body["state"] as string, JSON.stringify(body), this.now(), id);
-      const base = { id, kind: "workspace", updatedAt: iso(this.now()), lane: laneId };
-      const fenced = () => {
-        finish({ ...base, state: "failed", error: artroomError("forbidden", "The lease ended before the workspace was ready.") });
-        // Seal any expiry that is due, and revoke what it ended, as durable work.
+      if (!this.leaseCurrent(laneId, leaseGen)) {
         this.run("leases");
         this.run("tokens");
-      };
-      if (!current()) {
-        fenced();
         continue;
       }
-      let remote: `https://${string}`;
-      try {
-        ({ remote } = await this.ports.artifacts.ensureFork(laneId));
-      } catch {
-        const attempts = (num(r, "attempts") ?? 0) + 1;
-        if (attempts >= 5) finish({ ...base, state: "failed", error: artroomError("unavailable", "The lane's fork could not be created.") });
-        else this.sql.all("UPDATE workspaces SET attempts = ?, updated_ms = ? WHERE id = ?", attempts, this.now(), id);
-        continue;
+      if (this.workspaces.view(laneId)?.state === "pending") await this.workspaces.provision(laneId);
+      fault("workspace:after-provision");
+      // The lease may have ended or run out during provisioning: seal it and end its access now (R-LANE-8, R-WS-3).
+      if (!this.leaseCurrent(laneId, leaseGen)) {
+        this.run("leases");
+        this.run("tokens");
       }
-      // Re-validate after the await: the lease may have ended (R-ADM-6).
-      if (!current()) fenced();
-      else finish({ ...base, state: "ready", detail: { remote, leaseGeneration: leaseGen } });
-      fault("workspace:after-fork");
     }
-  }
-
-  /** Lanes with live tokens that should be revoked. */
-  tokensToRevoke(): LaneId[] {
-    return this.sql
-      .all("SELECT DISTINCT t.lane FROM fork_tokens t JOIN lanes l ON l.id = t.lane WHERE t.revoked = 0 AND (l.state = 'unheld' OR l.lease_gen != t.lease_gen)")
-      .map((r) => str(r, "lane") as LaneId);
+    await this.workspaces.reconcile();
   }
 
   /** Complete pinned refs that were admitted but not yet written (R-PROP-1 step 2). */
   async completePins(): Promise<void> {
     for (const r of this.sql.all("SELECT ref, head FROM pins WHERE done = 0")) {
-      await this.ports.artifacts.pinRef(str(r, "ref") as never, str(r, "head") as Sha);
+      const m = /^refs\/artroom\/heads\/(.+)\/(\d+)$/.exec(str(r, "ref")!)!;
+      await this.ports.artifacts.pinRef(m[1] as LaneId, Number(m[2]), str(r, "head") as Sha);
       this.sql.all("UPDATE pins SET done = 1 WHERE ref = ?", str(r, "ref")!);
     }
   }
@@ -1204,6 +1281,7 @@ export class RoomCore {
     workspaces: () => this.resumeWorkspaces(),
     recompute: () => this.recompute(),
     landing: () => this.resumeLanding(),
+    abort: () => this.landing.enforceAbort().then(() => undefined),
     publication: () => this.publish().then(() => undefined),
   } as const;
 
@@ -1217,11 +1295,18 @@ export class RoomCore {
     for (const step of Object.keys(this.steps) as (keyof RoomCore["steps"])[]) await this.steps[step]().catch(() => undefined);
   }
 
-  /** Re-evaluate preparing landings (resuming their derived work), then drive the engine (R-PUB-7 first). */
+  /** Evaluations asked for (after a check, a recomputation), then the engine's own work (R-PUB-7 first). */
   async resumeLanding(): Promise<void> {
+    if (!this.founded) return;
     // R-PUB-10: canonical write tokens are minted, and main is pushed, only for the bound room.
     if (!(await this.isBound())) return;
-    for (const op of this.landing.activeViews()) if (op.state === "preparing" && op.integration !== undefined) this.landing.evaluate(op.id);
+    // An abort attempt is carried out at once, even while a push is in flight (R-REV-5): not behind the engine's queue.
+    await this.landing.enforceAbort();
+    for (const r of this.sql.all("SELECT op FROM land_reeval ORDER BY rowid")) {
+      const op = str(r, "op") as OpId;
+      await this.landing.evaluate(op);
+      this.sql.all("DELETE FROM land_reeval WHERE op = ?", op);
+    }
     await this.landing.reconcile();
   }
 
@@ -1234,12 +1319,22 @@ export class RoomCore {
     if (notify !== null) times.push(notify);
     const landing = this.landing.nextDue();
     if (landing !== null) times.push(landing);
+    // Lane B's workspace duties: cleanup owed, and checks on unanswered remote steps, on their capped backoff.
+    let ws: Workspaces | null = null;
+    try {
+      ws = this.founded ? this.workspaces : null;
+    } catch {
+      ws = null;
+    }
+    const wsDue = ws?.nextDue() ?? null;
+    if (wsDue !== null) times.push(wsDue);
     const now = this.now();
     const pending =
-      this.tokensToRevoke().length > 0 ||
+      this.endedWorkspaces().length > 0 ||
       !!one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0") ||
       !!one(this.sql, "SELECT 1 AS x FROM previews WHERE state = 'pending'") ||
-      !!one(this.sql, "SELECT 1 AS x FROM workspaces WHERE state = 'pending'") ||
+      (ws !== null && !!one(this.sql, "SELECT 1 AS x FROM ws_leases w JOIN artroom_ws a ON a.lane = w.lane AND a.lease = w.lease_gen WHERE w.state = 'open' AND a.state = 'pending'")) ||
+      !!one(this.sql, "SELECT 1 AS x FROM land_reeval") ||
       !!one(this.sql, "SELECT 1 AS x FROM generations WHERE recompute IS NOT NULL") ||
       this.pendingPublication() !== null;
     if (pending) times.push(now + 5_000);

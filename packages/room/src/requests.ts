@@ -33,7 +33,7 @@ import { utf8 } from "./canonical.ts";
 import { fault, Moved, type RoomCore } from "./core.ts";
 import { digestBytes, digestJson, newKeyPair, randomToken, sha256Hex, sign, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
-import { iso, opIds, parseTime, RE } from "./ids.ts";
+import { iso, parseTime, RE } from "./ids.ts";
 import { laneRow } from "./model.ts";
 import { delegation, invitation, keyRow, memberRow, revocationOf } from "./roster.ts";
 import { checkRedemption, checkSignedRequest, isPlainObject, ShapeError } from "./schema.ts";
@@ -82,36 +82,26 @@ async function workspaceRequest(
   body: Exclude<SignedRequest["request"]["request"], { kind: "session" }>,
 ): Promise<WorkspaceOp | WorkspaceGrant | Refusal> {
   const r = { actor, delegation: delegationId };
-  const now = core.now();
   const holder = workspaceAuthority(core, r.actor, r.delegation, body.lane, body.lease);
   if ("refused" in holder) return holder;
   const lane = holder.lane;
-  const opId = opIds.workspace(lane.seq, lane.leaseGen);
+  // Lane B's workspaces: one fork per lane, one token per lease generation (R-WS, R-CRED-8).
+  const ws = core.workspaces;
   if (body.kind === "workspace") {
-    const existing = one(core.sql, "SELECT body FROM workspaces WHERE id = ?", opId);
-    if (existing) return JSON.parse(str(existing, "body")!) as WorkspaceOp;
-    const op: WorkspaceOp = { id: opId, kind: "workspace", updatedAt: iso(now), lane: lane.id, state: "pending" };
-    core.sql.all("INSERT INTO workspaces (id, lane, lease_gen, state, body, updated_ms) VALUES (?, ?, ?, 'pending', ?, ?)", opId, lane.id, lane.leaseGen, JSON.stringify(op), now);
-    core.run("workspaces");
-    core.committed();
+    const op = core.sql.transaction(() => {
+      const opened = ws.open(lane.id, lane.leaseGen, lane.expiresMs!);
+      if (!("refused" in opened))
+        core.sql.all("INSERT INTO ws_leases (lane, lease_gen, state) VALUES (?, ?, 'open') ON CONFLICT (lane, lease_gen) DO UPDATE SET state = 'open'", lane.id, lane.leaseGen);
+      return opened;
+    });
+    if (!("refused" in op) && op.state === "pending") {
+      core.run("workspaces");
+      core.committed();
+    }
     return op;
   }
-  const row = one(core.sql, "SELECT body FROM workspaces WHERE id = ?", opId);
-  const op = row ? (JSON.parse(str(row, "body")!) as WorkspaceOp) : null;
-  if (!op || op.state !== "ready")
-    return refusal("workspace-not-ready", "The workspace for this lease is not ready.", "Open the workspace and wait for it to be ready.", { current: { op: opId } });
-  const minted = await core.ports.artifacts.mintForkToken(lane.id, lane.leaseGen, lane.expiresMs!).catch(() => {
-    throw artroomError("unavailable", "A workspace token could not be minted. Retry.");
-  });
-  // Re-validate after the await: the lease may have ended meanwhile (R-ADM-6, R-WS-2).
-  const again = workspaceAuthority(core, r.actor, r.delegation, body.lane, body.lease);
-  if ("refused" in again) {
-    await core.ports.artifacts.revokeForkToken(lane.id, minted.id).catch(() => undefined);
-    return again;
-  }
-  core.sql.all("INSERT INTO fork_tokens (id, lane, lease_gen, revoked) VALUES (?, ?, ?, 0)", minted.id, lane.id, lane.leaseGen);
-  const expiresAt = Math.min(minted.expiresAt, again.lane.expiresMs!);
-  return { op: opId, lane: lane.id, leaseGeneration: lane.leaseGen, remote: op.detail.remote, token: minted.token, expiresAt: iso(expiresAt) };
+  // The caller was judged as holder of this lease just now; lane B checks the lease generation, readiness and expiry again.
+  return ws.grant(lane.id, lane.leaseGen);
 }
 
 function workspaceAuthority(core: RoomCore, actor: KeyId, delegationId: DelegationId | undefined, laneId: LaneId, lease: number) {

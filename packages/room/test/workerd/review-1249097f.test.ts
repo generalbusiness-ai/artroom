@@ -13,8 +13,8 @@ import type { RoomEnv } from "../../src/config.ts";
 import { draftRoom, foundRoom } from "../../src/founding.ts";
 import { roomIdOf } from "../../src/ids.ts";
 import { hex } from "../../src/crypto.ts";
-import { MemoryLogPublisher } from "../../src/memory/log.ts";
-import { advance, call, clock, day, failure, grant, iso, makeRoom, newKeyPair, randomBytes, sign, worldFor, type TestRoom } from "./support.ts";
+import { LogPublisher } from "@generalbusiness/artroom-log";
+import { advance, call, clock, day, failure, grant, iso, makeRoom, newKeyPair, randomBytes, sign, placeRepo, worldFor, type TestRoom } from "./support.ts";
 
 const inside = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 
@@ -36,15 +36,10 @@ describe("1. a pending cohort stored by the previous revision is upgraded with i
   /** A cohort stored, then a push that never reaches the remote. */
   async function pendingBeforePush(r: TestRoom): Promise<void> {
     await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
-    const push = r.world.log.push.bind(r.world.log);
-    r.world.log.push = async () => {
-      throw new Error("the network is down");
-    };
-    try {
-      expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
-    } finally {
-      r.world.log.push = push;
-    }
+    // Every attempt of the call fails before the update, with no answer (lane L makes five).
+    r.world.log.faults.failBeforePush = 5;
+    expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
+    expect(r.world.log.faults.failBeforePush).toBe(0);
     expect(r.world.log.ref).toBeNull();
   }
 
@@ -67,7 +62,7 @@ describe("1. a pending cohort stored by the previous revision is upgraded with i
     const out = await call<{ through: number; commit: string }>(r.stub.publishLog());
     expect(out).toEqual({ through: before.through, commit: before.expected });
     expect(r.world.log.ref).toBe(before.expected);
-    expect(r.world.log.commits.get(before.expected as never)!.parent).toBeNull();
+    expect(r.world.artifacts.parents(before.expected as never)).toEqual([]);
     expect((await r.admin.read({ q: "log" })).publishedThrough).toBe(before.through);
   });
 
@@ -89,14 +84,14 @@ describe("1. a pending cohort stored by the previous revision is upgraded with i
     expect(await stored(r)).not.toHaveProperty("v");
     await evictDurableObject(r.stub);
     // The publish after the upgrade fails at the transport: the upgraded cohort is already stored.
-    const publish = MemoryLogPublisher.prototype.publish;
-    MemoryLogPublisher.prototype.publish = async () => {
+    const publish = LogPublisher.prototype.publish;
+    LogPublisher.prototype.publish = async () => {
       throw new Error("the connection reset");
     };
     try {
       expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
     } finally {
-      MemoryLogPublisher.prototype.publish = publish;
+      LogPublisher.prototype.publish = publish;
     }
     expect(await stored(r)).toMatchObject({ v: 2, expected: own, through: 2 });
     await evictDurableObject(r.stub);
@@ -109,10 +104,10 @@ describe("1. a pending cohort stored by the previous revision is upgraded with i
   it("a foreign commit with the same entry lines on the ref is still another writer after the upgrade", async () => {
     const r = await makeRoom();
     const own = await pendingAfterLostPush(r);
-    const original = r.world.log.commits.get(own)!;
-    const cp = JSON.parse(original.files["artroom-log/v1/checkpoint.json"]!) as Record<string, unknown>;
-    const foreign = "f".repeat(40) as never;
-    r.world.log.commits.set(foreign, { ...original, files: { ...original.files, "artroom-log/v1/checkpoint.json": JSON.stringify({ ...cp, sig: "invalid-signature" }) } });
+    const files = Object.fromEntries(await r.world.log.files(own));
+    const cp = JSON.parse(files["artroom-log/v1/checkpoint.json"]!) as Record<string, unknown>;
+    files["artroom-log/v1/checkpoint.json"] = JSON.stringify({ ...cp, sig: "invalid-signature" });
+    const foreign = r.world.log.write(files, r.world.artifacts.parents(own)[0] ?? null);
     r.world.log.ref = foreign;
     await downgrade(r);
     expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
@@ -162,6 +157,7 @@ describe("2. an import grant's deadline is judged by the registry's clock, in th
     const input = { name: `review-${hex(randomBytes(6))}`, repo: { kind: "import", grant: grant(repo, admin.key, iso(clock.now + lifeMs)) }, admin: { handle: "@founder", key: admin.key }, recovery: newKeyPair().key };
     const d = await draftRoom(env as unknown as RoomEnv, input, clock.now);
     const world = worldFor(roomIdOf(d.genesis));
+    placeRepo(world, repo);
     world.artifacts.main = world.artifacts.commit(null, { "README.md": "# imported\n" });
     return { repo, genesis: d.genesis as Genesis, draft: d.draft, sig: sign(admin.seed, "artroom-genesis-v1", d.genesis), world };
   }

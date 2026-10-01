@@ -11,7 +11,7 @@ import { isArtroomError } from "@generalbusiness/artroom-contract";
 import { policy, requireReview, rule } from "@generalbusiness/artroom-policy/helpers";
 import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
-import { addMember, advance, b64url, call, clock, day, digestBytes, expectRefusal, failure, iso, makeRoom, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
+import { addMember, advance, b64url, call, clock, day, digestBytes, expectRefusal, failure, iso, makeRoom, pushChange, randomBytes, tick, tokenLive, type TestRoom } from "./support.ts";
 
 const entries = async (r: TestRoom): Promise<LogEntry[]> => [...(await r.admin.read({ q: "log", req: { limit: 500 } })).acts];
 const events = (log: LogEntry[], type: SystemEvent["type"]) => log.filter((e) => e.entry.type === "system" && e.entry.event.type === type).map((e) => ({ seq: e.seq, event: (e.entry as { event: SystemEvent }).event }));
@@ -52,7 +52,7 @@ describe("edit 6: bearerAct and bearerRequest on the Worker's RoomWire (R-CRED-1
     expect(op.state).toBe("pending");
     await tick(r);
     const grant = (await wire.bearerRequest(b.bearer, { kind: "workspace-token", lane: claim.lane, lease: 1 })) as WorkspaceGrant;
-    expect(grant.token).toMatch(/^artws_/);
+    expect(tokenLive(r, claim.lane, grant.token)).toBe(true);
     expectRefusal(await wire.bearerRequest(b.bearer, { kind: "workspace-token", lane: claim.lane, lease: 7 }), "lease-fenced");
     let thrown: unknown = null;
     try {

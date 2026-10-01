@@ -178,8 +178,12 @@ export function opById(core: RoomCore, id: string): OpByKind[OpKind] {
     const r = one(core.sql, "SELECT body FROM previews WHERE id = ?", id);
     if (r) return JSON.parse(str(r, "body")!) as OpByKind["preview"];
   } else if (id.startsWith("op_ws_")) {
-    const r = one(core.sql, "SELECT body FROM workspaces WHERE id = ?", id);
-    if (r) return JSON.parse(str(r, "body")!) as OpByKind["workspace"];
+    // Lane B's workspace operation IDs: `op_ws_<lane>_<lease generation>`; only the lane's current one is shown.
+    const m = /^op_ws_(act_\d+_[0-9a-f]{8})_\d+$/.exec(id);
+    if (m && core.founded) {
+      const v = core.workspaces.view(m[1] as LaneId);
+      if (v && v.id === id) return v;
+    }
   }
   throw artroomError("not-found", `There is no operation ${id}.`);
 }

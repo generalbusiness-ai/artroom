@@ -6,7 +6,8 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
-import type { CheckerConfig, Claim, Landing, LogEntry, PolicyDocument, Proposal, Redeemed, Refusal, RosterRecord, Update } from "@generalbusiness/artroom-contract";
+import type { CheckerConfig, Claim, Landing, LogEntry, PolicyDocument, Proposal, Redeemed, Refusal, RosterRecord, Update, WorkspaceGrant } from "@generalbusiness/artroom-contract";
+import { forkName } from "@generalbusiness/artroom-git";
 import { policy, requireCheck, requireReview, rule } from "@generalbusiness/artroom-policy/helpers";
 import { setFault, type Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
@@ -28,6 +29,7 @@ import {
   newKeyPair,
   pushChange,
   randomBytes,
+  openedWorkspace,
   runtimeFailure,
   tick,
   type TestRoom,
@@ -415,7 +417,7 @@ describe("P1.5: a durable pending publication completes forward (R-LOG-8)", () =
     expect(await published(r)).toBe(2);
     const p2 = await call<{ through: number; commit: string }>(r.stub.publishLog());
     expect(p2.through).toBe(4);
-    expect(r.world.log.commits.get(p2.commit as never)!.parent).toBe(pushed);
+    expect(r.world.artifacts.parents(p2.commit as never)).toEqual([pushed]);
   });
 
   it("restart: a new instance resumes the pending cohort before choosing another", async () => {
@@ -449,76 +451,54 @@ describe("P1.5: a durable pending publication completes forward (R-LOG-8)", () =
 
 // ------------------------------------------------------------------ P2.6
 
-describe("P2.6: pending workspaces are durable alarm work (R-WS)", () => {
-  async function pendingWorkspace(r: TestRoom, lane: string): Promise<string> {
-    return inDO(r, (room) => {
-      const id = `op_ws_2_1`;
-      room.core.sql.all(
-        "INSERT INTO workspaces (id, lane, lease_gen, state, body, updated_ms) VALUES (?, ?, 1, 'pending', ?, ?)",
-        id,
-        lane,
-        JSON.stringify({ id, kind: "workspace", state: "pending", lane, updatedAt: iso(clock.now) }),
-        clock.now,
-      );
-      return id;
-    });
-  }
-
-  it("interrupted before ensureFork: the alarm resumes the same op and lease", async () => {
+describe("P2.6: pending workspaces are durable alarm work (R-WS), through lane B's Workspaces", () => {
+  it("interrupted before provisioning: the alarm resumes the same op and lease, and creates one fork", async () => {
     const r = await makeRoom();
     const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
-    const id = await pendingWorkspace(r, c.lane);
+    const id = await openedWorkspace(r, c.lane);
+    expect(id).toBe(`op_ws_${c.lane}_1`);
     await tick(r);
-    expect(await r.admin.request({ kind: "workspace", lane: c.lane, lease: 1 })).toMatchObject({ id, state: "ready", detail: { leaseGeneration: 1 } });
-    expect(r.world.artifacts.calls.get("ensureFork")).toBe(1);
+    expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({ id, state: "ready", detail: { leaseGeneration: 1 } });
+    expect(r.world.artifacts.remoteCalls.get("fork")).toBe(1);
   });
 
-  it("interrupted after the fork was created but before the op was updated: it stays pending, then becomes ready", async () => {
+  it("the fork is created but its answer is lost: the same provision reads it back, and the fork's own token is swept", async () => {
     const r = await makeRoom();
     const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
-    const id = await pendingWorkspace(r, c.lane);
-    // The fork is created, but the reply is lost before the op is updated.
-    const real = r.world.artifacts.ensureFork.bind(r.world.artifacts);
-    let once = true;
-    r.world.artifacts.ensureFork = async (lane) => {
-      const out = await real(lane);
-      if (once) {
-        once = false;
-        throw new Error("reply lost after the fork was created");
-      }
-      return out;
-    };
-    await tick(r);
-    expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({ state: "pending" });
+    const id = await openedWorkspace(r, c.lane);
+    r.world.artifacts.loseReply("fork");
     await tick(r);
     expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({ state: "ready" });
+    expect(r.world.artifacts.remoteCalls.get("fork")).toBe(1);
+    // Only the lease's token is live: the 24-hour token that came with the fork was revoked by lane B's inventory.
+    const grant = expectOk(await r.admin.request<WorkspaceGrant>({ kind: "workspace-token", lane: c.lane, lease: 1 }));
+    const fork = r.world.artifacts.repo(forkName(r.world.artifacts.canonical, c.lane));
+    expect(fork.activeTokens().length).toBe(1);
+    expect(fork.admits(grant.token, "write")).toBe(true);
   });
 
-  it("fencing: a lease that ends while the fork is being created fails the op", async () => {
+  it("fencing: a take-over while the fork is being created ends the old lease's access; the old holder gets no token", async () => {
     const r = await makeRoom();
     const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
-    const id = await pendingWorkspace(r, c.lane);
+    const id = await openedWorkspace(r, c.lane);
     const sql = await inDO(r, (room) => room.core.sql);
-    const real = r.world.artifacts.ensureFork.bind(r.world.artifacts);
-    r.world.artifacts.ensureFork = async (lane) => {
-      const out = await real(lane);
-      // The lease ends during the await: a take-over moved the lease generation.
-      sql.all("UPDATE lanes SET lease_gen = lease_gen + 2 WHERE id = ?", c.lane);
-      return out;
-    };
-    await tick(r);
-    expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({ state: "failed" });
+    // The lease ends during the remote call: a take-over moved the lease generation.
+    r.world.artifacts.on("fork", () => void sql.all("UPDATE lanes SET lease_gen = lease_gen + 2 WHERE id = ?", c.lane));
+    await tick(r, 2);
+    expectRefusal(await r.admin.request({ kind: "workspace-token", lane: c.lane, lease: 1 }), "lease-fenced");
+    const fork = r.world.artifacts.repo(forkName(r.world.artifacts.canonical, c.lane));
+    expect(fork.activeTokens()).toEqual([]);
+    expect((await failure(r.stub.read(await r.admin.session(), { q: "op", op: id as never }))).code).toBe("not-found");
   });
 
-  it("fencing: a lease that ended before the resume fails the op; the old holder gets no token", async () => {
+  it("fencing: a lease that ended before the resume is never provisioned; the old holder gets no token", async () => {
     const r = await makeRoom();
     const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
-    const id = await pendingWorkspace(r, c.lane);
+    await openedWorkspace(r, c.lane);
     await r.admin.ok("release", { lane: c.lane }, { lease: 1 });
     await tick(r);
-    expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({ state: "failed" });
     // No fork is created for a lease that has already ended.
-    expect(r.world.artifacts.calls.get("ensureFork") ?? 0).toBe(0);
+    expect(r.world.artifacts.remoteCalls.get("fork") ?? 0).toBe(0);
     expectRefusal(await r.admin.request({ kind: "workspace-token", lane: c.lane, lease: 1 }), "not-holder");
   });
 });

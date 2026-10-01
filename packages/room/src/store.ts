@@ -172,6 +172,19 @@ export const ROOM_MIGRATIONS: readonly Migration[] = [
       }
     },
   },
+  {
+    version: 6,
+    name: "phase 2b: lane B workspaces and evaluations",
+    up: (sql) => {
+      // The leases whose workspace the Room opened in lane B's `Workspaces`; `ended` once their access is revoked.
+      sql.all("CREATE TABLE IF NOT EXISTS ws_leases (lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, state TEXT NOT NULL, PRIMARY KEY (lane, lease_gen))");
+      // Workspaces opened by the previous revision become lane B workspaces when their holder opens them again;
+      // their recorded tokens are swept by lane B's first inventory of the fork.
+      sql.all("INSERT OR IGNORE INTO ws_leases (lane, lease_gen, state) SELECT lane, lease_gen, 'ended' FROM workspaces");
+      // Landing evaluations the Room has asked for (after a check or a recomputation), run by the alarm's landing step.
+      sql.all("CREATE TABLE IF NOT EXISTS land_reeval (op TEXT PRIMARY KEY)");
+    },
+  },
 ];
 
 export function createSchema(sql: Sql): void {

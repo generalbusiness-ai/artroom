@@ -1,6 +1,8 @@
 /**
  * Test support for the workerd suite: rooms with real Durable Object SQLite,
- * the real policy runtime (lane C), and in-memory Artifacts and landing.
+ * the real policy runtime (lane C), and the real adapters (lane B's landing
+ * engine, workspaces, pinning and diffs; lane L's log publisher; the Room's
+ * Artifacts adapter) over fake remotes (`src/memory/artifacts.ts`).
  */
 
 import { env } from "cloudflare:workers";
@@ -29,7 +31,9 @@ import type {
   SignedOnboardingGrant,
 } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
-import { MemoryArtifacts, MemoryLanding, MemoryLogPublisher, MemoryLogRemote, lanePolicy, setAlarmDelay, setClock, setPortsFactory, type PolicyPort, type Registry, type Room } from "../../src/index.ts";
+import { FakeArtifactsHost, lanePolicy, setAlarmDelay, setClock, setServicesFactory, type ArtifactsPort, type PolicyPort, type Registry, type Room } from "../../src/index.ts";
+import { forkName, type FaultPoint, type DiffBounds } from "@generalbusiness/artroom-git";
+import { buildTree, encodeCommit, gitObject, readLogFiles } from "@generalbusiness/artroom-log";
 import { b64url, digestBytes, hex, keyPairFromSeed, newKeyPair, randomBytes, randomToken, sign, type KeyPair } from "../../src/crypto.ts";
 import { iso, roomIdOf } from "../../src/ids.ts";
 import { unwire, type Wire } from "../../src/errors.ts";
@@ -101,33 +105,155 @@ function faultyPolicy(): FaultyPolicy {
   return p;
 }
 
+/** Port-level instrumentation: calls by port method, and outages planned at the port. */
+export type PortMethod = keyof ArtifactsPort;
+
+/** The fake remotes of one room, with the helpers tests use to steer them. */
+export interface TestArtifacts extends FakeArtifactsHost {
+  /** Calls made, by Artifacts port method: tests check that refused acts did no I/O. */
+  readonly calls: Map<PortMethod, number>;
+  /** Make the next `count` calls of a port method fail, as an outage would. */
+  failNext(method: PortMethod, count?: number): void;
+}
+
+/** The log ref on the canonical repository, and its transport faults. */
+export interface LogFacet {
+  readonly faults: FakeArtifactsHost["log"]["faults"];
+  readonly pushes: number;
+  ref: Sha | null;
+  foreignWrite(): Sha;
+  /** The files of a log commit. */
+  files(commit: Sha): Promise<Map<string, string>>;
+  /** Write a log-shaped commit of these files on `parent` (another writer's). */
+  write(files: Readonly<Record<string, string>>, parent: Sha | null): Sha;
+}
+
 export interface World {
-  readonly artifacts: MemoryArtifacts;
-  readonly log: MemoryLogRemote;
+  readonly artifacts: TestArtifacts;
+  readonly log: LogFacet;
   readonly policy: FaultyPolicy;
-  landing: MemoryLanding | null;
+  /** Lane B's engine runs for real; tests steer only the sandbox's pushes. */
+  readonly landing: { readonly controls: FakeArtifactsHost["controls"] };
+  /** Diff bounds (R-PROP-6) the room's adapter uses; a test may lower them. */
+  readonly bounds: { -readonly [K in keyof DiffBounds]?: DiffBounds[K] };
+  /** Lane B's landing fault points: a test may throw from one, as a crash would. */
+  landingFault: ((point: FaultPoint, op: string) => void) | null;
 }
 
 const worlds = new Map<string, World>();
+const decoder = new TextDecoder();
 
 function newWorld(): World {
-  return { artifacts: new MemoryArtifacts(), log: new MemoryLogRemote(), policy: faultyPolicy(), landing: null };
+  const host = new FakeArtifactsHost("artroom-public", () => clock.now);
+  const calls = new Map<PortMethod, number>();
+  const planned = new Map<PortMethod, number>();
+  const artifacts = Object.assign(host, {
+    calls,
+    failNext(method: PortMethod, count = 1) {
+      planned.set(method, count);
+    },
+  }) as TestArtifacts;
+  const log: LogFacet = {
+    faults: host.log.faults,
+    get pushes() {
+      return host.log.pushes;
+    },
+    get ref() {
+      return host.logRef;
+    },
+    set ref(sha: Sha | null) {
+      host.logRef = sha;
+    },
+    foreignWrite: () => host.foreignWrite(),
+    files: async (commit) => {
+      const files = await readLogFiles(host.canonicalRepo(), commit);
+      return new Map([...files].map(([p, b]) => [p, decoder.decode(b)]));
+    },
+    write: (files, parent) => {
+      const { root, objects } = buildTree(Object.fromEntries(Object.entries(files).map(([p, t]) => [p, new TextEncoder().encode(t)])));
+      for (const o of objects) host.put(o);
+      const who = "Another Writer <other@example.invalid> 1700000000 +0000";
+      return host.put(gitObject("commit", encodeCommit({ tree: root, parents: parent ? [parent] : [], author: who, committer: who, message: "not the room\n" })));
+    },
+  };
+  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null };
+  (world as { instrument?: unknown }).instrument = (a: ArtifactsPort): ArtifactsPort =>
+    new Proxy(a, {
+      get(target, prop, receiver) {
+        const v = Reflect.get(target, prop, receiver);
+        if (typeof v !== "function") return v;
+        return (...args: unknown[]) => {
+          const m = prop as PortMethod;
+          calls.set(m, (calls.get(m) ?? 0) + 1);
+          const n = planned.get(m) ?? 0;
+          if (n > 0) {
+            planned.set(m, n - 1);
+            return Promise.reject(new Error(`Artifacts is unavailable (${String(m)})`));
+          }
+          return (v as (...a: unknown[]) => unknown).apply(target, args);
+        };
+      },
+    });
+  return world;
 }
 
-setPortsFactory((_env, objectId) => {
+setServicesFactory((_env, objectId) => {
   let w = worlds.get(objectId);
   if (!w) {
     w = newWorld();
     worlds.set(objectId, w);
   }
   const world = w;
+  const host = world.artifacts;
   return {
     policy: world.policy,
-    artifacts: world.artifacts,
-    landing: (sql, host) => (world.landing = new MemoryLanding(sql, host, world.artifacts, () => clock.now)),
-    log: () => MemoryLogPublisher.open(world.log),
+    remotes: {
+      artifacts: host.binding,
+      get namespace() {
+        return host.namespace;
+      },
+      publisher: host.stub,
+      logRemote: async () => host.canonicalRepo(),
+      sleep: async () => {},
+      bounds: world.bounds,
+      wrapArtifacts: (world as unknown as { instrument: (a: ArtifactsPort) => ArtifactsPort }).instrument,
+      landingFault: (point, op) => world.landingFault?.(point, op),
+    },
   };
 });
+
+/** The git remote of a lane's fork (lane B's fork name, in the room's namespace). */
+export function forkRemote(room: TestRoom, lane: string): string {
+  const a = room.world.artifacts;
+  return `https://artifacts.test/${a.namespace}/${forkName(a.canonical, lane as LaneId)}.git`;
+}
+
+/** Whether a workspace token is live on the lane's fork. */
+export function tokenLive(room: TestRoom, lane: string, token: string): boolean {
+  const a = room.world.artifacts;
+  return a.repo(forkName(a.canonical, lane as LaneId)).admits(token, "read");
+}
+
+/**
+ * A workspace opened in lane B's `Workspaces` and recorded by the Room for
+ * the lane's current lease, as if the host stopped before provisioning
+ * began. Returns the workspace operation's ID.
+ */
+export async function openedWorkspace(room: TestRoom, lane: string): Promise<string> {
+  return runInDurableObject(room.stub as unknown as DurableObjectStub<Room>, (r: Room) => {
+    const l = r.core.sql.all("SELECT lease_gen, expires_ms FROM lanes WHERE id = ?", lane)[0]!;
+    const op = r.core.workspaces.open(lane as LaneId, Number(l["lease_gen"]), Number(l["expires_ms"]));
+    r.core.sql.all("INSERT INTO ws_leases (lane, lease_gen, state) VALUES (?, ?, 'open')", lane, Number(l["lease_gen"]));
+    return (op as { id: string }).id;
+  });
+}
+
+/** Point a world's fake Artifacts at a repository identity `<namespace>/<name>`. */
+export function placeRepo(world: World, identity: string): void {
+  const [ns, name] = identity.split("/") as [string, string];
+  world.artifacts.namespace = ns;
+  world.artifacts.canonical = name;
+}
 
 // ------------------------------------------------------------ rooms and clients
 
@@ -245,14 +371,15 @@ export function grant(repo: string, admin: KeyId, notAfter = iso(clock.now + day
 /** A room founded from a signed genesis, with main holding `files` (R-GEN-1). */
 export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<string, string> } = {}): Promise<TestRoom> {
   const world = newWorld();
+  // An imported repository, with an operator's grant (R-GEN-12), bound in the registry before founding (R-GEN-13).
+  const repo = `test-import/${hex(randomBytes(16))}`;
+  placeRepo(world, repo);
   const files: Record<string, string> = { "README.md": "# test\n", "src/app.ts": "export const app = 1;\n", ...(opts.files ?? {}) };
   if (opts.policy) files[".artroom/policy.json"] = JSON.stringify(opts.policy);
   world.artifacts.main = world.artifacts.commit(null, files);
   const admin = newKeyPair();
   const recovery = newKeyPair();
   const seed = randomBytes(32);
-  // An imported repository, with an operator's grant (R-GEN-12), bound in the registry before founding (R-GEN-13).
-  const repo = `test-import/${hex(randomBytes(16))}`;
   const genesis: Genesis = {
     format: "artroom-log-v1",
     name: `test/${randomToken().slice(0, 8)}`,
@@ -306,6 +433,15 @@ export function pushChange(room: TestRoom, lane: LaneId, changes: Record<string,
   const head = a.commit(parent ?? a.main!, changes);
   a.push(lane, head);
   return head;
+}
+
+/** Poll until `ok` holds, while other work (a held push) is in flight. */
+export async function until(ok: () => Promise<boolean>, timeoutMs = 5_000): Promise<void> {
+  const end = Date.now() + timeoutMs;
+  while (!(await ok())) {
+    if (Date.now() > end) throw new Error("timed out waiting");
+    await new Promise((r) => setTimeout(r, 5));
+  }
 }
 
 /** Run the room's alarm work once. */

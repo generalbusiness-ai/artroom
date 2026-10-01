@@ -1,6 +1,6 @@
 /**
- * The Room's side of landing, with the in-memory engine standing in for lane
- * B's: admission of `land` (R-LAND-1), invalidation before reservation
+ * The Room's side of landing, with lane B's engine on the Room's SQLite and
+ * a fake publisher sandbox: admission of `land` (R-LAND-1), invalidation before reservation
  * (R-LAND-6, R-LAND-9), ordering after reservation (R-LAND-8, R-REV-7), the
  * abort attempt (R-REV-5, R-REV-6), the stage-specific land rule (R-POL-6,
  * R-LAND-7), configuration recovery (R-ADMIN-5 to 9) and sole-admin
@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import type { Claim, Landing, LandOp, Lane, LogEntry, PolicyDocument, Proposal, Review, RosterRecord, SystemEvent } from "@generalbusiness/artroom-contract";
 import { policy, requireReview, rule } from "@generalbusiness/artroom-policy/helpers";
-import { addMember, Client, expectOk, expectRefusal, makeRoom, newKeyPair, pushChange, tick, iso, clock, day, type TestRoom } from "./support.ts";
+import { addMember, Client, expectOk, expectRefusal, makeRoom, newKeyPair, pushChange, tick, until, iso, clock, day, type TestRoom } from "./support.ts";
 
 async function entries(room: TestRoom): Promise<LogEntry[]> {
   return [...(await room.admin.read({ q: "log", req: { limit: 500 } })).acts];
@@ -94,8 +94,9 @@ describe("R-LAND-8 and R-REV-7: acts admitted while a reservation is held", () =
     await tick(room);
     expect((await op(room, l.op.id)).state).toBe("ready");
     room.world.landing!.controls.pausePush = true;
-    await tick(room);
-    expect((await op(room, l.op.id)).state).toBe("publishing");
+    // The alarm reserves and starts the push, which the sandbox holds in flight.
+    const flight = tick(room);
+    await until(async () => (await op(room, l.op.id)).state === "publishing");
     const reserved = events(await entries(room), "land-reserved").at(-1)!;
     expect(reserved.entry.event).toMatchObject({ op: l.op.id, lane, generation: 1, publication: 1 });
     const head2 = pushChange(room, lane, { "src/app.ts": "v3" }, head);
@@ -110,6 +111,7 @@ describe("R-LAND-8 and R-REV-7: acts admitted while a reservation is held", () =
       expect(a.flags).toContain("after-reservation");
     }
     room.world.landing!.controls.pausePush = false;
+    await flight;
     await tick(room);
     expect(await op(room, l.op.id)).toMatchObject({ state: "landed", publication: 1 });
     expect(room.world.artifacts.main).toBe(head);
@@ -125,22 +127,25 @@ describe("R-LAND-8 and R-REV-7: acts admitted while a reservation is held", () =
     const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
     await tick(room);
     room.world.landing!.controls.pausePush = true;
-    await tick(room);
+    const flight = tick(room);
+    await until(async () => (await op(room, l.op.id)).state === "publishing");
     const rev = await room.admin.ok<RosterRecord>("roster", null, { op: "revoke-key", key: bob.key, reason: "compromised" });
     expect(rev.after).toBe(l.op.id);
     expect(rev.invalidated).toMatchObject({ evidence: [review.id], abortAttempt: l.op.id });
-    await tick(room);
+    // The abort attempt runs at once, beside the push in flight: it revokes the publication token and is recorded.
+    await until(async () => events(await entries(room), "abort-attempt").length > 0);
     let log = await entries(room);
     expect(events(log, "abort-attempt").at(-1)!.entry.event).toMatchObject({ op: l.op.id, attempt: { trigger: rev.id, key: bob.key, tokenRevoked: true } });
-    expect((await op(room, l.op.id)).state).toBe("unresolved");
-    // The paused push completes after all: the outcome is decided by what happened.
+    expect((await op(room, l.op.id)).state).toBe("publishing");
+    // The held push completes after all: revoking its token did not stop it, and the outcome is decided by what happened.
     room.world.landing!.controls.pausePush = false;
+    await flight;
     await tick(room);
     const done = await op(room, l.op.id);
     expect(done.state).toBe("landed");
     log = await entries(room);
     const revert = events(log, "revert-lane").at(-1)!;
-    expect(revert.entry.event).toEqual({ type: "revert-lane", of: l.op.id, scope: ["src/app.ts"], reason: "compromised-evidence" });
+    expect(revert.entry.event).toEqual({ type: "revert-lane", of: l.op.id, scope: ["src/app.ts"], reason: "abort-after-landing" });
     const revertId = `act_${revert.seq}_${revert.hash.slice(7, 15)}`;
     expect((done as { revertLane?: string }).revertLane).toBe(revertId);
     const lane2 = (await room.admin.read({ q: "lane", lane: revertId as never })) as Lane;
@@ -154,7 +159,8 @@ describe("R-LAND-8 and R-REV-7: acts admitted while a reservation is held", () =
     const { alice, bob, lane, head } = await approved(room);
     const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
     await tick(room);
-    room.world.landing!.controls.failPushes = 1;
+    // A push that failed before anything was sent: nothing can still land.
+    room.world.landing!.controls.errorPushes = 1;
     await tick(room);
     expect((await op(room, l.op.id)).state).toBe("unresolved");
     expect(events(await entries(room), "publication-unresolved").length).toBe(1);

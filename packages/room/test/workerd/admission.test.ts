@@ -46,7 +46,9 @@ describe("R-ID identifiers", () => {
     const room = await makeRoom();
     const claim = expectOk(await room.admin.act<Claim>("claim", null, { goal: "g", scope: ["src/**"] }));
     const ws = expectOk(await room.admin.request<{ id: string }>({ kind: "workspace", lane: claim.lane, lease: 1 }));
-    expect(ws.id).toBe(`op_ws_${claim.seq}_1`);
+    // Workspace operations are lane B's: `op_ws_<lane>_<lease generation>`, and the lane ID is its claim's seq (lane B contract gap 9).
+    expect(ws.id).toBe(`op_ws_${claim.lane}_1`);
+    expect(claim.lane.startsWith(`act_${claim.seq}_`)).toBe(true);
   });
 });
 

@@ -3,7 +3,11 @@
   "compilerOptions": {
     "rootDir": ".",
     "lib": ["ES2024", "ESNext.Disposable"],
-    "types": []
+    "types": [],
+    // Lane L's sources assume a lib whose TextDecoder options differ from the
+    // Workers runtime types, so the Room checks against declarations generated
+    // from them by `npm run typecheck` (as the UI does for the policy runtime).
+    "paths": { "@generalbusiness/artroom-log": ["./.types/log/src/index.d.ts"] }
   },
   "include": ["src"]
 }

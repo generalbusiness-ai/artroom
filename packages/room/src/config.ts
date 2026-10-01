@@ -1,20 +1,30 @@
 /**
- * Which ports a Room uses, and its clock.
+ * What a Room is given, and its clock.
  *
- * Production: lane C's policy runtime, and Artifacts and landing left
- * "unwired" until lane B's engine and Artifacts helpers are connected (see
- * README, "Integration"). Tests replace the factory with in-memory ports.
+ * Production: lane C's policy runtime; the Artifacts binding for the
+ * deployment's namespace; lane B's publisher sandbox (one Durable Object
+ * per room); and lane L's log remote over both. The Room builds the real
+ * adapters over them (see `core.ts`). Tests replace the factory with fake
+ * remotes.
  */
 
-import type { LaneId, OpId, PolicyVersion, PublicationSlot, Refusal, Sha } from "@generalbusiness/artroom-contract";
-import { UnwiredArtifacts } from "./memory/artifacts.ts";
+import type { PublisherStub } from "@generalbusiness/artroom-git";
+import type { LaneId } from "@generalbusiness/artroom-contract";
+import type { ArtifactsBinding } from "./artifacts.ts";
+import { artifactsLogRemote, type LogPushStub } from "./logremote.ts";
 import { lanePolicy } from "./policy.ts";
-import type { LandingPort, LandRecordLike, Ports } from "./ports.ts";
+import type { RoomServices } from "./ports.ts";
 
 export interface RoomEnv {
   readonly ROOMS: DurableObjectNamespace;
   /** The deployment's one registry (R-GEN-13). */
   readonly REGISTRY: DurableObjectNamespace;
+  /** The Artifacts binding, for one namespace. */
+  readonly ARTIFACTS?: unknown;
+  /** The namespace the binding reaches. Default: `PUBLIC_NAMESPACE`. */
+  readonly ARTIFACTS_NAMESPACE?: string;
+  /** Lane B's publisher sandbox (its `Publisher` Durable Object class). */
+  readonly PUBLISHER?: DurableObjectNamespace;
   /** Operator key IDs, comma-separated, whose onboarding grants this deployment accepts (R-GEN-12). */
   readonly OPERATOR_KEYS?: string;
   /** The repository namespace reserved for public founding (R-GEN-12). */
@@ -24,67 +34,47 @@ export interface RoomEnv {
   readonly ROOM_KEY_SECRET?: string;
 }
 
-/** A landing port for a deployment whose engine is not wired: `land` fails as unavailable. */
-export class UnwiredLanding implements LandingPort {
-  accept(): LandRecordLike | Refusal {
-    throw new Error("The landing engine is not wired into this deployment yet.");
-  }
-  laneChanged(): readonly LandRecordLike[] {
-    return [];
-  }
-  policyActivated(_v: PolicyVersion): readonly OpId[] {
-    return [];
-  }
-  abort(): LandRecordLike | null {
-    return null;
-  }
-  evaluate(): LandRecordLike | null {
-    return null;
-  }
-  after(): null {
-    return null;
-  }
-  view(): null {
-    return null;
-  }
-  slot(): PublicationSlot {
-    return { state: "free", last: 0 };
-  }
-  activeViews(): readonly never[] {
-    return [];
-  }
-  nextDue(): null {
-    return null;
-  }
-  main(): Sha | null {
-    return null;
-  }
-  async refreshMain(): Promise<Sha> {
-    throw new Error("The landing engine is not wired into this deployment yet.");
-  }
-  async reconcile(): Promise<void> {}
+export type ServicesFactory = (env: RoomEnv, roomObject: string) => RoomServices;
+
+function missing(what: string): never {
+  throw Object.assign(new Error(`This deployment has no ${what} binding.`), { code: "unavailable" });
 }
 
-export type PortsFactory = (env: RoomEnv, roomObject: string) => Ports;
+const productionServices: ServicesFactory = (env, roomObject) => {
+  const artifacts = (env.ARTIFACTS ?? null) as ArtifactsBinding | null;
+  const namespace = env.ARTIFACTS_NAMESPACE ?? env.PUBLIC_NAMESPACE ?? "artroom-public";
+  const publisher = (): PublisherStub & LogPushStub => (env.PUBLISHER ? (env.PUBLISHER.get(env.PUBLISHER.idFromName(roomObject)) as unknown as PublisherStub & LogPushStub) : missing("PUBLISHER"));
+  const binding: ArtifactsBinding = artifacts ?? {
+    get: async () => missing("ARTIFACTS"),
+    create: async () => missing("ARTIFACTS"),
+  };
+  // The stub is resolved per call, so a deployment without the sandbox still founds rooms and admits acts that need no repository work.
+  const stub: PublisherStub & LogPushStub = {
+    pinObjects: (r) => publisher().pinObjects(r),
+    pinRef: (r) => publisher().pinRef(r),
+    preview: (r) => publisher().preview(r),
+    integrate: (r) => publisher().integrate(r),
+    push: (r) => publisher().push(r),
+    pushLog: (r) => {
+      const p = publisher();
+      return p.pushLog ? p.pushLog(r) : missing("publisher pushLog");
+    },
+  };
+  return {
+    policy: lanePolicy(),
+    remotes: { artifacts: binding, namespace, publisher: stub, logRemote: async (repo) => artifactsLogRemote(binding, stub, repo) },
+  };
+};
 
-const productionPorts: PortsFactory = () => ({
-  policy: lanePolicy(),
-  artifacts: new UnwiredArtifacts(),
-  landing: () => new UnwiredLanding(),
-  log: async () => {
-    throw new Error("The log publisher is not wired into this deployment yet.");
-  },
-});
-
-let factory: PortsFactory = productionPorts;
+let factory: ServicesFactory = productionServices;
 let clockFn: () => number = () => Date.now();
 
-/** Tests and local development only: replace the ports every new Room object uses. */
-export function setPortsFactory(f: PortsFactory | null): void {
-  factory = f ?? productionPorts;
+/** Tests and local development only: replace the services every new Room object uses. */
+export function setServicesFactory(f: ServicesFactory | null): void {
+  factory = f ?? productionServices;
 }
 
-export function portsFor(env: RoomEnv, roomObject: string): Ports {
+export function servicesFor(env: RoomEnv, roomObject: string): RoomServices {
   return factory(env, roomObject);
 }
 

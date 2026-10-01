@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { exports } from "cloudflare:workers";
 import { runDurableObjectAlarm } from "cloudflare:test";
 import type { Claim, Lane, LogEntry, Proposal, Release, Renewal, RosterRecord, WorkspaceGrant, WorkspaceOp } from "@generalbusiness/artroom-contract";
-import { addMember, advance, call, clock, Client, day, expectOk, expectRefusal, iso, makeRoom, newKeyPair, pushChange, tick, type TestRoom } from "./support.ts";
+import { addMember, advance, call, clock, Client, day, expectOk, expectRefusal, forkRemote, iso, makeRoom, newKeyPair, pushChange, tick, tokenLive, type TestRoom } from "./support.ts";
 
 const LEASE = 1800 * 1000;
 
@@ -145,7 +145,7 @@ describe("R-PROP proposals", () => {
     const room = await makeRoom();
     const c = await claim(room, room.admin);
     const head = pushChange(room, c.lane, { "src/a.ts": "1", "src/b.ts": "2" });
-    room.world.artifacts.diffLimit = 1;
+    room.world.bounds.maxEntries = 2;
     expect(expectRefusal(await room.admin.act("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" }), "diff-too-large").act).toBeDefined();
   });
 
@@ -191,13 +191,13 @@ describe("R-WS workspace credentials", () => {
     expect(seen.lane).toBe(c.lane);
     await tick(room);
     const ready = await call<WorkspaceOp>(room.stub.read(bToken, { q: "op", op: pending.id, until: ["ready"], timeoutMs: 1000 }));
-    expect(ready).toMatchObject({ state: "ready", detail: { remote: `https://artifacts.example/forks/${c.lane}.git`, leaseGeneration: 1 } });
+    expect(ready).toMatchObject({ state: "ready", detail: { remote: forkRemote(room, c.lane), leaseGeneration: 1 } });
     expect(Object.keys((ready as { detail: object }).detail).sort()).toEqual(["leaseGeneration", "remote"]);
     expect(JSON.stringify(ready)).not.toMatch(/token/i);
     expectRefusal(await b.request({ kind: "workspace-token", lane: c.lane, lease: 1 }), "not-holder");
     const grant = expectOk(await a.request<WorkspaceGrant>({ kind: "workspace-token", lane: c.lane, lease: 1 }));
-    expect(grant).toMatchObject({ op: pending.id, lane: c.lane, leaseGeneration: 1, remote: `https://artifacts.example/forks/${c.lane}.git` });
-    expect(grant.token).toMatch(/^artws_/);
+    expect(grant).toMatchObject({ op: pending.id, lane: c.lane, leaseGeneration: 1, remote: forkRemote(room, c.lane) });
+    expect(tokenLive(room, c.lane, grant.token)).toBe(true);
   });
 
   it("R-WS-2: a token before the workspace is ready is workspace-not-ready", async () => {
@@ -240,12 +240,11 @@ describe("R-WS workspace credentials", () => {
     const c = await claim(room, room.admin);
     await workspaceReady(room, room.admin, c.lane);
     const g = expectOk(await room.admin.request<WorkspaceGrant>({ kind: "workspace-token", lane: c.lane, lease: 1 }));
-    const tok = [...room.world.artifacts.tokens.values()].find((t) => t.token === g.token)!;
-    expect(tok.revoked).toBe(false);
+    expect(tokenLive(room, c.lane, g.token)).toBe(true);
     expect(Date.parse(g.expiresAt)).toBeLessThanOrEqual(Date.parse(((await room.admin.read({ q: "lane", lane: c.lane })) as { lease: { expiresAt: string } }).lease.expiresAt));
     await room.admin.ok("release", { lane: c.lane }, { lease: 1 });
     await tick(room);
-    expect(tok.revoked).toBe(true);
+    expect(tokenLive(room, c.lane, g.token)).toBe(false);
   });
 
   it("section 23, A token appears in no attention item, update, log entry, explain, error or cached response (R-WS-4)", async () => {
@@ -268,7 +267,8 @@ describe("R-WS workspace credentials", () => {
     for (const e of log.acts) outputs.push(await call(room.stub.read(tokenA, { q: "explain", act: `act_${e.seq}_${e.hash.slice(7, 15)}` as never })));
     outputs.push(await call(room.stub.read(tokenA, { q: "attention" })), await call(room.stub.read(tokenB, { q: "attention" })));
     outputs.push(await call(room.stub.poll(tokenA, undefined, 0)));
-    outputs.push(await call(room.stub.read(tokenB, { q: "op", op: g.op })));
+    // The released lease's workspace is gone from the view: the answer is not-found, and carries no token either.
+    outputs.push(await room.stub.read(tokenB, { q: "op", op: g.op }));
     outputs.push(await call(room.stub.read(tokenB, { q: "lanes" })));
     outputs.push(await room.stub.request(room.admin.signedRequest({ kind: "workspace-token", lane: c.lane, lease: 1 })));
     outputs.push(await room.stub.read("ses_not-a-real-token", { q: "log" }));
