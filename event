@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"package-lock.json at exact 0da7e483b6c33d9302885316ff7eba705c9d23b3 on request/laneB-pushlog, under promise git:sha1…497a150 on request git:sha1…f4cee06","body":{"commit":"0da7e483b6c33d9302885316ff7eba705c9d23b3","path":"package-lock.json"}}
+{"kind":"artifact","text":"packages/git/measure/live.mjs at exact 0da7e483b6c33d9302885316ff7eba705c9d23b3 on request/laneB-pushlog, under promise git:sha1…497a150 on request git:sha1…f4cee06","body":{"commit":"0da7e483b6c33d9302885316ff7eba705c9d23b3","path":"packages/git/measure/live.mjs"}}
