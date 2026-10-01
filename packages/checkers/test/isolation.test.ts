@@ -259,6 +259,33 @@ test("G2: a same-ID retry gets its own runner; a runner failure still destroys t
   assert.equal(fleet.boxes.at(-1)!.c.running, false);
 });
 
+test("G2: two runs of one job ID on one checker each find only their own workspace, across awaits", async () => {
+  const { f, ledger, services } = await world();
+  const c1 = await f.init();
+  const j = job(c1, { kind: "tree", tree: await f.tree(c1) });
+  ledger.issue(j);
+  const g = gate();
+  let n = 0;
+  class Lookup extends TestsChecker<{ s: CheckerServices }> {
+    readonly seen: [unknown, unknown][] = [];
+    protected services() {
+      return this.env.s;
+    }
+    override async run(jb: CheckJob) {
+      const before = this.workspace(jb).runner;
+      await (++n === 2 ? (g.open(), undefined) : g.wait());
+      const after = this.workspace(jb).runner;
+      this.seen.push([before, after]);
+      return { ok: before === after, detail: "looked up the workspace twice" };
+    }
+  }
+  const checker = new Lookup({ waitUntil: () => {} }, { s: services() });
+  await Promise.all([checker.handle(j), checker.handle(j)]);
+  assert.equal(checker.seen.length, 2);
+  for (const [before, after] of checker.seen) assert.equal(after, before, "a run kept its own workspace");
+  assert.notEqual(checker.seen[0]![0], checker.seen[1]![0], "the two runs had different runners");
+});
+
 // ------------------------------------------------------------------ G3
 
 /** A room that records the envelopes it is sent, in front of the ledger. */
