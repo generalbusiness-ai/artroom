@@ -434,12 +434,13 @@ test("a late error from lease 1's provisioning does not fail lease 2's workspace
   const { clock, ns, ws, lane, fork } = setup();
   ws.open(lane, 1, clock.t + LEASE_MS);
   let fail!: (e: Error) => void;
-  ns.infoHooks.push(() => new Promise<void>((_r, j) => (fail = j)));
+  ns.mintDelays.push(() => new Promise<void>((_r, j) => (fail = j)));
   const old = ws.provision(lane); // lease 1 provisioning, waiting on Artifacts
   while (!fail) await new Promise((r) => setTimeout(r, 2));
   ws.open(lane, 2, clock.t + LEASE_MS); // taken over
-  fail(Object.assign(new Error("UPSTREAM_UNAVAILABLE"), { code: "UPSTREAM_UNAVAILABLE" }));
-  await old;
+  fail(new Error("the connection to Artifacts was reset"));
+  const oldView = await old;
+  assert.equal(oldView.state, "pending", "after lease 1's late error, the workspace (now lease 2's) is still pending");
   assert.equal(ws.view(lane)?.state, "pending", "lease 2 is not marked failed by lease 1's error");
   assert.equal((await ws.provision(lane)).state, "ready");
   assert.ok(!("refused" in ws.grant(lane, 2)));
@@ -462,7 +463,7 @@ test("a late release of lease 1 never revokes lease 2's token, in either order",
       await Promise.all([releasing, provisioning]);
     } else {
       ws.open(lane, 2, clock.t + LEASE_MS); // take-over first; lease 1's token is owed revocation
-      ns.mintDelays.push(() => gate); // lease 2's mint is slow
+      ns.mintAfter.push(() => gate); // lease 2's token exists in Artifacts; its answer is slow
       const provisioning = ws.provision(lane);
       await new Promise((r) => setTimeout(r, 5));
       const releasing = ws.revoke(lane, 1); // the stale release arrives during the mint
