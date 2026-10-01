@@ -18,6 +18,7 @@ import { policy, requireReview } from "@generalbusiness/artroom-policy/helpers";
 import type { Room } from "../../src/index.ts";
 import { createSchema } from "../../src/store.ts";
 import { cursor } from "../../src/reads.ts";
+import { MemoryLogPublisher } from "../../src/memory/log.ts";
 import { delegableBy } from "../../src/roster.ts";
 import {
   addMember,
@@ -92,6 +93,20 @@ describe("1. recovery accepts only the confirmed parent or the exact pending com
     });
   }
 
+  it("a publisher whose confirmed commit is not the expected one is not sealed (its serialization must match commitFor)", async () => {
+    const r = await makeRoom();
+    await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
+    const real = MemoryLogPublisher.prototype.commitFor;
+    MemoryLogPublisher.prototype.commitFor = () => "d".repeat(40) as never;
+    try {
+      expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
+    } finally {
+      MemoryLogPublisher.prototype.commitFor = real;
+    }
+    expect((await r.admin.read({ q: "log" })).publishedThrough).toBe(-1);
+    expect(events(await entries(r), "checkpoint")).toEqual([]);
+  });
+
   it("the exact pending commit is stored before any remote write, and lost-response recovery still confirms it, across a restart", async () => {
     const r = await makeRoom();
     const own = await lostReplies(r);
@@ -145,6 +160,8 @@ describe("2. a workspace is fenced by the lease's deadline, not only its generat
     expect(await r.admin.read({ q: "op", op: id as never })).toMatchObject({
       state: "failed",
     });
+    // The expiry is sealed by the same alarm run, not left for the next one.
+    expect(events(await entries(r), "lease-expired").length).toBe(1);
     await tick(r);
     expect(events(await entries(r), "lease-expired").length).toBe(1);
     expect(await r.admin.read({ q: "lane", lane: c.lane })).toMatchObject({
@@ -183,7 +200,10 @@ describe("3. attention made later at an existing head reaches issued live cursor
     r.world.log.foreignWrite();
     const waiting = call<Update>(r.stub.poll(token, start.cursor, 5_000));
     expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
+    const t0 = Date.now();
     const woke = await waiting;
+    // Woken by the item, not by the poll's own timeout.
+    expect(Date.now() - t0).toBeLessThan(4_000);
     expect(woke.attention).toContainEqual(
       expect.objectContaining({ why: "publication-unresolved" }),
     );
@@ -229,6 +249,24 @@ describe("3. attention made later at an existing head reaches issued live cursor
       }),
     );
     expect(next.items.map((i) => i.why)).toEqual(["publication-unresolved"]);
+  });
+
+  it("an RPC subscription opened at the live head receives the item made later at that head", async () => {
+    const r = await makeRoom();
+    await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
+    const token = await r.admin.session();
+    const reader = (
+      (await r.stub.subscribe(token)) as ReadableStream<Uint8Array>
+    ).getReader();
+    r.world.log.foreignWrite();
+    expect((await failure(r.stub.publishLog())).code).toBe("unavailable");
+    const { value } = await reader.read();
+    const u = JSON.parse(
+      new TextDecoder().decode(value).trim().split("\n")[0]!,
+    ) as Update;
+    expect(u.entries).toEqual([]);
+    expect(u.attention.map((a) => a.why)).toEqual(["publication-unresolved"]);
+    await reader.cancel();
   });
 
   it("cursors in the earlier (seq, n) form still read, and skip nothing after their point", async () => {
@@ -342,6 +380,9 @@ describe("5. durable storage upgrades through versioned migrations", () => {
         goal: "g",
         scope: ["src/**"],
       });
+      // Items at entries below and above seq 10, so an order by ID text differs from (seq, n).
+      for (let i = 0; i < 8; i++)
+        await bob.ok("note", { act: c.id }, { text: `note ${i}` });
       const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
       await r.admin.ok(
         "propose",

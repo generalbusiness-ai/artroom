@@ -1136,7 +1136,7 @@ export class RoomCore {
       await this.serial(async () =>
         this.sql.transaction(() => {
           const now = this.pendingPublication();
-          if (!now || now.through !== done.through || now.expected !== result.commit) return;
+          if (!now || now.through !== done.through) return;
           this.sealSystem({ type: "checkpoint", through: done.through, hash: done.hash, commit: result.commit });
           setMeta(this.sql, "published_through", String(done.through));
           setMeta(this.sql, "log_commit", result.commit);
