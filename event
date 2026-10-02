@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a2464a8a63e2effb72ae8ab48b81e1bfc680fcaa","text":"Republished at 685c068bf7bf4323ef27bf0449e7d39aa1b1edfb; the successor stands at packages/room/src/reads.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:26b6a200116429f1d94de44c8f23698dd6a68f25","text":"Republished at 685c068bf7bf4323ef27bf0449e7d39aa1b1edfb, which no longer changes packages/room/src/room.ts: the pointer is withdrawn with no successor."}
