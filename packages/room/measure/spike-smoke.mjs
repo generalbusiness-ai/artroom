@@ -412,12 +412,13 @@ function why(answer) {
  * inventory again. Each duty ends `done`, `refused` or `unknown`. `ok` is
  * true only when every duty is done and the final inventory proves no
  * repository is left. Repository names and token IDs are kept, so an
- * operator can finish what is unresolved; no token is ever kept.
+ * operator can finish what is unresolved; no token is ever kept. Every
+ * remote call's exception becomes an unknown duty; any other exception
+ * reaches the caller, whose result then has a failed cleanup.
  */
 export async function cleanupRun({ api, canonical, expected = [], minted = new Map() }) {
   const duties = [];
-  let reposLeft = null;
-  let error;
+  let reposLeft = [];
   const record = (duty, outcome, detail) => {
     const d = { ...duty, outcome, ...(outcome !== "done" && detail ? { detail } : {}) };
     duties.push(d);
@@ -442,34 +443,30 @@ export async function cleanupRun({ api, canonical, expected = [], minted = new M
       return null;
     }
   };
-  try {
-    for (const [id, repo] of [...minted]) {
-      if ((await settle({ duty: "revoke-minted-token", repo, token: id }, () => api("DELETE", `/tokens/${id}`))) === "done") minted.delete(id);
-    }
-    if (canonical) {
-      const mine = (r) => typeof r?.name === "string" && (r.name === canonical || r.name.startsWith(`${canonical}--`));
-      const inventory = (duty) => listing({ duty, repos: expected }, `/repos?limit=${REPO_PAGE}&search=${canonical}`, REPO_PAGE);
-      const found = await inventory("inventory");
-      // Without a complete inventory, still clean what the run knows it made; the run fails on the inventory duty.
-      const names = found ? found.filter(mine).map((r) => r.name) : [...new Set(expected)];
-      for (const name of names) {
-        const tokens = await listing({ duty: "list-tokens", repo: name }, `/repos/${name}/tokens?state=active&per_page=${TOKEN_PAGE}`, TOKEN_PAGE);
-        for (const t of tokens ?? []) {
-          // Token metadata only: the ID, scope and times, never the token.
-          const meta = Object.fromEntries(Object.entries(t ?? {}).filter(([k]) => !/plaintext|token|secret/i.test(k)));
-          await settle({ duty: "revoke-token", repo: name, token: t?.id, meta }, () => api("DELETE", `/tokens/${t?.id}`));
-        }
-        await settle({ duty: "delete-repo", repo: name }, () => api("DELETE", `/repos/${name}`));
+  for (const [id, repo] of [...minted]) {
+    if ((await settle({ duty: "revoke-minted-token", repo, token: id }, () => api("DELETE", `/tokens/${id}`))) === "done") minted.delete(id);
+  }
+  if (canonical) {
+    const mine = (r) => typeof r?.name === "string" && (r.name === canonical || r.name.startsWith(`${canonical}--`));
+    const inventory = (duty) => listing({ duty, repos: expected }, `/repos?limit=${REPO_PAGE}&search=${canonical}`, REPO_PAGE);
+    const found = await inventory("inventory");
+    // Without a complete inventory, still clean what the run knows it made; the run fails on the inventory duty.
+    const names = found ? found.filter(mine).map((r) => r.name) : [...new Set(expected)];
+    for (const name of names) {
+      const tokens = await listing({ duty: "list-tokens", repo: name }, `/repos/${name}/tokens?state=active&per_page=${TOKEN_PAGE}`, TOKEN_PAGE);
+      for (const t of tokens ?? []) {
+        // Token metadata only: the ID, scope and times, never the token.
+        const meta = Object.fromEntries(Object.entries(t ?? {}).filter(([k]) => !/plaintext|token|secret/i.test(k)));
+        await settle({ duty: "revoke-token", repo: name, token: t?.id, meta }, () => api("DELETE", `/tokens/${t?.id}`));
       }
-      const left = await inventory("final-inventory");
-      reposLeft = left ? left.filter(mine).map((r) => r.name) : null;
-    } else reposLeft = [];
-  } catch (e) {
-    error = e.message;
+      await settle({ duty: "delete-repo", repo: name }, () => api("DELETE", `/repos/${name}`));
+    }
+    const left = await inventory("final-inventory");
+    reposLeft = left ? left.filter(mine).map((r) => r.name) : null;
   }
   const unresolved = duties.filter((d) => d.outcome !== "done");
-  const ok = error === undefined && unresolved.length === 0 && Array.isArray(reposLeft) && reposLeft.length === 0;
-  return { ok, duties, unresolved, reposLeft, ...(error !== undefined ? { error } : {}) };
+  const ok = unresolved.length === 0 && Array.isArray(reposLeft) && reposLeft.length === 0;
+  return { ok, duties, unresolved, reposLeft };
 }
 
 /** The run succeeds only if main finished, every step passed, and cleanup is all done. */

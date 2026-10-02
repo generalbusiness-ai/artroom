@@ -24,7 +24,6 @@ export interface CleanupOutcome {
   readonly duties: readonly Duty[];
   readonly unresolved: readonly Duty[];
   readonly reposLeft: readonly string[] | null;
-  readonly error?: string;
 }
 
 export type Api = (method: string, path: string, body?: unknown) => Promise<Answer | undefined>;

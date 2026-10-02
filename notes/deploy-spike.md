@@ -223,9 +223,9 @@ The result has one cleanup outcome, `cleanup`, from `cleanupRun`:
 - When the inventory fails, the run still cleans the repositories it knows
   it made: the canonical repository and the forks of its ready workspaces.
 - `cleanup.ok` is true only when every duty is done and the final inventory
-  proves that no repository of the run is left. `cleanupRun` catches its own
-  exceptions, so a throw becomes an unknown duty or `cleanup.error`, never
-  a silent success.
+  proves that no repository of the run is left. An exception from a remote
+  call becomes an unknown duty. Any other exception in cleanup leaves the
+  result with `cleanup.ok` false and the error recorded.
 - The run's `ok` (`smokeOk`) needs main to finish, every step to pass and
   `cleanup.ok`. The exit status is 0 only then.
 - `cleanup.unresolved` lists every duty that is not done, with the
