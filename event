@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:dbdb6c4b60b20d3dfc589626f100a44d67bf1867","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa; the successor stands at packages/room/test/workerd/mcp.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3552d70096fa34037af8bda0e3aafb1f1f1b1b76","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/room/test/workerd/phase2b.test.ts: the pointer is withdrawn with no successor."}
