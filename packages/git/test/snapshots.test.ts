@@ -512,20 +512,82 @@ test("a job with a short deadline brings the wake-up forward to that deadline", 
   assert.equal(ns.repos.has(r.name), false);
 });
 
-test("a duty table from revision 3 (no snapshot column) is migrated, and its owed deletion still runs", async () => {
-  const clock = new Clock();
-  const ns = new Fake(clock);
-  const sql = nodeSql();
+// ------------------------------------------------------------------ review 13b98054: the upgrade from revision 3
+
+/**
+ * The ledger exactly as revision 3 (17a79543) left it after `prepare` sent a
+ * create whose reply was lost: its tables, a `creating` row, and the
+ * retirement duty it wrote before the call (reason "created", due 24 hours
+ * later). With `migrated`, as revision 4's column-only migration then left it.
+ */
+function revision3(sql: Sql, t: number, o: { migrated?: boolean; settled?: boolean } = {}) {
+  sql.all("CREATE TABLE artroom_snap (snapshot TEXT PRIMARY KEY, name TEXT NOT NULL, state TEXT NOT NULL, remote TEXT, created_at INTEGER NOT NULL)");
+  sql.all(
+    "CREATE TABLE artroom_snap_token (token_id TEXT PRIMARY KEY, snapshot TEXT NOT NULL, name TEXT NOT NULL, job TEXT NOT NULL, expires_at INTEGER NOT NULL, ended INTEGER NOT NULL DEFAULT 0)",
+  );
   sql.all(
     "CREATE TABLE artroom_snap_duty (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, kind TEXT NOT NULL, token_id TEXT, " +
       "expires_at INTEGER, reason TEXT NOT NULL, state TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, " +
       "last_error TEXT, done_at INTEGER, done_reason TEXT)",
   );
-  await ns.create("canon--snap-old");
-  sql.all("INSERT INTO artroom_snap_duty (name, kind, reason, state, next_at) VALUES ('canon--snap-old', 'delete', 'created', 'owed', ?)", clock.t);
-  const snaps = new SnapshotRepos({ sql, artifacts: ns, prefix: "canon", now: clock.now, sleep: async () => {} });
-  assert.equal(snaps.pending(), 1);
-  assert.equal(await snaps.reconcile(), 0);
-  assert.equal(ns.repos.has("canon--snap-old"), false);
-  await snaps.prepare(C1, async () => C1);
+  const name = `canon--snap-${C1}`;
+  if (o.settled) {
+    // Revision 3 already ran its retirement while the repository was absent, and closed it.
+    sql.all("INSERT INTO artroom_snap_duty (name, kind, reason, state, next_at, done_at, done_reason) VALUES (?, 'delete', 'created', 'done', ?, ?, 'repository-deleted')", name, t, t);
+  } else {
+    sql.all("INSERT INTO artroom_snap (snapshot, name, state, remote, created_at) VALUES (?, ?, 'creating', NULL, ?)", C1, name, t);
+    sql.all("INSERT INTO artroom_snap_duty (name, kind, reason, state, next_at) VALUES (?, 'delete', 'created', 'owed', ?)", name, t + MAX_RETAIN_MS);
+  }
+  if (o.migrated) sql.all("ALTER TABLE artroom_snap_duty ADD COLUMN snapshot TEXT NOT NULL DEFAULT ''");
+  return name;
+}
+
+for (const variant of [{}, { migrated: true }, { settled: true }] as const) {
+  const label = "migrated" in variant ? "after revision 4's column-only migration" : "settled" in variant ? "already closed by revision 3" : "straight from revision 3";
+  test(`upgrade (${label}): a legacy create whose reply was lost stays unresolved, and its repository is deleted whenever it appears (P2, review 13b98054)`, async () => {
+    const clock = new Clock();
+    const ns = new Fake(clock);
+    const sql = nodeSql();
+    const name = revision3(sql, clock.t, variant);
+    const host = () => new SnapshotRepos({ sql, artifacts: ns, prefix: "canon", now: clock.now, sleep: async () => {} });
+    clock.advance(MAX_RETAIN_MS + 1);
+    let snaps = host();
+    // The first cleanup after the upgrade, while the repository is absent: nothing is settled.
+    assert.equal(await snaps.reconcile(), 1);
+    assert.notEqual(snaps.nextDue(), null);
+    assert.deepEqual(
+      snaps.duties().filter((d) => d.state !== "done").map((d) => [d.kind, d.state, d.reason, d.name]),
+      [["create", "in-flight", "legacy", name]],
+    );
+    assert.equal(sql.all("SELECT * FROM artroom_snap").length, 0, "a legacy repository is never reused");
+    // The old create applies now, with its write token.
+    await ns.create(name);
+    assert.equal(ns.repos.get(name)!.active().filter((t) => t.scope === "write").length, 1);
+    await drain(clock, snaps, 3);
+    assert.equal(ns.repos.has(name), false, "deleted once seen");
+    // Still watched, across a restart: another old attempt on that name may yet apply.
+    snaps = host();
+    assert.equal(snaps.pending(), 1);
+    await ns.create(name);
+    await drain(clock, snaps, 3);
+    assert.equal(ns.repos.has(name), false, "deleted again");
+    // New attempts are separate and fenced: their own names, untouched by the legacy step.
+    const r = await snaps.prepare(C1, async () => C1);
+    assert.notEqual(r.name, name);
+    await snaps.mint(C1, "job_1", clock.t + 15 * 60_000);
+    await snaps.sweep();
+    assert.equal(ns.repos.has(r.name), true);
+  });
+}
+
+test("the upgrade runs once: a second start adds no legacy steps, and a new ledger has none", async () => {
+  const clock = new Clock();
+  const ns = new Fake(clock);
+  const sql = nodeSql();
+  revision3(sql, clock.t);
+  const host = () => new SnapshotRepos({ sql, artifacts: ns, prefix: "canon", now: clock.now, sleep: async () => {} });
+  host();
+  host();
+  assert.equal(host().duties().filter((d) => d.reason === "legacy").length, 1);
+  assert.equal(new SnapshotRepos({ sql: nodeSql(), artifacts: ns, prefix: "canon", now: clock.now }).duties().length, 0);
 });
