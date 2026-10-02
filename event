@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fb3e4e3d441e0db800e8cd0718551bbeeba169e7","text":"Merge retired a covered predecessor; the successor is at packages/room/src/jobs.ts."}
+{"kind":"artifact","text":".github/workflows/row-writes.yml at exact 487edd74c37aae85f73a2eca16ad3482c9301130 on request/row-writes, under promise git:sha1…239fba7 on request git:sha1…dc18d10","body":{"commit":"487edd74c37aae85f73a2eca16ad3482c9301130","path":".github/workflows/row-writes.yml"}}
