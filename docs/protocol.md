@@ -3254,7 +3254,9 @@ Workers binding and REST pages, 2026-10-02) document no way to name a
 token when it is created, and no way to learn that a failed create will
 never apply. So these rules keep a durable record and a stored wake-up
 before each request, and never revoke a token that the Room cannot match
-to its own record by ID. Revision 2 answers checker report 9ff903ab.
+to its own record by ID. Revision 2 answers checker report 9ff903ab;
+revision 3 answers the checker's follow-up on landing token IDs and check
+job deadlines.
 
 The design, the mint sites, the provider evidence, and each lane's edits
 and tests are in
@@ -3292,9 +3294,13 @@ record became unknown:
   with the expiry Artifacts reported, or with no expiry if it is
   unreadable.
 - The token may be used only if the answer also gives its text, the scope
-  asked, and a readable expiry no later than the asked lifetime allows,
-  and only by a caller still waiting for it. Otherwise it is owed
-  revocation at once, and no one uses its text.
+  asked, and a readable expiry no later than the answer's arrival plus the
+  lifetime asked, and only by a caller still waiting for it. Otherwise it
+  is owed revocation at once, and no one uses its text.
+- An owner's stricter bounds stand beside that check. A check job's token
+  is accepted only if its reported expiry is by the job's deadline, and an
+  attempt whose deadline has passed is never sent; its token is ended
+  instead (R-EXEC-9).
 - An Artifacts error that says the request was refused and changed
   nothing (`refusedUnchanged`) closes the record.
 - Any other result leaves the outcome unknown. That includes a transport
@@ -3363,6 +3369,11 @@ the job's deadline.
   request needed.
 - Every wake-up the Room stores for this work is in the future, so no
   alarm runs again at once.
+- Every known canonical token ID has a record keyed by that ID, from the
+  transaction that records the ID to the one that marks it revoked. That
+  includes a publication token, whose ID is also in its landing operation.
+  So an observation finds whether the Room knows a listed token by point
+  lookups, without reading operations.
 - Each wake-up does work bounded independently of the number of records
   kept: at most 20 revocations, earliest due first, each with a bounded
   wait; at most one inventory, with a bounded wait and size; a fixed

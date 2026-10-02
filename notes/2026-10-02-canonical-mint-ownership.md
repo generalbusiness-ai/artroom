@@ -3,8 +3,10 @@
 2026-10-02. Gitseq request `10fcfe4e` (builder), from checker audit handoff
 `9f2d8808` ([plans/README.md](../plans/README.md), "Canonical mint
 ownership"). Branch `request/mint-ownership`, cut from main `3ac55e96`.
-Revision 2 answers checker report `9ff903ab`. Source line numbers are as
-at this revision's head, where no source file differs from `3ac55e96`.
+Revision 2 answers checker report `9ff903ab`; revision 3 answers the
+checker's two follow-up points on it (landing token IDs, and check jobs'
+deadline). Source line numbers are as at this revision's head, where no
+source file differs from `3ac55e96`.
 
 This is a design for review. It changes no source code. Approving it
 authorizes no live operation and no implementation: lanes A, B and C below
@@ -121,8 +123,10 @@ and next due time). Counts change in the same transaction as each record.
   wake-up cannot be stored, the record is deleted and nothing is sent.
 - **The answer.** It is classified once, whenever it arrives:
   - an ID and text, with the scope asked and a readable expiry no later
-    than asked, while the caller still waits: the record becomes `held`,
-    and the caller gets the token;
+    than the answer's arrival plus the lifetime asked, while the caller
+    still waits: the record becomes `held`, and the caller gets the token.
+    This is the ledger's generic check. An owner may add a stricter one:
+    a check job also needs the expiry by its absolute deadline (lane C);
   - an ID, but no text, another scope, an unreadable or longer expiry, or
     a caller that no longer waits: the record becomes `owed`, with the
     reported expiry, or none if it is unreadable. No caller gets the text.
@@ -196,21 +200,40 @@ proportion to the number of records kept.
 | Work | Bound per wake-up |
 |---|---|
 | Owed revocations | One pass at a time, off the publication queue, never awaited by the alarm. At most 20 records, earliest due first, then by row ID, so older debt goes first however many new mints arrive. At most 30 s per revocation. At most 20 record writes and one summary write |
-| Observation | At most one, when due. One `listTokens()` call, waited on for at most 30 s. If the listing is incomplete (`completeInventory`) or has more than 1,000 records, that is the result, and nothing is counted. Otherwise each active, unexpired token's ID is looked up in the Room's records by index. One summary write: the time, the result and the next due time. No record is written |
+| Observation | At most one, when due. One `listTokens()` call, waited on for at most 30 s. If the listing is incomplete (`completeInventory`) or has more than 1,000 records, that is the result, and nothing is counted. Otherwise each active, unexpired token's ID is looked up by primary key or index in three tables (below): at most 3,000 point lookups. One summary write: the time, the result and the next due time. No record is written, and no operation body is read |
 | Observation schedule | After each observation, the next is due after a wait that doubles from 1 min to 6 h. A new unknown record brings it forward, but never sooner than 1 min after the last one. So there is at most one inventory a minute, whatever the rate of new unknowns |
 | Takeover at start | One update of the `sent` and `held` records, whose number is the host's work in flight, not the history |
 | `nextDue()` | Three indexed minimums and the summary row |
 | `duties({ after, limit })` | One page of records by row ID, at most `limit`, with the counts from the summary row. Every record stays reachable by paging. None is ever evicted |
 
-The Room records that the observation looks up are: the ledger's known
-tokens, `job_tokens`, the landing engine's tokens of active operations, and
-plan 003's cleanup table (lane B adds an index on its token column). The
-count is evidence for an operator, not attribution: an operator's own
-tokens, and a founding token not yet revoked, add to it.
+The observation looks up each listed ID in three places, each keyed by
+token ID:
 
-On the normal path a mint writes three rows: the record, its answer, and
-its deletion. Request `8bd623cc`, which is measuring physical rows per act,
-should measure this too.
+- the ledger's records (an index on their token ID);
+- `job_tokens` (its primary key);
+- a new landing table, `artroom_land_token (token TEXT PRIMARY KEY, op,
+  n)`. Today a publication token's ID lives only inside
+  `artroom_land_op.body`, in the push attempt (`core.ts:704–710`), and in
+  plan 003's cleanup table once its operation has ended
+  (`core.ts:155–167`). Neither can be read by token ID. The new table holds
+  one row for every landing token not yet confirmed revoked, active or
+  ended. `pushToken` inserts the row in the transaction that records the
+  ID and claims it from the ledger. `tokenRevoked` (`core.ts:726–733`)
+  deletes it in the transaction that marks the token revoked. Those are the
+  only two places that change a token's state. A room stored before this
+  change fills it once, under a meta key, from its active operations'
+  unrevoked tokens and its cleanup table rows; an ended operation's
+  unrevoked token is always in that table.
+
+The ledger takes these as one callback, `known(tokenId)`, which the Room
+builds from the three point lookups. The count is evidence for an
+operator, not attribution: an operator's own tokens, and a founding token
+not yet revoked, add to it.
+
+On the normal path a mint writes three ledger rows: the record, its
+answer, and its deletion by the claim or the revocation. A publication
+token also writes and deletes its landing row. Request `8bd623cc`, which
+is measuring physical rows per act, should measure this too.
 
 ### Rejected alternatives
 
@@ -249,7 +272,8 @@ Each lane runs these gates at its exact head, and records the exit codes:
 **Files:** new `packages/git/src/mints.ts`; `packages/git/src/index.ts`
 exports it; new `packages/git/test/mints.test.ts`. No caller changes.
 
-**API:** `new MintLedger({ sql, repo, now, wake, known, waitMs? })`;
+**API:** `new MintLedger({ sql, repo, now, wake, known, waitMs? })`,
+where `known(tokenId)` answers whether another Room record holds that ID;
 `mint(purpose, scope, ttl)` returns `{ id, plaintext, release(), claim() }`;
 `withToken(purpose, scope, ttl, fn)`; `reconcile()`; `nextDue()`;
 `duties({ after, limit })`.
@@ -311,7 +335,9 @@ revocation failure; a `claim()` in its own transaction.
 
 **Files:** `packages/git/src/artifacts.ts` (remove `canonicalTokens`),
 `packages/git/src/landing/engine.ts`, `packages/git/src/landing/core.ts`
-(`pushToken` takes `claim`; an index on the cleanup table's token column),
+(`pushToken` takes `claim`; the `artroom_land_token` table, written by
+`pushToken` and `tokenRevoked`, filled once for a stored room, and read by
+`knownToken(id)`),
 `packages/git/src/worker.ts` (the harness builds its own ledger),
 `packages/git/test/support.ts`, `packages/git/test/landing.test.ts`,
 `packages/git/test-workers/landing-do.test.ts`, `packages/room/src/core.ts`
@@ -331,10 +357,21 @@ and a new Room workerd test file.
    record stays; the retry's token is the one pushed; outcome, slot and
    receipts are as before.
 3. A trigger that fails `pushToken`'s transaction leaves the ledger owning
-   the token, which is revoked later.
-4. All existing landing tests, plan 003's cleanup tests and review
+   the token, with no landing row; the token is revoked later.
+4. The landing row: present after `pushToken`; deleted by `tokenRevoked`,
+   whether the held operation's own revocation or plan 003's cleanup pass
+   answered; kept while a revocation fails, including after the operation
+   ends; a trigger that fails the row's insert or delete rolls back
+   `pushToken` or `tokenRevoked` with it.
+5. A stored room with an active operation's unrevoked token and an ended
+   operation's owed token gains both landing rows once, at its first
+   start, and not again.
+6. An observation over a listing that holds an active operation's token
+   and an ended operation's owed token counts neither as unaccounted. The
+   SQL double shows it read no `artroom_land_op` row.
+7. All existing landing tests, plan 003's cleanup tests and review
    f060871b's Room control pass unchanged.
-5. Durable Object controls, with real storage and alarms, and no request
+8. Durable Object controls, with real storage and alarms, and no request
    after the first:
    - no alarm stored beforehand: while the create is held, storage has an
      alarm no later than the takeover time;
@@ -351,8 +388,10 @@ and a new Room workerd test file.
      takeover time ahead, and none is stored less than 1 s ahead.
 
 **Mutation targets:** no `claim`; `claim` outside `pushToken`'s
-transaction; the engine retrying the mint itself; the ledger left out of
-`nextAlarm()` or of start-up recovery.
+transaction; the landing row written outside `pushToken`'s transaction,
+or not deleted by `tokenRevoked`; the fill skipped, or run at every start;
+`knownToken` reading operation bodies; the engine retrying the mint
+itself; the ledger left out of `nextAlarm()` or of start-up recovery.
 
 ### Lane C: the other canonical sites
 
@@ -364,7 +403,12 @@ receives the ledger), `packages/room/src/core.ts:202–212`,
 `packages/room/src/jobs.ts`, and tests.
 
 **Check jobs:** `issue` mints through the ledger and claims inside the
-`job_tokens` transaction. `watchMint` and its `mint:<job>` rows go. A room
+`job_tokens` transaction. It keeps its own deadline checks, which are
+stricter than the ledger's generic one: it asks for a lifetime that ends
+before the deadline (`jobs.ts:371`); it accepts a token only if its
+reported expiry is by the attempt's absolute deadline (`jobs.ts:385–386`),
+and otherwise ends it at once; and it never sends an attempt once the
+deadline has passed, ending its token instead (`jobs.ts:424–429`). `watchMint` and its `mint:<job>` rows go. A room
 stored before this change moves its open `mint:` rows into the ledger as
 `unknown` records once, under a meta key, so no unknown create is lost.
 The tests in `job-token-mint.test.ts` keep their meaning, checked through
@@ -380,12 +424,23 @@ the ledger's duties.
    at a later alarm.
 3. A stored room with open `mint:` rows: after the move, each is an
    unknown ledger record, once, and none is lost.
-4. A source scan: outside the harnesses, `measure/` and tests, only
+4. The deadline, beside the generic check: the room clock moves 20 s while the
+   create's answer is held, so the answer passes the ledger's generic
+   check (expiry no later than its arrival plus the lifetime asked) but
+   its expiry is after the job's deadline. The token is not accepted, no
+   job is sent, and the token is revoked by its ID. A second case: the
+   expiry is by the deadline, but the clock passes the deadline before
+   dispatch. No job is sent, and the token is ended. A third: a token
+   whose expiry fails the generic check is refused too. Each case is red
+   if `issue` relies only on the generic check.
+5. A source scan: outside the harnesses, `measure/` and tests, only
    `mints.ts`, `workspace/workspaces.ts`, `snapshot/repos.ts` and
    `publisher/client.ts` (the fork token only) call `createToken`.
 
 **Mutation targets:** a site that calls `createToken` directly; a dropped
-revocation failure; the move run at every start, or not at all.
+revocation failure; the move run at every start, or not at all; `issue`'s
+expiry check against the deadline removed; `issue`'s check for a passed
+deadline before dispatch removed.
 
 ## Out of scope
 
