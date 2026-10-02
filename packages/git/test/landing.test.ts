@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { OpId, Sha } from "@generalbusiness/artroom-contract";
-import { Landing, type FaultPoint } from "../src/landing/engine.ts";
+import { EngineStopped, Landing, type FaultPoint } from "../src/landing/engine.ts";
 import { TOKEN_CLEANUP_BACKOFF } from "../src/landing/core.ts";
 import { GitPublisher } from "../src/publisher/git-publisher.ts";
 import { GitOps, pinnedRef } from "../src/publisher/gitops.ts";
@@ -823,6 +823,41 @@ test("R-PUB-3, R-REV-5: an abort that ends without a push, by its existing defin
   assert.deepEqual(w.room.log.map((x) => x.event.type), log, "no new event");
   const after = restarted.view(id);
   assert.equal(after?.state === "aborted" ? after.abort.tokenRevoked : null, false, "the abort attempt's record is history");
+});
+
+test("R-PUB-3: a held publication's tokens stay with its own publication steps; a stopped instance's late revocation answer writes nothing", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await readyAndReserve(w, id);
+  w.pub.pushDown = true;
+  w.tokens.failRevoke = true;
+  await w.engine.publish();
+  assert.equal(w.engine.view(id)?.state, "unresolved");
+  assert.deepEqual([...w.tokens.live], ["tok_1"]);
+  assert.deepEqual(w.engine.core.tokenCleanup(), [], "no cleanup record while the operation holds the slot");
+  // It lands on the forward retry, while revocation still fails: now both tokens are owed.
+  w.pub.pushDown = false;
+  w.clock.advance(5_000);
+  await w.engine.publish();
+  assert.equal(w.engine.view(id)?.state, "landed");
+  const owed = w.engine.core.tokenCleanup();
+  assert.deepEqual(owed.map((c) => [c.op, c.n, c.backoffMs]), [[id, 1, 1_000], [id, 2, 1_000]]);
+  // An instance asks for a revocation, and is replaced before Artifacts answers.
+  w.tokens.failRevoke = false;
+  const gate = (await import("./support.ts")).deferred();
+  const real = w.tokens.revoke.bind(w.tokens);
+  w.tokens.revoke = async (tok: string) => {
+    await gate.promise;
+    return real(tok);
+  };
+  w.clock.t = owed[0]!.dueAt;
+  const old = w.engine.reconcile();
+  await new Promise((r) => setTimeout(r, 10));
+  w.make();
+  gate.reject(new Error("Artifacts unavailable (revoke)"));
+  await assert.rejects(old, EngineStopped);
+  assert.deepEqual(w.current().core.tokenCleanup(), owed, "the stopped instance's failure rescheduled nothing");
 });
 
 test("R-PUB-3: a room stored before the cleanup records existed owes its ended operations' unrevoked tokens once, at start", async (t) => {
