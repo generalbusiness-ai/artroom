@@ -80,6 +80,8 @@ describe("redact: credentials known by their syntax, whatever their length or en
     ["a passphrase pair", "passphrase=q1 sent", ["q1"], "passphrase=<redacted> sent"],
     ["spaces around the separator", 'PASSWORD = "x y"', ["x y"], "PASSWORD = <redacted>"],
     ["an unclosed quote, to the end", 'password="abc def', ["abc", "def"], "password=<redacted>"],
+    ["an unclosed quote ending in a backslash, to the end", 'password="abc def\\', ["abc", "def"], "password=<redacted>"],
+    ["an unclosed quote across lines, to the end", 'password="abc\ndef ghi', ["abc", "def", "ghi"], "password=<redacted>"],
     ["JSON inside a string, to the end of the line", String.raw`body {\"password\":\"a b\",\"user\":\"u\"}` + "\nnext", ["a b", "user"], String.raw`body {\"password\":<redacted>` + "\nnext"],
     ["a short Bearer credential", "sent Bearer x, rejected", ["x,"], "sent Bearer <redacted>, rejected"],
     ["a two-character bearer credential", "bearer ab", ["ab"], "bearer <redacted>"],
@@ -89,6 +91,16 @@ describe("redact: credentials known by their syntax, whatever their length or en
     ["a short Authorization header", "Authorization: Bearer x\nthen", ["Bearer x"], "Authorization: <redacted>\nthen"],
     ["a JSON authorization header", '{"authorization": "Basic a"}', ["Basic a"], '{"authorization": <redacted>'],
     ["a Proxy-Authorization header", "Proxy-Authorization: Negotiate y", ["Negotiate y"], "Proxy-Authorization: <redacted>"],
+    ["a short GitHub token", `cut ${join("gh", "p_", "ab")} here`, [join("gh", "p_")], "cut <secret> here"],
+    ["a short fine-grained GitHub token", `cut ${join("github", "_pat_", "ab")} here`, ["_pat_"], "cut <secret> here"],
+    ["a short Slack token", `cut ${join("xo", "xb-", "1")} here`, [join("xo", "xb-")], "cut <secret> here"],
+    ["a short Stripe key", `cut ${join("sk", "_live_", "x")} here`, ["_live_"], "cut <secret> here"],
+    ["a short AWS access key ID", `cut ${join("AK", "IA", "Q1")} here`, [join("AK", "IA")], "cut <secret> here"],
+    ["a short Google API key", `cut ${join("AI", "za", "q")} here`, [join("AI", "za")], "cut <secret> here"],
+    ["a short JSON Web Token", `cut ${join("ey", "Ja.", "ey", "Jb.c")} here`, [join("ey", "Ja")], "cut <secret> here"],
+    ["a Slack webhook's path", `post ${join("https://hooks.", "slack.com/services/", "T0/B0/x")} failed`, ["T0/B0"], "post <secret> failed"],
+    ["a private key block's body", join("-----BEGIN ", "PRIVATE KEY-----\nq1w2\ne3r4\n-----END ", "PRIVATE KEY-----\nnext"), ["q1w2", "e3r4"], "<secret>\nnext"],
+    ["a private key block cut before its END line, to the end", join("key -----BEGIN ", "RSA PRIVATE KEY-----\nq1w2 e3r4"), ["q1w2", "e3r4"], "key <secret>"],
   ];
   for (const [what, input, gone, out] of cases)
     it(`removes ${what}`, () => {
@@ -96,6 +108,40 @@ describe("redact: credentials known by their syntax, whatever their length or en
       for (const g of gone) expect(r).not.toContain(g);
       expect(r).toBe(out);
     });
+});
+
+describe("redact: the checker's controls (report e6a9016b)", () => {
+  // The checker's three cases, verbatim, through `diagnosis` as the Room calls it.
+  for (const [what, text, fragments] of [
+    ["quoted spaces", 'password: "horse battery staple"', ["horse", "battery", "staple"]],
+    ["quoted escaped quote", JSON.stringify({ password: 'horse"battery' }), ["horse", "battery"]],
+    ["short bearer", "request with Bearer abcd failed", ["abcd"]],
+  ] as const)
+    it(what, () => {
+      const d = diagnosis("pre-admission-failed", "propose.pinObjects", new Error(text));
+      for (const f of fragments) expect(d.message).not.toContain(f);
+      expect(d.message).toContain("<redacted>");
+    });
+
+  it("the error's name is redacted too", () => {
+    const e = Object.assign(new Error("x"), { name: 'ArtifactsError password="horse battery" Bearer abcd' });
+    const d = diagnosis("e", "s", e);
+    for (const f of ["horse", "battery", "abcd"]) expect(d.name).not.toContain(f);
+  });
+
+  it("fails closed when the input bound cuts a quoted value: the rest is not published", () => {
+    // Twenty long tokens shrink to 160 characters, so what stood at the 4,096-character cut comes into view.
+    const long = join("art_", "v1_", fill(193));
+    const prefix = `${Array.from({ length: 20 }, () => long).join(" ")} ${"y ".repeat(27)}`;
+    const text = `${prefix}password: "horse battery staple correct" end`;
+    // The cut falls inside the quoted value, after its first word.
+    expect(text.indexOf("battery")).toBeLessThan(4096);
+    expect(text.indexOf("battery") + "battery".length).toBeGreaterThan(4096);
+    expect(text.indexOf("correct")).toBeGreaterThan(4096);
+    const r = redact(text);
+    expect(r).toContain("password: <redacted>");
+    for (const f of ["horse", "battery", "staple", "correct", "end"]) expect(r).not.toContain(f);
+  });
 });
 
 describe("diagnosis and report", () => {

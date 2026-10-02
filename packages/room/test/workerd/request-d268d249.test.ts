@@ -20,7 +20,7 @@ import { route } from "../../src/http.ts";
 import { mcpEndpoint } from "../../src/mcp.ts";
 import { roomIdOf } from "../../src/ids.ts";
 import { hex } from "../../src/crypto.ts";
-import { addMember, call, Client, expectOk, failure, grant, makeRoom, newKeyPair, placeRepo, pushChange, randomBytes, sign, tick, worldFor, type TestRoom } from "./support.ts";
+import { addMember, call, Client, clock, expectOk, failure, grant, makeRoom, newKeyPair, placeRepo, pushChange, randomBytes, sign, tick, worldFor, type TestRoom } from "./support.ts";
 import type { PortMethod } from "./support.ts";
 
 const UNAVAILABLE = "The repository could not be read. Nothing was recorded; retry with the same idempotency key.";
@@ -388,6 +388,13 @@ const SYNTAX_CASES: [string, string, string[]][] = [
   ["a short Basic credential", "sent Basic YQ== rejected", ["YQ=="]],
   ["a short Authorization header", "Authorization: Bearer q\nthen", ["Bearer q"]],
   ["a one-character token pair", "token=q ok", ["=q"]],
+  ["a short GitHub token", `cut ${join("gh", "p_", "q1")} here`, [join("gh", "p_")]],
+  ["a short JSON Web Token", `cut ${join("ey", "Jq.", "ey", "Jw.e")} here`, [join("ey", "Jq")]],
+  ["a private key block's body", join("-----BEGIN ", "PRIVATE KEY-----\nq1w2\ne3r4\n-----END ", "PRIVATE KEY-----"), ["q1w2", "e3r4"]],
+  // The checker's three controls (report e6a9016b), verbatim.
+  ["the checker's quoted spaces", 'password: "horse battery staple"', ["horse", "battery", "staple"]],
+  ["the checker's quoted escaped quote", JSON.stringify({ password: 'horse"battery' }), ["horse", "battery"]],
+  ["the checker's short bearer", "request with Bearer abcd failed", ["abcd"]],
 ];
 
 describe("request d268d249: credentials known by their syntax are redacted whatever their length (checker, 0e058f13)", () => {
@@ -397,18 +404,43 @@ describe("request d268d249: credentials known by their syntax are redacted whate
       const c = await claimed(r);
       const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
       const d = await failsAt(r, r.admin.signed("propose", { lane: c.lane }, proposeBody(head)), "pinObjects", "propose.pinObjects", Object.assign(new Error(message), { name: "ArtifactsError" }));
-      expect(d.message).toContain("<redacted>");
+      expect(d.message).toMatch(/<redacted>|<secret>/);
       for (const g of gone) expect(JSON.stringify(d)).not.toContain(g);
     });
 
-  it("a retained job error uses the same redaction: a canonical token mint whose answer is lost", async () => {
+  it("pinObjects fails with a credential in the error's name: the name is redacted too", async () => {
+    const r = await makeRoom();
+    const c = await claimed(r);
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    const e = Object.assign(new Error("x"), { name: 'ArtifactsError password="horse battery" Bearer abcd' });
+    const d = await failsAt(r, r.admin.signed("propose", { lane: c.lane }, proposeBody(head)), "pinObjects", "propose.pinObjects", e);
+    for (const f of ["horse", "battery", "abcd"]) expect(JSON.stringify(d)).not.toContain(f);
+  });
+
+  it("retained job errors use the same redaction, at all three sinks: a lost mint, an unreadable inventory, a failed revocation", async () => {
     const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: `sha256:${"0".repeat(64)}` };
     const r = await makeRoom({ policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })), files: { ".artroom/checkers/unit.json": JSON.stringify(whole), "package.json": "{}" } });
+    // The canonical repository's methods named in `failing` throw an error with every case's credential, in its
+    // message and its name (`String(e)` carries both), on this room's object only.
+    const failing = new Set<string>();
+    const message = SYNTAX_CASES.map(([, m]) => m).join("; ");
     await inDO(r, async (room) => {
       await room.core.idle();
       const run = room.core.run.bind(room.core);
       room.core.run = (s) => {
         if (s !== "jobs" && s !== "landing") run(s);
+      };
+      const binding = room.core.artifacts as unknown as { get: (name: string) => Promise<Record<string, unknown>> };
+      const get = binding.get.bind(binding);
+      binding.get = async (name) => {
+        const repo = await get(name);
+        const wrapped = Object.create(repo) as Record<string, unknown>;
+        for (const m of ["createToken", "listTokens", "revokeToken"])
+          wrapped[m] = (...a: unknown[]) => {
+            if (failing.has(m)) throw Object.assign(new Error(message), { name: "ArtifactsError Bearer abcd" });
+            return (repo[m] as (...x: unknown[]) => unknown).apply(repo, a);
+          };
+        return wrapped;
       };
     });
     const alice = await addMember(r, "@alice", "member");
@@ -417,26 +449,34 @@ describe("request d268d249: credentials known by their syntax are redacted whate
     const c = await alice.ok<Claim>("claim", null, { goal: "work", scope: ["src/**"] });
     const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
     await alice.ok<Proposal>("propose", { lane: c.lane }, proposeBody(head));
-    const message = SYNTAX_CASES.map(([, m]) => m).join("; ");
-    const rows = await inDO(r, async (room) => {
-      await room.core.idle();
-      // The canonical repository's mint fails with every case's credential in its message, on this room's object only.
-      const binding = room.core.artifacts as { get: (name: string) => Promise<object> };
-      const get = binding.get.bind(binding);
-      binding.get = async (name) =>
-        Object.assign(Object.create(await get(name)), {
-          createToken: async () => {
-            throw Object.assign(new Error(message), { name: "ArtifactsError" });
-          },
-        });
-      await room.core.steps.jobs();
-      await room.core.idle();
-      binding.get = get;
-      return room.core.sql.all("SELECT last_error FROM job_tokens");
-    });
-    const kept = rows.map((x) => String(x["last_error"])).find((e) => e.startsWith("answer lost"));
-    expect(kept).toBeDefined();
-    expect(kept).toContain("<redacted>");
-    for (const [, , gone] of SYNTAX_CASES) for (const g of gone) expect(kept).not.toContain(g);
+    const jobs = () =>
+      inDO(r, async (room) => {
+        await room.core.idle();
+        await room.core.steps.jobs();
+        await room.core.idle();
+        return room.core.sql.all("SELECT token_id, expires_at, next_ms, last_error FROM job_tokens ORDER BY token_id");
+      });
+    // jobs.ts, the lost mint: `answer lost: …`.
+    failing.add("createToken");
+    const lost = await jobs();
+    const mint = lost.find((x) => String(x["token_id"]).startsWith("mint:"))!;
+    expect(String(mint["last_error"])).toMatch(/^answer lost: /);
+    // jobs.ts, the unknown mint's observation and the ended token's revocation: once the mint's deadline has passed,
+    // the inventory cannot be read; the next attempt mints a token, the checker refuses, and its revocation fails.
+    failing.clear();
+    failing.add("listTokens");
+    failing.add("revokeToken");
+    clock.now = Math.max(Number(mint["next_ms"]), Number(mint["expires_at"])) + 1;
+    await jobs();
+    clock.now += 60_000;
+    const rows = await jobs();
+    const errors = rows.map((x) => String(x["last_error"]));
+    const of = (mintRow: boolean) => rows.filter((x) => String(x["token_id"]).startsWith("mint:") === mintRow).map((x) => String(x["last_error"]));
+    expect(of(true)).toEqual([expect.stringMatching(/^outcome unknown; the token inventory could not be read: ArtifactsError Bearer <redacted> login password=<redacted> /)]);
+    expect(of(false)).toEqual([expect.stringMatching(/^ArtifactsError Bearer <redacted> login password=<redacted> /)]);
+    for (const e of errors) {
+      expect(e).not.toContain("abcd");
+      for (const [, , gone] of SYNTAX_CASES) for (const g of gone) expect(e).not.toContain(g);
+    }
   });
 });
