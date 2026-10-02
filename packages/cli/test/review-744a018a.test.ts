@@ -2,7 +2,8 @@
  * Review 744a018a: one installation owner, kept at the destination itself.
  *
  * `.git/artroom/owner.json` records who owns a repository's Artroom remote
- * and credential: a revision, the installation, its Room, lane and lease.
+ * and credential: the installed credential's installation, Room, lane and
+ * lease, and (separately) the latest reservation.
  * `artroom workspace` reserves it before its first await, so the Room,
  * lane and repository are fixed at the start, and installs only if it
  * still owns the destination at the end, whatever Room or command touched
@@ -88,7 +89,7 @@ describe("the reservation is made before the first await", () => {
     expect(roomOf(home).workspaces[y]).toEqual(newer.mapping);
     expect(roomOf(home).workspaces[x]).toBeUndefined();
     expect(roomOf(home).lane).toBe(y);
-    expect(owner(dir)).toMatchObject({ state: "installed", lane: y, install: newer.mapping.install });
+    expect(owner(dir).installed).toMatchObject({ lane: y, install: newer.mapping.install });
   });
 
   test("workspaces in unrelated repositories do not supersede each other", async () => {
@@ -104,9 +105,9 @@ describe("the reservation is made before the first await", () => {
     expect((await cli(home, ["workspace"], two)).code).toBe(EXIT.ok);
     pause.release();
     expect((await first).code).toBe(EXIT.ok);
-    expect(owner(one)).toMatchObject({ state: "installed", lane: x });
-    expect(owner(two)).toMatchObject({ state: "installed", lane: x });
-    expect(owner(one).install).not.toBe(owner(two).install);
+    expect(owner(one).installed).toMatchObject({ lane: x });
+    expect(owner(two).installed).toMatchObject({ lane: x });
+    expect(owner(one).installed.install).not.toBe(owner(two).installed.install);
   });
 });
 
@@ -142,7 +143,7 @@ describe("ownership is shared by every Room that writes the repository", () => {
     expect((await old).code).toBe(EXIT.failed);
     expect(readFileSync(credential(dir), "utf8")).toBe(newer.file);
     expect(git(dir, "remote", "get-url", "artroom")).toBe(newer.remote);
-    expect(owner(dir).room).toBe(other.id);
+    expect(owner(dir).installed.room).toBe(other.id);
     expect(roomOf(home, h.room.id).workspaces ?? {}).toEqual({});
   });
 
@@ -159,7 +160,7 @@ describe("ownership is shared by every Room that writes the repository", () => {
     const res = await cli(home, ["release", "--room", h.room.id], dir);
     expect(res.code).toBe(EXIT.ok);
     expect(readFileSync(credential(dir), "utf8")).toBe(b);
-    expect(owner(dir).room).toBe(other.id);
+    expect(owner(dir).installed.room).toBe(other.id);
     expect(existsSync(credential(dir))).toBe(true);
   });
 });

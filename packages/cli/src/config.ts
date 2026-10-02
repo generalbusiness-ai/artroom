@@ -42,10 +42,13 @@ export interface RoomConfig {
  * The version of the config and journal files this CLI writes. Version 1
  * (no `v` in the config) was written before revisions, installation IDs
  * and lease-bound intents. Version 2 kept workspace ownership in the
- * config; version 3 keeps it at the repository (git.ts `Owner`).
- * `decode` below reads both older versions conservatively.
+ * config; version 3 kept one combined owner record at the repository;
+ * version 4 keeps the installed credential, an installation in progress and
+ * the latest reservation as separate parts (git.ts `Owner`), and a release
+ * records the installations it owns. `decode` reads every older version
+ * conservatively.
  */
-export const SCHEMA = 3;
+export const SCHEMA = 4;
 
 /** A file written by a newer artroom: refused, never guessed at. */
 export class SchemaError extends Error {}
@@ -88,15 +91,19 @@ export type LocalIntent =
    */
   | { readonly kind: "manual"; readonly steps: readonly string[] }
   /**
-   * `release`: of `lane` at `lease`. For each repository where this Room set
-   * up a workspace for the lane, the owner revision seen before the release
-   * was sent: the cleanup there is done only if it is still that revision.
+   * `release`: of `lane` at `lease`. Recorded before it is sent: the
+   * installation IDs of this lane that this Room knows of (`installs`),
+   * the reservations for this lane to cancel, and the repositories to look
+   * in (`held`: one of this lane's installations was recorded there). The
+   * cleanup removes only a credential whose file names one of `installs`.
    */
   | {
       readonly kind: "release-lane";
       readonly lane: LaneId;
       readonly lease: number;
-      readonly destinations: readonly { readonly dir: string; readonly rev: number }[];
+      readonly installs: readonly string[];
+      readonly reservations: readonly string[];
+      readonly dirs: readonly { readonly dir: string; readonly held: boolean }[];
       readonly laneRev: number;
       readonly landingRev: number;
     };
@@ -263,8 +270,9 @@ function newer(v: unknown, path: string): never {
 export function decodeConfig(raw: Raw, path: string): Config {
   const v = raw["v"] ?? 1;
   if (v === SCHEMA) return raw as unknown as Config;
-  // Version 2 differs only in its room-level workspace revision, which version 3 no longer reads.
-  if (v === 2) return { ...(raw as unknown as Config), v: SCHEMA };
+  // Versions 2 and 3 differ only in fields this version no longer reads (a room-level workspace revision).
+  // Their installed mappings are kept: they are the evidence a release uses, and are proved against each file's mark.
+  if (v === 2 || v === 3) return { ...(raw as unknown as Config), v: SCHEMA };
   if (v !== 1) newer(v, path);
   const rooms: Record<string, RoomConfig> = {};
   for (const [id, r] of Object.entries((raw["rooms"] ?? {}) as Record<string, Raw>)) {
@@ -289,13 +297,15 @@ export function decodeConfig(raw: Raw, path: string): Config {
 export function decodeEntry(raw: Raw, path: string): JournalEntry {
   const v = raw["v"];
   if (v === SCHEMA) return raw as unknown as JournalEntry;
-  if (v === 2) {
-    // Version 2 intents are version 3's, except a release, whose ownership evidence was a config mapping.
+  if (v === 2 || v === 3) {
+    // Version 2 and 3 intents are version 4's, except a release, whose ownership evidence was not the installations it owns.
     const local = raw["local"] as Raw | undefined;
     if (raw["type"] !== "act" || local?.["kind"] !== "release-lane") return { ...(raw as unknown as JournalEntry), v: SCHEMA } as JournalEntry;
     const installed = local["installed"] as { file?: string } | null | undefined;
+    const dirs = (local["destinations"] ?? []) as { dir: string }[];
     const steps = [`This release was recorded by an older artroom, so its local cleanup was not done. If lane ${String(local["lane"])} is still selected, claim or choose another lane.`];
     if (installed?.file) steps.push(`If ${installed.file} still holds lane ${String(local["lane"])}'s credential, remove it by hand.`);
+    for (const d of dirs) steps.push(`If ${d.dir}/artroom/credentials still holds lane ${String(local["lane"])}'s credential, remove it by hand.`);
     return { ...(raw as unknown as JournalEntry & { type: "act" }), v: SCHEMA, local: { kind: "manual", steps } };
   }
   if (v !== 1) newer(v, path);

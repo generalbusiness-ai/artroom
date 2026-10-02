@@ -149,8 +149,8 @@ describe("E5.1: a workspace installs only while its reservation still owns the w
     const dir = repoAt("repo");
     await login(home, "@alice");
     await cli(home, ["claim", "src/**", "--goal", "x"], dir);
-    // Interrupted after the mapping is written, before the credential: the mapping names a file that is not there.
-    expect((await cli(home, ["workspace"], dir, crashAt("workspace-mapped"))).code).toBe(EXIT.failed);
+    // Interrupted after the installation is recorded, before the credential is written: no file yet.
+    expect((await cli(home, ["workspace"], dir, crashAt("workspace-installing"))).code).toBe(EXIT.failed);
     expect(existsSync(credential(dir))).toBe(false);
     // The credential cannot be written at all: a directory is in its way.
     mkdirSync(credential(dir), { recursive: true });
@@ -230,7 +230,7 @@ describe("E5.2: schema 1 files are decoded conservatively; unknown versions are 
     expect(res.code).toBe(EXIT.ok);
     expect(res.out).toContain(`Manual local step: ${credential(dir)} was set up by an older artroom for lane ${x}. If it still holds this lane's credential, remove it by hand.`);
     expect(existsSync(credential(dir))).toBe(true);
-    expect(config(home).v).toBe(3);
+    expect(config(home).v).toBe(4);
   });
 
   test.each(["act-answered", "config-written"])("an interruption after %s while migrating a schema-1 config is finished by the same command", async (step) => {
@@ -242,7 +242,7 @@ describe("E5.2: schema 1 files are decoded conservatively; unknown versions are 
     const argv = ["claim", "src/**", "--goal", "g", "--idempotency-key", `mig-${step}`];
     expect((await cli(home, argv, h.tmp, crashAt(step))).code).toBe(EXIT.failed);
     expect((await cli(home, argv)).code).toBe(EXIT.ok);
-    expect(config(home).v).toBe(3);
+    expect(config(home).v).toBe(4);
     expect(room(home).lane).toMatch(/^act_/);
     expect(room(home).laneRev).toBe(1);
     expect(acts("claim")).toHaveLength(1);
@@ -253,11 +253,11 @@ describe("E5.2: schema 1 files are decoded conservatively; unknown versions are 
     await login(home, "@alice");
     h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
     await cli(home, ["claim", "src/**", "--goal", "g", "--idempotency-key", "future"]);
-    rewriteEntry(home, "future", (e) => ({ ...e, v: 4 }));
+    rewriteEntry(home, "future", (e) => ({ ...e, v: 5 }));
     const before = calls("/acts");
     const entry = await cli(home, ["claim", "src/**", "--goal", "g", "--idempotency-key", "future"]);
     expect(entry.code).toBe(EXIT.failed);
-    expect(entry.err).toMatch(/was written by a newer artroom \(schema 4; this one reads 1 to 3\)\. Update artroom/);
+    expect(entry.err).toMatch(/was written by a newer artroom \(schema 5; this one reads 1 to 4\)\. Update artroom/);
     expect(calls("/acts")).toBe(before);
     const c = config(home);
     writeFileSync(configPath(home), JSON.stringify({ ...c, v: 99 }));

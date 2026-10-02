@@ -14,6 +14,7 @@
  * redemption, and never rebuilds the request from changed state.
  */
 
+import { rmSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import {
@@ -57,7 +58,7 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import { SCHEMA, SchemaError, Store, type Config, type JournalEntry, type LocalIntent, type RoomConfig } from "./config.ts";
 import { attentionText, claimText, errorText, explainText, landText, logText, proposalText, refusalText, short } from "./format.ts";
-import { configureWorkspace, credentialFileIn, gitDir, head as gitHead, readOwner, removeCredential, REMOTE, withDestination } from "./git.ts";
+import { configureWorkspace, credentialFileIn, credentialOwner, gitDir, head as gitHead, readOwner, REMOTE, withDestination, type Party } from "./git.ts";
 import { parseInvitation } from "./link.ts";
 
 export interface Io {
@@ -326,28 +327,43 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
       return lines;
     }
     case "release-lane": {
-      // At each repository: clean up only if its owner is unchanged since this release was prepared.
+      // At each repository: remove exactly a credential whose file names one of this lane's own installations,
+      // recorded before the release was sent. Newer installations, any Room's, are left; so is a newer reservation.
       const removed = new Set<string>();
-      for (const d of local.destinations) {
+      for (const d of local.dirs) {
+        const file = credentialFileIn(d.dir);
         withDestination(d.dir, (o) => {
-          if (o.by === key) return undefined; // done already
-          if (o.rev !== d.rev) {
-            if (o.state === "installed" || o.state === "reserved") lines.push(`Left the workspace credential at ${credentialFileIn(d.dir)}: a newer workspace installed it.`);
-            return undefined;
+          const marker = credentialOwner(file);
+          if (marker && local.installs.includes(marker.install)) {
+            rmSync(file);
+            removed.add(marker.install);
+            lines.push(`Removed the workspace credential for lane ${local.lane}, lease ${marker.lease}, from ${file}.`);
+          } else if (marker && d.held) {
+            lines.push(`Left the workspace credential at ${file}: a newer workspace installed it.`);
+          } else if (marker === null && d.held) {
+            lines.push(`Manual local step: ${file} has no installation mark artroom can read. If it still holds lane ${local.lane}'s credential, remove it by hand.`);
           }
-          if (o.install !== undefined && removeCredential(credentialFileIn(d.dir), o.install) === "removed") {
-            lines.push(`Removed the workspace credential for lane ${local.lane}, lease ${o.lease ?? local.lease}, from ${credentialFileIn(d.dir)}.`);
-            removed.add(o.install);
-          }
-          return { ...o, rev: o.rev + 1, by: key, state: "released" };
+          const ours = (p: Party | undefined) => p !== undefined && local.installs.includes(p.install);
+          const cancel = o.reservation !== undefined && local.reservations.includes(o.reservation.install);
+          if (!ours(o.installed) && !ours(o.installing) && !cancel) return undefined;
+          const { installed, installing, reservation, ...rest } = o;
+          return {
+            ...rest,
+            rev: o.rev + 1,
+            ...(installed && !ours(installed) ? { installed } : {}),
+            ...(installing && !ours(installing) ? { installing } : {}),
+            ...(reservation && !cancel ? { reservation } : {}),
+          };
         });
       }
       ctx.step("credential-removed");
       updateRoom(ctx, id, (r) => {
         const mapped = r.workspaces?.[local.lane];
-        // Forget the lane's mapping once its installation owns no destination: removed now, or replaced by newer work.
-        if (mapped !== undefined && mapped.install !== "" && (removed.has(mapped.install) || readOwner(dirname(dirname(mapped.file))).install !== mapped.install)) {
-          delete r.workspaces![local.lane];
+        // The mapping is this Room's evidence of what it installed. Forget it only when that duty is done:
+        // its credential was removed now, or the file there is provably another installation's (or gone).
+        if (mapped !== undefined && mapped.install !== "" && local.installs.includes(mapped.install)) {
+          const there = credentialOwner(mapped.file);
+          if (removed.has(mapped.install) || there === undefined || (there !== null && there.install !== mapped.install)) delete r.workspaces![local.lane];
         }
         if (mapped !== undefined && mapped.install === "") {
           // A mapping from an older artroom names no installation: nothing proves the file is this lease's.
@@ -642,7 +658,8 @@ const COMMANDS: Record<string, Command> = {
       const { id, room } = roomOf(ctx);
       const lane = laneOf(ctx, room);
       const install = newIdempotencyKey();
-      const reserved = withDestination(dir, (o) => ({ v: 1, rev: o.rev + 1, by: install, state: "reserved", room: id, lane, install })).rev;
+      // A newer reservation replaces an older one; the installed credential's record is untouched.
+      withDestination(dir, (o) => ({ ...o, rev: o.rev + 1, reservation: { install, room: id, lane } }));
       updateRoom(ctx, id, (r) => {
         if (!(r.destinations ?? []).includes(dir)) r.destinations = [...(r.destinations ?? []), dir];
       });
@@ -666,15 +683,20 @@ const COMMANDS: Record<string, Command> = {
       // touched it since, and only for the lease it was made for. The remote, credential and mapping change together.
       const file = credentialFileIn(dir);
       let owned = false;
-      withDestination(dir, (o) => {
-        if (o.rev !== reserved || o.by !== install || grant.leaseGeneration !== h.lease.generation) return undefined;
+      withDestination(dir, (o, save) => {
+        if (o.reservation?.install !== install || grant.leaseGeneration !== h.lease.generation) return undefined;
         owned = true;
+        const me: Party = { install, room: id, lane, lease: grant.leaseGeneration };
+        // Recorded before the file is replaced, so a crash in between leaves evidence of what may be in it.
+        save({ ...o, rev: o.rev + 1, installing: me });
+        ctx.step("workspace-installing");
+        configureWorkspace(ctx.io.cwd, grant.remote, grant.token, lane, grant.leaseGeneration, install);
         updateRoom(ctx, id, (r) => {
           r.workspaces = { ...r.workspaces, [lane]: { file, lease: grant.leaseGeneration, install } };
         });
         ctx.step("workspace-mapped");
-        configureWorkspace(ctx.io.cwd, grant.remote, grant.token, lane, grant.leaseGeneration, install);
-        return { ...o, rev: o.rev + 1, state: "installed", lease: grant.leaseGeneration };
+        const { installing: _done, reservation: _used, ...rest } = o;
+        return { ...rest, rev: o.rev + 2, installed: me };
       });
       if (!owned) {
         return print(ctx, { op: ready, installed: false, reason: "superseded" }, () => [
@@ -773,16 +795,35 @@ const COMMANDS: Record<string, Command> = {
           const h = await held(api, laneOf(ctx, room), room.member);
           return isRefusal(h) ? h : api.release(h, note === undefined ? {} : { note }, opts);
         },
-        // Each repository this Room set up a workspace for the lane in, with its owner revision now, before the release is sent:
-        // not whatever is in the current directory.
+        // Recorded before the release is sent: every installation of this lane this Room knows of (its mapping,
+        // and the owner records where it set up workspaces), the reservations to cancel, and where to look.
+        // Not whatever is in the current directory.
         intent: (room, act, id) => {
           const lane = (act.target as { lane: LaneId }).lane;
           const lease = (act.body as { lease: number }).lease;
-          const destinations = (room.destinations ?? [])
-            .map((dir) => ({ dir, owner: readOwner(dir) }))
-            .filter(({ owner }) => owner.room === id && owner.lane === lane)
-            .map(({ dir, owner }) => ({ dir, rev: owner.rev }));
-          return { kind: "release-lane", lane, lease, destinations, laneRev: room.laneRev ?? 0, landingRev: room.landingRev ?? 0 };
+          const mapping = room.workspaces?.[lane];
+          const mapped = mapping !== undefined && mapping.install !== "" ? mapping : undefined;
+          const installs = new Set<string>(mapped ? [mapped.install] : []);
+          const reservations = new Set<string>();
+          const dirs = new Map<string, boolean>();
+          if (mapped) dirs.set(dirname(dirname(mapped.file)), true);
+          for (const dir of room.destinations ?? []) {
+            const o = readOwner(dir);
+            const mine = (p: Party | undefined) => p !== undefined && p.room === id && p.lane === lane;
+            for (const p of [o.installed, o.installing]) if (mine(p)) installs.add(p!.install);
+            if (mine(o.reservation)) reservations.add(o.reservation!.install);
+            dirs.set(dir, (dirs.get(dir) ?? false) || mine(o.installed) || mine(o.installing));
+          }
+          return {
+            kind: "release-lane",
+            lane,
+            lease,
+            installs: [...installs],
+            reservations: [...reservations],
+            dirs: [...dirs].map(([dir, held]) => ({ dir, held })),
+            laneRev: room.laneRev ?? 0,
+            landingRev: room.landingRev ?? 0,
+          };
         },
       });
       if (isRefusal(out)) return refused(ctx, out);
