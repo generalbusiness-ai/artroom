@@ -67,7 +67,6 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import type { InputOf } from "@generalbusiness/artroom-policy";
 import { checkerInputs } from "@generalbusiness/artroom-policy";
-import { underlyingIntegration } from "./obligations.ts";
 import { canonicalize, utf8 } from "./canonical.ts";
 import { b64url, digestJson, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
@@ -392,7 +391,7 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
     if (env.kind === "check") {
       const b = env.body as CheckBody;
       // A scoped check that binds a snapshot commit the room recorded: the room derived it, so nothing is read.
-      if (b.input?.kind === "filtered" && underlyingIntegration(core.sql, b.integration) !== b.integration) return {};
+      if (b.input?.kind === "filtered" && one(core.sql, "SELECT 1 AS x FROM check_snapshots WHERE commit_sha = ?", b.integration)) return {};
       const tree = await a.treeOf(b.integration);
       // A scoped checker's input: the filtered snapshot of the integration over the paths it names (R-CARRY-9).
       if (b.input?.kind === "filtered" && Array.isArray(b.input.paths)) return { tree, snapshot: (await a.snapshot(b.integration, b.input.paths))?.digest ?? null };
@@ -971,6 +970,7 @@ async function review(ctx: Ctx, laneId: LaneId, generation: Generation, body: Re
     authority: ctx.authority,
     admission,
     body,
+    canonical: null,
   });
   const judged = reviewObls.map((o) => qualification(ctx.policy.doc, o, prospective("act_0_00000000", 0)));
   if (!judged.some((q) => q === true || q === "self"))
@@ -1047,7 +1047,7 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   if (!spec || spec.kind !== "check") return refused(ctx, nope("obligation-unknown", `Generation ${generation} has no check obligation ${body.obligation}.`, "Name an open check obligation."), "R-OBL-3");
   const member = ctx.authority.member;
   const admission = { teams: member ? teamsOf(core.sql, member) : [], author: member === g.proposer || (lane.state === "held" && member === lane.holder) };
-  const prospective = (act: ActId, seq: number): EvidenceRow => ({
+  const prospective = (act: ActId, seq: number, canonical: Sha | null = null): EvidenceRow => ({
     act,
     seq,
     kind: "check",
@@ -1063,6 +1063,7 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
     authority: ctx.authority,
     admission,
     body,
+    canonical,
   });
   // R-OBL-3 by the one qualification rule: the holder or proposer never meets its own check.
   const q = qualification(ctx.policy.doc, spec, prospective("act_0_00000000", 0), ctx.policy.checkers);
@@ -1070,24 +1071,38 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
     return refused(ctx, nope("not-authorized-checker", `${member ?? "This signer"} may not meet ${spec.id}.`, "Ask an authorized checker."), "R-OBL-3");
   const binding = (why: string) => refused(ctx, nope("check-binding", why, "Run the check on the integration the room prepared, with the active configuration."), "R-OBL-3");
   if (body.check !== spec.check) return binding(`The obligation needs the ${spec.check} checker, not ${body.check}.`);
-  const integrations = new Set<string>();
+  // The integrations the room prepared for this generation: its clean preview's, and each active landing's. A check
+  // that names a land operation was run for that landing's job, and binds only that landing's integration.
+  const prepared: { integration: string; op: string | null }[] = [];
   const preview = one(core.sql, "SELECT body FROM previews WHERE lane = ? AND generation = ?", laneId, generation);
   const pv = preview ? (JSON.parse(str(preview, "body")!) as { state: string; integration?: string }) : null;
-  if (pv?.state === "clean" && pv.integration) integrations.add(pv.integration);
-  for (const op of core.landing.activeViews()) if (op.lane === laneId && op.generation === generation && "integration" in op && op.integration) integrations.add(op.integration);
-  // A scoped check may bind the snapshot commit the room recorded for one of these integrations (R-CARRY-9).
-  const recorded = one(core.sql, "SELECT * FROM check_snapshots WHERE commit_sha = ?", body.integration);
-  const bound = recorded ? str(recorded, "integration")! : body.integration;
-  if (!integrations.has(bound)) return binding("The check does not bind an integration the room prepared for this generation.");
+  if (pv?.state === "clean" && pv.integration) prepared.push({ integration: pv.integration, op: null });
+  for (const op of core.landing.activeViews())
+    if (op.lane === laneId && op.generation === generation && "integration" in op && op.integration) prepared.push({ integration: op.integration, op: op.id });
+  const jobs = body.landOp === undefined ? prepared : prepared.filter((p) => p.op === body.landOp);
+  if (body.landOp !== undefined && !jobs.length) return binding(`The check names ${body.landOp}, which is not an active landing of this generation.`);
+  // R-CARRY-15 step 5: a scoped check may bind a snapshot commit the room recorded for one of these integrations. Several
+  // integrations can share one snapshot commit, so the commit alone never names the canonical integration (review 95323c2b).
+  const snapshotRows = core.sql.all("SELECT * FROM check_snapshots WHERE commit_sha = ?", body.integration);
+  const recorded = snapshotRows.filter((r) => jobs.some((j) => j.integration === str(r, "integration")));
+  if (snapshotRows.length ? !recorded.length : !jobs.some((j) => j.integration === body.integration))
+    return binding("The check does not bind an integration the room prepared for this generation.");
   const cfg = ctx.policy.checkers[body.check];
   if (!cfg || cfg.digest !== body.config) return binding("The check's configuration digest is not the active configuration's.");
   // R-CARRY-10: the signed flag must be the configuration's; a check is never carried on a flag it contradicts.
   if (body.volatile !== cfg.config.volatile) return binding(`The check says volatile ${String(body.volatile)}, but the checker's configuration says ${String(cfg.config.volatile)}.`);
-  if (recorded) {
-    if (body.input.kind !== "filtered" || str(recorded, "checker") !== body.check || str(recorded, "config") !== cfg.digest)
-      return binding("The snapshot commit was recorded for another checker or configuration.");
-    if (canonicalize([...body.input.paths].sort()) !== str(recorded, "paths") || body.input.snapshot !== str(recorded, "digest"))
-      return binding("The check's snapshot is not the one the room recorded for this snapshot commit.");
+  let canonical = body.integration;
+  if (snapshotRows.length) {
+    const input = body.input;
+    const mine = recorded.filter((r) => str(r, "checker") === body.check && str(r, "config") === cfg.digest);
+    if (input.kind !== "filtered" || !mine.length) return binding("The snapshot commit was recorded for another checker or configuration.");
+    const paths = canonicalize([...input.paths].sort());
+    const exact = mine.filter((r) => str(r, "paths") === paths && str(r, "digest") === input.snapshot);
+    if (!exact.length) return binding("The check's snapshot is not the one the room recorded for this snapshot commit.");
+    // Exactly one with `landOp` (one row per integration, checker and configuration). Without it, more than one only if
+    // this generation's preview and landing integrations differ and share the snapshot: fail closed rather than choose.
+    if (exact.length > 1) return binding("The snapshot commit was recorded for more than one integration of this generation. Name the land operation the check ran for.");
+    canonical = str(exact[0]!, "integration") as Sha;
   } else if (body.input.kind === "tree") {
     if (ctx.pre.tree === undefined || body.input.tree !== ctx.pre.tree) return binding("The check's input is not the integration's tree.");
   } else {
@@ -1102,7 +1117,10 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   const r = await policyRefuse(ctx, lane);
   if (r) return refused(ctx, r);
   const statusOpts = { doc: ctx.policy.doc, checkers: ctx.policy.checkers };
-  const moved = transitions(statusesOf(core.sql, g, statusOpts), statusesOf(core.sql, g, { ...statusOpts, extra: [prospective(`act_${core.headSeq() + 1}_00000000`, core.headSeq() + 1)] }));
+  const moved = transitions(
+    statusesOf(core.sql, g, statusOpts),
+    statusesOf(core.sql, g, { ...statusOpts, extra: [prospective(`act_${core.headSeq() + 1}_00000000`, core.headSeq() + 1, canonical)] }),
+  );
   return {
     t: "accept",
     ctx,
@@ -1121,7 +1139,7 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
         ctx.authority.via === "delegation" ? ctx.authority.grantor : null,
         JSON.stringify([spec.id]),
         JSON.stringify(ctx.flags),
-        JSON.stringify({ authority: ctx.authority, admission, body }),
+        JSON.stringify({ authority: ctx.authority, admission, body, canonical }),
       );
       const op = core.activeLandOp(laneId);
       if (op) core.requestEvaluation(op);

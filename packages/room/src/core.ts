@@ -53,7 +53,7 @@ import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
 import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
-import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, underlyingIntegration } from "./obligations.ts";
+import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedFile, RoomServices, Sql } from "./ports.ts";
 import { ContainerPublisher, Landing, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
@@ -870,7 +870,7 @@ export class RoomCore {
         (e) =>
           e.kind === "check" &&
           (e.body as { obligation: string }).obligation === o.id &&
-          underlyingIntegration(this.sql, (e.body as { integration: string }).integration) === integration &&
+          e.canonical === integration &&
           !(e.body as { ok: boolean }).ok,
       );
       if (failed) return { kind: "failed", reason: { code: "check-failed", check: failed.act } };
@@ -954,7 +954,7 @@ export class RoomCore {
         .map((r) => evidenceByAct(this.sql, str(r, "act")!)!)
         .filter((e) => {
           const b = e.body as { obligation: string; check: string; ok: boolean; integration: Sha };
-          return b.ok && b.obligation === spec.id && b.check === spec.check && underlyingIntegration(this.sql, b.integration) !== integration;
+          return b.ok && b.obligation === spec.id && b.check === spec.check && e.canonical !== integration;
         });
       if (!candidates.length) continue;
       const inputs = checkerInputs(cfg.config.inputs, policy.doc.carry);

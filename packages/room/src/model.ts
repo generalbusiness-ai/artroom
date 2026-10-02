@@ -154,6 +154,15 @@ export interface EvidenceRow {
   /** Facts fixed at admission: the member's teams, and whether the member was an author (R-REV-1, R-OBL-2). */
   readonly admission: EvidenceAdmission;
   readonly body: ReviewBody | CheckBody;
+  /**
+   * For a check, the canonical integration it counts for, fixed at admission
+   * (R-CARRY-15 step 5): its own `integration`, or, for a recorded snapshot
+   * commit, the integration of its land operation or preview that the room
+   * recorded the snapshot for. Never looked up again from the snapshot
+   * commit, which several integrations can share (review 95323c2b). Null for
+   * a review.
+   */
+  readonly canonical: Sha | null;
 }
 
 export interface EvidenceAdmission {
@@ -163,11 +172,12 @@ export interface EvidenceAdmission {
 }
 
 function evidenceFrom(r: SqlRow): EvidenceRow {
-  const body = JSON.parse(r["body"] as string) as { authority: Authority; admission?: EvidenceAdmission; body: ReviewBody | CheckBody };
+  const body = JSON.parse(r["body"] as string) as { authority: Authority; admission?: EvidenceAdmission; body: ReviewBody | CheckBody; canonical?: Sha };
+  const kind = r["kind"] as "review" | "check";
   return {
     act: r["act"] as ActId,
     seq: r["seq"] as number,
-    kind: r["kind"] as "review" | "check",
+    kind,
     lane: r["lane"] as LaneId,
     generation: r["generation"] as number,
     head: r["head"] as Sha,
@@ -181,6 +191,9 @@ function evidenceFrom(r: SqlRow): EvidenceRow {
     // Migration 4 records these for earlier evidence; a missing record is judged as an author, which can only take eligibility away.
     admission: body.admission ?? { teams: [], author: true },
     body: body.body,
+    // A check admitted before review 95323c2b counts only for the commit it names: a snapshot commit is no
+    // integration, so such a scoped check counts for nothing, and the obligation waits for a new one.
+    canonical: kind === "check" ? (body.canonical ?? (body.body as CheckBody).integration) : null,
   };
 }
 
