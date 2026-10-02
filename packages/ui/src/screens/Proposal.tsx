@@ -15,6 +15,7 @@ import { Actor, Badge, Glob, LandBadge, RefusalNotice, Sha, When, WhyLink } from
 import { useApp } from "../ui/context.ts";
 import { clock, join, plural, relative, ruleTitle, short } from "../ui/format.ts";
 import { Icon } from "../ui/icons.tsx";
+import { ChangeHistoryView } from "../ui/ChangeHistory.tsx";
 import { LandingDetail } from "../ui/landing.tsx";
 import { href } from "../ui/router.ts";
 
@@ -732,6 +733,7 @@ export function ProposalScreen({ laneId, generation, focus }: { laneId: ActId; g
 
           <div class="two-col section">
             <div>
+              <ChangeHistoryView p={p} />
               <Diff p={p} lane={lane} />
               {discussion.length > 0 && (
                 <section class="section" aria-labelledby="disc-h">
