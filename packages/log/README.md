@@ -140,6 +140,8 @@ time can never pass an expiry check.
   - the recovery-key flag and idempotency;
   - that no effect or event names its own lane (R-LOG-12);
 - that `notified` events name an earlier accepted act, and no act twice;
+- that each `check-carried` event names in `act` an earlier accepted
+  `check` of the same lane and obligation (R-CARRY-13);
 - that `checkpoint` events name an earlier log commit with the same
   `through` and `hash`.
 
@@ -154,7 +156,9 @@ exactly one policy version, chosen by event kind:
   later activations do not change it (R-LOG-13);
 - an `obligations-recomputed` event: the version it names, which must be
   the active one (R-POL-9);
-- a `land-evaluated` event: the active policy (R-LAND-4).
+- a `land-evaluated` event: the active policy (R-LAND-4);
+- a `check-carried` event: the version it names, which an earlier
+  `policy-activated` event must have activated (R-CARRY-13).
 
 **The report** gives:
 - the verified prefix: the last good entry and its ID;
@@ -210,6 +214,8 @@ entries of the last consistent commit.
   (see below).
 - `test/amendment-2.test.ts` covers the lane L edits of contract
   amendment 2 (see below).
+- `test/amendment-3.test.ts` covers the lane L edits of contract
+  amendment 3: `check-carried` events (protocol section 29.8).
 - `test/review-07d3150e.test.ts` covers the findings of review 07d3150e
   (see below).
 - `test/review-a454cbaf.test.ts` covers review a454cbaf and `commitFor`
