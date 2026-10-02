@@ -10,8 +10,7 @@
             "prepared"
         ],
         "propose": [
-            "prepared",
-            "replayed"
+            "prepared"
         ],
         "land": [
             "prepared"
@@ -23,9 +22,10 @@
         "land"
     ],
     "refusals": [],
+    "landingWhenAnswered": "accepted",
     "landing": "landed",
     "mainIsHead": true,
-    "answer": "I added the file docs/pi-durable.md that says it was written by a pi-durable agent and landed the change successfully.",
+    "answer": "I have added the file docs/pi-durable.md stating that a pi-durable agent wrote it, and the change has been landed.",
     "responseModels": [
         "openai/gpt-4.1-mini"
     ],
@@ -42,7 +42,7 @@
         {
             "role": "toolResult",
             "tool": "artroom_claim",
-            "text": "Claimed lane act_5_17ebe495 (lease 1)."
+            "text": "Claimed lane act_5_2a9143a3 (lease 1)."
         },
         {
             "role": "assistant",
@@ -76,24 +76,24 @@
         },
         {
             "role": "assistant",
-            "text": "I added the file docs/pi-durable.md that says it was written by a pi-durable agent and landed the change successfully."
+            "text": "I have added the file docs/pi-durable.md stating that a pi-durable agent wrote it, and the change has been landed."
         }
     ],
     "usage": {
         "models": {
             "openrouter/openai/gpt-4.1-mini": {
-                "input": 2018,
-                "output": 148,
+                "input": 2042,
+                "output": 149,
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "reasoning": 0,
-                "totalTokens": 2166,
+                "totalTokens": 2191,
                 "cost": {
-                    "input": 0.0008072000000000001,
-                    "output": 0.00023680000000000004,
+                    "input": 0.0008168000000000001,
+                    "output": 0.00023840000000000005,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0.001044
+                    "total": 0.0010552
                 }
             }
         },
