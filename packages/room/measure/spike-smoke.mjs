@@ -277,6 +277,9 @@ function operatorKey() {
 
 // ------------------------------------------------------------ the run
 
+/** The public room's identity name (`genesis.repo` without its namespace): the base of its repository's names. */
+let publicBase = null;
+/** The public room's repository: the incarnation `<base>-<step>` it was sealed on (reviews 3eb7bc44 and 700b74ea), never the base name. */
 let canonical = null;
 let canonicalRemote = null;
 const lanes = [];
@@ -299,7 +302,8 @@ async function main() {
   step("found: draft", d.status === 200, { status: d.status, ms: d.ms, repo: d.body.genesis?.repo, roomKey: d.body.genesis?.roomKey, profile: d.body.genesis?.profile, error: d.body.code, message: d.body.message });
   if (d.status !== 200) throw new Error("draft failed");
   const genesis = d.body.genesis;
-  canonical = genesis.repo.split("/")[1];
+  // The identity names the room's repository; the repository itself is an incarnation of it, found after founding.
+  publicBase = genesis.repo.split("/")[1];
   out.repo = genesis.repo;
   const f = await http("POST", "/found", { genesis, sig: sign(admin.seed, "artroom-genesis-v1", genesis), draft: d.body.draft });
   step("found: found", f.status === 200, { status: f.status, ms: f.ms, room: f.body.room, error: f.body.code, message: f.body.message });
@@ -313,6 +317,12 @@ async function main() {
   const ref = await http("GET", `/${encodeURIComponent(name)}`);
   step("found: GET /v1/rooms/:name (no credential)", ref.status === 200 && ref.body.room === room, { status: ref.status, body: ref.body });
 
+  // The room's repository: the identity's incarnation (`<base>-<step>`, the latest one made), not the base name.
+  const listed = readListing(await api("GET", `/repos?limit=${REPO_PAGE}&search=${publicBase}`), REPO_PAGE, isRepoRecord);
+  canonical = listed.outcome === "done" ? incarnationOf(publicBase, listed.items.map((r) => r.name)) : null;
+  out.canonical = canonical;
+  step("found: the room's repository is an incarnation of its identity", canonical !== null, { base: publicBase, incarnation: canonical, listing: listed.outcome, names: listed.items?.map((r) => r.name) });
+  if (!canonical) throw new Error("no incarnation of the room's identity was found");
   const info = await api("GET", `/repos/${canonical}`);
   canonicalRemote = info.result?.remote ?? null;
   step("found: repository created in gitseq-spike", !!canonicalRemote, { name: info.result?.name, remote: canonicalRemote, source: info.result?.source ?? null });
@@ -337,6 +347,7 @@ async function main() {
   // 3. A first lane on the fresh repository: it must land (request b6b51de7, gap 1).
   const first = await lane(1, { "README.md": "# spike smoke\n", "docs/first.md": "first lane, fresh repository\n" });
   lanes.push({ ...first, room, admin, ns: NS });
+  step("lane 1: the fork is of the room's incarnation", !!first.fork && basename(first.fork, ".git").startsWith(`${canonical}--`), { fork: first.fork ? basename(first.fork, ".git") : null, incarnation: canonical });
   const mainAfterFirst = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
   out.firstLaneOnFreshRepo = { landed: first.op?.state === "landed", main: mainAfterFirst, integration: first.op?.integration ?? null };
   step("lane 1: main is lane 1's integration, on the first commit", !!first.op?.integration && mainAfterFirst === first.op.integration, { main: mainAfterFirst, integration: first.op?.integration });
@@ -515,6 +526,24 @@ export function outcomeOf(answer) {
   return "unknown";
 }
 
+/**
+ * The repository a public room was sealed on, from the names a listing returned: of the incarnations
+ * `<base>-<step>` of its identity, the one with the highest step (the last made; abandoned ones come before it,
+ * reviews 3eb7bc44 and 700b74ea). The base name itself (an older Room's, adopted and deleted) and forks are not
+ * incarnations. Null when there is none.
+ */
+export function incarnationOf(base, names) {
+  const re = new RegExp(`^${escapeRe(base)}-(\\d+)$`);
+  let best = null;
+  for (const n of names) {
+    const m = re.exec(n);
+    if (m && (best === null || Number(m[1]) > best.step)) best = { name: n, step: Number(m[1]) };
+  }
+  return best?.name ?? null;
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /** A repository record names an Artifacts repository; a token record carries a token ID (review 2485e992). */
 const NAME = /^[A-Za-z0-9._-]{1,100}$/;
 const TOKEN_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -557,7 +586,7 @@ function why(answer) {
  * remote call's exception becomes an unknown duty; any other exception
  * reaches the caller, whose result then has a failed cleanup.
  */
-export async function cleanupRun({ api, canonical, expected = [], minted = new Map() }) {
+export async function cleanupRun({ api, canonical, expected = [], minted = new Map(), incarnations = false }) {
   const duties = [];
   let reposLeft = [];
   const record = (duty, outcome, detail) => {
@@ -588,7 +617,10 @@ export async function cleanupRun({ api, canonical, expected = [], minted = new M
   }
   if (canonical) {
     // Records are validated by the listing; this only tells this run's repositories from others the search returns.
-    const mine = (r) => r.name === canonical || r.name.startsWith(`${canonical}--`);
+    // With `incarnations` (a public room since review 3eb7bc44), `canonical` is the identity's base name and the run's
+    // repositories are the base (an older Room's), every incarnation `<base>-<step>`, and the forks of each.
+    const ours = incarnations ? new RegExp(`^${escapeRe(canonical)}(-\\d+)?(--.+)?$`) : null;
+    const mine = (r) => (ours ? ours.test(r.name) : r.name === canonical || r.name.startsWith(`${canonical}--`));
     const inventory = (duty) => listing({ duty, repos: expected }, `/repos?limit=${REPO_PAGE}&search=${canonical}`, REPO_PAGE, isRepoRecord);
     const found = await inventory("inventory");
     // Without a complete inventory, still clean what the run knows it made; the run fails on the inventory duty.
@@ -626,12 +658,13 @@ async function cleanup() {
     releases[`lane ${l.n}`] = { status: r.status, rule: r.body?.rule };
   }
   // The deploy lane's cleanup, once per namespace: the public room's repositories, then the import's.
-  const run = async (ns, base) => {
+  const run = async (ns, base, repo, incarnations) => {
     const forks = lanes.filter((l) => l.fork && l.ns === ns).map((l) => basename(l.fork, ".git"));
-    return cleanupRun({ api: (m, p, b) => api(m, p, b, ns), canonical: base, expected: base ? [base, ...forks] : [], minted: minted[ns] });
+    return cleanupRun({ api: (m, p, b) => api(m, p, b, ns), canonical: base, expected: base ? [repo ?? base, ...forks] : [], minted: minted[ns], incarnations });
   };
-  const pub = await run(NS, canonical);
-  const imp = await run(IMPORT_NS, importRepo);
+  // The public room: every repository named from its identity's base (incarnations, forks, an adopted base name).
+  const pub = await run(NS, publicBase, canonical, true);
+  const imp = await run(IMPORT_NS, importRepo, importRepo, false);
   return {
     releases,
     ok: pub.ok && imp.ok,

@@ -1209,6 +1209,13 @@ it after founding; and not recording the adoption.
 Main `9bb700b6` (amendment 4, the bounded-memory publisher, the deploy
 cleanup and pi Workers AI) is merged. This revision has not been run live.
 
+The smoke script no longer takes `genesis.repo`'s name (the identity's base)
+for the public room's repository: it finds the sealed incarnation (the
+highest `<base>-<step>`, `incarnationOf`) for its founding checks, ref reads
+and verify, and its cleanup reaches the base name, every incarnation and
+their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.test.ts`
+covers both.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it

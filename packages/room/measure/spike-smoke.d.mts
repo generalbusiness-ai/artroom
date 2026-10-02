@@ -36,5 +36,6 @@ export function readListing(
   page: number,
   usable: (record: unknown) => boolean,
 ): { readonly outcome: Outcome; readonly items: unknown[] | null; readonly detail?: string };
-export function cleanupRun(opts: { api: Api; canonical: string | null; expected?: readonly string[]; minted?: Map<string, string> }): Promise<CleanupOutcome>;
+export function cleanupRun(opts: { api: Api; canonical: string | null; expected?: readonly string[]; minted?: Map<string, string>; incarnations?: boolean }): Promise<CleanupOutcome>;
+export function incarnationOf(base: string, names: readonly string[]): string | null;
 export function smokeOk(result: { readonly steps: readonly { readonly ok: boolean }[]; readonly cleanup?: { readonly ok: boolean } | null }, failed: boolean): boolean;
