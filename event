@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/README.md","body":{"commit":"b803d210def65e6e219d4bc60aa2c6855d5abf97","path":"plans/README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6651cd2af11319cd047d279438e22ac231e727d2","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-02-canonical-mint-ownership.md."}
