@@ -74,12 +74,12 @@ export class Room extends DurableObject<RoomEnv> {
   // ------------------------------------------------------------ RPC
 
   /** Found the room from a signed genesis (R-GEN-1). The seed is the room key's, derived by the Worker. */
-  found(genesis: Genesis, sig: string, seed: string): Promise<Wire<RoomId>> {
+  found(genesis: Genesis, sig: string, seed: string, rebound = false): Promise<Wire<RoomId>> {
     return wire(async () => {
       checkGenesis(genesis);
       const raw = unb64url(seed);
       if (!raw || raw.length !== 32) throw artroomError("bad-request", "The room key seed is not 32 bytes.");
-      return this.core.found(genesis, sig, raw);
+      return this.core.found(genesis, sig, raw, rebound === true);
     });
   }
 

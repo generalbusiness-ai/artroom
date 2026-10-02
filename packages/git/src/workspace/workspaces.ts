@@ -63,6 +63,9 @@ import type {
 import { type Sql, type SqlRow, text } from "../sql.ts";
 import { type ArtifactsNamespace, type RepoHandle, type TokenInfo, artifactsCode, refusedUnchanged, withRetry } from "../artifacts.ts";
 
+/** The reason of the step that stands for an old Room's unrecorded creates of a public founding's base name (review 700b74ea). */
+const LEGACY = "legacy";
+
 /** Artifacts' shortest token lifetime. */
 export const MIN_TOKEN_TTL_S = 60;
 
@@ -257,6 +260,7 @@ export class Workspaces {
       answeredAt: r["answered_at"] === null ? null : Number(r["answered_at"]),
       expiresAt: r["expires_at"] === null ? null : Number(r["expires_at"]),
       attempts: Number(r["attempts"]),
+      reason: text(r, "reason") ?? "",
     }));
   }
 
@@ -308,7 +312,7 @@ export class Workspaces {
     // Not the holder's founding duties (`prepareCanonical` owns them); abandoned incarnations' are counted.
     const holder = this.holder();
     return Number(
-      this.sql.all("SELECT COUNT(*) AS n FROM artroom_ws_duty WHERE state != 'done' AND fork != ? AND fork != ? AND NOT (kind = 'repo-create' AND state = 'answered')", this.canonical, holder ?? "")[0]?.["n"] ?? 0,
+      this.sql.all("SELECT COUNT(*) AS n FROM artroom_ws_duty WHERE state != 'done' AND fork != ? AND NOT (kind = 'repo-create' AND state = 'answered')", holder ?? "")[0]?.["n"] ?? 0,
     );
   }
 
@@ -628,7 +632,7 @@ export class Workspaces {
     // the holder or sealed one is never touched.
     const incarnations = new Set(this.incarnationNames());
     const forks = this.sql
-      .all("SELECT DISTINCT fork FROM artroom_ws_duty WHERE state != 'done' AND next_at <= ? AND fork != ?", this.now(), this.canonical)
+      .all("SELECT DISTINCT fork FROM artroom_ws_duty WHERE state != 'done' AND next_at <= ?", this.now())
       .map((r) => text(r, "fork")!)
       .filter((f) => !incarnations.has(f));
     for (const f of forks) {
@@ -643,8 +647,7 @@ export class Workspaces {
   nextDue(): number | null {
     const holder = this.holder();
     const r = this.sql.all(
-      "SELECT MIN(next_at) AS t FROM artroom_ws_duty WHERE state != 'done' AND fork != ? AND fork != ? AND NOT (kind = 'repo-create' AND state = 'answered')",
-      this.canonical,
+      "SELECT MIN(next_at) AS t FROM artroom_ws_duty WHERE state != 'done' AND fork != ? AND NOT (kind = 'repo-create' AND state = 'answered')",
       holder ?? "",
     )[0];
     return r?.["t"] == null ? null : Number(r["t"]);
@@ -652,7 +655,7 @@ export class Workspaces {
 
   /** Same as `reconcile`, ignoring backoff. Returns how many duties are still open. */
   async sweep(): Promise<number> {
-    this.sql.all("UPDATE artroom_ws_duty SET next_at = ? WHERE state != 'done' AND fork != ? AND fork != ?", this.now(), this.canonical, this.holder() ?? "");
+    this.sql.all("UPDATE artroom_ws_duty SET next_at = ? WHERE state != 'done' AND fork != ?", this.now(), this.holder() ?? "");
     return this.reconcile();
   }
 
@@ -915,9 +918,11 @@ export class Workspaces {
         }
         exists = false;
       }
+      // A legacy step (an old Room's creates of the base name, never recorded) is never settled: another of them may still apply.
+      const legacy = (d: Duty) => d.kind === "repo-create" && d.reason === LEGACY;
       if (exists) {
-        // The name was created once: seeing it proves that create applied, so it can apply no more.
-        this.done(this.dutiesOf(name, "repo-create", "in-flight"), "seen");
+        // An incarnation name was created once: seeing it proves that create applied, so it can apply no more.
+        this.done(this.open_(name).filter((d) => d.kind === "repo-create" && d.state === "in-flight" && !legacy(d)).map((d) => d.id), "seen");
         try {
           await withRetry(() => this.artifacts.delete(name), this.retryOpts());
         } catch (e) {
@@ -925,8 +930,9 @@ export class Workspaces {
           return this.open_(name).length;
         }
         this.sql.transaction(() => {
-          this.done(this.open_(name).map((d) => d.id), "deleted");
-          this.sql.all("DELETE FROM artroom_ws_canon_secret WHERE duty IN (SELECT id FROM artroom_ws_duty WHERE fork = ?)", name);
+          this.done(this.open_(name).filter((d) => !legacy(d)).map((d) => d.id), "deleted");
+          this.sql.all("DELETE FROM artroom_ws_canon_secret WHERE duty IN (SELECT id FROM artroom_ws_duty WHERE fork = ? AND state = 'done')", name);
+          // A legacy step stays open, so the name is watched on the backoff and deleted whenever it appears again.
         });
       } else {
         this.sql.transaction(() => {
@@ -961,8 +967,9 @@ export class Workspaces {
    * token, it abandons the incarnation and makes a new one (at most three
    * rounds). Throws when not ready; whatever is owed stays owed.
    */
-  prepareCanonical(base: string, firstCommit: (remote: string, token: string) => Promise<unknown>): Promise<string> {
+  prepareCanonical(base: string, firstCommit: (remote: string, token: string) => Promise<unknown>, opts: { readonly legacyBase?: boolean } = {}): Promise<string> {
     return this.exclusive(`incarnations:${base}`, async () => {
+      await this.adoptLegacyBase(base, opts.legacyBase === true);
       for (let round = 0; round < 3; round++) {
         let name = this.holder();
         if (name === null) {
@@ -994,6 +1001,44 @@ export class Workspaces {
       }
       await this.settleAbandoned(true).catch(() => undefined);
       throw new Error("the canonical repository is not ready yet");
+    });
+  }
+
+  /**
+   * Review 700b74ea: before the incarnation ledger, the Room created this
+   * founding's repository under the base name itself and recorded nothing:
+   * a repository and its 24-hour token may be there, or an old create whose
+   * answer never arrived may still apply, perhaps more than one. So the first
+   * time such a founding is prepared, the base name is accounted for
+   * durably: a `legacy` create step, in flight and never settled (not by a
+   * read of absence, a delete, or the seal), and its deletion owed. The base
+   * name is never an incarnation, so deleting it whenever it appears is
+   * safe. `possible` (from the Room) says an old Room may have tried: the
+   * registry already bound this founding and no newer Room recorded an
+   * attempt. A base name an earlier revision's ledger created, or that
+   * exists now, is adopted the same way: only this founding can have created
+   * it (R-GEN-12). Only a pending public founding calls this; an
+   * already-founded room or an import never does, and nothing else reaches
+   * the base name.
+   */
+  private async adoptLegacyBase(base: string, possible: boolean): Promise<void> {
+    const adopted = () => this.sql.all("SELECT 1 FROM artroom_ws_duty WHERE fork = ? AND kind = 'repo-create' AND reason = ?", base, LEGACY).length > 0;
+    if (adopted()) return;
+    const earlierLedger = this.sql.all("SELECT 1 FROM artroom_ws_duty WHERE fork = ?", base).length > 0;
+    if (!possible && !earlierLedger) {
+      try {
+        await (await this.artifacts.get(base)).info();
+      } catch (e) {
+        const code = artifactsCode(e);
+        if (code === "NOT_FOUND") return;
+        // Being created is existing; any other failure leaves it unknown, so this founding waits.
+        if (code !== "CREATE_IN_PROGRESS") throw e;
+      }
+    }
+    this.sql.transaction(() => {
+      if (adopted()) return;
+      this.insertDuty(base, "repo-create", "in-flight", LEGACY, null, null);
+      this.abandon(base, "legacy base name");
     });
   }
 
@@ -1065,4 +1110,5 @@ interface Duty {
   readonly answeredAt: number | null;
   readonly expiresAt: number | null;
   readonly attempts: number;
+  readonly reason: string;
 }

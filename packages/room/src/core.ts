@@ -325,7 +325,7 @@ export class RoomCore {
    * object, seal it as entry 0, and activate the initial policy at seq 1
    * from main, or the default (R-GEN-1, R-POL-9).
    */
-  async found(genesis: Genesis, sig: string, roomSeed: Uint8Array): Promise<RoomId> {
+  async found(genesis: Genesis, sig: string, roomSeed: Uint8Array, rebound = false): Promise<RoomId> {
     if (this.founded) {
       const id = this.roomId;
       if (id === roomIdOf(genesis)) return id;
@@ -342,9 +342,12 @@ export class RoomCore {
     let checkers: ActivePolicyFull["checkers"] = {};
     let main: Sha | null = null;
     let remote: string;
+    // A binding made before this call, with no attempt of this Room on record: an older Room may have created the
+    // base name and lost the answer (review 700b74ea).
+    const legacyBase = rebound && getMeta(this.sql, "founding_repo") === null;
     setMeta(this.sql, "founding_repo", genesis.repo);
     try {
-      if (!genesis.onboarding) await this.newRepository(genesis);
+      if (!genesis.onboarding) await this.newRepository(genesis, legacyBase);
       main = await this.ports.artifacts.readMain();
       if (main === null && !genesis.onboarding) throw new Error("main has no first commit");
       remote = await this.ports.artifacts.canonicalRemote();
@@ -406,14 +409,14 @@ export class RoomCore {
    * what is owed. One step at a time, and never after the room is founded,
    * when the Room's own tokens may be live there.
    */
-  private newRepository(genesis: Genesis): Promise<void> {
+  private newRepository(genesis: Genesis, legacyBase: boolean): Promise<void> {
     return this.serial(async () => {
       if (this.founded) return;
       const push = this.remotes.firstCommit;
       if (!push) throw new Error("this deployment cannot push a first commit");
       const base = locate(genesis.repo, [this.remotes.namespace, ...Object.keys(this.remotes.bindings ?? {})])!.name;
       // A refused push leaves main as it is; the ledger reads it next.
-      const name = await this.workspaces.prepareCanonical(base, (remote, token) => push(remote, token, Date.parse(genesis.createdAt)));
+      const name = await this.workspaces.prepareCanonical(base, (remote, token) => push(remote, token, Date.parse(genesis.createdAt)), { legacyBase });
       // From here the room's repository is this incarnation: reads, forks, landing and the log all reach it.
       if (getMeta(this.sql, "canonical_name") !== name) {
         setMeta(this.sql, "canonical_name", name);

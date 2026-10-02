@@ -1223,3 +1223,85 @@ test("after founding, nothing touches the sealed incarnation: the Room's own tok
   assert.equal(repo.live().length, 1, "untouched");
   assert.equal(ns.deleteCalls, 0);
 });
+
+// ------------------------------------------------------------------ review 700b74ea: the base name an older Room may have created
+
+const legacyOpen = (ws: Workspaces) => ws.duties().filter((d) => d.kind === "repo-create" && d.reason === "legacy" && d.state === "in-flight").length;
+
+test("review 700b74ea (a): a legacy base repository holding a 24-hour token is deleted with it; the room is sealed on a new incarnation; the old creates stay watched", async () => {
+  const { clock, ns, ws, prep, firstCommit } = setupFounding();
+  // An older Room created the base name and lost the answer: a repository with a write token, and no ledger row.
+  ns.repos.set("canon", new FakeRepo(ns, "canon", null));
+  const legacy = ns.repos.get("canon")!;
+  legacy.mintRaw("write", 86400);
+  void prep;
+  const name = await ws.prepareCanonical("canon", firstCommit, { legacyBase: true });
+  assert.notEqual(name, "canon");
+  assert.equal(ns.repos.has("canon"), false, "deleted, with its token");
+  ws.sealCanonical(name);
+  // Neither the delete nor the seal settles the old creates: another may still apply.
+  assert.equal(legacyOpen(ws), 1);
+  assert.notEqual(ws.nextDue(), null, "watched after founding");
+  clock.t = ws.nextDue()!;
+  await ws.reconcile();
+  assert.equal(legacyOpen(ws), 1);
+  assert.equal(ns.repos.get(name)!.mainSha, FIRST);
+});
+
+test("review 700b74ea (b): an absent base whose old create applies after the new seal is found and deleted, with its token; the room's repository is untouched", async () => {
+  const { clock, ns, ws, firstCommit } = setupFounding();
+  const name = await ws.prepareCanonical("canon", firstCommit, { legacyBase: true });
+  ws.sealCanonical(name);
+  assert.equal(legacyOpen(ws), 1, "a read of absence does not settle it");
+  // The old create applies now.
+  ns.repos.set("canon", new FakeRepo(ns, "canon", null));
+  ns.repos.get("canon")!.mintRaw("write", 86400);
+  clock.t = ws.nextDue()!;
+  await ws.reconcile();
+  assert.equal(ns.repos.has("canon"), false);
+  assert.equal(legacyOpen(ws), 1, "and still watched: another may apply");
+  // It appears again: deleted again.
+  ns.repos.set("canon", new FakeRepo(ns, "canon", null));
+  clock.t = ws.nextDue()!;
+  await ws.reconcile();
+  assert.equal(ns.repos.has("canon"), false);
+  assert.equal(ns.repos.get(name)!.mainSha, FIRST);
+});
+
+test("review 700b74ea (c): an already-founded legacy room, stored under its base name with no ledger: nothing reaches it, and its work and publishing token survive", async () => {
+  const clock = new Clock();
+  const ns = new FakeNamespace(clock);
+  ns.allowDelete = true;
+  const canon = ns.repos.get("canon")!;
+  canon.mainSha = "a".repeat(40);
+  canon.mintRaw("write", 60);
+  const ws = new Workspaces({ sql: nodeSql(), artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  assert.equal(await ws.settleCanonical(), 0);
+  assert.equal(await ws.reconcile(), 0);
+  assert.equal(await ws.sweep(), 0);
+  assert.equal(ws.nextDue(), null);
+  assert.equal(ws.canonicalDue(), null);
+  assert.equal(ns.deleteCalls, 0);
+  assert.equal(canon.live().length, 1);
+  assert.equal(canon.mainSha, "a".repeat(40));
+});
+
+test("review 700b74ea: without the flag and with no ledger row for the base name, nothing is adopted (a founding begun by this Room)", async () => {
+  const { ws, firstCommit } = setupFounding();
+  const name = await ws.prepareCanonical("canon", firstCommit);
+  ws.sealCanonical(name);
+  assert.equal(ws.duties().filter((d) => d.reason === "legacy").length, 0);
+  assert.equal(ws.nextDue(), null);
+});
+
+test("review 700b74ea: a base name an earlier revision's ledger created is adopted too, flag or not, and never held", async () => {
+  const { ns, sql, ws, firstCommit } = setupFounding();
+  // Revision 2 held the base name by an answered create.
+  ns.repos.set("canon", new FakeRepo(ns, "canon", null));
+  sql.all("INSERT INTO artroom_ws_duty (fork, kind, token_id, reason, state, started_at, next_at) VALUES ('canon', 'repo-create', NULL, 'repo-create', 'answered', 0, 0)");
+  const name = await ws.prepareCanonical("canon", firstCommit);
+  assert.notEqual(name, "canon");
+  assert.equal(ns.repos.has("canon"), false);
+  ws.sealCanonical(name);
+  assert.equal(legacyOpen(ws), 1);
+});
