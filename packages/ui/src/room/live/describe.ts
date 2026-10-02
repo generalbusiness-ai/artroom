@@ -1,6 +1,7 @@
 /** Plain sentences for log entries from a live room. */
 
 import type { ActId, LandOp, LogEntry } from "../contract.ts";
+import { checkCarriedText } from "../checks.ts";
 import { recoveryNow } from "../recovery.ts";
 import type { FeedEntry } from "../adapter.ts";
 
@@ -22,6 +23,8 @@ export function describeEntry(e: LogEntry): FeedEntry {
           return `${ev.holder}'s lease expired. There is no handover note.`;
         case "policy-activated":
           return `A new policy became active. ${ev.recomputed.reopened} obligations reopened.`;
+        case "check-carried":
+          return checkCarriedText(ev);
         case "land-reserved":
           return `A landing was reserved: publication ${ev.publication}.`;
         case "abort-attempt":
