@@ -42,8 +42,11 @@ token is never a command argument and never printed. `release` removes
 that lane's credential, from wherever you run it, and leaves a credential
 that a newer workspace for another lane has written.
 
-If two `artroom workspace` commands overlap, or a release happens while one
-is being prepared, only the workspace started last installs anything. The
+Each repository keeps a record of who owns its Artroom remote and
+credential, in `.git/artroom/owner.json`. Every Room you use with the
+repository shares that record. If two `artroom workspace` commands overlap,
+or a release happens while one is being prepared, only the workspace
+started last installs anything, whichever Room it is for. The
 other says it was superseded, and leaves the newer remote and credential
 alone.
 

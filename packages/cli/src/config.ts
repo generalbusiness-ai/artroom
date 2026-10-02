@@ -34,22 +34,18 @@ export interface RoomConfig {
   landingBy?: string;
   /** The credential `artroom workspace` installed for each lane: where, for which lease, and its installation ID. */
   workspaces?: Record<LaneId, Installed>;
-  /**
-   * Bumped by every local workspace action: a workspace command reserving
-   * its installation before it asks the room, an installation, a release's
-   * cleanup. A workspace installs only if nothing bumped it since its own
-   * reservation (`workspaceBy` is that reservation's installation ID).
-   */
-  workspaceRev?: number;
-  workspaceBy?: string;
+  /** The repositories (`.git` directories) this Room has set up workspaces in, whose owner records a release consults. */
+  destinations?: string[];
 }
 
 /**
  * The version of the config and journal files this CLI writes. Version 1
  * (no `v` in the config) was written before revisions, installation IDs
- * and lease-bound intents; `decode` below reads it conservatively.
+ * and lease-bound intents. Version 2 kept workspace ownership in the
+ * config; version 3 keeps it at the repository (git.ts `Owner`).
+ * `decode` below reads both older versions conservatively.
  */
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 
 /** A file written by a newer artroom: refused, never guessed at. */
 export class SchemaError extends Error {}
@@ -92,32 +88,19 @@ export type LocalIntent =
    */
   | { readonly kind: "manual"; readonly steps: readonly string[] }
   /**
-   * `release`: of `lane` at `lease`. Removes the credential installed for
-   * that lease (`installed`), only if it is still that installation; and
-   * forgets the lane's selection and landing only if unchanged since
-   * `laneRev` and `landingRev`.
+   * `release`: of `lane` at `lease`. For each repository where this Room set
+   * up a workspace for the lane, the owner revision seen before the release
+   * was sent: the cleanup there is done only if it is still that revision.
    */
   | {
       readonly kind: "release-lane";
       readonly lane: LaneId;
       readonly lease: number;
-      readonly installed: Installed | null;
+      readonly destinations: readonly { readonly dir: string; readonly rev: number }[];
       readonly laneRev: number;
       readonly landingRev: number;
     };
 
-/**
- * The journal: one durable record per unfinished piece of work, written
- * before the first request and removed only when every local step is done.
- * Running the same command again reads it and finishes the work with the
- * same key, the same request and the same receipt, instead of starting over.
- *
- * - `act`: an act, prepared and signed, under its idempotency key (R-IDEM-2);
- *   then the room's answer, until the local steps after it are done.
- * - `login`: the new key and the join's idempotency key, then the join's result.
- * - `redeem`: that a one-time redemption was sent, then its result. The bearer
- *   token stays here (0600) only until it is in its own file and the config.
- */
 export type JournalEntry =
   | {
       readonly v: typeof SCHEMA;
@@ -268,7 +251,7 @@ export class Store {
 type Raw = Record<string, unknown>;
 
 function newer(v: unknown, path: string): never {
-  throw new SchemaError(`${path} was written by a newer artroom (schema ${String(v)}; this one reads 1 and ${SCHEMA}). Update artroom, then run the command again.`);
+  throw new SchemaError(`${path} was written by a newer artroom (schema ${String(v)}; this one reads 1 to ${SCHEMA}). Update artroom, then run the command again.`);
 }
 
 /**
@@ -280,6 +263,8 @@ function newer(v: unknown, path: string): never {
 export function decodeConfig(raw: Raw, path: string): Config {
   const v = raw["v"] ?? 1;
   if (v === SCHEMA) return raw as unknown as Config;
+  // Version 2 differs only in its room-level workspace revision, which version 3 no longer reads.
+  if (v === 2) return { ...(raw as unknown as Config), v: SCHEMA };
   if (v !== 1) newer(v, path);
   const rooms: Record<string, RoomConfig> = {};
   for (const [id, r] of Object.entries((raw["rooms"] ?? {}) as Record<string, Raw>)) {
@@ -287,7 +272,8 @@ export function decodeConfig(raw: Raw, path: string): Config {
     for (const [lane, w] of Object.entries((r["workspaces"] ?? {}) as Record<string, unknown>)) {
       workspaces[lane] = typeof w === "string" ? { file: w, lease: 0, install: "" } : (w as Installed);
     }
-    rooms[id] = { ...(r as unknown as RoomConfig), workspaces };
+    const { destinations: _none, ...rest } = r as unknown as RoomConfig;
+    rooms[id] = { ...rest, workspaces };
   }
   return { ...(raw as unknown as Config), v: SCHEMA, rooms };
 }
@@ -303,6 +289,15 @@ export function decodeConfig(raw: Raw, path: string): Config {
 export function decodeEntry(raw: Raw, path: string): JournalEntry {
   const v = raw["v"];
   if (v === SCHEMA) return raw as unknown as JournalEntry;
+  if (v === 2) {
+    // Version 2 intents are version 3's, except a release, whose ownership evidence was a config mapping.
+    const local = raw["local"] as Raw | undefined;
+    if (raw["type"] !== "act" || local?.["kind"] !== "release-lane") return { ...(raw as unknown as JournalEntry), v: SCHEMA } as JournalEntry;
+    const installed = local["installed"] as { file?: string } | null | undefined;
+    const steps = [`This release was recorded by an older artroom, so its local cleanup was not done. If lane ${String(local["lane"])} is still selected, claim or choose another lane.`];
+    if (installed?.file) steps.push(`If ${installed.file} still holds lane ${String(local["lane"])}'s credential, remove it by hand.`);
+    return { ...(raw as unknown as JournalEntry & { type: "act" }), v: SCHEMA, local: { kind: "manual", steps } };
+  }
   if (v !== 1) newer(v, path);
   if (raw["type"] !== "act") return { ...(raw as unknown as JournalEntry), v: SCHEMA } as JournalEntry;
   const old = (raw["local"] ?? {}) as Raw;

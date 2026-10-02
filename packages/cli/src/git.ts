@@ -6,7 +6,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { writePrivate } from "./config.ts";
 
@@ -81,4 +81,85 @@ export function removeCredential(file: string, install: string): "removed" | "ab
   if (owner === null || owner.install !== install) return "kept";
   rmSync(file);
   return "removed";
+}
+
+// --------------------------------------------------------- the destination
+
+/**
+ * The owner of a repository's Artroom workspace: one record in
+ * `.git/artroom/owner.json`, shared by every Room and every command that
+ * writes this repository's `artroom` remote and credential. Each change
+ * bumps `rev` and names who made it (`by`). A workspace reserves the
+ * destination before its first await and installs only if `rev` is still
+ * its reservation's; a release changes it only if `rev` is still the one it
+ * saw before it was sent. Unrelated repositories have unrelated records.
+ */
+export interface Owner {
+  readonly v: 1;
+  readonly rev: number;
+  readonly by: string;
+  readonly state: "free" | "reserved" | "installed" | "released";
+  readonly room?: string;
+  readonly lane?: string;
+  readonly lease?: number;
+  readonly install?: string;
+}
+
+const OWNER = "artroom/owner.json";
+const LOCK = "artroom/owner.lock";
+const FREE: Owner = { v: 1, rev: 0, by: "", state: "free" };
+
+export function credentialFileIn(dir: string): string {
+  return join(dir, INCLUDE);
+}
+
+export function readOwner(dir: string): Owner {
+  const path = join(dir, OWNER);
+  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Owner) : FREE;
+}
+
+function sleep(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/** An exclusive lock on the destination, for one read-compare-write; a lock older than 30 s is a crashed command's. */
+function lock(dir: string): () => void {
+  mkdirSync(join(dir, "artroom"), { recursive: true, mode: 0o700 });
+  const path = join(dir, LOCK);
+  for (let i = 0; ; i++) {
+    try {
+      closeSync(openSync(path, "wx", 0o600));
+      return () => rmSync(path, { force: true });
+    } catch (e) {
+      if ((e as { code?: string }).code !== "EEXIST") throw e;
+      try {
+        if (Date.now() - statSync(path).mtimeMs > 30_000) {
+          rmSync(path, { force: true });
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (i > 500) throw new Error(`${path} is held by another artroom command.`);
+      sleep(10);
+    }
+  }
+}
+
+/**
+ * Reads the owner, lets `change` act on the destination and return the new
+ * owner (or undefined to change nothing), and writes it atomically, all
+ * under the destination's lock. Returns the owner as it then is.
+ */
+export function withDestination(dir: string, change: (owner: Owner) => Owner | undefined): Owner {
+  const unlock = lock(dir);
+  try {
+    const owner = readOwner(dir);
+    const next = change(owner);
+    if (next === undefined) return owner;
+    writePrivate(join(dir, OWNER), `${JSON.stringify(next, null, 2)}\n`);
+    return next;
+  } finally {
+    unlock();
+  }
 }

@@ -166,3 +166,18 @@ names each case.
 | E5.1 Fence workspace installation against an older response still in flight | `artroom workspace` reserves its installation (it bumps the room's workspace revision, and names its installation ID) before it asks the room for anything. It installs only if no later local workspace action or release has bumped the revision since, and only for the lease it asked for. A superseded workspace keeps the newer remote, credential, mapping and selection, says so, and exits 1. A release bumps the revision too, so a revoked token is never installed | "same lane: a lease-1 response that arrives after release, reclaim and a lease-2 workspace installs nothing", "different lanes…", "two overlapping workspaces: the one started last owns the installation…", "a release while the workspace is being prepared…", "a failed installation leaves nothing a later workspace or release mistakes for its own" |
 | E5.2 Version the config and journal schema | The config and journal are now schema 2. Schema 1 files are decoded explicitly. A schema-1 act's value-based intent cannot prove what it owns, so recovery returns the kept receipt, changes nothing local, and prints "Manual local step" lines. Path-only workspace mappings and old credential markers match no release, and the release says what to remove by hand. A schema-1 config becomes schema 2 at its first atomic write. A newer schema is refused, and nothing is sent | "the exact revision-4 answered release-lane entry returns its kept receipt…", "a revision-2 prepared claim…" and "a revision-4 prepared claim…", "a schema-1 config with a path-only mapping and an old marker…", "an interruption after %s while migrating a schema-1 config…", "a config or journal entry from a newer schema is refused…" |
 
+## Review 744a018a
+
+The checker's sixth review confirmed the schema migration and the
+token-response fence, and asked for one installation owner, kept at the
+destination itself and established when the command starts.
+`packages/cli/test/review-744a018a.test.ts` names each case.
+
+| Finding | Change | Tests |
+|---|---|---|
+| Reserve before the earlier awaits | `artroom workspace` fixes its Room, lane and repository, and reserves the destination, before its first await. It installs only if it still owns the destination at the end. A delay at the read session, the held-lane read or the token response cannot let an older command overwrite a newer one | "an older workspace delayed at %s does not overwrite a newer workspace for another lane" (the read session, the held-lane read, the token response), "workspaces in unrelated repositories do not supersede each other" |
+| Fence the shared credential destination across Rooms | Ownership lives at the destination: `.git/artroom/owner.json` holds a revision, the installation ID, its Room, lane and lease. It is updated under a lock file, by an atomic write. Workspace setup and release both compare that owner before changing any remote, credential file or mapping, so every Room that writes the repository sees the same owner. The config is now schema 3. Schema 2 workspace evidence was per Room, so a schema-2 release is decoded as a manual step | "a workspace for Room A delayed at %s does not overwrite Room B's newer installation in the same repository", "a release in Room A leaves Room B's newer installation in the same repository alone"; the same-Room cases in reviews 80d3710c, f7c79158 and f30be7f6 still pass |
+
+Also: CLI-generated idempotency keys never start with "-", which the option
+parser would have read as an option.
+

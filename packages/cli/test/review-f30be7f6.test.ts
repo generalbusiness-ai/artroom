@@ -81,7 +81,7 @@ describe("E5.1: a workspace installs only while its reservation still owns the w
     pause.release();
     const res = await old;
     expect(res.code).toBe(EXIT.failed);
-    expect(res.out).toContain(`Did not install the workspace for lane ${x}, lease 1: a newer local workspace action or release happened`);
+    expect(res.out).toContain(`Did not install the workspace for lane ${x}, lease 1: a newer workspace or release for this repository happened`);
     expect(readFileSync(credential(dir), "utf8")).toBe(newer.file);
     expect(room(home).workspaces[x]).toEqual(newer.mapping);
     expect(room(home).lane).toBe(x);
@@ -230,7 +230,7 @@ describe("E5.2: schema 1 files are decoded conservatively; unknown versions are 
     expect(res.code).toBe(EXIT.ok);
     expect(res.out).toContain(`Manual local step: ${credential(dir)} was set up by an older artroom for lane ${x}. If it still holds this lane's credential, remove it by hand.`);
     expect(existsSync(credential(dir))).toBe(true);
-    expect(config(home).v).toBe(2);
+    expect(config(home).v).toBe(3);
   });
 
   test.each(["act-answered", "config-written"])("an interruption after %s while migrating a schema-1 config is finished by the same command", async (step) => {
@@ -242,7 +242,7 @@ describe("E5.2: schema 1 files are decoded conservatively; unknown versions are 
     const argv = ["claim", "src/**", "--goal", "g", "--idempotency-key", `mig-${step}`];
     expect((await cli(home, argv, h.tmp, crashAt(step))).code).toBe(EXIT.failed);
     expect((await cli(home, argv)).code).toBe(EXIT.ok);
-    expect(config(home).v).toBe(2);
+    expect(config(home).v).toBe(3);
     expect(room(home).lane).toMatch(/^act_/);
     expect(room(home).laneRev).toBe(1);
     expect(acts("claim")).toHaveLength(1);
@@ -253,11 +253,11 @@ describe("E5.2: schema 1 files are decoded conservatively; unknown versions are 
     await login(home, "@alice");
     h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
     await cli(home, ["claim", "src/**", "--goal", "g", "--idempotency-key", "future"]);
-    rewriteEntry(home, "future", (e) => ({ ...e, v: 3 }));
+    rewriteEntry(home, "future", (e) => ({ ...e, v: 4 }));
     const before = calls("/acts");
     const entry = await cli(home, ["claim", "src/**", "--goal", "g", "--idempotency-key", "future"]);
     expect(entry.code).toBe(EXIT.failed);
-    expect(entry.err).toMatch(/was written by a newer artroom \(schema 3; this one reads 1 and 2\)\. Update artroom/);
+    expect(entry.err).toMatch(/was written by a newer artroom \(schema 4; this one reads 1 to 3\)\. Update artroom/);
     expect(calls("/acts")).toBe(before);
     const c = config(home);
     writeFileSync(configPath(home), JSON.stringify({ ...c, v: 99 }));

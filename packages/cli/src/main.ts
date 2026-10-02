@@ -14,6 +14,7 @@
  * redemption, and never rebuilds the request from changed state.
  */
 
+import { dirname } from "node:path";
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import {
   agentsMd,
@@ -56,7 +57,7 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import { SCHEMA, SchemaError, Store, type Config, type JournalEntry, type LocalIntent, type RoomConfig } from "./config.ts";
 import { attentionText, claimText, errorText, explainText, landText, logText, proposalText, refusalText, short } from "./format.ts";
-import { configureWorkspace, credentialPath, head as gitHead, removeCredential, REMOTE } from "./git.ts";
+import { configureWorkspace, credentialFileIn, gitDir, head as gitHead, readOwner, removeCredential, REMOTE, withDestination } from "./git.ts";
 import { parseInvitation } from "./link.ts";
 
 export interface Io {
@@ -252,13 +253,24 @@ async function held(api: HttpRoom, lane: LaneId, me: string): Promise<Extract<La
   return l;
 }
 
+/**
+ * A fresh idempotency key the user can pass back on a command line: never
+ * starting with "-", which the option parser would read as an option.
+ */
+function commandKey(): string {
+  for (;;) {
+    const key = newIdempotencyKey();
+    if (!key.startsWith("-")) return key;
+  }
+}
+
 /** One act command: how to start new work, the local steps after the room's answer, and what to print. */
 interface ActSpec<T> {
   readonly command: string;
   /** Resolves the act from current state and sends it. Runs only for new work, never for a journaled act. */
   start(api: HttpRoomClient, room: RoomConfig, opts: ClientActOptions): Promise<Result<T>>;
   /** The local change this act will own, fixed from the config and the prepared act just before it is sent. Default: none. */
-  intent?(room: RoomConfig, act: PreparedAct): LocalIntent;
+  intent?(room: RoomConfig, act: PreparedAct, id: RoomId): LocalIntent;
 }
 
 /** Changes the selected lane; every change, even back to an earlier lane, gets a new revision (R: review 80d3710c). */
@@ -314,24 +326,32 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
       return lines;
     }
     case "release-lane": {
-      const installed = local.installed;
-      if (installed !== null) {
-        const done = removeCredential(installed.file, installed.install);
-        if (done === "removed") lines.push(`Removed the workspace credential for lane ${local.lane}, lease ${installed.lease}, from ${installed.file}.`);
-        if (done === "kept") lines.push(`Left the workspace credential at ${installed.file}: a newer workspace installed it.`);
+      // At each repository: clean up only if its owner is unchanged since this release was prepared.
+      const removed = new Set<string>();
+      for (const d of local.destinations) {
+        withDestination(d.dir, (o) => {
+          if (o.by === key) return undefined; // done already
+          if (o.rev !== d.rev) {
+            if (o.state === "installed" || o.state === "reserved") lines.push(`Left the workspace credential at ${credentialFileIn(d.dir)}: a newer workspace installed it.`);
+            return undefined;
+          }
+          if (o.install !== undefined && removeCredential(credentialFileIn(d.dir), o.install) === "removed") {
+            lines.push(`Removed the workspace credential for lane ${local.lane}, lease ${o.lease ?? local.lease}, from ${credentialFileIn(d.dir)}.`);
+            removed.add(o.install);
+          }
+          return { ...o, rev: o.rev + 1, by: key, state: "released" };
+        });
       }
       ctx.step("credential-removed");
       updateRoom(ctx, id, (r) => {
-        // A release supersedes any workspace still being prepared, which must not install a token the release revoked.
-        if (r.workspaceBy !== key) {
-          r.workspaceRev = (r.workspaceRev ?? 0) + 1;
-          r.workspaceBy = key;
+        const mapped = r.workspaces?.[local.lane];
+        // Forget the lane's mapping once its installation owns no destination: removed now, or replaced by newer work.
+        if (mapped !== undefined && mapped.install !== "" && (removed.has(mapped.install) || readOwner(dirname(dirname(mapped.file))).install !== mapped.install)) {
+          delete r.workspaces![local.lane];
         }
-        if (installed !== null && r.workspaces?.[local.lane]?.install === installed.install) delete r.workspaces[local.lane];
-        const legacy = r.workspaces?.[local.lane];
-        if (installed === null && legacy !== undefined && legacy.install === "") {
-          // A mapping from an older artroom names no lease or installation: nothing proves the file is this lease's.
-          lines.push(`Manual local step: ${legacy.file} was set up by an older artroom for lane ${local.lane}. If it still holds this lane's credential, remove it by hand.`);
+        if (mapped !== undefined && mapped.install === "") {
+          // A mapping from an older artroom names no installation: nothing proves the file is this lease's.
+          lines.push(`Manual local step: ${mapped.file} was set up by an older artroom for lane ${local.lane}. If it still holds this lane's credential, remove it by hand.`);
         }
         if (r.lane === local.lane && r.laneBy !== key) {
           if ((r.laneRev ?? 0) === local.laneRev) setLane(r, undefined, key);
@@ -360,7 +380,7 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
  */
 async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T>; extra: string[] }> {
   const { id, room } = roomOf(ctx);
-  const key = str(ctx.values, "idempotency-key") ?? newIdempotencyKey();
+  const key = str(ctx.values, "idempotency-key") ?? commandKey();
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(key)) throw new UsageError("An idempotency key is 1 to 64 characters from A-Z, a-z, 0-9, '_' and '-'.");
   ctx.act = { room: id, key };
   let entry: Extract<JournalEntry, { type: "act" }> | undefined = ctx.store.entry(id, "act", key);
@@ -377,7 +397,7 @@ async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T
         onPrepared: (prepared) => {
           // Fixed now, before anything is sent: what this act owns locally, and the revisions it expects.
           const now = ctx.store.read().rooms[id] ?? room;
-          const local = spec.intent?.(now, prepared) ?? { kind: "none" as const };
+          const local = spec.intent?.(now, prepared, id) ?? { kind: "none" as const };
           entry = { v: SCHEMA, type: "act", id: key, room: id, command: spec.command, state: "prepared", prepared, local };
           ctx.store.journal(entry);
           ctx.step("act-journaled");
@@ -616,20 +636,21 @@ const COMMANDS: Record<string, Command> = {
   workspace: {
     options: { timeout: { type: "string" } },
     async run(ctx) {
-      const { api, id, room } = await open(ctx);
-      const file = credentialPath(ctx.io.cwd);
-      if (file === undefined) throw new UsageError("Run artroom workspace inside your git repository, so it can set up the remote.");
-      const h = await held(api, laneOf(ctx, room), room.member);
-      if (isRefusal(h)) return refused(ctx, h);
-      // Reserve the installation durably, before asking the room for anything. Any later local workspace
-      // action (a newer workspace, a release's cleanup) bumps the revision and so supersedes this one.
+      // Everything about where this workspace goes is fixed, and the destination reserved, before the first await.
+      const dir = gitDir(ctx.io.cwd);
+      if (dir === undefined) throw new UsageError("Run artroom workspace inside your git repository, so it can set up the remote.");
+      const { id, room } = roomOf(ctx);
+      const lane = laneOf(ctx, room);
       const install = newIdempotencyKey();
-      let reserved = 0;
+      const reserved = withDestination(dir, (o) => ({ v: 1, rev: o.rev + 1, by: install, state: "reserved", room: id, lane, install })).rev;
       updateRoom(ctx, id, (r) => {
-        reserved = r.workspaceRev = (r.workspaceRev ?? 0) + 1;
-        r.workspaceBy = install;
+        if (!(r.destinations ?? []).includes(dir)) r.destinations = [...(r.destinations ?? []), dir];
       });
       ctx.step("workspace-reserved");
+
+      const { api } = await open(ctx);
+      const h = await held(api, lane, room.member);
+      if (isRefusal(h)) return refused(ctx, h);
       const op = await api.workspace(h);
       if (isRefusal(op)) return refused(ctx, op);
       const ready = op.state === "pending" ? await api.wait(op, { until: ["ready", "failed"], timeoutMs: (int(ctx.values, "timeout") ?? 60) * 1000 }) : op;
@@ -640,24 +661,29 @@ const COMMANDS: Record<string, Command> = {
       const grant = await api.workspaceToken(h);
       if (isRefusal(grant)) return refused(ctx, grant);
       ctx.secrets.add(grant.token);
-      // Install only if this reservation still owns the workspace, and the grant is for the lease it was made for.
+
+      // Install only if the reservation still owns this repository's destination, whichever Room or command
+      // touched it since, and only for the lease it was made for. The remote, credential and mapping change together.
+      const file = credentialFileIn(dir);
       let owned = false;
-      updateRoom(ctx, id, (r) => {
-        if (r.workspaceRev !== reserved || r.workspaceBy !== install || grant.leaseGeneration !== h.lease.generation) return;
+      withDestination(dir, (o) => {
+        if (o.rev !== reserved || o.by !== install || grant.leaseGeneration !== h.lease.generation) return undefined;
         owned = true;
-        r.workspaceRev = reserved + 1;
-        r.workspaces = { ...r.workspaces, [h.lane]: { file, lease: grant.leaseGeneration, install } };
+        updateRoom(ctx, id, (r) => {
+          r.workspaces = { ...r.workspaces, [lane]: { file, lease: grant.leaseGeneration, install } };
+        });
+        ctx.step("workspace-mapped");
+        configureWorkspace(ctx.io.cwd, grant.remote, grant.token, lane, grant.leaseGeneration, install);
+        return { ...o, rev: o.rev + 1, state: "installed", lease: grant.leaseGeneration };
       });
       if (!owned) {
         return print(ctx, { op: ready, installed: false, reason: "superseded" }, () => [
-          `Did not install the workspace for lane ${h.lane}, lease ${h.lease.generation}: a newer local workspace action or release happened while it was being prepared.`,
+          `Did not install the workspace for lane ${lane}, lease ${h.lease.generation}: a newer workspace or release for this repository happened while it was being prepared.`,
           "Kept the newer git remote, credential, mapping and lane selection. Run artroom workspace again if you still want this one.",
         ], EXIT.failed);
       }
-      ctx.step("workspace-mapped");
-      configureWorkspace(ctx.io.cwd, grant.remote, grant.token, h.lane, grant.leaseGeneration, install);
       return print(ctx, { op: ready, remote: grant.remote, remoteName: REMOTE, leaseGeneration: grant.leaseGeneration, expiresAt: grant.expiresAt, credentialFile: file }, () => [
-        `Workspace ready for lane ${h.lane}, lease ${grant.leaseGeneration}.`,
+        `Workspace ready for lane ${lane}, lease ${grant.leaseGeneration}.`,
         `Git remote "${REMOTE}": ${grant.remote}`,
         `Git can push there until ${grant.expiresAt}. The token is in ${file}, readable only by you, and is not shown.`,
         'Next: git push artroom HEAD, then artroom propose -m "<what changed and why>"',
@@ -747,19 +773,16 @@ const COMMANDS: Record<string, Command> = {
           const h = await held(api, laneOf(ctx, room), room.member);
           return isRefusal(h) ? h : api.release(h, note === undefined ? {} : { note }, opts);
         },
-        // The released lease, and the credential installed for it, wherever it is: not whatever is in the current directory.
-        intent: (room, act) => {
+        // Each repository this Room set up a workspace for the lane in, with its owner revision now, before the release is sent:
+        // not whatever is in the current directory.
+        intent: (room, act, id) => {
           const lane = (act.target as { lane: LaneId }).lane;
           const lease = (act.body as { lease: number }).lease;
-          const installed = room.workspaces?.[lane];
-          return {
-            kind: "release-lane",
-            lane,
-            lease,
-            installed: installed !== undefined && installed.lease === lease ? installed : null,
-            laneRev: room.laneRev ?? 0,
-            landingRev: room.landingRev ?? 0,
-          };
+          const destinations = (room.destinations ?? [])
+            .map((dir) => ({ dir, owner: readOwner(dir) }))
+            .filter(({ owner }) => owner.room === id && owner.lane === lane)
+            .map(({ dir, owner }) => ({ dir, rev: owner.rev }));
+          return { kind: "release-lane", lane, lease, destinations, laneRev: room.laneRev ?? 0, landingRev: room.landingRev ?? 0 };
         },
       });
       if (isRefusal(out)) return refused(ctx, out);
