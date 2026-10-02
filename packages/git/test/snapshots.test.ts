@@ -313,6 +313,7 @@ function durable() {
 }
 
 const never = () => new Promise<never>(() => {});
+const RECHECK_FIRST = 60_000;
 const transport = () => new Error("lost transport reply; the request may still apply");
 
 /** Run alarms as the Room would until nothing is due for a while. */
@@ -494,4 +495,19 @@ test("a late callback from a stopped host cannot finish or settle a later attemp
   assert.deepEqual([t.name, t.remote], [r.name, r.remote], "the job reads the current attempt's repository");
   await fresh.reconcile();
   assert.deepEqual(ns.created.filter((n) => ns.repos.has(n)), [r.name], "the superseded attempt's repository is deleted");
+});
+
+test("a job with a short deadline brings the wake-up forward to that deadline", async () => {
+  const { clock, ns, host, wakes } = durable();
+  const snaps = host();
+  const r = await snaps.prepare(C1, async () => C1);
+  clock.advance(RECHECK_FIRST);
+  await snaps.reconcile(); // the alarm set before the create has fired; the next is the preparation window's end
+  assert.equal(wakes.at(-1), clock.t - RECHECK_FIRST + PREPARE_WINDOW_MS);
+  const deadline = clock.t + 3 * 60_000;
+  await snaps.mint(C1, "job_short", deadline);
+  assert.equal(wakes.at(-1), deadline, "woken at the job's deadline, not the window's end");
+  clock.t = deadline;
+  await snaps.reconcile();
+  assert.equal(ns.repos.has(r.name), false);
 });

@@ -32,9 +32,10 @@
  * - `done`: settled, with the reason.
  *
  * Every duty is written before the remote effect it covers, and `wake` (the
- * Room's alarm) is set from `nextDue()` before each create and write, and
- * after every change to the duties, so a host that stops at any await
- * leaves its debt scheduled. A mint needs no new duty: the repository's
+ * Room's alarm) is set from `nextDue()` before each create, and after every
+ * change that can bring a duty forward. Every alarm run sets the next one,
+ * so a wake-up at or before the earliest duty always exists, and a host
+ * that stops at any await leaves its debt scheduled. A mint needs no new duty: the repository's
  * deletion, owed and scheduled since its creation, removes a token whose
  * answer is lost. The alarm
  * calls `reconcile()`. A repository is deleted when its preparation stops
@@ -65,8 +66,8 @@ export interface SnapshotReposOptions {
   readonly retainMs?: number;
   /**
    * Persist a wake-up at `at` (ms), for example the Room's alarm, which then
-   * calls `reconcile()`. Called with `nextDue()` before each create and
-   * write, and after every change to the duties.
+   * calls `reconcile()`. Called with `nextDue()` before each create, after
+   * every change that can bring a duty forward, and after each reconcile.
    */
   readonly wake?: (at: number) => Promise<void>;
   readonly now?: () => number;
@@ -272,7 +273,7 @@ export class SnapshotRepos {
         this.done([step], "created");
         this.oweDelete(commit, name, this.now() + PREPARE_WINDOW_MS, "created");
       });
-      await this.wake();
+      // No new wake-up is needed: the one set before the create is earlier, and each alarm sets the next.
       let wrote: string;
       try {
         wrote = await write({ name, remote: created.remote, token: created.token });
