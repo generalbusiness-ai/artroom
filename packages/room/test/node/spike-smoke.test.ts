@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, outcomeOf, readListing, smokeOk, type Answer, type Api } from "../../measure/spike-smoke.mjs";
+import { cleanupRun, combineCleanups, incarnationOf, isRepoRecord, isTokenRecord, outcomeOf, readListing, smokeOk, type Answer, type Api } from "../../measure/spike-smoke.mjs";
 
 /**
  * Review 1b868265: the smoke run's cleanup has one explicit outcome, and it
@@ -263,3 +263,20 @@ describe("spike smoke: a public room's repository is an incarnation of its ident
   });
 });
 
+
+describe("9f81f372: one cleanup outcome across the public room and every imported repository", () => {
+  const done = { ok: true, duties: [{ duty: "inventory", outcome: "done" as const }], unresolved: [], reposLeft: [] };
+  it("ok only if every part is; duties, unresolved duties and repositories left carry their namespace", () => {
+    const c = combineCleanups({}, [["gitseq-spike", done], ["gitseq-spike-import", done], ["gitseq-spike-import", done]]);
+    expect(c).toMatchObject({ ok: true, reposLeft: [], unresolved: [] });
+    expect(c.duties.map((d) => d.namespace)).toEqual(["gitseq-spike", "gitseq-spike-import", "gitseq-spike-import"]);
+    const left = { ok: false, duties: [], unresolved: [{ duty: "delete-repo", repo: "r", outcome: "refused" as const }], reposLeft: ["r"] };
+    const bad = combineCleanups({}, [["gitseq-spike", done], ["gitseq-spike-import", left]]);
+    expect(bad).toMatchObject({ ok: false, reposLeft: ["gitseq-spike-import/r"], unresolved: [{ namespace: "gitseq-spike-import", duty: "delete-repo" }] });
+  });
+  it("one part's unknown remainder makes the whole remainder unknown, never empty; no parts is not ok", () => {
+    const unknown = { ok: false, duties: [], unresolved: [{ duty: "final-inventory", outcome: "unknown" as const }], reposLeft: null };
+    expect(combineCleanups({}, [["gitseq-spike", done], ["gitseq-spike-import", unknown]]).reposLeft).toBeNull();
+    expect(combineCleanups({}, []).ok).toBe(false);
+  });
+});
