@@ -23,15 +23,24 @@ import { controls, type CrashPoint } from "../src/agent.ts";
 import { agentActs, landed, logOf, runThroughCrashes, setup, stub, TASK } from "./support.ts";
 
 const send = RpcWire.prototype.submit;
+const read = RpcWire.prototype.read;
 
-/** Every `propose` the client hands the binding, and how many of their replies to drop after the room has them. */
-const wire = { proposes: [] as string[], drop: 0 };
+/** Every `propose` the client hands the binding, how many of their replies to drop after the room has them, and how many reads to fail. */
+const wire = { proposes: [] as string[], drop: 0, failReads: 0 };
 
 beforeEach(() => {
   controls.reset();
   controls.retryMs = 0;
   wire.proposes = [];
   wire.drop = 0;
+  wire.failReads = 0;
+  RpcWire.prototype.read = function (this: RpcWire, ...args: Parameters<RpcWire["read"]>) {
+    if (wire.failReads > 0) {
+      wire.failReads--;
+      return Promise.reject(artroomError("unavailable", "review f2212c63: read failed"));
+    }
+    return read.apply(this, args);
+  } as RpcWire["read"];
   // The real Room admits the act; then the reply is lost, as a dropped connection would lose it.
   RpcWire.prototype.submit = async function (this: RpcWire, act: SignedEnvelope): Promise<Result<ActRecord>> {
     const receipt = await send.call(this, act);
@@ -48,6 +57,7 @@ beforeEach(() => {
 
 afterEach(() => {
   RpcWire.prototype.submit = send;
+  RpcWire.prototype.read = read;
 });
 
 /** The run's outcome, as the other tests check it: one act of each kind, the receipts, the landing, no error. */
@@ -88,6 +98,25 @@ describe("review f2212c63, finding 1: an act whose reply is lost through every c
     expect(wire.proposes).toHaveLength(5);
     expect(new Set(wire.proposes).size).toBe(1);
     expect(controls.sends.get("propose")).toEqual(["prepared", "replayed"]);
+    await expectLanded(s);
+  });
+
+  it("after the reset, connecting to the room fails once: the tool connects again, and recovers the receipt", async () => {
+    const s = await setup();
+    wire.drop = Infinity;
+    controls.crashes.add("propose:unresolved");
+    const first = await stub(s.agentName).run(TASK, "task-1").then(
+      () => "",
+      (e: Error) => e.message,
+    );
+    expect(first).toMatch(/propose:unresolved/);
+    wire.drop = 0;
+    // The new instance's first connection reads the room's log; that read fails.
+    wire.failReads = 1;
+    const out = await runThroughCrashes(s.agentName, "task-1");
+    expect(out).toMatchObject({ status: "done", crashes: [] });
+    expect(wire.failReads).toBe(0);
+    expect(new Set(wire.proposes).size).toBe(1);
     await expectLanded(s);
   });
 
