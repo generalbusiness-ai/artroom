@@ -142,9 +142,16 @@ main token pairs in both themes; no automated audit has been run).
 When a generation's commits carry jj `change-id` headers, the Proposal
 screen lists, by change ID, which changes the generation rewrote, added or
 dropped compared with the previous generation. Each rewritten change has an
-interdiff: the change's own edits in each version, compared line by line, so
-changes underneath it (main moving) do not show. A change only rebased or
-reworded says so. When no commit in either generation has a header, the
+interdiff: each version of the change is a patch against its own parent, and
+the two patches are compared, so changes underneath it (main moving) mostly
+do not show. A patch keeps, for each path, what the commit did (added,
+modified, deleted or renamed, the rename source, the file modes) and its
+hunks with three lines of context. The interdiff lists a path when that
+metadata differs, said in words, or when a hunk, context included, is in only
+one version; each such hunk is shown with its line numbers. Line numbers are
+not compared, so a rebase that only moves an edit does not show; one that
+changes a line within three lines of an edit shows that hunk from both
+versions. A change only rebased or reworded says so. When no commit in either generation has a header, the
 screen shows nothing extra. Commits without a header beside ones with a
 header are counted, not followed. The same change ID twice in a generation
 is shown as divergent and not matched.
@@ -155,10 +162,25 @@ path-based. A test checks that no change ID reaches those records.
 
 **Bounds.** Each commit's own diff runs through lane B's bounded tree diff
 (`treeDiff` with `DEFAULT_BOUNDS`: depth 64, 100,000 entries), and a
-generation of more than 2,000 commits (`maxCommits`) is not compared. A diff
-over a bound is shown as too large, as a proposal's diff would be refused.
-Lane B bounds paths, not file contents, so the line comparison adds one bound
-of its own: 2,000 lines per version of a file (`LINE_LIMIT`).
+generation of more than 2,000 commits (`maxCommits`) is not compared. A
+proposal's diff has the same bounds. Lane B bounds paths, not file contents,
+so this view adds bounds of its own (`LINE_BOUNDS` in `src/room/changes.ts`),
+which do not apply to the proposal's diff:
+
+| Bound | Limit |
+|---|---|
+| Lines in one version of a file | 2,000 |
+| UTF-8 bytes in one line | 10,000 |
+| Work for one comparison of two generations, all its changes together: one unit per character read, plus one per pair of lines compared | 20,000,000 |
+
+Over any bound, the interdiff says "too large to compare here" and names the
+bound; once the work is spent, every later rewritten change says so too.
+Lines are numbered before the comparison, so comparing two lines costs the
+same whatever their length. The line comparison is synchronous, but no single
+file can cost more than 2,000 × 2,000 pairs, and the reads between files give
+the page back to the browser. A blob is read whole before its lines are
+counted: the `TreeReader` gives no size, so a live Room should refuse an
+oversized blob when it serves it.
 
 **What the live Room must expose.** The contract has no read for a
 generation's commits, so `LiveRoom.changeHistory` returns null and the live
@@ -282,3 +304,81 @@ Tests are in `test/review-88a20f74.test.tsx`.
    before validation, and a valid draft of each kind still replays.
 3. **Screenshots.** The phone screenshot now waits for the diff to load, as the
    laptop one does, so it captures the whole page.
+
+## Review 125ee638
+
+Checker reviewed head `048b2d51` (the per-change history) and asked for two
+changes, a security bound and two simplifications. Main at `fb2bd41` (contract
+amendment 3) is merged first. Tests are in `test/review-125ee638.test.tsx`;
+the checker's three diagnostics are among them, now asserting the correct
+outcome.
+
+1. **P2: tree-change metadata was lost.** A patch now keeps, for each path,
+   its status, rename source and old and new modes (`FileMeta`). A path whose
+   metadata differs between the versions is listed, and the screen says what
+   each version did ("renames it from y.txt; generation 1's renames it from
+   x.txt", "edits it, mode 100644 to 100755; generation 1's leaves it
+   alone"). Tests: "a different rename destination is a difference", "a
+   different rename source is a difference", "setting the executable bit in
+   one version only is a difference", "the same text edit, with the executable
+   bit set only in the new version, is a difference", and the control "the
+   same rename and the same mode change, rebased, are not a difference".
+2. **P2: edits at different places looked the same.** Hunks keep three lines
+   of context and their line numbers (`Hunk`). Two versions match on a hunk
+   only when its lines, context included, are equal; line numbers are not
+   compared. Tests: "denying in first() and denying in second() are different
+   edits" (each version's hunk names its function) and the control "the same
+   edit, moved down by a rebase that changed lines far from it, is not a
+   difference". The existing rebase-only control (whoami, `tkxlpsuy`) still
+   says "the same edits". In the scenario, `check.ts` now shows once more in
+   the first change: `rateKey()`'s body, two lines above the `currentUser`
+   edit, changed underneath it, so that hunk's context differs. The test "a
+   rewritten change's interdiff shows only how its own edits differ" asserts
+   this, and that the import edit, whose context did not change, is not
+   listed.
+3. **Security: bytes per line and total work were not bounded.** See
+   **Bounds** above: 10,000 UTF-8 bytes per line, and 20,000,000 units of work
+   per comparison, shared by all its changes. Tests: "a line over the byte
+   bound is too large, counted in UTF-8 bytes", "one file's line comparison
+   over the work bound is too large", "reading counts as work, even when the
+   line comparison is trivial", "the work bound covers all the changes of a
+   comparison together", and "once the work is spent, a later change that
+   needs no reading is still too large". The 2,000-line bound keeps its test
+   in `test/change-history.test.tsx`.
+4. **Simplification: structure.** The interdiff is per path: `meta` (or null)
+   and the hunks only in each version, each with `oldStart`, `newStart` and
+   its lines. No more unlocated `+`/`-` strings. Test: "each hunk shows where
+   it is, with its context".
+5. **Simplification: the "too large" copy.** It no longer says this view's
+   bounds apply to every proposal's diff. For lane B's bounds (depth,
+   entries, commits) it says every proposal's diff has the same bound; for
+   this view's own (lines, bytes per line, work) it says the bound does not
+   limit the proposal's diff. Test: "too large: this view's own bounds are not
+   said to bound the proposal's diff". The identical-edit case still reads
+   "The same edits as in generation 1 ... only rebased or reworded".
+
+**Mutations.** Each was applied to the committed fix, run against
+`test/review-125ee638.test.tsx` and `test/change-history.test.tsx`, then
+reverted. Each turned at least one test red:
+
+| Mutation | Tests that went red |
+|---|---|
+| Drop the metadata comparison | the four metadata tests |
+| Drop the context (0 lines) | first()/second(); the scenario interdiff |
+| Compare line numbers too | the moved-by-a-rebase control |
+| Remove the lines-per-file bound | lane B's bounds test (lines) |
+| Remove the bytes-per-line bound | the byte bound test |
+| Count characters, not bytes | the byte bound test |
+| Remove the work bound | the three LCS work tests |
+| Do not charge the line comparison | the three LCS work tests |
+| Do not charge reading | reading counts as work |
+| Give each change its own budget | all changes together; spent budget |
+| Do not check a spent budget first | spent budget |
+| Say the line bound is shared | the "too large" copy test |
+
+The screenshots `proposal-changes-light.png` and `proposal-changes-dark.png`
+are regenerated.
+
+**Gates**, all exit 0: root `npm run typecheck`; root `npm test` (git 118,
+log 100 and 95 in workerd, policy 190 and 189 with 1 skipped in workerd, UI
+114); `npm run build` in `packages/ui`; `npm run e2e` (Playwright, 7 tests).

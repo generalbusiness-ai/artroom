@@ -145,6 +145,16 @@ describe("Security: bytes per line and the work of a whole comparison are bounde
     expect(await compare(repo, [parent, parent], { "a.txt": "2\n" }, { "a.txt": lines("x") }, { maxWork: 50_000 })).toMatchObject({ kind: "ok" });
   });
 
+  test("reading counts as work, even when the line comparison is trivial", async () => {
+    const repo = new MemoryRepo();
+    const long = `${Array.from({ length: 50 }, (_, i) => `${i}`.padEnd(100, ".")).join("\n")}\n`;
+    const parent = repo.commit(null, { "a.txt": long }, "base");
+    // Appending one line: after the common prefix and suffix, no pairs of lines are left to compare,
+    // but each version reads about 10,000 characters.
+    expect(await compare(repo, [parent, parent], { "a.txt": `${long}old\n` }, { "a.txt": `${long}new\n` }, { maxWork: 5_000 })).toEqual({ kind: "too-large", bound: "work", limit: 5_000 });
+    expect(await compare(repo, [parent, parent], { "a.txt": `${long}old\n` }, { "a.txt": `${long}new\n` }, { maxWork: 50_000 })).toMatchObject({ kind: "ok" });
+  });
+
   test("the work bound covers all the changes of a comparison together", async () => {
     const repo = new MemoryRepo();
     const lines = (tag: string) => Array.from({ length: 60 }, (_, i) => `${tag}${i}`).join("\n");
