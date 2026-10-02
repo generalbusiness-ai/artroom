@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Builder takes the idle write storm fix now; it lands before mint lanes B and C, which also touch core.ts."}
+{"kind":"promise","text":"I will independently review the exact row-write accounting head caefe17dd5bf40a58888262c265fb77f90d75bb8, measurement limits, fail-closed gates, all 16 artifacts and architecture, security and simplification conclusions after the active Mint lane A review."}
