@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/checkers/tsconfig.json","body":{"commit":"5acf29ad7752db89d015aab80bd4606de90c9da4","path":"packages/checkers/tsconfig.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/checkers/vitest.config.ts","body":{"commit":"5acf29ad7752db89d015aab80bd4606de90c9da4","path":"packages/checkers/vitest.config.ts"}}
