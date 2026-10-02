@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/log/src/gitcli.ts at exact f953c04cfbda44ed2da170038e1b2a5652956ad4 on request/laneB-pushlog, under promise git:sha1…497a150 on request git:sha1…f4cee06","body":{"commit":"f953c04cfbda44ed2da170038e1b2a5652956ad4","path":"packages/log/src/gitcli.ts"}}
+{"kind":"artifact","text":"packages/log/src/index.ts at exact f953c04cfbda44ed2da170038e1b2a5652956ad4 on request/laneB-pushlog, under promise git:sha1…497a150 on request git:sha1…f4cee06","body":{"commit":"f953c04cfbda44ed2da170038e1b2a5652956ad4","path":"packages/log/src/index.ts"}}
