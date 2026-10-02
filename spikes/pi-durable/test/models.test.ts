@@ -126,10 +126,11 @@ describe("the Workers AI binding provider", () => {
     tools: [{ name: "artroom_claim", description: "Claim a lane.", parameters: Type.Object({ goal: Type.String(), scope: Type.Array(Type.String()) }) }],
   };
 
-  it("sends the OpenAI request body to AI.run and reads the tool call and usage from its stream", async () => {
+  // pi-durable's Harness calls streamSimple; both go through the binding.
+  it.each(["completeSimple", "complete"] as const)("%s sends the OpenAI request body to AI.run and reads the tool call and usage from its stream", async (call) => {
     const { ai, runs } = fakeAi();
     const { models } = await modelsFor({ AI: ai });
-    const out = await models.complete(models.getModel("workers-ai", WORKERS_AI_MODEL)!, context);
+    const out = await models[call](models.getModel("workers-ai", WORKERS_AI_MODEL)!, context);
     expect(out.errorMessage).toBeUndefined();
     expect(runs).toHaveLength(1);
     const run = runs[0]!;
