@@ -26,7 +26,7 @@ import {
   type Signer,
 } from "@generalbusiness/artroom-contract";
 import { digestOf } from "./canonical.ts";
-import { buildEnvelope, signEnvelope } from "./envelope.ts";
+import { buildEnvelope, signEnvelope, signRequest } from "./envelope.ts";
 import { artroomError, Redactor } from "./errors.ts";
 import { newIdempotencyKey } from "./keys.ts";
 import { McpBearer, RpcBearer } from "./bearer.ts";
@@ -128,8 +128,10 @@ async function withName<T extends HttpRoomClient | RpcRoomClient>(handle: T, id:
 /**
  * Redeem a client-custody invitation with a key the caller made (R-CRED-1,
  * R-CRED-2, R-CRED-9). The `join` is an ordinary signed act, so a lost
- * response is retried with the same bytes and the room returns the original
- * result (R-IDEM-2).
+ * response is retried with the same bytes. The room issues a session only
+ * for a join that call admitted, so it refuses the retry `invitation-invalid`;
+ * the client then recovers the original record by resubmitting the same
+ * bytes (R-IDEM-2), and a session by signing for one with the key (R-CRED-5).
  */
 export async function join(
   endpoint: ArtroomService | Endpoint,
@@ -145,13 +147,24 @@ export async function join(
   const signed = await signEnvelope(envelope, invitation.signer);
   const wire = isService(endpoint) ? new RpcWire(await endpoint.room(room), redactor) : new HttpWire(endpointUrl(endpoint.url), room, options, redactor);
   try {
-    const out = await withRetries(() => wire.redeem({ custody: "client", join: signed }), options.retries ?? 3, key);
+    const retries = options.retries ?? 3;
+    let out = await withRetries(() => wire.redeem({ custody: "client", join: signed }), retries, key);
+    if (isRefusal(out) && out.rule === "invitation-invalid") out = (await recoverJoin(wire, room, signed, invitation.signer, retries)) ?? out;
     if (!isRefusal(out) && out.custody !== "client") throw artroomError("internal", "The room answered a client-custody join with a room-custody result.");
     if (!isRefusal(out)) redactor.add(out.session.token);
     return out as Result<Joined>;
   } finally {
     wire.dispose();
   }
+}
+
+/** The `Joined` of a join the room admitted earlier with this key, or null when it admitted none. */
+async function recoverJoin(wire: HttpWire | RpcWire, room: RoomId, signed: SignedEnvelope, signer: Signer, retries: number): Promise<Joined | null> {
+  const record = await withRetries(() => wire.submit(signed), retries, signed.envelope.idempotencyKey);
+  if (isRefusal(record) || record.kind !== "roster" || record.by.via !== "join" || record.by.key !== signer.key) return null;
+  const session = await withRetries(async () => wire.request(await signRequest(room, { signer }, { kind: "session", ttlSeconds: 3600 })), retries, undefined);
+  if (isRefusal(session) || !("member" in session) || session.member !== record.by.member) return null;
+  return { custody: "client", member: record.by.member, role: record.by.role, key: signer.key, record, session };
 }
 
 /**

@@ -84,13 +84,16 @@ describe("client custody: a key the caller made (R-CRED-1, R-CRED-2)", () => {
     expect(isRefusal(await join({ url }, room.id, { invitation, secret, signer }))).toBe(false);
   });
 
-  test("a lost join response is recovered: the same signed bytes return the original join (R-IDEM-2)", async () => {
+  test("a lost join response is recovered: the room refuses the repeated redemption a session, the same bytes return the original join (R-IDEM-2), and the key signs for a session (R-CRED-5)", async () => {
     const { invitation, secret } = await room.invite("@alice");
     const { signer } = await generateSigner();
     room.faults.push({ route: "POST /redeem", kind: "drop" });
     const joined = await join({ url }, room.id, { invitation, secret, signer });
     expect(isRefusal(joined)).toBe(false);
+    expect((joined as Joined).session.member).toBe("@alice");
     expect(redeemCalls()).toBe(2);
+    expect(room.requests.filter((r) => r.route === "/acts")).toHaveLength(1);
+    expect(room.requests.filter((r) => r.route === "/requests")).toHaveLength(1);
     expect(joins()).toHaveLength(1);
     expect((joined as Joined).record.id).toBe(`act_${joins()[0]!.seq}_${joins()[0]!.hash.slice(7, 15)}`);
   });
