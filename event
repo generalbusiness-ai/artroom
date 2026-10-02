@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:00839da7e6e2f2766fd78d751993862870b41e09","text":"Merge retired a covered predecessor; the successor is at plans/003-retry-terminal-publication-tokens.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:02ebe3d1e628673d3017fe34368c979a6425d816","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/review-f060871b.test.ts."}
