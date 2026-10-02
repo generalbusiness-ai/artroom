@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f255f3a72892d27335623697b3389e0770ce84e4","text":"Republished at 38057c0a74baac4654daa8b107973ac9f4cf127c, which no longer changes packages/room/test/node/spike-smoke.test.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:81fcc4460d292b70cbb3e45ce4be88b377538331","text":"Republished at 38057c0a74baac4654daa8b107973ac9f4cf127c; the successor stands at packages/room/test/workerd/founding-gaps.test.ts."}
