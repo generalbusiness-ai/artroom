@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4c4624778d327895964de3cdf13eead6f45cf5ae","text":"Merge retired a covered predecessor; the successor is at packages/checkers/src/harness.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4cfa9b02bf3e84d82229996e74e18131ff9e9d28","text":"Merge retired a covered predecessor; the successor is at packages/checkers/test/harness-alarm.test.ts."}
