@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5f26c0a32a7e39161c88f3b09119a94af12287ae","text":"Merge retired a covered predecessor; the successor is at packages/checkers/measure/harness/harness.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5fa40142fefddae74e600b555c33ccaea2a003b6","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-laneG-checkers.md."}
