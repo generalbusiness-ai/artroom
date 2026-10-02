@@ -10,9 +10,14 @@ import { INSTRUCTIONS, TOOL_LIST } from "./tools.ts";
 
 export const SERVER_INFO = { name: "artroom", version: "0.0.0" } as const;
 
-/** What `tools/list` returns: name, description and input schema, exactly as the descriptors give them. */
+/**
+ * What `tools/list` returns: name, description, input schema and output
+ * schema, exactly as the descriptors give them. Every output schema's root
+ * is an object; a tool that can refuse has `oneOf` its result and `Refusal`,
+ * so every result's structured content conforms (R-API-1, MCP 2026-07-28).
+ */
 export function listedTools() {
-  return TOOL_LIST.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+  return TOOL_LIST.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, outputSchema: t.outputSchema }));
 }
 
 /** A fresh MCP server bound to one room handle. Create one per request (stateless) or per stdio connection. */
