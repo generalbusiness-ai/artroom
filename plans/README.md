@@ -486,7 +486,7 @@ core.nextAlarm();          // includes max(mints.nextDue(), the "mints" backoff)
 - **The handoff.** `pushToken` takes `claim` and calls it inside its transaction, after recording the ID on the attempt and inserting the token's `artroom_land_token (token PRIMARY KEY, op, n, expires_at)` row with Artifacts' reported expiry. A rollback leaves the ledger owning the token (still `held`) and no row. The engine then releases the token in the background (revoked by its ID; a failure makes it `owed`), never awaited by the publication queue (R-MINT-4), and rethrows. `cleanupDone()` also waits for those releases (tests).
 - **The token rows (R-MINT-7).** `pushToken` writes a row and `tokenRevoked` deletes it, in their own transactions; nothing else does. So a row is kept while a revocation fails, after the operation ends too, until plan 003's cleanup pass or the held operation's own revocation is answered; no row is settled at expiry. A room stored before this change fills the rows once, at its first start, under the meta key `token-index`: one per unrevoked token of an active operation, and one per cleanup record (plan 003's `adoptEndedTokens` runs first, so every ended operation's unrevoked token is there).
 - **The fault point.** `token-answered` sits between the mint's answer and `pushToken`. A host that stops there leaves the token with the ledger, `held`; the next object's ledger takes it over (`owed`, due at once) and its alarm revokes it by its ID, while the engine completes the publication forward with a new attempt.
-- **Revocation of publication tokens.** `canonicalTokens().revoke` is replaced by `publicationTokens().revoke`: the repository lookup and the revocation, with `withRetry`'s retries of a transient error, inside one bounded wait (30 s). A timeout is a failure, as before for the caller; a later answer is dropped, and no retry starts after the wait ends.
+- **Revocation of publication tokens.** `canonicalTokens().revoke` is replaced by `publicationTokens().revoke`: the repository lookup and the revocation, with `withRetry`'s retries of a transient error, inside one bounded wait (30 s). A timeout is a failure, as before for the caller; a later answer is dropped, and nothing is sent after the wait ends: the end is checked when each attempt starts (after a retry's sleep) and after each lookup, immediately before the send (review `d4a4c681`, below).
 - **Safe metadata.** A mint that fails is recorded on the push attempt as `token not minted (<errorNote("create failed", e)>)`: the stage, a known error name and code and bounded integers, never the provider's text (lane A's `errorNote`).
 - **The Room.** `RoomCore` builds the ledger in its constructor, before the landing engine, with the Room's persisted `wake` (read the stored alarm, store only an earlier one, resolve once stored), the room clock, the canonical repository, and `known(id)`: a primary-key lookup in `job_tokens`, then `landing.core.knownToken(id)`. The landing engine's tokens are `publicationTokens({ mints, repo })`. The `mints` step runs `mints.reconcile()` (takeover time, revocation pass, observation; each checks its own durable due time). `nextAlarm()` includes the ledger's `nextDue()`, so the Room's start-up recovery (`Room.recover`, which stores `nextAlarm()` through `wake`) schedules the ledger's debt with no request, and every alarm stores the earlier of the ledger's time and the Room's other work (`schedule` and `wake` only ever move the stored alarm earlier).
 - **The "mints" loop kind (merged with request `3da1d82b`).** The step is its own kind in `LOOP_KINDS`: a failure of the step itself (storage failing in `reconcile`, say) sets `loop_backoff.mints`, 5 s doubling to 5 min, and an alarm that runs earlier for other work skips the step. It is never pending by rows: the ledger times its own work. Like landing's, its backoff ends only when the step runs (`SELF_TIMED`), and `nextAlarm()` uses the later of the ledger's time and the backoff. It needs the canonical repository: while `canonical_gone` is set, the ledger's records are kept, and it is neither run nor scheduled. The other kinds' fences are unchanged.
@@ -534,7 +534,7 @@ Git package, `packages/git/test/landing.test.ts` ("mint lane B …", 10 tests, w
 
 ### Mutation table
 
-Each mutant was applied alone by a script (`/private/tmp/claude-501/mintB/mutants/run.py`) at the merge head `720a7fd4`, the suites named were run, and the file was restored from the commit (`git checkout`). B-mutants are in the Git package and were run against all three suites: `landing.test.ts` (Node), the Git Workers suite, and the Room file; R-mutants are in the Room and were run against the Room file. T marks the note's lane B mutation targets, O the approval's obligations, F the checker's lessons for this lane, and G the other guards. 32 mutants, all red; every new test is red under at least one. No earlier test went red under any mutant.
+Each mutant was applied alone by a script (`/private/tmp/claude-501/mintB/mutants/run.py`) at the merge head `720a7fd4`, the suites named were run, and the file was restored from the commit (`git checkout`). B-mutants are in the Git package and were run against all three suites: `landing.test.ts` (Node), the Git Workers suite, and the Room file; R-mutants are in the Room and were run against the Room file. T marks the note's lane B mutation targets, O the approval's obligations, F the checker's lessons for this lane, and G the other guards. 32 mutants, all red; every new test is red under at least one. No earlier test went red under any mutant. Review `d4a4c681` added K1 and K2 ([below](#review-d4a4c681)), both red.
 
 | Mutant | Kind | Mutation | Red tests |
 |---|---|---|---|
@@ -573,6 +573,23 @@ Each mutant was applied alone by a script (`/private/tmp/claude-501/mintB/mutant
 
 Lane A's mutants (T1 to T17, O1, O2, G1 to G33, F1 to F18, H1 to H4, J1, J2) guard `mints.ts`, which this lane does not change; its 47 tests pass unchanged in the Node gate.
 
+
+### Review d4a4c681
+
+Report `d4a4c681` on `af89862b` (changes requested) found one P2. `publicationTokens().revoke` checked whether its bounded wait had ended only when an attempt started, before `await o.repo()`. A repository lookup still out at the deadline, the first or a retry's, therefore sent its revocation when it answered, outside the bounded pass and possibly overlapping a later durable retry. The checker's 25 ms deferred-lookup controls saw one provider call where none was expected, and two where one was.
+
+**Change** (`engine.ts` only): the check now runs after the lookup too, immediately before `revokeToken` is sent. The check when an attempt starts stays; it covers a retry whose sleep outlasts the wait. A give-up is a failure for the caller, so the held operation's attempt, or plan 003's cleanup record, keeps the debt for a later bounded pass. Every other bounded provider path was checked for the same gap. The engine's other revocations go through this function. The mint ledger's lookups (`mints.ts`) resolve to nothing when their wait ends, so a late lookup starts no provider work (lane A's F5). The Room passes only the repository function.
+
+| Control (`landing.test.ts`, 200 ms wait) | What it shows |
+|---|---|
+| "review d4a4c681: a revocation whose repository lookup is still out when the bounded wait ends …" | The first lookup is held past the wait, then answers: no provider call. The landing goes on, its debt and token row stay, and a later cleanup pass revokes the token by its ID with one call |
+| "review d4a4c681: a retry whose repository lookup is still out …" | The first attempt fails with a transient error, and the retry's lookup is held past the wait: one call, not two. The debt stays, and a later pass revokes the token |
+| "review d4a4c681: a retry whose sleep outlasts the bounded wait …" | The retry's sleep is held past the wait: no further lookup and one call. The debt stays, and a later pass revokes the token |
+
+| Mutant | Mutation | Red tests |
+|---|---|---|
+| K1 | no check after the lookup (the reviewed head's code) | the first two controls |
+| K2 | no check when an attempt starts | the sleep control |
 
 ### Gates
 
