@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/mcp/src/server.ts at exact 33a04f3aef732a3fe7f71c1f8d6f157122feecdc on request/laneE-clients, under promise git:sha1…68876e3 on request git:sha1…cf2e531","body":{"commit":"33a04f3aef732a3fe7f71c1f8d6f157122feecdc","path":"packages/mcp/src/server.ts"}}
+{"kind":"artifact","text":"packages/mcp/src/stdio.ts at exact 33a04f3aef732a3fe7f71c1f8d6f157122feecdc on request/laneE-clients, under promise git:sha1…68876e3 on request git:sha1…cf2e531","body":{"commit":"33a04f3aef732a3fe7f71c1f8d6f157122feecdc","path":"packages/mcp/src/stdio.ts"}}
