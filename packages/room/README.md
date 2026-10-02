@@ -70,6 +70,8 @@ Work after a commit is one mechanism: named, idempotent durable steps (lease
 expiry, notify, token revocation, pins, previews, workspaces,
 recomputation, landing, log publication). The alarm runs them all; a commit
 may start one at once. Nothing depends on an in-memory promise surviving.
+An idle room has no alarm, and failing work backs off to a 5-minute cap
+(see "Request 3da1d82b: idle write storms").
 
 Sealing is synchronous. SHA-256 and Ed25519 signing use `@noble`, so the
 room can hash and sign inside the transaction. Verifying a caller's
@@ -1823,6 +1825,90 @@ conflict was this README, resolved by keeping both report sections;
 `npm ci`, the client and Room typechecks and suites, the root
 `npm run typecheck` and the root `npm test` exit 0. The Room's Node suite
 passes 125 tests in 12 files, and its workerd suite 411 tests in 31 files.
+
+## Request 3da1d82b: idle write storms
+
+The row measurements of request 8bd623cc
+(`packages/room/measure/results/row-costs-2026-10-02.md` on that branch)
+found two storms. The tests are in
+[test/workerd/idle-writes-3da1d82b.test.ts](test/workerd/idle-writes-3da1d82b.test.ts).
+They run the real Room object through its real `alarm()`, and count its
+storage writes with a spy installed on that object only: each SQL cursor's
+`rowsWritten`, and each alarm the Room stores.
+
+### What caused them
+
+**An idle room published its own checkpoint every minute.** Each
+publication seals a `checkpoint` event, which is itself unpublished
+(R-LOG-8). `publicationDue` measured the minute from the first unpublished
+entry, which after a publication is always that checkpoint, and `nextAlarm`
+asked for an alarm a minute ahead whenever the head was past
+`publishedThrough`. So every publication made the next one due: 7 rows a
+minute, forever.
+
+**A room whose repository was deleted ran its alarm every 5 seconds.**
+Reproduced on main `b803d210` with the test's spy: after the smoke run's
+cleanup deletes the fork and the canonical repository, the checkpoint
+publication a minute later still stores its cohort (the publisher opened
+before the deletion is cached), and its push fails with `NOT_FOUND`. A
+pending cohort was on the 5-second loop in `nextAlarm`, with no backoff.
+Each run reopened the publisher, failed with `NOT_FOUND` again, wrote
+`publication_error` (1 row) and stored the next alarm 5 seconds ahead: 12
+rows and 12 alarm runs a minute. The first run wrote 4 rows (the cohort and
+the error). This matches the spike: rooms at head 16 published through 15,
+writing about 12 rows a minute.
+
+The 12 requests a minute are those alarm runs. `wrangler tail
+artroom-spike-room` on the spike (version `75758995`, 2026-10-02 19:06 UTC,
+before this change) showed only `Room` alarm events: 17 objects, each
+alarmed every 5.0 seconds, all `ok`, with no fetch or RPC events.
+
+### The fix
+
+| Condition | Fix | Test |
+|---|---|---|
+| An idle room writes no rows | `publicationDueAt` counts only entries that are not `checkpoint` events; an idle room asks for no alarm | "after the last act's publication settles, a founded idle room writes no rows and stores no alarm over 24 simulated hours of alarm ticks" (also 120 forced `alarm()` runs: 0 rows, 0 alarms stored) |
+| A checkpoint-only suffix is never due; a real act after it is published promptly | The same; a due publication is asked for 5 s from now at the soonest | "a checkpoint-only unpublished suffix is never due; a real act after it is due a minute later and is published, and then the room is idle again" |
+| A failing publication backs off, capped, never every 5 s | `publication_retry` in `meta`: 5 s, doubling to 5 minutes (`ALARM` in [src/budgets.ts](src/budgets.ts)); the alarm does not publish inside it. A refusal by the registry (R-PUB-10) backs off the same way | "a failing publication backs off from 5 s, doubling, to a 5-minute cap …": waits of 5, 10, 20, 40, 80, 160, 300, 300 s; 17 runs in the first hour (the first try and its retries), 12 in each later hour; about one row each. "a publication the registry does not allow (R-PUB-10) backs off the same way" |
+| A failing step backs off, capped | The 5-second loop (pins, previews, provisioning, evaluations, recomputation, ended workspaces) doubles its wait each time an alarm leaves its work pending (`loop_backoff`), up to 5 minutes, and resets when none is left | "a failing step on the 5-second loop (a pin) backs off to the cap, and the backoff resets once it succeeds" |
+| A room whose canonical repository is gone stops, with one admin item, keeping unknown effects and owed cleanup | A publication that fails with `NOT_FOUND` asks Artifacts for the canonical repository itself. If that is `NOT_FOUND` too, `canonical_gone` is stored and admins get one `log-publication-stalled` item with the new reason `repository-gone`. While it is set, publication is due only after a later entry, landing is neither scheduled nor run, and the loop does not count work that needs the repository. Nothing is deleted or settled: the pending cohort, the landing engine's owed revocations and pending pins stay. Lane B's fork, snapshot and job-token duties keep their own capped backoff. A confirmed publication clears it, and the item closes | "stops rescheduling work that cannot succeed …" (the alarm stops within 10 minutes; then 2 hours with no alarm and 0 rows); "a later act tries once more …"; "if the repository comes back …" |
+
+`ALARM` is enforced as written in `src/budgets.ts` (copied unchanged from
+request 8bd623cc's branch, so the two merge cleanly): 0 rows for an idle
+room, the 5-second interval only while work makes progress, and a 5-minute
+cap. In the first hour of a failure the ramp adds 5 runs to the 12 that
+the cap allows: 17. Lane B's own backoffs (landing retries to 60 s, its
+token cleanup and workspace duties to 5 minutes) are unchanged; each is
+capped at 5 minutes or less.
+
+**Contract and protocol.** `log-publication-stalled` gains the reason
+`repository-gone` (additive; the UI's "Needs you" says what it means).
+R-LOG-8 says that unpublished `checkpoint` events alone never make a
+publication due; R-LOG-20 describes the gone repository. What a published
+log contains, its order and its verification are unchanged.
+
+**Mutations**, made one at a time on this change; 17 of 17 turned a test
+red:
+
+| Mutant | Red |
+|---|---|
+| a checkpoint-only suffix counts as unpublished work | idle room; checkpoint suffix; pin step |
+| the publication retry does not double | publication backoff; registry refusal |
+| the publication retry time is ignored | publication backoff; registry refusal |
+| the alarm publishes a pending cohort inside its backoff | gone: stops |
+| a gone repository is never detected | all three gone tests |
+| a gone repository does not stop publication | gone: stops; gone: a later act |
+| landing is scheduled while gone | all three gone tests |
+| landing runs while gone | gone: stops |
+| the loop counts the repository's work while gone | gone: stops; gone: a later act |
+| the loop backoff does not double | pin step |
+| the loop backoff is never recorded | pin step |
+| the loop backoff is never reset | pin step |
+| the `repository-gone` item never closes | gone: comes back |
+| a due publication is asked for at once | checkpoint suffix |
+| a registry refusal records no backoff | registry refusal |
+| an item for every gone failure | gone: a later act |
+| a confirmed publication does not clear gone | gone: comes back |
 
 ## Secrets
 

@@ -197,6 +197,8 @@ export class Room extends DurableObject<RoomEnv> {
   private async work(): Promise<void> {
     if (!this.core.founded) return this.core.settleFounding();
     await this.core.runAll();
+    // The 5-second loop backs off while its work stays pending (request 3da1d82b).
+    this.core.loopSettled();
   }
 
   private schedule(): void {

@@ -114,7 +114,9 @@ export function explainItem(snap: RoomSnapshot, item: AttentionItem): Explained 
               ? "Another writer moved the log ref, so the room has stopped publishing the log."
               : item.reason === "unresolved"
                 ? "The room has had no answer to a log push for an hour. It keeps trying."
-                : "The log could not be published. The room tries again after an hour, or when it restarts."}
+                : item.reason === "repository-gone"
+                  ? "The room's repository is gone, so the room has stopped publishing the log and landing. It tries again after the next act."
+                  : "The log could not be published. The room tries again after an hour, or when it restarts."}
           </>
         ),
         detail: <>{item.detail}</>,
