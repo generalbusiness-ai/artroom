@@ -8,13 +8,21 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
+      // Every package and subpath the spike or the vendored sources import, as
+      // vitest.config.ts aliases them: nothing may resolve to the repository's
+      // own packages or node_modules (scripts/check.sh fails if it does).
       "@generalbusiness/artroom-contract": ["./vendor/artroom/packages/contract/src/index.ts"],
+      "@generalbusiness/artroom-contract/policy": ["./vendor/artroom/packages/contract/src/policy.ts"],
+      "@generalbusiness/artroom-contract/client": ["./vendor/artroom/packages/contract/src/transports.ts"],
+      "@generalbusiness/artroom-contract/checker": ["./vendor/artroom/packages/contract/src/checker.ts"],
       "@generalbusiness/artroom-client": ["./vendor/artroom/packages/client/src/index.ts"],
       "@generalbusiness/artroom-room": ["./vendor/artroom/packages/room/src/index.ts"],
       "@generalbusiness/artroom-git": ["./vendor/artroom/packages/git/src/index.ts"],
+      "@generalbusiness/artroom-git/worker": ["./vendor/artroom/packages/git/src/worker.ts"],
       "@generalbusiness/artroom-log": ["./vendor/artroom/packages/log/src/index.ts"],
       "@generalbusiness/artroom-policy": ["./vendor/artroom/packages/policy/src/index.ts"],
-      "@generalbusiness/artroom-policy/helpers": ["./vendor/artroom/packages/policy/src/helpers.ts"]
+      "@generalbusiness/artroom-policy/helpers": ["./vendor/artroom/packages/policy/src/helpers.ts"],
+      "@generalbusiness/artroom-policy/pack": ["./vendor/artroom/packages/policy/src/pack.ts"]
     }
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],

@@ -173,11 +173,23 @@ const ctx0 = BACKGROUND_CONTEXT;
 /** A JSON copy, for memos and documents. */
 const json = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
-const sleep = (ms: number, signal: AbortSignal | undefined) =>
+/**
+ * Waits `ms`, or rejects when `signal` aborts. The abort listener is removed
+ * when the wait ends, so a long retry loop does not pile listeners on the
+ * conversation's signal.
+ */
+export const sleep = (ms: number, signal: AbortSignal | undefined) =>
   new Promise<void>((resolve, reject) => {
     signal?.throwIfAborted();
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => (clearTimeout(t), reject(signal.reason)), { once: true });
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(signal!.reason);
+    };
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 
 /**

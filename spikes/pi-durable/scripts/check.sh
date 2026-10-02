@@ -11,10 +11,15 @@
 # appears also fails, so the list stays exact. This is a check of the spike's
 # own files, not a clean whole-program check.
 #
+# It also fails if the compiler reads any file from the repository outside
+# this directory, such as the root workspaces' packages through the root
+# node_modules: the check must see only the pinned, vendored sources.
+#
 # For scripts/check-test.sh: TSC, CHECK_PROJECT and CHECK_ALLOWED replace the
 # compiler, the project and the list.
 set -u
-here=$(cd "$(dirname "$0")/.." && pwd)
+here=$(cd "$(dirname "$0")/.." && pwd -P)
+repo=$(cd "$(git -C "$here" rev-parse --show-toplevel)" && pwd -P)
 tsc=${TSC:-$here/node_modules/.bin/tsc}
 project=${CHECK_PROJECT:-tsconfig.json}
 allowed=${CHECK_ALLOWED:-$here/scripts/vendor-diagnostics.txt}
@@ -29,8 +34,10 @@ fi
 # The Workers runtime types, generated as lane A does (ignored by git).
 (cd "$here" && npx wrangler types --include-env=false src/worker-runtime.d.ts >/dev/null) || exit 1
 
-out=$(cd "$here" && "$tsc" -p "$project" --pretty false 2>&1)
+out=$(cd "$here" && "$tsc" -p "$project" --pretty false --listFiles 2>&1)
 status=$?
+# --listFiles prints each file read, as an absolute path; diagnostics are relative.
+ambient=$(printf '%s\n' "$out" | grep '^/' | grep -F "$repo/" | grep -vF "$here/")
 found=$(mktemp)
 expected=$(mktemp)
 unexpected=$(mktemp)
@@ -39,7 +46,7 @@ trap 'rm "$found" "$expected" "$unexpected"' EXIT
 printf '%s\n' "$out" | grep -E '^([^ ].*)?error TS[0-9]+' | sed -E 's/^(.*error TS[0-9]+).*/\1/' | sort -u > "$found"
 grep -v '^#' "$allowed" | grep . | sort -u > "$expected"
 if [ "$status" -ne 0 ] && [ ! -s "$found" ]; then
-  printf '%s\n' "$out" >&2
+  printf '%s\n' "$out" | grep -v '^/' >&2
   echo "check: the compiler failed (exit $status) without a diagnostic." >&2
   exit 1
 fi
@@ -50,6 +57,11 @@ fail=0
 if [ -s "$unexpected" ]; then
   echo "check: diagnostics not in the known list:" >&2
   printf '%s\n' "$out" | grep -F -f "$unexpected" >&2
+  fail=1
+fi
+if [ -n "$ambient" ]; then
+  echo "check: files read from the repository outside the spike (map their packages in tsconfig.json paths):" >&2
+  printf '%s\n' "$ambient" >&2
   fail=1
 fi
 if [ -n "$missing" ]; then
