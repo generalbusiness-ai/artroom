@@ -29,6 +29,24 @@ describe("wrangler.jsonc (deploy)", () => {
     expect(deploy.migrations.flatMap((m) => m.new_sqlite_classes ?? [])).toEqual(["Room", "Registry", "Publisher"]);
   });
 
+  it("the spike config (wrangler.spike.jsonc) is the same Worker under its own name, namespace and URL", () => {
+    const spike = read("../../wrangler.spike.jsonc") as Config & { name: string; containers: readonly unknown[] };
+    const prod = deploy as Config & { name: string; containers: readonly unknown[] };
+    expect(spike.name).toBe("artroom-spike-room");
+    expect(spike.vars["ARTIFACTS_NAMESPACE"]).toBe("gitseq-spike");
+    expect(spike.vars["PUBLIC_NAMESPACE"]).toBe("gitseq-spike");
+    expect(spike.artifacts).toEqual([expect.objectContaining({ binding: "ARTIFACTS", namespace: "gitseq-spike" })]);
+    expect(spike.vars["PUBLIC_URL"]).toBe("https://artroom-spike-room.inguz.workers.dev");
+    expect(spike.vars["OPERATOR_KEYS"]).toMatch(/^key_[A-Za-z0-9_-]{43}$/);
+    expect(spike.vars["ROOM_KEY_SECRET"]).toBeUndefined();
+    expect(spike.vars["ARTIFACTS_HOST"]).toBe(prod.vars["ARTIFACTS_HOST"]);
+    expect(spike.durable_objects).toEqual(prod.durable_objects);
+    expect(spike.migrations).toEqual(prod.migrations);
+    // The same image by digest; wrangler names each container application after its Worker.
+    const unnamed = (cs: readonly unknown[]) => cs.map((c) => ({ ...(c as object), name: undefined }));
+    expect(unnamed(spike.containers)).toEqual(unnamed(prod.containers));
+  });
+
   it("the test pool's config has no remote or container binding", () => {
     expect(test.artifacts ?? []).toEqual([]);
     expect(test.containers ?? []).toEqual([]);
