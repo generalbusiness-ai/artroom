@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:39895b1b8cc9649d71cda8713d64cb51aff90fe3","text":"Republished at 2439cb6417b30d05023c0e0f723cefacf6e67a46; the successor stands at packages/git/src/publisher/log-push.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:90b9f64029139aa472cd6eedd610179301f82a24","text":"Republished at 2439cb6417b30d05023c0e0f723cefacf6e67a46; the successor stands at packages/git/src/publisher/push-outcome.ts."}
