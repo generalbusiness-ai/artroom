@@ -8,12 +8,13 @@
  * - each entry: seq, prev, hash, entry ID, room signature; the genesis and
  *   its admin signature; each act's envelope signature, room and recorded
  *   authority, judged by replaying the roster from earlier entries
- *   (R-ADM-3, R-REV); idempotency; `notified` and `checkpoint` events; no
- *   self-reference (R-LOG-12);
+ *   (R-ADM-3, R-REV); idempotency; `notified`, `check-carried` and
+ *   `checkpoint` events; no self-reference (R-LOG-12);
  * - each recorded policy decision: it replays, with its retained context and
  *   the policy version it names, to the same decision (R-EVAL-6). The version
  *   must be the one in force when the act was admitted; for a `notified`
- *   event, when the act it names was admitted.
+ *   event, when the act it names was admitted; for a `check-carried` event,
+ *   the version the event names (R-CARRY-13).
  *
  * Untrusted content is decoded at one boundary (`decode.ts`) before any field
  * is read. Malformed content is a named failure, `malformed`, and the
@@ -79,6 +80,8 @@ export type VerifyReason =
   | "self-reference"
   | "notified-unknown"
   | "notified-twice"
+  | "carried-unknown"
+  | "carried-mismatch"
   | "checkpoint-event-mismatch"
   | "policy-missing"
   | "checker-missing"
@@ -358,6 +361,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
    *   many activations came after (R-LOG-13);
    * - an `obligations-recomputed` event's: the policy it names, which must be
    *   the active one (R-POL-9);
+   * - a `check-carried` event's: the policy it names, which an earlier
+   *   `policy-activated` event activated (R-CARRY-13);
    * - a `land-evaluated` event's: the active policy (R-LAND-4).
    */
   const replayDecisions = async (seq: Seq, decisions: readonly Decision[], version: PolicyVersion | null, why: string): Promise<boolean> => {
@@ -479,6 +484,29 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         }
       } else if (ev.type === "land-evaluated") {
         if (!(await replayDecisions(i, ev.decisions, activePolicy, "the active policy"))) {
+          firstBad = Math.min(firstBad, i);
+          break;
+        }
+      } else if (ev.type === "check-carried") {
+        // R-CARRY-13: `act` is an earlier accepted check of the same lane and obligation.
+        const m = /^act_(0|[1-9][0-9]*)_([0-9a-f]{8})$/.exec(ev.act);
+        const check = m ? entries[Number(m[1])] : undefined;
+        if (!m || !check || check.seq >= i || check.hash.slice(7, 15) !== m[2] || check.entry.type !== "act" || check.entry.act.envelope.kind !== "check") {
+          bad("carried-unknown", `check-carried names ${ev.act}, which is not an earlier accepted check`);
+          break;
+        }
+        const { target, body } = check.entry.act.envelope;
+        const lane = (target as { readonly lane?: unknown } | null)?.lane;
+        const obligation = (body as CheckBody).obligation;
+        if (lane !== ev.lane || obligation !== ev.obligation) {
+          bad("carried-mismatch", `${ev.act} is a check of lane ${String(lane)} for ${obligation}; check-carried names lane ${ev.lane} for ${ev.obligation}`);
+          break;
+        }
+        if (!policyByVersion.has(ev.policy)) {
+          bad("policy-version-mismatch", `check-carried names policy ${ev.policy}, which no earlier policy-activated event activated`);
+          break;
+        }
+        if (!(await replayDecisions(i, ev.decisions, ev.policy, "the policy the check-carried event names"))) {
           firstBad = Math.min(firstBad, i);
           break;
         }

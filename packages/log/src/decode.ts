@@ -68,7 +68,9 @@ type Field =
   | "op" | "member" | "role" | "custody" | "expiresAt" | "secretHash" | "invitation" | "secret" | "reason"
   | "team" | "members" | "kinds" | "lanes" | "delegation"
   // amendment 2: checker configurations, checks and onboarding grants
-  | "createdAt" | "checkers" | "name" | "config" | "check" | "onboarding" | "grant" | "repo" | "operator" | "notAfter";
+  | "createdAt" | "checkers" | "name" | "config" | "check" | "onboarding" | "grant" | "repo" | "operator" | "notAfter"
+  // amendment 3: check carry
+  | "lane" | "obligation";
 type Obj = { readonly [K in Field]?: unknown } & Readonly<Record<string, unknown>>;
 
 const bad = (path: string, what: string): never => {
@@ -102,6 +104,7 @@ const SYSTEM_EVENTS = [
   "lease-expired",
   "policy-activated",
   "obligations-recomputed",
+  "check-carried",
   "land-evaluated",
   "land-reserved",
   "abort-attempt",
@@ -170,6 +173,10 @@ function systemEvent(v: unknown, path: string): void {
     }
     case "obligations-recomputed":
       str(ev.policy, `${path}.policy`);
+      decisions(ev.decisions, `${path}.decisions`);
+      break;
+    case "check-carried":
+      for (const k of ["lane", "obligation", "act", "policy"] as const) str(ev[k], `${path}.${k}`);
       decisions(ev.decisions, `${path}.decisions`);
       break;
     case "land-evaluated":
@@ -254,6 +261,7 @@ function signedEnvelope(v: unknown, path: string): void {
   if (kind === "roster") rosterOp(env.body, p("body"));
   if (kind === "check") {
     const b = obj(env.body, p("body"));
+    str(b.obligation, p("body.obligation"));
     str(b.check, p("body.check"));
     str(b.config, p("body.config"));
   }
