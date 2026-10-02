@@ -122,7 +122,7 @@ storage. That is a further change to the Room's schema, not made here.
 
 ## Tests
 
-Log package (`packages/log/test/bounded.test.ts`, 19 tests):
+Log package (`packages/log/test/bounded.test.ts`, 18 tests):
 
 - **The same commits as `417a1618`.** The old publisher is kept,
   unchanged except for its import paths, as
@@ -304,19 +304,20 @@ The Worker was deleted afterwards (`wrangler delete`).
 
 ## Gates
 
-At the final head. All exited 0.
+Run at the head that adds these notes; later commits change only these
+notes. All exited 0.
 
 | Gate | Tests |
 |---|---|
 | root `npm run typecheck` | — |
-| root `npm test` | see below |
-| log `npm run test:node` | 147 |
-| log `npm run test:workerd` | 142 |
-| git `npm test` (Node) | 143 |
-| git `npm run test:workers` (workerd) | see below |
-| git `npm run test:log` | 11 |
-| room `npm run test:node` | 68 |
-| room `npm run test:workerd` | 276 |
+| root `npm test` | everything in the rows below marked "in root", plus policy 199 Node and 198 workerd (1 skipped), and ui 88 |
+| log `test:node` (in root) | 145 (127 before) |
+| log `test:workerd` (in root) | 140 (122 before) |
+| git `test`, Node (in root) | 143 |
+| git `test:workers`, workerd | 8 |
+| git `test:log`, lane L's publisher through `pushLog` | 11 |
+| room `test:node` (in root) | 68 (67 before) |
+| room `test:workerd` (in root) | 276 (275 before) |
 
 ## Not done
 
