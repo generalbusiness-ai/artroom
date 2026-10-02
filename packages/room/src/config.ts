@@ -40,8 +40,28 @@ export interface RoomEnv {
   /** The repository namespace reserved for public founding (R-GEN-12). */
   readonly PUBLIC_NAMESPACE?: string;
   readonly LEASE_SECONDS?: string;
+  /** Required: the deployment's own `https://` origin, where `Redeemed.mcp` sends a bearer token. No default. */
   readonly PUBLIC_URL?: string;
   readonly ROOM_KEY_SECRET?: string;
+}
+
+/**
+ * The deployment's public origin, from `PUBLIC_URL`. A Worker or Room
+ * without one refuses to start: there is no fallback host to send a bearer
+ * token to (request 55be0661). It must be an `https://` origin, with no
+ * path, query, fragment or credentials, so `${publicUrl}/v1/...` is exact.
+ */
+export function publicUrl(env: Pick<RoomEnv, "PUBLIC_URL">): `https://${string}` {
+  const v = env.PUBLIC_URL;
+  let origin: string | undefined;
+  try {
+    const u = new URL(v ?? "");
+    if (u.protocol === "https:") origin = u.origin;
+  } catch {
+    origin = undefined;
+  }
+  if (!v || origin !== v) throw new Error(`PUBLIC_URL must be this deployment's https:// origin, such as https://room.example.com, with nothing after the host; it is ${v === undefined ? "not set" : JSON.stringify(v)}.`);
+  return v as `https://${string}`;
 }
 
 export type ServicesFactory = (env: RoomEnv, roomObject: string) => RoomServices;
