@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/git/README.md at exact 04797d8c6eb5d9792d4c2e0b93a4d7896a5f7c67 on request/a4-log, under promise git:sha1…07e1049 on request git:sha1…76b6b6e","body":{"commit":"04797d8c6eb5d9792d4c2e0b93a4d7896a5f7c67","path":"packages/git/README.md"}}
+{"kind":"artifact","text":"packages/git/src/index.ts at exact 04797d8c6eb5d9792d4c2e0b93a4d7896a5f7c67 on request/a4-log, under promise git:sha1…07e1049 on request git:sha1…76b6b6e","body":{"commit":"04797d8c6eb5d9792d4c2e0b93a4d7896a5f7c67","path":"packages/git/src/index.ts"}}
