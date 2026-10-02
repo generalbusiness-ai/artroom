@@ -20,6 +20,7 @@ import type {
   Carried,
   Checkpoint,
   CheckerConfig,
+  CheckerService,
   Digest,
   EntryContent,
   Genesis,
@@ -46,19 +47,20 @@ import type {
   Sha,
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
-import { checkConditions, checkerInputs, ownersFor } from "@generalbusiness/artroom-policy";
-import { canonicalize, parseStrict } from "./canonical.ts";
-import { b64url, digestJson, keyPairFromSeed, unb64url, verify } from "./crypto.ts";
+import { checkerInputs, ownersFor } from "@generalbusiness/artroom-policy";
+import { canonicalize, parseStrict, utf8 } from "./canonical.ts";
+import { b64url, digestJson, keyPairFromSeed, sha256Hex, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
 import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
-import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions } from "./obligations.ts";
-import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
+import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
+import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, SnapshotPort, Sql } from "./ports.ts";
+import { ContainerPublisher, Landing, SnapshotRepos, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
-import { snapshotCommit } from "./snapshot.ts";
+import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
+import { issueJobs, oweJobs } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
@@ -151,13 +153,69 @@ export class RoomCore {
   readonly bound: CoreOptions["bound"];
   private readonly legacyBinding: NonNullable<CoreOptions["legacyBinding"]>;
   readonly remotes: Remotes;
-  /** The runner environment digest attested now for a checker; none means checks do not carry. */
-  private readonly runnerDigest: (checker: string) => Digest | null;
+  /** Each checker's service binding, which every job travels over (R-EXEC-8). */
+  readonly checkers: (checker: string) => CheckerService | null;
+  private readonly services: RoomServices;
+  private snapReposCache: SnapshotRepos | null = null;
+
+  /**
+   * Lane B's snapshot repositories on this room's SQLite (R-CARRY-16): one
+   * per snapshot commit, named after the canonical repository. Their create,
+   * deletion and revocation duties are durable; the alarm runs them
+   * (`steps.snapshots`, `nextAlarm`).
+   */
+  get snapshotRepos(): SnapshotRepos {
+    if (!this.snapReposCache) {
+      const name = this.location().name;
+      this.snapReposCache = new SnapshotRepos({
+        sql: this.sql,
+        artifacts: this.artifacts,
+        prefix: /^[A-Za-z0-9._-]{1,40}$/.test(name) ? name : `r${sha256Hex(utf8(name)).slice(0, 32)}`,
+        wake: async () => this.committed(),
+        now: () => this.now(),
+        ...(this.remotes.sleep ? { sleep: this.remotes.sleep } : {}),
+      });
+    }
+    return this.snapReposCache;
+  }
+
+  /** The snapshot repositories filtered jobs read (R-CARRY-16). */
+  get snapshots(): SnapshotPort {
+    return this.services.snapshots ?? this.ownSnapshots;
+  }
+
+  private readonly ownSnapshots: SnapshotPort = {
+    prepare: async (s) => {
+      let written: string | null = null;
+      // The publisher writes the snapshot into the new repository, reading the canonical one with a short read token.
+      const repo = await this.snapshotRepos.prepare(s.commit, async (store) => {
+        const snap = await this.ports.artifacts.snapshot(s.integration, s.paths);
+        if (!snap) throw new Error("the integration's snapshot could not be read");
+        const canonical = await this.artifacts.get(this.location().name);
+        const read = await canonical.createToken("read", 300);
+        try {
+          written = await this.remotes.writeSnapshot({
+            canonical: { remote: await this.canonicalRemoteReady(), token: read.plaintext },
+            store: { remote: store.remote, token: store.token },
+            files: snap.entries,
+            message: snapshotMessage(s.checker, s.digest),
+          });
+          return written;
+        } finally {
+          await canonical.revokeToken(read.id).catch(() => false);
+        }
+      });
+      // A reused repository was written for the same commit; a new one holds what the publisher wrote.
+      return { commit: (written ?? repo.commit) as Sha, remote: repo.remote };
+    },
+    mint: (commit, job, deadline) => this.snapshotRepos.mint(commit, job, deadline),
+    end: (commit, job) => this.snapshotRepos.end(commit, job),
+  };
   /** Lane B's landing engine, on this room's SQLite. */
   readonly landing: Landing;
   private wsCache: Workspaces | null = null;
   /** The Artifacts binding for the room's repository namespace (`binding()`), resolved per call. */
-  private readonly artifacts: ArtifactsBinding;
+  readonly artifacts: ArtifactsBinding;
   private chain: Promise<unknown> = Promise.resolve();
   private seedCache: Uint8Array | null = null;
   /** Deferred work already started, so a kick is not repeated. */
@@ -181,7 +239,8 @@ export class RoomCore {
   constructor(opts: CoreOptions) {
     this.sql = opts.sql;
     this.remotes = opts.services.remotes;
-    this.runnerDigest = opts.services.runnerDigest ?? (() => null);
+    this.checkers = opts.services.checkers ?? (() => null);
+    this.services = opts.services;
     this.clock = opts.clock;
     this.leaseMs = opts.leaseMs;
     this.defer = opts.defer;
@@ -591,7 +650,7 @@ export class RoomCore {
       );
       evaluations.push(...r.evaluations);
       blocked = r.refusal;
-      for (const o of r.obligations) if (!specs.some((s) => s.id === o.id)) specs.push(o);
+      for (const o of withAdvisory(r.obligations, policy.checkers)) if (!specs.some((s) => s.id === o.id)) specs.push(o);
     }
     if (blocked) specs = [...g.obligations];
     const carried: { obligation: ObligationId; evidence: Carried }[] = [];
@@ -871,7 +930,8 @@ export class RoomCore {
         return { reason: "evidence-invalid", fix: "Evidence this landing relied on no longer counts. Get a new review or check, then land again." };
       }
     }
-    if (obligations.some((o) => o.state !== "met"))
+    // An advisory obligation never holds up reservation (R-OBL-7).
+    if (obligations.some((o) => blocking(o) && o.state !== "met"))
       return { reason: "obligation-open", fix: "An obligation is open again on this integration. Meet it, then land again." };
     if (lane?.purpose !== "config-recovery") {
       // R-LAND-7: rebuild the reservation-stage land input now and compare its canonical
@@ -901,7 +961,9 @@ export class RoomCore {
       actor: initiator ? this.policyActor(initiator) : { member: null, role: null, teams: [], delegated: false },
       lane: this.policyLane(lane),
       proposal: this.proposalInput(policy.doc, gen),
-      obligations: obligations.map((o) => ({ id: o.id, met: o.state === "met" })),
+      // Advisory obligations are left out: a land rule cannot make one block, and an advisory check arriving
+      // between readiness and reservation does not change the input reservation compares (R-OBL-7).
+      obligations: obligations.filter(blocking).map((o) => ({ id: o.id, met: o.state === "met" })),
       reviews: reviews.sort((a, b) => (a.act < b.act ? -1 : 1)),
       stage,
     };
@@ -938,13 +1000,16 @@ export class RoomCore {
         };
     }
     await this.carryChecks(op, integration, policy);
-    await this.recordSnapshots(op, integration, policy);
+    await this.recordSnapshots(op.lane, op.generation, integration, policy);
     const obligations = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration });
     const openReview = obligations.find((o) => o.kind === "review" && o.state !== "met");
     if (openReview) return { kind: "retry", reason: "obligation-open", fix: `The obligation ${openReview.id} is open again. Meet it, then land again.` };
+    // Every check obligation still open on this integration gets a job, advisory ones too (R-EXEC-8, R-OBL-7).
+    oweJobs(this, op.id, op.lane, op.generation, integration, op.expectedMain, policy);
     const waiting: `obl_${string}`[] = [];
     for (const o of obligations) {
-      if (o.kind !== "check" || o.state === "met") continue;
+      // An advisory obligation is neither waited for nor failed by its check (R-OBL-7).
+      if (o.kind !== "check" || o.state === "met" || !blocking(o)) continue;
       const failed = evidenceOn(this.sql, op.lane, op.generation).find(
         (e) =>
           e.kind === "check" &&
@@ -956,7 +1021,7 @@ export class RoomCore {
       waiting.push(o.id);
     }
     if (waiting.length) return { kind: "waiting", obligations: waiting };
-    const evidence = [...new Set(obligations.flatMap((o) => o.evidenceActs))];
+    const evidence = [...new Set(obligations.filter(blocking).flatMap((o) => o.evidenceActs))];
     if (lane.purpose === "config-recovery") return { kind: "ready", evidence, retained: null };
     const input = this.landInput({ ...op, integration }, lane, gen, policy, "reservation");
     const digest = digestJson(input);
@@ -1004,29 +1069,34 @@ export class RoomCore {
   }
 
   /**
-   * Carry checks onto a new integration (R-CARRY-6 to 10): for each open
-   * check obligation, an earlier passing check of the same obligation and
-   * checker on this lane counts on the new integration if lane C's platform
-   * conditions hold, judged on the tree, or the filtered snapshot for a
-   * scoped checker, of both integrations, and on the runner environment
-   * attested now. The judgment is stored bound to this integration and to
-   * the active policy version: a later activation leaves it uncounted, and
-   * readiness judges again under the new policy (review a711f7b6).
+   * Carry checks onto a new integration (R-CARRY-6 to 14). For each open
+   * check obligation, the earlier passing checks of the same obligation and
+   * checker on this lane, newest first, are judged until one carries: lane
+   * C's platform conditions on the tree, or the scoped checker's filtered
+   * snapshot, of both integrations, then the policy's `carry` rules for
+   * checks, with one act meter per judgment (R-CARRY-13, R-EVAL-9).
    *
-   * It fails closed, carrying nothing, when: the policy turns check carrying
-   * off; a `carry` rule applies to checks (no event can seal its decision
-   * yet: amendment 3); or no runner environment is attested for the checker.
+   * Every judgment, carried or not, is sealed as a `check-carried` event in
+   * the transaction that stores it, once per earlier check, integration and
+   * policy version. A carry counts only with its event, on its integration,
+   * under the policy version that judged it: after an activation it is
+   * judged again (review a711f7b6).
+   *
+   * The current runner is the one the active configuration pins, never the
+   * earlier check's own value. A checker with no pin never carries
+   * (R-CARRY-14).
    */
   async carryChecks(op: LandRecord, integration: Sha, policy: ActivePolicyFull): Promise<void> {
     const gen = generationRow(this.sql, op.lane, op.generation);
-    if (!gen || !policy.doc.carry.checks) return;
-    if (policy.doc.rules.some((r) => r.kind === "carry" && (r.evidence === "check" || r.evidence === "any"))) return;
+    const lane = laneRow(this.sql, op.lane);
+    if (!gen || !lane) return;
     const statuses = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration });
     for (const spec of gen.obligations) {
       if (spec.kind !== "check" || statuses.find((s) => s.id === spec.id)?.state === "met") continue;
       const cfg = policy.checkers[spec.check];
-      const runner = this.runnerDigest(spec.check);
-      if (!cfg || !runner) continue;
+      if (!cfg) continue;
+      const judged = (act: ActId) =>
+        !!one(this.sql, "SELECT 1 AS x FROM check_judged WHERE lane = ? AND generation = ? AND integration = ? AND obligation = ? AND act = ? AND policy = ?", op.lane, op.generation, integration, spec.id, act, policy.version);
       // Earlier passing checks of this obligation and checker on this lane, on another integration, newest first.
       const candidates = this.sql
         .all("SELECT act FROM evidence WHERE lane = ? AND kind = 'check' AND generation <= ? ORDER BY seq DESC", op.lane, op.generation)
@@ -1041,42 +1111,76 @@ export class RoomCore {
       if (!tree) return;
       const snapshot = inputs ? ((await this.ports.artifacts.snapshot(integration, inputs))?.digest ?? null) : null;
       for (const ev of candidates) {
+        // A judgment already sealed under this policy stands; one that carried has met the obligation above.
+        if (judged(ev.act)) continue;
         const b = ev.body as CheckBody;
         const evGen = generationRow(this.sql, op.lane, ev.generation);
         const revoked = invalidity(this.sql, ev, policy.doc.retiredEvidence);
-        const input = {
-          kind: "carry" as const,
-          evidence: { act: ev.act, kind: "check" as const, verdict: null, by: this.policyActor(ev.authority), from: { generation: ev.generation, head: evGen?.head ?? gen.head }, scope: [], dependsOn: [] },
-          changedSince: [],
-          proposal: this.proposalInput(policy.doc, gen),
-          policy: { same: evGen?.policy === policy.version },
-        };
-        // R-CARRY-6, 9, 10, 12: the earlier check's binding against the new integration, under the active configuration.
-        const facts = {
-          revoked: revoked?.reason ?? null,
-          check: {
-            before: { integration: b.integration, config: b.config, runner: b.runner, input: b.input },
-            now: { integration, tree, snapshot, config: cfg.digest, runner },
-            volatile: cfg.config.volatile,
-          },
-        };
-        const platform = checkConditions(input, policy.doc, facts);
-        if (!platform.carries) continue;
-        const basis = platform.basis;
-        if (basis.code === "paths-unchanged") continue;
-        const text = basis.code === "tree-identical" ? "carried: the integration's tree is identical" : "carried: the filtered snapshot is identical";
-        const carried: Carried = { basis: "carried", act: ev.act, kind: "check", from: input.evidence.from, reason: { ...basis, text } as Carried["reason"], rules: [] };
-        this.sql.all(
-          "INSERT INTO check_carries (lane, generation, integration, obligation, act, evidence, policy) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (lane, generation, integration, obligation) DO UPDATE SET act = excluded.act, evidence = excluded.evidence, policy = excluded.policy",
-          op.lane,
-          op.generation,
-          integration,
-          spec.id,
-          ev.act,
-          JSON.stringify(carried),
-          policy.version,
-        );
-        break;
+        const runner = cfg.config.runner;
+        const res = runner
+          ? await this.ports.policy.carry(
+              policy,
+              {
+                kind: "carry",
+                evidence: { act: ev.act, kind: "check", verdict: null, by: this.policyActor(ev.authority), from: { generation: ev.generation, head: evGen?.head ?? gen.head }, scope: [], dependsOn: [] },
+                changedSince: [],
+                proposal: this.proposalInput(policy.doc, gen),
+                policy: { same: evGen?.policy === policy.version },
+              },
+              {
+                ...(revoked ? { revoked: revoked.reason } : {}),
+                // R-CARRY-6, 9, 10, 12, 14: the earlier check's binding against the new integration, under the active configuration.
+                check: {
+                  before: { integration: b.integration, config: b.config, runner: b.runner, input: b.input },
+                  now: { integration, tree, snapshot, config: cfg.digest, runner },
+                  volatile: cfg.config.volatile,
+                },
+              },
+              { budget: this.ports.policy.actBudget(), purpose: lane.purpose },
+            )
+          : { carried: null, notCarried: { act: ev.act, code: "runner-changed" as const, text: "No runner environment is pinned" }, evaluations: [] };
+        const carried = res.carried;
+        this.sql.transaction(() => {
+          if (judged(ev.act)) return;
+          this.retainEvaluations(res.evaluations);
+          const entry = this.sealSystem({
+            type: "check-carried",
+            op: op.id,
+            lane: op.lane,
+            generation: op.generation,
+            integration,
+            obligation: spec.id,
+            act: ev.act,
+            policy: policy.version,
+            outcome: carried ? { carried: true, reason: carried.reason } : { carried: false, notCarried: res.notCarried! },
+            decisions: res.evaluations.map((e) => e.decision),
+          });
+          const event = idOf(entry);
+          this.sql.all(
+            "INSERT INTO check_judged (lane, generation, integration, obligation, act, policy, event) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            op.lane,
+            op.generation,
+            integration,
+            spec.id,
+            ev.act,
+            policy.version,
+            event,
+          );
+          if (carried)
+            this.sql.all(
+              "INSERT INTO check_carries (lane, generation, integration, obligation, act, evidence, policy, event) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (lane, generation, integration, obligation) DO UPDATE SET act = excluded.act, evidence = excluded.evidence, policy = excluded.policy, event = excluded.event",
+              op.lane,
+              op.generation,
+              integration,
+              spec.id,
+              ev.act,
+              JSON.stringify(carried),
+              policy.version,
+              event,
+            );
+        });
+        this.committed();
+        if (carried) break;
       }
     }
   }
@@ -1087,8 +1191,8 @@ export class RoomCore {
    * built from, and what a contract-shaped scoped check binds as its
    * `integration` (R-OBL-3, R-CARRY-9; review a711f7b6).
    */
-  async recordSnapshots(op: LandRecord, integration: Sha, policy: ActivePolicyFull): Promise<void> {
-    const gen = generationRow(this.sql, op.lane, op.generation);
+  async recordSnapshots(lane: LaneId, generation: number, integration: Sha, policy: ActivePolicyFull): Promise<void> {
+    const gen = generationRow(this.sql, lane, generation);
     if (!gen) return;
     for (const spec of gen.obligations) {
       if (spec.kind !== "check") continue;
@@ -1183,6 +1287,12 @@ export class RoomCore {
       }
       const prev = json<Record<string, unknown>>(one(this.sql, "SELECT body FROM previews WHERE id = ?", id), "body")!;
       this.sql.all("UPDATE previews SET state = ?, body = ?, main = ?, updated_ms = ? WHERE id = ?", body["state"] as string, JSON.stringify({ ...prev, ...body }), main, this.now(), id);
+      // A check obligation open on a clean preview of a generation not yet landed gets a job (R-EXEC-8). Its base is
+      // the main commit the preview was built on (R-EXEC-10).
+      const lane = str(r, "lane") as LaneId;
+      const generation = num(r, "generation")!;
+      if (body["state"] === "clean" && !generationRow(this.sql, lane, generation)?.landed)
+        oweJobs(this, id as OpId, lane, generation, body["integration"] as Sha, main ?? (body["integration"] as Sha), this.activePolicy());
     }
   }
 
@@ -1516,6 +1626,10 @@ export class RoomCore {
     workspaces: () => this.resumeWorkspaces(),
     recompute: () => this.recompute(),
     landing: () => this.resumeLanding(),
+    jobs: () => issueJobs(this),
+    snapshots: async () => {
+      if (this.founded) await this.snapshotRepos.reconcile();
+    },
     abort: () => this.landing.enforceAbort().then(() => undefined),
     publication: () => this.publish().then(() => undefined),
   } as const;
@@ -1564,6 +1678,20 @@ export class RoomCore {
     }
     const wsDue = ws?.nextDue() ?? null;
     if (wsDue !== null) times.push(wsDue);
+    // Snapshot repositories' durable duties: unknown creates, deletions and revocations (R-CARRY-16).
+    let snap: number | null = null;
+    try {
+      snap = this.founded ? this.snapshotRepos.nextDue() : null;
+    } catch {
+      snap = null;
+    }
+    if (snap !== null) times.push(snap);
+    // Check jobs owed, and jobs sent whose deadline passed with no answer.
+    const job = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM check_jobs WHERE state != 'done'"), "t");
+    if (job !== null) times.push(job);
+    // Ended job tokens whose revocation Artifacts has not confirmed yet.
+    const revoke = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM job_tokens"), "t");
+    if (revoke !== null) times.push(revoke);
     const now = this.now();
     const pending =
       this.endedWorkspaces().length > 0 ||

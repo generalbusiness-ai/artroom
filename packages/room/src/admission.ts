@@ -87,12 +87,14 @@ import {
 import {
   ADMIN_APPROVAL,
   adminObligation,
+  blocking,
   invalidity,
   obligationsFor,
   publicObligation,
   qualification,
   statusesOf,
   transitions,
+  withAdvisory,
 } from "./obligations.ts";
 import type { ArtroomConfig, DiffResult, Evaluation, ObligationSpec } from "./ports.ts";
 import { activeAdmins, activeKeys, delegableBy, delegation, invitation, keyRow, memberRow, recoveryKey, revocationOf, teamsOf } from "./roster.ts";
@@ -738,7 +740,7 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
     );
     ctx.evaluations.push(...req.evaluations);
     if (req.refusal) return refused(ctx, req.refusal);
-    for (const o of req.obligations) if (!specs.some((s) => s.id === o.id)) specs.push(o);
+    for (const o of withAdvisory(req.obligations, ctx.policy.checkers)) if (!specs.some((s) => s.id === o.id)) specs.push(o);
   }
   // Carrying earlier verdicts (R-CARRY), through the policy port: platform conditions first, then carry rules.
   const carried: { obligation: ObligationId; evidence: Carried }[] = [];
@@ -1090,8 +1092,12 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   if (pv?.state === "clean" && pv.integration) prepared.push({ integration: pv.integration, op: null });
   for (const op of core.landing.activeViews())
     if (op.lane === laneId && op.generation === generation && "integration" in op && op.integration) prepared.push({ integration: op.integration, op: op.id });
+  // A job the landing did not wait for (an advisory obligation, R-OBL-7) may answer after it landed: its check binds
+  // the landed integration, when it names that operation.
+  const landed = body.landOp !== undefined ? core.landing.view(body.landOp) : null;
+  if (landed?.state === "landed" && landed.lane === laneId && landed.generation === generation) prepared.push({ integration: landed.integration, op: landed.id });
   const jobs = body.landOp === undefined ? prepared : prepared.filter((p) => p.op === body.landOp);
-  if (body.landOp !== undefined && !jobs.length) return binding(`The check names ${body.landOp}, which is not an active landing of this generation.`);
+  if (body.landOp !== undefined && !jobs.length) return binding(`The check names ${body.landOp}, which is not an active or landed landing of this generation.`);
   // R-CARRY-15 step 5: a scoped check may bind a snapshot commit the room recorded for one of these integrations. Several
   // integrations can share one snapshot commit, so the commit alone never names the canonical integration (review 95323c2b).
   const snapshotRows = core.sql.all("SELECT * FROM check_snapshots WHERE commit_sha = ?", body.integration);
@@ -1102,6 +1108,9 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   if (!cfg || cfg.digest !== body.config) return binding("The check's configuration digest is not the active configuration's.");
   // R-CARRY-10: the signed flag must be the configuration's; a check is never carried on a flag it contradicts.
   if (body.volatile !== cfg.config.volatile) return binding(`The check says volatile ${String(body.volatile)}, but the checker's configuration says ${String(cfg.config.volatile)}.`);
+  // R-CARRY-14: a configuration that pins a runner environment admits only checks that state it.
+  if (cfg.config.runner !== undefined && body.runner !== cfg.config.runner)
+    return binding(`The check says runner ${body.runner}, but the checker's configuration pins ${cfg.config.runner}.`);
   let canonical = body.integration;
   if (snapshotRows.length) {
     const input = body.input;
@@ -1377,10 +1386,13 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
           if (compromised) {
             for (const d of compromised.delegations) sql.all("UPDATE delegations SET revoked = ? WHERE id = ?", seq, d);
             const acts = new Set(compromised.evidence.map((e) => e.act));
-            // R-REV-3: unreserved landings that depend on the evidence become retryable.
+            // R-REV-3: unreserved landings that depend on the evidence become retryable. An advisory obligation
+            // that reopens is shown, but never holds up a landing (R-OBL-7).
+            const blocks = (x: { lane: LaneId; generation: Generation; obligation: ObligationId }) =>
+              !!generationRow(sql, x.lane, x.generation)?.obligations.some((o) => o.id === x.obligation && blocking(o));
             for (const v of core.landing.activeViews()) {
               if (v.state !== "accepted" && v.state !== "preparing" && v.state !== "ready") continue;
-              const uses = ("evidence" in v && v.evidence.some((a) => acts.has(a))) || (invalidated?.reopened ?? []).some((x) => x.lane === v.lane);
+              const uses = ("evidence" in v && v.evidence.some((a) => acts.has(a))) || (invalidated?.reopened ?? []).some((x) => x.lane === v.lane && blocks(x));
               if (uses) core.landing.laneChanged(v.lane, "evidence-invalid");
             }
             // R-REV-5: a compromised key behind the reserved landing starts a recorded abort attempt.

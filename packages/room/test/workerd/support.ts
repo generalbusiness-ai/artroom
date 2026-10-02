@@ -10,6 +10,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { entriesAfter } from "../../src/log.ts";
 import type {
   ActRecord,
+  CheckerService,
   DelegationId,
   Envelope,
   EnvelopeKind,
@@ -31,7 +32,7 @@ import type {
   SignedOnboardingGrant,
 } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
-import { FakeArtifactsHost, lanePolicy, setAlarmDelay, setClock, setServicesFactory, type ArtifactsPort, type PolicyPort, type Registry, type Room } from "../../src/index.ts";
+import { FakeArtifactsHost, lanePolicy, setAlarmDelay, setClock, setServicesFactory, type ArtifactsPort, type PolicyPort, type Registry, type Room, type SnapshotPort } from "../../src/index.ts";
 import { forkName, type FaultPoint, type DiffBounds } from "@generalbusiness/artroom-git";
 import { artifactsLogRemote } from "../../src/logremote.ts";
 import type { ArtifactsBinding } from "../../src/artifacts.ts";
@@ -140,8 +141,10 @@ export interface World {
   readonly bounds: { -readonly [K in keyof DiffBounds]?: DiffBounds[K] };
   /** Lane B's landing fault points: a test may throw from one, as a crash would. */
   landingFault: ((point: FaultPoint, op: string) => void) | null;
-  /** The runner environment attested now, by checker; none (the default) means checks do not carry. */
-  runnerDigest: ((checker: string) => string | null) | null;
+  /** Checker services by checker name, as service bindings would give them (R-EXEC-8); none by default. */
+  checkers: Record<string, CheckerService>;
+  /** Snapshot repositories (R-CARRY-16); none by default, as in production, so no filtered job is issued. */
+  snapshots: SnapshotPort | null;
   /** The most one log push may carry; lane L's default when null. */
   logTransfer: { objects: number; bytes: number } | null;
   /**
@@ -188,7 +191,7 @@ function newWorld(): World {
       return host.put(gitObject("commit", encodeCommit({ tree: root, parents: parent ? [parent] : [], author: who, committer: who, message: "not the room\n" })));
     },
   };
-  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, runnerDigest: null, logTransfer: null, imports: null };
+  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, checkers: {}, snapshots: null, logTransfer: null, imports: null };
   (world as { instrument?: unknown }).instrument = (a: ArtifactsPort): ArtifactsPort =>
     new Proxy(a, {
       get(target, prop, receiver) {
@@ -224,7 +227,10 @@ setServicesFactory((_env, objectId) => {
   });
   return {
     policy: world.policy,
-    runnerDigest: (checker: string) => (world.runnerDigest?.(checker) ?? null) as never,
+    checkers: (checker: string) => world.checkers[checker] ?? null,
+    get snapshots() {
+      return world.snapshots ?? undefined;
+    },
     remotes: {
       artifacts: host.binding,
       get namespace() {
@@ -234,6 +240,8 @@ setServicesFactory((_env, objectId) => {
         return world.imports ? { [world.imports.namespace]: world.imports.binding as unknown as ArtifactsBinding } : {};
       },
       publisher,
+      // The sandbox writes a snapshot into a repository beside the canonical one: in the import namespace for an imported room.
+      writeSnapshot: (req) => hostFor(req.store.remote).writeSnapshot(req),
       // The production log remote, over the fake binding and the fake sandbox's pushLog and readLogRef.
       logRemote: async (loc) => artifactsLogRemote(hostFor(loc.namespace).binding as unknown as ArtifactsBinding, hostFor(loc.namespace).logStub, loc),
       firstCommit: (remote, token, at) => hostFor(remote).firstCommit(remote, token, at),
@@ -395,14 +403,22 @@ export function grant(repo: string, admin: KeyId, notAfter = iso(clock.now + day
 }
 
 /** A room founded from a signed genesis, with main holding `files` (R-GEN-1). */
-export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<string, string> } = {}): Promise<TestRoom> {
+export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<string, string>; importNamespace?: string } = {}): Promise<TestRoom> {
   const world = newWorld();
   // An imported repository, with an operator's grant (R-GEN-12), bound in the registry before founding (R-GEN-13).
-  const repo = `test-import/${hex(randomBytes(16))}`;
-  placeRepo(world, repo);
+  // With `importNamespace`, it is in the deployment's second namespace (`world.imports`), and the primary is left empty.
+  const repo = `${opts.importNamespace ?? "test-import"}/${hex(randomBytes(16))}`;
   const files: Record<string, string> = { "README.md": "# test\n", "src/app.ts": "export const app = 1;\n", ...(opts.files ?? {}) };
   if (opts.policy) files[".artroom/policy.json"] = JSON.stringify(opts.policy);
-  world.artifacts.main = world.artifacts.commit(null, files);
+  if (opts.importNamespace) {
+    const imports = new FakeArtifactsHost(opts.importNamespace, () => clock.now);
+    imports.canonical = repo.split("/")[1]!;
+    imports.main = imports.commit(null, files);
+    world.imports = imports;
+  } else {
+    placeRepo(world, repo);
+    world.artifacts.main = world.artifacts.commit(null, files);
+  }
   const admin = newKeyPair();
   const recovery = newKeyPair();
   const seed = randomBytes(32);

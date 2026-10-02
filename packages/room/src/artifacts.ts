@@ -235,7 +235,7 @@ export class ArtifactsAdapter implements ArtifactsPort {
         const p = prefix ? `${prefix}/${e.name}` : e.name;
         if (e.type === "tree") {
           if (!(await walk(e.hash, p))) return false;
-        } else entries.push([p as RepoPath, e.mode, e.hash as Sha]);
+        } else if (/^(100644|100755|120000)$/.test(e.mode)) entries.push([p as RepoPath, e.mode, e.hash as Sha]); // never a submodule (R-CARRY-15)
       }
       return true;
     };
