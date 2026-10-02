@@ -263,8 +263,12 @@ export class LandingCore {
     return s.state === "held" ? { op: s.op, reservedAt: s.reservedAt } : null;
   }
 
-  /** The earliest time the driver has work due, for the Room's alarm. */
-  nextDue(): number | null {
+  /**
+   * The earliest time the driver has work due, for the Room's alarm. While a
+   * cleanup pass is still waiting on an answer, the owed revocations are not
+   * due before `cleanupNotBefore`: that pass will answer or time out by then.
+   */
+  nextDue(cleanupNotBefore: number | null = null): number | null {
     let due: number | null = null;
     const at = (t: number) => (due = due === null ? t : Math.min(due, t));
     for (const op of this.active()) {
@@ -274,7 +278,7 @@ export class LandingCore {
       else if (op.state === "ready" && this.slotRaw().state === "free") at(this.now());
     }
     const cleanup = this.sql.all("SELECT MIN(due) AS t FROM artroom_land_token_cleanup")[0]?.["t"];
-    if (typeof cleanup === "number") at(cleanup);
+    if (typeof cleanup === "number") at(cleanupNotBefore === null ? cleanup : Math.max(cleanup, cleanupNotBefore));
     return due;
   }
 

@@ -171,29 +171,88 @@ describe("landing in a Durable Object", () => {
     }
     expect(o.rows.map((r) => [r.op, r.n, r.backoff])).toEqual([[OP, 1, 2000]]);
     expect(o.rows[0]!.due).toBeGreaterThan(o.now);
-    expect(await alarmAt(room)).not.toBeNull(); // the alarm wakes again for it
+    const wake = await alarmAt(room);
+    expect(wake).not.toBeNull(); // the alarm wakes again for it, no later than a pending attempt's timeout
+    expect(wake!).toBeLessThanOrEqual(Date.now() + 30_000 + 1_000);
     expect(await room.liveTokens()).toBe(1);
     expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
 
-    // Artifacts recovers; another restart; the scheduled alarm fires by itself, revokes the token and owes nothing more.
+    // Artifacts recovers; another restart; the scheduled alarm (run now, if it has not fired by itself) revokes the token.
     await revocations(room, false);
     room = await restart(room);
-    const deadline = o.rows[0]!.due + 10_000;
+    await waitUntil(o.rows[0]!.due);
+    await runDurableObjectAlarm(room);
+    const deadline = Date.now() + 10_000;
     while ((await room.liveTokens()) !== 0) {
-      if (Date.now() > deadline) throw new Error("the scheduled alarm did not revoke the token");
+      if (Date.now() > deadline) throw new Error("the alarm did not revoke the token");
       await new Promise((r) => setTimeout(r, 50));
     }
-    expect(Date.now()).toBeGreaterThanOrEqual(o.rows[0]!.due);
     expect((await owed(room)).rows).toEqual([]);
-    // The alarm that started the pass set its next wake before the pass ended; that wake finds nothing owed and sets no other.
-    for (let i = 0; (await alarmAt(room)) !== null; i++) {
-      if (i > 500) throw new Error("the alarm kept waking with nothing owed");
-      await new Promise((r) => setTimeout(r, 10));
+    // The last alarm may have set its next wake while the pass was still running: bounded, and it finds nothing owed.
+    const last = await alarmAt(room);
+    if (last !== null) {
+      expect(last).toBeLessThanOrEqual(Date.now() + 30_000 + 1_000);
+      expect(await runDurableObjectAlarm(room)).toBe(true);
     }
+    expect(await alarmAt(room)).toBeNull();
     expect((await owed(room)).rows).toEqual([]);
     expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
     expect(await landed(room)).toBe(1);
     expect((await room.log()).map((x) => x.type)).toEqual(["land-reserved", "land-outcome"]);
+  });
+
+  // Adapted from review f060871b's diagnostic: real SQL statement failures inside the cleanup transactions.
+  it("review f060871b: a failure recording the cleanup duty rolls the landing back; a failure completing a revocation keeps the debt on its backoff; across real restarts both recover", async () => {
+    let { room } = await reservedRoom();
+    const exec = (s: DurableObjectStub<TestRoom>, q: string) =>
+      runInDurableObject(s, (_r, st) => {
+        st.storage.sql.exec(q);
+      });
+    const rows = (s: DurableObjectStub<TestRoom>) =>
+      runInDurableObject(s, (_r, st) => ({
+        debt: st.storage.sql.exec("SELECT due, backoff FROM artroom_land_token_cleanup").toArray() as { due: number; backoff: number }[],
+        op: JSON.parse(String(st.storage.sql.exec("SELECT body FROM artroom_land_op WHERE id = ?", OP).toArray()[0]!["body"])) as { pushes: { tokenRevoked: boolean }[] },
+      }));
+    const waitUntil = async (t: number) => {
+      while (Date.now() < t) await new Promise((r) => setTimeout(r, Math.max(10, t - Date.now())));
+    };
+    // Revocation fails, and so does recording the duty: the landing's transaction rolls back whole.
+    await exec(room, "CREATE TRIGGER revoke_down BEFORE UPDATE ON t_tokens BEGIN SELECT RAISE(ABORT, 'revoke down'); END");
+    await exec(room, "CREATE TRIGGER insert_down BEFORE INSERT ON artroom_land_token_cleanup BEGIN SELECT RAISE(ABORT, 'insert down'); END");
+    expect(await room.publish()).toContain("insert down");
+    expect(await room.view(OP)).toEqual({ state: "publishing", slot: "held" });
+    expect(await landed(room)).toBe(0);
+    expect((await rows(room)).debt).toEqual([]);
+    // Recording works again; a restart's alarm completes forward: landed once, with the duty recorded.
+    await exec(room, "DROP TRIGGER insert_down");
+    room = await restart(room);
+    expect(await runDurableObjectAlarm(room)).toBe(true);
+    expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
+    expect(await landed(room)).toBe(1);
+    let s = await rows(room);
+    expect(s.debt).toHaveLength(1);
+    // Artifacts answers the revocation, but its completion transaction fails: a failure, on the durable backoff.
+    await exec(room, "DROP TRIGGER revoke_down");
+    await exec(room, "CREATE TRIGGER delete_down BEFORE DELETE ON artroom_land_token_cleanup BEGIN SELECT RAISE(ABORT, 'delete down'); END");
+    await waitUntil(s.debt[0]!.due);
+    await runDurableObjectAlarm(room);
+    await until(async () => (await rows(room)).debt[0]?.backoff === 2000);
+    s = await rows(room);
+    expect(s.debt).toHaveLength(1);
+    expect(s.debt[0]!.due).toBeGreaterThan(Date.now());
+    expect(s.op.pushes[0]!.tokenRevoked).toBe(false);
+    expect(await room.liveTokens()).toBe(0);
+    expect(await landed(room)).toBe(1);
+    expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
+    // Storage recovers; after a restart the next answered attempt completes.
+    await exec(room, "DROP TRIGGER delete_down");
+    room = await restart(room);
+    await waitUntil(s.debt[0]!.due);
+    await runDurableObjectAlarm(room);
+    await until(async () => (await rows(room)).debt.length === 0);
+    expect((await rows(room)).op.pushes[0]!.tokenRevoked).toBe(true);
+    expect(await landed(room)).toBe(1);
+    expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
   });
 });
 

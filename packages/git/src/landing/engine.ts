@@ -107,6 +107,8 @@ export class Landing {
   private chain: Promise<unknown> = Promise.resolve();
   /** The cleanup pass in progress, if any. Never on `chain`. */
   private cleaning: Promise<void> | null = null;
+  /** When the current attempt of that pass times out at the latest. */
+  private cleaningUntil = 0;
   private readonly revokeTimeoutMs: number;
   private readonly preparing = new Set<OpId>();
   private stopped = false;
@@ -187,8 +189,9 @@ export class Landing {
   status(): PublicationStatus | null {
     return this.core.status();
   }
+  /** When the Room's alarm should next run. A cleanup pass in progress is due again when its current attempt times out. */
   nextDue(): number | null {
-    return this.core.nextDue();
+    return this.core.nextDue(this.cleaning ? this.cleaningUntil : null);
   }
 
   /** Read main and record it. Call once before the first `accept`, and when the slot is free. */
@@ -349,6 +352,7 @@ export class Landing {
    */
   private startCleanup(): void {
     if (this.cleaning) return;
+    this.cleaningUntil = this.now() + this.revokeTimeoutMs;
     this.cleaning = this.revokeEnded()
       .catch(() => undefined) // a stopped instance, or a step to retry: the records still owe it
       .finally(() => {
@@ -371,6 +375,7 @@ export class Landing {
   private async revokeEnded(): Promise<void> {
     for (const t of this.core.cleanupDue()) {
       this.alive();
+      this.cleaningUntil = this.now() + this.revokeTimeoutMs;
       let answered: boolean;
       try {
         answered = await this.revokeWithin(t.tokenId);
@@ -378,8 +383,19 @@ export class Landing {
         answered = false;
       }
       this.alive();
-      if (answered) this.core.tokenRevoked(t.op, t.n);
-      else this.core.cleanupFailed(t.op, t.n);
+      if (answered) {
+        try {
+          this.core.tokenRevoked(t.op, t.n);
+          continue;
+        } catch {
+          // The completion did not commit, so the record still owes it: a failure like any other.
+        }
+      }
+      try {
+        this.core.cleanupFailed(t.op, t.n);
+      } catch {
+        // Storage could not record the retry either. The record keeps its due time; go on with the batch.
+      }
     }
   }
 
