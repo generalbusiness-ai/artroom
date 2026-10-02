@@ -1,6 +1,6 @@
 # The default policy pack
 
-Artroom's default policy pack is eleven rules. Each one replaces something a
+Artroom's default policy pack is twelve rules. Each one replaces something a
 team sets up today in a Git hook, branch protection, a `CODEOWNERS` file,
 required CI checks or a review assistant's instructions. In Artroom they are
 one file, `.artroom/policy.json`. It is versioned with the code and changed
@@ -96,6 +96,36 @@ Each rule below shows what it replaces, the setup before and after, and what
 the user sees.
 
 ### Before an act is recorded
+
+**`jj-conflicts`** replaces a pre-push hook or CI step that rejects commits
+that add unresolved conflicts.
+- Before: jj can push a commit that still has conflicts
+  (`jj git push --allow-conflicts`). jj stores such a commit as a Git tree
+  with `.jjconflict-base-*` and `.jjconflict-side-*` directories at its
+  root. Without this rule the room would refuse it as `outside-claim`, or
+  its checks would fail, and neither says why.
+- After: the room refuses a proposal that introduces or changes jj conflict
+  data: a changed path that is added, modified or the destination of a
+  rename, and starts with `.jjconflict-base-` or `.jjconflict-side-`.
+  Deleting conflict data, or renaming a file out of it, is never refused,
+  so the usual repair (a child commit that resolves the conflict and
+  removes the directories) is accepted. Only the root of the tree counts:
+  `src/.jjconflict-side-0/app.ts` or `docs/jjconflict-notes.md` is an
+  ordinary file.
+- For a proposal, the room runs `refuse` rules before it checks the claim
+  (R-ADM-1, step 8). So the author sees this rule, not `outside-claim`. It
+  is also the pack's first `refuse` rule, so it fires before
+  `claim-before-propose`.
+- The user sees: *This proposal introduces or changes jj conflict data: it
+  adds or modifies .jjconflict-base-\* or .jjconflict-side-\* paths at the
+  root of its tree.* Fix: *Resolve the jj conflicts, so the proposal no
+  longer adds or changes .jjconflict-\* paths, then propose again.*
+- Limit: the rule sees only the proposal's changes, not the whole head. If
+  conflict data is already on the lane's base and a proposal leaves it
+  untouched, the rule does not see it, and the proposal is accepted. A
+  check of the whole head would need a fact the room owns: a bounded list
+  of the proposed head's root entries in the rule input. That is a
+  candidate for a later contract amendment; it is not built.
 
 **`claim-before-propose`** replaces a pre-push hook that requires a ticket or
 branch name.
@@ -219,20 +249,28 @@ and workerd. Both gave the same numbers, and the corpus pins them.
 
 | Act | Rules evaluated | Steps | Inspected bytes | Share of the act budget |
 |---|---|---|---|---|
-| `propose` | `claim-before-propose`; the `require` rules | 5 | 127 | under 0.1% |
+| `propose` | `jj-conflicts`, `claim-before-propose`; the `require` rules | 5,012 | 172,286 | 20.0% of steps; 4.1% of bytes |
 | `land`, and preparation at the reservation stage | `objection-open`, `fresh-approval` | 3,546 | 148,055 | 14.2% of steps; 3.5% of bytes |
 | One carried approval | `stale-approval` | 6 | 30,012 | under 1% |
 
-- The largest rule is `fresh-approval`, which reads every path: 3,532 steps
-  and 147,708 bytes. It reads each path's owners, so the fallback owner adds
-  15 bytes per path.
-- The largest act therefore has 21,454 steps of headroom (85.8%) and 4,046,249
-  bytes (96.5%).
+- The two rules that read every path are `jj-conflicts` (5,007 steps and
+  172,159 bytes) and `fresh-approval` (3,532 steps and 147,708 bytes).
+  `jj-conflicts` tests the path prefix first, so the status is read only
+  for `.jjconflict-` paths.
+  `fresh-approval` reads each path's owners, so the fallback owner adds 15
+  bytes per path.
+- The largest act is `propose`, with 19,988 steps of headroom (80.0%) and
+  4,022,018 bytes (95.9%).
+- Adding `jj-conflicts` raised `propose` from 5 steps and 127 bytes. It
+  does not lower the largest proposal the pack accepts. That limit comes
+  from the profile's 256 KiB limit on one input value, with or without the
+  rule: 1,461 paths of the length measured here. At that size `propose`
+  uses 14,622 steps (58.5%) and 511,636 bytes (12.2%).
 - `require` and `notify-owners` match paths in platform code, so they use no
   evaluator steps.
 - The room-core spike estimated 3 to 9 microseconds of deployed CPU per step
-  on the rules it sampled. That suggests about 11 to 32 ms for the largest
-  act. This is an estimate, not a bound.
+  on the rules it sampled. That suggests about 15 to 45 ms for the largest
+  act at 500 paths. This is an estimate, not a bound.
 
 If an act runs out of budget, the refusal is deterministic:
 `policy-budget-exceeded`, the same on every host and on replay. The corpus
@@ -243,7 +281,12 @@ shows this for `fresh-approval` on the same 500 paths with a 3,000-step budget.
 `packages/policy/test/pack.test.ts` runs the demo policy through the real
 runtime on Node and on workerd. It checks:
 
-- each rule's pass case and refuse or apply case;
+- each rule's pass case and refuse or apply case. For `jj-conflicts`:
+  adding conflict directories outside the lane's claim, modifying a
+  conflict file and renaming into one (refused); removing all conflict
+  data, renaming out of it, an unrelated change over untouched conflict
+  data (the known limit), names that only contain `jjconflict`, and a
+  configuration-recovery lane (accepted);
 - the carry cases of plan section 7;
 - the policy-level cases of protocol section 23 ("scoped checker, new test"
   and the policy lockout);

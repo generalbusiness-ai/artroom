@@ -42,6 +42,7 @@ sections 4 to 11 and 13.
 25. Review d12b67d6
 26. Policy amendment (81c31bc7)
 27. Amendment 2 (82a0b25a): integration gaps from lanes A, E and L
+28. Amendment 66d6fb14: `refuse` rules before the claim check
 29. Contract amendment 3 (bc351fa8): checks, check jobs and snapshots
 
 ## 1. Terms
@@ -369,10 +370,17 @@ The first failing step decides the outcome.
 | 5 | Body schema and sizes (R-SIG-4, R-SIG-6) | Refusal `invalid-body` or `body-too-large` | No |
 | 6 | Secret scan (R-SEC-1) | Refusal `secret-detected` | No |
 | 7 | Lane and lease (R-LANE) | Refusal, such as `generation-moved` | Yes |
-| 8 | Platform invariants (R-PROP, R-OBL, R-ADMIN) | Refusal, such as `outside-claim` | Yes |
-| 9 | Policy `refuse` rules, and `require` on `propose` (R-POL). Skipped on a configuration-recovery lane (R-ADMIN-5) | Refusal with the rule's ID and fix, or `policy-budget-exceeded`, `policy-type-error` | Yes |
+| 8 | Platform invariants (R-PROP, R-OBL, R-ADMIN). For `propose`, policy `refuse` rules run inside this step: after the head is known and the changed paths are computed and bounded (R-PROP-1, R-PROP-3, R-PROP-6), before the claim check (R-PROP-4) and the remaining invariants | Refusal, such as `outside-claim`, or a `refuse` rule's refusal as in step 9 | Yes |
+| 9 | Policy `refuse` rules (for kinds other than `propose`), and `require` on `propose` (R-POL). Skipped on a configuration-recovery lane (R-ADMIN-5) | Refusal with the rule's ID and fix, or `policy-budget-exceeded`, `policy-type-error` | Yes |
 | 10 | Seal the entry: content, hash, ID, room signature (R-LOG-2); commit; apply effects | — | Yes |
 | 11 | Policy `notify` rules, after the commit (R-LOG-13) | Never refuses; never changes the sealed entry | In a later `notified` entry |
+
+For `propose`, `refuse` rules run before the claim check so that a rule
+can name a cause that would otherwise show only as `outside-claim`, such
+as a proposal that adds jj conflict directories at the root of the tree.
+Moving them earlier only adds refusals: every platform invariant is still
+checked, and a configuration-recovery lane still skips them. They share the act's budget
+meter with the `require` rules that follow (R-EVAL-9).
 
 Admission is the act's place in the room's order. The room clock at
 admission is recorded as `at`. It is informational. The envelope carries
@@ -2380,6 +2388,24 @@ required lane edits above include them.
 | P1 Serialize the repository-to-room binding | New R-GEN-13 (one registry binding per repository identity holds the room ID and the name, bound atomically and kept through an incomplete founding); R-GEN-11 derives names from it; new R-PUB-10 (one publisher per repository); open point 37 (no succession) | — | Simultaneous founding; duplicate import; canonical-name aliases; recovery after binding |
 | (a) Policy for a queued `notify` | R-LOG-13 pins it to the version active when the entry was sealed; R-LOG-10 replays it with that version | — | Notify across an activation |
 | (b) Bearer expiry versus R-IDEM-2 | R-CRED-10, "Retries and idempotency" | — | Bearer receipt after revocation |
+
+## 28. Amendment 66d6fb14: `refuse` rules before the claim check
+
+Request 66d6fb14 added the `jj-conflicts` rule to the default policy pack
+(docs/policy-pack.md). Its condition is that a proposal adding
+`.jjconflict-side-0/` is refused with that rule, not `outside-claim`.
+Under R-ADM-1 as written, platform invariants (step 8) ran before policy
+`refuse` rules (step 9), so `outside-claim` always came first.
+
+| Change | Rules | Types | Who adapts |
+|---|---|---|---|
+| For `propose`, `refuse` rules run inside step 8: after R-PROP-1, R-PROP-3 and R-PROP-6, before R-PROP-4 and the remaining invariants. `require` rules stay at step 9 | R-ADM-1 | — | Room (lane A): evaluate `refuse` rules for `propose` before the claim check, with the same act meter as `require` |
+
+Not part of this amendment: the rule sees only the proposal's changes, so
+conflict data left untouched on the lane's base is not refused. A check of
+the whole head would need a Room-owned, bounded fact about the proposed
+head's root entries in the `refuse` rule input. That is a candidate for a
+later amendment.
 
 ## 29. Contract amendment 3 (bc351fa8): checks, check jobs and snapshots
 
