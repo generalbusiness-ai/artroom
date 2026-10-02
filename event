@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/test/workerd/log-bounded.test.ts","body":{"commit":"b5864882847734f35f0763e13326674ad184d538","path":"packages/room/test/workerd/log-bounded.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:00f09bcf5d47fff4d6dea4387f6b495654d2b869","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/logbig/wrangler.jsonc."}
