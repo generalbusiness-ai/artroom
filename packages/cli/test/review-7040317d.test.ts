@@ -106,6 +106,14 @@ describe("P2: unsettled installations stay plural until the file proves them set
     }
   });
 
+  test("an owner record written with the single installing slot of version 2 keeps that party as pending", () => {
+    const dir = join(repo(), ".git");
+    mkdirSync(join(dir, "artroom"), { recursive: true });
+    const y = { install: "y-install", room: h.room.id, lane: "act_5_00000000", lease: 1 };
+    writeFileSync(join(dir, "artroom", "owner.json"), JSON.stringify({ v: 2, rev: 4, installing: y }));
+    expect(readOwner(dir)).toEqual({ v: 3, rev: 4, pending: [y] });
+  });
+
   test("a completed later installation settles the earlier ones; the successor's file is then left by Y's release", async () => {
     const home = join(h.tmp, "alice");
     const dir = repo();
