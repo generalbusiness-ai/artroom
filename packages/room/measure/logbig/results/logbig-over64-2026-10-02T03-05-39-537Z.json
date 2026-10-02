@@ -1,0 +1,243 @@
+{
+  "date": "2026-10-02T03:05:39.537Z",
+  "mode": "over64",
+  "targetMiB": 64.5,
+  "worker": "artroom-lb-logbig",
+  "namespace": "gitseq-spike",
+  "steps": [
+    {
+      "step": "notified",
+      "at": 300,
+      "seqs": [
+        303
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 600,
+      "seqs": [
+        604
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 850,
+      "seqs": [
+        855
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "load",
+      "claims": 960,
+      "ms": 72828,
+      "head": 965,
+      "activeSegment": {
+        "first": 0,
+        "entries": 966,
+        "bytes": 67741983,
+        "largestEntry": 2013297
+      }
+    },
+    {
+      "step": "reset",
+      "abortStages": 2,
+      "reset": true
+    }
+  ],
+  "publications": [
+    {
+      "label": "load through 101",
+      "before": {
+        "head": 101,
+        "publishedThrough": -1,
+        "activeSegment": {
+          "first": 0,
+          "entries": 102,
+          "bytes": 6425055,
+          "largestEntry": 64240
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 101,
+        "commit": "a39451d0046cabb71c54505f889a9693a6d7ab62"
+      },
+      "error": null,
+      "ms": 3998,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "a39451d0046cabb71c54505f889a9693a6d7ab62",
+        "activeSegment": {
+          "first": 0,
+          "entries": 103,
+          "bytes": 6425589,
+          "largestEntry": 64240
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 1028876,
+          "peakSendBytes": 6427021,
+          "peakObjectBytes": 564,
+          "largestSegment": 6425055,
+          "hashedBytes": 12850110,
+          "sentSegmentBytes": 6425055
+        },
+        "head": "a39451d0046cabb71c54505f889a9693a6d7ab62",
+        "publishedThrough": 101
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "64.6 MiB active segment, reset mid-publication",
+      "reset": true,
+      "before": {
+        "head": 965,
+        "publishedThrough": 101
+      },
+      "after": {
+        "publishedThrough": 101,
+        "pending": {
+          "v": 2,
+          "parent": "a39451d0046cabb71c54505f889a9693a6d7ab62",
+          "expected": "8646794918a2c45eab9c1f55b82de2c11e73f1ab",
+          "through": 965,
+          "hash": "sha256:f359565364fe2bf36f3450536b5c983d31016f8665f412d575d61e8eb0be5fd6",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_65448aa9a51f57f6b263bbd6cf38f1b2",
+            "through": 965,
+            "hash": "sha256:f359565364fe2bf36f3450536b5c983d31016f8665f412d575d61e8eb0be5fd6",
+            "at": "2026-10-02T03:06:55.219Z",
+            "roomKey": "key_9ak8ncoi81sTfka-4g0jVnjsLIYVAaFrK2esXwD8ymI",
+            "sig": "jXAMdPqoQb0xP9zp8hRPqFXYAGU41KTPG-RdoFF9r1DTb6hBT5-EWmua5Zl1zLg-NSMv5Fg3WivnvvD9QprWCw"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        },
+        "publicationError": null,
+        "heap": {
+          "rss": 0,
+          "heapTotal": 0,
+          "heapUsed": 0,
+          "external": 0,
+          "arrayBuffers": 0
+        }
+      },
+      "ms": 13652
+    },
+    {
+      "label": "64.6 MiB active segment, after the reset",
+      "before": {
+        "head": 965,
+        "publishedThrough": 101,
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "pending": {
+          "v": 2,
+          "parent": "a39451d0046cabb71c54505f889a9693a6d7ab62",
+          "expected": "8646794918a2c45eab9c1f55b82de2c11e73f1ab",
+          "through": 965,
+          "hash": "sha256:f359565364fe2bf36f3450536b5c983d31016f8665f412d575d61e8eb0be5fd6",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_65448aa9a51f57f6b263bbd6cf38f1b2",
+            "through": 965,
+            "hash": "sha256:f359565364fe2bf36f3450536b5c983d31016f8665f412d575d61e8eb0be5fd6",
+            "at": "2026-10-02T03:06:55.219Z",
+            "roomKey": "key_9ak8ncoi81sTfka-4g0jVnjsLIYVAaFrK2esXwD8ymI",
+            "sig": "jXAMdPqoQb0xP9zp8hRPqFXYAGU41KTPG-RdoFF9r1DTb6hBT5-EWmua5Zl1zLg-NSMv5Fg3WivnvvD9QprWCw"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        }
+      },
+      "result": null,
+      "error": "ArtroomError unavailable: The log could not be published (transport); the same cohort is retried.",
+      "ms": 241,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "a39451d0046cabb71c54505f889a9693a6d7ab62",
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "publicationError": "transport"
+      },
+      "publisher": null,
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      },
+      "probe": {
+        "expected": "8646794918a2c45eab9c1f55b82de2c11e73f1ab",
+        "lease": "a39451d0046cabb71c54505f889a9693a6d7ab62",
+        "outcome": {
+          "ok": false,
+          "reason": "unknown",
+          "detail": "nothing was sent: before the push: 8646794918a2c45eab9c1f55b82de2c11e73f1ab is not here: send or stage it again"
+        }
+      }
+    }
+  ],
+  "room": "room_65448aa9a51f57f6b263bbd6cf38f1b2",
+  "repo": "gitseq-spike/496c09d070466251243d2cedfaa89a1f",
+  "checks": {
+    "resetHappened": true,
+    "pendingStoredBeforeReset": true,
+    "sameCohortAfterReset": true,
+    "resumedSameCommit": false,
+    "resumedThrough": null,
+    "resumedError": "ArtroomError unavailable: The log could not be published (transport); the same cohort is retried.",
+    "segmentBytes": null,
+    "sentAfterReset": null,
+    "resumedFromStaged": null,
+    "activeSegmentMiB": 64.60378932952881,
+    "largestEntry": 2013297
+  },
+  "verify": {
+    "ref": "a39451d0046cabb71c54505f889a9693a6d7ab62",
+    "refIsLast": true,
+    "exit": 0,
+    "ms": 1807,
+    "ok": true,
+    "verifiedThrough": 101,
+    "publishedThrough": 101,
+    "commits": 1,
+    "failures": [],
+    "stderr": ""
+  },
+  "cleanup": {
+    "activeTokensFound": 1,
+    "revoked": 1,
+    "repoDeleted": true
+  },
+  "totalMs": 95455
+}

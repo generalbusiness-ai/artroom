@@ -1,0 +1,7 @@
+{
+  // The spike's project plus one file with a type error in the spike's own
+  // files (the checker's probe in review f2212c63). scripts/check.sh must fail on it.
+  "extends": "../../tsconfig.json",
+  "include": ["../../src/**/*.ts", "../../test/**/*.ts", "checker-missing-compiler.ts"],
+  "exclude": []
+}

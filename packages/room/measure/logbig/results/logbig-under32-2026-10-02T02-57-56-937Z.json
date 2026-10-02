@@ -1,0 +1,367 @@
+{
+  "date": "2026-10-02T02:57:56.937Z",
+  "mode": "under32",
+  "targetMiB": 31.5,
+  "worker": "artroom-lb-logbig",
+  "namespace": "gitseq-spike",
+  "steps": [
+    {
+      "step": "notified",
+      "at": 100,
+      "seqs": [
+        102
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 200,
+      "seqs": [
+        204
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 300,
+      "seqs": [
+        306
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "load",
+      "claims": 420,
+      "ms": 85091,
+      "head": 428,
+      "activeSegment": {
+        "first": 0,
+        "entries": 429,
+        "bytes": 33035085,
+        "largestEntry": 2013297
+      }
+    },
+    {
+      "step": "reset",
+      "abortMs": 10950,
+      "reset": true
+    }
+  ],
+  "publications": [
+    {
+      "label": "load through 102",
+      "before": {
+        "head": 102,
+        "publishedThrough": -1,
+        "activeSegment": {
+          "first": 0,
+          "entries": 103,
+          "bytes": 8438353,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 102,
+        "commit": "05b4493f93fb1f03e2b0bf73f3000ace50431300"
+      },
+      "error": null,
+      "ms": 6256,
+      "after": {
+        "publishedThrough": 102,
+        "logCommit": "05b4493f93fb1f03e2b0bf73f3000ace50431300",
+        "activeSegment": {
+          "first": 0,
+          "entries": 104,
+          "bytes": 8438887,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 8438353,
+          "hashedBytes": 16876706,
+          "sentSegmentBytes": 8438353
+        },
+        "head": "05b4493f93fb1f03e2b0bf73f3000ace50431300",
+        "publishedThrough": 102
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 204",
+      "before": {
+        "head": 204,
+        "publishedThrough": 102,
+        "activeSegment": {
+          "first": 0,
+          "entries": 205,
+          "bytes": 16879685,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 204,
+        "commit": "3434337719b772b19a1ca40c587907971b35d452"
+      },
+      "error": null,
+      "ms": 9927,
+      "after": {
+        "publishedThrough": 204,
+        "logCommit": "3434337719b772b19a1ca40c587907971b35d452",
+        "activeSegment": {
+          "first": 0,
+          "entries": 206,
+          "bytes": 16880219,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 16879685,
+          "hashedBytes": 84395446,
+          "sentSegmentBytes": 25318038
+        },
+        "head": "3434337719b772b19a1ca40c587907971b35d452",
+        "publishedThrough": 204
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 306",
+      "before": {
+        "head": 306,
+        "publishedThrough": 204,
+        "activeSegment": {
+          "first": 0,
+          "entries": 307,
+          "bytes": 25321017,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 306,
+        "commit": "550733ebf230a6029b6a7e7a34f3bd4a56316ab1"
+      },
+      "error": null,
+      "ms": 14434,
+      "after": {
+        "publishedThrough": 306,
+        "logCommit": "550733ebf230a6029b6a7e7a34f3bd4a56316ab1",
+        "activeSegment": {
+          "first": 0,
+          "entries": 308,
+          "bytes": 25321551,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 25321017,
+          "hashedBytes": 185679514,
+          "sentSegmentBytes": 50639055
+        },
+        "head": "550733ebf230a6029b6a7e7a34f3bd4a56316ab1",
+        "publishedThrough": 306
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 407",
+      "before": {
+        "head": 407,
+        "publishedThrough": 306,
+        "activeSegment": {
+          "first": 0,
+          "entries": 408,
+          "bytes": 31749051,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 407,
+        "commit": "5cacd489c24d819e03bb1167e42716c0df6c0712"
+      },
+      "error": null,
+      "ms": 18250,
+      "after": {
+        "publishedThrough": 407,
+        "logCommit": "5cacd489c24d819e03bb1167e42716c0df6c0712",
+        "activeSegment": {
+          "first": 0,
+          "entries": 409,
+          "bytes": 31749585,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 31749051,
+          "hashedBytes": 312675718,
+          "sentSegmentBytes": 82388106
+        },
+        "head": "5cacd489c24d819e03bb1167e42716c0df6c0712",
+        "publishedThrough": 407
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "31.5 MiB active segment, reset mid-publication",
+      "reset": true,
+      "before": {
+        "head": 428,
+        "publishedThrough": 407
+      },
+      "after": {
+        "publishedThrough": 407,
+        "pending": {
+          "v": 2,
+          "parent": "5cacd489c24d819e03bb1167e42716c0df6c0712",
+          "expected": "09cf942cabbf1f09ec009da238ae72b9438b589f",
+          "through": 428,
+          "hash": "sha256:ae0702eef6ac787b813c3acca28a762c0de8f67b83b14b9a88334ac142ed60bf",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_362882d5b2cf20a1ad0e0013c72c19d8",
+            "through": 428,
+            "hash": "sha256:ae0702eef6ac787b813c3acca28a762c0de8f67b83b14b9a88334ac142ed60bf",
+            "at": "2026-10-02T02:59:24.239Z",
+            "roomKey": "key_J5IwcXzOoDzJJqxyCGzGQA56mnDdXJKY3zeHGE4x_EI",
+            "sig": "CtlXpvJRTneDqmRhLAp5-z6cZBUWX7vI2c0zHy8IJxY1oYkSqTfqaFdKrwiMiRmiqqWEH8oiSgb97xMQ1EylBA"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        },
+        "publicationError": null,
+        "heap": {
+          "rss": 0,
+          "heapTotal": 0,
+          "heapUsed": 0,
+          "external": 0,
+          "arrayBuffers": 0
+        }
+      },
+      "ms": 17065
+    },
+    {
+      "label": "31.5 MiB active segment, after the reset",
+      "before": {
+        "head": 428,
+        "publishedThrough": 407,
+        "activeSegment": {
+          "first": 0,
+          "entries": 429,
+          "bytes": 33035085,
+          "largestEntry": 2013297
+        },
+        "pending": {
+          "v": 2,
+          "parent": "5cacd489c24d819e03bb1167e42716c0df6c0712",
+          "expected": "09cf942cabbf1f09ec009da238ae72b9438b589f",
+          "through": 428,
+          "hash": "sha256:ae0702eef6ac787b813c3acca28a762c0de8f67b83b14b9a88334ac142ed60bf",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_362882d5b2cf20a1ad0e0013c72c19d8",
+            "through": 428,
+            "hash": "sha256:ae0702eef6ac787b813c3acca28a762c0de8f67b83b14b9a88334ac142ed60bf",
+            "at": "2026-10-02T02:59:24.239Z",
+            "roomKey": "key_J5IwcXzOoDzJJqxyCGzGQA56mnDdXJKY3zeHGE4x_EI",
+            "sig": "CtlXpvJRTneDqmRhLAp5-z6cZBUWX7vI2c0zHy8IJxY1oYkSqTfqaFdKrwiMiRmiqqWEH8oiSgb97xMQ1EylBA"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        }
+      },
+      "result": null,
+      "error": "ArtroomError unavailable: The log could not be published (INTERNAL_ERROR); the same cohort is retried.",
+      "ms": 3817,
+      "after": {
+        "publishedThrough": 407,
+        "logCommit": "5cacd489c24d819e03bb1167e42716c0df6c0712",
+        "activeSegment": {
+          "first": 0,
+          "entries": 429,
+          "bytes": 33035085,
+          "largestEntry": 2013297
+        },
+        "publicationError": "INTERNAL_ERROR"
+      },
+      "publisher": null,
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      },
+      "probe": {
+        "expected": "09cf942cabbf1f09ec009da238ae72b9438b589f",
+        "lease": "5cacd489c24d819e03bb1167e42716c0df6c0712",
+        "outcome": {
+          "ok": true
+        }
+      }
+    }
+  ],
+  "room": "room_362882d5b2cf20a1ad0e0013c72c19d8",
+  "repo": "gitseq-spike/814ec1b5a3c59eb7f00ed57088403f48",
+  "error": "Error: publication failed: ArtroomError unavailable: The log could not be published (INTERNAL_ERROR); the same cohort is retried.\n    at publish (file:///Users/hughpyle/play/artroom-worktrees/log-bounded/packages/room/measure/logbig/run.mjs:120:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///Users/hughpyle/play/artroom-worktrees/log-bounded/packages/room/measure/logbig/run.mjs:176:19",
+  "cleanup": {
+    "activeTokensFound": 1,
+    "revoked": 1,
+    "repoDeleted": true
+  },
+  "totalMs": 114042
+}

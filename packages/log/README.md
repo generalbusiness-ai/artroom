@@ -79,10 +79,37 @@ The publisher follows these rules:
   `commitFor` computes. `cohort-too-large` remains only for a remote that
   cannot stage. `MemoryGit` and `GitCli` stage. Tests:
   `test/transfer.test.ts`, `test/staging.test.ts`.
-- **Room memory.** The publisher builds the whole tree in memory, the
-  active segment included. A Durable Object has 128 MB; staging bounds
-  what one transfer carries, not what the Room must hold to build the
-  commit.
+- **Bounded memory** (request 5a7290b9). `entries` may be an
+  `EntrySource`: the publisher reads it in batches and never holds the
+  log, or a whole segment, at once. The Room passes one over its SQLite.
+  - A segment blob is streamed. The first read of its lines, one entry at
+    a time, measures each line, so the blob's size, which its git header
+    needs, is known. The second read hashes it. Each staged part reads
+    its lines again from where the part starts. Later reads take at most
+    `READ_LIMITS` (64 entries, 1 MiB by the measured lengths), and at
+    least one entry: one entry is bounded only by the 2 MB SQLite row.
+  - A full segment of the parent never changes, so it is reused by its
+    blob ID and not read. Only the parent's last segment, when it was not
+    full, and new segments are read.
+  - `retained` may hold `RetainedRef`s (kind, digest and `load`). A file
+    the parent already holds is reused by ID and not loaded. A new one is
+    loaded to hash it, and again when it is sent.
+  - `LogPublisher.open` reads the head's trees and `checkpoint.json` only.
+  - What still grows with the log, held as IDs: one blob ID per segment,
+    one path and blob ID per retained file, and the `inputs/` and
+    `policies/` trees themselves (97 bytes per file), which R-LOG-9's
+    layout makes single objects.
+  - A length that differs between two reads of the same line or retained
+    file is `invalid-input`, and nothing is pushed.
+  - `stats` reports the publisher's own buffers: the largest read batch,
+    the most sent in one call, the largest object built whole, the
+    largest segment and the bytes hashed and sent.
+- **What `would-rewrite` checks.** The cohort must not end before the
+  parent's checkpoint; its entry there must have the checkpoint's hash;
+  and the published part of the parent's last segment must hash to that
+  segment's blob ID, byte for byte. Full segments are reused, never
+  rewritten. `commitFor` with the publisher's own last commit as parent
+  makes the same checks.
 - **The commit, in advance.** `commitFor(parent, entries, checkpoint,
   retained)` returns the exact commit `publish` would write for that
   cohort on `parent`, without pushing. Both use the same owned copy and the
@@ -242,6 +269,15 @@ entries of the last consistent commit.
   (see below).
 - `test/review-a454cbaf.test.ts` covers review a454cbaf and `commitFor`
   (see below).
+- `test/bounded.test.ts` covers bounded-memory publication (request
+  5a7290b9; see `notes/log-bounded.md`): the same commits as the publisher
+  of main 417a1618 (`test/support/publisher-417a1618.ts`, kept as the
+  reference serialization) across segment boundaries, staged and not,
+  from arrays and sources, with restarts; bounded reads; retained files
+  read only when new; the size, order, staging-offset and rewrite guards;
+  `open` reading no segment; an entry near the 2 MB row bound.
+- `scripts/memory.ts` measures the publisher's heap with a 66.5 MiB active
+  segment against the 417a1618 publisher (results in `scripts/results/`).
 
 - `test/gitcli.node.test.ts` (Node only) publishes to a real local git
   repository and checks it:

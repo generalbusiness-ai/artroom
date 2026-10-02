@@ -1,0 +1,412 @@
+{
+  "date": "2026-10-02T03:00:07.677Z",
+  "mode": "under32",
+  "targetMiB": 31.5,
+  "worker": "artroom-lb-logbig",
+  "namespace": "gitseq-spike",
+  "steps": [
+    {
+      "step": "notified",
+      "at": 100,
+      "seqs": [
+        102
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 200,
+      "seqs": [
+        204
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 300,
+      "seqs": [
+        306
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "load",
+      "claims": 420,
+      "ms": 89647,
+      "head": 428,
+      "activeSegment": {
+        "first": 0,
+        "entries": 429,
+        "bytes": 33035085,
+        "largestEntry": 2013297
+      }
+    },
+    {
+      "step": "reset",
+      "abortMs": 11667,
+      "reset": true
+    }
+  ],
+  "publications": [
+    {
+      "label": "load through 102",
+      "before": {
+        "head": 102,
+        "publishedThrough": -1,
+        "activeSegment": {
+          "first": 0,
+          "entries": 103,
+          "bytes": 8438353,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 102,
+        "commit": "bab62061af3bb862d84ff4964579d54c17b1bab6"
+      },
+      "error": null,
+      "ms": 6271,
+      "after": {
+        "publishedThrough": 102,
+        "logCommit": "bab62061af3bb862d84ff4964579d54c17b1bab6",
+        "activeSegment": {
+          "first": 0,
+          "entries": 104,
+          "bytes": 8438887,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 8438353,
+          "hashedBytes": 16876706,
+          "sentSegmentBytes": 8438353
+        },
+        "head": "bab62061af3bb862d84ff4964579d54c17b1bab6",
+        "publishedThrough": 102
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 204",
+      "before": {
+        "head": 204,
+        "publishedThrough": 102,
+        "activeSegment": {
+          "first": 0,
+          "entries": 205,
+          "bytes": 16879685,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 204,
+        "commit": "3f3c85cadad7284f9de3b6e251d4592dcbf335a0"
+      },
+      "error": null,
+      "ms": 11586,
+      "after": {
+        "publishedThrough": 204,
+        "logCommit": "3f3c85cadad7284f9de3b6e251d4592dcbf335a0",
+        "activeSegment": {
+          "first": 0,
+          "entries": 206,
+          "bytes": 16880219,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 16879685,
+          "hashedBytes": 84395446,
+          "sentSegmentBytes": 25318038
+        },
+        "head": "3f3c85cadad7284f9de3b6e251d4592dcbf335a0",
+        "publishedThrough": 204
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 306",
+      "before": {
+        "head": 306,
+        "publishedThrough": 204,
+        "activeSegment": {
+          "first": 0,
+          "entries": 307,
+          "bytes": 25321017,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 306,
+        "commit": "86af4c6660c53f0cdfde2b8340ef67d5f2e7f0d7"
+      },
+      "error": null,
+      "ms": 15959,
+      "after": {
+        "publishedThrough": 306,
+        "logCommit": "86af4c6660c53f0cdfde2b8340ef67d5f2e7f0d7",
+        "activeSegment": {
+          "first": 0,
+          "entries": 308,
+          "bytes": 25321551,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 25321017,
+          "hashedBytes": 185679514,
+          "sentSegmentBytes": 50639055
+        },
+        "head": "86af4c6660c53f0cdfde2b8340ef67d5f2e7f0d7",
+        "publishedThrough": 306
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 407",
+      "before": {
+        "head": 407,
+        "publishedThrough": 306,
+        "activeSegment": {
+          "first": 0,
+          "entries": 408,
+          "bytes": 31749051,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 407,
+        "commit": "bed19a432e5881ecfc89f23f842089b81f59fd31"
+      },
+      "error": null,
+      "ms": 19445,
+      "after": {
+        "publishedThrough": 407,
+        "logCommit": "bed19a432e5881ecfc89f23f842089b81f59fd31",
+        "activeSegment": {
+          "first": 0,
+          "entries": 409,
+          "bytes": 31749585,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 31749051,
+          "hashedBytes": 312675718,
+          "sentSegmentBytes": 82388106
+        },
+        "head": "bed19a432e5881ecfc89f23f842089b81f59fd31",
+        "publishedThrough": 407
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "31.5 MiB active segment, reset mid-publication",
+      "reset": true,
+      "before": {
+        "head": 428,
+        "publishedThrough": 407
+      },
+      "after": {
+        "publishedThrough": 428,
+        "pending": null,
+        "publicationError": null,
+        "heap": {
+          "rss": 0,
+          "heapTotal": 0,
+          "heapUsed": 0,
+          "external": 0,
+          "arrayBuffers": 0
+        }
+      },
+      "ms": 20927
+    },
+    {
+      "label": "31.5 MiB active segment, after the reset",
+      "before": {
+        "head": 429,
+        "publishedThrough": 428,
+        "activeSegment": {
+          "first": 0,
+          "entries": 430,
+          "bytes": 33035619,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 429,
+        "commit": "dbc59b81675a23ebacc4c0fc7f69f81df1b4ca4b"
+      },
+      "error": null,
+      "ms": 20647,
+      "after": {
+        "publishedThrough": 429,
+        "logCommit": "dbc59b81675a23ebacc4c0fc7f69f81df1b4ca4b",
+        "activeSegment": {
+          "first": 0,
+          "entries": 431,
+          "bytes": 33036153,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 356,
+          "largestSegment": 33035619,
+          "hashedBytes": 132142476,
+          "sentSegmentBytes": 33035619
+        },
+        "head": "dbc59b81675a23ebacc4c0fc7f69f81df1b4ca4b",
+        "publishedThrough": 429
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "one more cohort: the checkpoint event, over the same segment",
+      "before": {
+        "head": 430,
+        "publishedThrough": 429,
+        "activeSegment": {
+          "first": 0,
+          "entries": 431,
+          "bytes": 33036153,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 430,
+        "commit": "0d747cc8af7e0229e4176a92979bf260afe3a84f"
+      },
+      "error": null,
+      "ms": 18184,
+      "after": {
+        "publishedThrough": 430,
+        "logCommit": "0d747cc8af7e0229e4176a92979bf260afe3a84f",
+        "activeSegment": {
+          "first": 0,
+          "entries": 432,
+          "bytes": 33036687,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 356,
+          "largestSegment": 33036153,
+          "hashedBytes": 264287088,
+          "sentSegmentBytes": 66071772
+        },
+        "head": "0d747cc8af7e0229e4176a92979bf260afe3a84f",
+        "publishedThrough": 430
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    }
+  ],
+  "room": "room_94638c0c616dbfcccd4e3d2ce4cf2e25",
+  "repo": "gitseq-spike/698e676d39200643563445d4cdf6fcd8",
+  "checks": {
+    "resetHappened": true,
+    "pendingStoredBeforeReset": false,
+    "sameCohortAfterReset": null,
+    "resumedSameCommit": null,
+    "resumedThrough": 429,
+    "resumedError": null,
+    "segmentBytes": 33035619,
+    "sentAfterReset": 33035619,
+    "resumedFromStaged": false,
+    "activeSegmentMiB": 31.505730628967285,
+    "largestEntry": 2013297
+  },
+  "verify": {
+    "ref": "0d747cc8af7e0229e4176a92979bf260afe3a84f",
+    "refIsLast": true,
+    "exit": 0,
+    "ms": 5376,
+    "ok": true,
+    "verifiedThrough": 430,
+    "publishedThrough": 430,
+    "commits": 7,
+    "failures": [],
+    "stderr": ""
+  },
+  "cleanup": {
+    "activeTokensFound": 1,
+    "revoked": 1,
+    "repoDeleted": true
+  },
+  "totalMs": 163161
+}

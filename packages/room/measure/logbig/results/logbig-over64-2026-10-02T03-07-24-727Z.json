@@ -1,0 +1,405 @@
+{
+  "date": "2026-10-02T03:07:24.727Z",
+  "mode": "over64",
+  "targetMiB": 64.5,
+  "worker": "artroom-lb-logbig",
+  "namespace": "gitseq-spike",
+  "steps": [
+    {
+      "step": "notified",
+      "at": 300,
+      "seqs": [
+        303
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 600,
+      "seqs": [
+        604
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 850,
+      "seqs": [
+        855
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "load",
+      "claims": 960,
+      "ms": 92569,
+      "head": 965,
+      "activeSegment": {
+        "first": 0,
+        "entries": 966,
+        "bytes": 67741983,
+        "largestEntry": 2013297
+      }
+    },
+    {
+      "step": "reset",
+      "abortStages": 2,
+      "reset": true
+    }
+  ],
+  "publications": [
+    {
+      "label": "load through 101",
+      "before": {
+        "head": 101,
+        "publishedThrough": -1,
+        "activeSegment": {
+          "first": 0,
+          "entries": 102,
+          "bytes": 6425055,
+          "largestEntry": 64240
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 101,
+        "commit": "bd06d17c6a02e8ec50036eac64621e02de30e8ff"
+      },
+      "error": null,
+      "ms": 4590,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+        "activeSegment": {
+          "first": 0,
+          "entries": 103,
+          "bytes": 6425589,
+          "largestEntry": 64240
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 1028876,
+          "peakSendBytes": 6427021,
+          "peakObjectBytes": 564,
+          "largestSegment": 6425055,
+          "hashedBytes": 12850110,
+          "sentSegmentBytes": 6425055
+        },
+        "head": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+        "publishedThrough": 101
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "64.6 MiB active segment, reset mid-publication",
+      "reset": true,
+      "before": {
+        "head": 965,
+        "publishedThrough": 101
+      },
+      "after": {
+        "publishedThrough": 101,
+        "pending": {
+          "v": 2,
+          "parent": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+          "expected": "a5d746a75be9de036b0f9b8198a22217df3e8772",
+          "through": 965,
+          "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_b6638443268503787d18ff51d7229edd",
+            "through": 965,
+            "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+            "at": "2026-10-02T03:08:59.320Z",
+            "roomKey": "key_Om6FeLq5FbPFyH9zTCgtO3yev8rzAuIiija3EgW6yvE",
+            "sig": "08zeio3pAsNh8QJVsiTxNKTsakGSe1D1ouB96sV0ceeqgWOJipMvFMb4Hwy68N2SPcPs4U5XaTKGIiuX1BEpCg"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        },
+        "publicationError": null,
+        "heap": {
+          "rss": 0,
+          "heapTotal": 0,
+          "heapUsed": 0,
+          "external": 0,
+          "arrayBuffers": 0
+        }
+      },
+      "ms": 21306
+    },
+    {
+      "label": "64.6 MiB active segment, after the reset",
+      "before": {
+        "head": 965,
+        "publishedThrough": 101,
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "pending": {
+          "v": 2,
+          "parent": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+          "expected": "a5d746a75be9de036b0f9b8198a22217df3e8772",
+          "through": 965,
+          "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_b6638443268503787d18ff51d7229edd",
+            "through": 965,
+            "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+            "at": "2026-10-02T03:08:59.320Z",
+            "roomKey": "key_Om6FeLq5FbPFyH9zTCgtO3yev8rzAuIiija3EgW6yvE",
+            "sig": "08zeio3pAsNh8QJVsiTxNKTsakGSe1D1ouB96sV0ceeqgWOJipMvFMb4Hwy68N2SPcPs4U5XaTKGIiuX1BEpCg"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        }
+      },
+      "result": null,
+      "error": "ArtroomError unavailable: The log could not be published (unresolved); the same cohort is retried.",
+      "ms": 50385,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "publicationError": "unresolved"
+      },
+      "publisher": null,
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "64.6 MiB active segment, after the reset (retry 1)",
+      "before": {
+        "head": 965,
+        "publishedThrough": 101,
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "pending": {
+          "v": 2,
+          "parent": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+          "expected": "a5d746a75be9de036b0f9b8198a22217df3e8772",
+          "through": 965,
+          "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_b6638443268503787d18ff51d7229edd",
+            "through": 965,
+            "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+            "at": "2026-10-02T03:08:59.320Z",
+            "roomKey": "key_Om6FeLq5FbPFyH9zTCgtO3yev8rzAuIiija3EgW6yvE",
+            "sig": "08zeio3pAsNh8QJVsiTxNKTsakGSe1D1ouB96sV0ceeqgWOJipMvFMb4Hwy68N2SPcPs4U5XaTKGIiuX1BEpCg"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        }
+      },
+      "result": null,
+      "error": "ArtroomError unavailable: The log could not be published (unresolved); the same cohort is retried.",
+      "ms": 31402,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "publicationError": "unresolved"
+      },
+      "publisher": null,
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "64.6 MiB active segment, after the reset (retry 2)",
+      "before": {
+        "head": 965,
+        "publishedThrough": 101,
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "pending": {
+          "v": 2,
+          "parent": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+          "expected": "a5d746a75be9de036b0f9b8198a22217df3e8772",
+          "through": 965,
+          "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_b6638443268503787d18ff51d7229edd",
+            "through": 965,
+            "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+            "at": "2026-10-02T03:08:59.320Z",
+            "roomKey": "key_Om6FeLq5FbPFyH9zTCgtO3yev8rzAuIiija3EgW6yvE",
+            "sig": "08zeio3pAsNh8QJVsiTxNKTsakGSe1D1ouB96sV0ceeqgWOJipMvFMb4Hwy68N2SPcPs4U5XaTKGIiuX1BEpCg"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        }
+      },
+      "result": null,
+      "error": "ArtroomError unavailable: The log could not be published (unresolved); the same cohort is retried.",
+      "ms": 28625,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "publicationError": "unresolved"
+      },
+      "publisher": null,
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "64.6 MiB active segment, after the reset (retry 3)",
+      "before": {
+        "head": 965,
+        "publishedThrough": 101,
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "pending": {
+          "v": 2,
+          "parent": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+          "expected": "a5d746a75be9de036b0f9b8198a22217df3e8772",
+          "through": 965,
+          "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_b6638443268503787d18ff51d7229edd",
+            "through": 965,
+            "hash": "sha256:6a1c8d5551889456a6309a25b94a2951a22e321d4cd546d4803fae74e68c3f0d",
+            "at": "2026-10-02T03:08:59.320Z",
+            "roomKey": "key_Om6FeLq5FbPFyH9zTCgtO3yev8rzAuIiija3EgW6yvE",
+            "sig": "08zeio3pAsNh8QJVsiTxNKTsakGSe1D1ouB96sV0ceeqgWOJipMvFMb4Hwy68N2SPcPs4U5XaTKGIiuX1BEpCg"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        }
+      },
+      "result": null,
+      "error": "ArtroomError unavailable: The log could not be published (unresolved); the same cohort is retried.",
+      "ms": 28632,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "publicationError": "unresolved"
+      },
+      "publisher": null,
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      },
+      "probe": {
+        "expected": "a5d746a75be9de036b0f9b8198a22217df3e8772",
+        "lease": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+        "outcome": {
+          "ok": false,
+          "reason": "unknown",
+          "detail": "no clear answer: remote: artifacts_git_receive_pack_object_too_large\n\nfatal: the remote end hung up unexpectedly\nfatal: the remote end hung up unexpectedly\nerror: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/8ffa3cc72b762d8b6e6caee458e4da7c.git'"
+        }
+      }
+    }
+  ],
+  "room": "room_b6638443268503787d18ff51d7229edd",
+  "repo": "gitseq-spike/8ffa3cc72b762d8b6e6caee458e4da7c",
+  "checks": {
+    "resetHappened": true,
+    "pendingStoredBeforeReset": true,
+    "sameCohortAfterReset": true,
+    "resumedSameCommit": false,
+    "resumedThrough": null,
+    "resumedError": "ArtroomError unavailable: The log could not be published (unresolved); the same cohort is retried.",
+    "segmentBytes": null,
+    "sentAfterReset": null,
+    "resumedFromStaged": null,
+    "activeSegmentMiB": 64.60378932952881,
+    "largestEntry": 2013297
+  },
+  "verify": {
+    "ref": "bd06d17c6a02e8ec50036eac64621e02de30e8ff",
+    "refIsLast": true,
+    "exit": 0,
+    "ms": 1775,
+    "ok": true,
+    "verifiedThrough": 101,
+    "publishedThrough": 101,
+    "commits": 1,
+    "failures": [],
+    "stderr": ""
+  },
+  "cleanup": {
+    "activeTokensFound": 1,
+    "revoked": 1,
+    "repoDeleted": true
+  },
+  "totalMs": 276923
+}
