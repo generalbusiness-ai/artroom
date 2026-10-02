@@ -181,3 +181,38 @@ destination itself and established when the command starts.
 Also: CLI-generated idempotency keys never start with "-", which the option
 parser would have read as an option.
 
+## Review 4758945b
+
+The checker's seventh review asked for three changes in the CLI.
+`packages/cli/test/review-4758945b.test.ts` names each case, and the
+checker's diagnostic, which asserted the defects, now fails on each of
+them.
+
+| Finding | Change | Tests |
+|---|---|---|
+| P2 Keep the installed credential's owner separate from reservations | The owner record (`.git/artroom/owner.json`, version 2) has three separate parts: `installed` (the installation whose credential is in the file), `installing` (recorded before the file is replaced, so a crash leaves evidence), and `reservation` (the latest workspace command; only it may install). Reserving never touches `installed`. A release records, before it is sent, the installations of its lane that the Room knows of (its mapping and the owner records) and the reservations to cancel. It removes exactly a credential whose file names one of those installations. It cancels only those reservations, never a newer one, and leaves any Room's newer credential alone | "failed before the token…", "failed install…", "delayed retry…", "a recovered release does not cancel a newer reservation for the same lane" |
+| P2 Upgrade schema-2 installed workspaces with their evidence | Schema 2 and 3 configs keep their installed mappings. A release removes a mapped credential only when the file's installation mark names that installation: the installation ID is random and written by that installation, so a path alone proves nothing. Otherwise it prints the manual step and keeps the mapping as the unresolved duty. If another installation has replaced the file, the duty is done and the newer file is left. Schema-3 release journals decode to manual steps. Schema 4 | "a fresh release after the upgrade removes the mapped credential, proved by its installation mark…", "a schema-2 mapping whose file has no installation mark…", "a schema-2 mapping whose file another Room has since replaced…", "an older journal's release, recovered after another Room replaced the credential…" |
+| P2 Lock age is not evidence that its holder stopped | See below | "an old lock held by a live command is never taken…", "a holder that crashed is recovered…", "a live holder in another process is waited for, and named, never removed", "a holder that lost its lock writes nothing, and never removes the lock that replaced it", "a lock from another host, or a recovery left by a crashed recoverer, is named for the user, not removed" |
+
+**The destination lock.** `owner.lock` is created exclusively (`O_EXCL`)
+and holds its holder's process ID, host name and a random token. Age is
+never evidence:
+- A command waits for a live holder, however old its lock, and after ten
+  seconds says which process holds it.
+- A lock is recovered only when its holder is provably gone: it is on this
+  host, and no process has its ID (`kill(pid, 0)` fails with `ESRCH`).
+  Recoverers are serialised by a second exclusive file,
+  `owner.lock.break`. While holding it, a recoverer re-reads the lock, and
+  removes it only if it still holds the dead holder's token. Nobody else
+  can change the lock in that window: a successor can create it only
+  after it is gone.
+- A lock is removed only by the holder whose token it holds, never a
+  successor's. The holder checks it still holds the lock before each owner
+  write, and writes nothing if it does not.
+- A lock from another host, or a recovery file left by a recoverer that
+  itself crashed, is not removed automatically. The error names the file
+  for the user to remove.
+
+Node has no portable OS file lock (`flock`), so this protocol is the
+simplest sound choice: it never relies on elapsed time.
+

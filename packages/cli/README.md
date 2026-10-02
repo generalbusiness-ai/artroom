@@ -44,7 +44,11 @@ that a newer workspace for another lane has written.
 
 Each repository keeps a record of who owns its Artroom remote and
 credential, in `.git/artroom/owner.json`. Every Room you use with the
-repository shares that record. If two `artroom workspace` commands overlap,
+repository shares that record. It keeps the installed credential apart
+from workspace commands still in progress, so a failed command never
+hides what a release must clean up. A lock file that names its holding
+process guards each change; a stopped command's lock is recovered only
+when that process is gone. If two `artroom workspace` commands overlap,
 or a release happens while one is being prepared, only the workspace
 started last installs anything, whichever Room it is for. The
 other says it was superseded, and leaves the newer remote and credential
