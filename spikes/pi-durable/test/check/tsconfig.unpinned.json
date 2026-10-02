@@ -1,0 +1,21 @@
+{
+  // The spike's project as it was before review 6d392973: no mapping for the
+  // subpath `@generalbusiness/artroom-contract/policy`, which the vendored
+  // policy helpers import. With the root workspaces installed it resolves to
+  // the root's contract package; without them it does not resolve. Either way
+  // scripts/check.sh must fail.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@generalbusiness/artroom-contract": ["../../vendor/artroom/packages/contract/src/index.ts"],
+      "@generalbusiness/artroom-client": ["../../vendor/artroom/packages/client/src/index.ts"],
+      "@generalbusiness/artroom-room": ["../../vendor/artroom/packages/room/src/index.ts"],
+      "@generalbusiness/artroom-git": ["../../vendor/artroom/packages/git/src/index.ts"],
+      "@generalbusiness/artroom-log": ["../../vendor/artroom/packages/log/src/index.ts"],
+      "@generalbusiness/artroom-policy": ["../../vendor/artroom/packages/policy/src/index.ts"],
+      "@generalbusiness/artroom-policy/helpers": ["../../vendor/artroom/packages/policy/src/helpers.ts"]
+    }
+  },
+  "include": ["../../src/**/*.ts", "../../test/**/*.ts"],
+  "exclude": ["../../test/check"]
+}

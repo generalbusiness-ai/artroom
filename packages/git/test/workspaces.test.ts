@@ -129,6 +129,12 @@ class FakeNamespace implements ArtifactsNamespace {
     if (this.createGate) await this.createGate;
     return r;
   }
+  async create(): Promise<never> {
+    throw new Error("workspaces never create a repository");
+  }
+  async delete(): Promise<never> {
+    throw new Error("workspaces never delete a repository");
+  }
 }
 
 function setup() {

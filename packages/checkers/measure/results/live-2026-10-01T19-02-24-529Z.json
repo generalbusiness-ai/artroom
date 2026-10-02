@@ -1,0 +1,346 @@
+{
+  "repo": "artroom-lg-live-mupwgvny",
+  "runs": [
+    {
+      "name": "pass (cold)",
+      "checker": "tests",
+      "commit": "76f8114b",
+      "ok": true,
+      "refused": null,
+      "volatile": false,
+      "input": "tree",
+      "detail": "Machine-run check \"tests\": passed. It ran `npm ci`, then `npm test`, in an isolated runner. |  | npm test exited 0.",
+      "note": null,
+      "ms": {
+        "jobAndSnapshot": 748,
+        "check": 4309,
+        "total": 5057
+      },
+      "clientMs": 5165,
+      "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+      "detailFull": "Machine-run check \"tests\": passed. It ran `npm ci`, then `npm test`, in an isolated runner.\n\nnpm test exited 0.\n> demo@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: adds\nok 1 - adds\n  ---\n  duration_ms: 0.943355\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 118.951989",
+      "noteFull": null,
+      "snapshot": null
+    },
+    {
+      "name": "pass (warm)",
+      "checker": "tests",
+      "commit": "76f8114b",
+      "ok": true,
+      "refused": null,
+      "volatile": false,
+      "input": "tree",
+      "detail": "Machine-run check \"tests\": passed. It ran `npm ci`, then `npm test`, in an isolated runner. |  | npm test exited 0.",
+      "note": null,
+      "ms": {
+        "jobAndSnapshot": 285,
+        "check": 2303,
+        "total": 2588
+      },
+      "clientMs": 2695,
+      "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+      "detailFull": "Machine-run check \"tests\": passed. It ran `npm ci`, then `npm test`, in an isolated runner.\n\nnpm test exited 0.\n> demo@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: adds\nok 1 - adds\n  ---\n  duration_ms: 0.945809\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 101.97117",
+      "noteFull": null,
+      "snapshot": null
+    },
+    {
+      "name": "fail",
+      "checker": "tests",
+      "commit": "2ee76854",
+      "ok": false,
+      "refused": null,
+      "volatile": false,
+      "input": "tree",
+      "detail": "Machine-run check \"tests\": failed. It ran `npm ci`, then `npm test`, in an isolated runner. |  | npm test exited 1.",
+      "note": null,
+      "ms": {
+        "jobAndSnapshot": 291,
+        "check": 2294,
+        "total": 2585
+      },
+      "clientMs": 2681,
+      "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+      "detailFull": "Machine-run check \"tests\": failed. It ran `npm ci`, then `npm test`, in an isolated runner.\n\nnpm test exited 1.\n> demo@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: adds\nnot ok 1 - adds\n  ---\n  duration_ms: 3.434904\n  type: 'test'\n  location: '/work/job_ba9d7ab127c44ff7b41a/src/test/add.test.js:4:1'\n  failureType: 'testCodeFailure'\n  error: '0 == 4'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 4\n  actual: 0\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///work/job_ba9d7ab127c44ff7b41a/src/test/add.test.js:4:27)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.start (node:internal/test_runner/test:944:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 159.880038",
+      "noteFull": null,
+      "snapshot": null
+    },
+    {
+      "name": "changed test, unchanged source",
+      "checker": "tests",
+      "commit": "fd62a2b2",
+      "ok": false,
+      "refused": null,
+      "volatile": false,
+      "input": "tree",
+      "detail": "Machine-run check \"tests\": failed. It ran `npm ci`, then `npm test`, in an isolated runner. |  | npm test exited 1.",
+      "note": null,
+      "ms": {
+        "jobAndSnapshot": 433,
+        "check": 3479,
+        "total": 3912
+      },
+      "clientMs": 3981,
+      "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+      "detailFull": "Machine-run check \"tests\": failed. It ran `npm ci`, then `npm test`, in an isolated runner.\n\nnpm test exited 1.\n> demo@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: adds\nnot ok 1 - adds\n  ---\n  duration_ms: 2.334173\n  type: 'test'\n  location: '/work/job_855ca4d3055e415c85bf/src/test/add.test.js:4:1'\n  failureType: 'testCodeFailure'\n  error: '4 == 5'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 5\n  actual: 4\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///work/job_855ca4d3055e415c85bf/src/test/add.test.js:4:27)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.start (node:internal/test_runner/test:944:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 226.936492",
+      "noteFull": null,
+      "snapshot": null
+    },
+    {
+      "name": "types pass (cold)",
+      "checker": "types",
+      "commit": "76f8114b",
+      "ok": true,
+      "refused": null,
+      "volatile": false,
+      "input": "tree",
+      "detail": "Machine-run check \"types\": passed. It ran `npm ci`, then `tsc --noEmit` from the repository's own TypeScript, in an isolated runner. |  | tsc --noEmit exited 0.",
+      "note": null,
+      "ms": {
+        "jobAndSnapshot": 236,
+        "check": 6490,
+        "total": 6726
+      },
+      "clientMs": 6808,
+      "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+      "detailFull": "Machine-run check \"types\": passed. It ran `npm ci`, then `tsc --noEmit` from the repository's own TypeScript, in an isolated runner.\n\ntsc --noEmit exited 0.\n",
+      "noteFull": null,
+      "snapshot": null
+    },
+    {
+      "name": "types fail (warm)",
+      "checker": "types",
+      "commit": "c88613f3",
+      "ok": false,
+      "refused": null,
+      "volatile": false,
+      "input": "tree",
+      "detail": "Machine-run check \"types\": failed. It ran `npm ci`, then `tsc --noEmit` from the repository's own TypeScript, in an isolated runner. |  | tsc --noEmit exited 2.",
+      "note": null,
+      "ms": {
+        "jobAndSnapshot": 272,
+        "check": 3210,
+        "total": 3482
+      },
+      "clientMs": 3557,
+      "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+      "detailFull": "Machine-run check \"types\": failed. It ran `npm ci`, then `tsc --noEmit` from the repository's own TypeScript, in an isolated runner.\n\ntsc --noEmit exited 2.\nsrc/units.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.",
+      "noteFull": null,
+      "snapshot": null
+    },
+    {
+      "name": "scoped: a test reads an excluded file",
+      "checker": "tests",
+      "commit": "a67bb5a6",
+      "ok": false,
+      "refused": null,
+      "volatile": false,
+      "input": "filtered",
+      "detail": "Machine-run check \"tests\": failed. It ran `npm ci`, then `npm test`, in an isolated runner. |  | npm test exited 1.",
+      "note": null,
+      "ms": {
+        "jobAndSnapshot": 4969,
+        "check": 5075,
+        "total": 10044
+      },
+      "clientMs": 10156,
+      "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+      "detailFull": "Machine-run check \"tests\": failed. It ran `npm ci`, then `npm test`, in an isolated runner.\n\nnpm test exited 1.\n> demo@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: adds\nok 1 - adds\n  ---\n  duration_ms: 1.080611\n  type: 'test'\n  ...\n# Subtest: reads an undeclared file\nnot ok 2 - reads an undeclared file\n  ---\n  duration_ms: 1.398468\n  type: 'test'\n  location: '/work/job_4cd80b7759c54aba89ee/src/test/secret.test.js:3:1'\n  failureType: 'testCodeFailure'\n  error: \"ENOENT: no such file or directory, open '/work/job_4cd80b7759c54aba89ee/src/src/secret.txt'\"\n  code: 'ENOENT'\n  stack: |-\n    readFileSync (node:fs:440:20)\n    TestContext.<anonymous> (file:///work/job_4cd80b7759c54aba89ee/src/test/secret.test.js:3:40)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.start (node:internal/test_runner/test:944:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 1\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 203.209241",
+      "noteFull": null,
+      "snapshot": {
+        "store": "artroom-lg-live-mupwgvny--snap-tests",
+        "files": [
+          "package-lock.json",
+          "package.json",
+          "src/add.js",
+          "test/add.test.js",
+          "test/secret.test.js",
+          "tsconfig.json"
+        ],
+        "digest": "sha256:49fd4e1204fb0ad487798dd2db64d3edc78ac738d7167f3a432bbdc4bdcd907f"
+      }
+    },
+    {
+      "name": "llm review (cold)",
+      "checker": "llm-review",
+      "commit": "2ee76854",
+      "ok": true,
+      "refused": null,
+      "volatile": true,
+      "input": "tree",
+      "detail": "Machine-run check \"llm-review\": passed. Advisory machine review by the model @cf/meta/llama-3.3-70b-instruct-fp8-fast. It never blocks landing and is not a review verdict. |  | Change reviewed against 76f8114b8817:",
+      "note": "Machine-generated, advisory review (model @cf/meta/llama-3.3-70b-instruct-fp8-fast; checker \"llm-review\"). It is not a review verdict and does not block landing.",
+      "ms": {
+        "jobAndSnapshot": 510,
+        "check": 3868,
+        "total": 4378
+      },
+      "clientMs": 4469,
+      "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+      "detailFull": "Machine-run check \"llm-review\": passed. Advisory machine review by the model @cf/meta/llama-3.3-70b-instruct-fp8-fast. It never blocks landing and is not a review verdict.\n\nChange reviewed against 76f8114b8817:\nsrc/add.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)\n\n1 finding(s):\n1. [high] src/add.js:3: Function name 'add' is misleading as it now performs subtraction",
+      "noteFull": "Machine-generated, advisory review (model @cf/meta/llama-3.3-70b-instruct-fp8-fast; checker \"llm-review\"). It is not a review verdict and does not block landing.\n\n1. [high] src/add.js:3: Function name 'add' is misleading as it now performs subtraction",
+      "snapshot": null
+    }
+  ],
+  "probeTree": {
+    "job": {
+      "id": "job_325fdb33c92e46dda77f",
+      "input": {
+        "kind": "tree",
+        "tree": "4971dc955e7ccd2ddb0fa06c7b4ae0ea92dae276"
+      },
+      "integration": "76f8114b881712d9df9fcd38a4e77fcd5852bb7b"
+    },
+    "head": "76f8114b881712d9df9fcd38a4e77fcd5852bb7b",
+    "results": [
+      {
+        "argv": "git -c credential.helper= push https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lg-live-mupwgvny.git HEAD:refs/heads/runner-was-here",
+        "exit": 128,
+        "out": "remote: Forbidden by the runner gateway: runners may not push\nfatal: unable to access 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lg-live-mupwgvny.git/': The requested URL returned error: 403"
+      },
+      {
+        "argv": "node -e fetch('https://example.com').then(r=>console.log('reached',r.status)).catch(e=>{console.log('blocked:',e.cause?.code??e.message);process.exit(3)})",
+        "exit": 3,
+        "out": "blocked: EAI_AGAIN"
+      },
+      {
+        "argv": "sh -c env | grep -ci 'art_v\\|bearer\\|token' || true",
+        "exit": 0,
+        "out": "0"
+      }
+    ],
+    "git": "76f8114 base: passing tests and types",
+    "ms": 11805,
+    "clientMs": 11852
+  },
+  "probeScoped": {
+    "job": {
+      "id": "job_1633d4b2a8e849a08ea7",
+      "input": {
+        "kind": "filtered",
+        "snapshot": "sha256:5ec5366cf533a990d3dcf33a9c967270d555e1b68f3ecf038f3e759d822c2554",
+        "paths": [
+          "src/add.js",
+          ".artroom/**",
+          ".github/**",
+          "scripts/**",
+          "**/scripts/**",
+          "package.json",
+          "**/package.json",
+          "package-lock.json",
+          "**/package-lock.json",
+          "npm-shrinkwrap.json",
+          "yarn.lock",
+          "**/yarn.lock",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "bun.lockb",
+          "bun.lock",
+          ".npmrc",
+          "**/.npmrc",
+          ".nvmrc",
+          ".node-version",
+          ".tool-versions",
+          "tests/**",
+          "**/tests/**",
+          "test/**",
+          "**/test/**",
+          "**/__tests__/**",
+          "spec/**",
+          "**/*.test.*",
+          "**/*.spec.*",
+          "**/fixtures/**",
+          "**/__fixtures__/**",
+          "**/__snapshots__/**",
+          "tsconfig*.json",
+          "**/tsconfig*.json",
+          "jsconfig*.json",
+          "wrangler.*",
+          "**/wrangler.*",
+          "vite.config.*",
+          "**/vite.config.*",
+          "vitest.config.*",
+          "**/vitest.config.*",
+          "vitest.workspace.*",
+          "jest.config.*",
+          "**/jest.config.*",
+          "playwright.config.*",
+          "karma.conf.*",
+          ".mocharc*",
+          "babel.config.*",
+          ".babelrc*",
+          ".swcrc",
+          "esbuild.*",
+          "rollup.config.*",
+          "webpack.config.*",
+          "turbo.json",
+          "nx.json",
+          "lerna.json",
+          ".env.test",
+          "Makefile",
+          "**/Makefile",
+          "Dockerfile",
+          "**/Dockerfile",
+          "docker-compose*.yml"
+        ]
+      },
+      "integration": "eee39ff18213dadda8278b86aa13f55249ef9e77"
+    },
+    "snapshot": {
+      "store": "artroom-lg-live-mupwgvny--snap-tests",
+      "files": [
+        "package-lock.json",
+        "package.json",
+        "src/add.js",
+        "test/add.test.js",
+        "tsconfig.json"
+      ],
+      "digest": "sha256:5ec5366cf533a990d3dcf33a9c967270d555e1b68f3ecf038f3e759d822c2554"
+    },
+    "head": "eee39ff18213dadda8278b86aa13f55249ef9e77",
+    "results": [
+      {
+        "argv": "git -c credential.helper= push https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lg-live-mupwgvny--snap-tests.git HEAD:refs/heads/runner-was-here",
+        "exit": 128,
+        "out": "remote: Forbidden by the runner gateway: runners may not push\nfatal: unable to access 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lg-live-mupwgvny--snap-tests.git/': The requested URL returned error: 403"
+      },
+      {
+        "argv": "git ls-remote https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lg-live-mupwgvny.git",
+        "exit": 128,
+        "out": "remote: Forbidden by the runner gateway: not this job's repository\nfatal: unable to access 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lg-live-mupwgvny.git/': The requested URL returned error: 403"
+      },
+      {
+        "argv": "node -e fetch('https://example.com').then(r=>console.log('reached',r.status)).catch(e=>{console.log('blocked:',e.cause?.code??e.message);process.exit(3)})",
+        "exit": 3,
+        "out": "blocked: EAI_AGAIN"
+      },
+      {
+        "argv": "sh -c env | grep -ci 'art_v\\|bearer\\|token' || true",
+        "exit": 0,
+        "out": "0"
+      },
+      {
+        "argv": "cat src/secret.txt",
+        "exit": 1,
+        "out": "cat: src/secret.txt: No such file or directory"
+      },
+      {
+        "argv": "git cat-file -e 5704cd7723bff21e2e4a61d4f708480ab6529166",
+        "exit": 1,
+        "out": ""
+      },
+      {
+        "argv": "git -c http.sslCAInfo=/etc/cloudflare/certs/cloudflare-containers-ca.crt fetch https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lg-live-mupwgvny--snap-tests.git 5704cd7723bff21e2e4a61d4f708480ab6529166",
+        "exit": 128,
+        "out": "error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500\nfatal: expected 'packfile'"
+      },
+      {
+        "argv": "git rev-list --all --count",
+        "exit": 0,
+        "out": "1"
+      }
+    ],
+    "git": "eee39ff Artroom filtered snapshot for tests",
+    "ms": 15312,
+    "clientMs": 15357
+  }
+}

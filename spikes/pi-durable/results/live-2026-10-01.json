@@ -1,0 +1,102 @@
+{
+    "model": "openrouter/openai/gpt-4.1-mini",
+    "seconds": 6,
+    "crashes": [
+        "injected crash at propose:after-send"
+    ],
+    "opens": 2,
+    "sends": {
+        "claim": [
+            "prepared"
+        ],
+        "propose": [
+            "prepared"
+        ],
+        "land": [
+            "prepared"
+        ]
+    },
+    "acts": [
+        "claim",
+        "propose",
+        "land"
+    ],
+    "refusals": [],
+    "landingWhenAnswered": "accepted",
+    "landing": "landed",
+    "mainIsHead": true,
+    "answer": "I have added the file docs/pi-durable.md stating that a pi-durable agent wrote it, and the change has been landed.",
+    "responseModels": [
+        "openai/gpt-4.1-mini"
+    ],
+    "transcript": [
+        {
+            "role": "user",
+            "text": "Add a file docs/pi-durable.md that says, in one sentence, that a pi-durable agent wrote it. Then land it."
+        },
+        {
+            "role": "assistant",
+            "tool": "artroom_claim",
+            "text": ""
+        },
+        {
+            "role": "toolResult",
+            "tool": "artroom_claim",
+            "text": "Claimed lane act_5_2a9143a3 (lease 1)."
+        },
+        {
+            "role": "assistant",
+            "tool": "artroom_write",
+            "text": ""
+        },
+        {
+            "role": "toolResult",
+            "tool": "artroom_write",
+            "text": "Pushed docs/pi-durable.md; head a4c981a70ef843780cc7510b84d49f681e430cf9."
+        },
+        {
+            "role": "assistant",
+            "tool": "artroom_propose",
+            "text": ""
+        },
+        {
+            "role": "toolResult",
+            "tool": "artroom_propose",
+            "text": "Proposed generation 1 at a4c981a70ef843780cc7510b84d49f681e430cf9."
+        },
+        {
+            "role": "assistant",
+            "tool": "artroom_land",
+            "text": ""
+        },
+        {
+            "role": "toolResult",
+            "tool": "artroom_land",
+            "text": "Landing op_land_7 started (accepted)."
+        },
+        {
+            "role": "assistant",
+            "text": "I have added the file docs/pi-durable.md stating that a pi-durable agent wrote it, and the change has been landed."
+        }
+    ],
+    "usage": {
+        "models": {
+            "openrouter/openai/gpt-4.1-mini": {
+                "input": 2042,
+                "output": 149,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 2191,
+                "cost": {
+                    "input": 0.0008168000000000001,
+                    "output": 0.00023840000000000005,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.0010552
+                }
+            }
+        },
+        "tools": {}
+    }
+}
