@@ -3,8 +3,9 @@
 // against a fake Artifacts namespace with the binding's shape.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_RETAIN_MS, RetirementOwed, SnapshotRepos, type SnapshotWriter } from "../src/snapshot/repos.ts";
+import { MAX_RETAIN_MS, PREPARE_WINDOW_MS, SnapshotRepos, type SnapshotWriter } from "../src/snapshot/repos.ts";
 import type { ArtifactsNamespace, MintedToken, RepoHandle, TokenInfo } from "../src/artifacts.ts";
+import type { Sql } from "../src/sql.ts";
 import { Clock, nodeSql } from "./support.ts";
 
 class ArtifactsError extends Error {
@@ -140,7 +141,7 @@ function setup(retainMs = 0) {
 test("one repository per snapshot commit: the same commit is reused with a token per job; another commit gets its own repository", async () => {
   const { ns, snaps, writes, writer, deadline } = setup();
   const a = await snaps.prepare(C1, writer(C1));
-  assert.equal(a.name, `canon--snap-${C1}`);
+  assert.match(a.name, new RegExp(`^canon--snap-${C1}-\\d+$`));
   const again = await snaps.prepare(C1, writer(C1));
   assert.deepEqual(again, a);
   assert.deepEqual(writes, [{ name: a.name, commit: C1 }], "written once, into its own repository");
@@ -194,6 +195,7 @@ test("retirement: each job's token is revoked when it ends, and the repository w
   assert.deepEqual(
     snaps.duties().map((d) => [d.kind, d.state]),
     [
+      ["create", "done"],
       ["delete", "done"],
       ["revoke", "done"],
       ["revoke", "done"],
@@ -201,8 +203,9 @@ test("retirement: each job's token is revoked when it ends, and the repository w
   );
   await assert.rejects(snaps.mint(C1, "job_c", deadline()), /not ready/);
   // The same snapshot later: a new, empty repository.
-  await snaps.prepare(C1, writer(C1));
-  assert.deepEqual(ns.created, [r.name, r.name]);
+  const again = await snaps.prepare(C1, writer(C1));
+  assert.notEqual(again.name, r.name);
+  assert.deepEqual(ns.created, [r.name, again.name]);
   void a;
 });
 
@@ -217,39 +220,44 @@ test("retirement during an Artifacts outage stays owed, blocks reuse, and is ret
   assert.deepEqual(ns.repos.get(r.name)!.active().map((x) => x.id), [t.id]);
   assert.deepEqual(snaps.duties().filter((d) => d.state === "owed").map((d) => d.kind).sort(), ["delete", "revoke"]);
   assert.ok(snaps.nextDue()! > clock.t, "retried later, with backoff");
-  // Nothing is issued against a repository whose retirement is owed.
+  // Nothing is issued against a repository whose retirement is owed. A new preparation gets a new
+  // repository, which cannot be made ready while its creation token cannot be revoked.
   await assert.rejects(snaps.mint(C1, "job_b", deadline()), /not ready/);
-  await assert.rejects(snaps.prepare(C1, writer(C1)), RetirementOwed);
+  await assert.rejects(snaps.prepare(C1, writer(C1)), /INTERNAL_ERROR/);
+  assert.equal(ns.created.length, 2);
   clock.advance(60_000);
-  assert.equal(await snaps.reconcile(), 2);
-  assert.ok(snaps.duties().every((d) => d.state === "owed" && d.attempts >= 2));
+  await snaps.reconcile();
+  assert.ok(snaps.duties().filter((d) => d.state === "owed" && d.name === r.name).every((d) => d.attempts >= 2));
+  assert.equal(ns.repos.has(r.name), true);
   // Artifacts recovers.
   ns.down.delete = false;
   ns.down.revoke = false;
-  clock.advance(MAX_RETAIN_MS);
+  clock.advance(PREPARE_WINDOW_MS);
   assert.equal(await snaps.reconcile(), 0);
-  assert.equal(ns.repos.has(r.name), false);
+  assert.deepEqual([...ns.repos.keys()], []);
   assert.equal(snaps.nextDue(), null);
 });
 
-test("the retirement duty is recorded before the repository exists: an interrupted preparation is deleted, never finished", async () => {
+test("an interrupted preparation is deleted, never finished; a repository no job uses is deleted after the preparation window", async () => {
   const { clock, ns, snaps, writes, writer } = setup();
   const crash: SnapshotWriter = async () => {
     throw new Error("the publisher stopped");
   };
   await assert.rejects(snaps.prepare(C1, crash), /publisher stopped/);
-  const name = `canon--snap-${C1}`;
-  assert.equal(ns.repos.has(name), true, "the repository was created");
-  assert.deepEqual(snaps.duties().map((d) => [d.kind, d.state]), [["delete", "owed"]]);
+  const [name] = ns.created;
+  assert.equal(ns.repos.has(name!), true, "the repository was created");
+  assert.deepEqual(snaps.duties().map((d) => [d.kind, d.state]), [["create", "done"], ["delete", "owed"]]);
   await assert.rejects(snaps.mint(C1, "job_1", clock.t + 600_000), /not ready/);
-  // The next preparation deletes it and starts again from a new, empty repository.
-  await snaps.prepare(C1, writer(C1));
-  assert.deepEqual(ns.deleted, [name]);
-  assert.deepEqual(ns.created, [name, name]);
+  // The next preparation starts again in a new, empty repository; the interrupted one's deletion is due now.
+  const next = await snaps.prepare(C1, writer(C1));
+  assert.notEqual(next.name, name);
   assert.equal(writes.length, 1);
-  // A repository no job ever uses is deleted 24 hours after it was made.
+  await snaps.reconcile();
+  assert.deepEqual(ns.deleted, [name]);
+  assert.equal(ns.repos.has(next.name), true);
+  // A repository no job ever uses is deleted when the preparation window ends.
   const unused = await snaps.prepare(C3, writer(C3));
-  clock.advance(MAX_RETAIN_MS - 1);
+  clock.advance(PREPARE_WINDOW_MS - 1);
   await snaps.reconcile();
   assert.equal(ns.repos.has(unused.name), true);
   clock.advance(1);
@@ -260,7 +268,7 @@ test("the retirement duty is recorded before the repository exists: an interrupt
 test("a publisher that writes any other commit: nothing is issued, and the repository is deleted", async () => {
   const { ns, snaps, writer, deadline } = setup();
   await assert.rejects(snaps.prepare(C1, writer(C1, C2)), /not the recorded/);
-  assert.equal(ns.repos.has(`canon--snap-${C1}`), false);
+  assert.equal(ns.repos.size, 0);
   await assert.rejects(snaps.mint(C1, "job_1", deadline()), /not ready/);
 });
 
@@ -290,4 +298,194 @@ test("a job that never reports its end still bounds the repository: it is delete
   clock.advance(deadline - clock.t);
   await snaps.reconcile();
   assert.equal(ns.repos.has(r.name), false);
+});
+
+// ------------------------------------------------------------------ review 96d1fbc9
+
+/** One durable SQL store and Artifacts, and a host that can stop and start again over them. */
+function durable() {
+  const clock = new Clock();
+  const ns = new Fake(clock);
+  const sql: Sql = nodeSql();
+  const wakes: number[] = [];
+  const host = () => new SnapshotRepos({ sql, artifacts: ns, prefix: "canon", now: clock.now, sleep: async () => {}, wake: async (at) => void wakes.push(at) });
+  return { clock, ns, sql, wakes, host };
+}
+
+const never = () => new Promise<never>(() => {});
+const transport = () => new Error("lost transport reply; the request may still apply");
+
+/** Run alarms as the Room would until nothing is due for a while. */
+async function drain(clock: Clock, snaps: SnapshotRepos, rounds = 12) {
+  for (let i = 0; i < rounds; i++) {
+    const due = snaps.nextDue();
+    if (due === null) return;
+    clock.t = Math.max(clock.t, due);
+    await snaps.reconcile();
+  }
+}
+
+test("a create whose answer is lost and which applies after 24 hours and a restart is still found and deleted (P2: the checker's diagnostic)", async () => {
+  const { clock, ns, sql, host } = durable();
+  let snaps = host();
+  const original = ns.create.bind(ns);
+  let applyLater: (() => Promise<unknown>) | undefined;
+  ns.create = async (name) => {
+    applyLater = () => original(name);
+    throw transport();
+  };
+  await assert.rejects(snaps.prepare(C1, async () => C1), /lost transport/);
+  assert.equal(snaps.pending(), 1);
+  assert.equal(ns.repos.size, 0);
+  clock.advance(MAX_RETAIN_MS + 1);
+  snaps = host();
+  // Absent, after more than 24 hours: still unresolved, still scheduled.
+  assert.equal(await snaps.reconcile(), 1);
+  assert.notEqual(snaps.nextDue(), null);
+  assert.deepEqual(snaps.duties().map((d) => [d.kind, d.state]), [["create", "in-flight"]]);
+  // The old creation applies now, with its write token.
+  await applyLater!();
+  const [name] = ns.created;
+  assert.equal(ns.repos.get(name!)!.active().filter((t) => t.scope === "write").length, 1);
+  await drain(clock, snaps);
+  assert.equal(ns.repos.has(name!), false, "the late repository was deleted");
+  assert.ok(ns.gone.length >= 0 && [...ns.repos.values()].every((r) => r.active().length === 0));
+  assert.equal(snaps.pending(), 0);
+  assert.equal(snaps.nextDue(), null);
+  assert.equal(sql.all("SELECT * FROM artroom_snap").length, 0);
+});
+
+test("every create attempt is its own step and name: a retry succeeds, and the lost first attempt applying later never touches it", async () => {
+  const { clock, ns, host } = durable();
+  const snaps = host();
+  const original = ns.create.bind(ns);
+  let applyLater: (() => Promise<unknown>) | undefined;
+  ns.create = async (name) => {
+    applyLater = () => original(name);
+    ns.create = original;
+    throw transport();
+  };
+  await assert.rejects(snaps.prepare(C1, async () => C1), /lost transport/);
+  const r = await snaps.prepare(C1, async () => C1);
+  const t = await snaps.mint(C1, "job_1", clock.t + 15 * 60_000);
+  await applyLater!();
+  const late = ns.created.find((n) => n !== r.name)!;
+  assert.notEqual(late, r.name);
+  await snaps.sweep();
+  assert.equal(ns.repos.has(late), false, "the late attempt's repository is deleted");
+  assert.equal(ns.repos.has(r.name), true, "the retry's repository is untouched");
+  assert.deepEqual(ns.repos.get(r.name)!.active().map((x) => x.id), [t.id]);
+  assert.ok((await snaps.mint(C1, "job_2", clock.t + 15 * 60_000)).id);
+});
+
+test("an unresolved create stays open while absent or in progress, on a capped backoff; only a definite refusal settles it without a repository", async () => {
+  const { clock, ns, host } = durable();
+  const snaps = host();
+  ns.create = async () => {
+    throw transport();
+  };
+  await assert.rejects(snaps.prepare(C1, async () => C1));
+  const gaps: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    const due = snaps.nextDue()!;
+    gaps.push(due - clock.t);
+    clock.t = due;
+    ns.down.get = i % 2 === 1; // absent, or no answer
+    assert.equal(await snaps.reconcile(), 1);
+  }
+  // The workspace backoff: 1, 1, 2, 4, 8, then every 16 minutes.
+  assert.deepEqual(gaps, [60_000, 60_000, 120_000, 240_000, 480_000, 960_000, 960_000, 960_000]);
+  // A definite refusal of a create (nothing changed) closes its own step.
+  const refused = Object.assign(new Error("INVALID_REPO_NAME (10006)"), { code: "INVALID_REPO_NAME", numericCode: 10006 });
+  ns.create = async () => {
+    throw refused;
+  };
+  await assert.rejects(snaps.prepare(C2, async () => C2));
+  assert.deepEqual(
+    snaps.duties().filter((d) => d.kind === "create").map((d) => [d.state, d.doneReason]),
+    [
+      ["in-flight", null],
+      ["done", "refused"],
+    ],
+  );
+});
+
+test("a wake-up is persisted before every remote effect, and a host stopped at any await leaves its debt to be cleaned after a restart", async () => {
+  type Point = "create" | "write" | "inventory" | "mint";
+  for (const point of ["create", "write", "inventory", "mint"] as Point[]) {
+    const { clock, ns, host, wakes } = durable();
+    const first = host();
+    const seen: { pending: number; wake: number | undefined; due: number | null }[] = [];
+    const stop = async (): Promise<never> => {
+      seen.push({ pending: first.pending(), wake: wakes.at(-1), due: first.nextDue() });
+      return never();
+    };
+    // Each stop happens once: the call's effect applies, and its answer never reaches the stopped host.
+    const original = ns.create.bind(ns);
+    if (point === "create") {
+      ns.create = async (name) => {
+        ns.create = original;
+        await original(name);
+        return stop();
+      };
+    }
+    if (point === "inventory") {
+      ns.create = async (name) => {
+        ns.create = original;
+        const made = await original(name);
+        const repo = ns.repos.get(name)!;
+        const list = repo.listTokens.bind(repo);
+        repo.listTokens = async () => {
+          repo.listTokens = list;
+          return stop();
+        };
+        return made;
+      };
+    }
+    const writer: SnapshotWriter = point === "write" ? stop : async () => C1;
+    if (point === "mint") {
+      await first.prepare(C1, writer);
+      const repo = ns.repos.get(ns.created[0]!)!;
+      const mint = repo.createToken.bind(repo);
+      repo.createToken = async (scope, ttl) => {
+        repo.createToken = mint;
+        await mint(scope, ttl);
+        return stop();
+      };
+      void first.mint(C1, "job_1", clock.t + 15 * 60_000);
+    } else void first.prepare(C1, writer);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(seen.length, 1, `${point}: the host stopped there`);
+    const at = seen[0]!;
+    assert.ok(at.pending >= 1, `${point}: the debt was durable before the effect`);
+    assert.ok(at.wake !== undefined && at.due !== null && at.wake <= at.due, `${point}: its wake-up was persisted before the effect`);
+    // The host is gone. The alarm fires on a new one, as often as it is set.
+    const second = host();
+    await drain(clock, second, 20);
+    assert.equal(ns.created.every((n) => !ns.repos.has(n)), true, `${point}: every repository it made is deleted`);
+    assert.equal(second.pending(), 0, `${point}: nothing is left owed`);
+  }
+});
+
+test("a late callback from a stopped host cannot finish or settle a later attempt (fenced by name)", async () => {
+  const { clock, ns, host } = durable();
+  const old = host();
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  const slow = old.prepare(C1, async () => (await gate, C1));
+  await new Promise((r) => setTimeout(r, 0));
+  // A new host takes over after the preparation window and prepares the same snapshot again.
+  clock.advance(PREPARE_WINDOW_MS + 1);
+  const fresh = host();
+  const r = await fresh.prepare(C1, async () => C1);
+  await fresh.reconcile();
+  // The old host's writer returns at last.
+  release();
+  await assert.rejects(slow, /superseded|NOT_FOUND/);
+  assert.equal(ns.repos.has(r.name), true);
+  const t = await fresh.mint(C1, "job_1", clock.t + 15 * 60_000);
+  assert.equal(t.name, r.name);
+  await fresh.reconcile();
+  assert.deepEqual(ns.created.filter((n) => ns.repos.has(n)), [r.name], "only the current attempt's repository is left, while its job runs");
 });

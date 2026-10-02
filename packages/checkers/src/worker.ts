@@ -169,9 +169,20 @@ export class HarnessLedger extends DurableObject<Env> {
   }
 
   // The room's snapshot repositories (R-CARRY-16): one per snapshot commit, one token per job, retired durably.
+  // Their cleanup ledger wakes this object's alarm before every remote effect, and a restarted object arms
+  // it from the debt it finds, so a host that stops at any await leaves its cleanup scheduled.
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    void ctx.blockConcurrencyWhile(() => this.arm());
+  }
   private snaps_: SnapshotRepos | null = null;
   private snaps(): SnapshotRepos {
-    return (this.snaps_ ??= new SnapshotRepos({ sql: durableSql(this.ctx.storage), artifacts: this.env.ARTIFACTS as unknown as ArtifactsNamespace, prefix: SNAPSHOT_PREFIX }));
+    return (this.snaps_ ??= new SnapshotRepos({
+      sql: durableSql(this.ctx.storage),
+      artifacts: this.env.ARTIFACTS as unknown as ArtifactsNamespace,
+      prefix: SNAPSHOT_PREFIX,
+      wake: (at) => this.ctx.storage.setAlarm(Math.max(at, Date.now() + 1000)),
+    }));
   }
   private async arm(): Promise<void> {
     const due = this.snaps().nextDue();
@@ -179,54 +190,41 @@ export class HarnessLedger extends DurableObject<Env> {
   }
   /** Prepare the snapshot repository for `commit`: the publisher writes the snapshot into a new, empty repository. */
   async prepareSnapshot(req: { readonly commit: Sha; readonly canonical: string; readonly files: SnapshotEntry[]; readonly message: string }): Promise<{ name: string; remote: string }> {
-    try {
-      const repo = await this.snaps().prepare(req.commit, async (store) => {
-        const canon = await withRetry(() => this.env.ARTIFACTS.get(req.canonical));
-        const remote = (await canon.info()).remote;
-        const read = await withRetry(() => canon.createToken("read", 300));
-        try {
-          return await this.env.PUBLISHER.getByName(`snap-${req.canonical}`).writeSnapshot({
-            canonical: { remote, token: read.plaintext },
-            store: { remote: store.remote, token: store.token },
-            files: req.files,
-            message: req.message,
-          });
-        } finally {
-          await canon.revokeToken(read.id).catch(() => false);
-        }
-      });
-      return { name: repo.name, remote: repo.remote };
-    } finally {
-      await this.arm();
-    }
+    const repo = await this.snaps().prepare(req.commit, async (store) => {
+      const canon = await withRetry(() => this.env.ARTIFACTS.get(req.canonical));
+      const remote = (await canon.info()).remote;
+      const read = await withRetry(() => canon.createToken("read", 300));
+      try {
+        return await this.env.PUBLISHER.getByName(`snap-${req.canonical}`).writeSnapshot({
+          canonical: { remote, token: read.plaintext },
+          store: { remote: store.remote, token: store.token },
+          files: req.files,
+          message: req.message,
+        });
+      } finally {
+        await canon.revokeToken(read.id).catch(() => false);
+      }
+    });
+    return { name: repo.name, remote: repo.remote };
   }
   /** A job's read token for its snapshot's repository only, expiring by its deadline. */
   async mintSnapshotToken(commit: Sha, job: string, deadline: number): Promise<{ id: string; token: string; expiresAt: number }> {
-    try {
-      const t = await this.snaps().mint(commit, job, deadline);
-      return { id: t.id, token: t.token, expiresAt: t.expiresAt };
-    } finally {
-      await this.arm();
-    }
+    const t = await this.snaps().mint(commit, job, deadline);
+    return { id: t.id, token: t.token, expiresAt: t.expiresAt };
   }
   /** The job has ended: revoke its token, and retire the repository if no job is left. Returns the duties still owed. */
   async endSnapshotJob(commit: Sha, job: string): Promise<number> {
-    try {
-      return await this.snaps().end(commit, job);
-    } finally {
-      await this.arm();
-    }
+    return this.snaps().end(commit, job);
   }
   async snapshotDuties() {
     return { pending: this.snaps().pending(), nextDue: this.snaps().nextDue(), duties: this.snaps().duties() };
   }
   override async alarm(): Promise<void> {
     await this.snaps().reconcile();
-    await this.arm();
   }
 }
 
-/** Every harness snapshot repository is named `artroom-lg--snap-<commit>`. */
+/** Every harness snapshot repository is named `artroom-lg--snap-<commit>-<attempt>`. */
 const SNAPSHOT_PREFIX = "artroom-lg";
 
 // ------------------------------------------------------------------ harness

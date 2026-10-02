@@ -27,7 +27,7 @@ export type {
 } from "./landing/types.ts";
 export { Workspaces, forkName, MIN_TOKEN_TTL_S } from "./workspace/workspaces.ts";
 export type { WorkspacesOptions } from "./workspace/workspaces.ts";
-export { MAX_RETAIN_MS, RetirementOwed, SnapshotRepos } from "./snapshot/repos.ts";
+export { MAX_RETAIN_MS, PREPARE_WINDOW_MS, SnapshotRepos } from "./snapshot/repos.ts";
 export type { SnapshotRepo, SnapshotReposOptions, SnapshotToken, SnapshotWriter } from "./snapshot/repos.ts";
 export {
   DEFAULT_BOUNDS,
