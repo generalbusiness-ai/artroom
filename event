@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f8879f2a25561df538428ae3a257902a684c4898","text":"Merge retired a covered predecessor; the successor is at packages/room/src/worker.ts."}
+{"kind":"artifact","text":"docs/protocol.md at exact f75ca1f8071cba659cd5ac041071fd3c36b5ca8a on request/sec-join, under promise git:sha1…c968591 on request git:sha1…0b7239f","body":{"commit":"f75ca1f8071cba659cd5ac041071fd3c36b5ca8a","path":"docs/protocol.md"}}
