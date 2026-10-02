@@ -257,4 +257,44 @@ outcome:
 | `smokeOk` | false for a failed cleanup, no cleanup, a failed main, a failed step, or no steps |
 | `outcomeOf`, `completeListing` | strict classification |
 
+**Mutations.** Each was made on the committed fix, the test file run, and
+the change reverted. 20 of 21 were caught, two only after a test was added
+(a full-page inventory on its own; names the substring search returns that
+are not the run's).
+
+| Mutation | Caught |
+|---|---|
+| A refusal counts as done | yes (4 tests) |
+| An answer without `success` counts as done | yes |
+| A refused listing reads as empty (the old `result ?? []`) | yes (3) |
+| A listing that fills its page is accepted | yes |
+| A larger `total_count` is accepted | yes |
+| `ok` ignores unresolved duties | yes (3) |
+| `ok` ignores repositories left | yes |
+| No final inventory | yes (6) |
+| A failed inventory cleans nothing | yes (2) |
+| Every repository the search returns is cleaned | yes |
+| A listing refusal is classed unknown | yes (2) |
+| A token value is kept in the metadata | yes |
+| Minted tokens are not retried | yes (2) |
+| A revoked minted token stays in the map | yes |
+| An unknown token listing skips the deletion | yes (2) |
+| `smokeOk` ignores cleanup | yes (2) |
+| `smokeOk` ignores a failed main | yes |
+| `smokeOk` accepts a run with no steps | yes |
+| `smokeOk` ignores a failed step | yes |
+| An exception counts as done | yes |
+| `ok` treats an unknown remainder (`null`) as empty | no: equivalent. `reposLeft` is null only when the final inventory duty is unresolved, which already fails `ok` |
+
 No redeploy or live run was needed for this change; the Worker is unchanged.
+
+**Gates** at `7486c142`, after merging main `472b2380`. The commit
+that adds this text changes only this file.
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | checkers 33; git 162; log 127 Node and 122 workerd; policy 199 Node and 198 workerd (1 skipped); room 81 Node and 275 workerd; ui 141 |
+
+The room workerd suite still prints the 22 "code had hung" messages, with
+every test passing.
