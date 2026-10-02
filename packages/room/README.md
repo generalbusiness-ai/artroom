@@ -1998,8 +1998,13 @@ failure, and a new repository that still owes cleanup; the founding tests
 own those setups. The code that logs them is the same as for the tested
 labels.
 
-**Gates**, at the head of `request/preadm-diag` that adds this section:
-see the report for this request.
+**Gates**, at the head of `request/preadm-diag` that adds this section
+(the code is that of `60f825db`; later commits change only this README):
+the Room's `npm run typecheck`, `test:node` (157 tests in 14 files) and
+`test:workerd` (440 tests in 34 files), and the root `npm ci`,
+`npm run typecheck` and `npm test`, exit 0. The workerd output's
+`uncaught exception` lines come from rejected RPC calls that tests expect;
+`founding.test.ts` alone, unchanged here, prints 41 of them.
 
 ## Secrets
 
