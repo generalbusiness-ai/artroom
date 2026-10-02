@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fd49f6e4782952e9dcd31ac1d37a04cd47849ebf","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/results/spike-smoke-2026-10-02T11-49-37-449Z.json."}
+{"kind":"artifact","text":"packages/git/src/landing/core.ts at exact 8a2b82da31414dde799ec7447a688c7390584585 on request/cc-terminal, under promise git:sha1…15624e6 on request git:sha1…c7c8217","body":{"commit":"8a2b82da31414dde799ec7447a688c7390584585","path":"packages/git/src/landing/core.ts"}}
