@@ -657,3 +657,32 @@ token, bearer or session token.
 
 The room workerd suite printed the "code had hung" message 28 times, with
 every test passing.
+
+## Rows written: the gate (request 8bd623cc, 2026-10-02)
+
+Part 2 of request 8bd623cc is built, but has not been run against
+Cloudflare. No analytics token exists yet, and the spike was being
+redeployed at the time.
+
+- **The gate,
+  [packages/room/measure/rows.mjs](../packages/room/measure/rows.mjs).**
+  It gets the physical rows written and read from Cloudflare's billing
+  datasets (`durableObjectsPeriodicGroups` and
+  `durableObjectsInvocationsAdaptiveGroups`). It attributes them to each
+  Worker namespace and each object over a window. It fails closed when the
+  token is missing, a namespace is missing, there is no invocation
+  evidence, or the result is truncated. It checks a total budget and a
+  budget for each object.
+- **The budgets are provisional.** They are woo's 250,000 rows in total and
+  50,000 per object.
+- **The smoke run.** `spike-smoke.mjs` gates itself when
+  `ARTROOM_CF_ANALYTICS_TOKEN` is set. `ARTROOM_ROW_GATE=1` makes the gate
+  required.
+- **The hourly check.** `.github/workflows/row-writes.yml` runs it. It does
+  nothing until the repository variable `ARTROOM_ROW_MONITOR` is `true`.
+- **The part 1 driver.** `SPIKE_PHASE=rows` runs each act once, each in its
+  own billing window, and writes the table.
+
+The method, the token's permissions, and what remains (the part 1 run, the
+table, grounded ceilings, and the part 3 budgets) are in
+[packages/room/measure/README.md](../packages/room/measure/README.md).
