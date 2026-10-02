@@ -24,7 +24,7 @@ export function obligationOf(proposal: unknown, kind: "check" | "review"): ({ re
 export function checksIn(
   entries: unknown,
   checker: string,
-): { readonly accepted: readonly { seq: number; ok: unknown; integration: unknown; check: unknown }[]; readonly refused: readonly { seq: number; rule: unknown }[] };
+): { readonly accepted: readonly { seq: number; ok: unknown; integration: unknown; check: unknown; runner?: unknown; detail?: string }[]; readonly refused: readonly { seq: number; rule: unknown }[] };
 
 export interface GitResult {
   readonly code: number;

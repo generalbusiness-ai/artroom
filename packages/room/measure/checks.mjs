@@ -96,13 +96,17 @@ export function obligationOf(proposal, kind) {
 
 /**
  * The accepted check acts in log entries, signed by `checker`: each with its
- * seq, ok and integration. A refused check is listed apart, with its rule.
+ * seq, ok, integration, runner digest and the start of its detail. A refused check is listed apart, with its rule.
  */
 export function checksIn(entries, checker) {
   const list = Array.isArray(entries) ? entries : [];
   const mine = (e) => e?.entry?.act?.envelope?.kind === "check" && e.entry.act.envelope.actor === checker;
   return {
-    accepted: list.filter((e) => e?.entry?.type === "act" && mine(e)).map((e) => ({ seq: e.seq, ok: e.entry.act.envelope.body?.ok, integration: e.entry.act.envelope.body?.integration, check: e.entry.act.envelope.body?.check })),
+    accepted: list.filter((e) => e?.entry?.type === "act" && mine(e)).map((e) => {
+        const b = e.entry.act.envelope.body ?? {};
+        // What ran, as the checker recorded it: the runner environment's digest and the start of its detail.
+        return { seq: e.seq, ok: b.ok, integration: b.integration, check: b.check, runner: b.runner, detail: typeof b.detail === "string" ? b.detail.slice(0, 400) : undefined };
+      }),
     refused: list.filter((e) => e?.entry?.type === "refusal" && mine(e)).map((e) => ({ seq: e.seq, rule: e.entry.receipt?.rule ?? e.entry.receipt?.refusal?.rule })),
   };
 }

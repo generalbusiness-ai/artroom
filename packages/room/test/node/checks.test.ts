@@ -143,13 +143,13 @@ describe("reading the flow's state", () => {
     const other = newKeyPair().key;
     const act = (seq: number, type: string, actor: string, kind: string, body: unknown, receipt: unknown = {}) => ({ seq, entry: { type, act: { envelope: { kind, actor, body } }, receipt } });
     const entries = [
-      act(5, "act", checker, "check", { ok: true, check: CHECK, integration: "a".repeat(40) }),
+      act(5, "act", checker, "check", { ok: true, check: CHECK, integration: "a".repeat(40), runner: "sha256:r", detail: "x".repeat(500) }),
       act(6, "act", other, "check", { ok: false, check: CHECK }),
       act(7, "refusal", checker, "check", {}, { rule: "check-binding" }),
       act(8, "act", checker, "note", { text: "x" }),
       { seq: 9, entry: { type: "system", event: { type: "land-outcome" } } },
     ];
-    expect(checksIn(entries, checker)).toEqual({ accepted: [{ seq: 5, ok: true, check: CHECK, integration: "a".repeat(40) }], refused: [{ seq: 7, rule: "check-binding" }] });
+    expect(checksIn(entries, checker)).toEqual({ accepted: [{ seq: 5, ok: true, check: CHECK, integration: "a".repeat(40), runner: "sha256:r", detail: "x".repeat(400) }], refused: [{ seq: 7, rule: "check-binding" }] });
     expect(checksIn(null, checker)).toEqual({ accepted: [], refused: [] });
   });
 });
