@@ -893,6 +893,100 @@ Gates at `2dac0041`, the merge:
 | `npm run test:workerd` (this package) | 0 | 275 |
 | `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles |
 
+## Founding gaps (request b6b51de7)
+
+The first live deploy (`notes/deploy-spike.md`) found three gaps in
+founding. This change closes them.
+
+**1. A new public room lands its first lane.** Founding now gives a new
+repository one commit on `main`, with no files. The contract's landing
+needs a main: `expectedMain` is a `Sha` in the landing operation and in
+`land-reserved`, and the push is a compare-and-swap from it (R-LAND-2,
+R-PUB-4). Landing onto a missing main would have changed the contract,
+lane B's engine and its sandbox git sequences, so the founding side was
+the smaller change. R-GEN-12 said only "fresh, empty"; one sentence now says
+that `main` gets a first commit with no files (the only amendment).
+
+- The commit is fixed by the genesis's `createdAt`: the empty tree, author
+  and committer `Artroom <room@artroom.invalid>`, a fixed message. A retried
+  founding pushes the same commit.
+- Artifacts has no call that writes a commit, so the Room pushes the two
+  objects itself, with one `git-receive-pack` request that creates
+  `refs/heads/main` only if it does not exist (lane B's
+  [first-commit.ts](../git/src/first-commit.ts), tested against real git's
+  `receive-pack`). Any answer but a clear `ok` is a refusal; `found` then
+  reads main, and fails with `unavailable` if it is still missing.
+- A `land` on a repository with no main (an empty import, or a room
+  founded before this change) fails with `not-found`, `retryable: false`,
+  and a message that does not say retry. Nothing is recorded.
+
+**2. The creation token is revoked durably.** Creating the repository is a
+step in lane B's workspace ledger (`Workspaces.createCanonical`), written
+before the call, like a fork's creation. The answer's 24-hour write token is
+owed from that answer on, as an inventory of the repository. The first
+commit's token (60 seconds, `withCanonicalToken`) is a mint step, owed by ID,
+and revoked after the push. `settleCanonical` revokes the tokens owed by ID
+and then every active token on the repository. That is safe only before
+founding, when no token of the Room's own is live there, so:
+
+- the genesis is sealed only when `settleCanonical` returns 0; until then
+  `found` is `unavailable`, and the same `found` retries;
+- the Room's alarm runs `settleFounding` before the room is founded, so the
+  debt is retried until Artifacts confirms it, even if the founder never
+  returns;
+- a create whose answer was lost stays in flight until the repository is
+  seen and swept; the step was on record before the call, so its token is
+  found;
+- the new-repository steps run one at a time (`serial`) and never after the
+  room is founded.
+
+**3. One deployment founds public rooms and imports.** The contract asks
+for both (R-GEN-12): an import's repository must be outside the public
+founding namespace, so it needs a second Artifacts binding. `IMPORT_ARTIFACTS`
+reaches `IMPORT_NAMESPACE`, the only namespace a grant may name. The Room
+resolves its binding from its repository's namespace (`Remotes.bindings`);
+lane B's workspaces, landing tokens and sandbox, and lane L's log remote,
+follow it. The sandbox's gateway allows both namespaces (`repoPathOf`).
+A source whose namespace has no binding is refused at `draft`, and at step
+4 of `found` before anything is bound, with `forbidden` and the reason, so
+it never leaves a binding that cannot complete. A deployment with one
+binding (production's `wrangler.jsonc`, and the spike) founds public rooms
+and refuses imports, saying why.
+
+### Evidence
+
+| Gap | Tests |
+|---|---|
+| 1 | `test/workerd/founding-gaps.test.ts` (first lane lands; push fails, is refused or its answer is lost; land on no main); `packages/git/test/first-commit.test.ts` (the commit equals `git commit-tree`'s; real `receive-pack` accepts the pack and refuses an existing main; only a clear `ok` counts) |
+| 2 | `founding-gaps.test.ts` (no active token at sealing; a lost create; revocation fails, then the alarm settles it before founding); `packages/git/test/workspaces.test.ts`, five canonical-repository cases |
+| 3 | `founding-gaps.test.ts` (an import lands and publishes in its own namespace on a deployment that also founds publicly; refusals at draft and found); `test/node/config.test.ts` (production bindings and log remote); `packages/git/test/ref-fence.test.ts` (sandbox namespaces) |
+
+Each mutation below was made once, and the named suite run; every one
+failed at least one test (21 of 21 killed).
+
+| Mutation | A test that failed |
+|---|---|
+| No first commit at founding | first lane lands on it |
+| A refused first commit still founds | push fails, is refused, or its answer is lost |
+| Created without a clear `ok` | an answer that is not a clear ok is refused |
+| Wrong pack type bits | pushed to an empty repository (real git) |
+| Old value not all zeros | a repository whose main exists is never moved |
+| Land on no main says `unavailable` and retry | land on a repository with no main |
+| The create owes nothing (ledger, and in the Room) | settling revokes it; no token left at sealing |
+| The create recorded after its answer | a create whose answer is lost |
+| The inventory revokes nothing | no token left at sealing |
+| The first commit's token not revoked after use | the first commit's token is revoked after |
+| `found` seals while a token is owed | revocation fails, then the alarm |
+| No alarm work, or no alarm, before founding | revocation fails, then the alarm |
+| The alarm treats the canonical repository as a fork | a later run, by the alarm's reconcile |
+| Imports accepted with no import namespace | refuses an import at draft |
+| Public founding not checked at `found` | refuses public founding before anything is bound |
+| The Room locates, or binds, only the public namespace | an imported room lands in its own namespace |
+| The production log remote ignores the namespace | Node: production services |
+| The sandbox reaches one namespace | sandbox namespaces |
+
+The live re-run is in [notes/deploy-spike.md](../../notes/deploy-spike.md).
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
