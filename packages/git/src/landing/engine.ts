@@ -356,7 +356,7 @@ export class Landing {
       });
   }
 
-  /** Resolves when the cleanup pass in progress, if any, has ended. For tests, and for `settle`. */
+  /** Resolves when the cleanup pass in progress, if any, has ended. */
   async cleanupDone(): Promise<void> {
     await this.cleaning;
   }
@@ -459,7 +459,6 @@ export class Landing {
     for (let i = 0; i < rounds; i++) {
       const before = this.fingerprint();
       await this.reconcile();
-      await this.cleanupDone();
       if (this.fingerprint() === before) return;
     }
   }
