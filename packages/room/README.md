@@ -736,6 +736,42 @@ Mutations, each run against the workerd suite and reverted:
 | The fake's push ignores staged objects | the first two above (2) |
 | The fake's push skips the completeness check | the third (1) |
 
+## Log publication: bounded memory (request 5a7290b9)
+
+The Room no longer loads its log to publish it. Before, `publish` and
+`commitFor` were given `entriesAfter(sql, -1, n + 1)`, every entry as an
+object, and every retained file's body. With an active segment over
+64 MiB, that is several times the Durable Object's 128 MB.
+
+- **Entries** come from `logSource(sql, through)` ([src/log.ts](src/log.ts)),
+  lane L's `EntrySource`. The publisher reads them in batches as it needs
+  them. A full segment it has published is reused by ID and never read.
+- **Retained files** are `RetainedRef`s (`retainedRefs` in
+  [src/core.ts](src/core.ts)): kind and digest, and a `load` that reads
+  the body only if the parent commit does not hold it.
+- **The log remote** ([src/logremote.ts](src/logremote.ts)) encodes each
+  part as base64url in one buffer (`partB64url`). `crypto.ts`'s `b64url`
+  builds its string by concatenation; in Node an 8 MiB part held 153 MiB
+  of heap that way.
+- Nothing else changed: the pending cohort, its stored commit and the
+  fence are as before. `PublisherPort` now takes an `EntrySource` and
+  `RetainedRef`s ([src/ports.ts](src/ports.ts)).
+
+Tests: [test/workerd/log-bounded.test.ts](test/workerd/log-bounded.test.ts)
+(reads of at most `READ_LIMITS.entries`, none of a published full segment,
+retained bodies only when new, and a verified log) and
+[test/node/logremote.test.ts](test/node/logremote.test.ts). The live
+matrix and memory figures are in `notes/log-bounded.md`; the harness is in
+[measure/logbig/](measure/logbig/).
+
+**A limit found live.** Artifacts refuses a push that carries a git object
+larger than 32 MiB (`artifacts_git_receive_pack_object_too_large`;
+[measure/logbig/object-limit.mjs](measure/logbig/object-limit.mjs)). Under
+R-LOG-9 the active segment is one blob, so a segment over 32 MiB cannot be
+published to Artifacts at all. The Room stages it and then retries the same
+cohort with `unresolved` without end. The layout, or a rule that bounds a
+segment's bytes, is a contract question, not changed here.
+
 ## Review 95323c2b
 
 The checker's review of revision 6 (`d0b09ca2`) found one P2, and
@@ -932,24 +968,13 @@ that `main` gets a first commit with no files (the only amendment).
   and a message that does not say retry. Nothing is recorded.
 
 **2. The creation token is revoked durably.** Creating the repository is a
-step in lane B's workspace ledger (`Workspaces.createCanonical`), written
-before the call, like a fork's creation. The answer's 24-hour write token is
-owed from that answer on, as an inventory of the repository. The first
-commit's token (60 seconds, `withCanonicalToken`) is a mint step, owed by ID,
-and revoked after the push. `settleCanonical` revokes the tokens owed by ID
-and then every active token on the repository. That is safe only before
-founding, when no token of the Room's own is live there, so:
-
-- the genesis is sealed only when `settleCanonical` returns 0; until then
-  `found` is `unavailable`, and the same `found` retries;
-- the Room's alarm runs `settleFounding` before the room is founded, so the
-  debt is retried until Artifacts confirms it, even if the founder never
-  returns;
-- a create whose answer was lost stays in flight until the repository is
-  seen and swept; the step was on record before the call, so its token is
-  found;
-- the new-repository steps run one at a time (`serial`) and never after the
-  room is founded.
+step in lane B's workspace ledger, written before the call, like a fork's
+creation. Revised by review a35b4b61 (below): the answer's 24-hour write
+token pushes the first commit, is kept by value until its revocation is
+confirmed, and nothing is ever minted on the canonical repository before
+founding. The genesis is sealed only when nothing is owed; until then
+`found` is `unavailable`, the same `found` retries, and the Room's alarm
+settles the debt before founding, even if the founder never returns.
 
 **3. One deployment founds public rooms and imports.** The contract asks
 for both (R-GEN-12): an import's repository must be outside the public
@@ -961,8 +986,10 @@ follow it. The sandbox's gateway allows both namespaces (`repoPathOf`).
 A source whose namespace has no binding is refused at `draft`, and at step
 4 of `found` before anything is bound, with `forbidden` and the reason, so
 it never leaves a binding that cannot complete. A deployment with one
-binding (production's `wrangler.jsonc`, and the spike) founds public rooms
-and refuses imports, saying why.
+binding (production's `wrangler.jsonc`) founds public rooms and refuses
+imports, saying why. The spike has both bindings since revision 2
+(`gitseq-spike` and `gitseq-spike-import`), and its live run founds a public
+room and imports a repository on the same deployment.
 
 ### Evidence
 
@@ -996,7 +1023,85 @@ failed at least one test (21 of 21 killed).
 | The production log remote ignores the namespace | Node: production services |
 | The sandbox reaches one namespace | sandbox namespaces |
 
-The live re-run is in [notes/deploy-spike.md](../../notes/deploy-spike.md).
+The gap 2 rows above describe the first revision's ledger. Review a35b4b61
+replaced that code (no canonical mint, retirement by deletion, complete
+inventories); its own mutations are in "Review a35b4b61".
+
+The live re-runs are in [notes/deploy-spike.md](../../notes/deploy-spike.md).
+
+## Review a35b4b61
+
+The checker found three ways the founding cleanup and checks could still
+leave something unaccounted for. Each is now a test of the right outcome.
+
+**1. No canonical mint can be left with an unknown outcome.** The first
+version minted a 60-second token for the first commit, and settled a mint
+whose answer was lost once an inventory came back empty, although the mint
+could still apply. Now no token is minted on the canonical repository before
+founding at all: the create's own token pushes the first commit. The ledger
+(`Workspaces.prepareCanonical`, `sealCanonical`, `settleCanonical`) keeps
+the fork cleanup's distinction between unanswered and finished effects:
+
+- a create whose answer was lost stays in flight. Absence, time or an
+  inventory never settle it. It is superseded only when the room is sealed on
+  an answered create, because the name is then taken and a late create can
+  only be refused;
+- whenever the Room cannot vouch for every token on the repository (no
+  answered create holds it, its token is spent and main has no first commit,
+  the first commit was refused, or an active token nobody owes appears), it
+  deletes the repository, with every token on it, and makes it again. The
+  delete is a step recorded before it is sent; a fresh public repository
+  holds only the deterministic first commit, so nothing is lost;
+- the creation token is kept, by value, in its own table until a revocation
+  answers, and `sealCanonical` refuses (so the seal aborts) while anything is
+  owed.
+
+**2. An inventory proves absence only when complete.** The binding's
+`listTokens` has no paging. An inventory counts only when it has as many
+records as its `total` and every record has an ID, a scope, a state and an
+expiry. Otherwise founding waits and the inventory stays owed. After
+founding, `reconcile`, `nextDue` and `settleCanonical` never act on the
+canonical repository, so the Room's own publishing credentials are never
+swept.
+
+**3. A mode needs its binding, not only its name.** `draft`, and step 4 of
+`found` before `registry.bind`, refuse public founding without an `ARTIFACTS`
+binding and imports without an `IMPORT_ARTIFACTS` binding, with `forbidden`
+and the reason; nothing is reserved. `productionServices` installs no adapter
+for a missing binding. The workerd test config has stand-in values for both
+bindings, because the test pool cannot have Artifacts bindings.
+
+| Finding | Tests |
+|---|---|
+| 1 | `packages/git/test/workspaces.test.ts`: healthy (answered) control; no canonical mint; a lost create that applies late, across a restart and after a successful retry; the alarm deletes a late repository before founding; refused control; unconfirmed revocation; spent token; refused first commit; after founding nothing is touched. `founding-gaps.test.ts`: no `createToken` at founding; a lost create; the alarm before founding |
+| 2 | `workspaces.test.ts`: inventories incomplete, without a total, with a record without an ID, with an unknown state; an active token nobody owes |
+| 3 | `founding-gaps.test.ts`: `IMPORT_NAMESPACE` without `IMPORT_ARTIFACTS`, and no `ARTIFACTS`, refused at draft and found with the registry checked; the two-binding import control; `test/node/config.test.ts` |
+
+Mutations, made once each after committing, with the named suite run: 26
+of 28 were killed. The checker's three diagnostics are among the tests.
+
+| Mutation | A test that failed |
+|---|---|
+| The seal does not require a holder with nothing owed | an unconfirmed revocation blocks the seal |
+| A repository no answered create holds is adopted | a lost create that applies late, across a restart |
+| The inventory ignores its total | an incomplete inventory proves nothing |
+| The inventory accepts malformed records | a record that has no ID proves nothing |
+| Absence settles a create in flight | a lost create that applies after a successful retry |
+| The seal leaves creates in flight open | a lost create that applies late, across a restart |
+| An active token nobody owes counts as clean | an active token nobody owes |
+| The creation token is marked revoked without revoking it | healthy control |
+| A refused first commit is retried with the same token | a refused first commit is retired and made again |
+| The alarm retires an unheld repository after founding too | after founding nothing is touched |
+| Imports accepted without `IMPORT_ARTIFACTS` | `IMPORT_NAMESPACE` with no binding |
+| Public founding accepted without `ARTIFACTS` | no `ARTIFACTS` binding |
+| Production installs an adapter for a missing binding | Node: production services |
+| The first commit not pushed; created without a clear ok; wrong pack bits; old value not zero; land on no main says retry; no alarm work or scheduling before founding; the import and public checks; namespace routing (Room, log remote, sandbox) | as in "Founding gaps" |
+
+Two survived, and both are equivalent in the Room's flow, kept as defence in
+depth: `found`'s check that main is not null after `prepareCanonical` (which
+returns only once main holds the first commit), and `sealCanonical`'s check
+when run through the Room (which seals only after `prepareCanonical`
+settled everything). The second is killed at the ledger level.
 
 ## Secrets
 

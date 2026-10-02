@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-02T02:55:14.470Z",
+  "namespace": "gitseq-spike",
+  "repo": "artroom-lb-objlimit-muqdejom",
+  "pushes": [
+    {
+      "kind": "random",
+      "bytes": 31457280,
+      "mib": 30,
+      "accepted": true,
+      "ms": 27555,
+      "stderr": []
+    },
+    {
+      "kind": "random",
+      "bytes": 33553408,
+      "mib": 31.9990234375,
+      "accepted": true,
+      "ms": 29562,
+      "stderr": []
+    },
+    {
+      "kind": "random",
+      "bytes": 33554432,
+      "mib": 32,
+      "accepted": true,
+      "ms": 29020,
+      "stderr": []
+    },
+    {
+      "kind": "random",
+      "bytes": 33554433,
+      "mib": 32.000000953674316,
+      "accepted": false,
+      "ms": 8373,
+      "stderr": [
+        "remote: artifacts_git_receive_pack_object_too_large",
+        "fatal: the remote end hung up unexpectedly",
+        "fatal: the remote end hung up unexpectedly",
+        "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-objlimit-muqdejom.git'"
+      ]
+    },
+    {
+      "kind": "random",
+      "bytes": 34603008,
+      "mib": 33,
+      "accepted": false,
+      "ms": 8718,
+      "stderr": [
+        "remote: artifacts_git_receive_pack_object_too_large",
+        "fatal: the remote end hung up unexpectedly",
+        "fatal: the remote end hung up unexpectedly",
+        "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-objlimit-muqdejom.git'"
+      ]
+    },
+    {
+      "kind": "text",
+      "bytes": 33554433,
+      "mib": 32.000000953674316,
+      "accepted": false,
+      "ms": 436,
+      "stderr": [
+        "remote: artifacts_git_receive_pack_object_too_large",
+        "fatal: the remote end hung up unexpectedly",
+        "fatal: the remote end hung up unexpectedly",
+        "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-objlimit-muqdejom.git'"
+      ]
+    },
+    {
+      "kind": "text",
+      "bytes": 41943040,
+      "mib": 40,
+      "accepted": false,
+      "ms": 449,
+      "stderr": [
+        "remote: artifacts_git_receive_pack_object_too_large",
+        "fatal: the remote end hung up unexpectedly",
+        "fatal: the remote end hung up unexpectedly",
+        "error: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-objlimit-muqdejom.git'"
+      ]
+    }
+  ],
+  "revoked": true,
+  "repoDeleted": true
+}

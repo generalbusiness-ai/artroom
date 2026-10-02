@@ -17,9 +17,9 @@ import type { Genesis } from "@generalbusiness/artroom-contract";
 import { artifactsLogRemote } from "../../src/logremote.ts";
 import type { ArtifactsBinding } from "../../src/artifacts.ts";
 import type { RoomEnv } from "../../src/config.ts";
-import { draftRoom, foundRoom } from "../../src/founding.ts";
+import { draftRoom, roomSeed } from "../../src/founding.ts";
 import { roomIdOf } from "../../src/ids.ts";
-import { hex } from "../../src/crypto.ts";
+import { b64url, hex } from "../../src/crypto.ts";
 import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
 import { obligationsFor } from "../../src/obligations.ts";
@@ -440,13 +440,17 @@ describe("the adapters' boundaries", () => {
     const input = { name: `nb-${hex(randomBytes(6))}`, repo: { kind: "import", grant: grant(repo, admin.key) }, admin: { handle: "@founder", key: admin.key }, recovery: newKeyPair().key };
     // The deployment imports only from its import namespace: refused at draft (request b6b51de7).
     await expect(draftRoom(env as unknown as RoomEnv, input, clock.now)).rejects.toMatchObject({ code: "forbidden", message: expect.stringContaining("acme-import") });
-    // A Worker configured for `elsewhere`, over a Room with no binding for it: the Room's own guard.
-    const misconfigured = { ...env, IMPORT_NAMESPACE: "elsewhere" } as unknown as RoomEnv;
-    const d = await draftRoom(misconfigured, input, clock.now);
-    const world = worldFor(roomIdOf(d.genesis as Genesis));
+    // The Room's own guard, for a repository the registry binds in a namespace the Room has no binding for
+    // (a Worker whose binding reaches another namespace than its configuration says, which it cannot see).
+    const d = await draftRoom({ ...env, IMPORT_NAMESPACE: "elsewhere" } as unknown as RoomEnv, input, clock.now);
+    const id = roomIdOf(d.genesis as Genesis);
+    const world = worldFor(id);
     placeRepo(world, `test-import/${repo.split("/")[1]}`);
     world.artifacts.main = world.artifacts.commit(null, { "README.md": "# here\n" });
-    await expect(foundRoom(misconfigured, d.genesis, sign(admin.seed, "artroom-genesis-v1", d.genesis), d.draft)).rejects.toMatchObject({ code: "unavailable" });
+    await call((env.REGISTRY.get(env.REGISTRY.idFromName("registry")) as unknown as DurableObjectStub<import("../../src/index.ts").Registry>).bind(repo, id, d.genesis.name));
+    const stub = env.ROOMS.get(env.ROOMS.idFromName(id)) as unknown as DurableObjectStub<Room>;
+    const seed = b64url(roomSeed(env as never, d.draft));
+    expect((await failure(stub.found(d.genesis, sign(admin.seed, "artroom-genesis-v1", d.genesis), seed))).code).toBe("unavailable");
     expect(world.artifacts.remoteCalls.get("log") ?? 0).toBe(0);
   });
 

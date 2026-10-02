@@ -29,13 +29,18 @@ describe("wrangler.jsonc (deploy)", () => {
     expect(deploy.migrations.flatMap((m) => m.new_sqlite_classes ?? [])).toEqual(["Room", "Registry", "Publisher"]);
   });
 
-  it("the spike config (wrangler.spike.jsonc) is the same Worker under its own name, namespace and URL", () => {
+  it("the spike config (wrangler.spike.jsonc) is the same Worker under its own name, namespaces and URL", () => {
     const spike = read("../../wrangler.spike.jsonc") as Config & { name: string; containers: readonly unknown[] };
     const prod = deploy as Config & { name: string; containers: readonly unknown[] };
     expect(spike.name).toBe("artroom-spike-room");
     expect(spike.vars["ARTIFACTS_NAMESPACE"]).toBe("gitseq-spike");
     expect(spike.vars["PUBLIC_NAMESPACE"]).toBe("gitseq-spike");
-    expect(spike.artifacts).toEqual([expect.objectContaining({ binding: "ARTIFACTS", namespace: "gitseq-spike" })]);
+    // Public founding in gitseq-spike, imports in gitseq-spike-import (request b6b51de7).
+    expect(spike.artifacts).toEqual([
+      expect.objectContaining({ binding: "ARTIFACTS", namespace: "gitseq-spike" }),
+      expect.objectContaining({ binding: "IMPORT_ARTIFACTS", namespace: "gitseq-spike-import" }),
+    ]);
+    expect(spike.vars["IMPORT_NAMESPACE"]).toBe("gitseq-spike-import");
     expect(spike.vars["PUBLIC_URL"]).toBe("https://artroom-spike-room.inguz.workers.dev");
     expect(spike.vars["OPERATOR_KEYS"]).toMatch(/^key_[A-Za-z0-9_-]{43}$/);
     expect(spike.vars["ROOM_KEY_SECRET"]).toBeUndefined();

@@ -7,17 +7,12 @@
 // ROOM_KEY_SECRET with `wrangler secret put` (on stdin, never in the repo)
 // and then deploys this file. See notes/deploy-spike.md.
 //
-// Public founding and the binding use the same namespace, as in production:
-// a room founded with `{ "kind": "new" }` gets a fresh repository in
-// gitseq-spike. A grant cannot name a repository in the public namespace
-// (R-GEN-12), so importing needs a second binding, for another namespace:
-//
-//   "artifacts": [ …, { "binding": "IMPORT_ARTIFACTS", "namespace": "<import namespace>", "remote": true } ],
-//   "vars": { …, "IMPORT_NAMESPACE": "<import namespace>" }
-//
-// (request b6b51de7). The spike is allowed one namespace, gitseq-spike, so
-// it has no import binding: it founds public rooms, and refuses an import at
-// draft with that reason.
+// Public founding and the ARTIFACTS binding use the same namespace, as in
+// production: a room founded with `{ "kind": "new" }` gets a fresh
+// repository in gitseq-spike. A grant cannot name a repository in the public
+// namespace (R-GEN-12), so imports use a second binding, IMPORT_ARTIFACTS,
+// for gitseq-spike-import (request b6b51de7, revision 2, approved by hugh):
+// one deployment both founds public rooms and imports.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "artroom-spike-room",
@@ -33,12 +28,17 @@
     "PUBLIC_URL": "https://artroom-spike-room.inguz.workers.dev",
     "PUBLIC_NAMESPACE": "gitseq-spike",
     "ARTIFACTS_NAMESPACE": "gitseq-spike",
+    // The only namespace an onboarding grant may name; IMPORT_ARTIFACTS reaches it.
+    "IMPORT_NAMESPACE": "gitseq-spike-import",
     "ARTIFACTS_HOST": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
     // The spike operator's key ID (its seed is in ~/.config/generalbusiness/artroom-spike.env).
     "OPERATOR_KEYS": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
   },
   "secrets": { "required": ["ROOM_KEY_SECRET"] },
-  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "gitseq-spike", "remote": true }],
+  "artifacts": [
+    { "binding": "ARTIFACTS", "namespace": "gitseq-spike", "remote": true },
+    { "binding": "IMPORT_ARTIFACTS", "namespace": "gitseq-spike-import", "remote": true }
+  ],
   "containers": [
     {
       "class_name": "Publisher",

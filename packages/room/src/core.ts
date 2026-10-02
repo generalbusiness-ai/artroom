@@ -51,10 +51,10 @@ import { canonicalize, parseStrict } from "./canonical.ts";
 import { b64url, digestJson, keyPairFromSeed, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
-import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
+import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions } from "./obligations.ts";
-import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedFile, RoomServices, Sql } from "./ports.ts";
+import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, Sql } from "./ports.ts";
 import { ContainerPublisher, Landing, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
@@ -364,6 +364,14 @@ export class RoomCore {
     }
     this.sql.transaction(() => {
       if (this.founded) return;
+      // A new repository is sealed only with nothing owed on it (review a35b4b61); this throws, and the seal aborts, otherwise.
+      if (!genesis.onboarding) {
+        try {
+          this.workspaces.sealCanonical();
+        } catch {
+          throw artroomError("unavailable", "The canonical repository still owes cleanup. Retry the same found.");
+        }
+      }
       const id = roomIdOf(genesis);
       setMeta(this.sql, "room", id);
       setMeta(this.sql, "genesis", canonicalize(genesis));
@@ -384,29 +392,28 @@ export class RoomCore {
   }
 
   /**
-   * Public founding, step 6 (R-GEN-12; request b6b51de7): create the room's
-   * repository and give `main` its first commit, with no files, so that the
-   * first landing has a main to land on (R-LAND-2, R-PUB-4). Each remote step
-   * is a duty in lane B's ledger, recorded before it is sent: the create's
-   * 24-hour token and the first commit's 60-second token are owed revocation
-   * from their answers on. The genesis is sealed only once no token is left
-   * on the repository; until then `found` fails, and the alarm settles what
-   * is owed. One step at a time, and never after the room is founded, when
-   * the Room's own tokens may be live there.
+   * Public founding, step 6 (R-GEN-12; request b6b51de7, review a35b4b61):
+   * create the room's repository and give `main` its first commit, with no
+   * files, so that the first landing has a main to land on (R-LAND-2,
+   * R-PUB-4). Lane B's ledger records each remote step before it is sent,
+   * pushes the first commit with the create's own token (no token is minted
+   * here), confirms that token's revocation and a complete inventory with no
+   * active token, and retires the repository whenever it cannot vouch for
+   * every token. The genesis is sealed only after that (`sealCanonical`, in
+   * the sealing transaction); until then `found` fails and the alarm settles
+   * what is owed. One step at a time, and never after the room is founded,
+   * when the Room's own tokens may be live there.
    */
   private newRepository(genesis: Genesis): Promise<void> {
     return this.serial(async () => {
       if (this.founded) return;
-      const ws = this.workspaces;
-      await ws.createCanonical();
-      if ((await this.ports.artifacts.readMain()) === null) {
-        const remote = await this.ports.artifacts.canonicalRemote();
-        const push = this.remotes.firstCommit;
-        if (!push) throw new Error("this deployment cannot push a first commit");
-        // A refused push leaves main as it is; `found` reads it next.
-        await ws.withCanonicalToken((token) => push(remote, token, Date.parse(genesis.createdAt)));
-      }
-      if ((await ws.settleCanonical()) > 0) throw new Error("a token on the new repository is not yet revoked");
+      const push = this.remotes.firstCommit;
+      if (!push) throw new Error("this deployment cannot push a first commit");
+      await this.workspaces.prepareCanonical({
+        readMain: () => this.ports.artifacts.readMain(),
+        // A refused push leaves main as it is; the ledger reads it next.
+        firstCommit: (remote, token) => push(remote, token, Date.parse(genesis.createdAt)),
+      });
     });
   }
 
@@ -422,7 +429,7 @@ export class RoomCore {
   foundingDue(): number | null {
     if (this.founded || !getMeta(this.sql, "founding_repo")) return null;
     try {
-      return this.workspaces.nextDue();
+      return this.workspaces.canonicalDue();
     } catch {
       return null;
     }
@@ -1366,10 +1373,9 @@ export class RoomCore {
     const version: unknown = (stored as { v?: unknown }).v;
     if (version !== undefined) throw Object.assign(new Error(`unknown pending publication version ${String(version)}`), { code: "unknown-version" });
     return this.sql.transaction(() => {
-      const entries = entriesAfter(this.sql, -1, stored.through + 1);
-      const last = entries[entries.length - 1];
-      if (!last || last.seq !== stored.through || last.hash !== stored.hash) throw Object.assign(new Error("the pending cohort does not match the log"), { code: "cohort-mismatch" });
-      const expected = publisher.commitFor(stored.parent, entries, stored.checkpoint, this.retainedFiles(stored.retained));
+      const last = entryAt(this.sql, stored.through);
+      if (!last || last.hash !== stored.hash) throw Object.assign(new Error("the pending cohort does not match the log"), { code: "cohort-mismatch" });
+      const expected = publisher.commitFor(stored.parent, logSource(this.sql, stored.through), stored.checkpoint, this.retainedRefs(stored.retained));
       const p: PendingPublication = { v: 2, parent: stored.parent, expected, through: stored.through, hash: stored.hash, checkpoint: stored.checkpoint, retained: stored.retained };
       setMeta(this.sql, "pending_publication", JSON.stringify(p));
       return p;
@@ -1420,13 +1426,14 @@ export class RoomCore {
             const parent = (getMeta(this.sql, "log_commit") as Sha | null) ?? null;
             const cp = checkpoint(this.roomId, this.genesis.roomKey, this.seed(), through, iso(this.now()));
             const digests = this.sql.all("SELECT digest FROM retained ORDER BY digest").map((r) => str(r, "digest") as Digest);
-            const expected = publisher.commitFor(parent, entriesAfter(this.sql, -1, n + 1), cp, this.retainedFiles(digests));
+            const expected = publisher.commitFor(parent, logSource(this.sql, n), cp, this.retainedRefs(digests));
             const p: PendingPublication = { v: 2, parent, expected, through: n, hash: through.hash, checkpoint: cp, retained: digests };
             setMeta(this.sql, "pending_publication", JSON.stringify(p));
             return p;
           });
-        const entries = entriesAfter(this.sql, -1, cohort.through + 1);
-        const retained = this.retainedFiles(cohort.retained);
+        // Read in batches as the publisher needs them, never the whole log at once (request 5a7290b9).
+        const entries = logSource(this.sql, cohort.through);
+        const retained = this.retainedRefs(cohort.retained);
         // The Room's own fence: the ref holds the parent it confirmed, or exactly the pending
         // commit (a push whose reply was lost). Anything else, even with the same entries, is
         // another writer, and publication stops; it is never built on (R-LOG-8).
@@ -1470,10 +1477,12 @@ export class RoomCore {
     }
   }
 
-  private retainedFiles(digests: readonly Digest[]): RetainedFile[] {
+  /** The retained files by digest; each body is read only if the publisher needs its bytes. */
+  private retainedRefs(digests: readonly Digest[]): RetainedRef[] {
     return digests.map((d) => {
-      const r = one(this.sql, "SELECT kind, body FROM retained WHERE digest = ?", d)!;
-      return { kind: str(r, "kind") === "input" ? ("input" as const) : ("policy" as const), body: str(r, "body")! };
+      const kind = str(one(this.sql, "SELECT kind FROM retained WHERE digest = ?", d)!, "kind");
+      const load = () => str(one(this.sql, "SELECT body FROM retained WHERE digest = ?", d)!, "body")!;
+      return { kind: kind === "input" ? ("input" as const) : ("policy" as const), digest: d, load };
     });
   }
 

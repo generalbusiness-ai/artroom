@@ -29,11 +29,12 @@ describe("production services: one deployment, a binding per namespace (request 
     expect(pub.length > 0 && pub.every((n) => n === "y")).toBe(true);
   });
 
-  it("without an import namespace there is one binding; an import namespace with no binding is unavailable, not the public binding", async () => {
+  it("without an import binding there is one binding, even with IMPORT_NAMESPACE set; its log remote is unavailable, never the public binding (review a35b4b61)", async () => {
     const pub: string[] = [];
     expect(servicesFor({ PUBLIC_NAMESPACE: "pub", ARTIFACTS: binding(pub) } as unknown as RoomEnv, "o").remotes.bindings).toEqual({});
     const r = servicesFor({ PUBLIC_NAMESPACE: "pub", ARTIFACTS: binding(pub), IMPORT_NAMESPACE: "imp" } as unknown as RoomEnv, "o").remotes;
-    await expect(r.bindings!["imp"]!.get("x")).rejects.toMatchObject({ code: "unavailable", message: expect.stringContaining("IMPORT_ARTIFACTS") });
+    expect(r.bindings).toEqual({});
+    await expect((await r.logRemote({ namespace: "imp", name: "x" })).readObject(SHA as never)).rejects.toThrow();
     expect(pub).toEqual([]);
   });
 });

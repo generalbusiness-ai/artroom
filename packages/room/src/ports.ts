@@ -22,7 +22,6 @@ import type {
   Digest,
   Glob,
   LaneId,
-  LogEntry,
   LanePurpose,
   NotifyDirectory,
   MemberId,
@@ -188,24 +187,27 @@ export interface ArtifactsPort {
 
 // ---------------------------------------------------------------- log publication
 
-/** A retained file for a log commit (lane L's `Retained`). */
-export type { Retained as RetainedFile } from "@generalbusiness/artroom-log";
-import type { Retained as RetainedFile } from "@generalbusiness/artroom-log";
+/** A retained file for a log commit (lane L's `Retained`), and one named by digest and read only when needed (`RetainedRef`). */
+export type { Retained as RetainedFile, RetainedRef, EntrySource } from "@generalbusiness/artroom-log";
+import type { EntrySource, RetainedRef } from "@generalbusiness/artroom-log";
 
 /**
  * Publication of the log (R-LOG-8): lane L's `LogPublisher`, opened over a
  * git remote for the canonical repository. The Room keeps the pending cohort
  * durable, stores the exact commit (`commitFor`) before any remote write,
  * and accepts a read-back only at the confirmed parent or at that commit.
+ * The entries are an `EntrySource` over the Room's SQLite, and retained
+ * files are `RetainedRef`s, so the publisher reads them in batches and
+ * the Room never holds the log in memory (request 5a7290b9).
  */
 export interface PublisherPort {
   readonly publishedThrough: Seq;
   readonly head: Sha | null;
-  commitFor(parent: Sha | null, entries: readonly LogEntry[], checkpoint: Checkpoint, retained: readonly RetainedFile[]): Sha;
+  commitFor(parent: Sha | null, entries: EntrySource, checkpoint: Checkpoint, retained: readonly RetainedRef[]): Sha;
   publish(
-    entries: readonly LogEntry[],
+    entries: EntrySource,
     checkpoint: Checkpoint,
-    retained: readonly RetainedFile[],
+    retained: readonly RetainedRef[],
   ): Promise<{ readonly commit: Sha; readonly through: Seq; readonly hash: Digest; readonly publishedThrough: Seq }>;
 }
 
