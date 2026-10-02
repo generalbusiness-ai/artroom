@@ -1881,6 +1881,15 @@ the cap allows: 17. Lane B's own backoffs (landing retries to 60 s, its
 token cleanup and workspace duties to 5 minutes) are unchanged; each is
 capped at 5 minutes or less.
 
+**Live.** Deployed to the spike as `artroom-spike-room` `065d3189` on
+2026-10-02. Before: 6,289 rows written in 30 idle minutes (18 rooms at 12
+rows a minute each). After the smoke run and its cleanup: 0 rows written
+by any `Room` object from 19:47 to 20:47 UTC. The 18 older rooms each ran
+once or twice after the deploy, found their repository gone, and stopped.
+The figures, the windows and the smoke record are in
+[notes/deploy-spike.md](../../notes/deploy-spike.md), "Idle write storms
+fixed (request 3da1d82b, 2026-10-02)".
+
 **Contract and protocol.** `log-publication-stalled` gains the reason
 `repository-gone` (additive; the UI's "Needs you" says what it means).
 R-LOG-8 says that unpublished `checkpoint` events alone never make a
