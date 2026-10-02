@@ -155,5 +155,20 @@ describe("review b618eca1: staged publication", () => {
     expect(git.pushed.length).toBe(pushes);
     expect(calls).toBeLessThanOrEqual(5 * 2);
   });
+
+  test("in-memory staging checks each completed object against its ID, and parts against the object", async () => {
+    const git = new MemoryGit();
+    const data = new Uint8Array(100).fill(7);
+    const { sha } = (await import("../src/git.ts")).gitObject("blob", data);
+    const want = [{ sha, type: "blob" as const, size: 100 }];
+    const cohort = "c".repeat(40) as Sha;
+    expect(await git.stage(cohort, want, [{ ...want[0]!, offset: 0, data: data.subarray(0, 60) }])).toEqual({ ok: true, missing: [{ sha, have: 60 }] });
+    const forged = await git.stage(cohort, want, [{ ...want[0]!, offset: 60, data: new Uint8Array(40) }]);
+    expect(forged.ok).toBe(false);
+    expect(git.objects.has(sha)).toBe(false);
+    expect((await git.stage(cohort, want, [{ ...want[0]!, offset: 0, data: new Uint8Array(101) }])).ok).toBe(false);
+    expect(await git.stage(cohort, want, [{ ...want[0]!, offset: 0, data }])).toEqual({ ok: true, missing: [] });
+    expect(git.objects.has(sha)).toBe(true);
+  });
 });
 

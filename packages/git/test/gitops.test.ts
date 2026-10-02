@@ -478,6 +478,8 @@ test("stageLog: an object that does not hash to its ID is refused and its staged
   const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
   assert.ok(probe.ok);
   assert.equal(probe.missing.find((m) => m.sha === c.blob.sha)?.have, 0, "the staged bytes were dropped");
+  const outside = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [{ ...chunk(c.blob, 0, 1000), offset: 2500 }]);
+  assert.ok(!outside.ok && /outside the object/.test(outside.detail));
   const whole = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [{ ...chunk(c.tree, 0, c.tree.data.length), sha: c.blob.sha, size: c.tree.data.length }]);
   assert.ok(!whole.ok && /does not match/.test(whole.detail));
   const wrongId = await f.ops.stageLog(f.canonical, c.commit.sha, [{ ...want(c.tree), sha: c.blob.sha }], [{ ...chunk(c.tree, 0, c.tree.data.length), sha: c.blob.sha }]);

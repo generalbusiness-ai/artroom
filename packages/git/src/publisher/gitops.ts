@@ -500,8 +500,7 @@ export class GitOps {
           }
           const file = `${area}/${p.sha}`;
           const have = (await this.stagedSizes(area)).get(p.sha) ?? 0;
-          if (p.data.length > 0 && p.offset + p.data.length <= have) continue; // already staged
-          if (p.offset !== have) continue; // out of order: the answer says where to resume
+          if (p.offset !== have) continue; // already staged, or out of order: the answer says where to resume
           const a = await this.sh('cat >> "$1"', [file], p.data);
           if (a.code !== 0) throw new GitError("stage", a);
           if (have + p.data.length === p.size) {

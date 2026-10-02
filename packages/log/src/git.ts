@@ -233,8 +233,8 @@ export class StagingArea {
       if (!w || w.type !== p.type || w.size !== p.size) return { ok: false, detail: `part of ${p.sha} does not match what is wanted` };
       if (this.has(p.sha)) continue;
       const have = this.staged(p.sha);
-      if (p.offset + p.data.length <= have && p.data.length > 0) continue; // already staged
-      if (p.offset !== have || have + p.data.length > p.size) continue; // out of order: the answer says where to resume
+      if (p.offset !== have) continue; // already staged, or out of order: the answer says where to resume
+      if (have + p.data.length > p.size) return { ok: false, detail: `a part of ${p.sha} is outside the object` };
       const chunks = this.partial.get(p.sha) ?? [];
       chunks.push(p.data.slice());
       this.partial.set(p.sha, chunks);
