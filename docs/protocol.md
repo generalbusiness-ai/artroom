@@ -3120,9 +3120,12 @@ attention cases to lane F's screen.
 1. Show the two new items in the attention queue. This branch makes that
    edit in `NeedsYou.tsx`, so main stays green. (type)
 
-**Lane E (`packages/client`, `packages/mcp`, `packages/cli`)**: none,
-except that a schema that lists the attention reasons gains the two new
-ones.
+**Lane E (`packages/client`, `packages/mcp`, `packages/cli`)**, which
+landed on main (3f44c993) after this amendment's base (472b2380):
+1. CLI `where()` in `src/format.ts` falls through to `item.lane`, which the
+   two new items do not have. Give them a case that returns the item's
+   `seq`. (type)
+2. A schema that lists the attention reasons gains the two new ones.
 
 **Lane G (`packages/checkers`)**: none.
 
