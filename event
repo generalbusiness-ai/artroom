@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/ui/test/amendment-3.test.tsx","body":{"commit":"ad19956b8798850120aef81282a3a5242b3a0657","path":"packages/ui/test/amendment-3.test.tsx"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:096128827d9363c1a766ba550f5888f6927bf296","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/screens/Room.tsx."}
