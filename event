@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/room/src/config.ts at exact e90cc7c0e8dc0fdb0362fec603de6c8435e72569 on request/sec-hygiene, under promise git:sha1…f777d3f on request git:sha1…eb833b1","body":{"commit":"e90cc7c0e8dc0fdb0362fec603de6c8435e72569","path":"packages/room/src/config.ts"}}
+{"kind":"artifact","text":"packages/room/src/http.ts at exact e90cc7c0e8dc0fdb0362fec603de6c8435e72569 on request/sec-hygiene, under promise git:sha1…f777d3f on request git:sha1…eb833b1","body":{"commit":"e90cc7c0e8dc0fdb0362fec603de6c8435e72569","path":"packages/room/src/http.ts"}}
