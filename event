@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/room/src/config.ts at exact 132be1ff1efe0427be82918ed76e320fded99b4d on request/laneA-carry, under promise git:sha1…ab8685c on request git:sha1…6644d07","body":{"commit":"132be1ff1efe0427be82918ed76e320fded99b4d","path":"packages/room/src/config.ts"}}
+{"kind":"artifact","text":"packages/room/src/core.ts at exact 132be1ff1efe0427be82918ed76e320fded99b4d on request/laneA-carry, under promise git:sha1…ab8685c on request git:sha1…6644d07","body":{"commit":"132be1ff1efe0427be82918ed76e320fded99b4d","path":"packages/room/src/core.ts"}}
