@@ -36,7 +36,7 @@ import { hex, verifySig } from "./crypto.ts";
 import { parseTime } from "./time.ts";
 import { Malformed, decodeCheckpoint, decodeLayout } from "./decode.ts";
 import { LOG_REF, ROOT, SEGMENT_SIZE, type Retained } from "./entries.ts";
-import { CHUNKS, OBJECT_BOUND, Placement, chunkedLine, chunks, fanTrees, isChunked, placedBytes, twelve, type Leaf } from "./layout.ts";
+import { CHUNKS, OBJECT_BOUND, Placement, chunkedLine, eachChunk, fanTrees, isChunked, placedBytes, twelve, type Leaf } from "./layout.ts";
 import { SETS, walkSet, type ListTree, type SetName } from "./tree.ts";
 import { encodeCommit, encodeTree, gitObject, parseCommit, parseTree, type GitObject, type GitReader, type GitRemote, type ObjectType, type StageOutcome, type StagePart, type StageWant, type TreeEntry } from "./git.ts";
 
@@ -274,8 +274,11 @@ const EMPTY: Index = { through: -1, hash: null, layout: undefined, genesis: null
 /** How to produce an object's bytes when they are sent. */
 type Body =
   | { readonly kind: "bytes"; readonly data: Uint8Array }
-  /** A segment: `lens` are the lines' lengths; `stubs` the `ChunkedLine` that stands for each chunked one, by index. */
-  | { readonly kind: "segment"; readonly first: Seq; readonly count: number; readonly lens: Uint32Array; readonly stubs: ReadonlyMap<number, Uint8Array> }
+  /**
+   * A segment: `lens` are the lines' lengths, as exact numbers (a line given in parts may be 4 GiB
+   * or more, so never a 32-bit array); `stubs` the `ChunkedLine` that stands for each chunked one, by index.
+   */
+  | { readonly kind: "segment"; readonly first: Seq; readonly count: number; readonly lens: Float64Array; readonly stubs: ReadonlyMap<number, Uint8Array> }
   /** A file, or one chunk of it, read again from its source. */
   | { readonly kind: "range"; readonly read: (offset: number, length: number) => Uint8Array };
 
@@ -458,7 +461,12 @@ export class LogPublisher {
     const { sig, ...unsigned } = cp;
     if (!verifySig(cp.roomKey, sig, "artroom-checkpoint-v1", unsigned))
       throw new PublishError("invalid-input", "the checkpoint's signature is not valid");
-    const files: RetainedIn[] = retained.map((r) => ("body" in r ? { kind: r.kind, body: r.body } : { ...r }));
+    const files: RetainedIn[] = retained.map((r) => {
+      if ("body" in r) return { kind: r.kind, body: r.body };
+      if ((r.read !== undefined || r.bytes !== undefined) && (typeof r.read !== "function" || !Number.isSafeInteger(r.bytes) || r.bytes! < 0))
+        throw new PublishError("invalid-input", `retained file ${r.digest} is given in parts of ${String(r.bytes)} bytes, which is not a length`);
+      return { ...r };
+    });
     return { lines, through: last.seq, hash: last.hash, checkpoint: text, at: cp.at, layout, retained: files };
   }
 
@@ -592,7 +600,7 @@ export class LogPublisher {
     let first = start;
     let lens: number[] = [];
     const close = () => {
-      segments.push({ first, sha: add(this.segment(c.lines, first, Uint32Array.from(lens), lay, first === start ? published : null, entryFile)) });
+      segments.push({ first, sha: add(this.segment(c.lines, first, Float64Array.from(lens), lay, first === start ? published : null, entryFile)) });
     };
     for (let seq = start; seq <= c.through; seq++) {
       const size = sizeOf(this.batch(c.lines, seq, 0, 1)[0]!);
@@ -730,10 +738,13 @@ export class LogPublisher {
    */
   private file(size: number, read: Reader, again: Reader, lay: LogLayout | undefined, add: (p: Planned) => Sha, base: Index): { readonly node: Node; readonly digest: string } {
     const chunked = lay !== undefined && size > OBJECT_BOUND;
-    const parts = chunked ? chunks(size) : [{ name: "", offset: 0, bytes: size }];
     const whole = sha256.create();
     const step = this.readLimits.bytes;
-    const blobs: Planned[] = parts.map((p) => {
+    // Chunk by chunk, so the list of chunks grows only as their bytes are read.
+    const parts: { readonly name: string; readonly offset: number; readonly bytes: number }[] = [];
+    const blobs: Planned[] = [];
+    for (const p of chunked ? eachChunk(size) : [{ name: "", offset: 0, bytes: size }]) {
+      parts.push(p);
       const h = sha1.create().update(utf8(`blob ${p.bytes}\0`));
       for (let at = 0; at < p.bytes; at += step) {
         const n = Math.min(step, p.bytes - at);
@@ -743,8 +754,8 @@ export class LogPublisher {
         whole.update(b);
       }
       const read2: Reader = (o, l) => again(p.offset + o, l);
-      return { sha: hex(h.digest()) as Sha, type: "blob", size: p.bytes, body: { kind: "range", read: read2 } };
-    });
+      blobs.push({ sha: hex(h.digest()) as Sha, type: "blob", size: p.bytes, body: { kind: "range", read: read2 } });
+    }
     const digest = hex(whole.digest());
     if (!chunked) {
       this.sizes.set(blobs[0]!.sha, size);
@@ -801,7 +812,7 @@ export class LogPublisher {
    * measured lengths, stopping before a line a `ChunkedLine` stands for, and
    * at least one.
    */
-  private batchSize(i: number, count: number, lens?: Uint32Array, stubs?: ReadonlyMap<number, Uint8Array>): number {
+  private batchSize(i: number, count: number, lens?: Float64Array, stubs?: ReadonlyMap<number, Uint8Array>): number {
     if (!lens) return 1;
     const { entries, bytes } = this.readLimits;
     const most = Math.min(entries, count - i);
@@ -811,7 +822,7 @@ export class LogPublisher {
   }
 
   /** Read one batch of lines from line `i` of a run that starts at seq `first`: text as UTF-8 bytes, a line in parts as it is. */
-  private batch(lines: Lines, first: Seq, i: number, count: number, lens?: Uint32Array, stubs?: ReadonlyMap<number, Uint8Array>): Line[] {
+  private batch(lines: Lines, first: Seq, i: number, count: number, lens?: Float64Array, stubs?: ReadonlyMap<number, Uint8Array>): Line[] {
     const batch = lines.read(first + i, this.batchSize(i, count, lens, stubs)).map((x) => (typeof x === "string" ? utf8(x) : x));
     if (batch.length === 0) throw new PublishError("invalid-input", `the entries ended at ${first + i - 1}`);
     this.counters.peakBatchBytes = Math.max(this.counters.peakBatchBytes, batch.reduce((n, b) => n + (b instanceof Uint8Array ? b.length : 0), 0));
@@ -827,11 +838,13 @@ export class LogPublisher {
    * requires the parent's blob ID: the published part of the last segment
    * is checked byte for byte.
    */
-  private segment(lines: Lines, first: Seq, lens: Uint32Array, lay: LogLayout | undefined, published: { readonly count: number; readonly sha: Sha } | null, entryFile: (seq: Seq, line: Line) => Uint8Array): Planned {
+  private segment(lines: Lines, first: Seq, lens: Float64Array, lay: LogLayout | undefined, published: { readonly count: number; readonly sha: Sha } | null, entryFile: (seq: Seq, line: Line) => Uint8Array): Planned {
     const count = lens.length;
     const placed = (i: number) => (isChunked(lay, first + i, lens[i]!) ? placedBytes(first + i, lens[i]!) : lens[i]!);
     let size = count - 1;
     for (let i = 0; i < count; i++) size += placed(i);
+    // Each length is a safe integer; their sum must be too, or the blob's header would be wrong.
+    if (!Number.isSafeInteger(size)) throw new PublishError("invalid-input", `segment ${first} would be ${size} bytes, more than a safe integer counts exactly`);
     const h = sha1.create().update(utf8(`blob ${size}\0`));
     let prefix: ReturnType<typeof sha1.create> | null = null;
     if (published) {

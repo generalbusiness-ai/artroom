@@ -16,7 +16,9 @@ import { LOG_REF, ROOT } from "../src/entries.ts";
 import { MemoryGit, OBJECT_TOO_LARGE, parseCommit } from "../src/git.ts";
 import * as layout from "../src/layout.ts";
 import { OBJECT_BOUND as B, Placement } from "../src/layout.ts";
-import { LogPublisher, PublishError } from "../src/publisher.ts";
+import { LogPublisher, PublishError, type EntryLine, type EntrySource, type RetainedRef } from "../src/publisher.ts";
+import type { LogEntry } from "@generalbusiness/artroom-contract";
+import { sha256Hex } from "../src/crypto.ts";
 import { verifyLog } from "../src/verify.ts";
 import { L2, RoomSim, Scripted, alice, exact, graft, keys, lineOf, note, rewrite, walk } from "./support/layout2.ts";
 
@@ -476,5 +478,90 @@ describe("acceptance cases (30.7): publication outcomes (R-LOG-20)", () => {
     const r = await p.publish(sim.entries, sim.checkpoint(L2(3)), sim.retained);
     expect(r.attempts).toBe(2);
     expect(remote.pushed.slice(-2)).toEqual([r.commit, r.commit]);
+  });
+});
+
+describe("lengths past 32 bits and sizes that are not lengths (review of 04797d8c)", () => {
+  const MiB = 2 ** 20;
+  const zeros = new Uint8Array(MiB); // every fake read is a view of this: nothing large is allocated
+  const STOP = "stop: the test reads no further";
+
+  /** A room whose entry 3 is a line of `bytes` given in parts; `read` records each read and decides how far reading may go. */
+  async function hugeLine(bytes: number, readable: (offset: number) => boolean) {
+    const sim = new RoomSim();
+    const { lane } = await sim.claim(keys.alice, alice, ["src/**"]);
+    note(sim, lane!, 10);
+    note(sim, lane!, 10);
+    const reads: [number, number][] = [];
+    const huge: EntryLine = {
+      seq: 3,
+      bytes,
+      read: (o, l) => {
+        reads.push([o, l]);
+        if (!readable(o)) throw new Error(STOP);
+        return zeros.subarray(0, l);
+      },
+    };
+    const source: EntrySource = { through: 4, read: (from, limit) => sim.entries.slice(from, from + limit).map((e): LogEntry | EntryLine => (e.seq === 3 ? huge : e)) };
+    return { sim, source, reads };
+  }
+  const attempt = (f: () => unknown): Error => {
+    try {
+      f();
+    } catch (e) {
+      return e as Error;
+    }
+    throw new Error("expected a throw");
+  };
+
+  test("a line given in parts of 2^32 + 9 bytes keeps its exact length: in layout 2 it is a ChunkedLine and its file is hashed chunk by chunk from byte 0, B bytes to the first chunk", async () => {
+    const size = 2 ** 32 + 9;
+    expect(layout.segmentStarts([1000, 1000, 1000, size, 1000], cp(L2(0)))).toEqual(ref.segmentStarts([1000, 1000, 1000, size, 1000], cp(L2(0))));
+    expect(layout.chunks(size).length).toBe(513);
+    const { sim, source, reads } = await hugeLine(size, (o) => o < B); // the first chunk only
+    const e = attempt(() => new LogPublisher(new MemoryGit()).commitFor(null, source, sim.checkpoint(L2(0)), sim.retained));
+    expect(e.message).toBe(STOP); // it got as far as reading the second chunk: no wrap, no false "changed" refusal
+    expect(reads.slice(0, 8)).toEqual(Array.from({ length: 8 }, (_, k) => [k * MiB, MiB]));
+    expect(reads.at(-1)).toEqual([B, MiB]);
+  });
+
+  test("in layout 1 the same line is hashed into its segment, from byte 0", async () => {
+    const { sim, source, reads } = await hugeLine(2 ** 32 + 9, () => false);
+    const e = attempt(() => new LogPublisher(new MemoryGit()).commitFor(null, source, sim.checkpoint(), sim.retained));
+    expect(e.message).toBe(STOP);
+    expect(reads).toEqual([[0, MiB]]);
+  });
+
+  test("a segment whose lengths sum past a safe integer is invalid-input before any byte is read", async () => {
+    const sim = new RoomSim();
+    const { lane } = await sim.claim(keys.alice, alice, ["src/**"]);
+    note(sim, lane!, 10);
+    note(sim, lane!, 10);
+    note(sim, lane!, 10);
+    const reads: number[] = [];
+    const big = (seq: number): EntryLine => ({ seq, bytes: 2 ** 52, read: (o) => (reads.push(o), zeros.subarray(0, 0)) });
+    const source: EntrySource = { through: 5, read: (from, limit) => sim.entries.slice(from, from + limit).map((e): LogEntry | EntryLine => (e.seq === 3 || e.seq === 4 ? big(e.seq) : e)) };
+    const e = attempt(() => new LogPublisher(new MemoryGit()).commitFor(null, source, sim.checkpoint(), sim.retained));
+    expect(e).toMatchObject({ code: "invalid-input" });
+    expect(e.message).toMatch(/safe integer/);
+    expect(reads).toEqual([]);
+  });
+
+  test("a retained file given in parts must have a length that is a safe integer, and a reader: otherwise invalid-input, never a commit", async () => {
+    const sim = new RoomSim();
+    const body = canonicalize({ budget: {}, input: {}, kind: "refuse" });
+    const digest = `sha256:${sha256Hex(utf8(body))}` as const;
+    const read = (o: number, l: number) => utf8(body).slice(o, o + l);
+    const p = new LogPublisher(new MemoryGit());
+    for (const bad of [{ bytes: NaN, read }, { bytes: -1, read }, { bytes: 1.5, read }, { bytes: Infinity, read }, { bytes: 2 ** 53, read }, { read }, { bytes: 3 }]) {
+      const r = { kind: "input", digest, load: () => body, ...bad } as RetainedRef;
+      expect(attempt(() => p.commitFor(null, sim.entries, sim.checkpoint(L2(0)), [r])), JSON.stringify(bad)).toMatchObject({ code: "invalid-input" });
+    }
+    const good: RetainedRef = { kind: "input", digest, load: () => body, bytes: utf8(body).length, read };
+    expect(p.commitFor(null, sim.entries, sim.checkpoint(L2(0)), [good])).toBe(p.commitFor(null, sim.entries, sim.checkpoint(L2(0)), [{ kind: "input", body }]));
+  });
+
+  test("eachChunk refuses a size that is not a length", () => {
+    for (const n of [NaN, -1, 1.5, Infinity]) expect(() => layout.chunks(n)).toThrow(RangeError);
   });
 });

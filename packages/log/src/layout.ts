@@ -84,11 +84,20 @@ export function segmentStarts(lineBytes: readonly number[], checkpoint: Pick<Che
   return starts;
 }
 
-/** The chunks of a file over B: names (12 digits from 0) and lengths. Every chunk is B bytes except the last. */
+/**
+ * The chunks of a file over B, one at a time: names (12 digits from 0),
+ * offsets and lengths. Every chunk is B bytes except the last. Lazy, so a
+ * caller that reads each chunk's bytes as it goes never holds more chunks
+ * than it has read. `fileBytes` must be a safe integer.
+ */
+export function* eachChunk(fileBytes: number): Generator<{ readonly name: string; readonly offset: number; readonly bytes: number }> {
+  if (!Number.isSafeInteger(fileBytes) || fileBytes < 0) throw new RangeError(`a file of ${fileBytes} bytes has no chunks`);
+  for (let at = 0, k = 0; at < fileBytes; at += OBJECT_BOUND, k++) yield { name: twelve(k), offset: at, bytes: Math.min(OBJECT_BOUND, fileBytes - at) };
+}
+
+/** Every chunk of a file over B (`eachChunk`, as a list). */
 export function chunks(fileBytes: number): { readonly name: string; readonly offset: number; readonly bytes: number }[] {
-  const out: { name: string; offset: number; bytes: number }[] = [];
-  for (let at = 0, k = 0; at < fileBytes; at += OBJECT_BOUND, k++) out.push({ name: twelve(k), offset: at, bytes: Math.min(OBJECT_BOUND, fileBytes - at) });
-  return out;
+  return [...eachChunk(fileBytes)];
 }
 
 // ------------------------------------------------------------------ fan-out
