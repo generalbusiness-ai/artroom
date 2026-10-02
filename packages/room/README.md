@@ -1159,6 +1159,56 @@ Two survived, both equivalent: a delete aimed at the sealed incarnation
 no open duty after the seal and so is never visited; and `found`'s check that
 main exists after `prepareCanonical`, which only returns once it does.
 
+## Review 700b74ea
+
+**The finding.** Before the incarnation ledger, the Room created a public
+founding's repository under its base name (the identity's own name) and
+recorded nothing. A pending founding begun by that Room and retried under
+revision 3 was sealed on `<base>-1`, and `<base>`, with its 24-hour write
+token, was never found, cleaned or reported. An old create whose answer was
+lost could also apply later.
+
+**The fix: adopt the base name, durably, before preparing.** The first time
+a pending public founding is prepared (`Workspaces.prepareCanonical`, called
+only from `found` for a public room that is not founded), the ledger adopts
+its base name when:
+
+- an older Room may have tried: the registry binding was made before this
+  `found` call (`bind` answers `already-bound`) and this Room has no attempt
+  on record (no `founding_repo`); or
+- an earlier revision's ledger has a row for the base name; or
+- the base repository exists now (only this founding can have made it,
+  R-GEN-12).
+
+Adoption records a `legacy` create step, in flight, and owes the base name's
+deletion. The legacy step is never settled: not by a read of absence, not by
+deleting the repository, and not by the new incarnation's seal, because more
+than one old create may still apply. The base name is never an incarnation,
+so the alarm deletes it whenever it appears, before and after founding, with
+every token on it. `Workspaces.duties()` shows the step. An already-founded
+room (whatever its storage name) and an import never reach this, and nothing
+else touches the base name. Cleanup scheduling no longer excludes the
+configured canonical name: it excludes the holder's founding duties, and the
+sealed incarnation has none.
+
+| Case | Tests |
+|---|---|
+| (a) a legacy base holding a token | `workspaces.test.ts` (a); `founding-gaps.test.ts` (a): deleted with its token before the seal, the room lands, the legacy step stays watched after eviction |
+| (b) an absent base whose old create applies after the seal | `workspaces.test.ts` (b), including a second appearance; `founding-gaps.test.ts` (b): the alarm deletes it after eviction, the landed main survives |
+| (c) an already-founded legacy room | `workspaces.test.ts` (c); `founding-gaps.test.ts` (c): a room turned into an older Room's (base name, no ledger), found again, lands, keeps a live publishing token through the alarm, and gets no legacy step |
+| Scope | a founding this Room began and retried adopts nothing; an earlier revision's ledger row is adopted, with the repository present or absent; the checker's control (a base that exists although the binding is new) |
+
+Mutations, made once each after committing: 12 of 12 were killed, after one
+test was added. Not adopting at all (ledger and Room); the Room never
+flagging an older attempt; flagging every first founding; ignoring this
+Room's own record; not looking for an existing base; ignoring an earlier
+ledger (it survived until the absent-base test was added); settling the
+legacy step when seen, when deleted, or on a read of absence; not scheduling
+it after founding; and not recording the adoption.
+
+Main `9bb700b6` (amendment 4, the bounded-memory publisher, the deploy
+cleanup and pi Workers AI) is merged. This revision has not been run live.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it

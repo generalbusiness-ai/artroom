@@ -1305,3 +1305,13 @@ test("review 700b74ea: a base name an earlier revision's ledger created is adopt
   ws.sealCanonical(name);
   assert.equal(legacyOpen(ws), 1);
 });
+
+test("review 700b74ea: an earlier revision's ledger row for the base name is adopted even when the repository is absent now", async () => {
+  const { ns, sql, ws, firstCommit } = setupFounding();
+  // Revision 2's create of the base name, whose answer never arrived; nothing is there now, but it may still apply.
+  sql.all("INSERT INTO artroom_ws_duty (fork, kind, token_id, reason, state, started_at, next_at) VALUES ('canon', 'repo-create', NULL, 'repo-create', 'in-flight', 0, 0)");
+  const name = await ws.prepareCanonical("canon", firstCommit);
+  ws.sealCanonical(name);
+  assert.equal(legacyOpen(ws), 1);
+  assert.equal(ns.repos.has("canon"), false);
+});
