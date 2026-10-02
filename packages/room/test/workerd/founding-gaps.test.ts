@@ -110,8 +110,9 @@ describe("gap 1: a newly founded public room lands its first lane", () => {
       const a = f.world.artifacts;
       if (fault === "fail") a.failRemote("firstCommit");
       else if (fault === "lose") a.loseReply("firstCommit");
-      // Refused: the token no longer admits the push, so git answers without creating main.
-      else a.on("firstCommit", () => [...a.repo(a.canonical).tokens.values()].forEach((t) => (t.revoked = true)));
+      // Refused: the token no longer admits the push, so git answers without creating main. Each round retires the
+      // repository and makes it again; after three rounds found gives up.
+      else for (let i = 0; i < 3; i++) a.on("firstCommit", () => [...a.repo(a.canonical).tokens.values()].forEach((t) => (t.revoked = true)));
       const r = await (exports.default as unknown as { fetch(u: string, i: RequestInit): Promise<Response> }).fetch("https://artroom.test/v1/rooms/found", {
         method: "POST",
         body: JSON.stringify({ genesis: f.drafted.genesis, sig: f.sig, draft: f.drafted.draft }),
@@ -122,7 +123,7 @@ describe("gap 1: a newly founded public room lands its first lane", () => {
       const id = await worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
       expect(a.main, fault).toBe((await firstCommit(Date.parse(f.drafted.genesis.createdAt))).commit);
       // A lost answer applied: the retry finds main and pushes nothing more.
-      expect(a.remoteCalls.get("firstCommit"), fault).toBe(fault === "lose" ? 1 : 2);
+      expect(a.remoteCalls.get("firstCommit"), fault).toBe({ fail: 2, lose: 1, refuse: 4 }[fault]);
       expect(a.repo(a.canonical).activeTokens(), fault).toEqual([]);
       expect((await logOf(id)).length).toBe(2);
     }
@@ -157,23 +158,24 @@ describe("gap 1: a newly founded public room lands its first lane", () => {
 // ------------------------------------------------------------------ 2. the creation token
 
 describe("gap 2: the token Artifacts returns when the Room creates the repository is revoked durably", () => {
-  it("before the genesis is sealed, no token is left on the new repository: the create's 24-hour token and the first commit's are both revoked, each recorded first", async () => {
+  it("before the genesis is sealed, no token is left on the new repository: the create's 24-hour token pushed the first commit and was revoked; nothing else was minted", async () => {
     const f = await draftPublic();
     const a = f.world.artifacts;
     const id = await worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
     const canonical = a.repo(a.canonical);
-    expect(canonical.tokens.size).toBeGreaterThanOrEqual(2);
-    expect([...canonical.tokens.values()].some((t) => t.expiresAt - t.createdAt === 86_400_000)).toBe(true);
+    expect(canonical.tokens.size).toBe(1);
+    expect([...canonical.tokens.values()].every((t) => t.expiresAt - t.createdAt === 86_400_000 && t.revoked)).toBe(true);
     expect(canonical.activeTokens()).toEqual([]);
-    expect((await duties(id)).map((d) => [d.kind, d.state])).toEqual([
-      ["repo-create", "done"],
-      ["inventory", "done"],
-      ["mint", "done"],
-      ["token", "done"],
+    expect((await duties(id)).map((d) => [d.kind, d.state, d.doneReason])).toEqual([
+      ["repo-create", "done", "sealed"],
+      ["token", "done", "revoked"],
+      ["inventory", "done", "inventory"],
     ]);
+    // The first commit was pushed with the create's own token: nothing was minted on the repository.
+    expect(a.remoteCalls.get("createToken")).toBeUndefined();
   });
 
-  it("a create whose answer is lost: the step was recorded before it was sent, so the same found revokes the 24-hour token nobody saw", async () => {
+  it("a create whose answer is lost: the step was recorded before it was sent, so the same found deletes the repository and its 24-hour token nobody saw, and makes it again", async () => {
     const f = await draftPublic();
     const a = f.world.artifacts;
     const id = roomIdOf(f.drafted.genesis);
@@ -190,9 +192,8 @@ describe("gap 2: the token Artifacts returns when the Room creates the repositor
     const f = await draftPublic();
     const a = f.world.artifacts;
     const id = roomIdOf(f.drafted.genesis);
-    // Listing fails: the inventory cannot confirm, so the debt stays.
-    a.failRemote("listTokens", artifactsErrors.transport());
-    a.failRemote("revokeToken", artifactsErrors.transport(), artifactsErrors.transport());
+    // The revocation has no answer: the token stays owed, and the genesis is not sealed.
+    a.failRemote("revokeToken", artifactsErrors.transport());
     await rejects(worker.found(f.drafted.genesis, f.sig, f.drafted.draft), "unavailable");
     expect(await logOf(id)).toEqual([]);
     expect(a.repo(a.canonical).activeTokens().length).toBeGreaterThan(0);
@@ -202,7 +203,7 @@ describe("gap 2: the token Artifacts returns when the Room creates the repositor
     // The alarm's work, with nobody calling found: the token is revoked, and the room is still not founded.
     await call(roomStub(id).tick());
     expect(a.repo(a.canonical).activeTokens()).toEqual([]);
-    expect((await duties(id)).every((d) => d.state === "done")).toBe(true);
+    expect((await duties(id)).filter((d) => d.state === "owed")).toEqual([]);
     expect(await logOf(id)).toEqual([]);
     expect(await worker.found(f.drafted.genesis, f.sig, f.drafted.draft)).toBe(id);
     expect(a.repo(a.canonical).activeTokens()).toEqual([]);
@@ -275,6 +276,38 @@ describe("gap 3: one deployment founds public rooms and imports", () => {
     const input = { name: name(), repo: { kind: "new" }, admin: { handle: "@f", key: f.admin.key }, recovery: newKeyPair().key };
     await expect(draftRoom(elsewhere, input, clock.now)).rejects.toMatchObject({ code: "forbidden", message: expect.stringContaining("does not found public rooms") });
     await expect(foundRoom(elsewhere, f.drafted.genesis, f.sig, f.drafted.draft)).rejects.toMatchObject({ code: "forbidden" });
+    expect(await reg().byRepo(f.drafted.genesis.repo)).toBeNull();
+    expect(await reg().lookup(f.drafted.genesis.name)).toBeNull();
+    expect(f.world.artifacts.remoteCalls.size).toBe(0);
+  });
+});
+
+// ------------------------------------------------------------------ review a35b4b61, 3: bindings, not only names
+
+describe("review a35b4b61: a mode needs its binding, checked before anything is bound", () => {
+  it("IMPORT_NAMESPACE with no IMPORT_ARTIFACTS binding: draft and found refuse the import, and the registry binds neither the repository nor the name", async () => {
+    const admin = newKeyPair();
+    const repo = `acme-import/${hex(randomBytes(16))}`;
+    const input = { name: name(), repo: { kind: "import", grant: grant(repo, admin.key) }, admin: { handle: "@f", key: admin.key }, recovery: newKeyPair().key };
+    const unbound = { ...env, IMPORT_ARTIFACTS: undefined } as unknown as RoomEnv;
+    await expect(draftRoom(unbound, input, clock.now)).rejects.toMatchObject({ code: "forbidden", message: expect.stringContaining("no IMPORT_ARTIFACTS binding") });
+    // A genesis drafted where the binding exists, then found where it does not.
+    const d = await draftRoom(env as unknown as RoomEnv, input, clock.now);
+    const id = roomIdOf(d.genesis);
+    const world = worldFor(id);
+    await expect(foundRoom(unbound, d.genesis, sign(admin.seed, "artroom-genesis-v1", d.genesis), d.draft)).rejects.toMatchObject({ code: "forbidden" });
+    expect(await reg().byRepo(repo)).toBeNull();
+    expect(await reg().lookup(d.genesis.name)).toBeNull();
+    expect(await logOf(id)).toEqual([]);
+    expect(world.artifacts.remoteCalls.size).toBe(0);
+  });
+
+  it("no ARTIFACTS binding: draft and found refuse public founding, and nothing is bound", async () => {
+    const f = await draftPublic();
+    const unbound = { ...env, ARTIFACTS: undefined } as unknown as RoomEnv;
+    const input = { name: name(), repo: { kind: "new" }, admin: { handle: "@f", key: f.admin.key }, recovery: newKeyPair().key };
+    await expect(draftRoom(unbound, input, clock.now)).rejects.toMatchObject({ code: "forbidden", message: expect.stringContaining("no ARTIFACTS binding") });
+    await expect(foundRoom(unbound, f.drafted.genesis, f.sig, f.drafted.draft)).rejects.toMatchObject({ code: "forbidden" });
     expect(await reg().byRepo(f.drafted.genesis.repo)).toBeNull();
     expect(await reg().lookup(f.drafted.genesis.name)).toBeNull();
     expect(f.world.artifacts.remoteCalls.size).toBe(0);

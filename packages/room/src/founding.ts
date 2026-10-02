@@ -56,11 +56,18 @@ function publicNamespace(env: RoomEnv): string {
  * One deployment both founds public rooms and imports, with an Artifacts
  * binding for each namespace (R-GEN-12; request b6b51de7): `ARTIFACTS` for
  * the public founding namespace, and `IMPORT_ARTIFACTS` for
- * `IMPORT_NAMESPACE`. A source whose namespace has no binding is refused at
- * `draft` and at step 4 of `found`, before anything is bound, so it never
- * leaves a binding that cannot complete.
+ * `IMPORT_NAMESPACE`. A source whose namespace has no binding (the binding
+ * itself, not only its namespace's name) is refused at `draft` and at step 4
+ * of `found`, before anything is bound, so it never leaves a binding that
+ * cannot complete.
  */
+/** A binding the deployment actually has (review a35b4b61): a configured namespace is not enough. */
+function present(binding: unknown): boolean {
+  return binding !== undefined && binding !== null;
+}
+
 function publicFoundingProblem(env: RoomEnv): string | null {
+  if (!present(env.ARTIFACTS)) return "This deployment does not found public rooms: it has no ARTIFACTS binding.";
   const bound = env.ARTIFACTS_NAMESPACE ?? publicNamespace(env);
   return bound === publicNamespace(env)
     ? null
@@ -71,6 +78,7 @@ function importProblem(env: RoomEnv, repo: string): string | null {
   const ns = env.IMPORT_NAMESPACE?.trim();
   if (!ns || ns === publicNamespace(env))
     return `This deployment does not import repositories: it has no Artifacts binding outside ${publicNamespace(env)}, the namespace reserved for public founding (R-GEN-12). Importing needs a second binding, IMPORT_ARTIFACTS, for the namespace IMPORT_NAMESPACE names.`;
+  if (!present(env.IMPORT_ARTIFACTS)) return `This deployment does not import repositories: IMPORT_NAMESPACE names ${ns}, but it has no IMPORT_ARTIFACTS binding.`;
   return repo.startsWith(`${ns}/`) ? null : `This deployment imports only repositories in the namespace ${ns}.`;
 }
 

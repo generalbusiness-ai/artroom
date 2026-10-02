@@ -150,8 +150,17 @@ class FakeNamespace implements ArtifactsNamespace {
     if (failure === "lost-after-create") throw new ArtifactsError("INTERNAL_ERROR", 10400);
     return { name, remote: (await repo.info()).remote, token: t.plaintext };
   }
-  async delete(): Promise<never> {
-    throw new Error("workspaces never delete a repository");
+  /** Public founding only (`retireCanonical`): off unless a test turns it on. */
+  allowDelete = false;
+  deleteCalls = 0;
+  readonly deleteFailures: Error[] = [];
+  async delete(name: string): Promise<boolean> {
+    if (!this.allowDelete) throw new Error("workspaces never delete a repository");
+    this.deleteCalls++;
+    const failure = this.deleteFailures.shift();
+    if (failure) throw failure;
+    // As the binding: the repository and every token on it.
+    return this.repos.delete(name);
   }
 }
 
@@ -916,95 +925,243 @@ test("no open duty is left due after a run, whichever way the run ends", async (
   assert.ok(ws.nextDue()! > clock.t);
 });
 
-// ------------------------------------------------------------------ request b6b51de7: the canonical repository at public founding
+// ------------------------------------------------------------------ request b6b51de7 and review a35b4b61: the canonical repository at public founding
+
+const FIRST = "f".repeat(40);
 
 function setupFounding() {
   const clock = new Clock();
   const ns = new FakeNamespace(clock);
   ns.repos.delete("canon");
   ns.allowCreate = true;
+  ns.allowDelete = true;
   const sql = nodeSql();
-  const ws = new Workspaces({ sql, artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
-  return { clock, ns, sql, ws, canon: () => ns.repos.get("canon")! };
+  const make = () => new Workspaces({ sql, artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  const ws = make();
+  // Main, as the Room reads it; a new repository has none. The first commit needs a live write token on it.
+  const world = { main: null as string | null, pushes: 0, tokensAtPush: [] as string[] };
+  const canon = () => ns.repos.get("canon")!;
+  const prep = (w: Workspaces = ws) =>
+    w.prepareCanonical({
+      readMain: async () => (ns.repos.has("canon") ? world.main : null),
+      firstCommit: async (_remote, token) => {
+        world.pushes++;
+        const t = [...canon().tokens.values()].find((x) => x.plaintext === token);
+        assert.ok(t && t.state === "active" && t.scope === "write", "the first commit is pushed with a live write token");
+        world.tokensAtPush.push(token);
+        world.main = FIRST;
+      },
+    });
+  // Deleting the repository loses main with it.
+  const realDelete = ns.delete.bind(ns);
+  ns.delete = async (name: string) => {
+    const r = await realDelete(name);
+    if (name === "canon") world.main = null;
+    return r;
+  };
+  return { clock, ns, sql, ws, make, world, canon, prep };
 }
 
-test("public founding: the create is recorded before it is sent, its 24-hour token is owed from its answer, and settling revokes it", async () => {
-  const { ns, ws, canon } = setupFounding();
-  ns.createHooks.push(() => {
-    // The step is on record before Artifacts sees the call.
-    assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"]]);
-  });
-  await ws.createCanonical();
-  assert.equal(ns.createCalls, 1);
-  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "answered"], ["inventory", "owed"]]);
-  assert.equal(canon().live().length, 1, "the create's own token is live until settled");
-  assert.ok(canon().tokens.get(canon().live()[0]!)!.ttl === 86400);
-  assert.equal(await ws.settleCanonical(), 0);
-  assert.deepEqual(canon().live(), [], "no token is left on the canonical repository");
-  assert.equal(ws.pendingCleanup(), 0);
+const open = (ws: Workspaces) => ws.duties().filter((d) => d.state !== "done").map((d) => [d.kind, d.state]);
+
+test("public founding, healthy: the create is recorded before it is sent; its own token pushes the first commit and is revoked; nothing is minted; the seal closes every duty", async () => {
+  const { ns, ws, world, canon, prep } = setupFounding();
+  ns.createHooks.push(() => assert.deepEqual(open(ws), [["repo-create", "in-flight"]], "on record before Artifacts sees it"));
+  await prep();
+  assert.equal(world.main, FIRST);
+  assert.equal(world.pushes, 1);
+  assert.equal(ns.minted.length, 1, "only the create's own token exists: nothing is minted on the canonical repository");
+  assert.deepEqual(canon().live(), [], "no token is live on the repository");
+  assert.equal(ws.canonicalDue(), null);
+  ws.sealCanonical();
+  assert.deepEqual(open(ws), []);
+  assert.deepEqual(ws.duties().map((d) => [d.kind, d.doneReason]), [["repo-create", "sealed"], ["token", "revoked"], ["inventory", "inventory"]]);
 });
 
-test("public founding: the first commit's token lasts 60 seconds, is owed by ID before it is used, and is revoked after", async () => {
-  const { ws, canon } = setupFounding();
-  await ws.createCanonical();
-  let during: { kind: string; state: string }[] = [];
-  const out = await ws.withCanonicalToken(async (token) => {
-    during = ws.duties().map((d) => ({ kind: d.kind, state: d.state }));
-    const live = canon().live().map((id) => canon().tokens.get(id)!);
-    assert.ok(live.some((t) => t.plaintext === token && t.ttl === 60 && t.scope === "write"));
-    return "pushed";
-  });
-  assert.equal(out, "pushed");
-  assert.deepEqual(during.filter((d) => d.kind === "token"), [{ kind: "token", state: "owed" }], "owed while it is used");
-  assert.deepEqual(during.filter((d) => d.kind === "mint"), [{ kind: "mint", state: "answered" }]);
-  assert.ok(canon().live().every((id) => canon().tokens.get(id)!.ttl !== 60), "revoked after use");
-  // A failure inside still revokes it.
-  await assert.rejects(ws.withCanonicalToken(async () => {
-    throw new Error("push failed");
-  }), /push failed/);
-  assert.ok(canon().live().every((id) => canon().tokens.get(id)!.ttl !== 60));
-  assert.equal(await ws.settleCanonical(), 0);
-  assert.deepEqual(canon().live(), []);
+test("public founding: no canonical token is ever minted, so no mint can be left with an unknown outcome (review a35b4b61, 1)", async () => {
+  const { ns, ws, canon, prep } = setupFounding();
+  // Any mint on the canonical repository would be a step whose outcome could be lost.
+  const realCreate = ns.create.bind(ns);
+  ns.create = async (name: string) => {
+    const r = await realCreate(name);
+    canon().createToken = async () => {
+      throw new Error("a canonical token was minted during founding");
+    };
+    return r;
+  };
+  await prep();
+  ws.sealCanonical();
+  assert.equal(ns.minted.length, 1);
+  assert.equal(ws.duties().filter((d) => d.kind === "mint").length, 0);
 });
 
-test("public founding: when settling fails the debt stays owed and blocks; a later run, by the alarm's reconcile, revokes the token", async () => {
-  const { clock, ns, ws, canon } = setupFounding();
-  await ws.createCanonical();
-  ns.failRevoke = true;
-  assert.ok((await ws.settleCanonical()) > 0, "open: the founding must not seal");
-  assert.equal(canon().live().length, 1);
-  const due = ws.nextDue()!;
-  assert.ok(due > clock.t, "the retry is scheduled");
-  // A restart, then the alarm: the canonical repository's duties are its own, not a fork's.
-  ns.failRevoke = false;
-  const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
-  clock.t = due;
-  assert.equal(await restarted.reconcile(), 0);
-  assert.deepEqual(canon().live(), []);
-  assert.deepEqual(restarted.duties().map((d) => d.doneReason), ["inventory", "inventory"]);
-  assert.equal(restarted.nextDue(), null);
-});
-
-test("public founding: a create whose answer was lost stays in flight until the repository is seen and swept; a retry's ALREADY_EXISTS is not an error", async () => {
-  const { ns, ws, canon } = setupFounding();
+test("public founding: a create whose answer is lost and that applies late, across a restart: the retry deletes the repository it cannot vouch for, recreates it, and seals with no live token", async () => {
+  const { clock, ns, ws, make, world, canon, prep } = setupFounding();
+  // The create applies, then its answer is lost: a 24-hour token nobody holds.
   ns.createFailures.push("lost-after-create");
-  await assert.rejects(ws.createCanonical(), /INTERNAL_ERROR/);
-  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"]]);
-  assert.equal(canon().live().length, 1, "the lost answer's token exists");
-  // The retried founding: the repository is there already.
-  await ws.createCanonical();
-  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"], ["repo-create", "answered"]]);
-  assert.equal(await ws.settleCanonical(), 0);
-  assert.deepEqual(canon().live(), [], "the token whose answer was lost is revoked too");
+  await assert.rejects(prep(), /INTERNAL_ERROR/);
+  assert.deepEqual(open(ws), [["repo-create", "in-flight"]]);
+  assert.equal(canon().live().length, 1);
+  // A restart, then the same found.
+  const restarted = make();
+  clock.advance(5_000);
+  await prep(restarted);
+  assert.equal(ns.deleteCalls, 1, "the repository no create of ours held was deleted, with its token");
+  assert.equal(world.main, FIRST);
+  assert.deepEqual(canon().live(), []);
+  restarted.sealCanonical();
+  assert.deepEqual(open(restarted), []);
+  assert.ok(restarted.duties().some((d) => d.kind === "repo-create" && d.doneReason === "superseded"));
 });
 
-test("public founding: absence never settles a create in flight; a refused create closes its step", async () => {
+test("public founding: a create whose answer is lost and that applies only after a successful retry: it is refused (the name is held), and no token appears", async () => {
+  const { ns, ws, canon, prep } = setupFounding();
+  // The first create is held back by the network and fails at the client.
+  let late: (() => Promise<unknown>) | null = null;
+  const realCreate = ns.create.bind(ns);
+  ns.create = async (name: string) => {
+    ns.create = realCreate;
+    late = () => realCreate(name);
+    throw new TypeError("connection lost before the answer");
+  };
+  await assert.rejects(prep(), /connection lost/);
+  assert.deepEqual(open(ws), [["repo-create", "in-flight"]]);
+  // Before founding, the alarm keeps watching it: nothing holds the repository.
+  assert.notEqual(ws.canonicalDue(), null);
+  assert.equal(await ws.settleCanonical(), 1, "absence never settles a create in flight");
+  await prep();
+  ws.sealCanonical();
+  await assert.rejects(late!(), /ALREADY_EXISTS/);
+  assert.deepEqual(canon().live(), [], "the late create made nothing");
+  assert.deepEqual(open(ws), []);
+});
+
+test("public founding, before founding: a late create that applies while nobody founds is deleted by the alarm", async () => {
   const { ns, ws } = setupFounding();
-  ns.createFailures.push(new TypeError("connection lost"));
-  await assert.rejects(ws.createCanonical(), /connection lost/);
-  assert.equal(await ws.settleCanonical(), 1, "no repository yet, and the create may still apply");
-  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"]]);
+  let late: (() => Promise<unknown>) | null = null;
+  const realCreate = ns.create.bind(ns);
+  ns.create = async (name: string) => {
+    ns.create = realCreate;
+    late = () => realCreate(name);
+    throw new TypeError("connection lost before the answer");
+  };
+  await assert.rejects(ws.prepareCanonical({ readMain: async () => null, firstCommit: async () => undefined }), /connection lost/);
+  await late!();
+  assert.equal(ns.repos.get("canon")!.live().length, 1);
+  await ws.settleCanonical();
+  assert.equal(ns.repos.has("canon"), false, "deleted, with its token");
+  assert.equal(ns.deleteCalls, 1);
+});
+
+test("public founding, refused control: a create Artifacts refuses changed nothing; its step is closed", async () => {
+  const { ns, ws, prep } = setupFounding();
   ns.createFailures.push(new ArtifactsError("INVALID_REPO_NAME", 10002));
-  await assert.rejects(ws.createCanonical(), /INVALID_REPO_NAME/);
-  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"], ["repo-create", "answered"]]);
+  await assert.rejects(prep(), /INVALID_REPO_NAME/);
+  assert.deepEqual(open(ws), []);
+  assert.equal(ws.canonicalDue(), null);
+});
+
+test("public founding: an unconfirmed revocation stays owed and blocks the seal; the alarm confirms it; the retry then seals", async () => {
+  const { ns, ws, canon, prep } = setupFounding();
+  ns.failRevokeOnly = true;
+  await assert.rejects(prep(), /INTERNAL_ERROR/);
+  assert.equal(canon().live().length, 1);
+  assert.throws(() => ws.sealCanonical(), /still owes/);
+  assert.ok(open(ws).some(([k, st]) => k === "token" && st === "owed"));
+  ns.failRevokeOnly = false;
+  assert.equal(await ws.settleCanonical(), 0);
+  assert.deepEqual(canon().live(), []);
+  await prep();
+  ws.sealCanonical();
+  assert.deepEqual(open(ws), []);
+});
+
+test("public founding: when the token is spent and main has no first commit, the repository is retired and made again", async () => {
+  const { ns, ws, world, canon, prep } = setupFounding();
+  // The first push fails; then the alarm revokes the token while nobody founds.
+  await assert.rejects(ws.prepareCanonical({ readMain: async () => null, firstCommit: async () => { throw new Error("push failed"); } }), /push failed/);
+  assert.equal(await ws.settleCanonical(), 0);
+  assert.deepEqual(canon().live(), []);
+  await prep();
+  assert.equal(ns.deleteCalls, 1);
+  assert.equal(world.main, FIRST);
+  ws.sealCanonical();
+});
+
+for (const [label, listing] of [
+  ["incomplete (total larger than the page)", (tokens: unknown[]) => ({ tokens, total: tokens.length + 1 })],
+  ["missing its total", (tokens: unknown[]) => ({ tokens })],
+  ["with a record that has no ID", (tokens: unknown[]) => ({ tokens: [...tokens, { scope: "write", state: "active", expiresAt: new Date(2e12).toISOString() }], total: tokens.length + 1 })],
+  ["with a record of an unknown state", (tokens: unknown[]) => ({ tokens: [...tokens, { id: "x", scope: "write", state: "live", expiresAt: new Date(2e12).toISOString() }], total: tokens.length + 1 })],
+] as const) {
+  test(`public founding: a token inventory ${label} proves nothing; founding waits, and seals once a complete inventory is clean (review a35b4b61, 2)`, async () => {
+    const { ns, ws, canon, prep } = setupFounding();
+    let broken = true;
+    const install = () => {
+      const repo = canon();
+      const real = repo.listTokens.bind(repo);
+      repo.listTokens = async () => (broken ? (listing((await real()).tokens) as never) : real());
+    };
+    // The repository appears at the create; break its listing then.
+    const create = ns.create.bind(ns);
+    ns.create = async (name: string) => {
+      const r = await create(name);
+      install();
+      return r;
+    };
+    await assert.rejects(prep(), /incomplete or malformed/);
+    assert.throws(() => ws.sealCanonical(), /still owes/);
+    assert.ok(open(ws).some(([k, st]) => k === "inventory" && st === "owed"));
+    assert.ok(ws.canonicalDue() !== null);
+    broken = false;
+    await prep();
+    ws.sealCanonical();
+    assert.deepEqual(canon().live(), []);
+  });
+}
+
+test("public founding: an active token nobody owes (from outside the Room) makes the repository unvouched: it is retired and made again", async () => {
+  const { ns, ws, canon, prep, world } = setupFounding();
+  const realCreate = ns.create.bind(ns);
+  ns.create = async (name: string) => {
+    const r = await realCreate(name);
+    if (ns.createCalls === 1) canon().mintRaw("write", 3600); // someone else's token
+    return r;
+  };
+  await prep();
+  assert.equal(ns.deleteCalls, 1);
+  assert.equal(world.main, FIRST);
+  assert.deepEqual(canon().live(), []);
+  ws.sealCanonical();
+});
+
+test("after founding, nothing here touches the canonical repository: the Room's own tokens are never swept", async () => {
+  const { ns, ws, canon, prep } = setupFounding();
+  await prep();
+  ws.sealCanonical();
+  // The Room's own publishing credential, live on the canonical repository.
+  canon().mintRaw("write", 60);
+  assert.equal(await ws.settleCanonical(), 0);
+  assert.equal(await ws.reconcile(), 0);
+  assert.equal(ws.nextDue(), null);
+  assert.equal(ws.canonicalDue(), null);
+  assert.equal(canon().live().length, 1, "untouched");
+  assert.equal(ns.deleteCalls, 0);
+});
+
+test("public founding: a refused first commit is not retried with a token that may be dead: the repository is retired and made again", async () => {
+  const { ns, ws, world, canon } = setupFounding();
+  let refusals = 1;
+  await ws.prepareCanonical({
+    readMain: async () => (ns.repos.has("canon") ? world.main : null),
+    firstCommit: async () => {
+      if (refusals-- > 0) return; // git answered without creating main
+      world.main = FIRST;
+    },
+  });
+  assert.equal(ns.deleteCalls, 1);
+  assert.equal(ns.createCalls, 2);
+  assert.equal(world.main, FIRST);
+  assert.deepEqual(canon().live(), []);
+  ws.sealCanonical();
 });

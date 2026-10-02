@@ -364,6 +364,14 @@ export class RoomCore {
     }
     this.sql.transaction(() => {
       if (this.founded) return;
+      // A new repository is sealed only with nothing owed on it (review a35b4b61); this throws, and the seal aborts, otherwise.
+      if (!genesis.onboarding) {
+        try {
+          this.workspaces.sealCanonical();
+        } catch {
+          throw artroomError("unavailable", "The canonical repository still owes cleanup. Retry the same found.");
+        }
+      }
       const id = roomIdOf(genesis);
       setMeta(this.sql, "room", id);
       setMeta(this.sql, "genesis", canonicalize(genesis));
@@ -384,29 +392,28 @@ export class RoomCore {
   }
 
   /**
-   * Public founding, step 6 (R-GEN-12; request b6b51de7): create the room's
-   * repository and give `main` its first commit, with no files, so that the
-   * first landing has a main to land on (R-LAND-2, R-PUB-4). Each remote step
-   * is a duty in lane B's ledger, recorded before it is sent: the create's
-   * 24-hour token and the first commit's 60-second token are owed revocation
-   * from their answers on. The genesis is sealed only once no token is left
-   * on the repository; until then `found` fails, and the alarm settles what
-   * is owed. One step at a time, and never after the room is founded, when
-   * the Room's own tokens may be live there.
+   * Public founding, step 6 (R-GEN-12; request b6b51de7, review a35b4b61):
+   * create the room's repository and give `main` its first commit, with no
+   * files, so that the first landing has a main to land on (R-LAND-2,
+   * R-PUB-4). Lane B's ledger records each remote step before it is sent,
+   * pushes the first commit with the create's own token (no token is minted
+   * here), confirms that token's revocation and a complete inventory with no
+   * active token, and retires the repository whenever it cannot vouch for
+   * every token. The genesis is sealed only after that (`sealCanonical`, in
+   * the sealing transaction); until then `found` fails and the alarm settles
+   * what is owed. One step at a time, and never after the room is founded,
+   * when the Room's own tokens may be live there.
    */
   private newRepository(genesis: Genesis): Promise<void> {
     return this.serial(async () => {
       if (this.founded) return;
-      const ws = this.workspaces;
-      await ws.createCanonical();
-      if ((await this.ports.artifacts.readMain()) === null) {
-        const remote = await this.ports.artifacts.canonicalRemote();
-        const push = this.remotes.firstCommit;
-        if (!push) throw new Error("this deployment cannot push a first commit");
-        // A refused push leaves main as it is; `found` reads it next.
-        await ws.withCanonicalToken((token) => push(remote, token, Date.parse(genesis.createdAt)));
-      }
-      if ((await ws.settleCanonical()) > 0) throw new Error("a token on the new repository is not yet revoked");
+      const push = this.remotes.firstCommit;
+      if (!push) throw new Error("this deployment cannot push a first commit");
+      await this.workspaces.prepareCanonical({
+        readMain: () => this.ports.artifacts.readMain(),
+        // A refused push leaves main as it is; the ledger reads it next.
+        firstCommit: (remote, token) => push(remote, token, Date.parse(genesis.createdAt)),
+      });
     });
   }
 
@@ -422,7 +429,7 @@ export class RoomCore {
   foundingDue(): number | null {
     if (this.founded || !getMeta(this.sql, "founding_repo")) return null;
     try {
-      return this.workspaces.nextDue();
+      return this.workspaces.canonicalDue();
     } catch {
       return null;
     }

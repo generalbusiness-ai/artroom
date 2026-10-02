@@ -58,8 +58,9 @@ const productionServices: ServicesFactory = (env, roomObject) => {
   const binding: ArtifactsBinding = artifacts ?? absent("ARTIFACTS");
   // The import namespace's own binding (R-GEN-12): repositories there are imported, never created.
   const bindings: Record<string, ArtifactsBinding> = {};
-  if (env.IMPORT_NAMESPACE && env.IMPORT_NAMESPACE !== namespace) bindings[env.IMPORT_NAMESPACE] = (env.IMPORT_ARTIFACTS as ArtifactsBinding | undefined) ?? absent("IMPORT_ARTIFACTS");
-  const bindingOf = (ns: string): ArtifactsBinding => bindings[ns] ?? binding;
+  // Only a binding the deployment has: a configured namespace without one has no repository here (review a35b4b61).
+  if (env.IMPORT_NAMESPACE && env.IMPORT_NAMESPACE !== namespace && env.IMPORT_ARTIFACTS) bindings[env.IMPORT_NAMESPACE] = env.IMPORT_ARTIFACTS as ArtifactsBinding;
+  const bindingOf = (ns: string): ArtifactsBinding => (ns === namespace ? binding : bindings[ns] ?? absent(`Artifacts binding for ${ns}`));
   // The stub is resolved per call, so a deployment without the sandbox still founds rooms and admits acts that need no repository work.
   const stub: PublisherStub = {
     pinObjects: (r) => publisher().pinObjects(r),
