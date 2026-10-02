@@ -91,6 +91,7 @@ describe("P2: the installed credential's record is separate from reservations", 
       return fetch(input, init);
     };
     expect((await cli(home, ["workspace"], dir, { fetch: offline })).code).toBe(EXIT.failed);
+    expect(ownerOf(dir).installed?.lane).toBe(x); // the failed reservation left the installed record alone
     const res = await cli(home, ["release", "--lane", x], dir);
     expect(res.code).toBe(EXIT.ok);
     expect(res.out).toContain(`Removed the workspace credential for lane ${x}, lease 1, from ${credential(dir)}.`);
@@ -326,7 +327,8 @@ describe("P2: the destination lock", () => {
   test("a lock from another host, or a recovery left by a crashed recoverer, is named for the user, not removed", () => {
     const dir = join(repoAt("repo"), ".git");
     mkdirSync(join(dir, "artroom"), { recursive: true });
-    writeFileSync(lockPath(dir), JSON.stringify({ pid: 1, host: "elsewhere.example", token: "t" }));
+    // A process ID that is free on this host: only the host tells that it is not this host's to judge.
+    writeFileSync(lockPath(dir), JSON.stringify({ pid: 999_997, host: "elsewhere.example", token: "t" }));
     const saved = lockWait.ms;
     lockWait.ms = 100;
     try {
