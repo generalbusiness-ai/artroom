@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3c468d7ede0d94d02b233bf210753170511decd7","text":"Replaced by the review request for exact head 522a54c7801590e0aa266f2cf8032ce0b77d0d8c; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"promise","text":"Checker will review exact acts-review revision 2 head 522a54c7, all source citations and the widened formal and comparative scope from assert ae96bba1; carry the source findings from revision 1 forward. No adoption or implementation."}
