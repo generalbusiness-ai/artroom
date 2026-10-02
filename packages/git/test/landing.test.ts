@@ -4,7 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { OpId, Sha } from "@generalbusiness/artroom-contract";
-import { Landing, type FaultPoint } from "../src/landing/engine.ts";
+import { Landing, REVOKE_TIMEOUT_MS, type FaultPoint } from "../src/landing/engine.ts";
+import { TOKEN_CLEANUP_BACKOFF } from "../src/landing/core.ts";
 import { GitPublisher } from "../src/publisher/git-publisher.ts";
 import { GitOps, pinnedRef } from "../src/publisher/gitops.ts";
 import { mkdirSync } from "node:fs";
@@ -35,9 +36,9 @@ async function world() {
   const sql = nodeSql();
   const pub = new ControlledPublisher(new GitPublisher(f.ops, f.canonical));
   const engines: Landing[] = [];
-  const make = (fault?: (p: FaultPoint, op: OpId) => void) => {
+  const make = (fault?: (p: FaultPoint, op: OpId) => void, opts: { revokeTimeoutMs?: number } = {}) => {
     for (const e of engines) e.kill(); // a restart replaces the old instance
-    const e = new Landing({ sql, room, publisher: pub, tokens, now: clock.now, ...(fault ? { fault } : {}) });
+    const e = new Landing({ sql, room, publisher: pub, tokens, now: clock.now, ...(fault ? { fault } : {}), ...opts });
     engines.push(e);
     return e;
   };
@@ -650,6 +651,532 @@ test("each push attempt mints its own token, and every one is revoked; a failed 
   assert.equal(w.tokens.minted, 2);
   assert.equal(w.tokens.live.size, 0);
   noTokens(w, id);
+});
+
+// ------------------------------------------------------- tokens of terminal operations (plan 003)
+
+test("R-PUB-3: the push lands but its token's revocation fails; after a restart, before the token expires, the alarm revokes it: one receipt, slot free", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id, head } = await w.land(1, { "src/c.txt": "c\n" });
+  await readyAndReserve(w, id);
+  w.tokens.failRevoke = true;
+  await w.engine.publish();
+  // The landing is confirmed by reading main back; the failed revocation changes nothing about it.
+  const landedView = w.engine.view(id);
+  assert.equal(landedView?.state, "landed");
+  assert.equal(await w.f.canonicalMain(), head);
+  assert.deepEqual(w.engine.slot(), { state: "free", last: 1 });
+  assert.deepEqual([...w.tokens.live], ["tok_1"]);
+  const startedAt = w.clock.t;
+  const due = w.engine.nextDue();
+  assert.ok(due !== null, "the known token's revocation is still owed");
+  assert.ok(due > startedAt, "and is not due at once after it just failed");
+  // Artifacts recovers and the room restarts on the same SQLite, well before the 60 s token expires.
+  w.tokens.failRevoke = false;
+  const restarted = w.make();
+  assert.equal(restarted.nextDue(), due, "the due time is durable");
+  w.clock.t = due;
+  assert.ok(w.clock.t - startedAt < 60_000);
+  await restarted.reconcile();
+  await restarted.cleanupDone();
+  assert.deepEqual([...w.tokens.live], [], "the token is revoked");
+  assert.deepEqual(w.tokens.revoked, ["tok_1"]);
+  assert.equal(restarted.nextDue(), null, "nothing is owed any more");
+  // One receipt, the slot free, the operation's view unchanged but for its update time.
+  assert.equal(landedCount(w, id), 1);
+  assert.deepEqual(w.room.log.map((e) => e.event.type), ["land-reserved", "land-outcome"]);
+  assert.deepEqual(restarted.slot(), { state: "free", last: 1 });
+  assert.deepEqual({ ...restarted.view(id), updatedAt: "" }, { ...landedView, updatedAt: "" });
+  noTokens(w, id);
+});
+
+/** Make revocation of chosen token IDs fail, and count every revocation asked for, by token ID. */
+function revocations(w: World) {
+  const stuck = new Set<string>();
+  const asked = new Map<string, number>();
+  const real = w.tokens.revoke.bind(w.tokens);
+  w.tokens.revoke = async (id: string) => {
+    asked.set(id, (asked.get(id) ?? 0) + 1);
+    if (stuck.has(id)) throw new Error("Artifacts unavailable (revoke)");
+    return real(id);
+  };
+  return { stuck, asked };
+}
+
+test("R-PUB-3: a failed cleanup keeps a durable later due time with capped backoff, is not retried early, and is never given up, however long the token has expired", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await readyAndReserve(w, id);
+  const r = revocations(w);
+  r.stuck.add("tok_1");
+  await w.engine.publish();
+  assert.equal(w.engine.view(id)?.state, "landed");
+  assert.equal(r.asked.get("tok_1"), 1);
+  const receipt = w.room.log.length;
+  const startedAt = w.clock.t;
+  let engine = w.engine;
+  let waits: number[] = [];
+  for (let i = 0; i < 12; i++) {
+    const [owed] = engine.core.tokenCleanup();
+    assert.ok(owed && owed.op === id && owed.n === 1, "still owed");
+    assert.equal(engine.nextDue(), owed.dueAt);
+    assert.ok(owed.dueAt > w.clock.t, "in the future");
+    waits.push(owed.backoffMs);
+    // Not yet due: an alarm for other work does not try it.
+    const before = r.asked.get("tok_1");
+    w.clock.t = owed.dueAt - 1;
+    await engine.reconcile();
+    await engine.cleanupDone();
+    assert.equal(r.asked.get("tok_1"), before, "not tried before its due time");
+    // Due: tried once, fails, rescheduled.
+    w.clock.t = owed.dueAt;
+    await engine.reconcile();
+    await engine.cleanupDone();
+    assert.equal(r.asked.get("tok_1"), (before ?? 0) + 1);
+    if (i % 4 === 3) engine = w.make(); // restarts keep the schedule
+  }
+  assert.deepEqual(waits, [1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 256_000, 300_000, 300_000, 300_000]);
+  assert.ok(w.clock.t - startedAt > 20 * 60_000, "more than 20 minutes: the 60 s token expired long ago");
+  // Neither expiry nor the failed answers decided anything about the landing.
+  assert.equal(engine.view(id)?.state, "landed");
+  assert.equal(w.room.log.length, receipt, "no event for any revocation attempt");
+  assert.deepEqual(engine.slot(), { state: "free", last: 1 });
+  // A healthy answer clears the duty.
+  r.stuck.clear();
+  w.clock.t = engine.core.tokenCleanup()[0]!.dueAt;
+  await engine.reconcile();
+  await engine.cleanupDone();
+  assert.deepEqual(engine.core.tokenCleanup(), []);
+  assert.equal(engine.nextDue(), null);
+  assert.deepEqual([...w.tokens.live], []);
+  assert.equal(landedCount(w, id), 1);
+});
+
+test("R-PUB-3: several ended operations owe revocations across a restart; each revokes only its own token, never another operation's or an unrelated one, and a later publication reserves, pushes and lands meanwhile", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const r = revocations(w);
+  const a = await w.land(1, { "src/a.txt": "a\n" });
+  const b = await w.land(2, { "src/b.txt": "b\n" });
+  r.stuck.add("tok_1").add("tok_2");
+  await w.engine.settle();
+  assert.equal(w.engine.view(a.id)?.state, "landed");
+  assert.equal(w.engine.view(b.id)?.state, "landed");
+  assert.deepEqual(w.engine.core.tokenCleanup().map((c) => [c.op, c.n]), [[a.id, 1], [b.id, 1]]);
+  // Another holder's canonical token, unknown to this engine.
+  const unrelated = await w.tokens.mint();
+  // Restart. Artifacts recovers, except that a's token is still refused.
+  const restarted = w.make();
+  r.stuck.delete("tok_2");
+  // A later publication, while both revocations are owed. Its push is checked against live tokens at the remote.
+  w.pub.authAtRemote = w.tokens;
+  const c = await w.land(3, { "src/c.txt": "c\n" });
+  w.clock.advance(TOKEN_CLEANUP_BACKOFF.firstMs);
+  await restarted.settle();
+  const cv = restarted.view(c.id);
+  assert.equal(cv?.state, "landed", "the owed revocations neither hold the slot nor stop the next push");
+  assert.equal(await w.f.canonicalMain(), cv?.state === "landed" ? cv.integration : null);
+  assert.deepEqual(w.room.events("land-reserved").map((e) => [e.op, e.publication]), [[a.id, 1], [b.id, 2], [c.id, 3]]);
+  for (const o of [a, b, c]) assert.equal(landedCount(w, o.id), 1);
+  // b's token was revoked by its own record; c's by its own publication step; a's stays owed.
+  assert.deepEqual([...w.tokens.live].sort(), ["tok_1", unrelated.id].sort());
+  assert.deepEqual(Object.fromEntries(r.asked), { tok_1: 2, tok_2: 2, tok_4: 1 });
+  assert.equal(r.asked.has(unrelated.id), false, "an unrelated canonical token is never revoked");
+  assert.equal(unrelated.id, "tok_3");
+  assert.deepEqual(restarted.core.tokenCleanup().map((x) => [x.op, x.n]), [[a.id, 1]]);
+  assert.ok(restarted.nextDue()! > w.clock.t);
+  // a's token is accepted again later: only a's record is cleared.
+  r.stuck.clear();
+  w.clock.t = restarted.nextDue()!;
+  await restarted.reconcile();
+  await restarted.cleanupDone();
+  assert.deepEqual([...w.tokens.live], [unrelated.id]);
+  assert.deepEqual(restarted.core.tokenCleanup(), []);
+  assert.equal(r.asked.get("tok_1"), 3);
+});
+
+test("R-PUB-3, R-REV-5: an abort that ends without a push, by its existing definite path, still owes its token's revocation, and the record of the abort attempt stays as it was", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await readyAndReserve(w, id);
+  // A compromised revocation arrives while the token is minted (R-LAND-3), and Artifacts refuses revocations.
+  const e = w.make((p) => {
+    if (p === "token-minted") w.current().abort(actId(900), "key_compromised", 900);
+  });
+  w.tokens.failRevoke = true;
+  await e.publish(); // the push is not made
+  await e.publish(); // the abort attempt is recorded and main is read back: nothing pushed can land
+  const v = e.view(id);
+  assert.equal(v?.state, "aborted");
+  assert.equal(w.pub.pushes, 0);
+  assert.equal(await w.f.canonicalMain(), w.f.main);
+  assert.deepEqual(e.slot(), { state: "free", last: 1 });
+  assert.equal(v?.state === "aborted" ? v.abort.tokenRevoked : null, false);
+  assert.deepEqual([...w.tokens.live], ["tok_1"]);
+  const log = w.room.log.map((x) => x.event.type);
+  assert.deepEqual(log, ["land-reserved", "abort-attempt", "land-outcome"]);
+  // Restart; Artifacts recovers; the alarm revokes it.
+  w.tokens.failRevoke = false;
+  const restarted = w.make();
+  w.clock.t = restarted.nextDue()!;
+  await restarted.reconcile();
+  await restarted.cleanupDone();
+  assert.deepEqual([...w.tokens.live], []);
+  assert.deepEqual(restarted.core.tokenCleanup(), []);
+  assert.deepEqual(w.room.log.map((x) => x.event.type), log, "no new event");
+  const after = restarted.view(id);
+  assert.equal(after?.state === "aborted" ? after.abort.tokenRevoked : null, false, "the abort attempt's record is history");
+});
+
+test("R-PUB-3: a held publication's tokens stay with its own publication steps; a stopped instance's late revocation answer writes nothing", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await readyAndReserve(w, id);
+  w.pub.pushDown = true;
+  w.tokens.failRevoke = true;
+  await w.engine.publish();
+  assert.equal(w.engine.view(id)?.state, "unresolved");
+  assert.deepEqual([...w.tokens.live], ["tok_1"]);
+  assert.deepEqual(w.engine.core.tokenCleanup(), [], "no cleanup record while the operation holds the slot");
+  // It lands on the forward retry, while revocation still fails: now both tokens are owed.
+  w.pub.pushDown = false;
+  w.clock.advance(5_000);
+  await w.engine.publish();
+  assert.equal(w.engine.view(id)?.state, "landed");
+  const owed = w.engine.core.tokenCleanup();
+  assert.deepEqual(owed.map((c) => [c.op, c.n, c.backoffMs]), [[id, 1, 1_000], [id, 2, 1_000]]);
+  // An instance asks for a revocation, and is replaced before Artifacts answers.
+  w.tokens.failRevoke = false;
+  const gate = (await import("./support.ts")).deferred();
+  const real = w.tokens.revoke.bind(w.tokens);
+  w.tokens.revoke = async (tok: string) => {
+    await gate.promise;
+    return real(tok);
+  };
+  w.clock.t = owed[0]!.dueAt;
+  const old = w.engine;
+  await old.reconcile(); // returns with the revocation still unanswered
+  w.make();
+  gate.reject(new Error("Artifacts unavailable (revoke)"));
+  await old.cleanupDone();
+  assert.deepEqual(w.current().core.tokenCleanup(), owed, "the stopped instance's failure rescheduled nothing");
+  // The new instance revokes each of the operation's two tokens by its own ID.
+  w.tokens.revoke = real;
+  await w.current().reconcile();
+  await w.current().cleanupDone();
+  assert.deepEqual(w.tokens.revoked, ["tok_1", "tok_2"]);
+  assert.deepEqual([...w.tokens.live], []);
+  assert.deepEqual(w.current().core.tokenCleanup(), []);
+});
+
+/** `p`, or a failure naming `what` if it has not settled within `ms` of real time. */
+async function within<T>(p: Promise<T>, what: string, ms = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`still waiting after ${ms} ms: ${what}`)), ms);
+    timer.unref();
+  });
+  try {
+    return await Promise.race([p, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Count revocations by token ID; the first revocation of each token in `held` waits for `gate`. */
+function heldRevocations(w: World, held: readonly string[]) {
+  const asked: string[] = [];
+  const gate = deferredGate();
+  const real = w.tokens.revoke.bind(w.tokens);
+  w.tokens.revoke = async (id: string) => {
+    asked.push(id);
+    if (held.includes(id) && asked.filter((x) => x === id).length === 1) await gate.promise;
+    return real(id);
+  };
+  return { asked, gate };
+}
+
+function deferredGate() {
+  let resolve!: () => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<void>((a, b) => {
+    resolve = a;
+    reject = b;
+  });
+  return { promise, resolve, reject };
+}
+
+test("review 14739925: an ended operation's revocation that has not answered holds up no later publication; it stays owed, one attempt at a time; a restarted room retries it, and the dead instance's late answer writes nothing", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const a = await w.land(1, { "src/a.txt": "a\n" });
+  await readyAndReserve(w, a.id);
+  w.tokens.failRevoke = true;
+  await w.engine.publish();
+  w.tokens.failRevoke = false;
+  assert.equal(w.engine.view(a.id)?.state, "landed");
+  const owed = w.engine.core.tokenCleanup();
+  const r = heldRevocations(w, ["tok_1"]);
+  w.clock.t = owed[0]!.dueAt;
+  const e1 = w.engine; // the default timeout: the revocation stays unanswered throughout
+  await within(e1.reconcile(), "the alarm returns while an old revocation is unanswered");
+  assert.deepEqual(r.asked, ["tok_1"]);
+  await within(e1.reconcile(), "a second alarm");
+  assert.deepEqual(r.asked, ["tok_1"], "one cleanup pass at a time: not sent again while unanswered");
+  // A later publication prepares, reserves, pushes and lands meanwhile.
+  const b = await w.land(2, { "src/b.txt": "b\n" });
+  await within(readyAndReserve(w, b.id), "the later preparation");
+  await within(e1.publish(), "the later publication");
+  assert.equal(e1.view(b.id)?.state, "landed");
+  assert.equal(w.pub.pushes, 2);
+  assert.equal(landedCount(w, b.id), 1);
+  assert.deepEqual(e1.slot(), { state: "free", last: 2 });
+  assert.deepEqual(r.asked, ["tok_1", "tok_2"], "b's token is revoked by its own publication step");
+  assert.deepEqual(e1.core.tokenCleanup(), owed, "a's revocation is still owed, unchanged");
+  assert.deepEqual([...w.tokens.live], ["tok_1"]);
+  // Restart: the new instance sends it again, and Artifacts answers.
+  const e2 = w.make();
+  await e2.reconcile();
+  await within(e2.cleanupDone(), "the restarted room's cleanup");
+  assert.deepEqual(r.asked, ["tok_1", "tok_2", "tok_1"]);
+  assert.deepEqual(e2.core.tokenCleanup(), []);
+  assert.deepEqual([...w.tokens.live], []);
+  // The dead instance's answer finally arrives: it writes nothing.
+  r.gate.resolve();
+  await within(e1.cleanupDone(), "the dead instance's pass");
+  assert.deepEqual(e2.core.tokenCleanup(), []);
+  assert.deepEqual(w.room.log.map((x) => x.event.type), ["land-reserved", "land-outcome", "land-reserved", "land-outcome"]);
+});
+
+test("review 14739925: a revocation that does not answer in time counts as failed, with backoff; its late answer is not taken as success, and the token stays owed until a later attempt is answered", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const a = await w.land(1, { "src/a.txt": "a\n" });
+  await readyAndReserve(w, a.id);
+  w.tokens.failRevoke = true;
+  await w.engine.publish();
+  w.tokens.failRevoke = false;
+  const e = w.make(undefined, { revokeTimeoutMs: 20 });
+  const r = heldRevocations(w, ["tok_1"]);
+  w.clock.t = e.core.tokenCleanup()[0]!.dueAt;
+  await e.reconcile();
+  await within(e.cleanupDone(), "the timed-out pass");
+  const [owed] = e.core.tokenCleanup();
+  assert.deepEqual([owed?.op, owed?.n, owed?.backoffMs, owed?.dueAt], [a.id, 1, 2_000, w.clock.t + 2_000]);
+  // The late answer: Artifacts did revoke it, but the engine no longer waits for that answer.
+  r.gate.resolve();
+  await new Promise((res) => setTimeout(res, 20));
+  assert.deepEqual([...w.tokens.live], []);
+  assert.deepEqual(e.core.tokenCleanup(), [owed], "still owed: a late answer is dropped");
+  // The next attempt is answered (already revoked), and clears it.
+  w.clock.t = owed!.dueAt;
+  await e.reconcile();
+  await within(e.cleanupDone(), "the retry");
+  assert.deepEqual(r.asked, ["tok_1", "tok_1"]);
+  assert.deepEqual(e.core.tokenCleanup(), []);
+  assert.equal(landedCount(w, a.id), 1);
+  assert.equal(e.view(a.id)?.state, "landed");
+});
+
+test("review 14739925: a slow batch of revocations delays no preparation or publication; the batch completes afterwards", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const ops = [];
+  for (let i = 1; i <= 3; i++) ops.push(await w.land(i, { [`src/f${i}.txt`]: `${i}\n` }));
+  w.tokens.failRevoke = true;
+  await w.engine.settle(50);
+  w.tokens.failRevoke = false;
+  for (const o of ops) assert.equal(w.engine.view(o.id)?.state, "landed");
+  assert.equal(w.engine.core.tokenCleanup().length, 3);
+  const r = heldRevocations(w, ["tok_1", "tok_2", "tok_3"]);
+  w.clock.t = Math.max(...w.engine.core.tokenCleanup().map((c) => c.dueAt));
+  const e = w.engine;
+  await within(e.reconcile(), "the alarm that starts the slow batch");
+  const d = await w.land(4, { "src/f4.txt": "4\n" });
+  await within(e.reconcile(), "an alarm that prepares the next operation");
+  assert.equal(e.view(d.id)?.state, "ready");
+  await within(e.reconcile(), "an alarm that reserves and publishes it");
+  assert.equal(e.view(d.id)?.state, "landed");
+  assert.equal(landedCount(w, d.id), 1);
+  assert.deepEqual(r.asked, ["tok_1", "tok_4"], "the batch is still on its first answer");
+  r.gate.resolve();
+  await within(e.cleanupDone(), "the batch");
+  assert.deepEqual(r.asked, ["tok_1", "tok_4", "tok_2", "tok_3"]);
+  assert.deepEqual(e.core.tokenCleanup(), []);
+  assert.deepEqual([...w.tokens.live], []);
+});
+
+test("R-PUB-3: one cleanup pass tries at most twenty owed tokens; the rest stay due for the next (adapted from review 14739925's diagnostic)", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const a = await w.land(1, { "src/a.txt": "a\n" });
+  await readyAndReserve(w, a.id);
+  w.tokens.failRevoke = true;
+  await w.engine.publish();
+  w.tokens.failRevoke = false;
+  // Storage with 25 owed tokens on one ended operation.
+  const op = w.engine.core.get(a.id)!;
+  for (let i = 2; i <= 25; i++) {
+    const token = await w.tokens.mint();
+    op.pushes!.push({ ...op.pushes![0]!, n: i, tokenId: token.id, tokenRevoked: false });
+  }
+  w.sql.all("UPDATE artroom_land_op SET body = ? WHERE id = ?", JSON.stringify(op), a.id);
+  w.sql.all("DELETE FROM artroom_land_token_cleanup");
+  w.sql.all("DELETE FROM artroom_land_meta WHERE k = 'token-cleanup'");
+  const e = w.make();
+  w.clock.t = e.nextDue()!;
+  await e.reconcile();
+  await within(e.cleanupDone(), "the first pass");
+  assert.equal(e.core.tokenCleanup().length, 5);
+  assert.equal(w.tokens.live.size, 5);
+  assert.equal(e.nextDue(), w.clock.t, "the rest are still due");
+  await e.reconcile();
+  await within(e.cleanupDone(), "the second pass");
+  assert.deepEqual(e.core.tokenCleanup(), []);
+  assert.equal(w.tokens.live.size, 0);
+  assert.equal(landedCount(w, a.id), 1);
+  assert.deepEqual(e.slot(), { state: "free", last: 1 });
+});
+
+test("R-PUB-7: after a restart the held publication is recovered before any ended operation's token is tried", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const a = await w.land(1, { "src/a.txt": "a\n" });
+  await readyAndReserve(w, a.id);
+  w.tokens.failRevoke = true;
+  await w.engine.publish();
+  w.tokens.failRevoke = false;
+  const b = await w.land(2, { "src/b.txt": "b\n" });
+  const crashing = w.make((p) => {
+    if (p === "token-minted") throw new Crash(p);
+  });
+  await readyAndReserve(w, b.id);
+  await assert.rejects(crashing.publish(), Crash);
+  const r = heldRevocations(w, []);
+  const restarted = w.make();
+  w.clock.t = restarted.core.tokenCleanup()[0]!.dueAt;
+  await restarted.reconcile();
+  await within(restarted.cleanupDone(), "the cleanup pass");
+  assert.equal(restarted.view(b.id)?.state, "landed");
+  assert.deepEqual(r.asked, ["tok_2", "tok_3", "tok_1"], "b's tokens first, by its own recovery; then a's owed token");
+  assert.deepEqual([...w.tokens.live], []);
+});
+
+/** Land operations 1..n, each with its token's revocation failing, so each owes one. */
+async function landedOwing(w: World, n: number) {
+  const ops = [];
+  for (let i = 1; i <= n; i++) ops.push(await w.land(i, { [`src/f${i}.txt`]: `${i}\n` }));
+  w.tokens.failRevoke = true;
+  await w.engine.settle(50);
+  w.tokens.failRevoke = false;
+  for (const o of ops) assert.equal(w.engine.view(o.id)?.state, "landed");
+  assert.equal(w.engine.core.tokenCleanup().length, n);
+  return ops;
+}
+
+test("review f060871b: while a cleanup pass waits on an answer, the owed revocations are due again when its current attempt times out, not at once; other work still sets an earlier wake; a restarted room owes them at once", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  await landedOwing(w, 2);
+  const gates = new Map([["tok_1", deferredGate()], ["tok_2", deferredGate()]]);
+  const r = { asked: [] as string[], gate: gates.get("tok_1")! };
+  const real = w.tokens.revoke.bind(w.tokens);
+  w.tokens.revoke = async (id: string) => {
+    r.asked.push(id);
+    await gates.get(id)?.promise;
+    return real(id);
+  };
+  t.after(() => gates.get("tok_2")!.resolve());
+  const due = Math.max(...w.engine.core.tokenCleanup().map((c) => c.dueAt));
+  w.clock.t = due + 5_000; // both overdue
+  const e = w.engine;
+  await e.reconcile();
+  assert.deepEqual(r.asked, ["tok_1"]);
+  assert.equal(e.nextDue(), w.clock.t + REVOKE_TIMEOUT_MS, "not the overdue time: the pass answers or times out by then");
+  // The first answer arrives 20 s later; the pass waits on the second: its own attempt sets the wake.
+  w.clock.advance(20_000);
+  const second = new Promise<void>((res) => {
+    const check = () => (r.asked.length === 2 ? res() : setTimeout(check, 2));
+    check();
+  });
+  r.gate.resolve();
+  await second;
+  assert.deepEqual(r.asked, ["tok_1", "tok_2"]);
+  assert.equal(e.nextDue(), w.clock.t + REVOKE_TIMEOUT_MS);
+  // Other work due now still wakes the room now.
+  const c = await w.land(3, { "src/f3.txt": "3\n" });
+  assert.equal(e.nextDue(), w.clock.t);
+  w.room.lanes.set(c.lane, { generation: 1, head: c.head, leaseGeneration: 1, holder: "released" });
+  e.laneChanged(c.lane, "released");
+  assert.equal(e.nextDue(), w.clock.t + REVOKE_TIMEOUT_MS);
+  // A restarted room has no pass in flight: the owed revocation is due at once.
+  const restarted = w.make();
+  assert.equal(restarted.nextDue(), restarted.core.tokenCleanup()[0]!.dueAt);
+  assert.ok(restarted.nextDue()! < w.clock.t);
+});
+
+test("review f060871b: a revocation answered whose completion cannot commit counts as a failure with backoff; the rest of the batch goes on; when storage cannot record even the retry, the debt keeps its due time", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const ops = await landedOwing(w, 2);
+  w.clock.t = Math.max(...w.engine.core.tokenCleanup().map((c) => c.dueAt));
+  // The completion transaction fails: deleting a cleanup record aborts.
+  w.sql.all("CREATE TRIGGER cleanup_delete_down BEFORE DELETE ON artroom_land_token_cleanup BEGIN SELECT RAISE(ABORT, 'completion down'); END");
+  const e = w.engine;
+  await e.reconcile();
+  await within(e.cleanupDone(), "the pass");
+  assert.deepEqual([...w.tokens.live], [], "Artifacts revoked both");
+  assert.deepEqual(e.core.tokenCleanup().map((c) => [c.op, c.backoffMs, c.dueAt]), ops.map((o) => [o.id, 2_000, w.clock.t + 2_000]), "both still owed, each on its backoff");
+  for (const o of ops) assert.equal(e.core.get(o.id)?.pushes?.[0]?.tokenRevoked, false, "the completion rolled back");
+  // Neither can the retry be recorded: the batch still goes on, and the debt keeps its due time.
+  w.sql.all("CREATE TRIGGER cleanup_update_down BEFORE UPDATE ON artroom_land_token_cleanup BEGIN SELECT RAISE(ABORT, 'retry down'); END");
+  const before = e.core.tokenCleanup();
+  w.clock.t = before[1]!.dueAt;
+  const asked = w.tokens.revoked.length;
+  await e.reconcile();
+  await within(e.cleanupDone(), "the second pass");
+  assert.equal(w.tokens.revoked.length - asked, 2, "both records were tried");
+  assert.deepEqual(e.core.tokenCleanup(), before);
+  // Storage recovers: the next answered attempts complete.
+  w.sql.all("DROP TRIGGER cleanup_delete_down");
+  w.sql.all("DROP TRIGGER cleanup_update_down");
+  await e.reconcile();
+  await within(e.cleanupDone(), "the third pass");
+  assert.deepEqual(e.core.tokenCleanup(), []);
+  for (const o of ops) {
+    assert.equal(e.core.get(o.id)?.pushes?.[0]?.tokenRevoked, true);
+    assert.equal(landedCount(w, o.id), 1);
+  }
+  assert.deepEqual(e.slot(), { state: "free", last: 2 });
+});
+
+test("R-PUB-3: a room stored before the cleanup records existed owes its ended operations' unrevoked tokens once, at start", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await readyAndReserve(w, id);
+  w.tokens.failRevoke = true;
+  await w.engine.publish();
+  assert.equal(w.engine.view(id)?.state, "landed");
+  // The storage as the previous version left it: the token unrevoked in the operation, and no cleanup records.
+  w.sql.all("DELETE FROM artroom_land_token_cleanup");
+  w.sql.all("DELETE FROM artroom_land_meta WHERE k = 'token-cleanup'");
+  assert.equal(w.engine.nextDue(), null);
+  w.tokens.failRevoke = false;
+  const restarted = w.make();
+  assert.deepEqual(restarted.core.tokenCleanup().map((c) => [c.op, c.n]), [[id, 1]]);
+  w.clock.t = restarted.nextDue()!;
+  await restarted.reconcile();
+  await restarted.cleanupDone();
+  assert.deepEqual([...w.tokens.live], []);
+  assert.equal(landedCount(w, id), 1);
+  // Once: a record cleared after adoption is not adopted again.
+  w.sql.all("UPDATE artroom_land_op SET body = replace(body, '\"tokenRevoked\":true', '\"tokenRevoked\":false')");
+  assert.deepEqual(w.make().core.tokenCleanup(), []);
 });
 
 // ------------------------------------------------------- the retained land input (R-LAND-4, R-LAND-7)
