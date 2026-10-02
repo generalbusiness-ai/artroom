@@ -1,3 +1,6 @@
+ ✓ test/review-6d392973.test.ts > review 6d392973: the retry wait > removes its abort listener when the wait ends
+ ✓ test/review-6d392973.test.ts > review 6d392973: the retry wait > still rejects with the signal's reason when aborted during the wait
+ ✓ test/review-6d392973.test.ts > review 6d392973: the retry wait > rejects at once if the signal is already aborted
  ↓ test/live.test.ts > live: openai/gpt-4.1-mini on OpenRouter claims, proposes and lands through a reset after propose
  ✓ test/do-sqlite.test.ts > Durable Object SQLite transactions > refuse SAVEPOINT in SQL, and roll back an async storage.transaction() across awaits
  ✓ test/do-sqlite.test.ts > pi-durable SqliteStorage on Durable Object SQLite > reserves ID 1 for the immutable root conversation
@@ -27,15 +30,15 @@
  ✓ test/review-f2212c63.test.ts > review f2212c63, finding 1: an act whose reply is lost through every client attempt > after the reset, connecting to the room fails once: the tool connects again, and recovers the receipt
  ✓ test/review-f2212c63.test.ts > review f2212c63, finding 1: an act whose reply is lost through every client attempt > replies lost for one round of client attempts, then restored: the same run sends the stored envelope again and goes on
  ✓ test/review-f2212c63.test.ts > review f2212c63, finding 1: an act whose reply is lost through every client attempt > a definite failure (an error that says nothing was recorded) settles the tool at once, and is not sent again
- ✓ test/review-f2212c63.test.ts > review f2212c63, finding 2: the push and the record of it > the checker's case: the Agent is reset inside the push, after the fork has the commit and before the call returns; the rerun finds that commit and lands it
  ✓ test/agent.test.ts > a pi-durable agent through claim, propose and land > runs the task end to end: one act of each kind, landed on main, the lane document matching the receipts
- ✓ test/agent.test.ts > a pi-durable agent through claim, propose and land > the same request ID after the run finished returns the same answer and sends nothing
+ ✓ test/review-f2212c63.test.ts > review f2212c63, finding 2: the push and the record of it > the checker's case: the Agent is reset inside the push, after the fork has the commit and before the call returns; the rerun finds that commit and lands it
  ✓ test/review-f2212c63.test.ts > review f2212c63, finding 2: the push and the record of it > reset at write:before-push: one commit prepared, pushed once, and landed
+ ✓ test/agent.test.ts > a pi-durable agent through claim, propose and land > the same request ID after the run finished returns the same answer and sends nothing
  ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at claim:before-send: the run resumes, each act is admitted once, no refusal, the landing lands
- ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at claim:after-send: the run resumes, each act is admitted once, no refusal, the landing lands
  ✓ test/review-f2212c63.test.ts > review f2212c63, finding 2: the push and the record of it > reset at write:after-push: one commit prepared, pushed once, and landed
  ✓ test/review-f2212c63.test.ts > review f2212c63, finding 2: the push and the record of it > reset at write:after-record: one commit prepared, pushed once, and landed
  ✓ test/review-f2212c63.test.ts > review f2212c63, finding 2: the push and the record of it > the fork moved between preparation and the push: the tool pushes nothing over it, and fails
+ ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at claim:after-send: the run resumes, each act is admitted once, no refusal, the landing lands
  ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at claim:after-receipt: the run resumes, each act is admitted once, no refusal, the landing lands
  ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at write:before-push: the run resumes, each act is admitted once, no refusal, the landing lands
  ✓ test/agent.test.ts > crash and resume across an act: the agent's Durable Object is reset (ctx.abort) at each point > reset at write:after-push: the run resumes, each act is admitted once, no refusal, the landing lands
@@ -49,5 +52,5 @@
  ✓ test/agent.test.ts > ablations: each half of the rule is needed > without replay (pi-durable's default, unsafe): after a reset past the room, the model is told the call was interrupted; the act stands in the room, unknown to the conversation
  ✓ test/agent.test.ts > ablations: each half of the rule is needed > without the stored envelope (no outbox): the rerun rebuilds the act from fresh reads, the bytes differ, and the room refuses it as idempotency-mismatch
  ✓ test/agent.test.ts > ablation: neither half > without the stored envelope and with a fresh key per attempt: the rerun's propose is a second act, admitted as generation 2
- Test Files  3 passed | 1 skipped (4)
-      Tests  50 passed | 1 skipped (51)
+ Test Files  4 passed | 1 skipped (5)
+      Tests  53 passed | 1 skipped (54)

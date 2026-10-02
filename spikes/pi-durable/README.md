@@ -36,10 +36,11 @@ Everything runs in workerd, under `@cloudflare/vitest-pool-workers`:
 | `test/support.ts` | The room, the delegation, the fake fork, and the retry loop the tests share |
 | `test/agent.test.ts` | The run, the run reset at twelve points, and three ablations |
 | `test/review-f2212c63.test.ts` | Lost replies, a reset inside the push, and a fork that moved (checker review f2212c63) |
+| `test/review-6d392973.test.ts` | The retry wait removes its abort listener (checker review 6d392973) |
 | `test/live.test.ts` | The same run with a real model on OpenRouter; skipped without a key |
 | `test/check/` | Fixtures for `scripts/check-test.sh`, outside the type-checked project |
 | `scripts/setup.sh` | Extracts the pinned lane sources into `vendor/` (ignored by git) |
-| `scripts/check.sh` | Type check with the pinned compiler: the spike's own files, and exactly the known vendor diagnostics |
+| `scripts/check.sh` | Type check with the pinned compiler: the spike's own files, exactly the known vendor diagnostics, and no file read from the repository outside the spike |
 | `scripts/vendor-diagnostics.txt` | The seven known vendor diagnostics that `check.sh` allows |
 | `scripts/check-test.sh` | Tests that `check.sh` fails when it should |
 | `results/` | The recorded results cited in the note |
@@ -52,14 +53,17 @@ From this directory, inside a clone that has the commits `4a7c4af6` and
 ```sh
 npm ci                # includes the pinned compiler, typescript 7.0.2
 sh scripts/setup.sh
-npm test              # 50 tests; the live test is skipped
+npm test              # 53 tests; the live test is skipped
 npm run check         # type check of src/ and test/
-npm run check:test    # 7 cases: check.sh fails when it should
+npm run check:test    # 8 cases: check.sh fails when it should
 ```
 
 The spike has its own `package.json` and lockfile. It is outside the root
 workspaces (`packages/*`), so the root `npm run typecheck` and `npm test`
-do not include it.
+do not include it, and it does not need them: `tsconfig.json` maps every
+Artroom package and subpath to `vendor/`, as `vitest.config.ts` aliases them,
+and `npm run check` fails if anything resolves to the root's packages. The
+sequence above passes in a checkout with no root `node_modules`.
 
 ### Live run
 
@@ -107,7 +111,8 @@ request.
 - The alarm loop. The agent is woken only by calls. A deployment would set
   an alarm while a run is unfinished, or an act's outcome is unknown, so the
   Durable Object resumes on its own. Today an act tool waiting on a lost
-  reply waits inside the request.
+  reply waits inside the request. The scheduler that replaces that wait
+  should also reconcile the outbox rows that aborted act tools leave.
 - The attention bridge. The Room's attention reaches the conversation
   through the test, which submits the landing's outcome with a request ID.
   The bridge itself (subscribe, then submit) is designed in the note, not

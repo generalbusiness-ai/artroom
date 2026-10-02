@@ -492,8 +492,9 @@ Set before the runs:
 | 4 | Pass: each ablation fails as predicted | "ablations" (3 cases) |
 | 5 | Pass in five runs; the latest recorded | `results/live-2026-10-01.json` |
 | Review f2212c63 | Pass | `test/review-f2212c63.test.ts` (9 cases), `scripts/check-test.sh` (7 cases) |
+| Review 6d392973 | Pass | `scripts/check-test.sh` (case 8), `test/review-6d392973.test.ts` (3 cases), and a checkout with no root `node_modules` |
 
-The whole suite: 50 tests pass, plus the live test when a key is present
+The whole suite: 53 tests pass, plus the live test when a key is present
 (`results/scripted-2026-10-01.txt`).
 
 **Crash and resume, by point.** "Sends" lists what the act tool handed to
@@ -648,7 +649,8 @@ and the suites run. Every mutant failed at least one test.
 
 **Production gaps.** The review names these; each is to become a request:
 
-- the alarm loop (section 3.5);
+- the alarm loop (section 3.5), whose scheduler replaces the in-request
+  retry wait;
 - the attention bridge (section 3.4);
 - lease renewal, release and abort (Q4), including reconciling the outbox
   row an aborted act tool leaves;
@@ -659,6 +661,54 @@ and the suites run. Every mutant failed at least one test.
 - viewer and steerer identity, and secret custody (Q8; the delegate key is
   in the agent's SQLite in the spike);
 - adversarial authorization tests.
+
+## Review 6d392973
+
+Checker review 6d392973 on `783440ea` accepted the three fixes above and
+found one more fault (P2): the standalone type check depended on the root
+workspaces.
+
+**The type check read the root's contract package.** `tsconfig.json` mapped
+`@generalbusiness/artroom-contract` to the vendored source, but not its
+subpath `@generalbusiness/artroom-contract/policy`, which the vendored
+`policy/src/helpers.ts` imports. With the root workspaces installed, the
+compiler found the root's `packages/contract` through the root
+`node_modules`, and the check passed against code that is not pinned. In a
+spike-only checkout it failed with TS2307 and nine further errors. Now:
+
+- `tsconfig.json` maps every Artroom package and subpath that the spike or
+  the vendored sources import, the same set `vitest.config.ts` aliases.
+  Every bare import in `src/`, `test/` and `vendor/` was listed; the only
+  other packages are npm dependencies of the spike, from its own lockfile;
+- `scripts/check.sh` fails if the compiler reads any file from the
+  repository outside the spike, and names the files;
+- `scripts/check-test.sh` has an eighth case, with the old paths. It fails
+  through the new guard when the root workspaces are installed, and through
+  TS2307 when they are not. TS2307 is not added to the known vendor list;
+- the README sequence (`npm ci`, `npm run setup`, `npm run check`,
+  `npm run check:test`) passes in a fresh detached worktree with no root
+  `node_modules`: 185 packages, 7 of 7 known vendor diagnostics, 8 of 8
+  cases. `npm test` passes there too.
+
+One file outside the repository is still read: pi-ai's `openai` types look
+for `undici` in up to ten parent directories, under `@ts-ignore`, and find
+one in the home directory on the machine used. It is a library declaration
+and changes no diagnostic; the isolated checkout, with no such directory,
+gives the same result.
+
+**The retry wait's abort listener.** The review asks, for the scheduler,
+that abort listeners be removed after a retry wait ends. That was small, so
+it is done now: the wait removes its listener when it ends, and
+`test/review-6d392973.test.ts` tests it. Reconciling the outbox rows of
+aborted act tools stays with the alarm loop, in the production gaps above.
+
+**Mutation results.** With the code committed first:
+
+| Mutant | Tests that failed |
+|---|---|
+| The wait does not remove its listener | 1 of 3 |
+| `check.sh` does not check for files outside the spike | case 8 of 8 |
+| `tsconfig.json` without the `/policy` mapping | case 1 of 8 (the clean control) |
 
 ## 7. Untested, and what would test it
 
