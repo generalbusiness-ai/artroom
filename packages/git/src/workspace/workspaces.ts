@@ -66,6 +66,7 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import { type Sql, type SqlRow, text } from "../sql.ts";
 import { type ArtifactsNamespace, type RepoHandle, type TokenInfo, artifactsCode, completeInventory, refusedUnchanged, withRetry } from "../artifacts.ts";
+import { errorNote } from "../mints.ts";
 
 /** Artifacts' shortest token lifetime. */
 export const MIN_TOKEN_TTL_S = 60;
@@ -92,8 +93,6 @@ export interface WorkspacesOptions {
 export const RECHECK_MS = { first: 60_000, max: 1_800_000 } as const;
 
 const iso = (ms: number) => new Date(ms).toISOString();
-const TOKEN = /art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g;
-const redact = (s: string) => s.replace(TOKEN, "<token>");
 
 export function forkName(canonical: string, lane: LaneId): string {
   const name = `${canonical}--${lane}`.replace(/[^A-Za-z0-9._-]/g, "_");
@@ -121,7 +120,8 @@ function failure(e: unknown): ArtroomError {
   return {
     name: "ArtroomError",
     code: code === "INTERNAL_ERROR" || code === "UPSTREAM_UNAVAILABLE" ? "unavailable" : "internal",
-    message: redact(`Could not provision the workspace: ${e instanceof Error ? e.message : String(e)}`).slice(0, 300),
+    // Safe metadata only: the view and the stored row never hold the provider's text (request d29c09fa).
+    message: errorNote("could not provision the workspace", e),
     retryable: true,
   };
 }
@@ -246,7 +246,7 @@ export class Workspaces {
    */
   private failedStep(id: number, error: unknown): void {
     if (refusedUnchanged(error)) this.answered(id, error);
-    else this.sql.all("UPDATE artroom_ws_duty SET last_error = ? WHERE id = ?", redact(String(error)).slice(0, 300), id);
+    else this.sql.all("UPDATE artroom_ws_duty SET last_error = ? WHERE id = ?", errorNote("workspace step failed", error), id);
   }
 
   /** A definite answer arrived (success, or refused-unchanged): the remote call has finished. */
@@ -255,7 +255,7 @@ export class Workspaces {
       "UPDATE artroom_ws_duty SET state = 'answered', answered_at = ?, next_at = ?, last_error = ? WHERE id = ? AND state = 'in-flight'",
       this.now(),
       this.now(),
-      error === undefined ? null : redact(String(error)).slice(0, 300),
+      error === undefined ? null : errorNote("workspace step failed", error),
       id,
     );
   }
@@ -278,11 +278,11 @@ export class Workspaces {
     for (const id of ids) this.sql.all("UPDATE artroom_ws_duty SET state = 'done', done_at = ?, done_reason = ? WHERE id = ?", this.now(), reason, id);
   }
 
-  private defer(ids: readonly number[], error: string, maxMs = 300_000): void {
+  private defer(ids: readonly number[], error: unknown, maxMs = 300_000): void {
     for (const id of ids) {
       const attempts = Number(this.sql.all("SELECT attempts FROM artroom_ws_duty WHERE id = ?", id)[0]?.["attempts"] ?? 0) + 1;
       const wait = Math.min(1000 * 2 ** Math.min(attempts, 9), maxMs);
-      this.sql.all("UPDATE artroom_ws_duty SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?", attempts, this.now() + wait, redact(error).slice(0, 300), id);
+      this.sql.all("UPDATE artroom_ws_duty SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?", attempts, this.now() + wait, errorNote("workspace cleanup failed", error), id);
     }
   }
 
@@ -576,7 +576,7 @@ export class Workspaces {
         this.done(duties.filter((d) => d.state !== "in-flight").map((d) => d.id), "not-our-repository");
         return 0;
       }
-      this.defer(duties.map((d) => d.id), String(e));
+      this.defer(duties.map((d) => d.id), e);
       return blocking();
     }
     // Busy (the fork is being created) is never a completion: every duty stays open, checked again later.
@@ -596,7 +596,7 @@ export class Workspaces {
       } catch (e) {
         // A known token's debt ends when the token itself has expired.
         if (d.expiresAt !== null && d.expiresAt <= this.now()) this.done([d.id], "expired");
-        else this.defer([d.id], String(e));
+        else this.defer([d.id], e);
       }
     }
     const sweep = duties.filter((x) => x.kind !== "token");
@@ -617,7 +617,7 @@ export class Workspaces {
           } catch (e) {
             // Owed by ID from now on.
             const expires = Date.parse(t.expiresAt);
-            this.defer([this.owe(name, "token", "inventory", t.id, Number.isFinite(expires) ? expires : null)], String(e));
+            this.defer([this.owe(name, "token", "inventory", t.id, Number.isFinite(expires) ? expires : null)], e);
           }
         }
         // This run settles owed inventories, and steps answered before it started.
@@ -625,7 +625,7 @@ export class Workspaces {
         this.done(sweep.filter((d) => d.state === "answered" && d.answeredAt !== null && d.answeredAt <= runStart).map((d) => d.id), "answered-and-swept");
         this.recheck(inFlight.map((d) => d.id));
       } catch (e) {
-        this.defer(sweep.map((d) => d.id), String(e));
+        this.defer(sweep.map((d) => d.id), e);
       }
     } else {
       this.recheck(inFlight.map((d) => d.id));
@@ -861,7 +861,7 @@ export class Workspaces {
         this.closeOwned(owned.duty, "expired");
         return;
       }
-      this.defer([owned.duty], String(e));
+      this.defer([owned.duty], e);
       throw e;
     }
     this.closeOwned(owned.duty, "revoked");
@@ -893,7 +893,7 @@ export class Workspaces {
     try {
       active = await this.inventoryOf(name);
     } catch (e) {
-      this.defer(owed, String(e));
+      this.defer(owed, e);
       throw e;
     }
     if (active.length > 0) return false;
@@ -925,7 +925,7 @@ export class Workspaces {
         exists = true;
       } catch (e) {
         if (artifactsCode(e) !== "NOT_FOUND") {
-          this.defer(this.open_(name).filter((d) => d.state !== "in-flight").map((d) => d.id), String(e));
+          this.defer(this.open_(name).filter((d) => d.state !== "in-flight").map((d) => d.id), e);
           return this.open_(name).length;
         }
         exists = false;
@@ -936,7 +936,7 @@ export class Workspaces {
         try {
           await withRetry(() => this.artifacts.delete(name), this.retryOpts());
         } catch (e) {
-          this.defer(this.dutiesOf(name, "repo-delete", "owed"), String(e));
+          this.defer(this.dutiesOf(name, "repo-delete", "owed"), e);
           return this.open_(name).length;
         }
         this.sql.transaction(() => {

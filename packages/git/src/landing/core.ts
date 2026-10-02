@@ -56,6 +56,7 @@ import type {
 export type IntegrateResult =
   | { readonly kind: "clean"; readonly integration: Sha; readonly ref: string }
   | { readonly kind: "conflict"; readonly paths: readonly string[] }
+  /** `detail` is safe metadata only (`errorNote`), never a provider's text: the record keeps it (request d29c09fa). */
   | { readonly kind: "error"; readonly detail: string };
 
 /** A push the driver should make now. */

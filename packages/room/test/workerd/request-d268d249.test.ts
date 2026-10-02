@@ -16,6 +16,7 @@ import type { CheckerConfig, Claim, DraftedRoom, Genesis, LogEntry, Proposal, Ro
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import type { Registry, Room, RoomEnv } from "../../src/index.ts";
 import type { Diagnosis } from "../../src/diag.ts";
+import { jobTokenDuties } from "../../src/jobs.ts";
 import { route } from "../../src/http.ts";
 import { mcpEndpoint } from "../../src/mcp.ts";
 import { roomIdOf } from "../../src/ids.ts";
@@ -417,7 +418,7 @@ describe("request d268d249: credentials known by their syntax are redacted whate
     for (const f of ["horse", "battery", "abcd"]) expect(JSON.stringify(d)).not.toContain(f);
   });
 
-  it("retained job errors use the same redaction, at all three sinks: a lost mint, an unreadable inventory, a failed revocation", async () => {
+  it("retained job errors keep safe metadata only (request d29c09fa), at all three sinks: a lost mint, an unreadable inventory, a failed revocation", async () => {
     const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: `sha256:${"0".repeat(64)}` };
     const r = await makeRoom({ policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })), files: { ".artroom/checkers/unit.json": JSON.stringify(whole), "package.json": "{}" } });
     // The canonical repository's methods named in `failing` throw an error with every case's credential, in its
@@ -456,11 +457,11 @@ describe("request d268d249: credentials known by their syntax are redacted whate
         await room.core.idle();
         return room.core.sql.all("SELECT token_id, expires_at, next_ms, last_error FROM job_tokens ORDER BY token_id");
       });
-    // jobs.ts, the lost mint: `answer lost: …`.
+    // jobs.ts, the lost mint: `answer lost: …`, with no provider text: the name is not one `errorNote` allows (request d29c09fa).
     failing.add("createToken");
     const lost = await jobs();
     const mint = lost.find((x) => String(x["token_id"]).startsWith("mint:"))!;
-    expect(String(mint["last_error"])).toMatch(/^answer lost: ArtifactsError Bearer <redacted> login password=<redacted> /);
+    expect(mint["last_error"]).toBe("answer lost: create failed: an error of another kind");
     const clean = (e: string) => {
       expect(e).not.toContain("abcd");
       for (const [, , gone] of SYNTAX_CASES) for (const g of gone) expect(e).not.toContain(g);
@@ -477,8 +478,15 @@ describe("request d268d249: credentials known by their syntax are redacted whate
     const rows = await jobs();
     const errors = rows.map((x) => String(x["last_error"]));
     const of = (mintRow: boolean) => rows.filter((x) => String(x["token_id"]).startsWith("mint:") === mintRow).map((x) => String(x["last_error"]));
-    expect(of(true)).toEqual([expect.stringMatching(/^outcome unknown; the token inventory could not be read: ArtifactsError Bearer <redacted> login password=<redacted> /)]);
-    expect(of(false)).toEqual([expect.stringMatching(/^ArtifactsError Bearer <redacted> login password=<redacted> /)]);
+    expect(of(true)).toEqual(["outcome unknown; the token inventory could not be read: an error of another kind"]);
+    expect(of(false)).toEqual(["revocation failed: an error of another kind"]);
     for (const e of errors) clean(e);
+    // Every row of every table, and the operators' view of the job tokens, hold none of it either (request d29c09fa).
+    const everything = await inDO(r, (room) => {
+      const tables = room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").map((x) => String(x["name"]));
+      return JSON.stringify([tables.map((t) => room.core.sql.all(`SELECT * FROM "${t}"`)), jobTokenDuties(room.core)]);
+    });
+    // The distinctive parts only: short ones ("cd", "it") occur in any room's rows.
+    for (const g of ["hunter", "horse", "battery", "staple", "q1w2", "e3r4", "Bearer", "password"]) expect(everything).not.toContain(g);
   });
 });

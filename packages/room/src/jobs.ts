@@ -36,10 +36,9 @@
 import type { CheckInput, CheckJob, Digest, Glob, LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { checkerInputs } from "@generalbusiness/artroom-policy";
-import { completeInventory } from "@generalbusiness/artroom-git";
+import { completeInventory, errorNote } from "@generalbusiness/artroom-git";
 import type { ActivePolicyFull, RoomCore } from "./core.ts";
 import { hex, randomBytes } from "./crypto.ts";
-import { redact } from "./diag.ts";
 import { iso } from "./ids.ts";
 import { generationRow, laneRow } from "./model.ts";
 import { obligationsFor } from "./obligations.ts";
@@ -204,7 +203,7 @@ async function watchMint(core: RoomCore, mint: string, notBefore: number, attemp
       "UPDATE job_tokens SET attempts = ?, next_ms = ?, last_error = ? WHERE token_id = ?",
       attempts + 1,
       core.now() + Math.min(5_000 * 2 ** (attempts + 1), MINT_RECHECK_MAX_MS),
-      redact(`outcome unknown; ${what}`),
+      `outcome unknown; ${what}`, // `what` is the Room's own text or safe metadata (request d29c09fa)
       mint,
     );
   if (core.now() < notBefore) return void core.sql.all("UPDATE job_tokens SET next_ms = ? WHERE token_id = ?", notBefore, mint);
@@ -224,7 +223,7 @@ async function watchMint(core: RoomCore, mint: string, notBefore: number, attemp
     // An observation only: a clean inventory shows absence now, not that the mint can never apply.
     note(`${unaccounted} live token(s) on the canonical repository not accounted for at ${iso(core.now())}`);
   } catch (e) {
-    note(`the token inventory could not be read: ${String(e)}`);
+    note(errorNote("the token inventory could not be read", e));
   }
 }
 
@@ -276,7 +275,7 @@ async function settleToken(core: RoomCore, token: string): Promise<void> {
       "UPDATE job_tokens SET attempts = ?, next_ms = ?, last_error = ? WHERE token_id = ?",
       attempts,
       core.now() + Math.min(5_000 * 2 ** attempts, 300_000),
-      redact(String(e)),
+      errorNote("revocation failed", e), // safe metadata only (request d29c09fa)
       token,
     );
   }
@@ -370,7 +369,7 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       } catch (e) {
         // A refusal that changed nothing settles it; any other failure may have minted a token.
         if (refusedUnchanged(e)) core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
-        else core.sql.all("UPDATE job_tokens SET last_error = ? WHERE token_id = ?", `answer lost: ${redact(String(e))}`, intent);
+        else core.sql.all("UPDATE job_tokens SET last_error = ? WHERE token_id = ?", `answer lost: ${errorNote("create failed", e)}`, intent);
         throw e;
       }
       // An answer without the token's ID and text cannot be used or revoked: as unknown as a lost one.

@@ -9,7 +9,8 @@ import type { Sha } from "@generalbusiness/artroom-contract";
 import type { IntegrateResult } from "../landing/core.ts";
 import type { PublisherPort } from "../landing/engine.ts";
 import type { PushOutcome } from "./push-outcome.ts";
-import { GitError, type GitOps, integrationMessage, integrationRef, pinnedRef } from "./gitops.ts";
+import { type GitOps, integrationMessage, integrationRef, pinnedRef } from "./gitops.ts";
+import { errorNote } from "../mints.ts";
 
 /** The message of an integration commit (see gitops `integrationMessage`). */
 export function landMessage(lane: string, generation: number): string {
@@ -37,7 +38,7 @@ export class GitPublisher implements PublisherPort {
       });
       return r.kind === "clean" ? { kind: "clean", integration: r.integration as Sha, ref: r.ref } : { kind: "conflict", paths: r.paths };
     } catch (e) {
-      return { kind: "error", detail: e instanceof GitError ? e.message : String(e) };
+      return { kind: "error", detail: errorNote("integration failed", e) }; // safe metadata only (request d29c09fa)
     }
   }
 

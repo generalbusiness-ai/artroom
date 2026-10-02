@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TOKEN_MARGIN_S, Workspaces, forkName } from "../src/workspace/workspaces.ts";
 import type { ArtifactsNamespace, MintedToken, RepoHandle, TokenInfo } from "../src/artifacts.ts";
-import { Clock, deferred, laneId, nodeSql } from "./support.ts";
+import { Clock, deferred, echoNote, echoing, everyRow, laneId, noEcho, nodeSql } from "./support.ts";
 
 class ArtifactsError extends Error {
   readonly code: string;
@@ -1527,4 +1527,51 @@ test("plan 004: a wake-up that cannot be stored sends no create; the step is clo
   const name = await ws.prepareCanonical("canon", firstCommit);
   assert.equal(ns.createCalls, 2);
   ws.sealCanonical(name);
+});
+
+// ------------------------------------------------------------------ request d29c09fa: safe metadata at durable sinks
+
+/** Every row, the lane's view and the duties: none may hold the provider's text. */
+function clean(what: string, ws: Workspaces, lane: ReturnType<typeof laneId>, ...more: unknown[]): void {
+  noEcho(what, everyRow(ws["sql"]), ws.view(lane), ws.duties(), ...more);
+}
+const stepErrors = (ws: Workspaces) => ws["sql"].all("SELECT kind, last_error FROM artroom_ws_duty WHERE last_error IS NOT NULL ORDER BY id").map((r) => [r["kind"], r["last_error"]]);
+
+test("d29c09fa: a fork that keeps failing with the provider's text: the failed view, its stored row and the steps keep safe metadata only", async () => {
+  const { clock, ns, ws, lane } = setup();
+  for (let i = 0; i < 5; i++) ns.forkFailures.push(echoing());
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  const v = await ws.provision(lane);
+  assert.ok(v.state === "failed");
+  assert.equal(v.error.message, echoNote("could not provision the workspace"));
+  assert.equal(v.error.code, "unavailable");
+  const steps = stepErrors(ws);
+  assert.equal(steps.length, 5);
+  for (const s of steps) assert.deepEqual(s, ["fork-create", echoNote("workspace step failed")]);
+  clean("a failed provisioning", ws, lane, v);
+});
+
+test("d29c09fa: a step refused with the provider's text is answered, and its row keeps safe metadata only", async () => {
+  const { clock, ns, ws, lane } = setup();
+  ns.forkFailures.push(echoing({ code: "INVALID_INPUT", numericCode: 10001, status: 400 }));
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  const v = await ws.provision(lane);
+  assert.ok(v.state === "failed");
+  assert.equal(v.error.message, "could not provision the workspace: Error INVALID_INPUT (10001) status 400");
+  assert.deepEqual(stepErrors(ws), [["fork-create", "workspace step failed: Error INVALID_INPUT (10001) status 400"]]);
+  clean("a refused step", ws, lane, v);
+});
+
+test("d29c09fa: cleanup that fails with the provider's text stays owed, and its row keeps safe metadata only", async () => {
+  const { clock, ws, lane, fork } = setup();
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "ready");
+  fork().revokeToken = async () => {
+    throw echoing();
+  };
+  assert.ok((await ws.revoke(lane, 1)) > 0, "cleanup is owed");
+  const owed = stepErrors(ws);
+  assert.ok(owed.length > 0);
+  for (const [, e] of owed) assert.equal(e, echoNote("workspace cleanup failed"));
+  clean("failed cleanup", ws, lane);
 });

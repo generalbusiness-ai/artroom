@@ -57,7 +57,7 @@ import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, SnapshotPort, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, publicationTokens } from "@generalbusiness/artroom-git";
+import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, knownArtifactsCode, publicationTokens } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
@@ -159,6 +159,25 @@ const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints"]);
 let faultHook: ((point: string) => void) | null = null;
 
 /** Tests only: throw at a named point inside a write, as a crash would. */
+/** Codes a failed publication may store as `publication_error` and name to the caller: lane L's and the Room's own. */
+const PUBLICATION_CODES: ReadonlySet<string> = new Set([
+  "would-rewrite",
+  "invalid-input",
+  "unexpected-writer",
+  "unresolved",
+  "cohort-too-large",
+  "object-too-large",
+  "refused",
+  "unknown-version",
+  "cohort-mismatch",
+]);
+
+/** A failed publication's code: a known one, a known Artifacts code, or `transport`. Never other text (request d29c09fa). */
+function publicationCode(e: unknown): string {
+  const code = (e as { code?: unknown } | null | undefined)?.code;
+  return typeof code === "string" && PUBLICATION_CODES.has(code) ? code : (knownArtifactsCode(e) ?? "transport");
+}
+
 export function setFault(f: ((point: string) => void) | null): void {
   faultHook = f;
 }
@@ -1693,7 +1712,7 @@ export class RoomCore {
       } catch (e) {
         // Reopen from the ref next time: the read-back decides what happened.
         this.publisherCache = null;
-        const code = (e as { code?: string }).code ?? "transport";
+        const code = publicationCode(e);
         if (e !== unbound) this.diagnose("publication-failed", "publish", e);
         // A NOT_FOUND counts as gone only if the canonical repository itself is not found.
         const gone = code === "NOT_FOUND" && (await this.canonicalMissing());

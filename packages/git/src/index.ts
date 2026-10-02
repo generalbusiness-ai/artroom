@@ -64,8 +64,10 @@ export {
   OVERDUE_STEP_MS,
   TAKEOVER_AHEAD_MS,
   TAKEOVER_MOVE_MS,
+  errorNote,
+  knownArtifactsCode,
 } from "./mints.ts";
-export type { LedgerToken, MintDuties, MintDuty, MintLedgerOptions, MintRepo, MintScope, MintState } from "./mints.ts";
+export type { ErrorStage, LedgerToken, MintDuties, MintDuty, MintLedgerOptions, MintRepo, MintScope, MintState } from "./mints.ts";
 export { EMPTY_TREE_SHA, FIRST_COMMIT_IDENTITY, FIRST_COMMIT_MESSAGE, firstCommit, pushFirstCommit } from "./first-commit.ts";
 export type { FirstCommitOutcome, LooseObject } from "./first-commit.ts";
 export type { ArtifactsNamespace, CreatedRepo, RepoHandle } from "./artifacts.ts";
