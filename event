@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f8e61bbd271c5faab064b0b64749b0dec4c849ae","text":"Merge retired a covered predecessor; the successor is at packages/checkers/src/snapshot-commit.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f9e6082048fa63ec8a67a837e48b1a9119c25b3a","text":"Merge retired a covered predecessor; the successor is at packages/checkers/measure/live.mjs."}
