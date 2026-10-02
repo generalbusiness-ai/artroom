@@ -32,6 +32,8 @@ import type { PinResult, PreviewResult, BuildResult, PublisherStub, PushOutcome 
 import { decodeLogPush, decodeLogStage, forkName, integrationMessage, type LogPushOutcome, type LogRemoteStub } from "@generalbusiness/artroom-git";
 import { utf8 } from "../canonical.ts";
 import { randomToken } from "../crypto.ts";
+import type { SnapshotWrite } from "../ports.ts";
+import { snapshotObjects } from "../snapshot.ts";
 
 const decoder = new TextDecoder();
 
@@ -79,7 +81,9 @@ export type RemoteMethod =
   | "pinRef"
   | "preview"
   | "integrate"
-  | "push";
+  | "push"
+  | "delete"
+  | "writeSnapshot";
 
 /** One repository: its refs, its objects and its tokens. */
 export class FakeRepo implements GitRemote {
@@ -416,6 +420,7 @@ export class FakeArtifactsHost {
       this.repos.set(name, r);
       if (!this.canonical) this.canonical = name;
       const t = r.mint("write", 86_400);
+      this.answer("create");
       return { id: `repo_${name}`, name, description: null, defaultBranch: "main", remote: r.remote, token: t.plaintext };
     },
     get: async (name: string): Promise<FakeRepo> => {
@@ -425,7 +430,36 @@ export class FakeArtifactsHost {
       return r;
     },
     // As the binding: delete a repository and its tokens; false when there is none.
-    delete: async (name: string): Promise<boolean> => this.repos.delete(name),
+    delete: async (name: string): Promise<boolean> => {
+      this.enter("delete");
+      const had = this.repos.delete(name);
+      this.answer("delete");
+      return had;
+    },
+  };
+
+  /** Tests only: the identity the sandbox's snapshot writer uses, when not the fixed one (a publisher that gets it wrong). */
+  snapshotIdentity: string | null = null;
+
+  /**
+   * Lane B's `writeSnapshot`: the fixed snapshot commit of `files` into an
+   * empty store, at `refs/artroom/snapshot`, with exactly its closure: the
+   * commit, its trees and its blobs. A store that has any ref is refused.
+   */
+  readonly writeSnapshot: SnapshotWrite = async (req) => {
+    this.enter("writeSnapshot");
+    const canonical = this.authorized(req.canonical, "read");
+    const store = this.authorized(req.store, "write");
+    if (store.refs.size) throw new Error("the snapshot repository is not empty; a snapshot is written only into a new, empty repository");
+    for (const [path, mode, blob] of req.files) {
+      if (!/^(100644|100755|120000)$/.test(mode)) throw new Error(`mode ${mode} cannot be in a snapshot`);
+      if (!canonical.objects.has(blob)) throw new Error(`${path}: blob ${blob} is not in the canonical repository`);
+    }
+    const { commit, objects } = snapshotObjects(req.files, req.message, this.snapshotIdentity ?? undefined);
+    for (const o of objects) store.objects.add(this.put(o));
+    for (const [, , blob] of req.files) store.objects.add(blob);
+    store.refs.set("refs/artroom/snapshot", commit);
+    return commit;
   };
 
   repo(name: string): FakeRepo {

@@ -13,7 +13,7 @@ import type { CheckerService, LaneId } from "@generalbusiness/artroom-contract";
 import type { ArtifactsBinding } from "./artifacts.ts";
 import { artifactsLogRemote, type LogRemoteStub } from "./logremote.ts";
 import { lanePolicy } from "./policy.ts";
-import type { RoomServices } from "./ports.ts";
+import type { RoomServices, SnapshotWrite } from "./ports.ts";
 
 export interface RoomEnv {
   readonly ROOMS: DurableObjectNamespace;
@@ -43,7 +43,8 @@ function missing(what: string): never {
 const productionServices: ServicesFactory = (env, roomObject) => {
   const artifacts = (env.ARTIFACTS ?? null) as ArtifactsBinding | null;
   const namespace = env.ARTIFACTS_NAMESPACE ?? env.PUBLIC_NAMESPACE ?? "artroom-public";
-  const publisher = (): PublisherStub & LogRemoteStub => (env.PUBLISHER ? (env.PUBLISHER.get(env.PUBLISHER.idFromName(roomObject)) as unknown as PublisherStub & LogRemoteStub) : missing("PUBLISHER"));
+  type Sandbox = PublisherStub & LogRemoteStub & { writeSnapshot: SnapshotWrite };
+  const publisher = (): Sandbox => (env.PUBLISHER ? (env.PUBLISHER.get(env.PUBLISHER.idFromName(roomObject)) as unknown as Sandbox) : missing("PUBLISHER"));
   const binding: ArtifactsBinding = artifacts ?? {
     get: async () => missing("ARTIFACTS"),
     create: async () => missing("ARTIFACTS"),
@@ -64,8 +65,14 @@ const productionServices: ServicesFactory = (env, roomObject) => {
   };
   return {
     policy: lanePolicy(),
-    remotes: { artifacts: binding, namespace, publisher: stub, logRemote: async (repo) => artifactsLogRemote(binding, logStub, repo) },
-    // Each checker's service binding, by name (R-EXEC-8). No snapshot repositories yet: no filtered job is issued (R-CARRY-16).
+    remotes: {
+      artifacts: binding,
+      namespace,
+      publisher: stub,
+      writeSnapshot: (r) => publisher().writeSnapshot(r),
+      logRemote: async (repo) => artifactsLogRemote(binding, logStub, repo),
+    },
+    // Each checker's service binding, by name (R-EXEC-8).
     checkers: (name) => ((env as unknown as Record<string, CheckerService | undefined>)[checkerBinding(name)] ?? null),
   };
 };

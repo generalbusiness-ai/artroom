@@ -234,6 +234,8 @@ export interface Remotes {
   readonly namespace: string;
   /** The room's publisher sandbox (lane B's Publisher Durable Object). */
   readonly publisher: import("@generalbusiness/artroom-git").PublisherStub;
+  /** The publisher sandbox's snapshot writer (R-CARRY-15, R-CARRY-16). */
+  readonly writeSnapshot: SnapshotWrite;
   /** Lane L's git remote for `refs/artroom/log` on the room's repository. It must stage. */
   readonly logRemote: (repo: import("./artifacts.ts").RepoLocation) => Promise<StagingRemote>;
   /** The most one log push may carry (lane L's `maxTransfer`); default lane L's `LOG_TRANSFER_LIMITS`. */
@@ -249,15 +251,17 @@ export interface Remotes {
 }
 
 /**
- * Snapshot repositories (R-CARRY-16): the seam for lane G's `SnapshotRepos`,
- * which is not on main yet. No deployment gives one, so the Room issues no
- * filtered job (fail closed); it never issues one against a shared store.
+ * Snapshot repositories (R-CARRY-16): one new repository per snapshot
+ * commit, one read token per job, and durable retirement. The Room's own is
+ * lane B's `SnapshotRepos` over its SQLite, written by its publisher sandbox
+ * (`core.ts`); tests may give another.
  */
 export interface SnapshotPort {
   /**
-   * Have the publisher write the snapshot commit into its own new repository,
-   * and return the commit it wrote. The Room issues the job only if that is
-   * the commit it recorded (R-CARRY-15 step 4).
+   * The repository holding exactly this snapshot commit: reused for the same
+   * commit, otherwise new, with the publisher writing the snapshot into it.
+   * Returns the commit the repository holds; the Room issues the job only if
+   * that is the commit it recorded (R-CARRY-15 step 4).
    */
   prepare(snapshot: {
     readonly commit: Sha;
@@ -265,10 +269,20 @@ export interface SnapshotPort {
     readonly checker: string;
     readonly digest: Digest;
     readonly paths: readonly Glob[];
-  }): Promise<{ readonly commit: Sha; readonly remote: `https://${string}` }>;
-  /** A read token for that repository only, expiring no later than `deadline` (ms). */
+  }): Promise<{ readonly commit: Sha; readonly remote: string }>;
+  /** A read token for that repository only, for one job, expiring no later than `deadline` (ms). */
   mint(commit: Sha, job: string, deadline: number): Promise<{ readonly token: string; readonly expiresAt: number }>;
+  /** The job has ended: revoke its token, and retire the repository once no job is left. */
+  end(commit: Sha, job: string): Promise<unknown>;
 }
+
+/** The publisher sandbox's snapshot writer (lane B's `Publisher.writeSnapshot`): the fixed commit into an empty store, at `refs/artroom/snapshot`. */
+export type SnapshotWrite = (req: {
+  readonly canonical: { readonly remote: string; readonly token: string };
+  readonly store: { readonly remote: string; readonly token: string };
+  readonly files: readonly (readonly [string, string, string])[];
+  readonly message: string;
+}) => Promise<string>;
 
 /** What the Room is given: the policy runtime, the remotes and the checker services. */
 export interface RoomServices {
@@ -276,7 +290,7 @@ export interface RoomServices {
   readonly remotes: Remotes;
   /** The checker's service binding (R-EXEC-8), or null when the deployment binds none for it. */
   readonly checkers?: (checker: string) => CheckerService | null;
-  /** Snapshot repositories for filtered jobs (R-CARRY-16). Absent: no filtered job is issued. */
+  /** Tests only: snapshot repositories other than the Room's own (R-CARRY-16). */
   readonly snapshots?: SnapshotPort | undefined;
 }
 

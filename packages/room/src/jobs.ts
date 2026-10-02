@@ -27,9 +27,10 @@
  *
  * A whole-tree job reads the canonical repository with a read token minted
  * for the attempt. A filtered job reads only its own snapshot repository
- * (R-CARRY-16); without snapshot repositories none is owed (fail closed).
- * With them, the job is issued only if the commit the publisher wrote is the
- * one the Room recorded (R-CARRY-15 step 4).
+ * (R-CARRY-16): one per snapshot commit, reused only for the same commit,
+ * with a token per attempt, ended when the attempt ends. It is issued only
+ * if the commit the publisher wrote is the one the Room recorded (R-CARRY-15
+ * step 4).
  */
 
 import type { CheckInput, CheckJob, Digest, Glob, LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
@@ -85,8 +86,6 @@ export function oweJobs(core: RoomCore, owner: OpId, lane: LaneId, generation: n
     if (o.kind !== "check" || o.state === "met") continue;
     const cfg = policy.checkers[o.check];
     if (!cfg || !core.checkers(o.check)) continue;
-    // R-CARRY-16: without snapshot repositories, a scoped checker gets no job.
-    if (checkerInputs(cfg.config.inputs, policy.doc.carry) && !core.snapshots) continue;
     core.sql.all(
       "INSERT INTO check_jobs (id, owner, lane, generation, obligation, checker, config, integration, base, state, next_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'owed', ?) ON CONFLICT (owner, integration, obligation, config) DO NOTHING",
       `job_${hex(randomBytes(12))}`,
@@ -134,18 +133,24 @@ export async function issueJobs(core: RoomCore): Promise<void> {
       attempt: num(r, "attempt") ?? 0,
       token: str(r, "token"),
     };
-    // An expired attempt: stop waiting for it, and revoke its token (it expired at the deadline in any case).
+    // An expired attempt: stop waiting for it, and end its token (it expired by the deadline in any case).
     if (j.state === "sent") {
       waitsOf(core).get(`${j.id}_${j.attempt}`)?.();
-      if (j.token) await revokeCanonical(core, j.token).catch(() => undefined);
+      if (j.token) await endToken(core, j.token, `${j.id}_${j.attempt}`).catch(() => undefined);
     }
     await issue(core, j).catch(() => move(core, j, "next_ms = ?", core.now() + JOB_RETRY_MS));
   }
 }
 
-async function revokeCanonical(core: RoomCore, tokenId: string): Promise<unknown> {
+/**
+ * End an attempt's token. `token` is a canonical read token's ID, or
+ * `snapshot:<commit>` for a filtered job's token, which the snapshot
+ * repositories revoke, retiring the repository once no job is left.
+ */
+async function endToken(core: RoomCore, token: string, job: string): Promise<unknown> {
+  if (token.startsWith("snapshot:")) return core.snapshots.end(token.slice("snapshot:".length) as Sha, job);
   const repo = await core.remotes.artifacts.get(core.location().name);
-  return repo.revokeToken(tokenId);
+  return repo.revokeToken(token);
 }
 
 /** The owner's hold on this integration now, or null: the land operation a check names, if any. */
@@ -175,10 +180,11 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
   const service = core.checkers(j.checker);
   if (!service) return void move(core, j, "state = 'done', outcome = 'unbound', token = NULL");
   const ttl = cfg.config.timeoutSeconds + JOB_MARGIN_S;
-  let target: { integration: Sha; input: CheckInput; readUrl: `https://${string}`; token: string; tokenId: string | null; expiresAt: number };
+  let target: { integration: Sha; input: CheckInput; readUrl: `https://${string}`; token: string; tokenId: string; expiresAt: number };
   const inputs = checkerInputs(cfg.config.inputs, policy.doc.carry);
+  const attempt = j.attempt + 1;
+  const jobId: CheckJob["id"] = `${j.id}_${attempt}`;
   if (inputs) {
-    if (!core.snapshots) return void move(core, j, "state = 'done', outcome = 'unbound', token = NULL");
     // R-CARRY-15 step 3: the snapshot commit is recorded before a filtered job is issued.
     const recorded = () => one(core.sql, "SELECT * FROM check_snapshots WHERE integration = ? AND checker = ? AND config = ?", j.integration, j.checker, j.config);
     if (!recorded()) await core.recordSnapshots(j.lane, j.generation, j.integration, policy);
@@ -190,8 +196,9 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
     const wrote = await core.snapshots.prepare({ commit, integration: j.integration, checker: j.checker, digest, paths });
     // R-CARRY-15 step 4: the publisher must have written exactly the commit the Room recorded.
     if (wrote.commit !== commit) throw new Error("the publisher wrote another snapshot commit");
-    const t = await core.snapshots.mint(commit, j.id, core.now() + ttl * 1000);
-    target = { integration: commit, input: { kind: "filtered", snapshot: digest, paths }, readUrl: wrote.remote, token: t.token, tokenId: null, expiresAt: t.expiresAt };
+    const deadline = core.now() + ttl * 1000;
+    const t = await core.snapshots.mint(commit, jobId, deadline);
+    target = { integration: commit, input: { kind: "filtered", snapshot: digest, paths }, readUrl: wrote.remote as `https://${string}`, token: t.token, tokenId: `snapshot:${commit}`, expiresAt: deadline };
   } else {
     const tree = await core.ports.artifacts.treeOf(j.integration);
     if (!tree) throw new Error("the integration's tree could not be read");
@@ -200,10 +207,9 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
     const t = await repo.createToken("read", ttl);
     target = { integration: j.integration, input: { kind: "tree", tree }, readUrl, token: t.plaintext, tokenId: t.id, expiresAt: Date.parse(t.expiresAt) };
   }
-  const attempt = j.attempt + 1;
   const job: CheckJob = {
     // Each attempt is its own run (R-EXEC-8): it names its own sandbox.
-    id: `${j.id}_${attempt}`,
+    id: jobId,
     room: core.roomId,
     lane: j.lane,
     generation: j.generation,
@@ -227,7 +233,7 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
   };
   // The attempt is recorded before it is sent. Another step that got here first wins; this one sends nothing.
   if (!move(core, j, "state = 'sent', attempt = ?, next_ms = ?, token = ?", attempt, target.expiresAt, target.tokenId)) {
-    if (target.tokenId) await revokeCanonical(core, target.tokenId).catch(() => undefined);
+    await endToken(core, target.tokenId, jobId).catch(() => undefined);
     return;
   }
   const sent: JobRow = { ...j, state: "sent", attempt, token: target.tokenId };
@@ -242,7 +248,7 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       move(core, sent, "state = 'owed', next_ms = ?", core.now() + JOB_RETRY_MS);
     } finally {
       waitsOf(core).delete(job.id);
-      if (target.tokenId) await revokeCanonical(core, target.tokenId).catch(() => undefined);
+      await endToken(core, target.tokenId, job.id).catch(() => undefined);
     }
   });
 }

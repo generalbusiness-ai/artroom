@@ -153,7 +153,7 @@ function checkerService(r: TestRoom, ci: Client, answer: (job: CheckJob) => Part
   return seen;
 }
 
-/** Snapshot repositories, as lane G's `SnapshotRepos` will give them; `wrong` makes the publisher write another identity. */
+/** Snapshot repositories in place of the Room's own, to steer the commit written; `wrong` makes the publisher write another identity. */
 function snapshotRepos(r: TestRoom, mode: { wrong: boolean }) {
   const prepared: string[] = [];
   const repos: SnapshotPort = {
@@ -168,6 +168,9 @@ function snapshotRepos(r: TestRoom, mode: { wrong: boolean }) {
     },
     async mint(_commit, _job, deadline) {
       return { token: "art_v1_snapshotjobtoken0000", expiresAt: deadline };
+    },
+    async end() {
+      return 0;
     },
   };
   r.world.snapshots = repos;
@@ -319,18 +322,7 @@ describe("R-CARRY-14: the runner environment is the configuration's pin", () => 
 
 // ------------------------------------------------------------------ 3. R-CARRY-15 step 4, and the R-CARRY-16 seam
 
-describe("R-CARRY-15, R-CARRY-16: a filtered job only for the recorded commit, in its own repository", () => {
-  it("R-CARRY-16 without snapshot repositories (as in production), a scoped checker with a service gets no job", async () => {
-    const { r, alice, ci } = await checkRoom(scoped);
-    const seen = checkerService(r, ci);
-    const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
-    const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
-    await tick(r, 3);
-    expect(seen).toEqual([]);
-    expect(await inDO(r, (room) => room.core.sql.all("SELECT id FROM check_jobs"))).toEqual([]);
-    expect(await op(r, l.op.id)).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
-  });
-
+describe("R-CARRY-15: a filtered job only for the recorded commit (R-CARRY-16 is in snapshot-repos.test.ts)", () => {
   it("R-CARRY-15 the publisher writes the snapshot with another identity: its ID differs and no job is issued; once it writes the recorded commit, the job is issued for it", async () => {
     const { r, alice, ci } = await checkRoom(scoped);
     const mode = { wrong: true };

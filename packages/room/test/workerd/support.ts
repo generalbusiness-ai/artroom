@@ -226,6 +226,7 @@ setServicesFactory((_env, objectId) => {
         return host.namespace;
       },
       publisher: host.stub,
+      writeSnapshot: host.writeSnapshot,
       // The production log remote, over the fake binding and the fake sandbox's pushLog and readLogRef.
       logRemote: async (loc) => artifactsLogRemote(host.binding as unknown as ArtifactsBinding, host.logStub, loc),
       sleep: async () => {},

@@ -48,18 +48,18 @@ import type {
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
 import { checkerInputs, ownersFor } from "@generalbusiness/artroom-policy";
-import { canonicalize, parseStrict } from "./canonical.ts";
-import { b64url, digestJson, keyPairFromSeed, unb64url, verify } from "./crypto.ts";
+import { canonicalize, parseStrict, utf8 } from "./canonical.ts";
+import { b64url, digestJson, keyPairFromSeed, sha256Hex, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
 import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedFile, RoomServices, SnapshotPort, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
+import { ContainerPublisher, Landing, SnapshotRepos, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type RepoLocation } from "./artifacts.ts";
-import { snapshotCommit } from "./snapshot.ts";
+import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
 import { issueJobs, oweJobs } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
@@ -153,10 +153,61 @@ export class RoomCore {
   /** Each checker's service binding, which every job travels over (R-EXEC-8). */
   readonly checkers: (checker: string) => CheckerService | null;
   private readonly services: RoomServices;
-  /** Snapshot repositories (R-CARRY-16). None until lane G's `SnapshotRepos` lands: then no filtered job is issued. */
-  get snapshots(): SnapshotPort | null {
-    return this.services.snapshots ?? null;
+  private snapReposCache: SnapshotRepos | null = null;
+
+  /**
+   * Lane B's snapshot repositories on this room's SQLite (R-CARRY-16): one
+   * per snapshot commit, named after the canonical repository. Their create,
+   * deletion and revocation duties are durable; the alarm runs them
+   * (`steps.snapshots`, `nextAlarm`).
+   */
+  get snapshotRepos(): SnapshotRepos {
+    if (!this.snapReposCache) {
+      const name = this.location().name;
+      this.snapReposCache = new SnapshotRepos({
+        sql: this.sql,
+        artifacts: this.remotes.artifacts,
+        prefix: /^[A-Za-z0-9._-]{1,40}$/.test(name) ? name : `r${sha256Hex(utf8(name)).slice(0, 32)}`,
+        wake: async () => this.committed(),
+        now: () => this.now(),
+        ...(this.remotes.sleep ? { sleep: this.remotes.sleep } : {}),
+      });
+    }
+    return this.snapReposCache;
   }
+
+  /** The snapshot repositories filtered jobs read (R-CARRY-16). */
+  get snapshots(): SnapshotPort {
+    return this.services.snapshots ?? this.ownSnapshots;
+  }
+
+  private readonly ownSnapshots: SnapshotPort = {
+    prepare: async (s) => {
+      let written: string | null = null;
+      // The publisher writes the snapshot into the new repository, reading the canonical one with a short read token.
+      const repo = await this.snapshotRepos.prepare(s.commit, async (store) => {
+        const snap = await this.ports.artifacts.snapshot(s.integration, s.paths);
+        if (!snap) throw new Error("the integration's snapshot could not be read");
+        const canonical = await this.remotes.artifacts.get(this.location().name);
+        const read = await canonical.createToken("read", 300);
+        try {
+          written = await this.remotes.writeSnapshot({
+            canonical: { remote: await this.canonicalRemoteReady(), token: read.plaintext },
+            store: { remote: store.remote, token: store.token },
+            files: snap.entries,
+            message: snapshotMessage(s.checker, s.digest),
+          });
+          return written;
+        } finally {
+          await canonical.revokeToken(read.id).catch(() => false);
+        }
+      });
+      // A reused repository was written for the same commit; a new one holds what the publisher wrote.
+      return { commit: (written ?? repo.commit) as Sha, remote: repo.remote };
+    },
+    mint: (commit, job, deadline) => this.snapshotRepos.mint(commit, job, deadline),
+    end: (commit, job) => this.snapshotRepos.end(commit, job),
+  };
   /** Lane B's landing engine, on this room's SQLite. */
   readonly landing: Landing;
   private wsCache: Workspaces | null = null;
@@ -1495,6 +1546,9 @@ export class RoomCore {
     recompute: () => this.recompute(),
     landing: () => this.resumeLanding(),
     jobs: () => issueJobs(this),
+    snapshots: async () => {
+      if (this.founded) await this.snapshotRepos.reconcile();
+    },
     abort: () => this.landing.enforceAbort().then(() => undefined),
     publication: () => this.publish().then(() => undefined),
   } as const;
@@ -1543,6 +1597,14 @@ export class RoomCore {
     }
     const wsDue = ws?.nextDue() ?? null;
     if (wsDue !== null) times.push(wsDue);
+    // Snapshot repositories' durable duties: unknown creates, deletions and revocations (R-CARRY-16).
+    let snap: number | null = null;
+    try {
+      snap = this.founded ? this.snapshotRepos.nextDue() : null;
+    } catch {
+      snap = null;
+    }
+    if (snap !== null) times.push(snap);
     // Check jobs owed, and jobs sent whose deadline passed with no answer.
     const job = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM check_jobs WHERE state != 'done'"), "t");
     if (job !== null) times.push(job);

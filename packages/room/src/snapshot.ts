@@ -21,6 +21,11 @@ export function snapshotMessage(checker: string, digest: Digest): string {
 
 /** The snapshot commit, and the trees and commit object a publisher would write (the blobs are the integration's). */
 export function snapshotCommit(entries: readonly SnapshotEntry[], checker: string, digest: Digest): { readonly commit: Sha; readonly objects: readonly GitObject[] } {
+  return snapshotObjects(entries, snapshotMessage(checker, digest));
+}
+
+/** The same commit for a given message, with the fixed identity, or another identity (tests: a publisher that gets it wrong). */
+export function snapshotObjects(entries: readonly (readonly [string, string, string])[], message: string, identity: string = SNAPSHOT_IDENTITY): { readonly commit: Sha; readonly objects: readonly GitObject[] } {
   interface Dir {
     files: Map<string, { mode: string; blob: string }>;
     dirs: Map<string, Dir>;
@@ -46,7 +51,7 @@ export function snapshotCommit(entries: readonly SnapshotEntry[], checker: strin
     return tree.sha;
   };
   const tree = write(top);
-  const commit = gitObject("commit", encodeCommit({ tree, parents: [], author: SNAPSHOT_IDENTITY, committer: SNAPSHOT_IDENTITY, message: snapshotMessage(checker, digest) }));
+  const commit = gitObject("commit", encodeCommit({ tree, parents: [], author: identity, committer: identity, message }));
   objects.push(commit);
   return { commit: commit.sha, objects };
 }
