@@ -119,9 +119,6 @@ const RETRY = { attempts: 5, firstMs: 500 } as const;
 /** Most records one `duties` page returns. */
 const PAGE_MAX = 1_000;
 
-/** The most text a record or the observation keeps about an error. */
-const NOTE_MAX = 300;
-
 /** Error names that may be stored. Any other name is not: it is the thrower's text. */
 const SAFE_NAMES: ReadonlySet<string> = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "AggregateError", "AbortError", "TimeoutError"]);
 /** Artifacts codes that may be stored: those `artifacts.ts` classifies (`REFUSED_UNCHANGED`, `retriable`). */
@@ -161,7 +158,7 @@ export function errorNote(stage: ErrorStage, e: unknown): string {
   if (typeof numeric === "number" && Number.isInteger(numeric) && numeric >= 0 && numeric <= 99_999) parts.push(`(${numeric})`);
   const status = x?.status;
   if (typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599) parts.push(`status ${status}`);
-  return `${stage}: ${parts.join(" ")}`.slice(0, NOTE_MAX);
+  return `${stage}: ${parts.join(" ")}`; // bounded: every part comes from a fixed list or a bounded integer
 }
 
 /** What a create's answer, or its failure, says. */
