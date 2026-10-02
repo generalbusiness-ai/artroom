@@ -153,7 +153,7 @@ describe("2. an import grant's deadline is judged by the registry's clock, in th
 
   async function drafted(lifeMs: number) {
     const admin = newKeyPair();
-    const repo = `review-import/${hex(randomBytes(16))}`;
+    const repo = `acme-import/${hex(randomBytes(16))}`;
     const input = { name: `review-${hex(randomBytes(6))}`, repo: { kind: "import", grant: grant(repo, admin.key, iso(clock.now + lifeMs)) }, admin: { handle: "@founder", key: admin.key }, recovery: newKeyPair().key };
     const d = await draftRoom(env as unknown as RoomEnv, input, clock.now);
     const world = worldFor(roomIdOf(d.genesis));
@@ -229,7 +229,7 @@ describe("2. an import grant's deadline is judged by the registry's clock, in th
   });
 
   it("the registry refuses a first binding at or after its deadline, and accepts the same binding again after it", async () => {
-    const repo = `review-import/${hex(randomBytes(16))}`;
+    const repo = `acme-import/${hex(randomBytes(16))}`;
     const room = `room_${hex(randomBytes(16))}` as RoomId;
     const n = `review-${hex(randomBytes(6))}`;
     await expect(call(real().bind(repo, room, n, clock.now))).rejects.toMatchObject({ code: "forbidden" });

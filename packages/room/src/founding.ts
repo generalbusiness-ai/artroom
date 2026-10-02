@@ -52,6 +52,36 @@ function publicNamespace(env: RoomEnv): string {
   return env.PUBLIC_NAMESPACE ?? "artroom-public";
 }
 
+/**
+ * One deployment both founds public rooms and imports, with an Artifacts
+ * binding for each namespace (R-GEN-12; request b6b51de7): `ARTIFACTS` for
+ * the public founding namespace, and `IMPORT_ARTIFACTS` for
+ * `IMPORT_NAMESPACE`. A source whose namespace has no binding (the binding
+ * itself, not only its namespace's name) is refused at `draft` and at step 4
+ * of `found`, before anything is bound, so it never leaves a binding that
+ * cannot complete.
+ */
+/** A binding the deployment actually has (review a35b4b61): a configured namespace is not enough. */
+function present(binding: unknown): boolean {
+  return binding !== undefined && binding !== null;
+}
+
+function publicFoundingProblem(env: RoomEnv): string | null {
+  if (!present(env.ARTIFACTS)) return "This deployment does not found public rooms: it has no ARTIFACTS binding.";
+  const bound = env.ARTIFACTS_NAMESPACE ?? publicNamespace(env);
+  return bound === publicNamespace(env)
+    ? null
+    : `This deployment does not found public rooms: its Artifacts binding reaches ${bound}, not the public founding namespace ${publicNamespace(env)}.`;
+}
+
+function importProblem(env: RoomEnv, repo: string): string | null {
+  const ns = env.IMPORT_NAMESPACE?.trim();
+  if (!ns || ns === publicNamespace(env))
+    return `This deployment does not import repositories: it has no Artifacts binding outside ${publicNamespace(env)}, the namespace reserved for public founding (R-GEN-12). Importing needs a second binding, IMPORT_ARTIFACTS, for the namespace IMPORT_NAMESPACE names.`;
+  if (!present(env.IMPORT_ARTIFACTS)) return `This deployment does not import repositories: IMPORT_NAMESPACE names ${ns}, but it has no IMPORT_ARTIFACTS binding.`;
+  return repo.startsWith(`${ns}/`) ? null : `This deployment imports only repositories in the namespace ${ns}.`;
+}
+
 function secret(env: RoomEnv): Uint8Array {
   if (!env.ROOM_KEY_SECRET) throw artroomError("unavailable", "This deployment has no ROOM_KEY_SECRET, so it cannot found rooms.");
   return utf8(env.ROOM_KEY_SECRET);
@@ -118,6 +148,8 @@ async function checkGrant(env: RoomEnv, signed: SignedOnboardingGrant, admin: st
   if (!operatorKeys(env).includes(g.operator)) throw artroomError("forbidden", "The grant is not signed by an operator of this deployment.");
   if (!(await verify(g.operator, "artroom-onboarding-v1", g, signed.sig))) throw artroomError("forbidden", "The grant's signature does not verify.");
   if (g.repo.startsWith(`${publicNamespace(env)}/`)) throw artroomError("forbidden", "A grant cannot name a repository in the public founding namespace.");
+  const unbound = importProblem(env, g.repo);
+  if (unbound) throw artroomError("forbidden", unbound);
   if (g.admin !== admin) throw artroomError("forbidden", "The grant is for another admin key.");
   return g;
 }
@@ -158,6 +190,8 @@ export async function draftRoom(env: RoomEnv, input: unknown, now: number): Prom
   let onboarding: SignedOnboardingGrant | undefined;
   if (source["kind"] === "new") {
     closed(source, "draft.repo", ["kind"]);
+    const unbound = publicFoundingProblem(env);
+    if (unbound) throw artroomError("forbidden", unbound);
     repo = publicRepo(env, draft);
   } else if (source["kind"] === "import") {
     closed(source, "draft.repo", ["kind", "grant"]);
@@ -201,6 +235,9 @@ export async function foundRoom(env: RoomEnv, genesisInput: unknown, sig: unknow
     deadline = parseTime(g.notAfter)!;
   } else if (genesis.repo !== publicRepo(env, draft as string)) {
     throw artroomError("forbidden", "A public founding uses the fresh repository its draft names.");
+  } else {
+    const unbound = publicFoundingProblem(env);
+    if (unbound) throw artroomError("forbidden", unbound);
   }
   // 5. Bind repository, room ID and name (R-GEN-13). The registry judges an import's deadline
   // with its own clock, in the same step as the first binding; the same binding again

@@ -149,7 +149,7 @@ export async function issueJobs(core: RoomCore): Promise<void> {
  */
 async function endToken(core: RoomCore, token: string, job: string): Promise<unknown> {
   if (token.startsWith("snapshot:")) return core.snapshots.end(token.slice("snapshot:".length) as Sha, job);
-  const repo = await core.remotes.artifacts.get(core.location().name);
+  const repo = await core.artifacts.get(core.location().name);
   return repo.revokeToken(token);
 }
 
@@ -226,7 +226,7 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       const tree = await core.ports.artifacts.treeOf(j.integration);
       if (!tree) throw new Error("the integration's tree could not be read");
       const readUrl = (await core.canonicalRemoteReady()) as `https://${string}`;
-      const repo = await core.remotes.artifacts.get(core.location().name);
+      const repo = await core.artifacts.get(core.location().name);
       // Expiring no later than the deadline claimed above (R-EXEC-9).
       const t = await repo.createToken("read", Math.floor((deadline - core.now()) / 1000));
       tokenId = t.id;

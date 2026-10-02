@@ -161,8 +161,6 @@ export type PreviewResult =
  * `Workspaces`, hosted by the Room directly.
  */
 export interface ArtifactsPort {
-  /** Create the room's repository for a public founding (R-GEN-12). An existing one can only be this founding's own. */
-  createRepo(): Promise<void>;
   /** The canonical repository's git remote. */
   canonicalRemote(): Promise<string>;
   readMain(): Promise<Sha | null>;
@@ -232,8 +230,20 @@ export type StagingRemote = import("@generalbusiness/artroom-log").GitRemote & R
  */
 export interface Remotes {
   readonly artifacts: import("./artifacts.ts").ArtifactsBinding;
-  /** The Artifacts namespace the binding reaches. A repository identity in any other namespace is unavailable here. */
+  /** The Artifacts namespace the binding reaches. A repository identity in a namespace with no binding is unavailable here. */
   readonly namespace: string;
+  /**
+   * The deployment's other Artifacts bindings, by the namespace each reaches:
+   * the import namespace, so that one deployment both founds public rooms and
+   * imports (R-GEN-12; request b6b51de7).
+   */
+  readonly bindings?: Readonly<Record<string, import("./artifacts.ts").ArtifactsBinding>>;
+  /**
+   * Push the first commit on a new repository's main with a write token
+   * (lane B's `pushFirstCommit`, over git's smart HTTP protocol). Tests give
+   * the fake remote's.
+   */
+  readonly firstCommit?: (remote: string, token: string, at: number) => Promise<import("@generalbusiness/artroom-git").FirstCommitOutcome>;
   /** The room's publisher sandbox (lane B's Publisher Durable Object). */
   readonly publisher: import("@generalbusiness/artroom-git").PublisherStub;
   /** The publisher sandbox's snapshot writer (R-CARRY-15, R-CARRY-16). */

@@ -5,17 +5,30 @@
 //
 //   node packages/room/measure/spike-smoke.mjs
 //
-// Steps: found a room (public founding), read it back, open a session; a
-// first lane on the fresh, empty repository (claim, workspace, push,
-// propose, land) to see how far it gets; seed main if the room cannot land
-// on an empty repository; a second lane (claim, workspace, token, push,
-// propose, land) that must land; check main; wait for the log to publish;
-// run `artroom verify` against the published log. Then clean up: release
-// the lanes, revoke every active token on the test repositories and delete
-// them. The run succeeds only if every step and every cleanup duty
-// succeeded (review 1b868265): an unconfirmed revocation or deletion, an
-// unreadable or incomplete inventory, or a repository left over fails it,
-// and the result lists what is unresolved by repository name and token ID.
+// Steps: found a room (public founding), read it back, check that the new
+// repository's main is the Room's first commit (no files) and that no token
+// is left on it, open a session; a first lane on the fresh repository
+// (claim, workspace, push, propose, land) that must land; release it and
+// check its token no longer works; a second lane (claim, workspace, token,
+// push, propose, land) that must land; check main; two import drafts that
+// must be refused with their reason (a grant for the public namespace, and
+// one for a namespace the deployment does not bind); wait for the log to
+// publish; run `artroom verify` against the published log.
+//
+// Then, on the same deployment, an import (request b6b51de7, revision 2):
+// create a throwaway repository with one commit in gitseq-spike-import,
+// sign an onboarding grant with the spike operator key, draft and found a
+// room on it, land a lane, and verify its log. Then clean up: release the
+// lanes, revoke every active token on the test repositories in both
+// namespaces and delete them. The run succeeds only if every step and every
+// cleanup duty succeeded (review 1b868265): an unconfirmed revocation or
+// deletion, an unreadable or incomplete inventory, or a repository left over
+// fails it, and the result lists what is unresolved by repository name and
+// token ID.
+//
+// Request b6b51de7 changed the first lane from a probe (it could not land:
+// founding left the repository with no main) to a step that must pass, and
+// removed the out-of-band seeding of main.
 //
 // It needs hugh's wrangler OAuth login (Artifacts REST: repository tokens,
 // listing and deletion). It prints no token and saves a redacted result in
@@ -27,11 +40,14 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { newKeyPair, randomToken, sign } from "../src/crypto.ts";
+import { keyPairFromSeed, newKeyPair, randomToken, sign, unb64url } from "../src/crypto.ts";
 import { iso } from "../src/ids.ts";
+import { firstCommit } from "../../git/src/first-commit.ts";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
 const NS = "gitseq-spike";
+/** The import namespace: the spike's IMPORT_ARTIFACTS binding reaches it (request b6b51de7, revision 2). */
+const IMPORT_NS = "gitseq-spike-import";
 const BASE = process.env.SPIKE_URL ?? "https://artroom-spike-room.inguz.workers.dev";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "../../..");
@@ -49,7 +65,7 @@ const clean = (v) => JSON.parse(redact(JSON.stringify(v ?? null)));
 
 const t0 = Date.now();
 const RUN = new Date(t0).toISOString().replace(/[:.]/g, "-");
-const out = { run: RUN, url: BASE, namespace: NS, steps: [], gaps: [], cleanup: null };
+const out = { run: RUN, url: BASE, namespace: NS, importNamespace: IMPORT_NS, steps: [], gaps: [], cleanup: null };
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, redact(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" ")));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -113,27 +129,38 @@ function oauth() {
   if (!m) throw new Error("no wrangler OAuth token; run wrangler whoami");
   return m[1];
 }
-async function api(method, path, body) {
-  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/artifacts/namespaces/${NS}${path}`, {
+async function api(method, path, body, ns = NS) {
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/artifacts/namespaces/${ns}${path}`, {
     method,
     headers: { authorization: `Bearer ${oauth()}`, "content-type": "application/json", "user-agent": "artroom-spike-smoke/1.0" },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   return r.json().catch(() => ({}));
 }
-/** Tokens this run minted and has not seen revoked, by ID (not a secret), with their repository. */
-const minted = new Map();
-async function mint(repo, scope, ttl) {
-  const r = await api("POST", "/tokens", { repo, scope, ttl });
+/** Tokens this run minted and has not seen revoked, by namespace, then by ID (not a secret), with their repository. */
+const minted = { [NS]: new Map(), [IMPORT_NS]: new Map() };
+async function mint(repo, scope, ttl, ns = NS) {
+  const r = await api("POST", "/tokens", { repo, scope, ttl }, ns);
   if (!r.result?.plaintext) throw new Error(`token for ${repo}: ${redact(JSON.stringify(r.errors ?? r))}`);
   secrets.add(r.result.plaintext);
-  minted.set(r.result.id, repo);
+  minted[ns].set(r.result.id, repo);
   return r.result;
 }
-async function revoke(id) {
-  const ok = (await api("DELETE", `/tokens/${id}`)).success === true;
-  if (ok) minted.delete(id);
+async function revoke(id, ns = NS) {
+  const ok = (await api("DELETE", `/tokens/${id}`, undefined, ns)).success === true;
+  if (ok) minted[ns].delete(id);
   return ok;
+}
+
+/** Token metadata only, never the token. */
+const tokenMeta = (toks) => toks.map((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !/plaintext|token|secret/i.test(k))));
+/**
+ * A repository's active tokens, or null when the listing proves nothing (refused, partial or malformed: the
+ * deploy lane's `readListing`). A step that reads it reports an unknown listing as a failure, never as none.
+ */
+async function activeTokens(repo, ns = NS) {
+  const { outcome, items } = readListing(await api("GET", `/repos/${repo}/tokens?state=active&per_page=100`, undefined, ns), 100, isTokenRecord);
+  return outcome === "done" ? items : null;
 }
 
 function git(args, { cwd, token, env = {} } = {}) {
@@ -167,13 +194,13 @@ function write(dir, path, text) {
 }
 
 /** Read one ref of the canonical repository with a 60-second read token, revoked after. */
-async function canonicalRef(remote, repo, ref) {
-  const t = await mint(repo, "read", 60);
+async function canonicalRef(remote, repo, ref, ns = NS) {
+  const t = await mint(repo, "read", 60, ns);
   try {
     const r = await git(["ls-remote", remote, ref], { token: t.plaintext });
     return r.code === 0 ? (r.stdout.split(/\s+/)[0] || null) : `error: ${r.stderr}`;
   } finally {
-    await revoke(t.id);
+    await revoke(t.id, ns);
   }
 }
 
@@ -233,14 +260,38 @@ async function lane(n, files, opts = {}) {
   return res;
 }
 
+// ------------------------------------------------------------ the spike operator key
+
+/** The spike operator's key pair, from the env file. The seed stays in this process; it is never printed. */
+function operatorKey() {
+  const file = process.env.ARTROOM_SPIKE_ENV ?? join(homedir(), ".config/generalbusiness/artroom-spike.env");
+  const text = readFileSync(file, "utf8");
+  const value = (k) => new RegExp(`^${k}=["']?([^"'\n]*)["']?$`, "m").exec(text)?.[1] ?? null;
+  const seed = value("ARTROOM_OPERATOR_SEED");
+  const raw = seed ? unb64url(seed) : null;
+  if (!raw || raw.length !== 32) return null;
+  secrets.add(seed);
+  const kp = keyPairFromSeed(raw);
+  return kp.key === value("OPERATOR_KEYS") ? kp : null;
+}
+
 // ------------------------------------------------------------ the run
 
+/** The public room's identity name (`genesis.repo` without its namespace): the base of its repository's names. */
+let publicBase = null;
+/** The public room's repository: the incarnation `<base>-<step>` it was sealed on (reviews 3eb7bc44 and 700b74ea), never the base name. */
 let canonical = null;
 let canonicalRemote = null;
 const lanes = [];
 
 async function main() {
   log(`smoke run ${RUN} against ${BASE}`);
+  // SPIKE_PHASE=import runs only the import, for a rerun of that part.
+  if (process.env.SPIKE_PHASE === "import") {
+    const op = operatorKey();
+    if (!op) throw new Error("no spike operator key");
+    return importPhase(op);
+  }
   admin = newKeyPair();
   const recovery = newKeyPair();
   const name = `deploy-spike-smoke-${Date.now().toString(36)}`;
@@ -251,7 +302,8 @@ async function main() {
   step("found: draft", d.status === 200, { status: d.status, ms: d.ms, repo: d.body.genesis?.repo, roomKey: d.body.genesis?.roomKey, profile: d.body.genesis?.profile, error: d.body.code, message: d.body.message });
   if (d.status !== 200) throw new Error("draft failed");
   const genesis = d.body.genesis;
-  canonical = genesis.repo.split("/")[1];
+  // The identity names the room's repository; the repository itself is an incarnation of it, found after founding.
+  publicBase = genesis.repo.split("/")[1];
   out.repo = genesis.repo;
   const f = await http("POST", "/found", { genesis, sig: sign(admin.seed, "artroom-genesis-v1", genesis), draft: d.body.draft });
   step("found: found", f.status === 200, { status: f.status, ms: f.ms, room: f.body.room, error: f.body.code, message: f.body.message });
@@ -265,9 +317,24 @@ async function main() {
   const ref = await http("GET", `/${encodeURIComponent(name)}`);
   step("found: GET /v1/rooms/:name (no credential)", ref.status === 200 && ref.body.room === room, { status: ref.status, body: ref.body });
 
+  // The room's repository: the identity's incarnation (`<base>-<step>`, the latest one made), not the base name.
+  const listed = readListing(await api("GET", `/repos?limit=${REPO_PAGE}&search=${publicBase}`), REPO_PAGE, isRepoRecord);
+  canonical = listed.outcome === "done" ? incarnationOf(publicBase, listed.items.map((r) => r.name)) : null;
+  out.canonical = canonical;
+  step("found: the room's repository is an incarnation of its identity", canonical !== null, { base: publicBase, incarnation: canonical, listing: listed.outcome, names: listed.items?.map((r) => r.name) });
+  if (!canonical) throw new Error("no incarnation of the room's identity was found");
   const info = await api("GET", `/repos/${canonical}`);
   canonicalRemote = info.result?.remote ?? null;
   step("found: repository created in gitseq-spike", !!canonicalRemote, { name: info.result?.name, remote: canonicalRemote, source: info.result?.source ?? null });
+
+  // Request b6b51de7, gap 1: main is the Room's first commit, with no files, fixed by the genesis's time.
+  const expectedFirst = (await firstCommit(Date.parse(genesis.createdAt))).commit;
+  const mainAtFounding = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
+  step("found: main is the Room's first commit (no files)", mainAtFounding === expectedFirst, { main: mainAtFounding, expected: expectedFirst });
+  // Gap 2: no token is left on the new repository (the create's 24-hour token and the first commit's are revoked).
+  // Read before this script mints its own read tokens, and after the one canonicalRef minted is revoked.
+  const left = await activeTokens(canonical);
+  step("found: no active token on the new repository", left !== null && left.length === 0, { active: left?.length ?? "unknown", tokens: left ? tokenMeta(left) : undefined });
 
   // 2. A read session (R-CRED-5).
   const s = await request({ kind: "session", ttlSeconds: 900 });
@@ -277,51 +344,61 @@ async function main() {
   const lg = await read("/log?limit=10");
   step("read: log after founding", lg.status === 200, { status: lg.status, head: lg.body.head, kinds: lg.body.acts?.map((e) => (e.entry.type === "system" ? e.entry.event.type : e.entry.act?.envelope?.kind)) });
 
-  // 3. A first lane on the fresh, empty repository.
-  const first = await lane(1, { "README.md": "# spike smoke\n", "docs/first.md": "first lane, empty repository\n" }, { mayFail: true });
-  lanes.push(first);
+  // 3. A first lane on the fresh repository: it must land (request b6b51de7, gap 1).
+  const first = await lane(1, { "README.md": "# spike smoke\n", "docs/first.md": "first lane, fresh repository\n" });
+  lanes.push({ ...first, room, admin, ns: NS });
+  step("lane 1: the fork is of the room's incarnation", !!first.fork && basename(first.fork, ".git").startsWith(`${canonical}--`), { fork: first.fork ? basename(first.fork, ".git") : null, incarnation: canonical });
   const mainAfterFirst = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
-  out.firstLaneOnEmptyRepo = { landed: first.op?.state === "landed", landResponse: clean(first.landResponse ?? null), main: mainAfterFirst };
-  if (first.op?.state !== "landed") {
-    out.gaps.push(
-      `A room founded with { kind: "new" } has an empty repository, and its first lane cannot land: ${redact(JSON.stringify(first.landResponse?.body ?? first.op ?? "no land response")).slice(0, 400)}`,
-    );
-    // Release the first lane (R-WS-3: its workspace token is revoked).
-    if (first.lane) {
-      const r = await act("release", { lane: first.lane }, { lease: 1, note: "spike smoke: the empty-repository lane is abandoned" });
-      first.released = r.status === 200;
-      step("lane 1: release", r.status === 200, { status: r.status, refused: r.body.rule, reason: r.body.reason });
-      // R-WS-3: release ends the lease's access. The token may take a moment to be revoked by the room's durable step.
-      if (first.token && first.fork) {
-        let code = 0;
-        for (let i = 0; i < 10 && code === 0; i++) {
-          code = (await git(["ls-remote", first.fork], { token: first.token })).code;
-          if (code === 0) await sleep(2_000);
-        }
-        step("lane 1: the released lane's workspace token no longer reads the fork", code !== 0, { lsRemoteExit: code });
+  out.firstLaneOnFreshRepo = { landed: first.op?.state === "landed", main: mainAfterFirst, integration: first.op?.integration ?? null };
+  step("lane 1: main is lane 1's integration, on the first commit", !!first.op?.integration && mainAfterFirst === first.op.integration, { main: mainAfterFirst, integration: first.op?.integration });
+  // Release the first lane (R-WS-3: its workspace token is revoked).
+  if (first.lane) {
+    const r = await act("release", { lane: first.lane }, { lease: 1, note: "spike smoke: lane 1 is done" });
+    first.released = r.status === 200;
+    step("lane 1: release", r.status === 200, { status: r.status, refused: r.body.rule, reason: r.body.reason });
+    // R-WS-3: release ends the lease's access. The token may take a moment to be revoked by the room's durable step.
+    if (first.token && first.fork) {
+      let code = 0;
+      for (let i = 0; i < 10 && code === 0; i++) {
+        code = (await git(["ls-remote", first.fork], { token: first.token })).code;
+        if (code === 0) await sleep(2_000);
       }
-    }
-    // Seed main out of band, as an operator would, with a 60-second write token revoked after.
-    if (!/^[0-9a-f]{40}$/.test(mainAfterFirst ?? "")) {
-      const seed = mkdtempSync(join(tmpdir(), "deploy-spike-seed-"));
-      await must(["init", "-q"], { cwd: seed });
-      write(seed, "README.md", "# spike smoke\n\nSeeded out of band: a fresh public room cannot land its first commit.\n");
-      await must(["add", "-A"], { cwd: seed });
-      await must(["commit", "-q", "-m", "seed"], { cwd: seed });
-      const t = await mint(canonical, "write", 60);
-      const p = await git(["push", "-q", canonicalRemote, "HEAD:refs/heads/main"], { cwd: seed, token: t.plaintext });
-      const revoked = await revoke(t.id);
-      step("seed main out of band (write token, revoked after)", p.code === 0, { code: p.code, stderr: p.stderr || undefined, main: await must(["rev-parse", "HEAD"], { cwd: seed }), tokenRevoked: revoked });
+      step("lane 1: the released lane's workspace token no longer reads the fork", code !== 0, { lsRemoteExit: code });
     }
   }
 
   // 4. A second lane that must land.
   const second = await lane(2, { "docs/smoke.md": `spike smoke ${RUN}\n` });
-  lanes.push(second);
+  lanes.push({ ...second, room, admin, ns: NS });
   const main2 = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
   step("main is the landed integration", !!second.op?.integration && main2 === second.op.integration, { main: main2, integration: second.op?.integration, head: second.head });
 
-  // 5. The log publishes (R-LOG-8): a minute after the oldest unpublished entry, by the alarm.
+  // Gap 3: imports are allowed only in the import namespace. A grant signed by the spike operator key
+  // for the public namespace, or for a namespace the deployment does not bind, is refused at draft with
+  // its reason; nothing is created, read or bound.
+  const operator = operatorKey();
+  if (operator) {
+    for (const [label, repo, want] of [
+      ["a grant for the public namespace", `${NS}/${"0".repeat(32)}`, /public founding namespace/],
+      ["a grant for a namespace with no binding", `gitseq-spike-other/${"0".repeat(32)}`, new RegExp(`imports only repositories in the namespace ${IMPORT_NS}`)],
+    ]) {
+      const importer = newKeyPair();
+      const g = { v: 1, repo, admin: importer.key, operator: operator.key, notAfter: iso(Date.now() + 10 * 60_000) };
+      const r = await http("POST", "", { name: `deploy-spike-import-${Date.now().toString(36)}`, repo: { kind: "import", grant: { grant: g, sig: sign(operator.seed, "artroom-onboarding-v1", g) } }, admin: { handle: "@importer", key: importer.key }, recovery: newKeyPair().key });
+      step(`import: ${label} is refused with its reason`, r.status === 403 && want.test(r.body.message ?? ""), { status: r.status, code: r.body.code, message: r.body.message });
+    }
+  } else step("import: the spike operator key", false, { error: "ARTROOM_OPERATOR_SEED is not in the env file, or does not match OPERATOR_KEYS" });
+
+  // 5 and 6. The log publishes, and artroom verify passes.
+  out.verify = await publishAndVerify("public", canonicalRemote, canonical, NS);
+  out.log = await logSummary();
+
+  // 7. An import on the same deployment (request b6b51de7, revision 2).
+  if (operator) await importPhase(operator);
+}
+
+/** Wait for the current room's log to publish (R-LOG-8), then run artroom verify (lane L's CLI) against the remote. */
+async function publishAndVerify(label, remote, repo, ns) {
   const head = (await read("/log?limit=1")).body.head;
   let published = -1;
   const end = Date.now() + 5 * 60_000;
@@ -331,22 +408,17 @@ async function main() {
     if (published >= head) break;
     await sleep(10_000);
   }
-  const logRef = await canonicalRef(canonicalRemote, canonical, "refs/artroom/log");
-  step("log published to refs/artroom/log", published >= head && /^[0-9a-f]{40}$/.test(logRef ?? ""), { logHead: head, publishedThrough: published, ref: logRef });
-
-  // 6. artroom verify (lane L's CLI) against the canonical repository, with a read token in git's environment.
-  const t = await mint(canonical, "read", 300);
-  const v = await git(["node", join(ROOT, "packages/log/src/cli.ts"), "verify", canonicalRemote, "--json"], {
-    token: t.plaintext,
-    env: { HOME: tmpdir() },
-  });
-  await revoke(t.id);
+  const logRef = await canonicalRef(remote, repo, "refs/artroom/log", ns);
+  step(`${label}: log published to refs/artroom/log`, published >= head && /^[0-9a-f]{40}$/.test(logRef ?? ""), { logHead: head, publishedThrough: published, ref: logRef });
+  // A read token in git's environment, revoked after.
+  const t = await mint(repo, "read", 300, ns);
+  const v = await git(["node", join(ROOT, "packages/log/src/cli.ts"), "verify", remote, "--json"], { token: t.plaintext, env: { HOME: tmpdir() } });
+  await revoke(t.id, ns);
   let report = null;
   try {
     report = JSON.parse(v.stdout);
   } catch {}
-  out.verify = { exit: v.code, report: clean(report), stderr: v.stderr || undefined };
-  step("artroom verify", v.code === 0 && report?.ok === true, {
+  step(`${label}: artroom verify`, v.code === 0 && report?.ok === true, {
     exit: v.code,
     ok: report?.ok,
     room: report?.room,
@@ -355,13 +427,17 @@ async function main() {
     publishedThrough: report?.publishedThrough,
     verifiedThrough: report?.verifiedThrough,
     decisionsReplayed: report?.decisionsReplayed,
+    operator: report?.operator,
     failures: report?.failures,
     stderr: v.stderr || undefined,
   });
+  return { exit: v.code, report: clean(report), stderr: v.stderr || undefined };
+}
 
-  // The whole log, for the record (entries hold no token).
+/** The current room's whole log, for the record (entries hold no token). */
+async function logSummary() {
   const full = await read("/log?limit=200");
-  out.log = clean(
+  return clean(
     full.body.acts?.map((e) => ({
       seq: e.seq,
       at: e.at,
@@ -370,6 +446,72 @@ async function main() {
       rule: e.entry.type === "refusal" ? e.entry.receipt?.rule ?? e.entry.receipt?.refusal?.rule : undefined,
     })),
   );
+}
+
+let importRepo = null;
+
+/**
+ * Import a throwaway repository: create it with one commit in the import namespace (hugh's OAuth; the
+ * creation token pushes the commit and is then revoked), have the spike operator grant it to a fresh
+ * admin key, draft and found a room on it, land a lane, and verify the room's log, which carries the grant.
+ */
+async function importPhase(operator) {
+  const out_ = (out.import = {});
+  importRepo = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const c = await api("POST", "/repos", { name: importRepo }, IMPORT_NS);
+  if (c.result?.token) secrets.add(c.result.token);
+  step("import: throwaway repository created in gitseq-spike-import", c.success === true && !!c.result?.remote, { name: importRepo, remote: c.result?.remote, errors: c.errors });
+  if (!c.success) throw new Error("the import repository could not be created");
+  const remote = c.result.remote;
+  const seed = mkdtempSync(join(tmpdir(), "deploy-spike-import-"));
+  await must(["init", "-q"], { cwd: seed });
+  write(seed, "README.md", "# imported\n\nA throwaway repository for the spike's live import.\n");
+  await must(["add", "-A"], { cwd: seed });
+  await must(["commit", "-q", "-m", "the imported repository's one commit"], { cwd: seed });
+  const seeded = await must(["rev-parse", "HEAD"], { cwd: seed });
+  const p = await git(["push", "-q", remote, "HEAD:refs/heads/main"], { cwd: seed, token: c.result.token });
+  // Every token on it is revoked before the Room sees it: the creation token is spent.
+  let revoked = 0;
+  const before = await activeTokens(importRepo, IMPORT_NS);
+  for (const t of before ?? []) if (await revoke(t.id, IMPORT_NS)) revoked++;
+  const leftover = await activeTokens(importRepo, IMPORT_NS);
+  step("import: one commit pushed; its creation token revoked", p.code === 0 && before !== null && leftover !== null && leftover.length === 0, { main: seeded, code: p.code, stderr: p.stderr || undefined, revoked, active: leftover?.length ?? "unknown" });
+  if (p.code !== 0) throw new Error("the import repository could not be seeded");
+
+  // The grant, signed with the operator seed in this process, and the founding.
+  admin = newKeyPair();
+  const recovery = newKeyPair();
+  const name = `deploy-spike-import-${Date.now().toString(36)}`;
+  const g = { v: 1, repo: `${IMPORT_NS}/${importRepo}`, admin: admin.key, operator: operator.key, notAfter: iso(Date.now() + 15 * 60_000) };
+  const d = await http("POST", "", { name, repo: { kind: "import", grant: { grant: g, sig: sign(operator.seed, "artroom-onboarding-v1", g) } }, admin: { handle: "@importer", key: admin.key }, recovery: recovery.key });
+  if (d.body?.draft) secrets.add(d.body.draft);
+  const genesis = d.body.genesis;
+  step("import: draft", d.status === 200 && genesis?.repo === g.repo && genesis?.onboarding?.grant?.operator === operator.key, { status: d.status, repo: genesis?.repo, operator: genesis?.onboarding?.grant?.operator, error: d.body.code, message: d.body.message });
+  if (d.status !== 200) throw new Error("import draft failed");
+  const f = await http("POST", "/found", { genesis, sig: sign(admin.seed, "artroom-genesis-v1", genesis), draft: d.body.draft });
+  step("import: found", f.status === 200, { status: f.status, ms: f.ms, room: f.body.room, error: f.body.code, message: f.body.message });
+  if (f.status !== 200) throw new Error("import found failed");
+  room = f.body.room;
+  Object.assign(out_, { repo: g.repo, room, name });
+  const main0 = await canonicalRef(remote, importRepo, "refs/heads/main", IMPORT_NS);
+  step("import: main is the imported commit; the Room wrote nothing", main0 === seeded, { main: main0, imported: seeded });
+  const s = await request({ kind: "session", ttlSeconds: 900 });
+  if (s.body?.token) secrets.add(s.body.token);
+  session = s.body.token;
+  step("import: session", s.status === 200 && !!session, { status: s.status, member: s.body.member });
+
+  // A lane, landed on the imported main.
+  const l = await lane(3, { "docs/imported.md": `landed by the spike smoke run ${RUN}\n` });
+  lanes.push({ ...l, room, admin, ns: IMPORT_NS });
+  const main1 = await canonicalRef(remote, importRepo, "refs/heads/main", IMPORT_NS);
+  step("import: main is the landed integration", !!l.op?.integration && main1 === l.op.integration, { main: main1, integration: l.op?.integration, base: seeded });
+  if (l.lane) {
+    const r = await act("release", { lane: l.lane }, { lease: 1, note: "spike smoke: import lane done" });
+    lanes[lanes.length - 1].released = r.status === 200;
+  }
+  out_.verify = await publishAndVerify("import", remote, importRepo, IMPORT_NS);
+  step("import: verify reports the operator key", out_.verify.report?.operator === operator.key, { operator: out_.verify.report?.operator });
+  out_.log = await logSummary();
 }
 
 // ------------------------------------------------------------ cleanup (review 1b868265)
@@ -383,6 +525,24 @@ export function outcomeOf(answer) {
   if (answer?.success === false) return "refused";
   return "unknown";
 }
+
+/**
+ * The repository a public room was sealed on, from the names a listing returned: of the incarnations
+ * `<base>-<step>` of its identity, the one with the highest step (the last made; abandoned ones come before it,
+ * reviews 3eb7bc44 and 700b74ea). The base name itself (an older Room's, adopted and deleted) and forks are not
+ * incarnations. Null when there is none.
+ */
+export function incarnationOf(base, names) {
+  const re = new RegExp(`^${escapeRe(base)}-(\\d+)$`);
+  let best = null;
+  for (const n of names) {
+    const m = re.exec(n);
+    if (m && (best === null || Number(m[1]) > best.step)) best = { name: n, step: Number(m[1]) };
+  }
+  return best?.name ?? null;
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** A repository record names an Artifacts repository; a token record carries a token ID (review 2485e992). */
 const NAME = /^[A-Za-z0-9._-]{1,100}$/;
@@ -426,7 +586,7 @@ function why(answer) {
  * remote call's exception becomes an unknown duty; any other exception
  * reaches the caller, whose result then has a failed cleanup.
  */
-export async function cleanupRun({ api, canonical, expected = [], minted = new Map() }) {
+export async function cleanupRun({ api, canonical, expected = [], minted = new Map(), incarnations = false }) {
   const duties = [];
   let reposLeft = [];
   const record = (duty, outcome, detail) => {
@@ -457,7 +617,10 @@ export async function cleanupRun({ api, canonical, expected = [], minted = new M
   }
   if (canonical) {
     // Records are validated by the listing; this only tells this run's repositories from others the search returns.
-    const mine = (r) => r.name === canonical || r.name.startsWith(`${canonical}--`);
+    // With `incarnations` (a public room since review 3eb7bc44), `canonical` is the identity's base name and the run's
+    // repositories are the base (an older Room's), every incarnation `<base>-<step>`, and the forks of each.
+    const ours = incarnations ? new RegExp(`^${escapeRe(canonical)}(-\\d+)?(--.+)?$`) : null;
+    const mine = (r) => (ours ? ours.test(r.name) : r.name === canonical || r.name.startsWith(`${canonical}--`));
     const inventory = (duty) => listing({ duty, repos: expected }, `/repos?limit=${REPO_PAGE}&search=${canonical}`, REPO_PAGE, isRepoRecord);
     const found = await inventory("inventory");
     // Without a complete inventory, still clean what the run knows it made; the run fails on the inventory duty.
@@ -488,12 +651,27 @@ async function cleanup() {
   // Release a lane still held (the landed lane may already be done; a refusal is fine: the token duties below cover access).
   const releases = {};
   for (const l of lanes) {
-    if (!l.lane || !room || l.released) continue;
+    if (!l.lane || !l.room || l.released) continue;
+    room = l.room;
+    admin = l.admin;
     const r = await act("release", { lane: l.lane }, { lease: 1, note: "spike smoke cleanup" }).catch((e) => ({ status: 0, body: { message: e.message } }));
     releases[`lane ${l.n}`] = { status: r.status, rule: r.body?.rule };
   }
-  const expected = canonical ? [canonical, ...lanes.filter((l) => l.fork).map((l) => basename(l.fork, ".git"))] : [];
-  return { releases, ...(await cleanupRun({ api, canonical, expected, minted })) };
+  // The deploy lane's cleanup, once per namespace: the public room's repositories, then the import's.
+  const run = async (ns, base, repo, incarnations) => {
+    const forks = lanes.filter((l) => l.fork && l.ns === ns).map((l) => basename(l.fork, ".git"));
+    return cleanupRun({ api: (m, p, b) => api(m, p, b, ns), canonical: base, expected: base ? [repo ?? base, ...forks] : [], minted: minted[ns], incarnations });
+  };
+  // The public room: every repository named from its identity's base (incarnations, forks, an adopted base name).
+  const pub = await run(NS, publicBase, canonical, true);
+  const imp = await run(IMPORT_NS, importRepo, importRepo, false);
+  return {
+    releases,
+    ok: pub.ok && imp.ok,
+    duties: [...pub.duties.map((d) => ({ namespace: NS, ...d })), ...imp.duties.map((d) => ({ namespace: IMPORT_NS, ...d }))],
+    unresolved: [...pub.unresolved.map((d) => ({ namespace: NS, ...d })), ...imp.unresolved.map((d) => ({ namespace: IMPORT_NS, ...d }))],
+    reposLeft: pub.reposLeft && imp.reposLeft ? [...pub.reposLeft.map((r) => `${NS}/${r}`), ...imp.reposLeft.map((r) => `${IMPORT_NS}/${r}`)] : null,
+  };
 }
 
 const isMain = !!process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -511,7 +689,7 @@ if (isMain) {
     } catch (e) {
       out.cleanup = { ok: false, error: redact(e.message), unresolved: [], reposLeft: null };
     }
-    for (const d of out.cleanup.duties ?? []) log(`cleanup ${d.duty}${d.repo ? ` ${d.repo}` : ""}${d.token ? ` token ${d.token}` : ""}: ${d.outcome}${d.detail ? ` (${d.detail})` : ""}`);
+    for (const d of out.cleanup.duties ?? []) log(`cleanup ${d.namespace ?? ""} ${d.duty}${d.repo ? ` ${d.repo}` : ""}${d.token ? ` token ${d.token}` : ""}: ${d.outcome}${d.detail ? ` (${d.detail})` : ""}`);
     log(`cleanup ok ${out.cleanup.ok}; repositories left ${JSON.stringify(out.cleanup.reposLeft)}; unresolved ${out.cleanup.unresolved?.length ?? "?"}`);
     out.ok = smokeOk(out, failed);
     out.ms = Date.now() - t0;

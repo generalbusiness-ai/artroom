@@ -22,12 +22,24 @@ export const REGISTRY_MIGRATIONS: readonly Migration[] = [
       sql.all("CREATE TABLE IF NOT EXISTS bindings (repo TEXT PRIMARY KEY, room TEXT NOT NULL UNIQUE, name TEXT NOT NULL UNIQUE)");
     },
   },
+  {
+    // Review 700b74ea: a binding made before this column is an older Worker's, whose Room may have created a public
+    // founding's base name and recorded nothing. Existing rows keep NULL; every new binding records 1. The column
+    // is a durable fact of the binding, so every retry of a founding reads the same answer.
+    version: 2,
+    name: "ledger-aware bindings",
+    up: (sql) => {
+      sql.all("ALTER TABLE bindings ADD COLUMN ledger INTEGER");
+    },
+  },
 ];
 
 export interface Binding {
   readonly repo: string;
   readonly room: RoomId;
   readonly name: string;
+  /** Made by an older Worker, before ledger-aware founding (review 700b74ea). */
+  readonly legacy: boolean;
 }
 
 export class Registry extends DurableObject<RoomEnv> {
@@ -41,8 +53,8 @@ export class Registry extends DurableObject<RoomEnv> {
   }
 
   private row(query: string, value: string): Binding | null {
-    const r = this.ctx.storage.sql.exec(query, value).toArray()[0] as Record<string, string> | undefined;
-    return r ? { repo: r["repo"]!, room: r["room"] as RoomId, name: r["name"]! } : null;
+    const r = this.ctx.storage.sql.exec(query, value).toArray()[0] as Record<string, string | number | null> | undefined;
+    return r ? { repo: r["repo"] as string, room: r["room"] as RoomId, name: r["name"] as string, legacy: r["ledger"] === null } : null;
   }
 
   /** Bind repository, room ID and name in one step (R-GEN-13). */
@@ -62,7 +74,7 @@ export class Registry extends DurableObject<RoomEnv> {
       if (notAfter !== undefined && notAfter <= clock()) throw artroomError("forbidden", "The grant has expired.");
       if (this.row("SELECT * FROM bindings WHERE room = ?", room)) throw artroomError("forbidden", "This room is already bound to another repository.");
       if (this.row("SELECT * FROM bindings WHERE name = ?", name)) throw artroomError("forbidden", "This name is already bound to another room.");
-      this.ctx.storage.sql.exec("INSERT INTO bindings (repo, room, name) VALUES (?, ?, ?)", repo, room, name);
+      this.ctx.storage.sql.exec("INSERT INTO bindings (repo, room, name, ledger) VALUES (?, ?, ?, 1)", repo, room, name);
       return "bound";
     });
   }

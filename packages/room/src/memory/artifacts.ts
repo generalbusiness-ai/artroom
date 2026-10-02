@@ -29,7 +29,7 @@ import {
   type StageWant,
 } from "@generalbusiness/artroom-log";
 import type { PinResult, PreviewResult, BuildResult, PublisherStub, PushOutcome } from "@generalbusiness/artroom-git";
-import { decodeLogPush, decodeLogStage, forkName, integrationMessage, type LogPushOutcome, type LogRemoteStub } from "@generalbusiness/artroom-git";
+import { decodeLogPush, decodeLogStage, firstCommit, forkName, integrationMessage, type FirstCommitOutcome, type LogPushOutcome, type LogRemoteStub } from "@generalbusiness/artroom-git";
 import { utf8 } from "../canonical.ts";
 import { randomToken } from "../crypto.ts";
 import type { SnapshotWrite } from "../ports.ts";
@@ -83,7 +83,8 @@ export type RemoteMethod =
   | "integrate"
   | "push"
   | "delete"
-  | "writeSnapshot";
+  | "writeSnapshot"
+  | "firstCommit";
 
 /** One repository: its refs, its objects and its tokens. */
 export class FakeRepo implements GitRemote {
@@ -423,7 +424,8 @@ export class FakeArtifactsHost {
       if (this.repos.has(name)) throw artifactsErrors.exists();
       const r = new FakeRepo(this, name, null);
       this.repos.set(name, r);
-      if (!this.canonical) this.canonical = name;
+      // The room's repository: the latest incarnation a public founding made (review 3eb7bc44), never a fork or snapshot.
+      if (!this.canonical || !name.includes("--")) this.canonical = name;
       const t = r.mint("write", 86_400);
       this.answer("create");
       return { id: `repo_${name}`, name, description: null, defaultBranch: "main", remote: r.remote, token: t.plaintext };
@@ -693,6 +695,26 @@ export class FakeArtifactsHost {
 
   /** Push controls: hold a push in flight, or make pushes end with no answer. */
   readonly controls: PushControls = { pausePush: false, failPushes: 0, errorPushes: 0, lostPushReports: 0 };
+
+  /**
+   * Lane B's `pushFirstCommit` against this host (request b6b51de7): the same
+   * first commit, created only on a missing main, and only with a live write
+   * token on that repository.
+   */
+  readonly firstCommit = async (remote: string, token: string, at: number): Promise<FirstCommitOutcome> => {
+    this.enter("firstCommit");
+    const { commit, objects } = await firstCommit(at);
+    const r = this.byRemote(remote);
+    if (!r.admits(token, "write")) return { kind: "refused", commit, detail: "HTTP 401: the token is not a live write token on this repository" };
+    if (r.refs.has("refs/heads/main")) return { kind: "refused", commit, detail: "HTTP 200: unpack ok; ng refs/heads/main stale ref" };
+    for (const o of objects) {
+      if (this.put(gitObject(o.type, o.data)) !== o.sha) throw new Error(`object ${o.sha} does not match its content`);
+      r.objects.add(o.sha);
+    }
+    r.refs.set("refs/heads/main", commit as Sha);
+    this.answer("firstCommit");
+    return { kind: "created", commit };
+  };
 
   private byRemote(remote: string): FakeRepo {
     for (const r of this.repos.values()) if (r.remote === remote) return r;

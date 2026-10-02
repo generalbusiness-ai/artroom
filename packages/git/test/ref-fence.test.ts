@@ -2,7 +2,7 @@
 // update the operation did not allow, replaying allowed bodies unchanged.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkUpdates, readCommands, FenceError, ZERO } from "../src/publisher/ref-fence.ts";
+import { checkUpdates, readCommands, repoPathOf, FenceError, ZERO } from "../src/publisher/ref-fence.ts";
 
 const A = "a".repeat(40), B = "b".repeat(40), C = "c".repeat(40);
 const enc = new TextEncoder();
@@ -76,4 +76,13 @@ test("anything the fence cannot read is refused", async () => {
   for (const b of bad) await assert.rejects(readCommands(stream(b, 5)), FenceError);
   const huge = body(Array.from({ length: 1000 }, (_, i) => `${A} ${B} refs/heads/${"x".repeat(60)}${i}`));
   await assert.rejects(readCommands(stream(huge, 4096)), FenceError);
+});
+
+test("the sandbox reaches the public namespace and, in a deployment that imports, the import namespace; nothing else (request b6b51de7)", () => {
+  const host = "acct.artifacts.cloudflare.net";
+  assert.equal(repoPathOf(`https://${host}/git/pub/r.git`, host, ["pub", undefined]), "/git/pub/r.git");
+  assert.throws(() => repoPathOf(`https://${host}/git/imp/r.git`, host, ["pub", undefined]), /not allowed/);
+  assert.equal(repoPathOf(`https://${host}/git/imp/r.git`, host, ["pub", "imp"]), "/git/imp/r.git");
+  for (const bad of [`https://${host}/git/other/r.git`, `https://${host}/git/pubx/r.git`, `http://${host}/git/pub/r.git`, `https://evil.example/git/pub/r.git`, `https://u:p@${host}/git/pub/r.git`, `https://${host}/git/pub/r.git?x=1`, `https://${host}/git/pub/r`])
+    assert.throws(() => repoPathOf(bad, host, ["pub", "imp"]), /not allowed/, bad);
 });
