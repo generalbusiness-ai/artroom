@@ -66,40 +66,83 @@ function service(r: TestRoom, hang = false) {
   return { seen, late };
 }
 
+/** A lane of its own with one change, proposed: its preview owes a job. */
+async function lane(r: TestRoom, who: Client, path: string) {
+  const c = await who.ok<Claim>("claim", null, { goal: "work", scope: [path] });
+  const head = pushChange(r, c.lane, { [path]: "changed\n" });
+  await who.ok<Proposal>("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "change" });
+  return c.lane;
+}
+
 describe("review 786e9606 P2 1: the step that loses the claim never ends the winner's credentials", () => {
   for (const [kind, cfg] of [
     ["filtered", scoped],
     ["whole-tree", whole],
   ] as const)
-    it(`${kind}: two jobs steps at once send one attempt, whose token and repository stay usable until it answers`, async () => {
+    it(`${kind}: two jobs steps at once on two owed jobs send one attempt each, whose tokens and repositories stay usable until they answer`, async () => {
       const { r, alice } = await checkRoom(cfg);
       const { seen, late } = service(r, true);
-      await propose(r, alice, { "src/app.ts": "v2" });
+      await lane(r, alice, "src/a.ts");
+      await lane(r, alice, "src/b.ts");
       await settled(r);
-      expect(await jobsOf(r)).toMatchObject([{ state: "owed" }]);
-      const reads = r.world.artifacts.remoteCalls.get("createToken") ?? 0;
+      expect(await jobsOf(r)).toMatchObject([{ state: "owed" }, { state: "owed" }]);
+      // The first step reads both rows and works on the first; meanwhile the second claims the second row, so
+      // the first step reaches it holding a row that is no longer owed.
       await inDO(r, (room) => Promise.all([room.core.steps.jobs(), room.core.steps.jobs()]));
-      await pause();
-      expect(seen).toHaveLength(1);
-      expect(seen[0]!.readsOwn).toBe(true);
-      expect(await jobsOf(r)).toMatchObject([{ state: "sent", attempt: 1 }]);
-      // Still in flight: the job's token reads its repository, and (filtered) the repository is not retired.
-      const job = seen[0]!.job;
-      const own = () => [...r.world.artifacts.repos.values()].find((x) => x.remote === job.readUrl);
-      expect(own()?.admits(tokenOf(job), "read")).toBe(true);
+      await pause(20);
+      expect(seen).toHaveLength(2);
+      expect(new Set(seen.map((s) => s.job.lane)).size).toBe(2);
+      expect(await jobsOf(r)).toMatchObject([
+        { state: "sent", attempt: 1 },
+        { state: "sent", attempt: 1 },
+      ]);
+      // Still in flight: each job's token reads its own repository, and no snapshot repository is retired.
+      const own = (job: CheckJob) => [...r.world.artifacts.repos.values()].find((x) => x.remote === job.readUrl);
+      for (const { job } of seen) expect(own(job)?.admits(tokenOf(job), "read")).toBe(true);
       if (kind === "filtered") {
-        expect(snapshotRepos(r)).toHaveLength(1);
+        expect(snapshotRepos(r)).toHaveLength(2);
         expect(await inDO(r, (room) => room.core.snapshotRepos.duties().filter((d) => d.kind === "revoke"))).toEqual([]);
       }
-      // One step prepared: one canonical read token (whole tree), or one writer's token and one job token (filtered).
-      expect((r.world.artifacts.remoteCalls.get("createToken") ?? 0) - reads).toBe(kind === "filtered" ? 2 : 1);
-      // The answer comes: the job is done and its credentials end.
-      await inDO(r, () => late[0]!());
+      // The answers come: the jobs are done and their credentials end.
+      await inDO(r, () => late.forEach((answer) => answer()));
       await settled(r);
-      expect(await jobsOf(r)).toMatchObject([{ state: "done", attempt: 1, outcome: "refused: check-binding" }]);
-      expect(own()?.admits(tokenOf(job), "read") ?? false).toBe(false);
+      expect(await jobsOf(r)).toMatchObject([
+        { state: "done", attempt: 1, outcome: "refused: check-binding" },
+        { state: "done", attempt: 1, outcome: "refused: check-binding" },
+      ]);
+      for (const { job } of seen) expect(own(job)?.admits(tokenOf(job), "read") ?? false).toBe(false);
       expect(snapshotRepos(r)).toEqual([]);
     });
+
+  it("filtered: a job token that cannot be minted leaves the job due again later; the retry reuses the repository written for it", async () => {
+    const { r, alice } = await checkRoom(scoped);
+    const { seen } = service(r);
+    await lane(r, alice, "src/a.ts");
+    await settled(r);
+    const a = r.world.artifacts;
+    // The snapshot writer's canonical token is minted; the job's token on the snapshot repository is not.
+    a.on("createToken", () => undefined);
+    a.on("createToken", () => {
+      throw new Error("Artifacts is unavailable (createToken)");
+    });
+    const step = () =>
+      inDO(r, async (room) => {
+        await room.core.steps.jobs();
+        await room.core.idle();
+      });
+    await step();
+    expect(seen).toEqual([]);
+    expect(await jobsOf(r)).toMatchObject([{ state: "owed", attempt: 1 }]);
+    const written = snapshotRepos(r).map((x) => x.name);
+    expect(written).toHaveLength(1);
+    const creates = a.remoteCalls.get("create") ?? 0;
+    clock.now += 30_000;
+    await step();
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.job.id.endsWith("_2")).toBe(true);
+    expect(a.remoteCalls.get("create") ?? 0).toBe(creates);
+    expect(snapshotRepos(r)).toEqual([]);
+  });
 });
 
 describe("review 786e9606 P2 1: a preparation that outlives its deadline sends nothing", () => {
