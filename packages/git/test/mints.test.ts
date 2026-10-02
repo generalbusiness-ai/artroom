@@ -1202,6 +1202,16 @@ test("(checker 2) a create failure's error and an observation's error are redact
   await t.release();
 });
 
+test("(checker 2) a malformed answer whose scope field echoes its text: the owed record's reason does not store it", async () => {
+  const r = room();
+  const secret = "Sc4echoedInScope";
+  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: secret, scope: secret })];
+  await assert.rejects(r.ledger.mint("a", "read", ttl60), /cannot be used/);
+  assert.equal(only(r.sql)["state"], "owed");
+  assert.match(String(only(r.sql)["last_error"]), /scope <token>, not read/);
+  assertNoSecret(r, secret);
+});
+
 test("(checker 2) redactNote: secrets first, then patterns, then the bound", () => {
   assert.equal(redactNote("a k9 b", ["k9"]), "a <token> b");
   assert.equal(redactNote(`x art_v1_${"q".repeat(2_000)}?expires=1 y`), "x <token> y");
