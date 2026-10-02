@@ -391,3 +391,147 @@ them, and the runner containers were destroyed at the end of each job.
   snapshot repositories this way (29.8 lane A item 4). Until it does, only
   the harness's filtered jobs have this boundary.
 - Lane G items 4 to 8 of 29.8, apart from the type-forced 3 and 8.
+
+## Review 96d1fbc9
+
+Revision 4. The checker credited the isolation fix and found two cleanup
+defects. This revision first merges main `4892e114` (jj-refuse, and lane L's
+amendment-3 decoder) with no conflicts; both are kept as they are on main.
+
+### P2: an unknown create was settled by absence and time
+
+**What was wrong.** `prepare` sent `create` without recording the attempt.
+If the answer was lost, only a timed delete duty was left, and retirement
+took "not found" as final: it closed every duty and removed the row. A
+create that applied later left a repository and a live write token that
+nothing tracked. The checker showed this with a lost reply, more than 24
+hours, a restart, and then the old create applying.
+
+**Fix: the workspace ledger's principle.** `SnapshotRepos` now keeps the
+same states as `Workspaces` (in flight, owed, done), and never uses time as
+proof:
+
+- Every create attempt is its own step, written as in flight before the
+  call, with its own repository name `<prefix>--snap-<commit>-<step>`. A
+  retry is a new step with a new name. So a late attempt can only create its
+  own repository, and can never settle, or be confused with, a later
+  attempt's.
+- An in-flight create is closed only by a definite answer (success, or an
+  error that says nothing changed, such as `INVALID_REPO_NAME`), or by
+  seeing its repository exist, which makes its deletion owed now. "Not
+  found", "in progress" and no answer keep it open. It is checked again on
+  the workspace backoff (`RECHECK_MS`: after 1, 1, 2, 4 and 8 minutes, then
+  every 16), for as long as it is open.
+- A deletion is owed only for a repository whose creation is known. Only
+  there is "not found" final.
+- An unfinished or superseded preparation is not retired inline. Its
+  deletion is owed now, and the new attempt goes ahead under its own name.
+  Readiness is fenced by name: only the attempt's own row can become
+  ready, so a stopped host's late callback cannot finish a later attempt.
+- A new repository that no job uses is deleted 15 minutes after creation
+  (`PREPARE_WINDOW_MS`), not 24 hours. Retirement is still immediate when
+  the last job ends, and there is still one token per job.
+
+### P2: the cleanup wake-up came after preparation's effects
+
+**What was wrong.** `HarnessLedger` set its alarm only in `finally`, after
+`prepare` and the publisher returned. A host that stopped during the create
+or the write left durable debt with no alarm, and a restarted object did
+not schedule it either.
+
+**Fix.**
+- `SnapshotRepos` takes a `wake` callback and calls it with `nextDue()`
+  before each create, after every change that can bring a duty forward
+  (a mint with a short deadline, a job's end), and after each reconcile.
+  So an alarm at or before the earliest owed duty always exists. The
+  wake-up set before the create also covers the write and the inventory
+  that follow: it is earlier than anything they owe, and each alarm run sets
+  the next. A mint adds no duty: the repository's deletion, already owed
+  and scheduled, removes a token whose answer is lost, and that token
+  expires by the job's deadline anyway.
+- `HarnessLedger` passes its alarm as the wake-up, and arms the persisted
+  debt in its constructor (`blockConcurrencyWhile`). The `finally` arming is
+  gone.
+- `SnapshotRepos` reads the clock at call time.
+
+### Tests
+
+The checker's diagnostics are now tests of the right outcome:
+- `laneG-checker-G3-retirement.test.ts` became, in
+  `packages/git/test/snapshots.test.ts`: "a create whose answer is lost and
+  which applies after 24 hours and a restart is still found and deleted (P2:
+  the checker's diagnostic)".
+- `laneG-checker-G3-alarm.mjs` became `packages/checkers/test/harness-alarm.test.ts`.
+  It loads the real `HarnessLedger` (vitest maps `cloudflare:workers` to
+  `test/cloudflare-workers-stub.ts`): "a host stopped during the
+  repository's creation …" and "a host stopped during the publisher's write
+  has persisted its wake-up, and a restarted object arms and cleans up
+  (P2)".
+
+Also new in `packages/git/test/snapshots.test.ts`:
+- "every create attempt is its own step and name: a retry succeeds, and the
+  lost first attempt applying later never touches it"
+- "an unresolved create stays open while absent or in progress, on a capped
+  backoff; only a definite refusal settles it without a repository"
+- "a wake-up is persisted before every remote effect, and a host stopped at
+  any await leaves its debt to be cleaned after a restart". It stops the
+  host at the create, the write, the token inventory and the mint. Each
+  call applies but never answers, and a new host then drains the alarms.
+- "a late callback from a stopped host cannot finish or settle a later
+  attempt (fenced by name)". The new attempt is still creating when the old
+  host's preparation returns.
+- "a job with a short deadline brings the wake-up forward to that deadline"
+- "a duty table from revision 3 (no snapshot column) is migrated, and its
+  owed deletion still runs"
+
+Earlier tests now expect per-attempt names and the 15-minute window.
+
+**Mutation checks** (each after committing; tree clean afterwards):
+
+| Mutant | Failing tests |
+|---|---|
+| Absence settles an unresolved create | 2 git (the diagnostic; the backoff test) |
+| Elapsed time settles it (after five checks) | 1 git (backoff) |
+| Every attempt reuses one name per commit | 6 git (including "every create attempt is its own step" and the fence) |
+| No wake-up before the create | 1 git (termination); both harness tests |
+| The create step not recorded before the call | 3 git; 1 harness |
+| Readiness not fenced by name | 1 git (late callback) |
+| A superseded known attempt not owed deletion now | 1 git |
+| A definite refusal left in flight | 1 git |
+| The restarted Durable Object does not arm its debt | both harness tests |
+| The harness passes no wake-up | both harness tests |
+| No wake-up after a mint | 1 git (short deadline), after that test was added; it first survived |
+| No wake-up after a reconcile | 1 git (short deadline) |
+| No migration of the revision 3 table | 1 git |
+
+One mutant was equivalent: removing a second wake-up before the write
+changed nothing, because the wake-up before the create is earlier and each
+alarm sets the next. That call was removed instead.
+
+### Gates
+
+At `b800dc72` (this note's commit changes only this file):
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | exit 0 |
+| Root `npm test` | exit 0: checkers 33; git (Node) 134; log 116 Node and 111 workerd; policy 199 Node and 198 workerd (1 skipped); ui 88 |
+| `packages/git` `npm run test:workers` | exit 0, 8 tests |
+| `wrangler deploy --dry-run`, `packages/checkers` and `packages/git` | exit 0 each |
+
+### Live run
+
+[live-2026-10-02T01-47-35-267Z.json](../packages/checkers/measure/results/live-2026-10-02T01-47-35-267Z.json),
+Worker `artroom-lg-checkers`, namespace `gitseq-spike`. Every check gave
+the same result as in revision 3, in 2.7 to 5.3 s. The scoped probe again
+could not fetch the older, wider snapshot's commit, tree or excluded blob
+by ID, while the control fetched the job's own tree and blob by ID. The
+names now carry the attempt (for example `…-25`). Afterwards the harness
+owed nothing (28 duties, all done) and no snapshot repository was left.
+
+The first run of this revision failed at its first scoped check:
+`table artroom_snap_duty has no column named snapshot`. The Durable Object
+still had revision 3's table. `SnapshotRepos` now adds the column when it is
+missing, with a test, and the next run passed using the migrated table. The
+failed run's repository was deleted. No `artroom-lg` repository is left in
+the namespace.
