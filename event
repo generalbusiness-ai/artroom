@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e2879ecec7aede9533656f04d2c46864795763f6","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/review-f47a509c.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e8a07fd2f7313eb28311aac5d649c79ae1c27f8a","text":"Merge retired a covered predecessor; the successor is at packages/cli/bin/artroom.js."}
