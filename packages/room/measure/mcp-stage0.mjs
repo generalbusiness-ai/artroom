@@ -13,9 +13,12 @@
 // advertised schema, land, read attention with its cursor, explain, release.
 // With --claude: write an MCP config that names the URL and reads the bearer
 // from the environment, run `claude -p` on a short task in an empty
-// directory, and check that its lane landed. Then clean up: revoke the
-// agents' keys (ending their bearer sessions), revoke every active
-// Artifacts token on the test repositories and delete them.
+// directory, and check that its lane landed. Then clean up with the shared
+// rules of cleanup.mjs (review 66fec276): end every bearer session (revoke
+// the agent's key and see its bearer refused), revoke every token the run
+// minted, revoke every active Artifacts token on the run's repositories and
+// delete them. Every duty is recorded; the run exits nonzero unless every
+// duty is done and the final inventory proves nothing is left.
 //
 // It needs hugh's wrangler OAuth login (Artifacts REST). It prints no token
 // and saves redacted results in measure/results/: the run as JSON, and the
@@ -24,11 +27,12 @@
 import { execFile, spawn } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { b64url, digestBytes, newKeyPair, randomBytes, randomToken, sign } from "../src/crypto.ts";
 import { iso } from "../src/ids.ts";
+import { cleanupRun, smokeOk } from "./cleanup.mjs";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
 const NS = "gitseq-spike";
@@ -89,12 +93,19 @@ function act(kind, target, body) {
 /** Invite and redeem a room-custody agent (R-CRED-3). The bearer is kept in `secrets`, never printed. */
 async function agent(handle) {
   const bytes = randomBytes(32);
+  // Retained before any effect, so cleanup knows this agent even if a call below fails or its answer is lost.
+  const a = { member: handle, invitation: null, redeemed: "not-sent", key: null, bearer: null };
+  agents.push(a);
   const inv = await act("roster", null, { op: "invite", member: handle, role: "agent", custody: "room", expiresAt: iso(Date.now() + 3600_000), secretHash: digestBytes(bytes), session: { kinds: KINDS, lanes: "*", ttlSeconds: 3600 } });
   if (inv.status !== 200) throw new Error(`invite ${handle}: ${JSON.stringify(inv.body)}`);
+  a.invitation = inv.body.id;
   const secret = b64url(bytes);
   secrets.add(secret);
-  const r = await http("POST", `/${room}/redeem`, { custody: "room", invitation: inv.body.id, secret });
+  a.redeemed = "unknown";
+  const r = await http("POST", `/${room}/redeem`, { custody: "room", invitation: inv.body.id, secret }).catch((e) => ({ status: 0, body: { message: e.message } }));
   if (r.body?.bearer) secrets.add(r.body.bearer);
+  if (r.status === 200 && r.body?.key && r.body?.bearer) Object.assign(a, { redeemed: "done", key: r.body.key, bearer: r.body.bearer });
+  else if (r.status >= 400 && r.status < 500) a.redeemed = "refused"; // nothing was redeemed, so there is no session to end
   step(`redeem ${handle}`, r.status === 200 && !!r.body.bearer, { status: r.status, member: r.body.member, role: r.body.role, delegation: r.body.delegation, mcp: r.body.mcp, expiresAt: r.body.expiresAt });
   if (r.status !== 200) throw new Error(`redeem ${handle} failed`);
   return r.body;
@@ -119,9 +130,15 @@ async function mint(repo, scope, ttl) {
   const r = await api("POST", "/tokens", { repo, scope, ttl });
   if (!r.result?.plaintext) throw new Error(`token for ${repo}: ${redact(JSON.stringify(r.errors ?? r))}`);
   secrets.add(r.result.plaintext);
+  minted.set(r.result.id, repo);
   return r.result;
 }
-const revoke = async (id) => (await api("DELETE", `/tokens/${id}`)).success === true;
+/** Revoke a token this run minted; until a revocation is seen to succeed, cleanup still owes it. */
+async function revoke(id) {
+  const ok = (await api("DELETE", `/tokens/${id}`)).success === true;
+  if (ok) minted.delete(id);
+  return ok;
+}
 
 function git(args, { cwd, token } = {}) {
   const env = {
@@ -176,7 +193,10 @@ async function tool(c, name, args, timeout = 120_000) {
 
 let canonical = null;
 let canonicalRemote = null;
+/** What the run made, retained before each effect: agents (bearer sessions), tokens it minted (ID to repository), and lane forks. */
 const agents = [];
+const minted = new Map();
+const forks = new Set();
 const landedLanes = [];
 
 async function drive(driver) {
@@ -211,6 +231,7 @@ async function drive(driver) {
   step("workspace: ready, with a grant", !!ws.sc?.grant?.token, { ms: ws.ms, op: ws.sc?.op, remote: ws.sc?.grant?.remote, expiresAt: ws.sc?.grant?.expiresAt, refused: ws.sc?.rule, text: ws.text, thrown: ws.thrown });
   if (!ws.sc?.grant?.token) return;
   const { remote, token } = ws.sc.grant;
+  forks.add(basename(new URL(remote).pathname, ".git"));
 
   const dir = mkdtempSync(join(SCRATCH, "mcp0-drive-"));
   const cl = await git(["clone", "-q", remote, dir], { token });
@@ -319,8 +340,9 @@ async function claudeRun(redeemed) {
       return { unparsed: l.slice(0, 500) };
     }
   });
-  // Any token the agent saw in a tool result is a secret too.
-  for (const l of lines) for (const m of l.matchAll(/"token"\s*:\s*"([^"]+)"/g)) secrets.add(m[1]);
+  // Any token the agent saw in a tool result is a secret too, and any fork it was given is the run's to clean.
+  for (const l of lines) for (const m of l.matchAll(/"token\\?"\s*:\s*\\?"([^"\\]+)/g)) secrets.add(m[1]);
+  for (const l of lines) for (const m of l.matchAll(/\/git\/[A-Za-z0-9._-]+\/([A-Za-z0-9._-]+)\.git/g)) forks.add(m[1]);
   const file = join(HERE, "results", `mcp-stage0-claude-${RUN}.jsonl`);
   writeFileSync(file, events.map((e) => redact(JSON.stringify(e))).join("\n") + "\n");
   const init = events.find((e) => e.type === "system" && e.subtype === "init");
@@ -379,16 +401,11 @@ async function main() {
   step("route: an unknown bearer is 401 invalid_token", wrong.status === 401 && /invalid_token/.test(wrong.headers.get("www-authenticate") ?? ""), { status: wrong.status, wwwAuthenticate: wrong.headers.get("www-authenticate") });
 
   const driver = await agent("@mcp-driver");
-  agents.push(driver);
   await drive(driver);
 
   if (WITH_CLAUDE) {
     const cold = await agent("@claude-code");
-    agents.push(cold);
     await claudeRun(cold);
-    const lanes = await http("GET", `/${room}/lanes?limit=50`, undefined, cold.bearer);
-    const theirs = (lanes.body.items ?? []).filter((l) => l.claim?.by?.member === "@claude-code" || l.holder === "@claude-code" || JSON.stringify(l).includes("@claude-code"));
-    step("the cold agent's lanes, read with its bearer", lanes.status === 200, { lanes: theirs.map((l) => ({ lane: l.lane, state: l.state, generation: l.generation, landing: l.landing })) });
   }
   if (canonicalRemote) {
     const main = await canonicalMain(canonicalRemote, canonical);
@@ -397,47 +414,105 @@ async function main() {
   }
 }
 
-async function cleanup() {
-  // End every bearer session: revoke the agents' room-held keys (R-CRED-3).
-  out.cleanup.agents = [];
-  for (const a of agents) {
-    const r = await act("roster", null, { op: "revoke-key", key: a.key, reason: "retired" }).catch((e) => ({ status: 0, body: { message: e.message } }));
-    const after = await http("GET", `/${room}/attention`, undefined, a.bearer);
-    out.cleanup.agents.push({ member: a.member, revoked: r.status === 200, rule: r.body?.rule, bearerAfter: after.status });
-  }
-  if (!canonical) return;
-  const repos = ((await api("GET", `/repos?limit=200&search=${canonical}`)).result ?? []).filter((r) => r.name === canonical || r.name.startsWith(`${canonical}--`));
-  out.cleanup.repos = [];
-  for (const r of repos) {
-    const toks = (await api("GET", `/repos/${r.name}/tokens?state=active&per_page=100`)).result ?? [];
-    let revoked = 0;
-    for (const t of toks) if (await revoke(t.id)) revoked++;
-    const d = await api("DELETE", `/repos/${r.name}`);
-    out.cleanup.repos.push({ repo: r.name, activeTokens: toks.length, revoked, deleted: d.success === true });
-    log(`cleanup ${r.name}: ${toks.length} active tokens, ${revoked} revoked, deleted ${d.success === true}`);
-  }
-  out.cleanup.reposLeft = ((await api("GET", `/repos?limit=200&search=${canonical}`)).result ?? []).filter((r) => r.name === canonical || r.name.startsWith(`${canonical}--`)).map((r) => r.name);
+// ------------------------------------------------------------ cleanup (review 66fec276)
+
+/** The outcome of one Room answer: 200 done, another 4xx refused, anything else (no answer, 5xx) unknown. */
+const roomOutcome = (status) => (status === 200 ? "done" : status >= 400 && status < 500 ? "refused" : "unknown");
+
+/**
+ * How the run ends one agent's bearer session (R-CRED-3): revoke its
+ * room-held key with `act`, then see its bearer refused with `read`. Each
+ * duty is `done`, `refused` or `unknown`. An agent whose redemption was
+ * refused, or never sent, has no session. One whose redemption answer was
+ * lost has a session nobody can name, so it stays unknown until its
+ * delegation expires.
+ */
+export function sessionEnder({ act, read }) {
+  return async (a) => {
+    if (a.redeemed === "not-sent" || a.redeemed === "refused") return [{ duty: "end-session", member: a.member, outcome: "done", detail: `redemption ${a.redeemed}` }];
+    if (a.redeemed !== "done") return [{ duty: "end-session", member: a.member, invitation: a.invitation, outcome: "unknown", detail: "the redemption's answer was lost; its key is unknown" }];
+    const r = await act("roster", null, { op: "revoke-key", key: a.key, reason: "retired" });
+    const after = await read(a.bearer);
+    return [
+      { duty: "revoke-agent-key", member: a.member, key: a.key, outcome: roomOutcome(r.status), detail: r.body?.rule ?? r.body?.code },
+      { duty: "bearer-refused", member: a.member, key: a.key, outcome: after.status === 401 ? "done" : after.status === 200 ? "refused" : "unknown", detail: `status ${after.status}` },
+    ];
+  };
 }
 
-let failed = false;
-try {
-  await main();
-} catch (e) {
-  failed = true;
-  out.error = redact(e.stack ?? e.message);
-  log("error:", e.message);
-} finally {
-  try {
-    await cleanup();
-  } catch (e) {
-    out.cleanup.error = redact(e.message);
+/**
+ * The run's whole cleanup. Each agent's session is ended independently: an
+ * exception for one is an unknown duty, and the rest still run. Then the
+ * Artifacts state, by the shared rules (cleanup.mjs): minted tokens, the
+ * canonical repository and its forks, known before any effect, even when an
+ * inventory is refused, unknown, incomplete or malformed. `ok` only when
+ * every duty is done and the final inventory proves nothing is left.
+ */
+export async function cleanupMcp({ api, canonical, expected = [], minted = new Map(), agents = [], endSession }) {
+  const sessions = [];
+  for (const a of agents) {
+    try {
+      sessions.push(...(await endSession(a)));
+    } catch (e) {
+      sessions.push({ duty: "end-session", member: a.member, key: a.key ?? undefined, outcome: "unknown", detail: e.message });
+    }
   }
-  out.ok = !failed && out.steps.every((s) => s.ok) && (out.cleanup.reposLeft ?? []).length === 0 && (out.cleanup.agents ?? []).every((a) => a.revoked && a.bearerAfter === 401);
+  let artifacts;
+  try {
+    artifacts = await cleanupRun({ api, canonical, expected, minted });
+  } catch (e) {
+    const d = { duty: "artifacts-cleanup", outcome: "unknown", detail: e.message };
+    artifacts = { ok: false, duties: [d], reposLeft: null };
+  }
+  const duties = [...sessions.map(({ detail, ...d }) => (d.outcome === "done" ? d : { ...d, ...(detail ? { detail } : {}) })), ...artifacts.duties];
+  const unresolved = duties.filter((d) => d.outcome !== "done");
+  return { ok: unresolved.length === 0 && artifacts.ok === true, duties, unresolved, reposLeft: artifacts.reposLeft };
+}
+
+/**
+ * The finalizer: run the cleanup, record its outcome on `out`, and return
+ * the exit code. A cleanup that throws is a failed cleanup. The run is ok
+ * (exit 0) only if the drive finished, every step passed, and cleanup is all
+ * done (`smokeOk`, cleanup.mjs).
+ */
+export async function finishRun(out, failed, cleanup) {
+  try {
+    out.cleanup = await cleanup();
+  } catch (e) {
+    const d = { duty: "cleanup", outcome: "unknown", detail: redact(e.message) };
+    out.cleanup = { ok: false, error: d.detail, duties: [d], unresolved: [d], reposLeft: null };
+  }
+  out.ok = smokeOk(out, failed);
+  return out.ok ? 0 : 1;
+}
+
+const isMain = !!process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  let failed = false;
+  try {
+    await main();
+  } catch (e) {
+    failed = true;
+    out.error = redact(e.stack ?? e.message);
+    log("error:", e.message);
+  }
+  const code = await finishRun(out, failed, () =>
+    cleanupMcp({
+      api,
+      canonical,
+      expected: canonical ? [canonical, ...forks] : [],
+      minted,
+      agents,
+      endSession: sessionEnder({ act, read: (bearer) => http("GET", `/${room}/attention`, undefined, bearer) }),
+    }),
+  );
+  for (const d of out.cleanup.duties ?? []) log(`cleanup ${d.duty}${d.member ? ` ${d.member}` : ""}${d.repo ? ` ${d.repo}` : ""}${d.token ? ` token ${d.token}` : ""}: ${d.outcome}${d.detail ? ` (${d.detail})` : ""}`);
+  log(`cleanup ok ${out.cleanup.ok}; repositories left ${JSON.stringify(out.cleanup.reposLeft)}; unresolved ${out.cleanup.unresolved?.length ?? "?"}`);
   out.ms = Date.now() - t0;
   const dir = join(HERE, "results");
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `mcp-stage0-${RUN}.json`);
   writeFileSync(file, redact(JSON.stringify(out, null, 2)) + "\n");
   log(`ok ${out.ok}; result ${file}`);
-  process.exit(out.ok ? 0 : 1);
+  process.exit(code);
 }
