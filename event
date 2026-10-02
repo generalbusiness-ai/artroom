@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/checkers/src/llm.ts","body":{"commit":"72d6abde5c6dfa993ac441884e8f966a903b932f","path":"packages/checkers/src/llm.ts"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/checkers/src/worker.ts","body":{"commit":"72d6abde5c6dfa993ac441884e8f966a903b932f","path":"packages/checkers/src/worker.ts"}}
