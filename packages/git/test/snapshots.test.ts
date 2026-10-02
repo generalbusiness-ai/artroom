@@ -669,3 +669,30 @@ test("the upgrade runs once: a second start adds no legacy steps, and a new ledg
   assert.equal(host().duties().filter((d) => d.reason === "legacy").length, 1);
   assert.equal(new SnapshotRepos({ sql: nodeSql(), artifacts: ns, prefix: "canon", now: clock.now }).duties().length, 0);
 });
+
+// ------------------------------------------------------------------ follow-up c9cd4cd8 (1): a wake-up that cannot be stored
+
+test("follow-up c9cd4cd8: a wake-up that cannot be stored sends no create; the step is closed as never sent, and the next attempt prepares", async () => {
+  const clock = new Clock();
+  const ns = new Fake(clock);
+  let fail = 1;
+  const wakes: { createdBefore: number }[] = [];
+  const snaps = new SnapshotRepos({
+    sql: nodeSql(),
+    artifacts: ns,
+    prefix: "canon",
+    now: clock.now,
+    sleep: async () => {},
+    wake: async () => {
+      wakes.push({ createdBefore: ns.created.length });
+      if (fail-- > 0) throw new Error("the alarm could not be stored");
+    },
+  });
+  await assert.rejects(snaps.prepare(C1, async () => C1), /alarm could not be stored/);
+  assert.deepEqual(ns.created, [], "nothing was sent");
+  assert.deepEqual(snaps.duties().map((d) => [d.kind, d.state, d.doneReason]), [["create", "done", "not-sent"]]);
+  assert.equal(snaps.pending(), 0, "no unknown create is left to watch");
+  const r = await snaps.prepare(C1, async () => C1);
+  assert.deepEqual(ns.created, [r.name]);
+  assert.equal(wakes[1]!.createdBefore, 0, "the wake-up came before the create");
+});
