@@ -386,6 +386,7 @@ a.lane-goal:hover { text-decoration: underline; }
 
 .obligations { display: grid; gap: 12px; }
 .obl { padding: 14px 16px; display: grid; gap: 10px; }
+.obl.advisory { border-style: dashed; }
 .obl-head { display: flex; gap: 10px; align-items: flex-start; }
 .check-circle { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center; border: 2px solid var(--border-strong); color: transparent; margin-top: 1px; }
 .check-circle.met { background: var(--ok); border-color: var(--ok); color: var(--surface); }
@@ -402,6 +403,15 @@ a.lane-goal:hover { text-decoration: underline; }
 .choice label { flex: 1; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 10px; cursor: pointer; font-weight: 560; }
 .choice label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .choice input { accent-color: var(--accent); }
+
+.change-entry { padding: 12px 14px; display: grid; gap: 6px; }
+.change-id { font-family: var(--mono); font-size: 12.5px; color: var(--muted); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.patch { margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; border: 1px solid var(--border); border-radius: 6px; padding: 6px 0; background: var(--surface); }
+.patch > span { display: block; padding: 0 10px; }
+.patch > span.add { background: var(--diff-add); }
+.patch > span.del { background: var(--diff-del); }
+.patch > span.hunk { color: var(--muted); }
+#changes-h + .badge, .section-head > .badge { align-self: center; }
 
 /* ------------------------------------------------------------ policy */
 

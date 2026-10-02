@@ -29,7 +29,7 @@ import type {
   Subscription,
 } from "../contract.ts";
 import { holdsSlot } from "../contract.ts";
-import type { DraftRule, DryRunResult, FileDiff, Person, PolicyOutcome, ReviewDraft, RoomAdapter, RoomSnapshot, Why } from "../adapter.ts";
+import type { CheckCarry, DraftRule, DryRunResult, FileDiff, Person, PolicyOutcome, ReviewDraft, RoomAdapter, RoomSnapshot, Why } from "../adapter.ts";
 import { describeEntry, entryId, withRecovery } from "./describe.ts";
 
 export class LiveRoom implements RoomAdapter {
@@ -108,6 +108,9 @@ export class LiveRoom implements RoomAdapter {
     const entries = log.acts;
     const feed = entries.map((e) => withRecovery(describeEntry(e), landOps));
     const records = recordsFromLog(entries);
+    const checkCarries: CheckCarry[] = entries.flatMap((e) =>
+      e.entry.type === "system" && e.entry.event.type === "check-carried" ? [{ id: entryId(e), seq: e.seq, at: e.at, event: e.entry.event }] : [],
+    );
     const outcomes: PolicyOutcome[] = entries.flatMap((e) => {
       const r = e.entry.type === "system" ? null : e.entry.receipt;
       if (!r || e.entry.type === "system") return [];
@@ -134,6 +137,7 @@ export class LiveRoom implements RoomAdapter {
       lanes,
       proposals,
       ...records,
+      checkCarries,
       landOps,
       slot,
       coverage: { lanes: lanePage.complete, attention: attention.complete, feed: { from: log.from, complete: log.complete } },

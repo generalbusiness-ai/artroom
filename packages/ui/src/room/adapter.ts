@@ -12,6 +12,7 @@
  * UI-defined here and listed in README.md under "Contract gaps".
  */
 
+import type { ChangeHistory } from "./changes.ts";
 import type {
   ActId,
   AttentionItem,
@@ -42,6 +43,7 @@ import type {
   Rule,
   Seq,
   Sha,
+  SystemEvent,
   Timestamp,
   Verdict,
 } from "./contract.ts";
@@ -75,6 +77,21 @@ export interface FeedEntry {
   /** For a system event about a landing operation: that operation. */
   readonly op?: OpId;
   readonly flags: readonly Flag[];
+}
+
+/** A `check-carried` system event (R-CARRY-13). */
+export type CheckCarriedEvent = Extract<SystemEvent, { readonly type: "check-carried" }>;
+
+/**
+ * One sealed judgment of whether an earlier check counts on a new
+ * integration, with the entry that holds it. A check carries only by such an
+ * event; one that did not carry has its event too.
+ */
+export interface CheckCarry {
+  readonly id: ActId;
+  readonly seq: Seq;
+  readonly at: Timestamp;
+  readonly event: CheckCarriedEvent;
 }
 
 /** One rule outcome on one act, for the Policy screen. */
@@ -122,6 +139,8 @@ export interface RoomSnapshot {
   readonly reviews: readonly Review[];
   readonly checks: readonly Check[];
   readonly notes: readonly Note[];
+  /** The `check-carried` events loaded, oldest first. Covered by `coverage.feed`. */
+  readonly checkCarries: readonly CheckCarry[];
   readonly landOps: readonly LandOp[];
   /** The publication slot, or null when the transport cannot read it. Never guessed as free. */
   readonly slot: PublicationSlot | null;
@@ -136,6 +155,8 @@ export interface RoomSnapshot {
   readonly policy: PolicyView;
   readonly source: { readonly kind: "mock" | "live"; readonly status: "live" | "connecting" | "offline"; readonly note?: string };
 }
+
+export type { ChangeEntry, ChangeHistory, FileInterdiff, FileMeta, Hunk, Interdiff } from "./changes.ts";
 
 // ------------------------------------------------------------------ diffs
 
@@ -255,6 +276,14 @@ export interface RoomAdapter {
 
   /** The proposal's diff from its base to its head. Null when the transport cannot provide it. */
   diff(ref: ProposalRef): Promise<readonly FileDiff[] | null>;
+  /**
+   * Author-supplied: how this generation's jj changes (commits with a
+   * `change-id` header) relate to the previous generation's. Null when no
+   * commit in either carries a header. Absent when the transport cannot read
+   * a generation's commits (the live room: contract gap 10, open point 39).
+   * It never affects obligations, evidence or carrying.
+   */
+  changeHistory?(ref: ProposalRef): Promise<ChangeHistory | null>;
   /** Paths that changed between the previous generation's head and this one's. */
   changedSince(ref: ProposalRef): readonly RepoPath[] | null;
   explain(act: ActId): Promise<Why | null>;

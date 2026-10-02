@@ -5,9 +5,11 @@
  */
 
 import type { ActId, MemberId, Note, NoteAnchor, ProposalAt, ProposalRef, Result, Review } from "../contract.ts";
-import type { DraftRule, DryRunResult, FileDiff, ReviewDraft, RoomAdapter, RoomSnapshot, Timeline, Why } from "../adapter.ts";
+import type { ChangeHistory, DraftRule, DryRunResult, FileDiff, ReviewDraft, RoomAdapter, RoomSnapshot, Timeline, Why } from "../adapter.ts";
 import { dryRun } from "../dryrun.ts";
 import { DIFFS, parseDiff } from "./diffs.ts";
+import { changeHistory } from "../changes.ts";
+import { SCENARIO_COMMITS } from "./commits.ts";
 import { POLICY } from "./policy.ts";
 import { STEPS } from "./scenario.ts";
 import { PEOPLE, World } from "./world.ts";
@@ -131,6 +133,14 @@ export class MockRoom implements RoomAdapter {
     const tag = this.world.tagOf(ref.lane);
     const text = tag ? DIFFS[`${tag}/${ref.generation}`] : undefined;
     return text ? parseDiff(text) : null;
+  }
+
+  async changeHistory(ref: ProposalRef): Promise<ChangeHistory | null> {
+    const tag = this.world.tagOf(ref.lane);
+    const prev = tag ? SCENARIO_COMMITS.commits[`${tag}/${ref.generation - 1}`] : undefined;
+    const next = tag ? SCENARIO_COMMITS.commits[`${tag}/${ref.generation}`] : undefined;
+    if (!prev || !next) return null;
+    return changeHistory(SCENARIO_COMMITS.repo, { generation: ref.generation - 1, commits: prev }, { generation: ref.generation, commits: next });
   }
 
   changedSince(ref: ProposalRef) {
