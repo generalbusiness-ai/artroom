@@ -3,7 +3,7 @@
 // remote while the Room is gone.
 import { describe, expect, it } from "vitest";
 import { env, exports } from "cloudflare:workers";
-import { abortAllDurableObjects, runDurableObjectAlarm } from "cloudflare:test";
+import { abortAllDurableObjects, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
 import type { FakeRemote, TestRoom } from "./worker.ts";
 
@@ -127,6 +127,61 @@ describe("landing in a Durable Object", () => {
     expect(late.outcome).toBe("landed"); // main already equals the same integration: "up to date"
     expect(await remote.main()).toBe(main);
     expect(await landed(room)).toBe(1);
+  });
+
+  it("R-PUB-3: the push lands but its token's revocation fails; across real restarts the alarm keeps the revocation owed with backoff, and revokes it when Artifacts recovers", async () => {
+    let { room } = await reservedRoom();
+    // The test Room's revoke marks its token row; this trigger makes Artifacts refuse revocations, durably, across restarts.
+    const revocations = (stub: DurableObjectStub<TestRoom>, on: boolean) =>
+      runInDurableObject(stub, (_room, state) => {
+        state.storage.sql.exec(
+          on ? "CREATE TRIGGER revoke_down BEFORE UPDATE ON t_tokens BEGIN SELECT RAISE(ABORT, 'Artifacts unavailable (revoke)'); END" : "DROP TRIGGER revoke_down",
+        );
+      });
+    const owed = (stub: DurableObjectStub<TestRoom>) =>
+      runInDurableObject(stub, (_room, state) => ({
+        rows: state.storage.sql.exec("SELECT op, n, due, backoff FROM artroom_land_token_cleanup").toArray() as { op: string; n: number; due: number; backoff: number }[],
+        now: Date.now(),
+      }));
+    const alarmAt = (stub: DurableObjectStub<TestRoom>) => runInDurableObject(stub, (_room, state) => state.storage.getAlarm());
+    const waitUntil = async (t: number) => {
+      while (Date.now() < t) await new Promise((r) => setTimeout(r, Math.max(10, t - Date.now())));
+    };
+
+    await revocations(room, true);
+    expect(await room.publish()).toBe("true");
+    expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
+    expect(await landed(room)).toBe(1);
+    expect(await room.liveTokens()).toBe(1);
+    let o = await owed(room);
+    expect(o.rows.map((r) => [r.op, r.n, r.backoff])).toEqual([[OP, 1, 1000]]);
+    expect(o.rows[0]!.due).toBeGreaterThan(o.now - 1000);
+
+    // Restart with Artifacts still refusing. The alarm tries once it is due, fails, and schedules the next try.
+    room = await restart(room);
+    await waitUntil(o.rows[0]!.due);
+    expect(await runDurableObjectAlarm(room)).toBe(true);
+    o = await owed(room);
+    expect(o.rows.map((r) => [r.op, r.n, r.backoff])).toEqual([[OP, 1, 2000]]);
+    expect(o.rows[0]!.due).toBeGreaterThan(o.now);
+    expect(await alarmAt(room)).toBe(o.rows[0]!.due);
+    expect(await room.liveTokens()).toBe(1);
+    expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
+
+    // Artifacts recovers; another restart; the scheduled alarm fires by itself, revokes the token and owes nothing more.
+    await revocations(room, false);
+    room = await restart(room);
+    const deadline = o.rows[0]!.due + 10_000;
+    while ((await room.liveTokens()) !== 0) {
+      if (Date.now() > deadline) throw new Error("the scheduled alarm did not revoke the token");
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(Date.now()).toBeGreaterThanOrEqual(o.rows[0]!.due);
+    expect((await owed(room)).rows).toEqual([]);
+    expect(await alarmAt(room)).toBeNull();
+    expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
+    expect(await landed(room)).toBe(1);
+    expect((await room.log()).map((x) => x.type)).toEqual(["land-reserved", "land-outcome"]);
   });
 });
 

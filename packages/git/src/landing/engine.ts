@@ -325,8 +325,28 @@ export class Landing {
         this.core.tokenRevoked(id, t.n);
       } catch (e) {
         if (e instanceof EngineStopped) throw e;
-        // Leave it: a later step revokes it. It expires within 60 s regardless,
-        // and expiry decides nothing (R-PUB-2).
+        // Leave it: a later step revokes it, while the slot is held, or from the
+        // cleanup records once the operation has ended. It expires within 60 s
+        // regardless, and expiry decides nothing (R-PUB-2).
+      }
+    }
+  }
+
+  /**
+   * Revoke the known tokens of ended operations whose revocation failed
+   * (R-PUB-3). Each by its own recorded ID: never a sweep of the canonical
+   * repository's tokens. The answer changes no outcome and no receipt.
+   */
+  private async revokeEnded(): Promise<void> {
+    for (const t of this.core.cleanupDue()) {
+      try {
+        await this.tokens.revoke(t.tokenId);
+        this.alive();
+        this.core.tokenRevoked(t.op, t.n);
+      } catch (e) {
+        if (e instanceof EngineStopped) throw e;
+        this.alive();
+        this.core.cleanupFailed(t.op, t.n);
       }
     }
   }
@@ -350,7 +370,8 @@ export class Landing {
    * 1. a held slot: revoke tokens a previous instance left live, read main
    *    back, then complete forward;
    * 2. reserve the next ready operation and publish it;
-   * 3. start every preparation that is due.
+   * 3. revoke the due tokens of operations that have ended;
+   * 4. start every preparation that is due.
    * Each call does a bounded amount of work; set the alarm to `nextDue()`.
    */
   reconcile(): Promise<void> {
@@ -373,6 +394,7 @@ export class Landing {
         const r = this.core.reserveNext();
         if (r?.kind === "reserved") await this.publishStep();
       }
+      await this.revokeEnded();
       const due = this.core.active().filter((o) => o.state === "accepted" || (o.state === "preparing" && o.integration === undefined));
       await Promise.all(due.map((o) => this.prepare(o.id)));
       // A built integration whose readiness answer was lost (a crash, a failed evaluation).
@@ -395,7 +417,7 @@ export class Landing {
   }
 
   private fingerprint(): string {
-    return JSON.stringify([this.core.slot(), this.core.active().map((o) => [o.id, o.state, o.attempts, o.integration, o.readinessPending, o.pushes?.length, o.nextAt])]);
+    return JSON.stringify([this.core.slot(), this.core.tokenCleanup(), this.core.active().map((o) => [o.id, o.state, o.attempts, o.integration, o.readinessPending, o.pushes?.length, o.nextAt])]);
   }
 
   /** Every non-terminal operation, as views. */
