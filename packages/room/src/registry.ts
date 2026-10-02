@@ -9,6 +9,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { RoomId, RoomRef } from "@generalbusiness/artroom-contract";
 import { clock, type RoomEnv } from "./config.ts";
+import { report, toConsole } from "./diag.ts";
 import { artroomError, wire, type Wire } from "./errors.ts";
 import type { Sql } from "./ports.ts";
 import { migrate, type Migration } from "./store.ts";
@@ -53,6 +54,8 @@ export class Registry extends DurableObject<RoomEnv> {
    * forward after an interruption.
    */
   bind(repo: string, room: RoomId, name: string, notAfter?: number): Promise<Wire<"bound" | "already-bound">> {
+    // The registry has no services: a failure that is not an `ArtroomError` goes to the Worker's log (request d268d249).
+    const unknown = (e: unknown) => report(toConsole, "rpc-failed", "registry.bind", e);
     return wire(async () => {
       const byRepo = this.row("SELECT * FROM bindings WHERE repo = ?", repo);
       if (byRepo) {
@@ -64,7 +67,7 @@ export class Registry extends DurableObject<RoomEnv> {
       if (this.row("SELECT * FROM bindings WHERE name = ?", name)) throw artroomError("forbidden", "This name is already bound to another room.");
       this.ctx.storage.sql.exec("INSERT INTO bindings (repo, room, name) VALUES (?, ?, ?)", repo, room, name);
       return "bound";
-    });
+    }, unknown);
   }
 
   byRepo(repo: string): Promise<Binding | null> {

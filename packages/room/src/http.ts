@@ -9,6 +9,7 @@ import type { ReadQuery, Sha } from "@generalbusiness/artroom-contract";
 import { isArtroomError, isRefusal } from "@generalbusiness/artroom-contract";
 import { parseStrict } from "./canonical.ts";
 import { clock, type RoomEnv } from "./config.ts";
+import { report, toConsole, type DiagnosisSink } from "./diag.ts";
 import { artroomError, HTTP_STATUS, toArtroomError, unwire, type Wire } from "./errors.ts";
 import { draftRoom, foundRoom } from "./founding.ts";
 import { RE } from "./ids.ts";
@@ -104,7 +105,8 @@ function intParam(url: URL, name: string): number | undefined {
 
 // ------------------------------------------------------------ the router
 
-export async function route(req: Request, env: RoomEnv): Promise<Response> {
+/** `log` takes a failure that is not an `ArtroomError`, which the client sees only as `internal` (request d268d249). */
+export async function route(req: Request, env: RoomEnv, log: DiagnosisSink = toConsole): Promise<Response> {
   try {
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
@@ -184,7 +186,7 @@ export async function route(req: Request, env: RoomEnv): Promise<Response> {
     }
     return failure(artroomError("not-found", "No such route."));
   } catch (e) {
-    if (isArtroomError(e)) return failure(e);
+    if (!isArtroomError(e)) report(log, "http-failed", "route", e);
     return failure(e);
   }
 }

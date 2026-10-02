@@ -391,22 +391,34 @@ function rosterSemantics(core: RoomCore, env: Envelope, by: Authority): Refusal 
 
 // =============================================================== pre-admission I/O
 
+/**
+ * The reads before admission. Any failure is `unavailable` to the client,
+ * with a fixed message; the step that failed and the error's name and
+ * redacted message go to the Worker's log (request d268d249).
+ */
 async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
   const a = core.ports.artifacts;
   const unavailable = () => artroomError("unavailable", "The repository could not be read. Nothing was recorded; retry with the same idempotency key.", { maybeRecorded: false });
   let noMain = false;
+  let step: string = env.kind;
   try {
     if (env.kind === "propose") {
       const lane = laneOf(env)!;
       const body = env.body as ProposeBody;
       if (!laneRow(core.sql, lane)) return {};
+      step = "propose.headInFork";
       const inFork = await a.headInFork(lane, body.head);
       if (!inFork) return { head: { inFork } };
+      step = "propose.pinObjects";
       await a.pinObjects(lane, body.head); // R-PROP-1 step 1: named by content, so repeating is harmless
+      step = "propose.readMain";
       const main = await a.readMain();
+      step = "propose.diff";
       const diff = await a.diff(main, body.head);
       let config: ArtroomConfig | null = null;
+      step = "propose.readConfig";
       if (diff.kind === "ok" && changedPaths(diff.changed).some(isConfigPath)) config = await a.readConfig(body.head);
+      step = "propose.changedBetween";
       const since = new Map<Sha, readonly RepoPath[] | null>();
       for (const r of core.sql.all("SELECT DISTINCT head FROM generations WHERE lane = ?", lane)) {
         const h = str(r, "head") as Sha;
@@ -419,17 +431,23 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
       const b = env.body as CheckBody;
       // A scoped check that binds a snapshot commit the room recorded: the room derived it, so nothing is read.
       if (b.input?.kind === "filtered" && one(core.sql, "SELECT 1 AS x FROM check_snapshots WHERE commit_sha = ?", b.integration)) return {};
+      step = "check.treeOf";
       const tree = await a.treeOf(b.integration);
       // A scoped checker's input: the filtered snapshot of the integration over the paths it names (R-CARRY-9).
+      step = "check.snapshot";
       if (b.input?.kind === "filtered" && Array.isArray(b.input.paths)) return { tree, snapshot: (await a.snapshot(b.integration, b.input.paths))?.digest ?? null };
       return { tree };
     }
     if (env.kind === "land" && core.landing.core.main() === null) {
+      step = "land.readMain";
       if ((await a.readMain()) === null) noMain = true;
-      else await core.landing.refreshMain();
+      else {
+        step = "land.refreshMain";
+        await core.landing.refreshMain();
+      }
     }
   } catch (e) {
-    void e;
+    core.diagnose("pre-admission-failed", step, e);
     throw unavailable();
   }
   // A repository with no main can take no landing, and a retry changes nothing (request b6b51de7).
