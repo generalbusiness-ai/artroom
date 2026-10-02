@@ -56,7 +56,7 @@ import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, SnapshotPort, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, SnapshotRepos, Workspaces, canonicalTokens } from "@generalbusiness/artroom-git";
+import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, publicationTokens } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
@@ -218,6 +218,15 @@ export class RoomCore {
   };
   /** Lane B's landing engine, on this room's SQLite. */
   readonly landing: Landing;
+  /**
+   * The canonical mint ledger (protocol section 32): it owns each token the
+   * Room creates on its canonical repository, from before the request is
+   * sent until the token's revocation is answered or another owner claims
+   * it. Built once per object start, with the core: its constructor takes
+   * over what a stopped object left (R-MINT-7). The alarm runs it
+   * (`steps.mints`, `nextAlarm`).
+   */
+  readonly mints: MintLedger;
   private wsCache: Workspaces | null = null;
   /** The Artifacts binding for the room's repository namespace (`binding()`), resolved per call. */
   readonly artifacts: ArtifactsBinding;
@@ -283,11 +292,22 @@ export class RoomCore {
         return remote;
       },
     };
+    const canonicalRepo = () => this.artifacts.get(this.location().name);
+    this.mints = new MintLedger({
+      sql: this.sql,
+      repo: canonicalRepo,
+      now: () => this.now(),
+      // The persisted alarm: resolves only once storage has it, before any create is sent (R-MINT-2).
+      wake: this.wake ?? (async () => this.committed()),
+      // Point lookups in the Room's other records of token IDs: job tokens, and the landing's token rows (R-MINT-7).
+      known: (id) => !!one(this.sql, "SELECT 1 AS x FROM job_tokens WHERE token_id = ?", id) || this.landing.core.knownToken(id),
+      ...sleep,
+    });
     this.landing = new Landing({
       sql: this.sql,
       room: this.host(),
       publisher: new ContainerPublisher({ stub: r.publisher, artifacts: this.artifacts, canonical, ...sleep }),
-      tokens: canonicalTokens(() => this.artifacts.get(this.location().name), sleep),
+      tokens: publicationTokens({ mints: this.mints, repo: canonicalRepo, ...sleep }),
       now: () => this.now(),
       ...(r.landingFault ? { fault: r.landingFault } : {}),
     });
@@ -1629,6 +1649,11 @@ export class RoomCore {
     },
     abort: () => this.landing.enforceAbort().then(() => undefined),
     publication: () => this.publish().then(() => undefined),
+    // Its own kind of work (request 3da1d82b's per-kind fences): `due` is the alarm loop's fence after a failure of
+    // the step itself; the ledger's own durable due times are checked inside, at execution.
+    mints: async (due: (kind: "mints") => boolean = () => true) => {
+      if (due("mints")) await this.reconcileMints();
+    },
   } as const;
 
   /** Start one durable step now, in the background. */
@@ -1657,6 +1682,17 @@ export class RoomCore {
     await this.landing.reconcile();
   }
 
+  /**
+   * The canonical mint ledger's alarm work (R-MINT-7): move the takeover
+   * time ahead while a request or token is in flight, start a revocation
+   * pass if one is due (not awaited), and observe if due (bounded). Each
+   * honours its own durable due time, so an alarm that runs early for other
+   * work does nothing here, and an idle room writes nothing.
+   */
+  async reconcileMints(): Promise<void> {
+    if (this.founded) await this.mints.reconcile();
+  }
+
   /** When the alarm should next run, or null. */
   nextAlarm(): number | null {
     const times: number[] = [];
@@ -1666,6 +1702,10 @@ export class RoomCore {
     if (notify !== null) times.push(notify);
     const landing = this.landing.nextDue();
     if (landing !== null) times.push(landing);
+    // The canonical mint ledger: the takeover time while anything is in flight, owed revocations and the next
+    // observation. A still-future time as it is; overdue work 1 s ahead, never sooner (R-MINT-7).
+    const mints = this.mints.nextDue();
+    if (mints !== null) times.push(mints);
     // Lane B's workspace duties: cleanup owed, and checks on unanswered remote steps, on their capped backoff.
     let ws: Workspaces | null = null;
     try {
