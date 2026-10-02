@@ -26,7 +26,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { submit } from "./admission.ts";
-import { alarmTime, clock, publicUrl, servicesFor, type RoomEnv } from "./config.ts";
+import { alarmTime, clock, pinDelayMs, publicUrl, servicesFor, type RoomEnv } from "./config.ts";
 import { RoomCore, fault } from "./core.ts";
 import { jobTokenDuties } from "./jobs.ts";
 import { checkGenesis } from "./founding.ts";
@@ -65,6 +65,7 @@ export class Room extends DurableObject<RoomEnv> {
       services: servicesFor(env, ctx.id.toString()),
       clock,
       leaseMs: Number(env.LEASE_SECONDS ?? "1800") * 1000,
+      pinDelayMs: pinDelayMs(env),
       defer: (p) => ctx.waitUntil(p),
       committed: () => this.onCommit(),
       bound: async (repo, room, name) => {

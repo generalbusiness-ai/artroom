@@ -65,7 +65,7 @@ import { b64url, digestBytes, newKeyPair, randomBytes, randomToken, sign } from 
 import { iso } from "../src/ids.ts";
 import { firstCommit } from "../../git/src/first-commit.ts";
 import { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, readListing, REPO_PAGE, smokeOk } from "./cleanup.mjs";
-import { attentionFor, CHECK, CHECKED_PATHS, checkedChange, checkProject, checksIn, checksPolicy, importDraft, loadSpikeKeys, obligationOf, REVIEW_RULE, seedImportRepo } from "./checks.mjs";
+import { attentionFor, CHECK, CHECKED_PATHS, checkedChange, checkProject, checksIn, checksPolicy, importDraft, loadSpikeKeys, manualCheckProject, MANUAL_PATHS, obligationOf, REVIEW_RULE, seedImportRepo } from "./checks.mjs";
 import { gateOk, gateOptions, querySamples, rowGate, safeMessage, SETTLE_MS, SMOKE_BUDGET, SPIKE_WORKER, windowEndAfterSettle, windowTable, windowTableMarkdown } from "./rows.mjs";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
@@ -279,6 +279,7 @@ async function pushLane(res, files) {
   await must(["add", "-A"], { cwd: dir });
   await must(["commit", "-q", "-m", `spike smoke lane ${n}`], { cwd: dir });
   res.head = await must(["rev-parse", "HEAD"], { cwd: dir });
+  res.tree = await must(["rev-parse", "HEAD^{tree}"], { cwd: dir });
   const p = await git(["push", "-q", "origin", "HEAD:refs/heads/work"], { cwd: dir, token: g.body.token });
   step(`lane ${n}: push to fork`, p.code === 0, { head: res.head, code: p.code, stderr: p.stderr || undefined });
   if (p.code !== 0) return false;
@@ -436,6 +437,12 @@ async function main() {
   lanes.push({ ...second, room, admin, ns: NS });
   const main2 = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
   step("main is the landed integration", !!second.op?.integration && main2 === second.op.integration, { main: main2, integration: second.op?.integration, head: second.head });
+  // PIN_DELAY_MS is unset (request 8bd623cc, assert 66a41558): the propose itself wrote the pinned ref; nothing read
+  // the proposal, which would write it too. After a measurement window, this is the evidence the switch is off.
+  if (second.lane && second.head) {
+    const pin = await canonicalRef(canonicalRemote, canonical, `refs/artroom/heads/${second.lane}/1`);
+    step("the propose wrote its pinned ref itself (PIN_DELAY_MS unset)", pin === second.head, { pin, head: second.head });
+  }
 
   // Gap 3: imports are allowed only in the import namespace. A grant signed by the spike operator key
   // for the public namespace, or for a namespace the deployment does not bind, is refused at draft with
@@ -699,7 +706,7 @@ async function measured(name, fn, { kind = "act", tail = kind === "act" ? ACT_TA
   const r = await fn();
   await sleep(tail);
   const to = new Date().toISOString();
-  windows.push({ name, kind, from, to });
+  windows.push({ name, kind, from, to, room });
   log(`window ${kind} ${name}: ${from} .. ${to}`);
   return r;
 }
@@ -713,6 +720,12 @@ async function measured(name, fn, { kind = "act", tail = kind === "act" ? ACT_TA
  * (founding, then the N lanes and the policy landing).
  */
 async function rowsPhase(operator, checker) {
+  const mode = process.env.ROWS_ONLY ?? "";
+  out.rows = { mode: mode || "all", rooms: [], windows };
+  if (mode === "pin") return pinPhase(operator);
+  if (mode === "check") return checkPhase(operator);
+  if (mode === "activation") return activationPhase(operator);
+  if (mode) throw new Error(`ROWS_ONLY must be pin, check or activation, not ${mode}`);
   const L = "rows";
   const N = Number(process.env.ROWS_OPEN ?? 3);
   if (!Number.isSafeInteger(N) || N < 1) throw new Error("ROWS_OPEN must be a positive integer");
@@ -723,8 +736,9 @@ async function rowsPhase(operator, checker) {
     return f;
   });
   const measuredRoom = founded.room;
-  out.rows = { room: measuredRoom, open: N, windows };
-  const onlyPolicy = process.env.ROWS_ONLY === "policy";
+  Object.assign(out.rows, { room: measuredRoom, open: N });
+  out.rows.rooms.push(measuredRoom);
+  const onlyPolicy = false;
   // A change to .artroom/ owes an approval from an admin other than its author (obl_admin-approval).
   const admin2 = newKeyPair();
   const reviewer = newKeyPair();
@@ -830,13 +844,156 @@ async function rowsPhase(operator, checker) {
 async function rowsReport() {
   // querySamples starts a minute early (sampleQueryStart), so the first window's first sample is in.
   const samples = await querySamples({ accountId: rowsGate.accountId, token: rowsGate.token, worker: SPIKE_WORKER, from: windows[0].from, to: windows.at(-1).to });
-  const table = windowTable(windows, samples, out.rows.room);
+  // Each window belongs to the room it measured; each room's windows are tabled against that room's samples.
+  const rooms = out.rows.rooms;
+  const table = rooms.flatMap((r) => windowTable(windows.filter((w) => w.room === r), samples, r).map((row) => ({ room: r, ...row })));
   out.rows.table = table;
-  out.rows.samples = samples.samples.filter((s) => s.name === out.rows.room || s.className !== "Room");
+  out.rows.namespaces = samples.namespaces;
+  out.rows.samples = samples.samples.filter((s) => rooms.includes(s.name) || s.className !== "Room");
   const file = join(HERE, "results", `row-costs-${RUN}.md`);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, `# Rows per act, ${RUN}\n\nRoom \`${out.rows.room}\`; N = ${out.rows.open}. From Cloudflare's per-minute durableObjectsPeriodicGroups samples (rowsWritten, rowsRead), by window (measure/README.md).\n\n${windowTableMarkdown(table)}`);
+  const sections = rooms.map((r) => `## Room \`${r}\`\n\n${windowTableMarkdown(table.filter((row) => row.room === r))}`).join("\n");
+  writeFileSync(file, `# Rows per act, ${RUN} (${out.rows.mode})\n\nFrom Cloudflare's per-minute durableObjectsPeriodicGroups samples (rowsWritten, rowsRead), by window (measure/README.md). Namespaces queried: ${samples.namespaces.map((n) => `${n.className} \`${n.id}\``).join(", ")}.\n\n${sections}`);
   log(`rows table ${file}`);
+}
+
+// ------------------------------------------------------------ isolated measurements (review 28615b74)
+
+/** A quiet window: nothing is sent. It is the control for the windows on either side. */
+const QUIET_MS = 300_000;
+const quiet = (name, ms) => measured(name, () => sleep(Math.max(0, ms)), { kind: "quiet", tail: 0 });
+
+/** Found a dedicated room for one isolated measurement; its founding is a setup window. */
+async function dedicatedRoom(L, operator, files) {
+  const repo = await seedImport(L, files);
+  const f = await measured(`${L}: found a dedicated room`, async () => {
+    const r = await foundImport(L, operator, repo, "@author");
+    sessionAt = Date.now();
+    return r;
+  }, { kind: "setup" });
+  out.rows.rooms.push(f.room);
+  return { repo, room: f.room };
+}
+
+const listedLane = (res) => (lanes.push(Object.assign(res, { room, admin, ns: IMPORT_NS })), res);
+
+/**
+ * ROWS_ONLY=pin, on a Room deployed with PIN_DELAY_MS (assert 66a41558),
+ * ROWS_PIN_DELAY_MS the same value. Two isolated alarm ticks in one dedicated
+ * room, each against quiet controls:
+ *   1. A pending pin: the propose leaves its pin (and writes the switch's due
+ *      time, 2 rows), and the alarm at the due time completes it.
+ *   2. Nothing pending: a second propose's pin is completed early by a read of
+ *      the proposal (a setup window); the alarm stored for its due time then
+ *      fires with nothing to do.
+ * The pinned refs are read from the repository (not the Room) before and
+ * after each tick, as evidence.
+ */
+async function pinPhase(operator) {
+  const L = "rows-pin";
+  const delay = Number(process.env.ROWS_PIN_DELAY_MS ?? 0);
+  if (!Number.isSafeInteger(delay) || delay < 360_000) throw new Error("ROWS_ONLY=pin needs ROWS_PIN_DELAY_MS, the PIN_DELAY_MS the Room was deployed with, of at least 360000");
+  const { repo } = await dedicatedRoom(L, operator, checkProject(RUN));
+  const pinned = (l) => canonicalRef(repo.remote, repo.name, `refs/artroom/heads/${l.lane}/1`, IMPORT_NS);
+  const prepare = async (n, path) => {
+    const l = listedLane(await claimLane(n, [`${path}/**`]));
+    if (!l.lane || !(await pushLane(l, { [`${path}/a.md`]: `rows ${RUN} ${n}\n` }))) throw new Error(`lane ${n} was not pushed`);
+    return l;
+  };
+  const a = await measured("pin: setup, lane A claimed and pushed", () => prepare(50, "docs/pa"), { kind: "setup" });
+  await quiet("pin: quiet before (control)", QUIET_MS);
+  const ta = Date.now();
+  await measured("pin: propose under the switch, its pin left pending (includes the switch's due time, 2 rows)", () => proposeLane(a));
+  const beforeA = await pinned(a);
+  step(`${L}: lane A's pinned ref is not written before its due time`, beforeA !== a.head, { pinned: beforeA, head: a.head });
+  await quiet("pin: quiet, the pin pending (control)", ta + delay - 90_000 - Date.now());
+  await measured("pin: the alarm tick that completes the pending pin (includes deleting the switch's due time, 2 rows)", () => sleep(Math.max(0, ta + delay + 15_000 - Date.now())));
+  const afterA = await pinned(a);
+  step(`${L}: the alarm wrote lane A's pinned ref`, afterA === a.head, { pinned: afterA, head: a.head });
+  await measured("pin: setup, release lane A", async () => void (a.released = (await act("release", { lane: a.lane }, { lease: 1, note: "measured" })).status === 200), { kind: "setup" });
+
+  const b = await measured("pin: setup, lane B claimed and pushed", () => prepare(51, "docs/pb"), { kind: "setup" });
+  const tb = Date.now();
+  await measured("pin: setup, propose B under the switch", () => proposeLane(b), { kind: "setup" });
+  // The read completes B's pin now (R-PROP-1); the alarm stored for B's due time stays, with nothing left to do.
+  await measured("pin: setup, a read of proposal B completes its pin early", () => read(`/lanes/${b.lane}/1`), { kind: "setup" });
+  const afterRead = await pinned(b);
+  step(`${L}: the read wrote lane B's pinned ref before its due time`, afterRead === b.head, { pinned: afterRead, head: b.head });
+  await quiet("idle: quiet before the empty tick (control)", tb + delay - 90_000 - Date.now());
+  await measured("idle: the alarm tick at B's old due time, nothing pending", () => sleep(Math.max(0, tb + delay + 15_000 - Date.now())));
+  await quiet("idle: quiet after (control)", QUIET_MS);
+  await measured("pin: setup, release lane B", async () => void (b.released = (await act("release", { lane: b.lane }, { lease: 1, note: "measured" })).status === 200), { kind: "setup", tail: 0 });
+}
+
+/**
+ * ROWS_ONLY=check: one check, admitted 5 minutes after its propose, in a
+ * dedicated room. The policy requires the `manual` check on lib/**, which no
+ * service is bound for (CHECKER_MANUAL does not exist), so no job is sent;
+ * the driver signs the check itself with a fresh member key of role checker.
+ */
+async function checkPhase(operator) {
+  const L = "rows-check";
+  await dedicatedRoom(L, operator, manualCheckProject(RUN));
+  const checker = newKeyPair();
+  await measured("check: setup, a checker member joins", () => joinAs(L, checker, "@manual-checker", "checker"), { kind: "setup" });
+  const l = await measured("check: setup, a lane on lib/** claimed and pushed", async () => {
+    const r = listedLane(await claimLane(60, MANUAL_PATHS));
+    if (!r.lane || !(await pushLane(r, { "lib/x.js": `export const x = "${RUN}";\n` }))) throw new Error("the checked lane was not pushed");
+    return r;
+  }, { kind: "setup" });
+  await measured("check: setup, propose (owes the manual check; no job is sent)", () => proposeLane(l), { kind: "setup" });
+  const obligation = obligationOf(l.proposal, "check");
+  const integration = l.preview?.integration ?? null;
+  step(`${L}: the proposal owes the manual check, on a clean fast-forward preview`, obligation?.state === "open" && integration === l.head, { obligation, integration, head: l.head });
+  const activated = ((await read("/log?limit=5")).body?.acts ?? []).find((e) => e.entry?.type === "system" && e.entry.event?.type === "policy-activated");
+  const config = activated?.entry.event.checkers?.find((c) => c.name === "manual")?.config ?? null;
+  step(`${L}: the manual checker's configuration digest, from policy-activated`, !!config, { config });
+  await quiet("check: quiet before (control)", QUIET_MS);
+  const body = { obligation: obligation?.id, check: "manual", integration: l.head, input: { kind: "tree", tree: l.tree }, config, runner: digestBytes(new TextEncoder().encode(`rows-${RUN}`)), volatile: false, ok: true, detail: "Measured check (request 8bd623cc): signed by the driver." };
+  const c = await measured("check: the check, admitted", () => actAs(checker, "check", { lane: l.lane, generation: 1 }, body));
+  step(`${L}: the check was admitted`, c.status === 200, { status: c.status, refused: c.body.rule, reason: c.body.reason });
+  await quiet("check: quiet after (control)", QUIET_MS);
+}
+
+/**
+ * ROWS_ONLY=activation: policy activation with N open proposals, separated
+ * from its landing by difference. Two dedicated rooms, with N = 0 and with
+ * N = ROWS_OPEN open proposals. In each, three times: land a plain change,
+ * then land a change to .artroom/policy.json (approved by a second admin).
+ * activation(N) = policy landing - plain landing, in the same room, at
+ * nearly the same log length; the N = 0 room gives the fixed part.
+ */
+async function activationPhase(operator) {
+  const N = Number(process.env.ROWS_OPEN ?? 3);
+  if (!Number.isSafeInteger(N) || N < 1) throw new Error("ROWS_OPEN must be a positive integer");
+  for (const n of [0, N]) {
+    const L = `rows-activation-${n}`;
+    await dedicatedRoom(L, operator, checkProject(RUN));
+    const admin2 = newKeyPair();
+    await measured(`activation N=${n}: setup, a second admin joins`, () => joinAs(L, admin2, "@admin2", "admin"), { kind: "setup" });
+    if (n > 0)
+      await measured(`activation N=${n}: setup, ${n} lanes proposed and left open`, async () => {
+        for (let i = 1; i <= n; i++) if (!listedLane(await openLane(70 + i, { [`docs/o${i}/a.md`]: `rows ${RUN} ${i}\n` }, [`docs/o${i}/**`])).proposal) throw new Error("an open lane was not proposed");
+      }, { kind: "setup" });
+    for (let rep = 1; rep <= 3; rep++) {
+      const plain = await measured(`activation N=${n}: setup, plain lane ${rep} proposed`, async () => listedLane(await openLane(80 + rep, { [`docs/p${rep}/a.md`]: `plain ${RUN} ${rep}\n` }, [`docs/p${rep}/**`])), { kind: "setup" });
+      await measured(`activation N=${n}, rep ${rep}: land a plain change`, () => landLane(plain));
+      await measured(`activation N=${n}: setup, release plain lane ${rep}`, async () => void (plain.released = (await act("release", { lane: plain.lane }, { lease: 1, note: "measured" })).status === 200), { kind: "setup" });
+      const changed = { ...checksPolicy(), rules: checksPolicy().rules.map((r) => (r.id === REVIEW_RULE ? { ...r, id: `${REVIEW_RULE}-${n}-${rep}` } : r)) };
+      const pol = await measured(`activation N=${n}: setup, policy lane ${rep} proposed and approved`, async () => {
+        const p = listedLane(await openLane(90 + rep, { ".artroom/policy.json": JSON.stringify(changed, null, 2) + "\n" }, [".artroom/**"]));
+        if (!p.proposal) throw new Error("the policy lane was not proposed");
+        const a = await actAs(admin2, "review", { lane: p.lane, generation: 1 }, { head: p.head, verdict: "approve", scope: [".artroom/**"], text: "Approved for the measurement." });
+        step(`${L}: the second admin approves policy lane ${rep}`, a.status === 200, { status: a.status, refused: a.body.rule });
+        return p;
+      }, { kind: "setup" });
+      await measured(`activation N=${n}, rep ${rep}: land a policy change (activation)`, () => landLane(pol));
+      await measured(`activation N=${n}: setup, release policy lane ${rep}`, async () => void (pol.released = (await act("release", { lane: pol.lane }, { lease: 1, note: "measured" })).status === 200), { kind: "setup" });
+    }
+    await measured(`activation N=${n}: setup, release the open lanes`, async () => {
+      for (const l of lanes) if (l.lane && !l.released && l.room === room) l.released = (await act("release", { lane: l.lane }, { lease: 1, note: "measured" })).status === 200;
+    }, { kind: "setup", tail: 0 });
+  }
 }
 
 // ------------------------------------------------------------ cleanup (review 1b868265)

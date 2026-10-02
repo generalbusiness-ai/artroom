@@ -15,6 +15,9 @@ export declare const TESTS_CONFIG: { readonly format: string; readonly volatile:
 
 export function checksPolicy(): { readonly rules: readonly { readonly id: string; readonly kind: string; readonly paths?: readonly string[]; readonly obligation?: Record<string, unknown> }[] } & Record<string, unknown>;
 export function checkProject(run: string): Record<string, string>;
+export declare const MANUAL_PATHS: readonly string[];
+export declare const MANUAL_CONFIG: { readonly format: string; readonly volatile: boolean; readonly timeoutSeconds: number };
+export function manualCheckProject(run: string): Record<string, string>;
 export function checkedChange(run: string): Record<string, string>;
 export function envValue(text: string, name: string): string | null;
 export function spikeKeys(text: string, secrets?: Set<string>): { readonly operator: KeyPair | null; readonly checker: KeyPair | null };

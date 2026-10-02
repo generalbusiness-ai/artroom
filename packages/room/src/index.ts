@@ -12,7 +12,7 @@ export { Registry } from "./registry.ts";
 export { Publisher, ArtifactsGateway } from "@generalbusiness/artroom-git/publisher";
 export { RoomWireTarget } from "./worker.ts";
 export { RoomCore } from "./core.ts";
-export { setServicesFactory, setClock, setAlarmDelay, type ServicesFactory, type RoomEnv } from "./config.ts";
+export { setServicesFactory, setClock, setAlarmDelay, setPinDelay, type ServicesFactory, type RoomEnv } from "./config.ts";
 export { lanePolicy } from "./policy.ts";
 export { ArtifactsAdapter, locate } from "./artifacts.ts";
 export { FakeArtifactsHost, FakeRepo, FakeArtifactsError, artifactsErrors } from "./memory/artifacts.ts";

@@ -104,7 +104,7 @@ import { activeAdmins, activeKeys, delegableBy, delegation, invitation, keyRow, 
 import { checkBody, checkEnvelopeSize, checkSignedEnvelope, ShapeError } from "./schema.ts";
 import { limitInvitation } from "./ratelimit.ts";
 import { scanValue } from "./secrets.ts";
-import { one, num, str } from "./store.ts";
+import { one, num, setMeta, str } from "./store.ts";
 import { isConfigPath, Moved, type ActivePolicyFull, type RoomCore } from "./core.ts";
 
 const MAX_INVITE_MS = 7 * 24 * 3600 * 1000;
@@ -862,6 +862,8 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
       renewLease(ctx, laneId);
       const ref = pinnedRef(laneId, generation);
       core.sql.all("INSERT INTO pins (ref, head, done) VALUES (?, ?, 0) ON CONFLICT (ref) DO NOTHING", ref, body.head);
+      // Spike measurement only (PIN_DELAY_MS): the pin is left to the alarm, due later.
+      if (core.pinDelayMs > 0) setMeta(core.sql, `pin_due:${ref}`, String(ctx.now + core.pinDelayMs));
       const preview = { id: previewId, kind: "preview" as const, updatedAt: entry.at, lane: laneId, generation, state: "pending" as const };
       core.sql.all(
         "INSERT INTO previews (id, lane, generation, head, state, body, main, updated_ms) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)",
@@ -886,6 +888,7 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
       return proposalRecord(core, recordBase(ctx, entry, id, "propose", receiptOf(entry)), laneId, generation, ctx.policy);
     },
     afterCommit: () => {
+      // With the spike's PIN_DELAY_MS, the pins step leaves a pin that is not due yet.
       core.run("pins");
       core.run("previews");
     },

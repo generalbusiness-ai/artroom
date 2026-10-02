@@ -14,6 +14,9 @@ import {
   checksIn,
   checksPolicy,
   importDraft,
+  MANUAL_CONFIG,
+  MANUAL_PATHS,
+  manualCheckProject,
   obligationOf,
   seedImportRepo,
   spikeKeys,
@@ -212,3 +215,19 @@ describe("seedImportRepo and importDraft", () => {
     expect(await verify(operator.key, "artroom-onboarding-v1", d.repo.grant.grant, d.repo.grant.sig)).toBe(true);
   });
 });
+
+describe("the manual check of the isolated check measurement (request 8bd623cc)", () => {
+  it("adds a valid `manual` check on lib/** with its configuration, which the spike binds no service for", async () => {
+    const files = manualCheckProject("run");
+    const doc = JSON.parse(files[".artroom/policy.json"]!);
+    expect(validatePolicy(doc).ok).toBe(true);
+    expect(doc.rules.find((r: { id: string }) => r.id === "check-manual")).toMatchObject({ kind: "require", paths: MANUAL_PATHS, obligation: { type: "check", check: "manual", by: ["role:checker"] } });
+    expect(JSON.parse(files[".artroom/checkers/manual.json"]!)).toEqual(MANUAL_CONFIG);
+    expect(validateCheckerConfig(MANUAL_CONFIG).ok).toBe(true);
+    // No job: the spike Room has no CHECKER_MANUAL binding.
+    const { unstable_readConfig } = await import("wrangler");
+    const spike = unstable_readConfig({ config: new URL("../../wrangler.spike.jsonc", import.meta.url).pathname }) as unknown as { services: { binding: string }[] };
+    expect(spike.services.map((x) => x.binding)).not.toContain("CHECKER_MANUAL");
+  });
+});
+

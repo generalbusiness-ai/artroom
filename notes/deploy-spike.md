@@ -923,7 +923,13 @@ Four isolated measurements are **not yet measured**: a check, an idle
 alarm tick, an alarm tick with a pending pin, and policy activation alone.
 Review 28615b74 asked for them, with billing evidence and controls. They
 will be measured after the idle-write fix is deployed. The methods are in
-`packages/room/measure/README.md`, "Not yet measured". Every admitted act writes at least 7 rows:
+`packages/room/measure/README.md`, "Not yet measured".
+
+The spike-only pin switch that hugh approved (assert 66a41558),
+`PIN_DELAY_MS`, is built and tested. It is off unless
+`deploy-spike.sh` is run with it set. The driver modes `ROWS_ONLY=pin`,
+`check` and `activation` are built for the four measurements. None of these
+has run on the spike yet. Every admitted act writes at least 7 rows:
 
 - `entries` 2 (the rowid and the UNIQUE `id`);
 - `records` 2;

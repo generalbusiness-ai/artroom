@@ -237,7 +237,7 @@ by default. To check it, run the command with
 ## Part 1: rows per act
 
 ```sh
-ARTROOM_CF_ANALYTICS_TOKEN=… SPIKE_PHASE=rows [ROWS_OPEN=3] [ROWS_ONLY=policy] \
+ARTROOM_CF_ANALYTICS_TOKEN=… SPIKE_PHASE=rows [ROWS_OPEN=3] [ROWS_ONLY=pin|check|activation] \
   node packages/room/measure/spike-smoke.mjs
 ```
 
@@ -255,7 +255,8 @@ billing window, in this order:
 6. On a checked lane: propose, the check, the review.
 7. Idle for 5 minutes.
 
-`ROWS_ONLY=policy` runs only steps 1, 4, 5 and 7.
+`ROWS_ONLY` runs instead one of the isolated measurements below, each in
+rooms of its own.
 
 Cloudflare sends one periodic sample a minute for each object, stamped with
 the start of its interval. So the driver leaves 150 s of quiet after each
@@ -282,63 +283,111 @@ and controls. None of the four is done yet:
 |---|---|---|
 | A check | **not yet measured** | The checker service admitted its check 9 s after the propose, inside the same one-minute sample, so its cost could not be separated. |
 | An idle alarm tick (nothing pending) | **not yet measured** | Alarms do not appear in the invocations dataset. Every idle minute holds a checkpoint publication, so no quiet minute exists to compare with. The idle-write fix changes this figure. |
-| An alarm tick with one pending pin | **not yet measured** | The commit that admits a propose runs the pin step itself (`core.run("pins")`). On the deployed code no alarm tick ever finds a pin pending. |
+| An alarm tick with one pending pin | **not yet measured** | On the deployed code, the commit that admits a propose writes the pin itself, so no alarm tick ever finds a pin pending. The approved switch, `PIN_DELAY_MS` (below), is built and tested, but not yet deployed. |
 | Policy activation alone, with N open proposals | **not yet measured** | Activation is sealed in the landing's own transaction. Its only figure so far (about 40 written) is one subtraction across two rooms. It has no repetition and no control. |
 
 All four will be measured on the spike after the idle-write fix is
 deployed. With that fix, a quiet minute should cost nothing, so an act
-stands out against it. The methods proposed:
+stands out against it.
 
-- **The same for all four:**
-  - Use a dedicated room for each measurement, so no other act's deferred
-    work falls in the window.
-  - Leave at least 5 minutes of quiet before and after, so there are at
-    least four quiet samples on each side for the baseline and its
-    spread.
-  - Repeat three times.
-  - Record rows written and read in each window, the window times, the
-    namespace IDs queried (`Room`, `Registry`, `Publisher`), and the raw
-    samples (`out.rows.samples`).
-  - Keep a control room that runs the same sequence without the act being
-    measured.
-- **A check.** The check must be admitted at least 5 minutes after the
-  propose. Use a room whose policy requires a check that no checker service
-  answers: a check name with no service binding. Then the driver signs the
-  check itself, with its own member key of role `checker`, after the quiet
-  window. Before the run, confirm in the workerd suite whether such a policy
-  still sends a job. If it does, the job's attempts fall in the propose
-  window, and the check's admission still has a window to itself. The
-  control is the same room, with the propose and no check.
-- **An idle alarm tick.** Claim a lane and release it at once. The alarm
-  that was stored for the lease's expiry stays stored, because `schedule`
-  only moves an alarm earlier. When it fires (`LEASE_SECONDS` later, 30
-  minutes on the spike) there is nothing to do. Measure 5 minutes either
-  side of the expected time. Confirm first in the workerd suite that the
-  release leaves the alarm stored. To show that the tick ran, use the
-  room's Workers log (observability is on), because invocations do not
-  show alarms. The control is a room with no lane, which has no alarm.
-- **An alarm tick with one pending pin.** The deployed code never leaves a
-  pin pending for an alarm. This needs a spike-only switch, for example a
-  `PIN_DELAY_MS` variable under which the commit leaves the pin to the
-  alarm, due 3 minutes later. Then the tick that completes the pin has a
-  window of its own. A propose under the switch, without its pin, is the
-  control. This changes the deployed Worker, so it needs hugh's approval
-  before it is built.
-- **Policy activation with N open proposals.** Activation shares its
-  landing's transaction, so it is separated by difference, with controls,
-  in dedicated rooms of the same shape. Use a plain landing and a landing
-  of `.artroom/policy.json`, each with N = 0 and with N = 3 open proposals,
-  three times each. Then:
-  - activation with N open = policy landing(N) − plain landing(N);
-  - the cost per open proposal = (activation(3) − activation(0)) / 3.
+**What every isolated measurement has.**
 
-  Report the spread with each figure.
+- **Its own rooms.** Each mode founds rooms of its own, so no other act's
+  deferred work falls in its windows. The report tables each room against
+  its own samples.
+- **Quiet controls.** Each measured act has quiet windows before and after
+  it (`quiet`, 5 minutes, or until the act is due). Nothing is sent in a
+  quiet window, so it shows the room's background to compare with.
+- **Billing evidence.** The run's JSON keeps the rows written and read in
+  each window, the window's times and room, the namespace IDs queried, and
+  the raw per-minute samples. The results Markdown repeats the table and
+  the namespaces.
+
+**The modes:**
+
+- **`ROWS_ONLY=pin`: a tick with a pending pin, and an idle tick.** Deploy
+  the Room with the spike-only `PIN_DELAY_MS` (below) first, and give the
+  driver the same value as `ROWS_PIN_DELAY_MS`, at least 360000.
+
+  *Lane A, the pending pin.* The propose leaves its pin pending, and writes
+  the switch's due time: one `meta` row, so 2 rows written. That cost stays
+  in the propose's window. A quiet window follows while the pin is pending.
+  Then the tick window holds the alarm that completes the pin at its due
+  time. That tick also deletes the switch's due time (2 rows), so the
+  ordinary pending-pin tick is the window less those 2 rows.
+
+  *Lane B, the idle tick.* A read of the proposal (a setup window) writes
+  B's pin early. The alarm stored for B's due time then fires with nothing
+  to do. That is the idle tick, with quiet windows before and after it.
+
+  The pinned refs are read from the repository, not from the Room: absent
+  before A's due time, present after it, and present after B's read.
+- **`ROWS_ONLY=check`: a check.** The room's policy also requires a
+  `manual` check on `lib/**` (`manualCheckProject`). The spike binds no
+  service for it, so no job is sent. A fresh member of role `checker`
+  signs the check after 5 quiet minutes, with the configuration digest read
+  from the `policy-activated` entry.
+- **`ROWS_ONLY=activation`: policy activation with N open proposals.** Two
+  rooms, with N = 0 and with N = `ROWS_OPEN` open proposals. In each, three
+  times: land a plain change, then land a change to `.artroom/policy.json`,
+  approved by a second admin. Then:
+  - activation(N) = policy landing − plain landing, from adjacent windows
+    in the same room;
+  - the cost per open proposal = (activation(N) − activation(0)) / N.
+
+  Report the spread over the three repetitions.
+
+### The pin switch (`PIN_DELAY_MS`)
+
+Hugh approved this as a spike-only switch (assert 66a41558).
+
+- **Off by default.** No config file sets it; `test/node/deploy.test.ts`
+  checks the production, spike and test configs. With it unset, the
+  propose's commit writes the pin at once, as before.
+- **Set only by an explicit measurement step:**
+
+  ```sh
+  PIN_DELAY_MS=360000 packages/room/scripts/deploy-spike.sh  # measurement window
+  packages/room/scripts/deploy-spike.sh                       # unset it afterwards
+  ```
+
+  The script prints which of the two it did.
+- **What it does when set.** The propose records the pin's due time in
+  `meta`, and the pin is written when it is due. The alarm wakes for that
+  due time, not on the 5-second loop. A read of the proposal still writes
+  the pin, because a proposal read must find its pinned ref (R-PROP-1).
+  Whenever a pin is written, its due time is deleted, even after the switch
+  is unset.
+- **Its tests**, in `test/workerd/pin-delay.test.ts` against the real
+  Durable Object:
+  - unset, the pin is written by the commit, with no tick and no due time;
+  - set, it is not written before its due time, the next alarm is exactly
+    that time, and at that time the alarm writes it and deletes the due
+    time;
+  - set, a read writes it;
+  - set, it survives a restart, and the fresh object's stored alarm writes
+    it when due;
+  - unset after a delayed pin, the restarted object writes it at once and
+    cleans up.
+
+  `test/node/config.test.ts` covers parsing; any value that is not a whole
+  number of milliseconds stops the Room from starting.
+- **Evidence that it was unset after its window.** Every full smoke run
+  checks that lane 2's propose wrote its pinned ref itself: "the propose
+  wrote its pinned ref itself (PIN_DELAY_MS unset)". Nothing reads that
+  proposal, so with the switch on the step would fail.
 
 ## What remains
 
 - **Measure the four isolated cases** under "Not yet measured", on the
-  spike after the idle-write fix is deployed. Then rerun one clean smoke
-  with `ARTROOM_ROW_GATE=1` at that deploy, and check the ceilings again.
+  spike after the idle-write fix is deployed:
+  1. Deploy this branch's head with `PIN_DELAY_MS=360000`. Run
+     `ROWS_ONLY=pin` with `ROWS_PIN_DELAY_MS=360000`.
+  2. Run `ROWS_ONLY=check` and `ROWS_ONLY=activation`. These do not depend
+     on the switch.
+  3. Unset the switch by redeploying without it, and record when.
+  4. Run one clean full smoke with `ARTROOM_ROW_GATE=1`. Its pin step is the
+     evidence that the switch is off. Check the ceilings again.
 - **Request 99782949 enforces the budgets.** `src/budgets.ts` states each
   limit and the measurement it comes from. Nothing enforces them yet.
 - **Remove the idle background.** A cohort that holds only checkpoint

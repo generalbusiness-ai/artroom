@@ -73,6 +73,8 @@ export interface CoreOptions {
   readonly clock: () => number;
   /** Lease length in milliseconds (R-LANE-5). */
   readonly leaseMs: number;
+  /** Spike measurement only (`PIN_DELAY_MS`): a pin is left to the alarm until this long after its propose. 0 or absent: off. */
+  readonly pinDelayMs?: number;
   /** Keep a promise alive after the response (`ctx.waitUntil`). */
   readonly defer: (p: Promise<unknown>) => void;
   /** Called after every commit that sealed entries: wake subscribers, reschedule the alarm. */
@@ -152,6 +154,7 @@ export class RoomCore {
   readonly ports: Ports;
   readonly clock: () => number;
   readonly leaseMs: number;
+  readonly pinDelayMs: number;
   readonly defer: (p: Promise<unknown>) => void;
   readonly committed: () => void;
   readonly bound: CoreOptions["bound"];
@@ -248,6 +251,7 @@ export class RoomCore {
     this.services = opts.services;
     this.clock = opts.clock;
     this.leaseMs = opts.leaseMs;
+    this.pinDelayMs = opts.pinDelayMs ?? 0;
     this.defer = opts.defer;
     this.bound = opts.bound;
     this.wake = opts.wake;
@@ -1398,12 +1402,33 @@ export class RoomCore {
   }
 
   /** Complete pinned refs that were admitted but not yet written (R-PROP-1 step 2). */
-  async completePins(): Promise<void> {
+  /**
+   * Write every pending pinned ref. With the spike's pin delay on, a pin is
+   * written only once due, unless `force` (a read of the proposal, which must
+   * find its pinned ref: R-PROP-1).
+   */
+  async completePins(force = false): Promise<void> {
     for (const r of this.sql.all("SELECT ref, head FROM pins WHERE done = 0")) {
-      const m = /^refs\/artroom\/heads\/(.+)\/(\d+)$/.exec(str(r, "ref")!)!;
+      const ref = str(r, "ref")!;
+      if (!force && this.pinDue(ref) > this.now()) continue;
+      const m = /^refs\/artroom\/heads\/(.+)\/(\d+)$/.exec(ref)!;
       await this.ports.artifacts.pinRef(m[1] as LaneId, Number(m[2]), str(r, "head") as Sha);
-      this.sql.all("UPDATE pins SET done = 1 WHERE ref = ?", str(r, "ref")!);
+      this.sql.all("UPDATE pins SET done = 1 WHERE ref = ?", ref);
+      // Always, so a due time left by the switch is cleaned up even after the switch is unset.
+      this.sql.all("DELETE FROM meta WHERE k = ?", `pin_due:${ref}`);
     }
+  }
+
+  /** When a pending pin is due: now, unless the spike's pin delay recorded a later time at its propose. */
+  pinDue(ref: string): number {
+    if (this.pinDelayMs <= 0) return this.now();
+    return Number(getMeta(this.sql, `pin_due:${ref}`) ?? this.now());
+  }
+
+  /** The earliest time a pending pin is due, or null when none is pending. */
+  nextPinDue(): number | null {
+    const refs = this.sql.all("SELECT ref FROM pins WHERE done = 0").map((r) => str(r, "ref")!);
+    return refs.length ? Math.min(...refs.map((ref) => this.pinDue(ref))) : null;
   }
 
   // ------------------------------------------------------------ notify (R-LOG-13)
@@ -1690,9 +1715,12 @@ export class RoomCore {
     const revoke = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM job_tokens"), "t");
     if (revoke !== null) times.push(revoke);
     const now = this.now();
+    // A pin delayed by the spike's switch wakes the alarm when due, not on the 5-second loop.
+    const pinDue = this.nextPinDue();
+    if (pinDue !== null && pinDue > now) times.push(pinDue);
     const pending =
       this.endedWorkspaces().length > 0 ||
-      !!one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0") ||
+      (pinDue !== null && pinDue <= now) ||
       !!one(this.sql, "SELECT 1 AS x FROM previews WHERE state = 'pending'") ||
       (ws !== null && !!one(this.sql, "SELECT 1 AS x FROM ws_leases w JOIN artroom_ws a ON a.lane = w.lane AND a.lease = w.lease_gen WHERE w.state = 'open' AND a.state = 'pending'")) ||
       !!one(this.sql, "SELECT 1 AS x FROM land_reeval") ||
