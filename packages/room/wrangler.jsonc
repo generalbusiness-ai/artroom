@@ -9,7 +9,10 @@
 // - the container image is lane B's (packages/git/container/image.sh copies
 //   alpine/git into the account's registry); use the digest it prints;
 // - secrets: `wrangler secret put ROOM_KEY_SECRET`;
-// - OPERATOR_KEYS lists the operator key IDs that sign onboarding grants.
+// - OPERATOR_KEYS lists the operator key IDs that sign onboarding grants;
+// - PUBLIC_URL is this deployment's https:// origin, and has no default:
+//   `wrangler deploy --var PUBLIC_URL:https://<host>`. Redemption sends a
+//   bearer token to that host, and the Worker refuses to start without it.
 //
 // To import repositories as well as found public rooms, add a second
 // Artifacts binding for another namespace (an import's repository must be
@@ -27,8 +30,6 @@
   "vars": {
     // The lease length in seconds (R-LANE-5).
     "LEASE_SECONDS": "1800",
-    // The public base URL, used for the MCP endpoint in `Redeemed`.
-    "PUBLIC_URL": "https://artroom.example.workers.dev",
     // The repository namespace reserved for public founding (R-GEN-12).
     "PUBLIC_NAMESPACE": "artroom-public",
     // The Artifacts namespace the ARTIFACTS binding reaches. Public founding creates repositories here.

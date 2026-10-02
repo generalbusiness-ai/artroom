@@ -259,12 +259,13 @@ Before the first deploy (the file's header says the same):
 - the container image is lane B's (`packages/git/container/image.sh`);
   use the digest it prints for the account's registry;
 - `wrangler secret put ROOM_KEY_SECRET`;
-- `OPERATOR_KEYS` lists the operator keys that sign onboarding grants.
+- `OPERATOR_KEYS` lists the operator keys that sign onboarding grants;
+- `PUBLIC_URL` has no default: `wrangler deploy --var PUBLIC_URL:https://<host>`.
 
 | Setting | Meaning |
 |---|---|
 | `LEASE_SECONDS` | Lease length, default 1800 |
-| `PUBLIC_URL` | Base URL, used for the MCP endpoint in `Redeemed` |
+| `PUBLIC_URL` | Required, no default: this deployment's `https://` origin, with nothing after the host. Redemption names `<PUBLIC_URL>/v1/rooms/<room>/mcp` in `Redeemed`, and a bearer token goes there. Without a valid one, the Worker and every Room object refuse to start |
 | `ROOM_KEY_SECRET` (secret) | Derives each new room's signing key and, for public founding, its repository identity |
 | `OPERATOR_KEYS` | Operator key IDs, comma-separated, whose onboarding grants are accepted (R-GEN-12) |
 | `PUBLIC_NAMESPACE` | The repository namespace reserved for public founding, default `artroom-public` |

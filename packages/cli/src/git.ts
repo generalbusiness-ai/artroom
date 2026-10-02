@@ -3,6 +3,13 @@
  * as an `http.<remote>.extraHeader` in a separate file that the repository
  * config includes. The token goes only into that file, which is readable
  * only by the user; it is never a command argument and never printed.
+ *
+ * The remote and token come from the room, so neither is trusted: each must
+ * match a strict pattern before anything is written (`checkGrant`). Neither
+ * pattern admits a character that git config treats specially (quote,
+ * backslash, `#`, `;`, `]`, whitespace or newline), so the file is always
+ * exactly one setting (request 55be0661). The file is written directly, not
+ * by `git config`, because that would put the token in a command argument.
  */
 
 import { execFileSync } from "node:child_process";
@@ -48,10 +55,35 @@ export function credentialPath(cwd: string): string | undefined {
 const marker = (lane: string, lease: number, install: string) => `# artroom workspace credential for lane ${lane}, lease ${lease}, installation ${install}.`;
 
 /**
+ * A grant's remote: an `https://` URL of a host, optional port and path,
+ * already in normal form, with no credentials, query or fragment, and none
+ * of the characters that are special to git config or a shell.
+ */
+const GRANT_REMOTE = /^https:\/\/[a-z0-9.-]+(:[0-9]{1,5})?(\/[A-Za-z0-9._~\/-]*)?$/;
+
+/** A grant's token: the bearer token characters (RFC 6750 b64token), and `?` and `=` for an Artifacts token's expiry. */
+const GRANT_TOKEN = /^[A-Za-z0-9._~+\/?=-]{1,4096}$/;
+
+/** Throws, naming neither value, unless the room's remote and token are safe to write (request 55be0661). */
+export function checkGrant(remote: string, token: string): void {
+  // Normal form, and a string: `href` equals only a string the parser would not rewrite.
+  const normal = (u: string) => {
+    try {
+      return new URL(u).href === u;
+    } catch {
+      return false;
+    }
+  };
+  if (!GRANT_REMOTE.test(remote) || !normal(remote)) throw new Error("The room sent a workspace remote that is not a plain https:// URL. Nothing was written; tell the room's admin.");
+  if (typeof token !== "string" || !GRANT_TOKEN.test(token)) throw new Error("The room sent a workspace token with characters a token cannot have. Nothing was written; tell the room's admin.");
+}
+
+/**
  * Points the `artroom` remote at the fork and writes its credential, marked
  * with its lane, lease and installation ID. Returns the credential file's path.
  */
 export function configureWorkspace(cwd: string, remote: string, token: string, lane: string, lease: number, install: string): string {
+  checkGrant(remote, token);
   const dir = gitDir(cwd);
   if (dir === undefined) throw new Error("not a git repository");
   if (tryGit(cwd, ["remote", "get-url", REMOTE]) === undefined) git(cwd, ["remote", "add", REMOTE, remote]);

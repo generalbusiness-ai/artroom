@@ -58,7 +58,7 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import { SCHEMA, SchemaError, Store, type Config, type JournalEntry, type LocalIntent, type RoomConfig } from "./config.ts";
 import { attentionText, claimText, errorText, explainText, landText, logText, proposalText, refusalText, short } from "./format.ts";
-import { configureWorkspace, credentialFileIn, credentialOwner, gitDir, head as gitHead, readOwner, REMOTE, withDestination, type Party } from "./git.ts";
+import { checkGrant, configureWorkspace, credentialFileIn, credentialOwner, gitDir, head as gitHead, readOwner, REMOTE, withDestination, type Party } from "./git.ts";
 import { parseInvitation } from "./link.ts";
 
 export interface Io {
@@ -690,6 +690,8 @@ const COMMANDS: Record<string, Command> = {
       const grant = await api.workspaceToken(h);
       if (isRefusal(grant)) return refused(ctx, grant);
       ctx.secrets.add(grant.token);
+      // The room's remote and token are written into git config: refuse a malformed one before touching the destination.
+      checkGrant(grant.remote, grant.token);
 
       // Install only if the reservation still owns this repository's destination, whichever Room or command
       // touched it since, and only for the lease it was made for. The remote, credential and mapping change together.
