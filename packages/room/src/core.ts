@@ -80,6 +80,11 @@ export interface CoreOptions {
   readonly bound: (repo: string, room: RoomId, name: string) => Promise<boolean>;
   /** Was the registry's binding of this repository made by an older Worker (review 700b74ea)? A durable fact of the binding. */
   readonly legacyBinding?: (repo: string) => Promise<boolean>;
+  /**
+   * Persist the alarm at or before `at` (room clock), keeping an earlier one; resolves only once it is stored. Public
+   * founding awaits it before each repository create (plan 004).
+   */
+  readonly wake?: (at: number) => Promise<void>;
 }
 
 export interface ActivePolicyFull extends ActivePolicy {
@@ -152,6 +157,7 @@ export class RoomCore {
   readonly committed: () => void;
   readonly bound: CoreOptions["bound"];
   private readonly legacyBinding: NonNullable<CoreOptions["legacyBinding"]>;
+  private readonly wake: CoreOptions["wake"];
   readonly remotes: Remotes;
   /** Each checker's service binding, which every job travels over (R-EXEC-8). */
   readonly checkers: (checker: string) => CheckerService | null;
@@ -246,6 +252,7 @@ export class RoomCore {
     this.defer = opts.defer;
     this.bound = opts.bound;
     this.legacyBinding = opts.legacyBinding ?? (async () => false);
+    this.wake = opts.wake;
     this.committed = () => {
       opts.committed();
       for (const w of [...this.waiters]) w();
@@ -331,6 +338,7 @@ export class RoomCore {
         namespace: loc.namespace,
         now: () => this.now(),
         ...(this.remotes.sleep ? { sleep: this.remotes.sleep } : {}),
+        ...(this.wake ? { wake: this.wake } : {}),
       });
     }
     return this.wsCache;

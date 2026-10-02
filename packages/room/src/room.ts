@@ -27,7 +27,7 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import { submit } from "./admission.ts";
 import { alarmTime, clock, servicesFor, type RoomEnv } from "./config.ts";
-import { RoomCore } from "./core.ts";
+import { RoomCore, fault } from "./core.ts";
 import { jobTokenDuties } from "./jobs.ts";
 import { checkGenesis } from "./founding.ts";
 import { registry } from "./registry.ts";
@@ -46,7 +46,10 @@ interface SocketState {
 
 export class Room extends DurableObject<RoomEnv> {
   readonly core: RoomCore;
+  /** An alarm is stored at or before this time (room clock), or null when that is not known. Set only once storage has it. */
   private scheduled: number | null = null;
+  /** `wake` calls, one at a time: each reads the stored alarm and only ever moves it earlier. */
+  private wakes: Promise<unknown> = Promise.resolve();
 
   constructor(ctx: DurableObjectState, env: RoomEnv) {
     super(ctx, env);
@@ -66,7 +69,10 @@ export class Room extends DurableObject<RoomEnv> {
         return b !== null && b.room === room && b.name === name;
       },
       legacyBinding: async (repo) => (await registry(env).byRepo(repo))?.legacy === true,
+      wake: (at) => this.wake(at),
     });
+    // A fresh object schedules the founding debt it finds, with no new found request (plan 004).
+    void ctx.blockConcurrencyWhile(() => this.recover().catch(() => undefined));
   }
 
   private get mcpBase(): string {
@@ -199,7 +205,45 @@ export class Room extends DurableObject<RoomEnv> {
     if (next === null) return;
     if (this.scheduled !== null && this.scheduled <= next) return;
     this.scheduled = next;
-    void this.ctx.storage.setAlarm(alarmTime(next));
+    // A rejected store claims nothing: the next schedule tries again.
+    this.storeAlarm(alarmTime(next)).catch(() => {
+      if (this.scheduled === next) this.scheduled = null;
+    });
+  }
+
+  /** Store the alarm. The call to storage is made now, in the caller's turn. */
+  private storeAlarm(when: number): Promise<void> {
+    try {
+      fault("room:set-alarm");
+      return this.ctx.storage.setAlarm(when);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  /**
+   * Persist an alarm at or before `at` (room clock), and resolve once storage
+   * has it (plan 004). An alarm already stored at or before that time is kept:
+   * it runs, and every alarm run schedules the next. Calls run one at a time,
+   * so a later request never replaces an earlier one. A rejection leaves the
+   * cache as it was.
+   */
+  private wake(at: number): Promise<void> {
+    const run = this.wakes.then(async () => {
+      const want = alarmTime(at);
+      const stored = await this.ctx.storage.getAlarm();
+      if (stored === null || stored > want) await this.storeAlarm(want);
+      if (this.scheduled === null || at < this.scheduled) this.scheduled = at;
+    });
+    this.wakes = run.catch(() => undefined);
+    return run;
+  }
+
+  /** On a fresh object: founding debt in the ledger gets an alarm, though no found request comes (plan 004). */
+  private async recover(): Promise<void> {
+    if (this.core.founded) return;
+    const due = this.core.foundingDue();
+    if (due !== null) await this.wake(due);
   }
 
   private onCommit(): void {
