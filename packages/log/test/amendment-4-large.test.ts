@@ -118,12 +118,14 @@ describe("acceptance cases (30.7): large entries and files", () => {
       }
     }
     expect(commits[1]).toBe(commits[0]);
-    // A restarted publisher whose open segment holds the chunked entry does not send its chunks again.
+    // A restarted publisher whose open segment holds the chunked entry does not send its chunks again:
+    // to a remote that cannot stage, the next publication is one small push.
     const git = new MemoryGit();
     const first = new LogPublisher(git);
     await first.publish(sim.entries, sim.checkpoint(L2(0)), []);
     note(sim, "act_0_00000000", 5);
-    const reopened = await LogPublisher.open(git);
+    const noStage = { readRef: (r: string) => git.readRef(r), readObject: (sha: Sha) => git.readObject(sha), push: git.push.bind(git) };
+    const reopened = await LogPublisher.open(noStage);
     await reopened.publish(sim.entries, sim.checkpoint(L2(0)), []);
     expect(reopened.stats.peakSendBytes).toBeLessThan(64 * 1024);
   }, 300_000);
@@ -278,6 +280,9 @@ describe("acceptance cases (30.7): large entries and files", () => {
     const p = new LogPublisher(new MemoryGit());
     // The last entry given as the line of the one before it.
     expect(() => p.commitFor(null, source((s) => (s === n ? as(n, lines[n - 1]!) : sim.entries[s]!)), sim.checkpoint(L2(0)), sim.retained)).toThrow(expect.objectContaining({ code: "invalid-input" }));
+    // The last line with its seq changed: its hash is still the checkpoint's, but it is not entry n.
+    const renumbered = utf8(new TextDecoder().decode(lines[n]!).replace(new RegExp(`"seq":${n}}$`), `"seq":${n + 7}}`));
+    expect(() => p.commitFor(null, source((s) => (s === n ? as(n, renumbered) : sim.entries[s]!)), sim.checkpoint(L2(0)), sim.retained)).toThrow(expect.objectContaining({ code: "invalid-input" }));
     // A line whose length changes between reads.
     let reads = 0;
     const shifting = (s: number): LogEntry | EntryLine => (s === n - 1 ? as(s, reads++ < 1 ? lines[s]! : new Uint8Array([...lines[s]!, 0x20])) : sim.entries[s]!);
@@ -341,6 +346,19 @@ describe("acceptance cases (30.7): large entries and files", () => {
 
     const report = await verifies(git, sim.entries.length - 1);
     expect(report.decisionsReplayed).toBeGreaterThan(0);
+
+    // A file moved to a sibling shard directory that exists: fan-out, though its bytes and name are right.
+    const moved = new MemoryGit();
+    for (const [k, v] of git.objects) moved.objects.set(k, v);
+    const prefixedPaths = [...files.keys()].filter((k) => /^artroom-log\/v1\/inputs\/ab\/[0-9a-f]{2}\/[0-9a-f]{64}\.json$/.test(k));
+    const from = prefixedPaths[0]!;
+    const sibling = prefixedPaths.find((k) => k.split("/")[4] !== from.split("/")[4])!.split("/")[4]!;
+    await rewrite(moved, r.commit, (f) => {
+      f.set(from.replace(/\/ab\/[0-9a-f]{2}\//, `/ab/${sibling}/`), f.get(from)!);
+      f.delete(from);
+    });
+    const misplaced = await verifyLog(moved);
+    expect(misplaced.failures.map((x) => x.reason)).toEqual(["fan-out"]);
 
     // Bad chunk: a changed chunk of the 20 MiB policy document.
     const policyName = `${sha256Hex(utf8(canonicalize(big)))}.json`;
