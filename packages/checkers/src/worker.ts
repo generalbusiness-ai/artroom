@@ -242,10 +242,15 @@ async function makeJob(env: Env, b: Record<string, unknown>): Promise<{ job: Che
     obligation: `obl_${checker}`,
     check: checker,
     integration,
+    // The harness has no landing: the commit stands in for its own base.
+    base: (b["base"] as Sha | undefined) ?? commit,
     input,
     readUrl: readUrl as `https://${string}`,
     gitAuthEnv: gitAuthEnvFor(tok.plaintext),
     config: (b["config"] as Digest | undefined) ?? `sha256:${"0".repeat(63)}1`,
+    volatile: checker === "llm-review",
+    advisory: checker === "llm-review",
+    runner: null,
     deadline: new Date(Date.now() + 15 * 60_000).toISOString(),
   };
   return { job, revoke: tok.revoke, snapshot };

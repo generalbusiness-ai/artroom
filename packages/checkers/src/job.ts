@@ -10,7 +10,7 @@
  * gateway; it never enters the runner's environment.
  */
 
-import type { CheckJob, Refusal, RoomId } from "@generalbusiness/artroom-contract";
+import type { CheckJob, GitAuthEnv, Refusal, RoomId } from "@generalbusiness/artroom-contract";
 import { isGlob } from "@generalbusiness/artroom-policy";
 
 export interface JobExpectations {
@@ -53,7 +53,7 @@ export function tokenFromGitAuthEnv(env: Readonly<Record<string, string>>): stri
 }
 
 /** `gitAuthEnv` for a token: what the room puts in a job. */
-export function gitAuthEnvFor(token: string): Record<string, string> {
+export function gitAuthEnvFor(token: string): GitAuthEnv {
   return { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: `Authorization: Bearer ${token}` };
 }
 
