@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/ui/src/screens/NeedsYou.tsx","body":{"commit":"b377f170434fee17da2690256c8e7cd6550ad196","path":"packages/ui/src/screens/NeedsYou.tsx"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:08493c06599475dca8b1636e9117fad251d293ff","text":"Merge retired a covered predecessor; the successor is at packages/contract/src/log.ts."}
