@@ -9,6 +9,7 @@ import { TOKEN_CLEANUP_BACKOFF } from "../src/landing/core.ts";
 import { GitPublisher } from "../src/publisher/git-publisher.ts";
 import { GitOps, pinnedRef } from "../src/publisher/gitops.ts";
 import { mkdirSync } from "node:fs";
+import type { Sql } from "../src/sql.ts";
 import { join } from "node:path";
 import {
   Clock,
@@ -16,6 +17,7 @@ import {
   FakeRoom,
   FakeTokens,
   Fixture,
+  LedgerHost,
   actId,
   edit,
   laneId,
@@ -1352,4 +1354,336 @@ test("readiness: a restart while an evaluation is out asks again; the dead insta
   assert.equal(restarted.view(id)?.state === "ready" || restarted.view(id)?.state === "publishing" || restarted.view(id)?.state === "landed", true);
   await restarted.settle();
   assert.equal(restarted.view(id)?.state, "landed");
+});
+
+// ------------------------------------------------------- mint lane B: the publication token through the mint ledger
+//
+// notes/2026-10-02-canonical-mint-ownership.md, "Lane B", tests (1) to (7);
+// protocol section 32. The engine mints through the production
+// `publicationTokens` and a real `MintLedger` on the room's SQLite, over a
+// canonical repository double. A restart is a new engine and a new ledger on
+// the same SQLite: the ledger's constructor takes over what the stopped host
+// left.
+
+/** The SQL a test records while `on`: which statements ran, to show what a step reads. */
+function spySql(inner: Sql) {
+  const s = {
+    on: false,
+    queries: [] as string[],
+    all: (q: string, ...b: Parameters<Sql["all"]> extends [string, ...infer R] ? R : never) => {
+      if (s.on) s.queries.push(q);
+      return inner.all(q, ...b);
+    },
+    transaction: <T>(fn: () => T): T => inner.transaction(fn),
+  };
+  return s;
+}
+
+async function ledgerWorld() {
+  const f = await new Fixture().init();
+  const room = new FakeRoom();
+  const clock = new Clock();
+  const sql = spySql(nodeSql());
+  const host = new LedgerHost(sql, clock);
+  const pub = new ControlledPublisher(new GitPublisher(f.ops, f.canonical));
+  // The remote takes a push only with a live token, so the pushed token is the one the room holds.
+  pub.authAtRemote = host;
+  const engines: Landing[] = [];
+  const make = (fault?: (p: FaultPoint, op: OpId) => void) => {
+    for (const e of engines) e.kill(); // a restart replaces the old instance …
+    if (engines.length > 0) host.start(); // … and its ledger, which takes over
+    const e = new Landing({ sql, room, publisher: pub, tokens: host.tokens, now: clock.now, ...(fault ? { fault } : {}) });
+    host.known = (id) => e.core.knownToken(id);
+    engines.push(e);
+    return e;
+  };
+  const engine = make();
+  await engine.refreshMain();
+  const current = () => engines[engines.length - 1]!;
+  const land = async (n: number, files: Record<string, string>) => {
+    const head = await f.propose(laneId(n), 1, f.main, files);
+    room.hold(laneId(n), 1, head);
+    const id = opId(n);
+    const r = current().accept({ id, lane: laneId(n), generation: 1, head, act: actId(500 + n), leaseGeneration: 1, policyVersion: room.policy });
+    assert.ok(!("refused" in r), "accepted");
+    return { id, head, lane: laneId(n) };
+  };
+  const ready = async (id: OpId) => {
+    await current().prepare(id);
+    assert.equal(current().reserve(id).kind, "reserved");
+  };
+  /** The landing's token rows, by token ID. */
+  const rows = () => sql.all("SELECT token, op, n, expires_at FROM artroom_land_token ORDER BY token").map((r) => ({ token: r["token"], op: r["op"], n: r["n"], expiresAt: r["expires_at"] }));
+  const records = () => host.mints.duties({ limit: 1000 }).records;
+  const pushes = (id: OpId) => (current().core.get(id)?.pushes ?? []).map((p) => ({ n: p.n, tokenId: p.tokenId, tokenRevoked: p.tokenRevoked, outcome: p.outcome }));
+  /** Nothing durable or shown holds a token's text or the provider's message. */
+  const clean = (id: OpId) => {
+    const shown = JSON.stringify([current().view(id), current().status(), current().core.get(id), current().slot(), room.log, host.mints.duties({ limit: 1000 }), sql.all("SELECT * FROM artroom_land_token")]);
+    assert.ok(!/art_v\d/.test(shown), "a token's text is stored or shown");
+    assert.ok(!shown.includes(host.repo.failureText), "the provider's text is stored or shown");
+  };
+  return { f, room, clock, sql, host, pub, make, engine, current, land, ready, rows, records, pushes, clean, dispose: () => f.dispose() };
+}
+
+test("mint lane B (1), R-MINT-4, R-MINT-7: a host that stops between the mint's answer and pushToken; after a restart within 60 s the ledger revokes that token by its ID, the publication completes forward with a new attempt, and there is one receipt", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  const { id, head } = await w.land(1, { "src/c.txt": "c\n" });
+  let fired = false;
+  const crashing = w.make((p) => {
+    if (p === "token-answered" && !fired) {
+      fired = true;
+      throw new Crash(p);
+    }
+  });
+  await w.ready(id);
+  const start = w.clock.t;
+  await assert.rejects(crashing.publish(), Crash);
+  // The answer is the ledger's alone: held by its record, on no attempt and in no landing row.
+  const [first] = w.host.repo.tokens;
+  assert.ok(first && w.host.repo.live(first.id));
+  assert.deepEqual(w.records().map((r) => [r.purpose, r.state, r.tokenId]), [[`publish:${id}:1`, "held", first.id]]);
+  assert.deepEqual(w.pushes(id), [{ n: 1, tokenId: null, tokenRevoked: false, outcome: null }]);
+  assert.deepEqual(w.rows(), []);
+  // A restart within the token's 60 s: the new ledger takes over, and owes the token at once.
+  w.clock.advance(10_000);
+  const restarted = w.make();
+  assert.deepEqual(w.records().map((r) => [r.state, r.tokenId]), [["owed", first.id]]);
+  assert.equal(w.host.mints.nextDue(), w.clock.t + 1_000, "overdue work is due 1 s ahead");
+  await restarted.reconcile();
+  await w.host.reconcile();
+  assert.ok(w.clock.t - start < 60_000);
+  assert.equal(w.host.repo.live(first.id), false, "the stopped host's token is revoked");
+  assert.deepEqual(w.host.repo.revokes.filter((x) => x === first.id), [first.id], "by its own ID, once");
+  // Forward, with a new attempt and its own token, landed once.
+  assert.equal(restarted.view(id)?.state, "landed");
+  assert.equal(await w.f.canonicalMain(), head);
+  assert.equal(w.room.events("land-outcome", id).length, 1);
+  const second = w.host.repo.tokens[1]!;
+  assert.deepEqual(w.pushes(id), [
+    { n: 1, tokenId: null, tokenRevoked: false, outcome: null },
+    { n: 2, tokenId: second.id, tokenRevoked: true, outcome: "landed" },
+  ]);
+  assert.deepEqual(w.host.repo.liveIds(), []);
+  assert.deepEqual(w.records(), []);
+  assert.deepEqual(w.rows(), []);
+  w.clean(id);
+});
+
+test("mint lane B (2), R-MINT-2: the first create applies and fails with INTERNAL_ERROR; an unknown record stays, the ledger's retry is a new record, its token is the one pushed, and outcome, slot and receipts are as before", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  const { id, head } = await w.land(1, { "src/c.txt": "c\n" });
+  await w.ready(id);
+  w.host.repo.plans = ["apply-throw"];
+  assert.equal(await w.engine.publish(), true);
+  assert.equal(w.engine.view(id)?.state, "landed");
+  assert.equal(await w.f.canonicalMain(), head);
+  assert.deepEqual(w.engine.slot(), { state: "free", last: 1 });
+  assert.deepEqual(w.room.log.map((e) => e.event.type), ["land-reserved", "land-outcome"]);
+  const [applied, pushed] = w.host.repo.tokens;
+  assert.equal(w.host.repo.creates.length, 2);
+  assert.deepEqual(w.pushes(id), [{ n: 1, tokenId: pushed!.id, tokenRevoked: true, outcome: "landed" }]);
+  // The applied create stays unknown: its token is live, the Room cannot name it, and it is never revoked.
+  assert.deepEqual(w.records().map((r) => [r.purpose, r.state, r.tokenId]), [[`publish:${id}:1`, "unknown", null]]);
+  assert.equal(w.host.repo.live(applied!.id), true);
+  assert.deepEqual(w.host.repo.revokes, [pushed!.id]);
+  w.clock.advance(120_000);
+  await w.host.reconcile();
+  assert.deepEqual(w.records().map((r) => r.state), ["unknown"], "kept after its lifetime and an observation");
+  assert.deepEqual(w.host.repo.revokes, [pushed!.id]);
+  w.clean(id);
+});
+
+test("mint lane B (2), R-MINT-2: a lost answer is the ledger's to keep, never the engine's to retry: one create, one unknown record, the attempt ends with safe metadata only, and the next attempt lands", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await w.ready(id);
+  w.host.repo.plans = ["lose"];
+  assert.equal(await w.engine.publish(), true);
+  assert.equal(w.host.repo.creates.length, 1, "the engine does not mint again");
+  assert.deepEqual(w.records().map((r) => r.state), ["unknown"]);
+  const [lost] = w.pushes(id);
+  assert.deepEqual(lost, { n: 1, tokenId: null, tokenRevoked: false, outcome: "error" });
+  assert.equal(w.engine.core.get(id)!.pushes![0]!.detail, "token not minted (create failed: Error)");
+  assert.equal(w.engine.view(id)?.state, "unresolved");
+  w.clock.advance(5_000);
+  await w.engine.reconcile();
+  assert.equal(w.engine.view(id)?.state, "landed");
+  assert.equal(w.room.events("land-outcome", id).length, 1);
+  assert.equal(w.host.repo.creates.length, 2);
+  w.clean(id);
+});
+
+test("mint lane B (3), R-MINT-3, R-MINT-4: a trigger that fails pushToken's transaction leaves the ledger owning the token, with no landing row and no ID on the attempt; the ledger revokes it later, by its ID", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await w.ready(id);
+  // The operation's save in pushToken fails; nothing else does.
+  w.sql.all("CREATE TRIGGER push_token_down BEFORE UPDATE ON artroom_land_op WHEN NEW.body LIKE '%tok_c1%' BEGIN SELECT RAISE(ABORT, 'pushToken down'); END");
+  w.host.repo.revokeDown = true;
+  await assert.rejects(w.engine.publish(), /pushToken down/);
+  await w.engine.cleanupDone();
+  assert.deepEqual(w.pushes(id), [{ n: 1, tokenId: null, tokenRevoked: false, outcome: null }]);
+  assert.deepEqual(w.rows(), []);
+  // The ledger still owns it: the release failed, so it is owed with backoff.
+  assert.deepEqual(w.records().map((r) => [r.state, r.tokenId]), [["owed", "tok_c1"]]);
+  assert.equal(w.host.repo.live("tok_c1"), true);
+  w.host.repo.revokeDown = false;
+  w.sql.all("DROP TRIGGER push_token_down");
+  w.clock.advance(1_000);
+  await w.host.reconcile();
+  assert.equal(w.host.repo.live("tok_c1"), false);
+  assert.deepEqual(w.records(), []);
+  // The publication goes forward with a new token, and lands once.
+  w.clock.advance(5_000);
+  await w.engine.reconcile();
+  assert.equal(w.engine.view(id)?.state, "landed");
+  assert.equal(w.room.events("land-outcome", id).length, 1);
+  assert.deepEqual(w.host.repo.liveIds(), []);
+  w.clean(id);
+});
+
+test("mint lane B (4), R-MINT-7: the landing's token row lives from pushToken to tokenRevoked, whether the held operation or plan 003's cleanup pass is answered, and is kept while revocation fails, after the operation ends too", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  // a: the held operation's own revocation answers.
+  const a = await w.land(1, { "src/a.txt": "a\n" });
+  await w.ready(a.id);
+  w.pub.pausePushes = true;
+  const publishing = w.engine.publish();
+  await w.pub.waitPaused(1);
+  const [ta] = w.host.repo.tokens;
+  assert.deepEqual(w.rows(), [{ token: ta!.id, op: a.id, n: 1, expiresAt: ta!.expiresAt }], "written by pushToken, with the reported expiry");
+  assert.equal(w.engine.core.knownToken(ta!.id), true);
+  assert.deepEqual(w.records(), [], "claimed from the ledger in the same transaction");
+  w.pub.pausePushes = false;
+  w.pub.paused[0]!.release();
+  await publishing;
+  assert.equal(w.engine.view(a.id)?.state, "landed");
+  assert.deepEqual(w.rows(), [], "deleted by tokenRevoked");
+  assert.equal(w.engine.core.knownToken(ta!.id), false);
+  // b: the revocation fails; the operation ends; the row stays with plan 003's record until a cleanup pass is answered.
+  const b = await w.land(2, { "src/b.txt": "b\n" });
+  await w.ready(b.id);
+  w.host.repo.revokeDown = true;
+  await w.engine.publish();
+  assert.equal(w.engine.view(b.id)?.state, "landed");
+  const tb = w.host.repo.tokens[1]!;
+  assert.deepEqual(w.rows().map((r) => r.token), [tb.id]);
+  assert.deepEqual(w.engine.core.tokenCleanup().map((c) => [c.op, c.n]), [[b.id, 1]]);
+  w.clock.advance(2_000);
+  await w.engine.reconcile();
+  await w.engine.cleanupDone();
+  assert.deepEqual(w.rows().map((r) => r.token), [tb.id], "kept while the cleanup pass fails");
+  // Past the token's expiry too: a landing row ends only with tokenRevoked.
+  w.clock.advance(120_000);
+  await w.engine.reconcile();
+  await w.engine.cleanupDone();
+  assert.deepEqual(w.rows().map((r) => r.token), [tb.id]);
+  w.host.repo.revokeDown = false;
+  w.clock.advance(300_000);
+  await w.engine.reconcile();
+  await w.engine.cleanupDone();
+  assert.deepEqual(w.rows(), [], "deleted by the cleanup pass's tokenRevoked");
+  assert.deepEqual(w.engine.core.tokenCleanup(), []);
+  w.clean(b.id);
+});
+
+test("mint lane B (4), R-MINT-4: a trigger that fails the token row's insert rolls pushToken back with it; one that fails its delete rolls tokenRevoked back with it", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  const a = await w.land(1, { "src/a.txt": "a\n" });
+  await w.ready(a.id);
+  w.sql.all("CREATE TRIGGER row_insert_down BEFORE INSERT ON artroom_land_token BEGIN SELECT RAISE(ABORT, 'row insert down'); END");
+  await assert.rejects(w.engine.publish(), /row insert down/);
+  await w.engine.cleanupDone();
+  assert.deepEqual(w.pushes(a.id), [{ n: 1, tokenId: null, tokenRevoked: false, outcome: null }], "no ID recorded");
+  assert.deepEqual(w.rows(), []);
+  assert.equal(w.host.repo.live("tok_c1"), false, "the ledger kept it, and its release revoked it");
+  assert.deepEqual(w.host.repo.revokes, ["tok_c1"]);
+  assert.deepEqual(w.records(), []);
+  w.sql.all("DROP TRIGGER row_insert_down");
+  // The delete fails: tokenRevoked does not commit, so the attempt stays unrevoked and the duty stays owed.
+  w.sql.all("CREATE TRIGGER row_delete_down BEFORE DELETE ON artroom_land_token BEGIN SELECT RAISE(ABORT, 'row delete down'); END");
+  w.clock.advance(5_000);
+  await w.engine.reconcile();
+  assert.equal(w.engine.view(a.id)?.state, "landed");
+  assert.deepEqual(w.pushes(a.id)[1], { n: 2, tokenId: "tok_c2", tokenRevoked: false, outcome: "landed" });
+  assert.deepEqual(w.rows().map((r) => r.token), ["tok_c2"]);
+  assert.deepEqual(w.engine.core.tokenCleanup().map((c) => [c.op, c.n]), [[a.id, 2]]);
+  w.sql.all("DROP TRIGGER row_delete_down");
+  w.clock.advance(2_000);
+  await w.engine.reconcile();
+  await w.engine.cleanupDone();
+  assert.deepEqual(w.rows(), []);
+  assert.equal(w.pushes(a.id)[1]!.tokenRevoked, true);
+  assert.equal(w.room.events("land-outcome", a.id).length, 1);
+});
+
+/** One active operation holding its token (its push paused) and one ended operation owing its token's revocation. */
+async function heldAndOwed(w: Awaited<ReturnType<typeof ledgerWorld>>) {
+  const b = await w.land(2, { "src/b.txt": "b\n" });
+  await w.ready(b.id);
+  w.host.repo.revokeDown = true;
+  await w.engine.publish();
+  w.host.repo.revokeDown = false;
+  assert.equal(w.engine.view(b.id)?.state, "landed");
+  const a = await w.land(1, { "src/a.txt": "a\n" });
+  await w.ready(a.id);
+  w.pub.pausePushes = true;
+  void w.engine.publish().catch(() => undefined);
+  await w.pub.waitPaused(1);
+  const tb = w.host.repo.tokens[0]!.id;
+  const ta = w.host.repo.tokens[1]!.id;
+  assert.deepEqual(w.current().core.liveTokens(a.id).map((x) => x.tokenId), [ta]);
+  assert.deepEqual(w.current().core.tokenCleanup().map((c) => c.op), [b.id]);
+  return { a, b, ta, tb };
+}
+
+test("mint lane B (5), R-MINT-7: a room stored before the token rows existed gains a row for an active operation's unrevoked token and for an ended operation's owed token once, at its first start, and not again", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  const { a, b, ta, tb } = await heldAndOwed(w);
+  // The storage as the previous version left it: no token rows, and no fill recorded.
+  w.sql.all("DELETE FROM artroom_land_token");
+  w.sql.all("DELETE FROM artroom_land_meta WHERE k = 'token-index'");
+  const first = w.make();
+  assert.deepEqual(
+    w.rows().map((r) => [r.token, r.op, r.n]),
+    [
+      [tb, b.id, 1],
+      [ta, a.id, 1],
+    ].sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
+  );
+  assert.equal(first.core.knownToken(ta) && first.core.knownToken(tb), true);
+  // Once: rows removed after the fill are not filled again at the next start.
+  w.sql.all("DELETE FROM artroom_land_token");
+  w.make();
+  assert.deepEqual(w.rows(), []);
+  w.pub.paused[0]!.abandon();
+});
+
+test("mint lane B (6), R-MINT-5, R-MINT-7: an observation over a listing that holds an active operation's token and an ended operation's owed token counts neither as unaccounted, by point lookups that read no artroom_land_op row", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  const { ta, tb } = await heldAndOwed(w);
+  // An unknown create (nothing applied) makes an observation due.
+  w.host.repo.plans = ["drop"];
+  await assert.rejects(w.host.mints.mint("test:unknown", "write", () => 60));
+  assert.deepEqual(w.records().map((r) => r.state), ["unknown"]);
+  const listed = (await w.host.repo.listTokens()).tokens.filter((x) => x.state === "active").map((x) => x.id).sort();
+  assert.deepEqual(listed, [ta, tb].sort());
+  w.sql.queries.length = 0;
+  w.sql.on = true;
+  await w.host.mints.reconcile();
+  w.sql.on = false;
+  const seen = w.host.mints.duties().observation;
+  assert.equal(seen.unaccounted, 0);
+  assert.equal(seen.result, "0 live token(s) on the canonical repository not accounted for");
+  assert.deepEqual(w.sql.queries.filter((q) => q.includes("artroom_land_op")), [], "no operation is read");
+  assert.equal(w.sql.queries.filter((q) => q.includes("artroom_land_token WHERE token")).length, 2, "one point lookup per listed token");
+  w.pub.paused[0]!.abandon();
 });

@@ -20,13 +20,14 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ActId, LaneId, OpId, PolicyVersion, Seq, Sha, SystemEvent } from "@generalbusiness/artroom-contract";
 import { durableSql, type Sql, text } from "../../src/sql.ts";
-import { Landing } from "../../src/landing/engine.ts";
+import { Landing, publicationTokens } from "../../src/landing/engine.ts";
+import { MintLedger } from "../../src/mints.ts";
 import type { LaneFacts, LandingRoom, LandRecord, Readiness } from "../../src/landing/types.ts";
 import { ContainerPublisher, type LogRemoteStub, Pinning, type PublisherStub } from "../../src/publisher/client.ts";
 import { LOG_REF } from "../../src/publisher/gitops.ts";
 import type { LogPushRequest, LogStageRequest } from "../../src/publisher/log-push.ts";
 import { Workspaces, forkName } from "../../src/workspace/workspaces.ts";
-import { type ArtifactsNamespace, canonicalTokens, withRetry } from "../../src/artifacts.ts";
+import { type ArtifactsNamespace, withRetry } from "../../src/artifacts.ts";
 import { TreeCache, changedPaths, previewPlan } from "../../src/diff/treediff.ts";
 import { redact } from "../../src/publisher/container.ts";
 
@@ -53,6 +54,8 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
   private readonly sql: Sql;
   private readonly cache = new TreeCache();
   private landing: Landing | null = null;
+  /** The canonical mint ledger for publication tokens (mint lane B): one per object start, built with the landing. */
+  private mints: MintLedger | null = null;
   private workspaces: Workspaces | null = null;
   private pinning: Pinning | null = null;
 
@@ -77,11 +80,23 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
     const opts = { stub, artifacts, canonical: { name: repo, remote } };
     this.pinning = new Pinning(opts);
     this.workspaces = new Workspaces({ sql: this.sql, artifacts, canonical: repo, namespace: this.env.ARTIFACTS_NAMESPACE });
+    const canonical = () => withRetry(() => artifacts.get(repo));
+    const mints = new MintLedger({
+      sql: this.sql,
+      repo: canonical,
+      now: () => Date.now(),
+      wake: async (at) => {
+        const stored = await this.ctx.storage.getAlarm();
+        if (stored === null || stored > at) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 50));
+      },
+      known: (id) => this.landing?.core.knownToken(id) ?? false,
+    });
+    this.mints = mints;
     this.landing = new Landing({
       sql: this.sql,
       room: this,
       publisher: new ContainerPublisher(opts),
-      tokens: canonicalTokens(() => withRetry(() => artifacts.get(repo))),
+      tokens: publicationTokens({ mints, repo: canonical }),
     });
   }
 
@@ -126,19 +141,21 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
   // ------------------------------------------------ alarm
 
   /**
-   * The alarm contract a hosting Room follows: each firing reconciles both
-   * the landing engine (a held publication first, R-PUB-7) and workspace
-   * cleanup (tokens owed revocation), then sets the next alarm to the
-   * earlier of their `nextDue()`.
+   * The alarm contract a hosting Room follows: each firing reconciles the
+   * landing engine (a held publication first, R-PUB-7), the mint ledger
+   * (takeover, owed revocations, the observation) and workspace cleanup
+   * (tokens owed revocation), then sets the next alarm to the earliest of
+   * their `nextDue()`.
    */
   override async alarm(): Promise<void> {
     if (this.landing) await this.landing.reconcile();
+    if (this.mints) await this.mints.reconcile();
     if (this.workspaces) await this.workspaces.reconcile();
     await this.schedule();
   }
 
   private async schedule(): Promise<void> {
-    const dues = [this.landing?.nextDue(), this.workspaces?.nextDue()].filter((d): d is number => d != null);
+    const dues = [this.landing?.nextDue(), this.mints?.nextDue(), this.workspaces?.nextDue()].filter((d): d is number => d != null);
     if (dues.length > 0) await this.ctx.storage.setAlarm(Math.max(Math.min(...dues), Date.now() + 50));
   }
 

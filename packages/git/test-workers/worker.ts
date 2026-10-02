@@ -1,10 +1,13 @@
 // A test Worker for the workerd tests: a Room Durable Object hosting the
 // landing engine on Durable Object SQLite and alarms, and a fake canonical
 // repository in another Durable Object, so that it survives the Room's crash
-// and can apply a push the Room never hears about.
+// and can apply a push the Room never hears about. Publication tokens are
+// minted through a real mint ledger (mint lane B), one per object start,
+// over a token table that stands in for Artifacts.
 import { DurableObject } from "cloudflare:workers";
 import type { ActId, LaneId, OpId, PolicyVersion, Seq, Sha, SystemEvent } from "@generalbusiness/artroom-contract";
-import { Landing, type FaultPoint, type PublisherPort } from "../src/landing/engine.ts";
+import { Landing, publicationTokens, type FaultPoint, type PublisherPort } from "../src/landing/engine.ts";
+import { MintLedger, type MintRepo } from "../src/mints.ts";
 import type { LaneFacts, LandingRoom, Readiness } from "../src/landing/types.ts";
 import { durableSql, type Sql } from "../src/sql.ts";
 import type { PushOutcome } from "../src/publisher/push-outcome.ts";
@@ -72,6 +75,8 @@ const POLICY = "act_1_00000001" as PolicyVersion;
 export class TestRoom extends DurableObject<Env> implements LandingRoom {
   private readonly sql: Sql;
   private readonly engine: Landing;
+  /** The canonical mint ledger: built once per object start, so its constructor takes over what a stopped instance left. */
+  private readonly mints: MintLedger;
   private crashAt: FaultPoint | null = null;
   failRecordOf: SystemEvent["type"] | null = null;
 
@@ -87,21 +92,43 @@ export class TestRoom extends DurableObject<Env> implements LandingRoom {
       push: (req) => remote().push(req.n, req.expectedMain, req.integration),
       readMain: () => remote().main(),
     };
+    // Artifacts' token calls on the canonical repository, as rows that survive the Room's crash.
+    const repo: MintRepo = {
+      createToken: async (scope = "write", ttl = 60) => {
+        const id = `tok_${crypto.randomUUID()}`;
+        this.sql.all("INSERT INTO t_tokens (id, live) VALUES (?, 1)", id);
+        return { id, plaintext: `art_v1_${id.replace(/-/g, "")}?expires=${ttl}`, scope, expiresAt: new Date(Date.now() + ttl * 1000).toISOString() };
+      },
+      revokeToken: async (id) => {
+        this.sql.all("UPDATE t_tokens SET live = 0 WHERE id = ?", id);
+        return true;
+      },
+      listTokens: async () => {
+        const tokens = this.sql.all("SELECT id, live FROM t_tokens").map((r) => ({
+          id: String(r["id"]),
+          scope: "write" as const,
+          state: r["live"] ? ("active" as const) : ("revoked" as const),
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        }));
+        return { tokens, total: tokens.length };
+      },
+    };
+    this.mints = new MintLedger({
+      sql: this.sql,
+      repo: async () => repo,
+      now: () => Date.now(),
+      // As the Room's wake: read the stored alarm, and only ever move it earlier.
+      wake: async (at) => {
+        const stored = await ctx.storage.getAlarm();
+        if (stored === null || stored > at) await ctx.storage.setAlarm(Math.max(at, Date.now() + 10));
+      },
+      known: (id) => this.engine.core.knownToken(id),
+    });
     this.engine = new Landing({
       sql: this.sql,
       room: this,
       publisher,
-      tokens: {
-        mint: async () => {
-          const id = `tok_${crypto.randomUUID()}`;
-          this.sql.all("INSERT INTO t_tokens (id, live) VALUES (?, 1)", id);
-          return { id, plaintext: `art_v1_${id.replace(/-/g, "")}?expires=60` };
-        },
-        revoke: async (id) => {
-          this.sql.all("UPDATE t_tokens SET live = 0 WHERE id = ?", id);
-          return true;
-        },
-      },
+      tokens: publicationTokens({ mints: this.mints, repo: async () => repo }),
       fault: (point) => {
         if (point === this.crashAt) {
           this.crashAt = null;
@@ -180,6 +207,14 @@ export class TestRoom extends DurableObject<Env> implements LandingRoom {
   liveTokens(): number {
     return Number(this.sql.all("SELECT COUNT(*) AS n FROM t_tokens WHERE live = 1")[0]?.["n"]);
   }
+  /** The mint ledger's records: state and token ID. */
+  mintRecords(): { state: string; tokenId: string | null }[] {
+    return this.mints.duties().records.map((r) => ({ state: r.state, tokenId: r.tokenId }));
+  }
+  /** The landing's token rows. */
+  tokenRows(): string[] {
+    return this.sql.all("SELECT token FROM artroom_land_token ORDER BY token").map((r) => String(r["token"]));
+  }
   /** Nested transactions: an inner failure rolls back only the inner part. */
   nested(): string[] {
     this.sql.all("CREATE TABLE IF NOT EXISTS t_nest (v TEXT)");
@@ -197,10 +232,12 @@ export class TestRoom extends DurableObject<Env> implements LandingRoom {
     return this.sql.all("SELECT v FROM t_nest").map((r) => String(r["v"]));
   }
 
+  /** The landing engine and the mint ledger, then the earlier of their next due times (as the Room's `nextAlarm`). */
   override async alarm(): Promise<void> {
     await this.engine.reconcile();
-    const due = this.engine.nextDue();
-    if (due !== null) await this.ctx.storage.setAlarm(Math.max(due, Date.now() + 1000));
+    await this.mints.reconcile();
+    const dues = [this.engine.nextDue(), this.mints.nextDue()].filter((d): d is number => d !== null);
+    if (dues.length > 0) await this.ctx.storage.setAlarm(Math.max(Math.min(...dues), Date.now() + 1000));
   }
 }
 

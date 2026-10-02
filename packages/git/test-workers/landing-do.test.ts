@@ -81,6 +81,29 @@ describe("landing in a Durable Object", () => {
     expect(await room.liveTokens()).toBe(0);
   });
 
+  it("mint lane B (1), R-MINT-4: the Room stops between the mint's answer and pushToken; after a real abort, the fresh object's ledger revokes that token by its ID through the alarm, and the publication lands forward once", async () => {
+    let { room, remote } = await reservedRoom();
+    const before = await remote.pushes();
+    await room.setCrash("token-answered");
+    expect(await room.publish()).toMatch(/crash at token-answered/);
+    // The token is live and only the ledger knows it: held, on no attempt and in no landing row.
+    expect(await room.liveTokens()).toBe(1);
+    const [held] = await room.mintRecords();
+    expect(held).toMatchObject({ state: "held", tokenId: expect.stringMatching(/^tok_/) });
+    expect(await room.tokenRows()).toEqual([]);
+    room = await restart(room);
+    remote = e.REMOTE.getByName("canonical");
+    // The fresh object's ledger took over in its constructor: owed at once.
+    expect(await room.mintRecords()).toEqual([{ state: "owed", tokenId: held!.tokenId }]);
+    expect(await runDurableObjectAlarm(room)).toBe(true);
+    await until(async () => (await room.liveTokens()) === 0);
+    expect(await room.mintRecords()).toEqual([]);
+    expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
+    expect(await remote.pushes()).toBe(before + 1);
+    expect(await landed(room)).toBe(1);
+    expect(await room.tokenRows()).toEqual([]);
+  });
+
   it("crash after push, before the receipt: the alarm reads main back and does not push again (R-PUB-5, R-PUB-7)", async () => {
     let { room, remote } = await reservedRoom();
     await room.setCrash("push-returned");

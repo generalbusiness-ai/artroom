@@ -11,8 +11,10 @@ import type { Sql, SqlValue, SqlRow } from "../src/sql.ts";
 import type { Exec } from "../src/publisher/gitops.ts";
 import { GitOps, pinnedRef } from "../src/publisher/gitops.ts";
 import type { LaneFacts, LandRecord, LandingRoom, Readiness } from "../src/landing/types.ts";
-import type { PublicationTokens, PublisherPort } from "../src/landing/engine.ts";
+import { publicationTokens, type PublicationToken, type PublicationTokens, type PublisherPort } from "../src/landing/engine.ts";
 import type { PushOutcome } from "../src/publisher/push-outcome.ts";
+import { MintLedger, type MintRepo } from "../src/mints.ts";
+import type { MintedToken, TokenInfo } from "../src/artifacts.ts";
 
 /** node:sqlite as `Sql`. Nested transactions use savepoints, like a Durable Object's transactionSync. */
 export function nodeSql(path = ":memory:"): Sql & { db: DatabaseSync } {
@@ -221,17 +223,20 @@ export class FakeRoom implements LandingRoom {
   }
 }
 
-/** Publication tokens that only count. `live` is every minted, unrevoked token. */
+/** Publication tokens that only count. `live` is every minted, unrevoked token. No ledger: `claim` does nothing. */
 export class FakeTokens implements PublicationTokens {
   minted = 0;
   readonly live = new Set<string>();
   readonly revoked: string[] = [];
+  /** The owner each mint was asked for, in order. */
+  readonly owners: string[] = [];
   failMint = false;
-  async mint() {
+  async mint(owner = "test"): Promise<PublicationToken> {
+    this.owners.push(owner);
     if (this.failMint) throw new Error("Artifacts unavailable (mint)");
     const id = `tok_${++this.minted}`;
     this.live.add(id);
-    return { id, plaintext: `art_v1_${"f".repeat(40)}${this.minted}?expires=1` };
+    return { id, plaintext: `art_v1_${"f".repeat(40)}${this.minted}?expires=1`, expiresAt: null, claim: () => {}, release: async () => void (await this.revoke(id)) };
   }
   async revoke(id: string) {
     if (this.failRevoke) throw new Error("Artifacts unavailable (revoke)");
@@ -274,7 +279,7 @@ export class ControlledPublisher implements PublisherPort {
   down = false;
   pushDown = false;
   readMainDown = false;
-  authAtRemote: FakeTokens | null = null;
+  authAtRemote: { isLive(plaintext: string): boolean } | null = null;
   pushes = 0;
   integrations = 0;
   readonly paused: { n: number; release: () => void; abandon: () => void; done: Promise<unknown> }[] = [];
@@ -359,3 +364,160 @@ export class Clock {
 }
 
 export const opId = (n: number): OpId => `op_land_${n}`;
+
+// ------------------------------------------------------------ the canonical mint ledger (mint lane B)
+
+/** An Artifacts error, as the binding throws it. */
+export class ArtifactsError extends Error {
+  readonly code: string;
+  readonly numericCode: number;
+  constructor(code: string, numericCode: number, text = `${code} (${numericCode})`) {
+    super(text);
+    this.code = code;
+    this.numericCode = numericCode;
+  }
+}
+
+/** What one `createToken` call does. */
+export type CreatePlan =
+  | "ok" //          applies and answers
+  | "apply-throw" // applies, then INTERNAL_ERROR (retriable)
+  | "lose" //        applies, then a transport failure: the answer is lost
+  | "drop" //        a transport failure; nothing applies
+  | "hold"; //       applies; the answer waits for the test (`held`)
+
+interface CanonicalToken {
+  readonly id: string;
+  readonly plaintext: string;
+  readonly scope: "read" | "write";
+  state: TokenInfo["state"];
+  readonly expiresAt: number;
+}
+
+/**
+ * The canonical repository's tokens, as the ledger and publication tokens
+ * see them: creates can apply and fail, lose their answer, or be held;
+ * revocations can fail or be held. Tokens' text has the Artifacts shape,
+ * so `noTokens` finds any that leaks.
+ */
+export class FakeCanonical implements MintRepo {
+  readonly clock: Clock;
+  readonly tokens: CanonicalToken[] = [];
+  plans: CreatePlan[] = [];
+  /** Every create asked: scope and lifetime (s). */
+  readonly creates: { scope: string; ttl: number }[] = [];
+  readonly held: { tok: CanonicalToken; answer: () => void }[] = [];
+  /** Every revocation asked, by ID, in order. */
+  readonly revokes: string[] = [];
+  /** While set, every revocation fails. */
+  revokeDown = false;
+  /** Provider text a failure carries: it must never be stored. */
+  failureText = "Artifacts: internal error";
+  constructor(clock: Clock) {
+    this.clock = clock;
+  }
+  private apply(scope: "read" | "write", ttl: number): CanonicalToken {
+    const id = `tok_c${this.tokens.length + 1}`;
+    const t: CanonicalToken = { id, plaintext: `art_v1_${"c".repeat(40)}${this.tokens.length + 1}?expires=${ttl}`, scope, state: "active", expiresAt: this.clock.t + ttl * 1000 };
+    this.tokens.push(t);
+    return t;
+  }
+  private answer(t: CanonicalToken): MintedToken {
+    return { id: t.id, plaintext: t.plaintext, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() };
+  }
+  async createToken(scope: "write" | "read" = "write", ttl = 86_400): Promise<MintedToken> {
+    this.creates.push({ scope, ttl });
+    const plan = this.plans.shift() ?? "ok";
+    if (plan === "drop") throw new Error(`the connection was reset: ${this.failureText}`);
+    const t = this.apply(scope, ttl);
+    if (plan === "apply-throw") throw new ArtifactsError("INTERNAL_ERROR", 10400, this.failureText);
+    if (plan === "lose") throw new Error(`the connection was reset: ${this.failureText}`);
+    if (plan === "hold") {
+      const gate = deferred<void>();
+      this.held.push({ tok: t, answer: () => gate.resolve() });
+      await gate.promise;
+    }
+    return this.answer(t);
+  }
+  async revokeToken(id: string): Promise<boolean> {
+    this.revokes.push(id);
+    if (this.revokeDown) throw new ArtifactsError("INTERNAL_ERROR", 10400, this.failureText);
+    const t = this.tokens.find((x) => x.id === id);
+    if (!t || t.state !== "active") return false;
+    t.state = "revoked";
+    return true;
+  }
+  async listTokens() {
+    const tokens: TokenInfo[] = this.tokens.map((t) => ({
+      id: t.id,
+      scope: t.scope,
+      state: t.state === "active" && t.expiresAt <= this.clock.t ? "expired" : t.state,
+      expiresAt: new Date(t.expiresAt).toISOString(),
+    }));
+    return { tokens, total: tokens.length };
+  }
+  /** Active and unexpired, by ID. */
+  live(id: string): boolean {
+    const t = this.tokens.find((x) => x.id === id);
+    return !!t && t.state === "active" && t.expiresAt > this.clock.t;
+  }
+  /** True if this plaintext is a live token's: what the remote checks at a push. */
+  isLive(plaintext: string): boolean {
+    const t = this.tokens.find((x) => x.plaintext === plaintext);
+    return !!t && this.live(t.id);
+  }
+  liveIds(): string[] {
+    return this.tokens.filter((t) => this.live(t.id)).map((t) => t.id);
+  }
+}
+
+/**
+ * The Room's side of the ledger for landing tests: one `MintLedger` per
+ * host start on the room's SQLite (its constructor takes over), the
+ * production `publicationTokens`, a stored alarm that a wake only moves
+ * earlier, and `known` from the landing's token rows.
+ */
+export class LedgerHost {
+  readonly repo: FakeCanonical;
+  readonly sql: Sql;
+  readonly clock: Clock;
+  mints!: MintLedger;
+  tokens!: PublicationTokens;
+  alarm: number | null = null;
+  readonly wakes: number[] = [];
+  wakeFails = false;
+  known: (tokenId: string) => boolean = () => false;
+  private readonly waitMs: number;
+  constructor(sql: Sql, clock: Clock, waitMs = 30_000) {
+    this.sql = sql;
+    this.clock = clock;
+    this.waitMs = waitMs;
+    this.repo = new FakeCanonical(clock);
+    this.start();
+  }
+  /** A new host: a new ledger, which takes over what the last one left. */
+  start(): void {
+    this.mints = new MintLedger({
+      sql: this.sql,
+      repo: async () => this.repo,
+      now: this.clock.now,
+      wake: async (at) => {
+        if (this.wakeFails) throw new Error("storage refused the alarm");
+        this.wakes.push(at);
+        if (this.alarm === null || at < this.alarm) this.alarm = at;
+      },
+      known: (id) => this.known(id),
+      waitMs: this.waitMs,
+      sleep: async () => {},
+    });
+    this.tokens = publicationTokens({ mints: this.mints, repo: async () => this.repo, waitMs: this.waitMs, sleep: async () => {} });
+  }
+  /** The alarm's ledger work, waited on to the end of its revocation pass. */
+  async reconcile(): Promise<void> {
+    await this.mints.reconcile();
+    await this.mints.idle();
+  }
+  isLive(plaintext: string): boolean {
+    return this.repo.isLive(plaintext);
+  }
+}
