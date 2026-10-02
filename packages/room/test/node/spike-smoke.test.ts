@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanupRun, isRepoRecord, isTokenRecord, outcomeOf, readListing, smokeOk, type Answer, type Api } from "../../measure/spike-smoke.mjs";
+import { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, outcomeOf, readListing, smokeOk, type Answer, type Api } from "../../measure/spike-smoke.mjs";
 
 /**
  * Review 1b868265: the smoke run's cleanup has one explicit outcome, and it
@@ -236,3 +236,30 @@ describe("spike smoke cleanup (review 1b868265)", () => {
     expect(readListing({ success: true, result: [{ name: "a" }, {}] }, 10, isRepoRecord)).toMatchObject({ outcome: "unknown", items: null });
   });
 });
+
+describe("spike smoke: a public room's repository is an incarnation of its identity (reviews 3eb7bc44 and 700b74ea)", () => {
+  // `genesis.repo` names the identity, `<namespace>/<base>`; the repository is `<base>-<step>`.
+  const SEALED = `${CANON}-7`;
+  const ABANDONED = `${CANON}-3`;
+  const SEALED_FORK = `${SEALED}--act_5_a8503d4b`;
+
+  it("incarnationOf: the latest incarnation, never the base name, a fork or a lookalike", () => {
+    expect(incarnationOf(CANON, [CANON, ABANDONED, SEALED, SEALED_FORK, `${CANON}-copy`, `old-${CANON}-99`])).toBe(SEALED);
+    expect(incarnationOf(CANON, [CANON, FORK])).toBeNull();
+    expect(incarnationOf(CANON, [`${CANON}-2`, `${CANON}-10`])).toBe(`${CANON}-10`);
+  });
+
+  it("cleanup of a public room reaches every repository named from its base: the adopted base name, each incarnation and their forks; nothing else", async () => {
+    const fake = fakeArtifacts({
+      repos: { [CANON]: [{ id: "tok-legacy", scope: "write" }], [ABANDONED]: [{ id: "tok-abandoned", scope: "write" }], [SEALED]: [{ id: "tok-pub", scope: "write" }], [SEALED_FORK]: [] },
+      others: [`${CANON}-copy`, `old-${CANON}`],
+    });
+    const c = await cleanupRun({ api: fake.api, canonical: CANON, expected: [SEALED, SEALED_FORK], minted: new Map(), incarnations: true });
+    expect(c.ok).toBe(true);
+    expect(c.reposLeft).toEqual([]);
+    expect(c.duties.filter((d) => d.duty === "delete-repo").map((d) => d.repo).sort()).toEqual([CANON, ABANDONED, SEALED, SEALED_FORK].sort());
+    expect([...fake.repos.keys()].sort()).toEqual([`${CANON}-copy`, `old-${CANON}`].sort());
+    expect([...fake.revoked].sort()).toEqual(["tok-abandoned", "tok-legacy", "tok-pub"]);
+  });
+});
+

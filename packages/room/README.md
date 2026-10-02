@@ -1049,9 +1049,8 @@ the fork cleanup's distinction between unanswered and finished effects:
 - whenever the Room cannot vouch for every token on the repository (no
   answered create holds it, its token is spent and main has no first commit,
   the first commit was refused, or an active token nobody owes appears), it
-  deletes the repository, with every token on it, and makes it again. The
-  delete is a step recorded before it is sent; a fresh public repository
-  holds only the deterministic first commit, so nothing is lost;
+  deletes the repository, with every token on it, and makes it again. Review
+  3eb7bc44 changed "again": each attempt now has its own name (below);
 - the creation token is kept, by value, in its own table until a revocation
   answers, and `sealCanonical` refuses (so the seal aborts) while anything is
   owed.
@@ -1102,6 +1101,139 @@ depth: `found`'s check that main is not null after `prepareCanonical` (which
 returns only once main holds the first commit), and `sealCanonical`'s check
 when run through the Room (which seals only after `prepareCanonical`
 settled everything). The second is killed at the ledger level.
+
+## Review 3eb7bc44
+
+**The finding.** After review a35b4b61, a retirement deleted the repository
+and made it again under the same name. A delete whose answer was lost could
+then apply after a later delete had answered and the room had been sealed
+on the new repository, erasing it, even after landings. A later answer is
+not proof that an earlier request completed or was cancelled.
+
+**The fix: one name per creation attempt.** A public room's identity stays
+`<namespace>/<base>` (R-GEN-12, derived from the draft value), but its
+repository is stored under an *incarnation* name, `<base>-<step>`, where
+`<step>` is the ID of the create step, recorded before the create is sent.
+
+- A name is created at most once and never reused. A delete is only ever
+  owed for an *abandoned* incarnation (one whose create's answer was lost,
+  or that the Room could not vouch for). So a late delete, or a late create,
+  can only reach an abandoned incarnation, never the one the room is sealed
+  on. This holds by construction, without any provider guarantee.
+- An abandoned incarnation's delete is retried until Artifacts answers;
+  deleting a missing repository is harmless. Seeing the incarnation proves
+  its single create applied; after that, NOT_FOUND settles it. A create in
+  flight whose repository is absent stays watched, before and after
+  founding, and is deleted if it appears.
+- These duties never block the seal, and the alarm runs them before founding
+  (`settleCanonical`) and after it (`reconcile`, which counts them in
+  `nextDue` and `pendingCleanup`). `Workspaces.duties()` lists them for
+  operators.
+- `sealCanonical(name)` requires that `name` is the holder, is not
+  abandoned, and owes nothing.
+- The Room records the sealed incarnation (meta `canonical_name`) and locates
+  its repository there. Forks, landing, the log and the sandbox follow. A
+  room founded before this change keeps its identity's name.
+- R-GEN-12 gains one sentence: the deployment may store the repository under
+  a name derived from the identity, one per creation attempt and never
+  reused.
+
+The checker's cases are tests: a delete whose answer is lost and applies
+late, across a restart; the same after the seal and a normal landing (the
+repository, its landed main and its log survive), at the ledger level and
+through the Room, with a real Durable Object eviction; and a lost delete
+followed by NOT_FOUND. The healthy control stays.
+
+Also from the review: the smoke script now reports an unknown token listing
+as unknown, using the deploy lane's `readListing`, instead of reading it as
+no tokens. The deploy notes' references to lane E (now on main) are dated.
+This revision has not been run live.
+
+Mutations, made once each after committing: 32 of 34 were killed.
+
+| Mutation | A test that failed |
+|---|---|
+| Every attempt reuses the identity's name (ledger, and Room) | healthy control; a refused or lost first commit |
+| A delete may be aimed at the holder | healthy control |
+| Seeing an incarnation does not settle its create | the late delete after the seal and a landing |
+| Absence settles a create in flight | a late create after the seal |
+| The seal accepts a name that is not the holder | the seal refuses a non-holder |
+| The seal does not require nothing owed | an unconfirmed revocation blocks the seal |
+| The Room ignores its sealed incarnation | the first lane lands |
+| Prepare leaves abandoned incarnations for later | the late delete across a restart |
+| The alarm after founding ignores abandoned incarnations | the late delete across a restart |
+| `nextDue` ignores abandoned incarnations | the late delete after the seal and a landing |
+| The earlier rows of "Review a35b4b61" and "Founding gaps", rerun | as there |
+
+Two survived, both equivalent: a delete aimed at the sealed incarnation
+(`abandonedNames` without excluding it), because the sealed incarnation has
+no open duty after the seal and so is never visited; and `found`'s check that
+main exists after `prepareCanonical`, which only returns once it does.
+
+## Review 700b74ea
+
+**The finding.** Before the incarnation ledger, the Room created a public
+founding's repository under its base name (the identity's own name) and
+recorded nothing. A pending founding begun by that Room and retried under
+revision 3 was sealed on `<base>-1`, and `<base>`, with its 24-hour write
+token, was never found, cleaned or reported. An old create whose answer was
+lost could also apply later.
+
+**The fix: adopt the base name, durably, before preparing.** The first time
+a pending public founding is prepared (`Workspaces.prepareCanonical`, called
+only from `found` for a public room that is not founded), the ledger adopts
+its base name when:
+
+- an older Room may have tried: the registry binding was made before this
+  `found` call (`bind` answers `already-bound`) and this Room has no attempt
+  on record (no `founding_repo`); or
+- an earlier revision's ledger has a row for the base name; or
+- the base repository exists now (only this founding can have made it,
+  R-GEN-12).
+
+Adoption records a `legacy` create step, in flight, and owes the base name's
+deletion. The legacy step is never settled: not by a read of absence, not by
+deleting the repository, and not by the new incarnation's seal, because more
+than one old create may still apply. The base name is never an incarnation,
+so the alarm deletes it whenever it appears, before and after founding, with
+every token on it. `Workspaces.duties()` shows the step. An already-founded
+room (whatever its storage name) and an import never reach this, and nothing
+else touches the base name. Cleanup scheduling no longer excludes the
+configured canonical name: it excludes the holder's founding duties, and the
+sealed incarnation has none.
+
+| Case | Tests |
+|---|---|
+| (a) a legacy base holding a token | `workspaces.test.ts` (a); `founding-gaps.test.ts` (a): deleted with its token before the seal, the room lands, the legacy step stays watched after eviction |
+| (b) an absent base whose old create applies after the seal | `workspaces.test.ts` (b), including a second appearance; `founding-gaps.test.ts` (b): the alarm deletes it after eviction, the landed main survives |
+| (c) an already-founded legacy room | `workspaces.test.ts` (c); `founding-gaps.test.ts` (c): a room turned into an older Room's (base name, no ledger), found again, lands, keeps a live publishing token through the alarm, and gets no legacy step |
+| Scope | a founding this Room began and retried adopts nothing; an earlier revision's ledger row is adopted, with the repository present or absent; the checker's control (a base that exists although the binding is new) |
+
+Mutations, made once each after committing: 12 of 12 were killed, after one
+test was added. Not adopting at all (ledger and Room); the Room never
+flagging an older attempt; flagging every first founding; ignoring this
+Room's own record; not looking for an existing base; ignoring an earlier
+ledger (it survived until the absent-base test was added); settling the
+legacy step when seen, when deleted, or on a read of absence; not scheduling
+it after founding; and not recording the adoption.
+
+Main `9bb700b6` (amendment 4, the bounded-memory publisher, the deploy
+cleanup and pi Workers AI) is merged. This revision has not been run live.
+
+The smoke script no longer takes `genesis.repo`'s name (the identity's base)
+for the public room's repository: it finds the sealed incarnation (the
+highest `<base>-<step>`, `incarnationOf`) for its founding checks, ref reads
+and verify, and its cleanup reaches the base name, every incarnation and
+their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.test.ts`
+covers both.
+
+Recovery: whether an older Room may have tried is now a durable fact of the
+registry binding (migration 2: `ledger` is NULL on bindings an older Worker
+made, 1 on every new one), read on every attempt, not the `bind` answer and
+this Room's attempt record. The earlier rule lost the adoption when a found
+was interrupted after recording its attempt and before adopting, and adopted
+spuriously after a lost bind answer or an interrupted first found; real-DO
+controls interrupt each window.
 
 ## Secrets
 

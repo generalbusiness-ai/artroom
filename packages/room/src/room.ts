@@ -64,6 +64,7 @@ export class Room extends DurableObject<RoomEnv> {
         const b = await registry(env).byRepo(repo);
         return b !== null && b.room === room && b.name === name;
       },
+      legacyBinding: async (repo) => (await registry(env).byRepo(repo))?.legacy === true,
     });
   }
 

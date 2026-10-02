@@ -76,6 +76,8 @@ export interface CoreOptions {
   readonly committed: () => void;
   /** Does the registry bind this repository to this room ID and name (R-GEN-13)? */
   readonly bound: (repo: string, room: RoomId, name: string) => Promise<boolean>;
+  /** Was the registry's binding of this repository made by an older Worker (review 700b74ea)? A durable fact of the binding. */
+  readonly legacyBinding?: (repo: string) => Promise<boolean>;
 }
 
 export interface ActivePolicyFull extends ActivePolicy {
@@ -147,6 +149,7 @@ export class RoomCore {
   readonly defer: (p: Promise<unknown>) => void;
   readonly committed: () => void;
   readonly bound: CoreOptions["bound"];
+  private readonly legacyBinding: NonNullable<CoreOptions["legacyBinding"]>;
   readonly remotes: Remotes;
   /** The runner environment digest attested now for a checker; none means checks do not carry. */
   private readonly runnerDigest: (checker: string) => Digest | null;
@@ -183,6 +186,7 @@ export class RoomCore {
     this.leaseMs = opts.leaseMs;
     this.defer = opts.defer;
     this.bound = opts.bound;
+    this.legacyBinding = opts.legacyBinding ?? (async () => false);
     this.committed = () => {
       opts.committed();
       for (const w of [...this.waiters]) w();
@@ -233,7 +237,9 @@ export class RoomCore {
     const identity = this.founded ? this.genesis.repo : getMeta(this.sql, "founding_repo");
     const loc = identity ? locate(identity, [this.remotes.namespace, ...Object.keys(this.remotes.bindings ?? {})]) : null;
     if (!loc) throw artroomError("unavailable", identity ? "This deployment has no Artifacts binding for the room's repository namespace." : "This room has not been founded.");
-    return loc;
+    // A public founding stores the repository under the incarnation it prepared (review 3eb7bc44); a room founded before keeps its identity's name.
+    const incarnation = getMeta(this.sql, "canonical_name");
+    return incarnation ? { namespace: loc.namespace, name: incarnation } : loc;
   }
 
   private binding(): ArtifactsBinding {
@@ -367,7 +373,7 @@ export class RoomCore {
       // A new repository is sealed only with nothing owed on it (review a35b4b61); this throws, and the seal aborts, otherwise.
       if (!genesis.onboarding) {
         try {
-          this.workspaces.sealCanonical();
+          this.workspaces.sealCanonical(getMeta(this.sql, "canonical_name") ?? "");
         } catch {
           throw artroomError("unavailable", "The canonical repository still owes cleanup. Retry the same found.");
         }
@@ -409,11 +415,19 @@ export class RoomCore {
       if (this.founded) return;
       const push = this.remotes.firstCommit;
       if (!push) throw new Error("this deployment cannot push a first commit");
-      await this.workspaces.prepareCanonical({
-        readMain: () => this.ports.artifacts.readMain(),
-        // A refused push leaves main as it is; the ledger reads it next.
-        firstCommit: (remote, token) => push(remote, token, Date.parse(genesis.createdAt)),
-      });
+      const base = locate(genesis.repo, [this.remotes.namespace, ...Object.keys(this.remotes.bindings ?? {})])!.name;
+      // An older Worker's binding: its Room may have created the base name and recorded nothing (review 700b74ea). Read
+      // from the registry, a durable fact, on every attempt, so a retry after any interruption reaches the same answer;
+      // the ledger records the adoption in one transaction, and adoption is idempotent.
+      const legacyBase = await this.legacyBinding(genesis.repo);
+      fault("found:before-prepare");
+      // A refused push leaves main as it is; the ledger reads it next.
+      const name = await this.workspaces.prepareCanonical(base, (remote, token) => push(remote, token, Date.parse(genesis.createdAt)), { legacyBase });
+      // From here the room's repository is this incarnation: reads, forks, landing and the log all reach it.
+      if (getMeta(this.sql, "canonical_name") !== name) {
+        setMeta(this.sql, "canonical_name", name);
+        this.wsCache = null;
+      }
     });
   }
 

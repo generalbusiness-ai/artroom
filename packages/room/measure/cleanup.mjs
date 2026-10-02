@@ -6,8 +6,8 @@
 // knows it made are cleaned even without an inventory; and a run is ok only
 // when every duty is done and the final inventory proves nothing is left.
 
-const REPO_PAGE = 200;
-const TOKEN_PAGE = 100;
+export const REPO_PAGE = 200;
+export const TOKEN_PAGE = 100;
 
 /** A remote answer settles a duty only on `success: true`; `success: false` is a refusal; anything else is unknown. */
 export function outcomeOf(answer) {
@@ -15,6 +15,24 @@ export function outcomeOf(answer) {
   if (answer?.success === false) return "refused";
   return "unknown";
 }
+
+/**
+ * The repository a public room was sealed on, from the names a listing returned: of the incarnations
+ * `<base>-<step>` of its identity, the one with the highest step (the last made; abandoned ones come before it,
+ * reviews 3eb7bc44 and 700b74ea). The base name itself (an older Room's, adopted and deleted) and forks are not
+ * incarnations. Null when there is none.
+ */
+export function incarnationOf(base, names) {
+  const re = new RegExp(`^${escapeRe(base)}-(\\d+)$`);
+  let best = null;
+  for (const n of names) {
+    const m = re.exec(n);
+    if (m && (best === null || Number(m[1]) > best.step)) best = { name: n, step: Number(m[1]) };
+  }
+  return best?.name ?? null;
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** A repository record names an Artifacts repository; a token record carries a token ID (review 2485e992). */
 const NAME = /^[A-Za-z0-9._-]{1,100}$/;
@@ -58,7 +76,7 @@ function why(answer) {
  * remote call's exception becomes an unknown duty; any other exception
  * reaches the caller, whose result then has a failed cleanup.
  */
-export async function cleanupRun({ api, canonical, expected = [], minted = new Map() }) {
+export async function cleanupRun({ api, canonical, expected = [], minted = new Map(), incarnations = false }) {
   const duties = [];
   let reposLeft = [];
   const record = (duty, outcome, detail) => {
@@ -89,7 +107,10 @@ export async function cleanupRun({ api, canonical, expected = [], minted = new M
   }
   if (canonical) {
     // Records are validated by the listing; this only tells this run's repositories from others the search returns.
-    const mine = (r) => r.name === canonical || r.name.startsWith(`${canonical}--`);
+    // With `incarnations` (a public room since review 3eb7bc44), `canonical` is the identity's base name and the run's
+    // repositories are the base (an older Room's), every incarnation `<base>-<step>`, and the forks of each.
+    const ours = incarnations ? new RegExp(`^${escapeRe(canonical)}(-\\d+)?(--.+)?$`) : null;
+    const mine = (r) => (ours ? ours.test(r.name) : r.name === canonical || r.name.startsWith(`${canonical}--`));
     const inventory = (duty) => listing({ duty, repos: expected }, `/repos?limit=${REPO_PAGE}&search=${canonical}`, REPO_PAGE, isRepoRecord);
     const found = await inventory("inventory");
     // Without a complete inventory, still clean what the run knows it made; the run fails on the inventory duty.

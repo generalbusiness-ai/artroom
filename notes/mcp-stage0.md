@@ -398,3 +398,43 @@ The gates ran at `90ad465e`. The only commit after it adds this note.
   `wrangler.spike.jsonc`: 1,553.78 KiB, 340.78 KiB gzipped. The bundle
   grew 22 KiB from founding revision 2 and the bounded-memory publisher.
 
+
+## Founding revision 4.2 merged
+
+At the coordinator's request, this branch merges `request/founding-gaps`
+at `f493953a` (founding revision 4.2, still in review) on top of revision
+2 (`a81f8a05`). It also brings main `9bb700b6`.
+
+- **The conflict.** Founding revision 4.2 changed the cleanup rules inside
+  `measure/spike-smoke.mjs`: `incarnationOf`, and `cleanupRun`'s
+  `incarnations` option. Revision 2 had moved those rules out of that file
+  into `measure/cleanup.mjs`. The resolution keeps founding's
+  `spike-smoke.mjs` and moves its cleanup section, byte for byte, into
+  `cleanup.mjs`. The only change is that `REPO_PAGE` and `TOKEN_PAGE` are
+  now exported, because `spike-smoke.mjs` imports them for its
+  incarnation lookup. `spike-smoke.mjs` imports and re-exports the rules,
+  and its tests run unchanged.
+- **Incarnations in the MCP harness.** Since founding revision 3, a public
+  room's repository is an incarnation `<base>-<step>` of its identity, not
+  the base name. `mcp-stage0.mjs` now handles it the same way
+  `spike-smoke.mjs` does:
+  - it keeps the base at draft, before `found`;
+  - it finds the room's repository with `incarnationOf` after founding,
+    and reads `main` from it;
+  - it cleans up with `incarnations: true`. That covers the base name,
+    every incarnation and every fork. The incarnation and the known forks
+    are the expected repositories when an inventory fails.
+
+  The cold-agent transcript tooling names no canonical repository. It
+  collects fork names from the remotes in the transcript, and those are
+  already `<incarnation>--<lane>`.
+
+  A new test, with a fake API, deletes the base, both incarnations and a
+  fork, and leaves names that only look alike (`<base>x`, `<base>-1x`,
+  `<base>-x`). It also shows that without `incarnations` only the base
+  name would be cleaned.
+- **The MCP route** in `src/worker.ts` and `src/mcp.ts` is unchanged by
+  the merge. The Room's workerd MCP tests run in the root gates, and the
+  spike dry build bundles the route.
+
+No deploy and no live calls were made.

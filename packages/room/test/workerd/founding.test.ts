@@ -78,8 +78,10 @@ describe("R-GEN-10, R-GEN-12: public founding", () => {
     expect(room).toBe(roomIdOf(drafted.genesis));
     // Created in the deployment's Artifacts namespace, under the identity's name.
     expect(world.artifacts.namespace).toBe("artroom-public");
-    expect(world.artifacts.repos.has(drafted.genesis.repo.split("/")[1]!)).toBe(true);
-    expect(await reg().byRepo(drafted.genesis.repo)).toEqual({ repo: drafted.genesis.repo, room, name: drafted.genesis.name });
+    // Stored under the identity's incarnation for this creation attempt (review 3eb7bc44).
+    expect(world.artifacts.canonical).toMatch(new RegExp(`^${drafted.genesis.repo.split("/")[1]!}-\\d+$`));
+    expect(world.artifacts.repos.has(world.artifacts.canonical)).toBe(true);
+    expect(await reg().byRepo(drafted.genesis.repo)).toEqual({ repo: drafted.genesis.repo, room, name: drafted.genesis.name, legacy: false });
     const again = await post("/found", body);
     expect(((await again.json()) as { room: RoomId }).room).toBe(room);
     const log = await logOf(room);

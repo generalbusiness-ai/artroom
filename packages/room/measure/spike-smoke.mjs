@@ -43,7 +43,7 @@ import { fileURLToPath } from "node:url";
 import { keyPairFromSeed, newKeyPair, randomToken, sign, unb64url } from "../src/crypto.ts";
 import { iso } from "../src/ids.ts";
 import { firstCommit } from "../../git/src/first-commit.ts";
-import { cleanupRun, smokeOk } from "./cleanup.mjs";
+import { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, readListing, REPO_PAGE, smokeOk } from "./cleanup.mjs";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
 const NS = "gitseq-spike";
@@ -155,8 +155,13 @@ async function revoke(id, ns = NS) {
 
 /** Token metadata only, never the token. */
 const tokenMeta = (toks) => toks.map((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !/plaintext|token|secret/i.test(k))));
+/**
+ * A repository's active tokens, or null when the listing proves nothing (refused, partial or malformed: the
+ * deploy lane's `readListing`). A step that reads it reports an unknown listing as a failure, never as none.
+ */
 async function activeTokens(repo, ns = NS) {
-  return (await api("GET", `/repos/${repo}/tokens?state=active&per_page=100`, undefined, ns)).result ?? [];
+  const { outcome, items } = readListing(await api("GET", `/repos/${repo}/tokens?state=active&per_page=100`, undefined, ns), 100, isTokenRecord);
+  return outcome === "done" ? items : null;
 }
 
 function git(args, { cwd, token, env = {} } = {}) {
@@ -273,6 +278,9 @@ function operatorKey() {
 
 // ------------------------------------------------------------ the run
 
+/** The public room's identity name (`genesis.repo` without its namespace): the base of its repository's names. */
+let publicBase = null;
+/** The public room's repository: the incarnation `<base>-<step>` it was sealed on (reviews 3eb7bc44 and 700b74ea), never the base name. */
 let canonical = null;
 let canonicalRemote = null;
 const lanes = [];
@@ -295,7 +303,8 @@ async function main() {
   step("found: draft", d.status === 200, { status: d.status, ms: d.ms, repo: d.body.genesis?.repo, roomKey: d.body.genesis?.roomKey, profile: d.body.genesis?.profile, error: d.body.code, message: d.body.message });
   if (d.status !== 200) throw new Error("draft failed");
   const genesis = d.body.genesis;
-  canonical = genesis.repo.split("/")[1];
+  // The identity names the room's repository; the repository itself is an incarnation of it, found after founding.
+  publicBase = genesis.repo.split("/")[1];
   out.repo = genesis.repo;
   const f = await http("POST", "/found", { genesis, sig: sign(admin.seed, "artroom-genesis-v1", genesis), draft: d.body.draft });
   step("found: found", f.status === 200, { status: f.status, ms: f.ms, room: f.body.room, error: f.body.code, message: f.body.message });
@@ -309,6 +318,12 @@ async function main() {
   const ref = await http("GET", `/${encodeURIComponent(name)}`);
   step("found: GET /v1/rooms/:name (no credential)", ref.status === 200 && ref.body.room === room, { status: ref.status, body: ref.body });
 
+  // The room's repository: the identity's incarnation (`<base>-<step>`, the latest one made), not the base name.
+  const listed = readListing(await api("GET", `/repos?limit=${REPO_PAGE}&search=${publicBase}`), REPO_PAGE, isRepoRecord);
+  canonical = listed.outcome === "done" ? incarnationOf(publicBase, listed.items.map((r) => r.name)) : null;
+  out.canonical = canonical;
+  step("found: the room's repository is an incarnation of its identity", canonical !== null, { base: publicBase, incarnation: canonical, listing: listed.outcome, names: listed.items?.map((r) => r.name) });
+  if (!canonical) throw new Error("no incarnation of the room's identity was found");
   const info = await api("GET", `/repos/${canonical}`);
   canonicalRemote = info.result?.remote ?? null;
   step("found: repository created in gitseq-spike", !!canonicalRemote, { name: info.result?.name, remote: canonicalRemote, source: info.result?.source ?? null });
@@ -320,7 +335,7 @@ async function main() {
   // Gap 2: no token is left on the new repository (the create's 24-hour token and the first commit's are revoked).
   // Read before this script mints its own read tokens, and after the one canonicalRef minted is revoked.
   const left = await activeTokens(canonical);
-  step("found: no active token on the new repository", left.length === 0, { active: left.length, tokens: tokenMeta(left) });
+  step("found: no active token on the new repository", left !== null && left.length === 0, { active: left?.length ?? "unknown", tokens: left ? tokenMeta(left) : undefined });
 
   // 2. A read session (R-CRED-5).
   const s = await request({ kind: "session", ttlSeconds: 900 });
@@ -333,6 +348,7 @@ async function main() {
   // 3. A first lane on the fresh repository: it must land (request b6b51de7, gap 1).
   const first = await lane(1, { "README.md": "# spike smoke\n", "docs/first.md": "first lane, fresh repository\n" });
   lanes.push({ ...first, room, admin, ns: NS });
+  step("lane 1: the fork is of the room's incarnation", !!first.fork && basename(first.fork, ".git").startsWith(`${canonical}--`), { fork: first.fork ? basename(first.fork, ".git") : null, incarnation: canonical });
   const mainAfterFirst = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
   out.firstLaneOnFreshRepo = { landed: first.op?.state === "landed", main: mainAfterFirst, integration: first.op?.integration ?? null };
   step("lane 1: main is lane 1's integration, on the first commit", !!first.op?.integration && mainAfterFirst === first.op.integration, { main: mainAfterFirst, integration: first.op?.integration });
@@ -457,9 +473,10 @@ async function importPhase(operator) {
   const p = await git(["push", "-q", remote, "HEAD:refs/heads/main"], { cwd: seed, token: c.result.token });
   // Every token on it is revoked before the Room sees it: the creation token is spent.
   let revoked = 0;
-  for (const t of await activeTokens(importRepo, IMPORT_NS)) if (await revoke(t.id, IMPORT_NS)) revoked++;
+  const before = await activeTokens(importRepo, IMPORT_NS);
+  for (const t of before ?? []) if (await revoke(t.id, IMPORT_NS)) revoked++;
   const leftover = await activeTokens(importRepo, IMPORT_NS);
-  step("import: one commit pushed; its creation token revoked", p.code === 0 && leftover.length === 0, { main: seeded, code: p.code, stderr: p.stderr || undefined, revoked, active: leftover.length });
+  step("import: one commit pushed; its creation token revoked", p.code === 0 && before !== null && leftover !== null && leftover.length === 0, { main: seeded, code: p.code, stderr: p.stderr || undefined, revoked, active: leftover?.length ?? "unknown" });
   if (p.code !== 0) throw new Error("the import repository could not be seeded");
 
   // The grant, signed with the operator seed in this process, and the founding.
@@ -501,7 +518,7 @@ async function importPhase(operator) {
 // ------------------------------------------------------------ cleanup (review 1b868265)
 
 // The rules live in cleanup.mjs, shared with mcp-stage0.mjs (review 66fec276).
-export { cleanupRun, isRepoRecord, isTokenRecord, outcomeOf, readListing, smokeOk } from "./cleanup.mjs";
+export { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, outcomeOf, readListing, smokeOk } from "./cleanup.mjs";
 
 async function cleanup() {
   // Release a lane still held (the landed lane may already be done; a refusal is fine: the token duties below cover access).
@@ -514,12 +531,13 @@ async function cleanup() {
     releases[`lane ${l.n}`] = { status: r.status, rule: r.body?.rule };
   }
   // The deploy lane's cleanup, once per namespace: the public room's repositories, then the import's.
-  const run = async (ns, base) => {
+  const run = async (ns, base, repo, incarnations) => {
     const forks = lanes.filter((l) => l.fork && l.ns === ns).map((l) => basename(l.fork, ".git"));
-    return cleanupRun({ api: (m, p, b) => api(m, p, b, ns), canonical: base, expected: base ? [base, ...forks] : [], minted: minted[ns] });
+    return cleanupRun({ api: (m, p, b) => api(m, p, b, ns), canonical: base, expected: base ? [repo ?? base, ...forks] : [], minted: minted[ns], incarnations });
   };
-  const pub = await run(NS, canonical);
-  const imp = await run(IMPORT_NS, importRepo);
+  // The public room: every repository named from its identity's base (incarnations, forks, an adopted base name).
+  const pub = await run(NS, publicBase, canonical, true);
+  const imp = await run(IMPORT_NS, importRepo, importRepo, false);
   return {
     releases,
     ok: pub.ok && imp.ok,

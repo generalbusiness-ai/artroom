@@ -27,6 +27,7 @@ export function cleanupMcp(opts: {
   minted?: Map<string, string>;
   agents?: readonly Agent[];
   endSession: (a: Agent) => Promise<readonly SessionDuty[]>;
+  incarnations?: boolean;
 }): Promise<CleanupOutcome & { readonly duties: readonly (Duty | SessionDuty)[]; readonly unresolved: readonly (Duty | SessionDuty)[] }>;
 
 export function finishRun(

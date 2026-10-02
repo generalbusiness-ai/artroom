@@ -415,7 +415,8 @@ export class FakeArtifactsHost {
       if (this.repos.has(name)) throw artifactsErrors.exists();
       const r = new FakeRepo(this, name, null);
       this.repos.set(name, r);
-      if (!this.canonical) this.canonical = name;
+      // The room's repository: the latest incarnation a public founding made (review 3eb7bc44), never a fork or snapshot.
+      if (!this.canonical || !name.includes("--")) this.canonical = name;
       const t = r.mint("write", 86_400);
       this.answer("create");
       return { id: `repo_${name}`, name, description: null, defaultBranch: "main", remote: r.remote, token: t.plaintext };

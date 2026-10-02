@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { b64url, digestBytes, newKeyPair, randomBytes, randomToken, sign } from "../src/crypto.ts";
 import { iso } from "../src/ids.ts";
-import { cleanupRun, smokeOk } from "./cleanup.mjs";
+import { cleanupRun, incarnationOf, isRepoRecord, readListing, REPO_PAGE, smokeOk } from "./cleanup.mjs";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
 const NS = "gitseq-spike";
@@ -191,6 +191,9 @@ async function tool(c, name, args, timeout = 120_000) {
 
 // ------------------------------------------------------------ the scripted drive
 
+/** The room's identity name (`genesis.repo` without its namespace): the base of its repositories' names, known at draft. */
+let publicBase = null;
+/** The room's repository: the incarnation `<base>-<step>` it was sealed on (founding revision 3), never the base name. */
 let canonical = null;
 let canonicalRemote = null;
 /** What the run made, retained before each effect: agents (bearer sessions), tokens it minted (ID to repository), and lane forks. */
@@ -382,7 +385,8 @@ async function main() {
   step("found: draft", d.status === 200, { status: d.status, repo: d.body.genesis?.repo, error: d.body.code, message: d.body.message });
   if (d.status !== 200) throw new Error("draft failed");
   const genesis = d.body.genesis;
-  canonical = genesis.repo.split("/")[1];
+  // Retained before `found` makes anything: every repository the room gets is named from this base.
+  publicBase = genesis.repo.split("/")[1];
   out.repo = genesis.repo;
   const f = await http("POST", "/found", { genesis, sig: sign(admin.seed, "artroom-genesis-v1", genesis), draft: d.body.draft });
   step("found: found", f.status === 200, { status: f.status, room: f.body.room, error: f.body.code, message: f.body.message });
@@ -390,6 +394,12 @@ async function main() {
   room = f.body.room;
   out.room = room;
   out.name = name;
+  // The room's repository is the identity's incarnation `<base>-<step>`, the latest made, not the base name.
+  const listed = readListing(await api("GET", `/repos?limit=${REPO_PAGE}&search=${publicBase}`), REPO_PAGE, isRepoRecord);
+  canonical = listed.outcome === "done" ? incarnationOf(publicBase, listed.items.map((r) => r.name)) : null;
+  out.canonical = canonical;
+  step("found: the room's repository is an incarnation of its identity", canonical !== null, { base: publicBase, incarnation: canonical, listing: listed.outcome });
+  if (!canonical) throw new Error("no incarnation of the room's identity was found");
   canonicalRemote = (await api("GET", `/repos/${canonical}`)).result?.remote ?? null;
 
   // Route guards on the deployed Worker.
@@ -445,10 +455,13 @@ export function sessionEnder({ act, read }) {
  * exception for one is an unknown duty, and the rest still run. Then the
  * Artifacts state, by the shared rules (cleanup.mjs): minted tokens, the
  * canonical repository and its forks, known before any effect, even when an
- * inventory is refused, unknown, incomplete or malformed. `ok` only when
- * every duty is done and the final inventory proves nothing is left.
+ * inventory is refused, unknown, incomplete or malformed. With
+ * `incarnations`, `canonical` is the identity's base name, and the run's
+ * repositories are every incarnation `<base>-<step>`, the base name, and
+ * their forks. `ok` only when every duty is done and the final inventory
+ * proves nothing is left.
  */
-export async function cleanupMcp({ api, canonical, expected = [], minted = new Map(), agents = [], endSession }) {
+export async function cleanupMcp({ api, canonical, expected = [], minted = new Map(), agents = [], endSession, incarnations = false }) {
   const sessions = [];
   for (const a of agents) {
     try {
@@ -459,7 +472,7 @@ export async function cleanupMcp({ api, canonical, expected = [], minted = new M
   }
   let artifacts;
   try {
-    artifacts = await cleanupRun({ api, canonical, expected, minted });
+    artifacts = await cleanupRun({ api, canonical, expected, minted, incarnations });
   } catch (e) {
     const d = { duty: "artifacts-cleanup", outcome: "unknown", detail: e.message };
     artifacts = { ok: false, duties: [d], reposLeft: null };
@@ -499,8 +512,10 @@ if (isMain) {
   const code = await finishRun(out, failed, () =>
     cleanupMcp({
       api,
-      canonical,
-      expected: canonical ? [canonical, ...forks] : [],
+      // The public room: every repository named from its identity's base, and the incarnation and forks it knows.
+      canonical: publicBase,
+      expected: publicBase ? [canonical ?? publicBase, ...forks] : [],
+      incarnations: true,
       minted,
       agents,
       endSession: sessionEnder({ act, read: (bearer) => http("GET", `/${room}/attention`, undefined, bearer) }),

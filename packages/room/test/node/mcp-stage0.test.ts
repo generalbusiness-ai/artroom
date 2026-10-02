@@ -218,4 +218,31 @@ describe("review 66fec276: bearer sessions and the run's own result", () => {
     expect(code).toBe(1);
     expect(out.cleanup.unresolved).toEqual([{ duty: "artifacts-cleanup", outcome: "unknown", detail: "unreadable record" }]);
   });
+
+  it("founding revision 3: with incarnations, the base name's incarnations and their forks are the run's, and nothing else is touched", async () => {
+    const base = "fedcba9876543210fedcba9876543210";
+    const ours = [`${base}-1`, `${base}-1--act_5_d0f22a95`, `${base}-2`, base];
+    const others = [`${base}x`, `${base}-1x`, `${base}-x`];
+    const deleted = new Set<string>();
+    const api: Api = async (method, path) => {
+      if (method === "GET" && path.startsWith("/repos?")) return { success: true, result: [...ours, ...others].filter((n) => !deleted.has(n)).map((name) => ({ name })) };
+      if (method === "GET" && path.includes("/tokens?")) return { success: true, result: [] };
+      const repo = /^\/repos\/([^/?]+)$/.exec(path);
+      if (method === "DELETE" && repo) {
+        deleted.add(repo[1]!);
+        return { success: true };
+      }
+      throw new Error(`unexpected ${method} ${path}`);
+    };
+    const out: { steps: { ok: boolean }[]; cleanup?: any; ok?: boolean } = { steps: [{ ok: true }] };
+    const code = await finishRun(out, false, () => cleanupMcp({ api, canonical: base, expected: [`${base}-2`, `${base}-1--act_5_d0f22a95`], agents: [], endSession: noSessions, incarnations: true }));
+    expect(code).toBe(0);
+    expect([...deleted].sort()).toEqual([...ours].sort());
+    // Without `incarnations`, only the base name and its own forks are the run's: the incarnations would be left
+    // unseen. This is why the harness passes `incarnations: true` with the identity's base.
+    deleted.clear();
+    const out2: { steps: { ok: boolean }[]; cleanup?: any; ok?: boolean } = { steps: [{ ok: true }] };
+    await finishRun(out2, false, () => cleanupMcp({ api, canonical: base, expected: [base], agents: [], endSession: noSessions }));
+    expect([...deleted]).toEqual([base]);
+  });
 });

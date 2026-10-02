@@ -66,8 +66,9 @@ Objects' storage too.
 node packages/room/measure/spike-smoke.mjs
 ```
 
-There is no client or CLI package on main yet (lane E), so the script drives
-the Room's HTTPS API directly. It signs envelopes and requests with the
+When this was written there was no client or CLI package on main (lane E
+landed later, at main `3f44c993`); the script still drives the Room's HTTPS
+API directly. It signs envelopes and requests with the
 Room's own `src/crypto.ts`. It uses hugh's OAuth for the Artifacts REST API,
 to read refs, seed main and clean up. It saves a redacted result in
 `packages/room/measure/results/`.
@@ -177,9 +178,9 @@ fixes" below, and "Founding gaps" in
    both bindings, `gitseq-spike` and `gitseq-spike-import` (approved by
    hugh), and its live run imports a repository as well as founding a public
    room.
-4. **No client on main.** Lane E's client, CLI and MCP are not on main, so
-   the smoke run is a script over the HTTPS API. `artroom verify` is lane
-   L's CLI, which is on main.
+4. **No client on main (at the time).** Lane E's client, CLI and MCP were
+   not on main then (they landed at `3f44c993`), so the smoke run is a
+   script over the HTTPS API. `artroom verify` is lane L's CLI.
 5. **The first deploy needed a retry** for the container application (see
    "Deploy and redeploy").
 
@@ -226,6 +227,9 @@ deploy lane's `cleanupRun` (review 2485e992), once per namespace.
 | [03:55:25](../packages/room/measure/results/spike-smoke-2026-10-02T03-55-25-370Z.json) | revision 2, before review a35b4b61 | Public founding passed. The import founded and landed, but its log never published: another actor redeployed `artroom-spike-room` at 03:57:21 from a config without the import binding (version `2092006a`), so the import room lost its namespace. |
 | [04:03:51](../packages/room/measure/results/spike-smoke-2026-10-02T04-03-51-743Z.json) | the same, redeployed | Every step passed. |
 | [04:21:13](../packages/room/measure/results/spike-smoke-2026-10-02T04-21-13-851Z.json) | review a35b4b61 answered, merged with main `b5864882` and `request/deploy-spike` `97f42684`; version `a9f55d45` | Every step and every cleanup duty passed (57 steps). |
+
+These runs predate review 3eb7bc44 (incarnation names). That revision was
+not run live: one coordinated redeploy follows.
 
 The 04:21:13 run, on one deployment:
 
