@@ -1,6 +1,6 @@
 # Positioning exploration: how to present Artroom
 
-Date: 2026-10-02. Revision 1. Request `9c4d7b9b`. Exploration
+Date: 2026-10-02. Revision 2. Request `9c4d7b9b`, promise `0655d5da`. Exploration
 instructions. This note is not a design and not a deliverable. It records
 the position reached in discussion on 2026-10-02, states what is still
 open, and says what the first checker round should bring back. Nothing in
@@ -85,8 +85,8 @@ software lifecycle. The rollout room is proposed as the middle example
 because its rules are ones every developer has been burned by, and because
 the Cloudflare platform already has versions and gradual deployments for
 the room to drive rather than reimplement. Its rulebook should be drafted
-as an appendix to the positioning design note, not built before the
-competition submission.
+as an appendix to the positioning design note. It is built before the
+competition submission only if time permits.
 
 **H8. The image.** A paving machine that lays bricks in the road just ahead
 of itself. The road is the record; a brick is an act that took effect; the
@@ -106,15 +106,18 @@ stays laid.
   comparison to be factual and qualified; the simplest way to meet that is
   to make none.
 - **Product names.** No other products, tools or companies are named, in
-  this note or in the assets.
+  this note or in the assets. Cloudflare and its platform parts, Workers,
+  Durable Objects, Artifacts, Workflows and the rest, are not "other
+  products": they are what Artroom runs on, and they are named freely.
 
 ## 4. Questions for the first round
 
 Answer each with breadth: name the alternatives considered, say which
 survive and why, and name the strongest objection to the working position.
 Draw on the repository's notes, the plan (`notes/2026-10-01-artroom-plan.md`),
-the protocol, the jam-room note, dap's design and authoring notes, and the
-spike reports. Separate sourced facts from judgement.
+the protocol, the jam-room note, dap's design and authoring notes, the
+spike reports, and your own research. Separate sourced facts from
+judgement.
 
 **Audience and order**
 
@@ -197,7 +200,8 @@ no slide text.
 
 ## 6. Constraints on the round and on everything after it
 
-- Plain English, per ISO 24495-1, for a technical audience.
+- Plain conversational English, written for readability by a technical
+  audience.
 - No comparison statements. No product names other than GitHub, and that
   only as a nod to shared vocabulary.
 - No visibility claims in the guarantee.
