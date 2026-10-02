@@ -130,6 +130,27 @@ describe("acceptance cases (30.7): large entries and files", () => {
     expect(reopened.stats.peakSendBytes).toBeLessThan(64 * 1024);
   }, 300_000);
 
+  test("a chunked line whose length changes between hashing and sending is refused as changed, and nothing is pushed", async () => {
+    const sim = bareRoom();
+    const big = exact(sim, B + 1, (pad) => sim.system({ type: "revert-lane", of: "op_land_0" as never, scope: ["x".repeat(pad) as RepoPath], reason: "abort-after-landing" }));
+    const bytes = utf8(canonicalize(big));
+    let calls = 0;
+    const source: EntrySource = {
+      through: 1,
+      read: (from, limit) =>
+        sim.entries.slice(from, from + limit).map((e): LogEntry | EntryLine => {
+          if (e.seq !== 1) return e;
+          const n = calls++ < 3 ? bytes.length : bytes.length + 1; // measured, tail, hashed: then one byte longer
+          return { seq: 1, bytes: n, read: (o, l) => bytes.slice(o, o + l) };
+        }),
+    };
+    const git = new MemoryGit();
+    const e = (await new LogPublisher(git).publish(source, sim.checkpoint(L2(0)), []).catch((x: unknown) => x)) as Error;
+    expect(e).toMatchObject({ code: "invalid-input" });
+    expect(e.message).toMatch(/changed while it was read/);
+    expect(git.refs.get(LOG_REF)).toBeUndefined();
+  }, 300_000);
+
   test("Bad chunk: a changed chunk of an entry file is chunk-mismatch, and the verified prefix ends before the entry", async () => {
     const sim = bareRoom();
     const git = new MemoryGit();

@@ -20,7 +20,7 @@ import { LogPublisher, PublishError, type EntryLine, type EntrySource, type Reta
 import type { LogEntry } from "@generalbusiness/artroom-contract";
 import { sha256Hex } from "../src/crypto.ts";
 import { verifyLog } from "../src/verify.ts";
-import { L2, RoomSim, Scripted, alice, exact, graft, keys, lineOf, note, rewrite, walk } from "./support/layout2.ts";
+import { L2, RoomSim, Scripted, alice, bareRoom, exact, graft, keys, lineOf, note, rewrite, walk } from "./support/layout2.ts";
 
 /** A seeded generator, so each run checks the same cases. */
 function rng(seed: number) {
@@ -559,6 +559,47 @@ describe("lengths past 32 bits and sizes that are not lengths (review of 04797d8
     }
     const good: RetainedRef = { kind: "input", digest, load: () => body, bytes: utf8(body).length, read };
     expect(p.commitFor(null, sim.entries, sim.checkpoint(L2(0)), [good])).toBe(p.commitFor(null, sim.entries, sim.checkpoint(L2(0)), [{ kind: "input", body }]));
+  });
+
+  // Review 74f29c21: the boundary controls. The huge line is the last entry, so the checkpoint names it and
+  // the publisher reads its seq and hash from its canonical tail, which the fake serves from a real sealed entry.
+  for (const size of [2 ** 32 - 1, 2 ** 32, 2 ** 32 + 1])
+    for (const l2 of [true, false])
+      test(`boundary control: an EntryLine of ${size} bytes as the last entry reaches the hashing of its body through the real commitFor (layout ${l2 ? 2 : 1})`, () => {
+        const sim = bareRoom();
+        const last = sim.system({ type: "lease-expired", lane: "act_1_00000000" as never, holder: "@alice" as never, leaseGeneration: 1 });
+        const lineBytes = utf8(canonicalize(last));
+        const tail = new Uint8Array(512); // the last 512 bytes of the huge line: zeros, then the canonical end of a real entry
+        tail.set(lineBytes.slice(-512), 512 - Math.min(512, lineBytes.length));
+        const reads: [number, number][] = [];
+        const huge: EntryLine = {
+          seq: 1,
+          bytes: size,
+          read: (o, l) => {
+            reads.push([o, l]);
+            if (o >= size - tail.length) return tail.subarray(o - (size - tail.length), o - (size - tail.length) + l);
+            if (reads.length > 2) throw new Error(STOP); // the second read of the body: hashing has begun
+            return zeros.subarray(0, l);
+          },
+        };
+        const source: EntrySource = { through: 1, read: (from, limit) => [sim.entries[0]!, huge].slice(from, from + limit) };
+        const e = attempt(() => new LogPublisher(new MemoryGit()).commitFor(null, source, sim.checkpoint(l2 ? L2(0) : undefined), []));
+        expect(e.message).toBe(STOP);
+        expect(reads[0]).toEqual([size - 512, 512]); // the tail, for seq and hash
+        expect(reads.slice(1)).toEqual([[0, MiB], [MiB, MiB]]); // then the body, from byte 0, as one line of `size` bytes
+      });
+
+  test("boundary control: a line that is 2^32 bytes when measured and 2^32 + 1 when hashed is still refused as changed", async () => {
+    const sim = new RoomSim();
+    const { lane } = await sim.claim(keys.alice, alice, ["src/**"]);
+    note(sim, lane!, 10);
+    note(sim, lane!, 10);
+    let calls = 0;
+    const line = (): EntryLine => ({ seq: 3, bytes: calls++ === 0 ? 2 ** 32 : 2 ** 32 + 1, read: (_o, l) => zeros.subarray(0, l) });
+    const source: EntrySource = { through: 4, read: (from, limit) => sim.entries.slice(from, from + limit).map((e): LogEntry | EntryLine => (e.seq === 3 ? line() : e)) };
+    const e = attempt(() => new LogPublisher(new MemoryGit()).commitFor(null, source, sim.checkpoint(L2(0)), sim.retained));
+    expect(e).toMatchObject({ code: "invalid-input" });
+    expect(e.message).toMatch(/was 4294967296 bytes and is now 4294967297/);
   });
 
   test("eachChunk refuses a size that is not a length", () => {
