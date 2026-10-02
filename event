@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/git/src/index.ts at exact e80c2c3953b3830fc563f32a2a34e82e9be0b835 on request/d5-retire, under promise git:sha1…9e1886c on request git:sha1…6757e43","body":{"commit":"e80c2c3953b3830fc563f32a2a34e82e9be0b835","path":"packages/git/src/index.ts"}}
+{"kind":"artifact","text":"packages/git/src/snapshot/repos.ts at exact e80c2c3953b3830fc563f32a2a34e82e9be0b835 on request/d5-retire, under promise git:sha1…9e1886c on request git:sha1…6757e43","body":{"commit":"e80c2c3953b3830fc563f32a2a34e82e9be0b835","path":"packages/git/src/snapshot/repos.ts"}}
