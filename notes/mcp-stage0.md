@@ -20,12 +20,14 @@ deployed from `70097fe0`).
 | Advertised `outputSchema` | `packages/mcp/src/tools.ts`, `server.ts` | `tools/list` sends each tool's `outputSchema`. Every root is `type: "object"`. The eight tools that can refuse have `oneOf` their result and `Refusal`, so a refusal's structured content conforms. |
 | Instructions | `packages/mcp/src/tools.ts` | 378 characters, under the limit of 512. They stand alone and name `attention` first and the refusal fix. |
 | Legacy stateless mode | `packages/mcp/src/worker.ts` | `legacy: "stateless"` is set explicitly. 2025-era clients are served statelessly, and GET and DELETE get 405. |
-| Live harness | `packages/room/measure/mcp-stage0.mjs` | Founds a room, drives it through the endpoint, and with `--claude` runs a cold Claude Code agent. Then it cleans up. |
+| Live harness | `packages/room/measure/mcp-stage0.mjs` | Founds a room, drives it through the endpoint, and with `--claude` runs a cold Claude Code agent. Then it cleans up by the shared rules of `measure/cleanup.mjs` (see "Review 66fec276"). |
 
 To deploy the endpoint with the fixes that are live on the spike, this
-branch merges `request/founding-gaps` (`d8312c32`). That branch brings the
-deploy script and the first land on an empty repository. The spike already
-ran it, and `request/mcp-stage0` would otherwise have rolled it back.
+branch first merged `request/founding-gaps` at `d8312c32`. That branch
+brings the deploy script and the first land on an empty repository. The
+spike already ran it, and `request/mcp-stage0` would otherwise have rolled
+it back. Revision 2 replaces that merge with founding revision 2 and main
+`9d0d0cbd` (see "Review 66fec276").
 
 ### Two choices to check against the request
 
@@ -163,7 +165,8 @@ and the instructions.
 One step in that result file is uninformative. "The cold agent's lanes,
 read with its bearer" lists no lanes, because the default lane listing does
 not include a released lane. The landing is shown instead by `main`
-(`5e5b699a`) and the agent's own receipts in the transcript.
+(`5e5b699a`) and the agent's own receipts in the transcript. Revision 2
+removes that step from the harness.
 
 ## Tests and gates
 
@@ -239,3 +242,159 @@ it, and then the file was restored. The suites were the Room's workerd
   Stage 1 caps it at 45,000 (R-API-15).
 - The room this run founded stays in the registry, as the smoke runs'
   rooms do. Its repositories are deleted.
+
+## Review 66fec276
+
+checker's review of `6abe1ce8` credited the endpoint and requested two
+changes.
+
+### P2: the harness could report a clean run with resources left
+
+The finding was right. The old cleanup had four faults:
+
+- It read a refused, thrown or malformed inventory as empty.
+- It ignored `cleanup.error` and each revocation's and deletion's own
+  result.
+- An exception while ending one agent's session stopped the rest of the
+  cleanup.
+- Its `ok` looked only at `reposLeft` and the agents.
+
+checker's seven controls ran the real cleanup against a fake API. Five of
+them exited 0 with the canonical repository or a write token still
+present.
+
+The fix reuses deploy V3's reviewed rules (reviews 1b868265 and 2485e992)
+instead of a second set:
+
+- **One shared module.** `packages/room/measure/cleanup.mjs` holds
+  `outcomeOf`, `isRepoRecord`, `isTokenRecord`, `readListing`, `cleanupRun`
+  and `smokeOk`. They are moved byte for byte out of `spike-smoke.mjs`,
+  which imports them and re-exports them for its own tests.
+  `cleanup.d.mts` holds the types.
+- **Identities kept before effects.** The harness records the canonical
+  repository at draft, before `found` creates it. It records each agent
+  before its invitation, with its redemption state. It keeps each token it
+  mints until it sees the revocation succeed. It records each fork from the
+  workspace grant, and the cold agent's forks from its transcript.
+- **Every duty attempted and recorded.** `cleanupMcp` ends each agent's
+  bearer session on its own. It revokes the key and checks that the bearer
+  is then refused. An exception for one agent is an `unknown` duty, and
+  the other agents and the Artifacts cleanup still run.
+  - A refused redemption has no session.
+  - A redemption whose answer was lost stays unresolved, because its key
+    is unknown.
+
+  Then `cleanupRun` revokes the minted tokens and inventories the
+  repositories. It still cleans the repositories the run knows it made
+  when an inventory is refused, unknown, incomplete or malformed. It then
+  inventories again.
+- **Nonzero exit on anything unresolved.** `finishRun` is the harness's
+  finalizer. It records every duty and its outcome, and treats a cleanup
+  that throws as failed. It exits 0 only when all of these hold:
+  - the drive finished;
+  - every step passed;
+  - every duty is `done`;
+  - the final inventory proves that no repository is left.
+
+The main block runs only when the file is executed, so the tests import
+the real `cleanupMcp`, `sessionEnder` and `finishRun`.
+
+`packages/room/test/node/mcp-stage0.test.ts` has 16 tests, all against a
+fake Artifacts API. The checker's seven controls, with the exit code each
+now gives:
+
+| Control | Exit | What is recorded |
+|---|---|---|
+| clean | 0 | every token revoked, both repositories deleted, `reposLeft: []` |
+| inventory refused | 1 | `reposLeft: null`; the known repositories are still revoked and deleted |
+| cleanup threw | 1 | every duty `unknown`; every known repository still attempted |
+| malformed inventory `[{}]` | 1 | `reposLeft: null`; the known repositories are still deleted |
+| revoke refused | 1 | the token IDs are unresolved, even though the repositories were deleted |
+| delete refused, final inventory known | 1 | both repositories named in `reposLeft` |
+| delete refused, final inventory unknown | 1 | `reposLeft: null`, not empty |
+
+The other nine tests cover these cases:
+- sessions ended with clean Artifacts (exit 0);
+- an exception ending one agent's session, while the later agents and the
+  Artifacts cleanup still run;
+- a bearer still answered after its key was revoked;
+- a failed step, a drive that threw, or no steps;
+- a cleanup that throws outside any duty;
+- a minted token that is revoked late, or whose revocation is refused;
+- `sessionEnder`'s outcomes, including a lost redemption;
+- a deletion answered as success while the repository is still listed;
+- an exception inside the Artifacts cleanup that no duty catches.
+
+The recorded live runs used the old harness. Their cleanup records show
+every repository deleted and every bearer refused afterwards. The old
+finalizer, though, would not have caught a failure. No live run was
+repeated, as the coordinator asked.
+
+#### Cleanup mutations
+
+The mutants ran after the commit `826479dd`. Each mutant changed one
+committed file and ran `test/node/mcp-stage0.test.ts` and
+`test/node/spike-smoke.test.ts`, and then the file was restored.
+
+| Mutant | Result |
+|---|---|
+| C1 an exception for one agent aborts cleanup | killed |
+| C2 `cleanupMcp`'s `ok` ignores unresolved session duties | killed |
+| C3 `cleanupMcp`'s `ok` ignores the Artifacts outcome | survived at first; killed by the test where a repository is still listed after a claimed deletion (`90ad465e`) |
+| C4 a throwing Artifacts cleanup counts as ok | survived at first; killed by the test with an exception outside any duty (`90ad465e`) |
+| C5 a throwing cleanup is ok in `finishRun` | killed |
+| C6 `finishRun` always exits 0 | killed |
+| C7 `finishRun`'s `ok` looks at cleanup only | killed |
+| C8 a live bearer counts as ended | killed |
+| C9 a lost redemption counts as done | killed |
+| C10 a refused key revocation counts as done | killed |
+| C11 shared: records need no usable identity | killed |
+| C12 shared: without an inventory, known repositories are not cleaned | killed |
+| C13 shared: an unknown final inventory reads as empty | killed |
+| C14 shared: an answer without `success` counts as done | killed |
+| C15 shared: a refused listing is treated as empty | killed |
+| C16 shared: a remote exception escapes its duty | killed |
+| C17 shared: `ok` ignores a non-empty `reposLeft` | killed |
+
+Not covered by the Node tests: the live calls themselves. These are
+`mint` recording a token, `revoke` dropping it, `agent` recording itself
+before the invitation, and fork recording. They run only against the
+deployed spike, and no live run was made for this revision.
+
+### The founding blockers
+
+The branch carried founding `d8312c32`, which review a35b4b61 sent back.
+Revision 2 merges `request/founding-gaps` at `a5185fa6` (founding revision
+2, now in review) as `fb4335a0`, and then main `9d0d0cbd` as the next
+merge commit. Founding revision 2 already contains deploy V3 (`97f42684`)
+and main `b5864882`, the bounded-memory log publisher. So the merge of
+main had no conflict, and `measure/spike-smoke.mjs` is founding revision
+2's version. The cleanup rules then moved out of `spike-smoke.mjs` into
+`cleanup.mjs` unchanged, and `spike-smoke.mjs`'s own 17 tests still pass.
+
+The source of this revision needs review as a combined head. The founding
+code is founding revision 2's. The MCP route and adapter are unchanged
+from `6abe1ce8`.
+
+### Not redeployed
+
+The spike was not redeployed for this revision, as the coordinator asked.
+The running Worker (`2092006a`) is still the one built from `70097fe0`,
+with founding `d8312c32`. The coordinator will redeploy once from main
+after these land.
+
+### Gates for revision 2
+
+The gates ran at `90ad465e`. The only commit after it adds this note.
+
+- Root `npm run typecheck`: exit 0.
+- Root `npm test`: exit 0. Every workspace passes, with 1,522 tests passed and 1 existing skip.
+  - The Room's Node suite has 11 files and 104 tests, including the 16 new
+    ones in `mcp-stage0.test.ts` and the 17 in `spike-smoke.test.ts`.
+  - The Room's workerd suite has 21 files and 298 tests, with the
+    bounded-memory log tests from main.
+  - The MCP package has 73 Node tests and 1 workerd test.
+- `wrangler deploy --dry-run` passes for both `wrangler.jsonc` and
+  `wrangler.spike.jsonc`: 1,553.78 KiB, 340.78 KiB gzipped. The bundle
+  grew 22 KiB from founding revision 2 and the bounded-memory publisher.
+
