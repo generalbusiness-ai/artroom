@@ -88,10 +88,16 @@ describe("review 786e9606 P2 1: the step that loses the claim never ends the win
       expect(await jobsOf(r)).toMatchObject([{ state: "owed" }, { state: "owed" }]);
       // The first step reads both rows and works on the first; meanwhile the second claims the second row, so
       // the first step reaches it holding a row that is no longer owed.
+      const a = r.world.artifacts;
+      const calls = a.remoteCalls.get("createToken") ?? 0;
+      const before = a.canonicalRepo().tokens.size;
       await inDO(r, (room) => Promise.all([room.core.steps.jobs(), room.core.steps.jobs()]));
       await pause(20);
       expect(seen).toHaveLength(2);
       expect(new Set(seen.map((s) => s.job.lane)).size).toBe(2);
+      // Each job was prepared once: the step that lost the claim on the second minted nothing for it. (A whole-tree
+      // job mints one canonical token; a filtered one, the snapshot writer's and the job's own.)
+      expect((a.remoteCalls.get("createToken") ?? 0) - calls).toBe(kind === "filtered" ? 4 : 2);
       expect(await jobsOf(r)).toMatchObject([
         { state: "sent", attempt: 1 },
         { state: "sent", attempt: 1 },
@@ -111,6 +117,7 @@ describe("review 786e9606 P2 1: the step that loses the claim never ends the win
         { state: "done", attempt: 1, outcome: "refused: check-binding" },
       ]);
       for (const { job } of seen) expect(own(job)?.admits(tokenOf(job), "read") ?? false).toBe(false);
+      expect([...a.canonicalRepo().tokens.values()].slice(before).filter((t) => !t.revoked)).toEqual([]);
       expect(snapshotRepos(r)).toEqual([]);
     });
 
