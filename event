@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:286017aa0894a56c5649899facc1989d859cfbf9","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/styles.css."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2879048d66a74eb7401cce7f60e6f498721b9262","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/room/live/describe.ts."}
