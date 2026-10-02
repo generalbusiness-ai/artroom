@@ -38,12 +38,16 @@ artroom release -m "Landed; nothing left."
 to `.git/artroom/credentials`, readable only by you. The file names the
 lane it belongs to, and the CLI records where it wrote it. The repository config
 includes that file, so `git push artroom` sends the token as a header. The
-token is never a command argument and never printed. The remote and
-token come from the room, so `workspace` first checks them: the remote
-must be a plain `https://` URL in normal form, and the token may hold only
-the characters a bearer token can have. A grant that fails either check
-is refused with exit code 1, before the git remote or credential is
-touched (request 55be0661). `release` removes
+token is never a command argument and never printed. Everything written
+into that file is checked first, because most of it comes from the room:
+the remote must be a plain `https://` URL in normal form, the token may
+hold only the characters a bearer token can have, and the file's first
+line, which names the lane, lease and installation it belongs to, takes
+only a canonical lane ID (`act_<number>_<8 hex digits>`), a whole-number
+lease and the CLI's own installation ID. A claim's lane is selected only
+if canonical, and `--lane` takes only a lane ID. A grant that fails a
+check is refused with exit code 1, before the git remote or credential is
+touched or an installation is recorded (request 55be0661). `release` removes
 that lane's credential, from wherever you run it, and leaves a credential
 that a newer workspace for another lane has written.
 

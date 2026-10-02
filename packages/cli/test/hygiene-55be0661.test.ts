@@ -18,11 +18,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { checkGrant, checkMarker, configureWorkspace, credentialOwner } from "../src/git.ts";
+import { checkGrant, checkMarker, checkRedeemed, configureWorkspace, credentialOwner } from "../src/git.ts";
 import { EXIT } from "../src/main.ts";
 import { useHarness } from "./harness.ts";
 
-const { h, cli, login, git, repo } = useHarness();
+const { h, cli, login, link, git, repo } = useHarness();
 
 const GOOD_REMOTE = "https://artifacts.example/acme/web-act_3_0a1b2c3d.git";
 const GOOD_TOKEN = "art_v1_0123456789abcdef?expires=1790000000";
@@ -270,5 +270,37 @@ describe("a malicious room's mark metadata never reaches the repository", () => 
     expect(credentialOwner(join(dir, ".git", "artroom", "credentials"))).toMatchObject({ lane, lease: 1 });
     expect((await cli(home, ["release", "-m", "done"], dir)).code).toBe(EXIT.ok);
     expect(existsSync(join(dir, ".git", "artroom", "credentials"))).toBe(false);
+  });
+});
+
+describe("a redemption's MCP URL and bearer token are checked before they are saved or printed", () => {
+  test("checkRedeemed accepts an http or https URL in normal form and a token, and refuses the rest", () => {
+    expect(() => checkRedeemed("https://room.example.com/v1/rooms/room_0123456789abcdef0123456789abcdef/mcp", "arb_AZaz09-_")).not.toThrow();
+    expect(() => checkRedeemed("http://127.0.0.1:8787/v1/rooms/r/mcp", "arb_x")).not.toThrow();
+    for (const mcp of ["https://room.example.com/mcp $(touch pwned)", "https://room.example.com/mcp\nx", 'https://room.example.com/"', "https://room.example.com/a/../mcp", "ftp://room.example.com/mcp", ["https://room.example.com/mcp"]]) {
+      expect(() => checkRedeemed(mcp, "arb_x")).toThrow(/MCP URL that is not a plain URL/);
+    }
+    for (const bearer of ["arb_x\nmore", "arb_x y", "", ["arb_x"]]) expect(() => checkRedeemed("https://room.example.com/mcp", bearer)).toThrow(/bearer token with characters/);
+  });
+
+  test.each([
+    ["MCP URL", (r: Record<string, unknown>) => (r["mcp"] = `${String(r["mcp"])} $(touch pwned)`), "MCP URL that is not a plain URL"],
+    ["bearer token", (r: Record<string, unknown>) => (r["bearer"] = `${String(r["bearer"])}\n$(touch pwned)`), "bearer token with characters"],
+  ])("an injecting %s: exit 1, nothing saved, and no command printed", async (_which, change, message) => {
+    const home = join(h.tmp, "agent");
+    const evil: typeof fetch = async (input, init) => {
+      const res = await fetch(input, init);
+      if (!String(input).endsWith("/redeem")) return res;
+      const out = (await res.json()) as Record<string, unknown>;
+      change(out);
+      return new Response(JSON.stringify(out), { status: res.status, headers: res.headers });
+    };
+    const res = await cli(home, ["redeem", await link("@agent", { role: "agent", custody: "room" })], h.tmp, { fetch: evil });
+    expect(res.out).not.toContain("touch pwned");
+    expect(res.out).not.toContain("claude mcp add");
+    expect(existsSync(join(home, "bearers", h.room.id))).toBe(false);
+    expect(existsSync(join(home, "config.json")) ? JSON.parse(readFileSync(join(home, "config.json"), "utf8")).rooms[h.room.id] : undefined).toBeUndefined();
+    expect(res.code).toBe(EXIT.failed);
+    expect(res.err).toContain(message);
   });
 });

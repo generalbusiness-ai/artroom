@@ -1685,17 +1685,23 @@ controls interrupt each window.
 Request 55be0661 carries findings SEC-04, SEC-05 and SEC-11 of
 simplification review 55563589. Each finding was reproduced on main
 a6330262, and each has tests that fail there: 13 of 13 in the Room's node
-file, 4 of 6 in its workerd file, 2 of 4 in the MCP file and 29 of 31 in the
-CLI file. The ones that pass on main pin behaviour that was already right
-and must stay so: the Room's declared-length pre-check, an exact 1 MiB
-body, the MCP route's 401 before reading, and the read-back of every
-admitted character. (The CLI's "refusal does not repeat the token" also
-passes on main, only because `checkGrant` does not exist there.)
+file, 4 of 6 in its workerd file, 2 of 4 in the MCP file, and 55 of 57 in
+the CLI's two files. The ones that pass on main pin behaviour that was
+already right and must stay so: the Room's declared-length pre-check, an
+exact 1 MiB body, the MCP route's 401 before reading, and the read-back of
+the whole credential file. (The CLI's "refusal does not repeat the token"
+also passes on main, only because `checkGrant` does not exist there.)
+
+The checker's report f593d8f7 found SEC-05 still open at e90cc7c0: the
+credential file's first-line mark carried the room's lane and lease
+unchecked. That is fixed below; 26 of the CLI's 57 tests fail at e90cc7c0,
+including the checker's own fixture
+(packages/cli/test/checker-hygiene-marker.test.ts).
 
 | Finding | Fix | Tests |
 |---|---|---|
 | SEC-04: `PUBLIC_URL` fell back to `https://artroom.example.workers.dev` (src/room.ts), and wrangler.jsonc set that placeholder. Redemption names that host in `Redeemed.mcp`, and the CLI prints a `claude mcp add` command that sends the bearer token there. | `publicUrl()` in src/config.ts requires an `https://` origin with nothing after the host, and has no default. The Worker entrypoint (src/worker.ts constructor) and every Room object (src/room.ts constructor) call it first, so neither starts without one, for HTTPS or RPC. wrangler.jsonc no longer sets `PUBLIC_URL`; a deploy passes `--var PUBLIC_URL:https://<host>`. | test/node/hygiene-55be0661.test.ts (the accepted and refused values; wrangler.jsonc has no `PUBLIC_URL` and names no example host; the spike's value is accepted). test/workerd/hygiene-55be0661.test.ts (the Worker and a Room object refuse to start without it, or with a value that is not an origin). |
-| SEC-05: the CLI wrote the room's workspace remote and token verbatim into the git config file the repository includes (packages/cli/src/git.ts). A remote ending `"]`, newline, `[core]`, newline, `sshCommand = ...` set `core.sshCommand`; so did a token with a newline. Both were reproduced on main. | `checkGrant()` in packages/cli/src/git.ts: the remote must be a plain `https://` URL in normal form (no credentials, query, fragment, dot segments or characters outside `A-Za-z0-9._~/-` in the path), and the token may hold only the RFC 6750 token characters and `?` and `=`, up to 4096. `artroom workspace` checks before it touches the destination; `configureWorkspace` checks again at its own boundary. | packages/cli/test/hygiene-55be0661.test.ts: 14 refused remotes and 10 refused tokens, each named; the refusal does not repeat the token; `configureWorkspace` refuses and changes nothing; every admitted character reads back through git as exactly one setting; `artroom workspace` given an injecting remote or token exits 1 with no remote, no credential, no `core.sshCommand` and nothing pending. |
+| SEC-05: the CLI wrote room-supplied values verbatim into the git config file the repository includes (packages/cli/src/git.ts): the workspace remote and token in the setting, and the lane and lease in the first-line comment that marks whose credential it is. A newline in any of them ends its line and adds settings: a remote ending `"]`, newline, `[core]`, newline, `sshCommand = ...`, a token, a `Claim.lane` or a lease with a newline each set `core.sshCommand`. All four were reproduced (the remote and token on main, the lane and lease on e90cc7c0). | Every value written into the file is checked before anything changes, in packages/cli/src/git.ts. `checkGrant`: the remote must be a plain `https://` URL in normal form (no credentials, query, fragment, dot segments or characters outside `A-Za-z0-9._~/-` in the path), and the token may hold only the RFC 6750 token characters and `?` and `=`, up to 4096. `checkMarker`: the lane must be a canonical lane ID (`act_<seq>_<8 hex>`), the lease a whole number, and the installation ID an idempotency key. In packages/cli/src/main.ts, a claim's lane is selected only if canonical; `laneOf` refuses any other `--lane` or stored lane before the destination is reserved; `workspace` checks the grant's remote, token and lease before anything is pending. `configureWorkspace` checks all five again at its own boundary. | packages/cli/test/hygiene-55be0661.test.ts: 14 refused remotes, 10 tokens, 7 lanes, 6 leases and 5 installation IDs, each named; the refusal does not repeat the token; `configureWorkspace` given an injecting remote, token, lane, lease or installation ID refuses and changes nothing; the whole file, written with every admitted character in every field, reads back through git as exactly one setting, every other line is a comment, and the ownership reader reads the mark back exactly; `artroom workspace` given an injecting remote or token exits 1, and a lease from a malicious room (in both the lane and the grant) exits 1, each with no remote, no credential, no `core.sshCommand` and nothing pending, after which a valid workspace installs and releases; a claim answered with an injecting lane exits 1 and selects nothing; an injecting `--lane` is a usage error before the destination is reserved. packages/cli/test/checker-hygiene-marker.test.ts: the checker's fixture, unchanged. |
 | SEC-11: the HTTPS routes read a body whole and then compared its length in UTF-16 units with 1 MiB, so a body without `Content-Length` was read entirely first (src/http.ts). The MCP route had no cap (packages/mcp/src/worker.ts). | Both count bytes as the body streams in and stop reading past 1 MiB: 413 `payload-too-large` on the HTTPS routes, a 413 JSON-RPC error on the MCP route. A declared `Content-Length` over 1 MiB is refused before any read. The MCP route reads the body only after the bearer is accepted. | test/workerd/hygiene-55be0661.test.ts: a 16 MiB stream with no length is refused after at most 1 MiB plus two chunks is pulled (main pulled all 16 MiB); 1.5 MiB of two-byte characters is refused; a large declared length is refused with nothing pulled; exactly 1 MiB is read. packages/mcp/test/workerd/body-cap.test.ts: the same three, an unknown bearer refused with nothing pulled, and exactly 1 MiB handed on. |
 
 **Where this departs from the request.** Item 2 asked that the credential
@@ -1708,7 +1714,7 @@ treats specially (quote, backslash, `#`, `;`, `]`, whitespace, newline), and
 a test writes every admitted character and reads the file back through git
 as exactly one setting.
 
-**Mutants.** Each guard was broken in turn (the script restores the file
+**Mutants.** Each of 30 guards was broken in turn (the script restores the file
 from memory, not from git); every mutant turned at least one of the tests
 above red.
 
@@ -1735,6 +1741,15 @@ above red.
 | CLI: no token length bound | more than 4096 characters |
 | CLI: `configureWorkspace` skips `checkGrant` | both boundary tests |
 | CLI: `workspace` skips `checkGrant` before the destination | both end-to-end tests (a pending entry was recorded) |
+| CLI: `checkMarker` accepts any lane | 7 lane refusals; the injecting lane at the boundary |
+| CLI: `checkMarker` lease without the integer check | the injecting lease, a string, a fraction, NaN, past a safe integer |
+| CLI: `checkMarker` lease without the sign check | a negative lease |
+| CLI: `checkMarker` installation ID without the type check | an array |
+| CLI: `checkMarker` installation ID without the pattern | the injecting ID, a dot, nothing, more than 64 |
+| CLI: `configureWorkspace` skips `checkMarker` | the three boundary tests for the mark |
+| CLI: `workspace` skips `checkMarker` before the destination | the malicious-lease test (a pending entry was recorded) |
+| CLI: `laneOf` accepts any lane | the injecting `--lane` test |
+| CLI: a claim's lane is selected unchecked | the injecting-claim test (the lane was stored) |
 
 Not changed, and outside this request: the CLI's `login` prints
 `Redeemed.mcp` from the room into a shell command line without checking it.

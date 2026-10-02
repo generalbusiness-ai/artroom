@@ -67,16 +67,31 @@ const GRANT_REMOTE = /^https:\/\/[a-z0-9.-]+(:[0-9]{1,5})?(\/[A-Za-z0-9._~\/-]*)
 /** A grant's token: the bearer token characters (RFC 6750 b64token), and `?` and `=` for an Artifacts token's expiry. */
 const GRANT_TOKEN = /^[A-Za-z0-9._~+\/?=-]{1,4096}$/;
 
+/** Normal form, and a string: `href` equals only a string the parser would not rewrite. */
+function normal(u: unknown): boolean {
+  try {
+    return new URL(u as string).href === u;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * An MCP URL the CLI prints inside a shell command (`claude mcp add ...`):
+ * `http` or `https`, in normal form, with only characters a shell takes
+ * literally. A room that is not on https is the room's choice; what is
+ * checked here is that the printed command is the command it appears to be.
+ */
+const MCP_URL = /^https?:\/\/[a-z0-9.-]+(:[0-9]{1,5})?(\/[A-Za-z0-9._~\/-]*)?$/;
+
+/** Throws unless a redemption's MCP URL and bearer token are safe to save and print (request 55be0661). */
+export function checkRedeemed(mcp: unknown, bearer: unknown): void {
+  if (!MCP_URL.test(mcp as string) || !normal(mcp)) throw new Error("The room sent an MCP URL that is not a plain URL. Nothing was saved; tell the room's admin.");
+  if (typeof bearer !== "string" || !GRANT_TOKEN.test(bearer)) throw new Error("The room sent a bearer token with characters a token cannot have. Nothing was saved; tell the room's admin.");
+}
+
 /** Throws, naming neither value, unless the room's remote and token are safe to write (request 55be0661). */
 export function checkGrant(remote: string, token: string): void {
-  // Normal form, and a string: `href` equals only a string the parser would not rewrite.
-  const normal = (u: string) => {
-    try {
-      return new URL(u).href === u;
-    } catch {
-      return false;
-    }
-  };
   if (!GRANT_REMOTE.test(remote) || !normal(remote)) throw new Error("The room sent a workspace remote that is not a plain https:// URL. Nothing was written; tell the room's admin.");
   if (typeof token !== "string" || !GRANT_TOKEN.test(token)) throw new Error("The room sent a workspace token with characters a token cannot have. Nothing was written; tell the room's admin.");
 }

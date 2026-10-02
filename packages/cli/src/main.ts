@@ -59,7 +59,7 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import { SCHEMA, SchemaError, Store, type Config, type JournalEntry, type LocalIntent, type RoomConfig } from "./config.ts";
 import { attentionText, claimText, errorText, explainText, landText, logText, proposalText, refusalText, short } from "./format.ts";
-import { checkGrant, checkMarker, configureWorkspace, credentialFileIn, credentialOwner, gitDir, head as gitHead, readOwner, REMOTE, withDestination, type Party } from "./git.ts";
+import { checkGrant, checkMarker, checkRedeemed, configureWorkspace, credentialFileIn, credentialOwner, gitDir, head as gitHead, readOwner, REMOTE, withDestination, type Party } from "./git.ts";
 import { parseInvitation } from "./link.ts";
 
 export interface Io {
@@ -617,6 +617,8 @@ const COMMANDS: Record<string, Command> = {
       }
       const { bearer, ...shown } = entry.redeemed!;
       ctx.secrets.add(bearer);
+      // The bearer is saved to a file and the MCP URL printed in a shell command: both checked first (request 55be0661).
+      checkRedeemed(shown.mcp, bearer);
       ctx.store.saveBearer(inv.room, bearer);
       ctx.step("bearer-saved");
       const name = await connect({ url: entry.url }, inv.room, { kind: "bearer", token: bearer }, clientOptions(ctx)).then(
