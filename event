@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6014bbf41f4de316b003f691d38a2c497fabe7e7","text":"Merge retired a covered predecessor; the successor is at packages/git/test/gitops.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:641143cf0328902f7dc5472e9597ab92dad9aab6","text":"Merge retired a covered predecessor; the successor is at packages/checkers/test/cloudflare-workers-stub.ts."}
