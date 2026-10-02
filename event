@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f6f10a9ad05a8d0948cd267dd5e75dbec8540733","text":"Merge retired a covered predecessor; the successor is at plans/004-persist-founding-wake.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f9338a44ec9d2f5a9179cd3cd98dc9ee5b2fb501","text":"Merge retired a covered predecessor; the successor is at packages/git/src/snapshot/repos.ts."}
