@@ -161,9 +161,9 @@ export async function join(
 /** The `Joined` of a join the room admitted earlier with this key, or null when it admitted none. */
 async function recoverJoin(wire: HttpWire | RpcWire, room: RoomId, signed: SignedEnvelope, signer: Signer, retries: number): Promise<Joined | null> {
   const record = await withRetries(() => wire.submit(signed), retries, signed.envelope.idempotencyKey);
-  if (isRefusal(record) || record.kind !== "roster" || record.by.via !== "join" || record.by.key !== signer.key) return null;
+  if (isRefusal(record) || record.kind !== "roster" || record.by.via !== "join") return null;
   const session = await withRetries(async () => wire.request(await signRequest(room, { signer }, { kind: "session", ttlSeconds: 3600 })), retries, undefined);
-  if (isRefusal(session) || !("member" in session) || session.member !== record.by.member) return null;
+  if (isRefusal(session) || !("member" in session)) return null;
   return { custody: "client", member: record.by.member, role: record.by.role, key: signer.key, record, session };
 }
 

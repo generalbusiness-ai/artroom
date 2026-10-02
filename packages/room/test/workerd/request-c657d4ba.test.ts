@@ -213,7 +213,7 @@ describe("(3) the redemption rate limit (SEC-07, R-CRED-9)", () => {
       expectRefusal(await call(r.stub.redeem({ custody: "client", join }, `fresh-${i}`)), "invitation-invalid");
     }
     // And on /acts, with values that are not entry IDs.
-    for (const id of ["act_999_00000000", "x".repeat(4096), 7, null])
+    for (const id of ["act_999_00000000", "x".repeat(4096), 7, null, {}])
       for (let i = 0; i < 12; i++) {
         const join = new Client(r, newKeyPair()).signed("roster", null, { op: "join", invitation: id, secret: b64url(randomBytes(32)) });
         expectRefusal(await call(r.stub.submit(join)), "invitation-invalid");

@@ -12,7 +12,6 @@
  */
 
 import { artroomError } from "./errors.ts";
-import { RE } from "./ids.ts";
 import { invitation } from "./roster.ts";
 import type { RoomCore } from "./core.ts";
 
@@ -62,10 +61,10 @@ export function limitAddress(core: RoomCore, address: string | null): void {
 
 /**
  * Per invitation, for an attempt to join with it on any path. The ID is
- * caller input: it is counted only when it is an entry ID that names an
- * invitation this room issued. Any other value is refused by admission.
+ * caller input: it is counted only when it names an invitation this room
+ * issued. Any other value is refused by admission.
  */
 export function limitInvitation(core: RoomCore, id: unknown): void {
-  if (typeof id !== "string" || !RE.actId.test(id) || !invitation(core.sql, id)) return;
+  if (typeof id !== "string" || !invitation(core.sql, id)) return;
   rateLimit(core, `inv:${id}`, PER_INVITATION);
 }
