@@ -157,10 +157,16 @@ do not show. A patch keeps, for each path, what the commit did (added,
 modified, deleted or renamed, the rename source, the file modes) and its
 hunks with three lines of context. The interdiff lists a path when that
 metadata differs, said in words, or when a hunk, context included, is in only
-one version; each such hunk is shown with its line numbers. Line numbers are
-not compared, so a rebase that only moves an edit does not show; one that
-changes a line within three lines of an edit shows that hunk from both
-versions. A change only rebased or reworded says so. When no commit in either generation has a header, the
+one version, or is in both but at different places; each such hunk is shown
+with its line numbers. A hunk's place is where it starts in the file it was
+made against (its parent). When the two versions' parents differ at that
+path, the old hunk's parent lines are mapped into the new parent by a line
+diff of the two parents. So a rebase that only moves an edit up or down does
+not show, and one that changes a line within three lines of an edit shows
+that hunk from both versions. When the old hunk's lines do not map one to
+one (the parent changed inside them) and the new version has the same hunk,
+the screen says it **could not tell whether the edit moved**, rather than
+calling it the same. A change only rebased or reworded says so. When no commit in either generation has a header, the
 screen shows nothing extra. Commits without a header beside ones with a
 header are counted, not followed. The same change ID twice in a generation
 is shown as divergent and not matched.
@@ -416,3 +422,69 @@ are regenerated.
 **Gates**, all exit 0: root `npm run typecheck`; root `npm test` (git 118,
 log 100 and 95 in workerd, policy 190 and 189 with 1 skipped in workerd, UI
 114); `npm run build` in `packages/ui`; `npm run e2e` (Playwright, 7 tests).
+
+## Review f3fff92c
+
+Checker reviewed head `69a8931` and credited the metadata fix, the bounds
+and the copy. One P2 remained. Main at `ad19956b` (lane F's carry UI,
+`3203660e`) is merged first, keeping both sides: the README rows and
+scenario, the e2e carry screenshot, and lane F's test that a live room has
+no per-change history. For that test, `RoomAdapter.changeHistory` is now
+optional and `LiveRoom` does not have it. Tests are in
+`test/review-f3fff92c.test.tsx`; the checker's diagnostic is the first one,
+now asserting the correct outcome.
+
+**P2: repeated context still hid an edit moved between functions.** Hunks
+were matched by their lines alone, so with two functions whose bodies are
+identical for more than three lines, denying in `first()` and denying in
+`second()` matched. Now a pair of hunks is the same edit only when its lines
+are equal and the old hunk's place, mapped into the new version's parent, is
+the new hunk's place (`matchHunks` and `placeIn` in `src/room/changes.ts`):
+
+- **Same parent blob at that path:** places are compared as they are.
+- **Different parents:** a line diff of the two parents maps each old
+  parent line to the new one. The old hunk's place maps only if every one of
+  its parent lines maps, one to one and in order. That diff is charged to
+  the work bound.
+- **No map, but the same hunk in the new version:** reported explicitly in
+  `FileInterdiff.unsure`. The screen says "Could not tell whether this edit
+  moved" and shows the hunk once, with where generation 1 made it. It is never
+  counted as the same edit.
+
+Tests:
+- "same parent: denying in first() and denying in second() are different
+  edits, at their own places" (the diagnostic: five identical lines on each
+  side);
+- "different parents: the move is still found, through the rebase";
+- the controls "the same edit, rebased onto lines added above it, is the
+  same edit" and "the same edit, rebased onto an unrelated change in the
+  other function, is the same edit". Review 125ee638's unrelated-rebase
+  control and the scenario's rebase-only change (whoami) still pass;
+- "ambiguous: when the old edit's place is gone from the new parent, it says
+  it could not tell" (main deleted `first()`);
+- "ambiguous: a rebase that repeats a line inside the old edit's
+  surroundings is not claimed as a move". A fuzz of 6,000 small rebases found
+  this case: without the one-to-one check it was reported as a move;
+- "diffing the two parents counts as work";
+- "an unsure match says it could not tell whether the edit moved, and shows
+  the hunk".
+
+**Mutations.** Each was applied to the committed fix, run against the
+three per-change test files, then reverted:
+
+| Mutation | Tests that went red |
+|---|---|
+| Ignore the place (lines only) | the diagnostic, the rebased move, both ambiguous tests |
+| Same place even when the parents differ | both rebase controls, both ambiguous tests |
+| No "unsure": an unmapped hunk is "only in" one version | both ambiguous tests |
+| An unmapped equal hunk counts as the same edit | both ambiguous tests |
+| Drop the one-to-one check | the repeated-line ambiguous test |
+| Do not charge the parents' diff | diffing the two parents counts as work |
+| Do not render "unsure" | the on-screen test |
+| Let a region whose first parent line is gone still map | none (below) |
+
+No test separates that last check (`first < 0`) from the one-to-one check,
+which almost always rejects the same regions. The same fuzz, run 40,000
+times over two-letter files (the most repetitive), gave identical results
+with and without it. It is kept as the plain statement that a line main
+deleted has no place, but it is not counted as tested.

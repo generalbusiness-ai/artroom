@@ -106,6 +106,27 @@ describe("an edit moved between places with the same surrounding lines", () => {
   });
 });
 
+describe("bounds", () => {
+  test("diffing the two parents counts as work", async () => {
+    // Each version changes only the last line, so each patch is cheap; but main replaced every line
+    // underneath, so mapping the old hunk's place compares 100 x 100 parent lines.
+    const repo = new MemoryRepo();
+    const lines = (tag: string, last = "end") => [...Array.from({ length: 100 }, (_, i) => `${tag}${i}`), last].join("\n");
+    const p1 = repo.commit(null, { "auth.ts": lines("p") }, "base");
+    const p2 = repo.commit(p1, { "auth.ts": lines("q") }, "main moved");
+    const info = (commit: Sha, parent: Sha): CommitInfo => ({ commit, parent, changeId: "kkkkkkkk", subject: "change" });
+    const a = repo.commit(p1, { "auth.ts": lines("p", "END") }, "before");
+    const b = repo.commit(p2, { "auth.ts": lines("q", "END") }, "after");
+    const run = async (maxWork: number) => {
+      const h = await changeHistory(repo, { generation: 1, commits: [info(a, p1)] }, { generation: 2, commits: [info(b, p2)] }, { maxWork });
+      return h?.kind === "ok" && h.entries[0]?.kind === "rewritten" ? h.entries[0].interdiff : null;
+    };
+    // Reading the four file versions costs under 2,500 units; the parents' diff about 10,000 more.
+    expect(await run(5_000)).toEqual({ kind: "too-large", bound: "work", limit: 5_000 });
+    expect(await run(50_000)).toMatchObject({ kind: "ok" });
+  });
+});
+
 describe("on screen", () => {
   test("an unsure match says it could not tell whether the edit moved, and shows the hunk", () => {
     render(
