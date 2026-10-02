@@ -21,7 +21,7 @@ Everything runs in workerd, under `@cloudflare/vitest-pool-workers`:
 | The Room, landing engine, workspaces, log publisher | `request/laneA-room` at `4a7c4af6` (lanes A, B, C, L) | Real |
 | Artifacts and the publisher sandbox | Lane A's `FakeArtifactsHost` | Fake, over real git objects |
 | The client | `request/laneE-clients` at `cb1767dd`, `connect(env.ARTROOM, …)` | Real |
-| The model | pi-ai's faux provider with a response factory that reads the transcript (`scriptedTurn` in `src/agent.ts`) | Scripted; a real model in the live run |
+| The model | pi-ai's faux provider with a response factory that reads the transcript (`scriptedTurn` in `src/agent.ts`) | Scripted; in the live run, Workers AI through the `AI` binding by default |
 | Pushing to the lane's fork | `controls.workspace` (`test/support.ts`): prepare a commit, then a compare-and-swap push to the fork, through the fake Artifacts | Simulated; the workspace token path is not exercised |
 
 ## Files
@@ -30,6 +30,8 @@ Everything runs in workerd, under `@cloudflare/vitest-pool-workers`:
 |---|---|
 | `src/agent.ts` | `Agent` Durable Object: a pi-durable Harness, the `artroom` extension (five tools, two prompt sections, the `artroom.lane` document), the outbox of prepared acts, the crash points, and RPC for the tests |
 | `src/do-sqlite.ts` | `DurableObjectSqlite`: pi-durable's SQLite facade over `ctx.storage` |
+| `src/models.ts` | The model providers the Agent registers from its bindings: `workers-ai` (the `AI` binding), `cloudflare-workers-ai` (REST) and `openrouter` |
+| `src/live.ts` | Which provider and model the live run uses (`SPIKE_LIVE`, `SPIKE_LIVE_MODEL`) |
 | `src/scratch.ts` | An empty Durable Object for the SQLite probe and the conformance runs |
 | `src/worker.ts` | The Worker: lane A's Room Worker, plus the two Durable Objects above |
 | `test/do-sqlite.test.ts` | Durable Object SQLite transaction facts, then pi-durable's own storage conformance suite (23 cases) on the facade |
@@ -37,7 +39,8 @@ Everything runs in workerd, under `@cloudflare/vitest-pool-workers`:
 | `test/agent.test.ts` | The run, the run reset at twelve points, and three ablations |
 | `test/review-f2212c63.test.ts` | Lost replies, a reset inside the push, and a fork that moved (checker review f2212c63) |
 | `test/review-6d392973.test.ts` | The retry wait removes its abort listener (checker review 6d392973) |
-| `test/live.test.ts` | The same run with a real model on OpenRouter; skipped without a key |
+| `test/models.test.ts` | The live selection, the providers the Agent registers, and the binding provider's request and response over a fake binding |
+| `test/live.test.ts` | The same run with a real model; skipped unless `SPIKE_LIVE` is set |
 | `test/check/` | Fixtures for `scripts/check-test.sh`, outside the type-checked project |
 | `scripts/setup.sh` | Extracts the pinned lane sources into `vendor/` (ignored by git) |
 | `scripts/check.sh` | Type check with the pinned compiler: the spike's own files, exactly the known vendor diagnostics, and no file read from the repository outside the spike |
@@ -53,7 +56,7 @@ From this directory, inside a clone that has the commits `4a7c4af6` and
 ```sh
 npm ci                # includes the pinned compiler, typescript 7.0.2
 sh scripts/setup.sh
-npm test              # 53 tests; the live test is skipped
+npm test              # 68 tests; the live test is skipped
 npm run check         # type check of src/ and test/
 npm run check:test    # 8 cases: check.sh fails when it should
 ```
@@ -67,20 +70,80 @@ sequence above passes in a checkout with no root `node_modules`.
 
 ### Live run
 
-The live test runs only when `OPENROUTER_API_KEY` is set in the host
-environment. `vitest.config.ts` passes it to workerd as a binding; the agent
-gives it to pi-ai through an in-memory credential store. Nothing prints it.
-`SPIKE_LIVE_MODEL` chooses the OpenRouter model (default
-`openai/gpt-4.1-mini`).
+The live test runs only when `SPIKE_LIVE` is set. Its value names the
+provider (`src/live.ts`):
+
+| `SPIKE_LIVE` | Provider | Default model | Needs |
+|---|---|---|---|
+| `1` or `workers-ai` (the default) | Workers AI through the Worker's `AI` binding | `@cf/zai-org/glm-4.7-flash` | wrangler's login; no model key |
+| `cloudflare-workers-ai` | Workers AI over its REST API: pi-ai's provider, for a run outside a Worker | `@cf/zai-org/glm-4.7-flash` | `CLOUDFLARE_API_KEY`, `CLOUDFLARE_ACCOUNT_ID` |
+| `openrouter` | OpenRouter: pi-ai's provider | `openai/gpt-4.1-mini` | `OPENROUTER_API_KEY` |
+
+`SPIKE_LIVE_MODEL` replaces the default model. A variable the provider needs
+that is missing fails the run; it is not skipped. `vitest.config.ts` passes
+to workerd only the selected provider's variables, and the agent gives keys
+to pi-ai through an in-memory credential store. Nothing prints them.
 
 ```sh
-OPENROUTER_API_KEY="$(tr -d '[:space:]' < ~/.config/generalbusiness/openrouter.env)" \
+# Workers AI through the AI binding (the default)
+SPIKE_LIVE=1 env -u CLOUDFLARE_API_TOKEN \
+  npx vitest run --config vitest.config.ts test/live.test.ts --disableConsoleIntercept
+
+# Workers AI over REST, with an account API token that has Workers AI Read and Workers AI Edit
+(set -a; . ~/.config/generalbusiness/cloudflare_ai.env; set +a
+ SPIKE_LIVE=cloudflare-workers-ai \
+  npx vitest run --config vitest.config.ts test/live.test.ts --disableConsoleIntercept)
+
+# OpenRouter
+SPIKE_LIVE=openrouter OPENROUTER_API_KEY="$(tr -d '[:space:]' < ~/.config/generalbusiness/openrouter.env)" \
   npx vitest run --config vitest.config.ts test/live.test.ts --disableConsoleIntercept
 ```
 
-It prints one line, `SPIKE-LIVE {…}`, with the acts, the sends, the
-transcript, the landing's state when the model answered and after the
-room's alarm, and the spend. `results/live-2026-10-01.json` is that line.
+**The `AI` binding.** `wrangler.jsonc` declares `"ai": { "binding": "AI",
+"remote": true }`. Workers AI has no local simulator, so in the local test
+pool the binding is a remote binding: `vitest.config.ts` turns on
+`remoteBindings` only when `SPIKE_LIVE` selects `workers-ai`, and wrangler
+then connects it with its own login (`wrangler login`; the OAuth scope
+`ai (write)`). `env -u CLOUDFLARE_API_TOKEN` keeps wrangler on that login
+when the shell has a token for something else. Every other run, including
+`npm test`, needs no Cloudflare account. No Worker is deployed for the live
+run. A deployed Worker with the binding would also need no model key.
+
+pi-ai 1.0.0 has no provider for the binding, so `src/models.ts` makes one:
+pi-ai's Workers AI catalog and OpenAI chat-completions client, with a
+`fetch` that hands each request body to `AI.run(model, body, {
+returnRawResponse: true })` and returns the binding's stream as it is. This
+works for models whose binding answer is in the OpenAI chat-completion shape;
+some older catalog models answer in another shape (`response`, `tool_calls`)
+and would need a converter.
+
+**Why GLM-4.7-Flash.** From the Workers AI catalog (checked 2026-10-02) and
+pi-ai 1.0.0's copy of it:
+
+- tool calling: Cloudflare lists it with function calling and multi-turn
+  tool calling, and its binding answer is in the OpenAI chat-completion
+  shape, with tool calls in `choices[].message.tool_calls`;
+- context: 131,072 tokens, enough for long lane conversations;
+- cost: USD 0.0605 per million input tokens and USD 0.40 per million output
+  tokens. An agent loop sends the transcript again on each turn, so input
+  dominates; this is the lowest input price among the catalog's tool-calling
+  models with a context of 131,072 or more and an OpenAI-shaped answer. Gemma
+  4 26B (USD 0.10 and 0.30, 256,000 tokens) is the nearest alternative.
+  Granite 4.0 Micro is cheaper but answers in the older shape; Qwen3 30B is
+  cheaper for input but has a 32,768-token context; GLM-5.3-Flash needs the
+  Workers Paid plan.
+
+It is a reasoning model; its reasoning is in the output tokens.
+
+**Results.** `results/live-runs-2026-10-02.txt` has one line per run;
+`results/live-workers-ai-2026-10-02.json` is the full `SPIKE-LIVE {…}` line
+of the last Workers AI run, with the acts, the sends, the transcript, the
+landing's state when the model answered and after the room's alarm, and the
+spend. On Workers AI through the binding, 19 of 20 runs passed, each for
+USD 0.00024 to 0.00051 by pi-ai's price table (about USD 0.0073 for all 20).
+In the failed run the model's turn after `propose` was empty, so it never
+sent `land`. The REST path and OpenRouter passed once each (USD 0.00046 and
+USD 0.0010). `results/live-2026-10-01.json` is the earlier OpenRouter run.
 The model's answer is not evidence of landing; the room's operation is.
 
 ## Crash points
@@ -126,7 +189,8 @@ request.
 - Cross-identity context handoff: a reviewer fork signing as its own
   `agent` identity.
 - Viewer and steerer identity, and secret custody: who may watch or steer a
-  conversation, and where the agent's key and model key live.
+  conversation, and where the agent's key lives. On Workers AI through the
+  binding there is no model key; on another provider there is.
 - Adversarial authorization tests: a steer, a fork or a forged envelope
   from someone without the grant.
 - The delegate key is kept in the agent's own SQLite for the spike. In a

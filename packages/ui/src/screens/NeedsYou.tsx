@@ -103,6 +103,23 @@ export function explainItem(snap: RoomSnapshot, item: AttentionItem): Explained 
     }
     case "revert-lane":
       return { icon: "refresh", tone: "bad", why: <>The room opened a revert lane.</>, action: { label: "See the lane", href: href.proposal(item.lane) } };
+    case "log-publication-stalled":
+      return {
+        icon: "cloudOff",
+        tone: "bad",
+        why: (
+          <>
+            You are an admin.{" "}
+            {item.reason === "unexpected-writer"
+              ? "Another writer moved the log ref, so the room has stopped publishing the log."
+              : item.reason === "unresolved"
+                ? "The room has had no answer to a log push for an hour. It keeps trying."
+                : "The log could not be published. The room tries again after an hour, or when it restarts."}
+          </>
+        ),
+        detail: <>{item.detail}</>,
+        action: { label: "See the log", href: href.room() },
+      };
     case "policy": {
       const rule = snap.policy.document?.rules.find((r) => r.id === item.rule);
       return {

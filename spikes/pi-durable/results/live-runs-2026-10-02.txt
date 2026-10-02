@@ -1,0 +1,33 @@
+# Live runs, 2026-10-02 (UTC), one reset after the room admitted `propose`.
+# Columns: run, provider/model, result, acts in the room, landing after the alarm,
+# model turns (tools called in each; '-' is a turn with text only),
+# input and output tokens, USD by pi-ai's price table, seconds.
+# Code: runs 1-5 at 5d65215f (before the summary had stop reasons); runs 6-19, rest and openrouter
+# at d852115f; run 20 at dc601496, recorded in full as live-workers-ai-2026-10-02.json.
+# 'claim,write,propose,land' is one turn calling all four tools; 'claim write ...' is one per turn.
+         1  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1562 out=416 usd=0.000261 s=7
+         2  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1568 out=465 usd=0.000281 s=19
+         3  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4543 out=443 usd=0.000452 s=30
+         4  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1643 out=485 usd=0.000293 s=7
+         5  workers-ai/@cf/zai-org/glm-4.7-flash               FAIL  claim,propose      None    [claim write propose -]  in=3242 out=327 usd=0.000327 s=11  (the turn after propose was empty: no text, no tool call; land never sent)
+         6  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4672 out=492 usd=0.000479 s=7
+         7  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4500 out=594 usd=0.000510 s=11
+         8  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4498 out=433 usd=0.000445 s=9
+         9  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4683 out=448 usd=0.000463 s=9
+        10  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4286 out=430 usd=0.000431 s=8
+        11  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4063 out=306 usd=0.000368 s=12
+        12  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1602 out=443 usd=0.000274 s=9
+        13  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1555 out=370 usd=0.000242 s=6
+        14  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1617 out=453 usd=0.000279 s=8
+        15  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1605 out=469 usd=0.000285 s=11
+        16  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4495 out=443 usd=0.000449 s=7
+        17  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4452 out=406 usd=0.000432 s=8
+        18  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim write propose land -]  in=4328 out=425 usd=0.000432 s=19
+        19  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1583 out=440 usd=0.000272 s=8
+        20  workers-ai/@cf/zai-org/glm-4.7-flash               pass  claim,propose,land landed  [claim,write,propose,land -]  in=1606 out=471 usd=0.000286 s=10
+      rest  cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash    pass  claim,propose,land landed  [claim write propose land -]  in=4448 out=473 usd=0.000458 s=9
+openrouter  openrouter/openai/gpt-4.1-mini                     pass  claim,propose,land landed  [claim write propose land -]  in=1994 out=139 usd=0.001020 s=6
+# Totals by provider: runs, passes, USD
+#   workers-ai: 20 runs, 19 passed, USD 0.0073
+#   cloudflare-workers-ai: 1 runs, 1 passed, USD 0.0005
+#   openrouter: 1 runs, 1 passed, USD 0.0010

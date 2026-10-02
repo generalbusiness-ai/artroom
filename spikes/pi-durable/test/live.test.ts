@@ -1,7 +1,9 @@
 /**
- * The live run: the same agent and Room, with a real model on OpenRouter in
- * place of the scripted one. It runs only when OPENROUTER_API_KEY is in the
- * host environment (README, "Live run"); otherwise it is skipped.
+ * The live run: the same agent and Room, with a real model in place of the
+ * scripted one. It runs only when SPIKE_LIVE asks for it (src/live.ts,
+ * README, "Live run"); otherwise it is skipped. The default is Workers AI
+ * through the Worker's `AI` binding; OpenRouter, or Workers AI over its REST
+ * API, by configuration.
  *
  * The run is reset once, after the room admitted the `propose` and before
  * the tool's result was committed. It prints one JSON summary line, with no
@@ -15,15 +17,14 @@ import { expect, it } from "vitest";
 import type { LandOp } from "@generalbusiness/artroom-contract";
 import { tick } from "../vendor/artroom/packages/room/test/workerd/support.ts";
 import { controls } from "../src/agent.ts";
+import { liveModel } from "../src/live.ts";
 import { agentActs, landingNow, logOf, setup, stub as stubOf } from "./support.ts";
 
-const e = env as unknown as { OPENROUTER_API_KEY?: string; SPIKE_LIVE_MODEL?: string };
-const live = typeof e.OPENROUTER_API_KEY === "string" && e.OPENROUTER_API_KEY.length > 0;
-const MODEL_ID = e.SPIKE_LIVE_MODEL ?? "openai/gpt-4.1-mini";
+const live = liveModel(env as unknown as Record<string, string | undefined>);
 
-it.skipIf(!live)(`live: ${MODEL_ID} on OpenRouter claims, proposes and lands through a reset after propose`, { timeout: 300_000 }, async () => {
+it.skipIf(!live)(`live: ${live?.provider}/${live?.modelId} claims, proposes and lands through a reset after propose`, { timeout: 300_000 }, async () => {
   controls.reset();
-  const s = await setup({ provider: "openrouter", modelId: MODEL_ID });
+  const s = await setup(live);
   const room = s.room;
   controls.crashes.add("propose:after-send");
   const stub = () => stubOf(s.agentName);
@@ -48,7 +49,7 @@ it.skipIf(!live)(`live: ${MODEL_ID} on OpenRouter claims, proposes and lands thr
   const op = lane.landOp ? ((await room.admin.read({ q: "op", op: lane.landOp as never })) as LandOp) : undefined;
   const transcript = await stub().transcript();
   const summary = {
-    model: `openrouter/${MODEL_ID}`,
+    model: `${live!.provider}/${live!.modelId}`,
     seconds: Math.round((Date.now() - started) / 1000),
     crashes,
     opens: controls.opens,
@@ -60,7 +61,7 @@ it.skipIf(!live)(`live: ${MODEL_ID} on OpenRouter claims, proposes and lands thr
     mainIsHead: room.world.artifacts.main === lane.head,
     answer: out.answer,
     responseModels: [...new Set(transcript.flatMap((t) => (t.model ? [t.model] : [])))],
-    transcript: transcript.filter((t) => t.role !== "system").map((t) => ({ role: t.role ?? t.kind, ...(t.tool ? { tool: t.tool } : {}), ...(t.error ? { error: true } : {}), text: t.text.slice(0, 200) })),
+    transcript: transcript.filter((t) => t.role !== "system").map((t) => ({ role: t.role ?? t.kind, ...(t.tool ? { tool: t.tool } : {}), ...(t.error ? { error: true } : {}), ...(t.stop ? { stop: t.stop } : {}), ...(t.thinking ? { thinking: true } : {}), text: t.text.slice(0, 200) })),
     usage: await stub().usage(),
   };
   console.log(`SPIKE-LIVE ${JSON.stringify(summary)}`);

@@ -10,7 +10,11 @@ declare global {
       AGENTS: DurableObjectNamespace<Agent>;
       SCRATCH: DurableObjectNamespace<Scratch>;
       ARTROOM: Fetcher;
+      AI: Ai;
+      CLOUDFLARE_API_KEY?: string;
+      CLOUDFLARE_ACCOUNT_ID?: string;
       OPENROUTER_API_KEY?: string;
+      SPIKE_LIVE?: string;
       SPIKE_LIVE_MODEL?: string;
     }
   }
