@@ -154,7 +154,7 @@ export function ChangeHistoryView({ p }: { p: Proposal }) {
   const key = `${p.lane}/${p.generation}`;
   useEffect(() => {
     latest.current = key;
-    if (p.generation < 2) return;
+    if (p.generation < 2 || !adapter.changeHistory) return;
     adapter.changeHistory(p).then(
       (history) => latest.current === key && setH({ key, history }),
       () => latest.current === key && setH({ key, history: null }),

@@ -279,10 +279,11 @@ export interface RoomAdapter {
   /**
    * Author-supplied: how this generation's jj changes (commits with a
    * `change-id` header) relate to the previous generation's. Null when no
-   * commit in either carries a header, or the transport cannot read commits.
+   * commit in either carries a header. Absent when the transport cannot read
+   * a generation's commits (the live room: contract gap 10, open point 39).
    * It never affects obligations, evidence or carrying.
    */
-  changeHistory(ref: ProposalRef): Promise<ChangeHistory | null>;
+  changeHistory?(ref: ProposalRef): Promise<ChangeHistory | null>;
   /** Paths that changed between the previous generation's head and this one's. */
   changedSince(ref: ProposalRef): readonly RepoPath[] | null;
   explain(act: ActId): Promise<Why | null>;

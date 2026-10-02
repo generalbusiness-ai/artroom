@@ -192,7 +192,8 @@ counted: the `TreeReader` gives no size, so a live Room should refuse an
 oversized blob when it serves it.
 
 **What the live Room must expose.** The contract has no read for a
-generation's commits, so `LiveRoom.changeHistory` returns null and the live
+generation's commits (contract gap 10), so `LiveRoom` has no
+`changeHistory` (the adapter method is optional) and the live
 screen shows nothing extra. To support it, the Room would need to serve, per
 proposal generation:
 1. the commits from the generation's base to its head, oldest first, each
