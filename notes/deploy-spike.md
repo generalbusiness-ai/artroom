@@ -298,3 +298,88 @@ that adds this text changes only this file.
 
 The room workerd suite still prints the 22 "code had hung" messages, with
 every test passing.
+
+## Review 2485e992
+
+The checker's review of `ea4c058c` accepted the cleanup outcome and found
+one P2: a malformed repository record could prove an empty remainder. Any
+successful array was accepted as a complete listing, and the filter that
+picked this run's repositories dropped records without a string name. So a
+fake API answering `{ success: true, result: [{}] }` to both inventories,
+with the canonical repository still present, deleted nothing and still
+gave `cleanup.ok: true`, `reposLeft: []` and exit 0.
+
+**The fix.** `readListing` decides a listing's outcome once, from three
+facts: `success`, completeness, and whether every record is usable. It
+replaces `completeListing`.
+
+- A repository record is usable only if it is an object whose `name` is a
+  string in the Artifacts name form (`[A-Za-z0-9._-]`, 1 to 100
+  characters). A token record is usable only if its `id` is a string of
+  `[A-Za-z0-9_-]`, 1 to 128 characters, so it is safe in
+  `DELETE /tokens/<id>`.
+- One unusable record makes the whole listing `unknown`, with no items. It
+  is never filtered out.
+- An unknown inventory leaves `reposLeft` as `null`, and cleanup falls back
+  to the repositories the run knows it made.
+- An unknown token listing revokes nothing from that listing. The
+  repository is still deleted, and the run fails on the `list-tokens`
+  duty.
+- The filter that tells this run's repositories from others the search
+  returns now sees only validated records.
+
+**Tests**, added to `test/node/spike-smoke.test.ts` (17 in all):
+
+| Test | What it shows |
+|---|---|
+| the checker's case: both inventories answer `[{}]` | not `ok`; `reposLeft` is `null`; both inventories are `unknown`; the canonical repository and the fork are deleted by the fallback; `smokeOk` is false |
+| malformed repository records: `{}`, `null`, a number, a string, an array, an empty, numeric, null or slash-containing `name`; alone, and mixed with a valid record before or after | not `ok`; `reposLeft` is `null`; the known repositories are cleaned |
+| malformed token records: the same kinds, plus `id`s that are empty, numeric, null, contain `/` or contain a space; alone, and mixed with a valid record | `list-tokens` is `unknown`; no `DELETE /tokens/` call; the repository is still deleted |
+| `isRepoRecord`, `isTokenRecord` | the identity rules |
+| `readListing` | done with items only for a complete, successful listing of usable records; refused or unknown with no items otherwise |
+
+**Mutations**, made on the committed fix (`61ae5f1a`), each run against the
+test file and reverted. This set replaces the previous one for the changed
+code: 28 of 29 were caught.
+
+| Mutation | Caught |
+|---|---|
+| A refusal counts as done | yes (4 tests) |
+| An answer without `success` counts as done | yes |
+| A refused listing reads as empty | yes (3) |
+| A listing without `success` or an array reads as empty | yes (2) |
+| A full page is accepted | yes |
+| A larger `total_count` is accepted | yes |
+| Malformed records are accepted (no identity check) | yes (4) |
+| Malformed records are filtered out (the old shape) | yes (4) |
+| A repository record needs only to be an object | yes (4) |
+| A repository name needs only to be a string | yes (2) |
+| A token record needs only to be an object | yes (2) |
+| A token ID needs only to be a string | yes (2) |
+| The token listing is not identity-checked | yes |
+| The inventory is not identity-checked | yes (2) |
+| `ok` ignores unresolved duties | yes (4) |
+| `ok` ignores repositories left | yes |
+| No final inventory | yes (8) |
+| A failed inventory cleans nothing | yes (4) |
+| Every repository the search returns is cleaned | yes |
+| A token value is kept in the metadata | yes |
+| Minted tokens are not retried | yes (2) |
+| A revoked minted token stays in the map | yes |
+| An unknown token listing skips the deletion | yes (3) |
+| `smokeOk` ignores cleanup, a failed main, no steps, or a failed step | yes (four mutants) |
+| An exception counts as done | yes |
+| `ok` treats an unknown remainder (`null`) as empty | no: equivalent, as before. `reposLeft` is null only when the final inventory duty is unresolved |
+
+No live call, redeploy or live run was made for this change.
+
+**Gates** at `61ae5f1a`, after merging main `3f44c993` (lane E). The commit
+that adds this section changes only this file.
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | checkers 33; cli 102; client 86 Node and 2 workerd; git 162; log 127 Node and 122 workerd; mcp 66 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 85 Node and 275 workerd; ui 141 |
+
+The room workerd suite printed the "code had hung" message 23 times this
+run (22 before), with every test passing. No room source changed here.
