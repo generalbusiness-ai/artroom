@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review pi Workers AI default at 12494f3eef37088c2f995b0295229134da9bc9ac and all 12 artifacts; verify provider routing, model compatibility, credentials, failure behavior, tests and dated live evidence without new live model calls."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ca592301fc71127f97459b8d0ebbc54baf612c19"}
