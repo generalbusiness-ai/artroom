@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"notes/deploy-spike.md at exact 12227d41a062a788733449103fee3b11b2f49551 on request/idle-writes, under promise git:sha1…6fe9286 on request git:sha1…84eee84","body":{"commit":"12227d41a062a788733449103fee3b11b2f49551","path":"notes/deploy-spike.md"}}
+{"kind":"artifact","text":"packages/contract/src/pagination.ts at exact 12227d41a062a788733449103fee3b11b2f49551 on request/idle-writes, under promise git:sha1…6fe9286 on request git:sha1…84eee84","body":{"commit":"12227d41a062a788733449103fee3b11b2f49551","path":"packages/contract/src/pagination.ts"}}
