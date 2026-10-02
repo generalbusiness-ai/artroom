@@ -487,8 +487,6 @@ export class GitOps {
           if (!isLogType(w.type) || !Number.isSafeInteger(w.size) || w.size < 0) throw new Error(`${w.sha} is not a git object type and size`);
           wanted.set(w.sha, w);
         }
-        // Recovery first: whatever an earlier call left (a lost answer, a restart of the caller), settle it.
-        await this.reconcile(dir, area, wanted);
         for (const p of parts) {
           const w = wanted.get(p.sha);
           if (!w || w.type !== p.type || w.size !== p.size) throw new Error(`a part of ${p.sha} does not match what is wanted`);
@@ -505,7 +503,8 @@ export class GitOps {
           const a = await this.sh('cat >> "$1"', [`${area}/${p.sha}`], p.data);
           if (a.code !== 0) throw new GitError("stage", a);
         }
-        // Then settle again: a file the parts completed is stored here, not by the append.
+        // Settle the staging, every call: a file completed by these parts or by an earlier call whose
+        // answer was lost is stored here, not by the append.
         const stored = await this.reconcile(dir, area, wanted);
         const sizes = await this.stagedSizes(area);
         return { ok: true, missing: want.filter((w) => !stored.has(w.sha)).map((w) => ({ sha: w.sha, have: sizes.get(w.sha) ?? 0 })) };

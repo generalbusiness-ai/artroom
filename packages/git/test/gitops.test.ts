@@ -657,3 +657,13 @@ test("de5289a5: an object counts as stored only with the exact type and size wan
   const sized = await f.ops.stageLog(f.canonical, c.commit.sha, [{ ...want(c.blob), size: 99 }], []);
   assert.ok(!sized.ok && /stored as a blob of 100/.test(sized.detail));
 });
+
+test("de5289a5: a call settles only the objects it asks about; another batch's staging is left as it is", async (t) => {
+  const f = await new Fixture().init();
+  t.after(() => f.dispose());
+  const c = bigCommit(new Uint8Array(3000).fill(4), null);
+  await f.ops.stageLog(f.canonical, c.commit.sha, c.all.map(want), [chunk(c.blob, 0, 1000)]);
+  const other = await f.ops.stageLog(f.canonical, c.commit.sha, [want(c.tree)], []);
+  assert.deepEqual(other, { ok: true, missing: [{ sha: c.tree.sha, have: 0 }] });
+  assert.equal(statSync(await stagingFile(f, c.commit.sha, c.blob.sha)).size, 1000);
+});
