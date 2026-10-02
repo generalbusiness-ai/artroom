@@ -1,0 +1,273 @@
+{
+  "date": "2026-10-02T02:52:36.597Z",
+  "worker": "artroom-lb-logbig",
+  "namespace": "gitseq-spike",
+  "steps": [
+    {
+      "step": "notified",
+      "at": 300,
+      "seqs": [
+        304
+      ],
+      "bytes": [
+        2013297
+      ]
+    }
+  ],
+  "publications": [
+    {
+      "label": "load through 101",
+      "before": {
+        "head": 101,
+        "publishedThrough": -1,
+        "activeSegment": {
+          "first": 0,
+          "entries": 102,
+          "bytes": 6425055,
+          "largestEntry": 64240
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 101,
+        "commit": "c91173f5dc1e689b5df724d1f22783867a93db51"
+      },
+      "error": null,
+      "ms": 3843,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "c91173f5dc1e689b5df724d1f22783867a93db51",
+        "activeSegment": {
+          "first": 0,
+          "entries": 103,
+          "bytes": 6425589,
+          "largestEntry": 64240
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 1028876,
+          "peakSendBytes": 6427021,
+          "peakObjectBytes": 564,
+          "largestSegment": 6425055,
+          "hashedBytes": 12850110,
+          "sentSegmentBytes": 6425055
+        },
+        "head": "c91173f5dc1e689b5df724d1f22783867a93db51",
+        "publishedThrough": 101
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 202",
+      "before": {
+        "head": 202,
+        "publishedThrough": 101,
+        "activeSegment": {
+          "first": 0,
+          "entries": 203,
+          "bytes": 12853089,
+          "largestEntry": 64274
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 202,
+        "commit": "36a06809872ea669b907e7bc4fe71317c450d6cf"
+      },
+      "error": null,
+      "ms": 6625,
+      "after": {
+        "publishedThrough": 202,
+        "logCommit": "36a06809872ea669b907e7bc4fe71317c450d6cf",
+        "activeSegment": {
+          "first": 0,
+          "entries": 204,
+          "bytes": 12853623,
+          "largestEntry": 64274
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 1028876,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 12853089,
+          "hashedBytes": 64262466,
+          "sentSegmentBytes": 19278144
+        },
+        "head": "36a06809872ea669b907e7bc4fe71317c450d6cf",
+        "publishedThrough": 202
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 304",
+      "before": {
+        "head": 304,
+        "publishedThrough": 202,
+        "activeSegment": {
+          "first": 0,
+          "entries": 305,
+          "bytes": 21294421,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 304,
+        "commit": "6fc38e5cdeaebf89fbcfcfa15f6b3d20a1445d68"
+      },
+      "error": null,
+      "ms": 11128,
+      "after": {
+        "publishedThrough": 304,
+        "logCommit": "6fc38e5cdeaebf89fbcfcfa15f6b3d20a1445d68",
+        "activeSegment": {
+          "first": 0,
+          "entries": 306,
+          "bytes": 21294955,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 21294421,
+          "hashedBytes": 149440150,
+          "sentSegmentBytes": 40572565
+        },
+        "head": "6fc38e5cdeaebf89fbcfcfa15f6b3d20a1445d68",
+        "publishedThrough": 304
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 405",
+      "before": {
+        "head": 405,
+        "publishedThrough": 304,
+        "activeSegment": {
+          "first": 0,
+          "entries": 406,
+          "bytes": 27722455,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": {
+        "through": 405,
+        "commit": "8dc459395ea98fd500ab43e21aaf08ea575c0663"
+      },
+      "error": null,
+      "ms": 14677,
+      "after": {
+        "publishedThrough": 405,
+        "logCommit": "8dc459395ea98fd500ab43e21aaf08ea575c0663",
+        "activeSegment": {
+          "first": 0,
+          "entries": 407,
+          "bytes": 27722989,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 2013297,
+          "peakSendBytes": 8388608,
+          "peakObjectBytes": 564,
+          "largestSegment": 27722455,
+          "hashedBytes": 260329970,
+          "sentSegmentBytes": 68295020
+        },
+        "head": "8dc459395ea98fd500ab43e21aaf08ea575c0663",
+        "publishedThrough": 405
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "load through 506",
+      "before": {
+        "head": 506,
+        "publishedThrough": 405,
+        "activeSegment": {
+          "first": 0,
+          "entries": 507,
+          "bytes": 34150489,
+          "largestEntry": 2013297
+        },
+        "pending": null
+      },
+      "result": null,
+      "error": "ArtroomError unavailable: The log could not be published (unresolved); the same cohort is retried.",
+      "ms": 25738,
+      "after": {
+        "publishedThrough": 405,
+        "logCommit": "8dc459395ea98fd500ab43e21aaf08ea575c0663",
+        "activeSegment": {
+          "first": 0,
+          "entries": 507,
+          "bytes": 34150489,
+          "largestEntry": 2013297
+        },
+        "publicationError": "unresolved"
+      },
+      "publisher": null,
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      },
+      "probe": {
+        "expected": "6f74bd7ccb14b6f4312301151f24d30abbe6efd7",
+        "lease": "8dc459395ea98fd500ab43e21aaf08ea575c0663",
+        "outcome": {
+          "ok": false,
+          "reason": "unknown",
+          "detail": "no clear answer: remote: artifacts_git_receive_pack_object_too_large\n\nfatal: the remote end hung up unexpectedly\nfatal: the remote end hung up unexpectedly\nerror: failed to push some refs to 'https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/41f76e2305ebae3721c4db4b2465719d.git'"
+        }
+      }
+    }
+  ],
+  "room": "room_6f0aee6f29b54cea796d1c5671204730",
+  "repo": "gitseq-spike/41f76e2305ebae3721c4db4b2465719d",
+  "error": "Error: publication failed: ArtroomError unavailable: The log could not be published (unresolved); the same cohort is retried.\n    at publish (file:///Users/hughpyle/play/artroom-worktrees/log-bounded/packages/room/measure/logbig/run.mjs:111:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///Users/hughpyle/play/artroom-worktrees/log-bounded/packages/room/measure/logbig/run.mjs:147:7",
+  "cleanup": {
+    "activeTokensFound": 1,
+    "revoked": 1,
+    "repoDeleted": true
+  },
+  "totalMs": 110649
+}
