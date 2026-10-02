@@ -66,7 +66,10 @@ accepted → preparing → ready → publishing → landed
   single publication slot, and records `land-reserved`. After this the landing
   cannot be cancelled by ordinary acts (R-LAND-8).
 - **Publication completes forward** (R-PUB-5). `publish` mints a 60-second
-  canonical write token, records its ID, pushes
+  canonical write token through the canonical mint ledger (`MintLedger`,
+  protocol section 32), records its ID and claims it from the ledger in one
+  transaction (`pushToken`, which also writes the token's
+  `artroom_land_token` row), pushes
   `--force-with-lease=refs/heads/main:<expectedMain>`, revokes the token,
   and reads main back. Only the read-back decides:
   - main is the integration: `landed`; the slot is released;
@@ -119,7 +122,11 @@ active policy version, `revalidate` (synchronous) and `readiness`
 (asynchronous), `revertScope`, and `record`, which appends a system event to
 the log inside the engine's transaction. After a check arrives, the Room
 calls `await landing.evaluate(op.id)`. `publisher` is `ContainerPublisher` in a Worker, or
-`GitPublisher` over local git in tests. `tokens` is `canonicalTokens(…)`.
+`GitPublisher` over local git in tests. `tokens` is
+`publicationTokens({ mints, repo })`, over the room's one `MintLedger` (built
+once per object start, so its constructor takes over what a stopped object
+left). The host's alarm also runs `mints.reconcile()` and includes
+`mints.nextDue()` in its next alarm.
 
 ## Previews
 
