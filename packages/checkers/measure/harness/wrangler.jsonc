@@ -1,12 +1,14 @@
 {
-	"$schema": "../../node_modules/wrangler/config-schema.json",
-	// Lane G's harness Worker, for live runs only: the checker entrypoints and
-	// runner sandboxes, a publisher for filtered snapshots, and key-protected
-	// /h/* routes that play one room. Never a production deployment: that is
-	// wrangler.jsonc, whose Worker has no routes (R-EXEC-8).
-	//   wrangler deploy -c wrangler.harness.jsonc
+	"$schema": "../../../../node_modules/wrangler/config-schema.json",
+	// Lane G's harness Worker, for live measurements only: the checker
+	// entrypoints and runner sandboxes, a publisher for filtered snapshots, and
+	// key-protected /h/* routes that play one room. Never a production
+	// deployment: that is wrangler.jsonc, whose Worker has no routes
+	// (R-EXEC-8). Not deployed (decision D5); deploy it for a run and delete
+	// it after:
+	//   wrangler deploy -c measure/harness/wrangler.jsonc
 	"name": "artroom-lg-checkers",
-	"main": "src/harness.ts",
+	"main": "harness.ts",
 	"compatibility_date": "2026-10-01",
 	"workers_dev": true,
 	"observability": { "enabled": true },

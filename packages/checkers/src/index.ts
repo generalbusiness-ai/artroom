@@ -19,5 +19,3 @@ export type { ContainerLike, ExecOptions, GatewayProps, RunnerGrant, RunnerHostO
 export type { CheckoutOptions, CheckoutResult, Workspace } from "./runner.ts";
 export { generateKey, importSigner, signEnvelope, signingBytes, verifyEnvelope } from "./signing.ts";
 export type { Ed25519Jwk, Signer } from "./signing.ts";
-export { Ledger } from "./ledger.ts";
-export type { LedgerOptions } from "./ledger.ts";

@@ -4,6 +4,15 @@
 [packages/checkers](../packages/checkers/README.md). It builds on lane B
 ([packages/git](../packages/git/README.md)), which is still under review.
 
+**Status (2026-10-02, decision D5, request 73eccbec):** the harness Worker
+`artroom-lg-checkers` described here (`src/harness.ts`,
+`wrangler.harness.jsonc`) was retired to `packages/checkers/measure/harness/`
+and its deployment deleted. The stand-in ledger moved from `src/ledger.ts` to
+`test/ledger.ts`. `test/harness-alarm.test.ts`, which tested only the
+harness's Durable Object, was deleted. The revision-3 snapshot ledger upgrade
+(review 13b98054 below) and its tests were removed with the spike's state.
+See [notes/deploy-spike.md](deploy-spike.md).
+
 ## What was built
 
 - The contract's `Checker` base class and runner wrapper. The checker

@@ -132,9 +132,9 @@ tree or blob: the job's repository does not have them. In the live run of
 ID, and could not serve the older snapshot's objects.
 
 The git package's `SnapshotRepos` does the room's part: it creates and
-names the repositories, mints the job tokens, and keeps the duties. In
-this package only the harness uses it. A production room (lane A) must do
-the same before it issues filtered jobs (section 29.8, lane A item 4).
+names the repositories, mints the job tokens, and keeps the duties. The
+Room does this before it issues filtered jobs (section 29.8); in this
+package only the measurement harness (`measure/harness/`) uses it.
 
 ## The LLM reviewer
 
@@ -174,8 +174,8 @@ Worker as `ROOM` (see [wrangler.jsonc](wrangler.jsonc)):
 ```
 
 One deployment serves every room on its `ROOM` binding: each job names its
-room. The harness ledger is used only by the harness Worker's `/h/*`
-routes.
+room. The stand-in ledger (`test/ledger.ts`) is used only by the tests and
+the measurement harness's `/h/*` routes.
 
 ## Cost of a new container per job
 
@@ -234,22 +234,30 @@ explicit error.
 
 ## Live runs
 
+**Status:** measurement only. The harness Worker `artroom-lg-checkers` was
+retired from `src/` to `measure/harness/` and its deployment deleted
+(decision D5, request 73eccbec, 2026-10-02). The Room's spike deployment
+runs the production checker service (`artroom-spike-checkers`) for the
+tests checker on a whole tree ([notes/deploy-spike.md](../../notes/deploy-spike.md));
+`measure/live.mjs` covers what it does not: scoped snapshots, the types
+checker, the LLM reviewer and the runner's isolation. The harness is not
+type-checked or tested by this package's gates.
+
 ```sh
 cd packages/checkers
 env -u CLOUDFLARE_API_TOKEN npx wrangler whoami
 CRANE=/path/to/crane ./container/image.sh   # once: copies node:22-bookworm into the registry
 # secrets: LG_KEY (harness key) and CHECKER_KEY (Ed25519 private JWK), in a JSON secrets file
-env -u CLOUDFLARE_API_TOKEN npx wrangler deploy -c wrangler.harness.jsonc --secrets-file <file>
+env -u CLOUDFLARE_API_TOKEN npx wrangler deploy -c measure/harness/wrangler.jsonc --secrets-file <file>
 node measure/live.mjs
+env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-lg-checkers
 ```
 
-Live runs use the harness Worker, `artroom-lg-checkers` (`src/harness.ts`,
-`wrangler.harness.jsonc`), never the production one. The script makes its
+Live runs use the harness Worker, `artroom-lg-checkers`
+(`measure/harness/`), never the production one. The script makes its
 own repos in the `gitseq-spike` namespace, deletes
 them afterwards, and saves redacted results in `measure/results/`. The
 `/h/*` routes it uses play the room: they build jobs, mint read tokens,
 prepare snapshot repositories (`artroom-lg--snap-<commit>-<attempt>`, deleted when
 their jobs end) and record checks in `HarnessLedger`. They need the
 `x-lg-key` header.
-
-To remove the Worker: `env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-lg-checkers`.

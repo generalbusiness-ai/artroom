@@ -9,7 +9,7 @@ export { default } from "./worker.ts";
 export { Room } from "./room.ts";
 export { Registry } from "./registry.ts";
 // Lane B's publisher sandbox: the container Durable Object and its gateway, hosted by the Room Worker.
-export { Publisher, ArtifactsGateway } from "@generalbusiness/artroom-git/worker";
+export { Publisher, ArtifactsGateway } from "@generalbusiness/artroom-git/publisher";
 export { RoomWireTarget } from "./worker.ts";
 export { RoomCore } from "./core.ts";
 export { setServicesFactory, setClock, setAlarmDelay, type ServicesFactory, type RoomEnv } from "./config.ts";

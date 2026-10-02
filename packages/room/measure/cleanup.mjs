@@ -19,8 +19,7 @@ export function outcomeOf(answer) {
 /**
  * The repository a public room was sealed on, from the names a listing returned: of the incarnations
  * `<base>-<step>` of its identity, the one with the highest step (the last made; abandoned ones come before it,
- * reviews 3eb7bc44 and 700b74ea). The base name itself (an older Room's, adopted and deleted) and forks are not
- * incarnations. Null when there is none.
+ * review 3eb7bc44). The base name itself and forks are not incarnations. Null when there is none.
  */
 export function incarnationOf(base, names) {
   const re = new RegExp(`^${escapeRe(base)}-(\\d+)$`);

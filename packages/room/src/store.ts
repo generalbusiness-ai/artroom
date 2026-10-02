@@ -9,11 +9,13 @@
  */
 
 import type { Digest, Seq } from "@generalbusiness/artroom-contract";
-import type { Role } from "@generalbusiness/artroom-contract";
 import type { Sql, SqlRow, SqlValue } from "./ports.ts";
-import { delegableBy } from "./roster.ts";
 
-/** Version 1: the schema as first released. Later versions are migrations below. */
+/**
+ * Version 1: the base schema. The spike deployment's earlier versions (2 to
+ * 8) were folded into it when its state was wiped (decision D5, request
+ * 73eccbec). A new table, column or index is a migration after it.
+ */
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
   // The log (R-LOG-1): one canonical LogEntry per row.
@@ -52,6 +54,9 @@ const SCHEMA = [
      head TEXT NOT NULL, base TEXT NOT NULL, summary TEXT NOT NULL, proposer TEXT NOT NULL, changed TEXT NOT NULL,
      obligations TEXT NOT NULL, carried TEXT NOT NULL, not_carried TEXT NOT NULL, policy TEXT NOT NULL, landed TEXT,
      blocked TEXT, recompute TEXT, PRIMARY KEY (lane, generation))`,
+  // Obligation recomputations after a policy activation, by policy version.
+  `CREATE TABLE IF NOT EXISTS recomputations (version TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL, body TEXT NOT NULL,
+     PRIMARY KEY (version, lane, generation))`,
   // Reviews and checks, with the authority recorded at admission (R-REV-1).
   `CREATE TABLE IF NOT EXISTS evidence (act TEXT PRIMARY KEY, seq INTEGER NOT NULL, kind TEXT NOT NULL, lane TEXT NOT NULL,
      generation INTEGER NOT NULL, head TEXT NOT NULL, member TEXT NOT NULL, key TEXT NOT NULL, grantor TEXT,
@@ -59,28 +64,55 @@ const SCHEMA = [
   // Operations that are not landing operations.
   `CREATE TABLE IF NOT EXISTS previews (id TEXT PRIMARY KEY, lane TEXT NOT NULL, generation INTEGER NOT NULL, head TEXT NOT NULL,
      state TEXT NOT NULL, body TEXT NOT NULL, main TEXT, updated_ms INTEGER NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, state TEXT NOT NULL,
-     body TEXT NOT NULL, updated_ms INTEGER NOT NULL)`,
-  // Workspace tokens by ID only; the token text is never stored (R-WS-4).
-  `CREATE TABLE IF NOT EXISTS fork_tokens (id TEXT PRIMARY KEY, lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, revoked INTEGER NOT NULL)`,
+  // The leases whose workspace the Room opened in lane B's `Workspaces`; `ended` once their access is revoked.
+  `CREATE TABLE IF NOT EXISTS ws_leases (lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, state TEXT NOT NULL, PRIMARY KEY (lane, lease_gen))`,
   `CREATE TABLE IF NOT EXISTS pins (ref TEXT PRIMARY KEY, head TEXT NOT NULL, done INTEGER NOT NULL)`,
   // Policy versions (R-POL-9), and `.artroom/` configuration read from integrations.
   `CREATE TABLE IF NOT EXISTS policies (version TEXT PRIMARY KEY, seq INTEGER NOT NULL, digest TEXT NOT NULL, doc TEXT NOT NULL, checkers TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS configs (commit_sha TEXT PRIMARY KEY, body TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS land_evals (op TEXT NOT NULL, digest TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY (op, digest))`,
+  // Landing evaluations the Room has asked for (after a check or a recomputation), run by the alarm's landing step.
+  `CREATE TABLE IF NOT EXISTS land_reeval (op TEXT PRIMARY KEY)`,
+  // Checks carried onto a landing's integration (R-CARRY-6 to 10): the earlier check, and why it carries. A carry
+  // counts only under the policy version that judged it (R-POL-9), and only with its sealed `check-carried` event
+  // (R-CARRY-13).
+  `CREATE TABLE IF NOT EXISTS check_carries (lane TEXT NOT NULL, generation INTEGER NOT NULL, integration TEXT NOT NULL, obligation TEXT NOT NULL,
+     act TEXT NOT NULL, evidence TEXT NOT NULL, policy TEXT, event TEXT, PRIMARY KEY (lane, generation, integration, obligation))`,
+  // Every check carry judgment, carried or not, by the event that sealed it: one per earlier check, obligation,
+  // integration and policy version.
+  `CREATE TABLE IF NOT EXISTS check_judged (lane TEXT NOT NULL, generation INTEGER NOT NULL, integration TEXT NOT NULL, obligation TEXT NOT NULL,
+     act TEXT NOT NULL, policy TEXT NOT NULL, event TEXT NOT NULL, PRIMARY KEY (lane, generation, integration, obligation, act, policy))`,
+  // A scoped checker's snapshot commit for an integration, as the Room derived it when it asked for the check (R-CARRY-9).
+  `CREATE TABLE IF NOT EXISTS check_snapshots (integration TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, paths TEXT NOT NULL,
+     digest TEXT NOT NULL, commit_sha TEXT NOT NULL, PRIMARY KEY (integration, checker, config))`,
+  // Check jobs (R-EXEC-8): one logical job per owner (a preview or a landing operation), canonical integration,
+  // obligation and configuration. `owed` is due at next_ms. `sent` is attempt `attempt`, in flight until next_ms,
+  // its deadline, with its token `token`; after that it is due again. `done` keeps its outcome. Every change is
+  // made only for the attempt it read, so a late answer never overwrites a newer attempt.
+  `CREATE TABLE IF NOT EXISTS check_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL,
+     obligation TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, integration TEXT NOT NULL, base TEXT NOT NULL,
+     state TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, next_ms INTEGER NOT NULL, token TEXT, outcome TEXT,
+     UNIQUE (owner, integration, obligation, config))`,
+  // Canonical read tokens of job attempts that the Room has ended but Artifacts has not yet confirmed revoked:
+  // retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose expiry
+  // is not known is retried until it is revoked. A row `mint:<job>` is a mint in progress, written before
+  // Artifacts is asked; if the answer is lost it stays until an answer settles it (a refusal that changed
+  // nothing, or a usable answer whose token is then revoked); `expires_at` is only when it is first checked.
+  `CREATE TABLE IF NOT EXISTS job_tokens (token_id TEXT PRIMARY KEY, expires_at INTEGER, next_ms INTEGER NOT NULL,
+     attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)`,
   // R-LOG-13: notify runs after commit, from this durable queue.
   `CREATE TABLE IF NOT EXISTS notify_queue (seq INTEGER PRIMARY KEY, entry TEXT NOT NULL, policy TEXT NOT NULL, context TEXT NOT NULL,
      attempts INTEGER NOT NULL, next_ms INTEGER NOT NULL, last_error TEXT)`,
-  `CREATE TABLE IF NOT EXISTS attention (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, principal TEXT NOT NULL, lane TEXT,
-     item TEXT NOT NULL, open INTEGER NOT NULL)`,
-  `CREATE INDEX IF NOT EXISTS attention_principal ON attention (principal, seq)`,
+  // Attention items. n: an item's order within its entry, from its ID `att_<seq>_<n>`. pos: one position per item,
+  // increasing in the order items were made, so an item made later is never behind a cursor already issued (R-API-8).
+  `CREATE TABLE IF NOT EXISTS attention (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, n INTEGER NOT NULL, pos INTEGER NOT NULL,
+     principal TEXT NOT NULL, lane TEXT, item TEXT NOT NULL, open INTEGER NOT NULL)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS attention_pos ON attention (pos)`,
+  `CREATE INDEX IF NOT EXISTS attention_principal_pos ON attention (principal, pos)`,
   `CREATE INDEX IF NOT EXISTS evidence_lane ON evidence (lane, generation)`,
   `CREATE INDEX IF NOT EXISTS keys_member ON keys (member)`,
+  `CREATE INDEX IF NOT EXISTS check_snapshots_commit ON check_snapshots (commit_sha)`,
 ];
-
-function columns(sql: Sql, table: string): Set<string> {
-  return new Set(sql.all("SELECT name FROM pragma_table_info(?)", table).map((r) => r["name"] as string));
-}
 
 /** One schema step: idempotent, so a step that ran without recording its version runs again harmlessly. */
 export interface Migration {
@@ -108,137 +140,8 @@ export function migrate(sql: Sql, steps: readonly Migration[]): number {
   return v;
 }
 
-/** The Room's migrations. A new table, column or index is added only here. */
-export const ROOM_MIGRATIONS: readonly Migration[] = [
-  { version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) },
-  {
-    version: 2,
-    name: "review aabda1ed: workspace attempts, recomputations",
-    up: (sql) => {
-      if (!columns(sql, "workspaces").has("attempts")) sql.all("ALTER TABLE workspaces ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0");
-      sql.all(`CREATE TABLE IF NOT EXISTS recomputations (version TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL, body TEXT NOT NULL,
-        PRIMARY KEY (version, lane, generation))`);
-    },
-  },
-  {
-    version: 3,
-    name: "review 8faa2ef9: monotonic attention positions",
-    up: (sql) => {
-      const cols = columns(sql, "attention");
-      // n: an item's order within its entry, from its ID `att_<seq>_<n>`.
-      if (!cols.has("n")) {
-        sql.all("ALTER TABLE attention ADD COLUMN n INTEGER NOT NULL DEFAULT 0");
-        sql.all("UPDATE attention SET n = CAST(substr(id, instr(substr(id, 5), '_') + 5) AS INTEGER)");
-      }
-      // pos: one position per item, increasing in the order items were made, so an item made later
-      // is never behind a cursor already issued. Existing items keep their (seq, n) order.
-      if (!cols.has("pos")) {
-        sql.all("ALTER TABLE attention ADD COLUMN pos INTEGER");
-        sql.all("UPDATE attention SET pos = (SELECT COUNT(*) FROM attention b WHERE b.seq < attention.seq OR (b.seq = attention.seq AND b.n <= attention.n))");
-      }
-      sql.all("CREATE UNIQUE INDEX IF NOT EXISTS attention_pos ON attention (pos)");
-      sql.all("CREATE INDEX IF NOT EXISTS attention_principal_pos ON attention (principal, pos)");
-    },
-  },
-  {
-    version: 4,
-    name: "review 8faa2ef9: admission facts for earlier evidence",
-    up: (sql) => {
-      // Evidence admitted before these facts were recorded gets them conservatively: an author if the
-      // member proposed that generation or ever claimed the lane before the evidence; no teams. Both
-      // can only take eligibility away, never give it (R-REV-1, R-OBL-2).
-      for (const r of sql.all("SELECT act, seq, lane, generation, member, body FROM evidence")) {
-        const body = JSON.parse(r["body"] as string) as { admission?: unknown };
-        if (body.admission) continue;
-        const proposer = str(one(sql, "SELECT proposer FROM generations WHERE lane = ? AND generation = ?", r["lane"] as string, r["generation"] as number), "proposer");
-        const claimed = sql
-          .all("SELECT body FROM entries WHERE seq < ? AND (id = ? OR lane = ?) AND type = 'act' AND kind = 'claim'", r["seq"] as number, r["lane"] as string, r["lane"] as string)
-          .some((e) => (JSON.parse(e["body"] as string) as { entry: { receipt?: { authority: { member: string | null } } } }).entry.receipt?.authority.member === r["member"]);
-        const admission = { teams: [], author: proposer === r["member"] || claimed };
-        sql.all("UPDATE evidence SET body = ? WHERE act = ?", JSON.stringify({ ...body, admission }), r["act"] as string);
-      }
-    },
-  },
-  {
-    version: 5,
-    name: "review 8faa2ef9: '*' delegations fixed at the grant",
-    up: (sql) => {
-      // A "*" grant covers the kinds the grantor's role could sign when it was granted: the role
-      // recorded in the grant's own receipt (R-ADM-5, R-LOG-10).
-      for (const r of sql.all("SELECT id FROM delegations WHERE kinds = '\"*\"'")) {
-        const entry = one(sql, "SELECT body FROM entries WHERE id = ?", r["id"] as string);
-        const role = entry ? (JSON.parse(str(entry, "body")!) as { entry: { receipt?: { authority: { role: Role | null } } } }).entry.receipt?.authority.role : null;
-        sql.all("UPDATE delegations SET kinds = ? WHERE id = ?", JSON.stringify(role ? delegableBy(role) : []), r["id"] as string);
-      }
-    },
-  },
-  {
-    version: 6,
-    name: "phase 2b: lane B workspaces and evaluations",
-    up: (sql) => {
-      // The leases whose workspace the Room opened in lane B's `Workspaces`; `ended` once their access is revoked.
-      sql.all("CREATE TABLE IF NOT EXISTS ws_leases (lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, state TEXT NOT NULL, PRIMARY KEY (lane, lease_gen))");
-      // Workspaces opened by the previous revision become lane B workspaces when their holder opens them again;
-      // their recorded tokens are swept by lane B's first inventory of the fork.
-      sql.all("INSERT OR IGNORE INTO ws_leases (lane, lease_gen, state) SELECT lane, lease_gen, 'ended' FROM workspaces");
-      // Landing evaluations the Room has asked for (after a check or a recomputation), run by the alarm's landing step.
-      sql.all("CREATE TABLE IF NOT EXISTS land_reeval (op TEXT PRIMARY KEY)");
-      // Checks carried onto a landing's integration (R-CARRY-6 to 10): the earlier check, and why it carries.
-      sql.all(`CREATE TABLE IF NOT EXISTS check_carries (lane TEXT NOT NULL, generation INTEGER NOT NULL, integration TEXT NOT NULL, obligation TEXT NOT NULL,
-        act TEXT NOT NULL, evidence TEXT NOT NULL, PRIMARY KEY (lane, generation, integration, obligation))`);
-    },
-  },
-  {
-    version: 7,
-    name: "review a711f7b6: earlier workspace access into lane B's cleanup; carries bound to a policy",
-    up: (sql) => {
-      // Access opened before lane B's workspaces: the lease is `legacy` until its end imports the cleanup it is owed
-      // (each recorded token, and an inventory of the fork for any mint whose answer was never recorded) into lane B's
-      // durable duties. Version 6 marked these `ended` without any cleanup; that is undone here.
-      // `token` '' stands for "an inventory of the fork is owed".
-      sql.all("CREATE TABLE IF NOT EXISTS ws_legacy (lane TEXT NOT NULL, lease_gen INTEGER NOT NULL, token TEXT NOT NULL, PRIMARY KEY (lane, lease_gen, token))");
-      sql.all("UPDATE ws_leases SET state = 'legacy' WHERE state = 'ended' AND EXISTS (SELECT 1 FROM workspaces w WHERE w.lane = ws_leases.lane AND w.lease_gen = ws_leases.lease_gen)");
-      sql.all("INSERT OR IGNORE INTO ws_leases (lane, lease_gen, state) SELECT lane, lease_gen, 'legacy' FROM workspaces");
-      sql.all("INSERT OR IGNORE INTO ws_legacy (lane, lease_gen, token) SELECT lane, lease_gen, '' FROM workspaces");
-      sql.all("INSERT OR IGNORE INTO ws_legacy (lane, lease_gen, token) SELECT lane, lease_gen, id FROM fork_tokens WHERE revoked = 0");
-      sql.all("INSERT OR IGNORE INTO ws_leases (lane, lease_gen, state) SELECT lane, lease_gen, 'legacy' FROM fork_tokens WHERE revoked = 0");
-      // A carried check counts only under the policy version that judged it (R-POL-9). Earlier rows have none, and never count.
-      const cols = new Set(sql.all("SELECT name FROM pragma_table_info('check_carries')").map((r) => r["name"] as string));
-      if (!cols.has("policy")) sql.all("ALTER TABLE check_carries ADD COLUMN policy TEXT");
-      // A scoped checker's snapshot commit for an integration, as the Room derived it when it asked for the check (R-CARRY-9).
-      sql.all(`CREATE TABLE IF NOT EXISTS check_snapshots (integration TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, paths TEXT NOT NULL,
-        digest TEXT NOT NULL, commit_sha TEXT NOT NULL, PRIMARY KEY (integration, checker, config))`);
-      sql.all("CREATE INDEX IF NOT EXISTS check_snapshots_commit ON check_snapshots (commit_sha)");
-    },
-  },
-  {
-    version: 8,
-    name: "amendment 3: sealed check carry judgments, check jobs",
-    up: (sql) => {
-      // A carry counts only with its sealed `check-carried` event (R-CARRY-13). Earlier rows have none, and never count.
-      if (!columns(sql, "check_carries").has("event")) sql.all("ALTER TABLE check_carries ADD COLUMN event TEXT");
-      // Every check carry judgment, carried or not, by the event that sealed it: one per earlier check, obligation,
-      // integration and policy version.
-      sql.all(`CREATE TABLE IF NOT EXISTS check_judged (lane TEXT NOT NULL, generation INTEGER NOT NULL, integration TEXT NOT NULL, obligation TEXT NOT NULL,
-        act TEXT NOT NULL, policy TEXT NOT NULL, event TEXT NOT NULL, PRIMARY KEY (lane, generation, integration, obligation, act, policy))`);
-      // Check jobs (R-EXEC-8): one logical job per owner (a preview or a landing operation), canonical integration,
-      // obligation and configuration. `owed` is due at next_ms. `sent` is attempt `attempt`, in flight until next_ms,
-      // its deadline, with its token `token`; after that it is due again. `done` keeps its outcome. Every change is
-      // made only for the attempt it read, so a late answer never overwrites a newer attempt.
-      sql.all(`CREATE TABLE IF NOT EXISTS check_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL,
-        obligation TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, integration TEXT NOT NULL, base TEXT NOT NULL,
-        state TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, next_ms INTEGER NOT NULL, token TEXT, outcome TEXT,
-        UNIQUE (owner, integration, obligation, config))`);
-      // Canonical read tokens of job attempts that the Room has ended but Artifacts has not yet confirmed revoked:
-      // retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose expiry
-      // is not known is retried until it is revoked. A row `mint:<job>` is a mint in progress, written before
-      // Artifacts is asked; if the answer is lost it stays until an answer settles it (a refusal that changed
-      // nothing, or a usable answer whose token is then revoked); `expires_at` is only when it is first checked.
-      sql.all(`CREATE TABLE IF NOT EXISTS job_tokens (token_id TEXT PRIMARY KEY, expires_at INTEGER, next_ms INTEGER NOT NULL,
-        attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)`);
-    },
-  },
-];
+/** The Room's migrations. A new table, column or index is added only here, as a version after the base. */
+export const ROOM_MIGRATIONS: readonly Migration[] = [{ version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) }];
 
 export function createSchema(sql: Sql): void {
   migrate(sql, ROOM_MIGRATIONS);

@@ -8,8 +8,9 @@
  *   (`changedPaths`, `previewPlan`);
  * - the durable landing operation (`Landing`).
  *
- * The Durable Object and container classes are in `./worker`
+ * The publisher's Durable Object and gateway classes are in `./publisher`
  * (`Publisher`, `ArtifactsGateway`), because they need the Workers runtime.
+ * The Room Worker hosts them.
  */
 
 export { Landing, EngineStopped } from "./landing/engine.ts";

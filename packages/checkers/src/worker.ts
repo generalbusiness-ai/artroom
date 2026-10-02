@@ -5,9 +5,8 @@
  *   the RPC entrypoints the Room calls over a service binding:
  *   `handle(job) → Result<Check>` (the contract's `CheckerService`). A job
  *   arrives only that way (R-EXEC-8): this Worker's `fetch` accepts no job
- *   and builds none, and it has no harness routes. The harness is a separate
- *   Worker (src/harness.ts, wrangler.harness.jsonc), never deployed with this
- *   one.
+ *   and builds none, and it has no harness routes. The measurement harness
+ *   is a separate Worker (measure/harness/), never deployed with this one.
  * - The room is each job's own. The service resolves `job.room`, a room ID,
  *   through the `ROOM` service binding (the Room Worker's `ArtroomService`)
  *   before any sandbox starts, and submits the signed check to that room,
