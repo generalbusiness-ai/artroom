@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bbe2c66b2fa7b61d5eb076ea1dc6da2e14436d69","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bc18ed6360443f9fed7263bd231b8e8c0e92dc30","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/cleanup.mjs."}
