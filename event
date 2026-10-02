@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"docs/protocol.md at exact 812fb9076ba56441b14efcc19115cb720b18ae94 on request/sec-join, under promise git:sha1…c968591 on request git:sha1…0b7239f","body":{"commit":"812fb9076ba56441b14efcc19115cb720b18ae94","path":"docs/protocol.md"}}
+{"kind":"artifact","text":"packages/client/src/connect.ts at exact 812fb9076ba56441b14efcc19115cb720b18ae94 on request/sec-join, under promise git:sha1…c968591 on request git:sha1…0b7239f","body":{"commit":"812fb9076ba56441b14efcc19115cb720b18ae94","path":"packages/client/src/connect.ts"}}
