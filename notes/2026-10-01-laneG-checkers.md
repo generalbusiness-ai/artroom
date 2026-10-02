@@ -535,3 +535,26 @@ still had revision 3's table. `SnapshotRepos` now adds the column when it is
 missing, with a test, and the next run passed using the migrated table. The
 failed run's repository was deleted. No `artroom-lg` repository is left in
 the namespace.
+
+### Merge of main 1a3ad0c8 (lane B pushlog follow-up)
+
+After this section was first written, main moved to `1a3ad0c8` (request
+`090a0eca`: `stageLog` with reconcile, `decodeLogStage`, `pushLog`,
+`readLogRef`, previews with their integration commit). It merges as
+`28d86e94`. The conflicts were all additive, in `packages/git`'s
+`src/index.ts`, `src/publisher/container.ts`, `test/gitops.test.ts` and
+`README.md`, and both sides are kept: lane B's staging and log push, and
+this lane's `create`/`delete`, `writeSnapshot`, `listTree` and
+`SnapshotRepos`. `gitops.ts` merged without conflict.
+
+Gates on the merged tree (`28d86e94`):
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | exit 0 |
+| Root `npm test` | exit 0: checkers 33; git (Node) 159; log 127 Node and 122 workerd; policy 199 Node and 198 workerd (1 skipped); ui 88 |
+| `packages/git` `npm run test:workers` | exit 0, 8 tests |
+| `wrangler deploy --dry-run`, `packages/checkers` and `packages/git` | exit 0 each |
+
+The live run above was made before this merge. It was not repeated, because
+the merge changes no snapshot or checker code.
