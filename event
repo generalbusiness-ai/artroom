@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7deb6feae6c328165645b608de31111427d379df","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/log-bounded.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:82ff95d91544b7501ecb3993f1b81c7012cc0502","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/logbig/results/logbig-over64-2026-10-02T03-07-24-727Z.json."}
