@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
-import type { Check, CheckBody, CheckerConfig, CheckerService, CheckJob, Claim, Landing, LandOp, LogEntry, PolicyDocument, Proposal, Refusal, SystemEvent } from "@generalbusiness/artroom-contract";
+import type { Check, CheckBody, CheckerConfig, CheckerService, CheckJob, Claim, Landing, LandOp, LogEntry, PolicyDocument, Proposal, Refusal, RosterRecord, SystemEvent } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import { checkerInputs, filterSnapshot, snapshotDigest, type SnapshotEntry } from "@generalbusiness/artroom-policy";
 import { encodeCommit, gitObject, verifyLog } from "@generalbusiness/artroom-log";
@@ -403,6 +403,47 @@ describe("R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding", ()
     expect(await op(r, l.op.id)).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
   });
 
+  /** A landing prepared step by step, with its job owed but not yet issued: the landing and jobs steps are held. */
+  async function owedJob() {
+    const { r, doc, alice, ci } = await checkRoom(whole);
+    const seen = checkerService(r, ci);
+    await inDO(r, async (room) => {
+      await room.core.idle();
+      const run = room.core.run.bind(room.core);
+      room.core.run = (step) => {
+        if (step !== "landing" && step !== "jobs") run(step);
+      };
+    });
+    const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
+    await inDO(r, (room) => room.core.landing.prepare(l.op.id));
+    const waiting = await op(r, l.op.id);
+    expect(waiting).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT state FROM check_jobs"))).toEqual([{ state: "owed" }]);
+    const issue = () =>
+      inDO(r, async (room) => {
+        await room.core.steps.jobs();
+        await room.core.idle();
+        return room.core.sql.all("SELECT state, outcome FROM check_jobs");
+      });
+    return { r, doc, alice, ci, seen, lane, l, waiting, issue };
+  }
+
+  it("R-EXEC-8 a job is not issued once its landing has ended", async () => {
+    const { alice, seen, lane, l, r, issue } = await owedJob();
+    await alice.ok("release", { lane }, { lease: 1 });
+    expect((await op(r, l.op.id)).state).not.toMatch(/^(accepted|preparing|ready)$/);
+    expect(await issue()).toEqual([{ state: "done", outcome: "not-needed" }]);
+    expect(seen).toEqual([]);
+  });
+
+  it("R-EXEC-8 a job is not issued once its obligation is met on the integration", async () => {
+    const { r, doc, ci, seen, lane, l, waiting, issue } = await owedJob();
+    await ci.ok("check", { lane, generation: 1 }, { ...(await bodyFor(r, whole, doc, waiting.integration!)), landOp: l.op.id });
+    expect(await issue()).toEqual([{ state: "done", outcome: "not-needed" }]);
+    expect(seen).toEqual([]);
+  });
+
   for (const volatile of [true, false])
     it(`R-EXEC-10 the job's volatile is the configuration's (${volatile}); a check that says otherwise is check-binding, and one that agrees is admitted`, async () => {
       const cfg: CheckerConfig = { ...whole, volatile };
@@ -472,6 +513,30 @@ describe("R-OBL-7: advisory obligations never block a landing", () => {
     const ready = await op(r, l.op.id);
     expect(ready.state).toBe("ready");
     await ci.ok("check", { lane, generation: 1 }, await bodyFor(r, advisory, doc, ready.integration!));
+    expect(await inDO(r, (room) => room.core.sql.transaction(() => room.core.landing.reserve(l.op.id)))).toMatchObject({ kind: "reserved" });
+  });
+
+  it("R-OBL-7, R-REV-3 a landing does not rely on advisory evidence: the advisory checker's key compromised before reservation reopens the obligation but does not stop the landing", async () => {
+    const { r, doc, alice, ci } = await checkRoom(advisory);
+    await inDO(r, async (room) => {
+      await room.core.idle();
+      const run = room.core.run.bind(room.core);
+      room.core.run = (step) => {
+        if (step !== "landing") run(step);
+      };
+    });
+    const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
+    await inDO(r, (room) => room.core.landing.prepare(l.op.id));
+    const ready = await op(r, l.op.id);
+    expect(ready.state).toBe("ready");
+    // The advisory check passes and readiness is evaluated again: it is shown as met, but the landing does not rely on it.
+    await ci.ok("check", { lane, generation: 1 }, await bodyFor(r, advisory, doc, ready.integration!));
+    await inDO(r, (room) => room.core.landing.evaluate(l.op.id));
+    expect(await obligationOf(r, lane)).toMatchObject({ advisory: true, state: "met" });
+    const revoked = await r.admin.ok<RosterRecord>("roster", null, { op: "revoke-key", key: ci.key, reason: "compromised" });
+    expect(revoked.invalidated?.reopened).toEqual([{ lane, generation: 1, obligation: "obl_unit-tests" }]);
+    expect(await op(r, l.op.id)).toMatchObject({ state: "ready" });
     expect(await inDO(r, (room) => room.core.sql.transaction(() => room.core.landing.reserve(l.op.id)))).toMatchObject({ kind: "reserved" });
   });
 

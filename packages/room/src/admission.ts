@@ -87,6 +87,7 @@ import {
 import {
   ADMIN_APPROVAL,
   adminObligation,
+  blocking,
   invalidity,
   obligationsFor,
   publicObligation,
@@ -1374,10 +1375,13 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
           if (compromised) {
             for (const d of compromised.delegations) sql.all("UPDATE delegations SET revoked = ? WHERE id = ?", seq, d);
             const acts = new Set(compromised.evidence.map((e) => e.act));
-            // R-REV-3: unreserved landings that depend on the evidence become retryable.
+            // R-REV-3: unreserved landings that depend on the evidence become retryable. An advisory obligation
+            // that reopens is shown, but never holds up a landing (R-OBL-7).
+            const blocks = (x: { lane: LaneId; generation: Generation; obligation: ObligationId }) =>
+              !!generationRow(sql, x.lane, x.generation)?.obligations.some((o) => o.id === x.obligation && blocking(o));
             for (const v of core.landing.activeViews()) {
               if (v.state !== "accepted" && v.state !== "preparing" && v.state !== "ready") continue;
-              const uses = ("evidence" in v && v.evidence.some((a) => acts.has(a))) || (invalidated?.reopened ?? []).some((x) => x.lane === v.lane);
+              const uses = ("evidence" in v && v.evidence.some((a) => acts.has(a))) || (invalidated?.reopened ?? []).some((x) => x.lane === v.lane && blocks(x));
               if (uses) core.landing.laneChanged(v.lane, "evidence-invalid");
             }
             // R-REV-5: a compromised key behind the reserved landing starts a recorded abort attempt.
