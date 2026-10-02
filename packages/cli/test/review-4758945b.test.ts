@@ -109,14 +109,14 @@ describe("P2: the installed credential's record is separate from reservations", 
     await cli(home, ["claim", "lib/**", "--goal", "y"], dir);
     const y = roomOf(home).lane as string;
     expect((await cli(home, ["workspace"], dir, crashAt("workspace-installing"))).code).toBe(EXIT.failed);
-    expect(ownerOf(dir).installing?.lane).toBe(y);
+    expect(ownerOf(dir).pending?.map((p) => p.lane)).toEqual([y]);
     expect(readFileSync(credential(dir), "utf8")).toContain(`lane ${x},`);
     expect((await cli(home, ["release", "--lane", x], dir)).code).toBe(EXIT.ok);
     expect(existsSync(credential(dir))).toBe(false);
-    expect(ownerOf(dir).installing?.lane).toBe(y); // another lane's evidence is kept
+    expect(ownerOf(dir).pending?.map((p) => p.lane)).toEqual([y]); // another lane's evidence is kept
     // Y's own release clears Y's evidence, and removes nothing it does not own.
     expect((await cli(home, ["release", "--lane", y], dir)).code).toBe(EXIT.ok);
-    expect(ownerOf(dir).installing).toBeUndefined();
+    expect(ownerOf(dir).pending).toBeUndefined();
   });
 
   test("delayed retry: a release of lane X while lane Y's workspace waits for its token lets Y install afterwards", async () => {

@@ -104,9 +104,13 @@ export interface Party {
  *   changes only when an installation completes or a release removes it,
  *   never when a workspace merely reserves, so cleanup evidence survives a
  *   failed or superseded reservation.
- * - `installing`: an installation writing the file now. Set before the
- *   file is replaced and cleared after, so a crash in between leaves
- *   evidence of what may be in the file.
+ * - `pending`: installations that recorded themselves before replacing
+ *   the file and have not been settled. Plural: a later installer adds
+ *   itself and never drops an earlier entry, so evidence of a credential
+ *   that may still be in the file survives any number of interruptions.
+ *   Only a completed replacement of the file settles them all (their
+ *   credentials, if ever written, are then provably gone), and a release
+ *   settles its own.
  * - `reservation`: the latest workspace command to reserve the
  *   destination. A newer reservation replaces it, and only the current
  *   reservation may install: the fence for overlapping commands.
@@ -115,34 +119,38 @@ export interface Party {
  * records.
  */
 export interface Owner {
-  readonly v: 2;
+  readonly v: 3;
   readonly rev: number;
   readonly installed?: Party;
-  readonly installing?: Party;
+  readonly pending?: readonly Party[];
   readonly reservation?: Party;
 }
 
 const OWNER = "artroom/owner.json";
 const LOCK = "artroom/owner.lock";
 const BREAK = "artroom/owner.lock.break";
-const FREE: Owner = { v: 2, rev: 0 };
+const FREE: Owner = { v: 3, rev: 0 };
 
 export function credentialFileIn(dir: string): string {
   return join(dir, INCLUDE);
 }
 
-/** Reads the owner record; version 1 (one combined state) is decoded into the three parts. */
+/** Reads the owner record. Version 1 (one combined state) and version 2 (one `installing` slot) are decoded. */
 export function readOwner(dir: string): Owner {
   const path = join(dir, OWNER);
   if (!existsSync(path)) return FREE;
   const raw = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
-  if (raw["v"] === 2) return raw as unknown as Owner;
+  if (raw["v"] === 3) return raw as unknown as Owner;
+  const rev = raw["rev"] as number;
+  if (raw["v"] === 2) {
+    const { installing, installed, reservation } = raw as { installing?: Party; installed?: Party; reservation?: Party };
+    return { v: 3, rev, ...(installed ? { installed } : {}), ...(installing ? { pending: [installing] } : {}), ...(reservation ? { reservation } : {}) };
+  }
   if (raw["v"] !== 1) throw new Error(`${path} was written by a newer artroom (owner record ${String(raw["v"])}). Update artroom.`);
   const party = raw["install"] !== undefined ? ({ install: raw["install"], room: raw["room"], lane: raw["lane"], ...(raw["lease"] !== undefined ? { lease: raw["lease"] } : {}) } as Party) : undefined;
-  const rev = raw["rev"] as number;
-  if (raw["state"] === "installed" && party) return { v: 2, rev, installed: party };
-  if (raw["state"] === "reserved" && party) return { v: 2, rev, reservation: party };
-  return { v: 2, rev };
+  if (raw["state"] === "installed" && party) return { v: 3, rev, installed: party };
+  if (raw["state"] === "reserved" && party) return { v: 3, rev, reservation: party };
+  return { v: 3, rev };
 }
 
 function sleep(ms: number): void {
@@ -198,32 +206,41 @@ function removeIfHeld(path: string, token: string): void {
 }
 
 /**
- * Recovers a lock whose holder is provably dead. Recoverers are serialised
- * by a second exclusive file, so between reading the dead holder's token and
- * removing its lock, nobody else can remove or replace it: a successor can
- * only create the lock after it is gone. Age is never evidence.
+ * Tries to recover a lock whose holder is provably dead. Recoverers are
+ * serialised by a second exclusive file, so between reading the dead
+ * holder's token and removing its lock, nobody else can remove or replace
+ * it: a successor can only create the lock after it is gone. Age is never
+ * evidence.
  *
- * A recovery file left by a recoverer that itself crashed is not removed
- * automatically: nothing would serialise two commands removing it. The
- * error names the file for the user to remove.
+ * Returns true when the lock was recovered (or vanished), or else what is
+ * in the way, for the caller to wait on, within its deadline, and name.
+ * A recovery file is never removed by anyone but its own creator: not when
+ * it is another host's, not when it is empty (a recoverer may be between
+ * creating it and writing it, or may have crashed there), and not when its
+ * creator crashed, since nothing would serialise two commands removing it.
  */
-function recover(dir: string, dead: Holder, me: Holder): void {
+function recover(dir: string, dead: Holder, me: Holder): true | string {
   const breakPath = join(dir, BREAK);
   if (!create(breakPath, me)) {
     const breaker = readHolder(breakPath);
-    if (breaker !== undefined && provablyDead(breaker)) {
-      throw new Error(`${breakPath} was left by an artroom command that stopped while recovering a lock. Remove that file by hand, then try again.`);
-    }
-    return; // another command is recovering now
+    if (breaker === undefined) return `${breakPath} is empty or unreadable. If no artroom command is running, remove it by hand`;
+    if (breaker.host !== hostname()) return `${breakPath} belongs to a process on ${breaker.host}. If that command has stopped, remove it by hand`;
+    if (provablyDead(breaker)) return `${breakPath} was left by an artroom command that stopped while recovering a lock. Remove that file by hand`;
+    return `the lock is being recovered by process ${breaker.pid}`;
   }
   try {
     if (readHolder(join(dir, LOCK))?.token === dead.token) rmSync(join(dir, LOCK));
   } finally {
     removeIfHeld(breakPath, me.token);
   }
+  return true;
 }
 
-/** Holds the destination's lock while `body` runs; waits for a live holder, recovers a dead one. */
+/**
+ * Holds the destination's lock while `body` runs. Every unsuccessful
+ * attempt, to acquire or to recover, waits briefly and counts against one
+ * deadline; at the deadline the error names what is in the way.
+ */
 function locked<T>(dir: string, body: (stillHeld: () => void) => T, waitMs: number): T {
   mkdirSync(join(dir, "artroom"), { recursive: true, mode: 0o700 });
   const path = join(dir, LOCK);
@@ -231,17 +248,16 @@ function locked<T>(dir: string, body: (stillHeld: () => void) => T, waitMs: numb
   const deadline = Date.now() + waitMs;
   while (!create(path, me)) {
     const holder = readHolder(path);
-    if (holder !== undefined && provablyDead(holder)) {
-      recover(dir, holder, me);
-      continue;
+    let blocked: string;
+    if (holder === undefined) blocked = `${path} is empty or unreadable. If no artroom command is running, remove it by hand`;
+    else if (holder.host !== hostname()) blocked = `${path} is held by a process on ${holder.host}. If that command has stopped, remove the file by hand`;
+    else if (!provablyDead(holder)) blocked = `${path} is held by another artroom command (process ${holder.pid}). Wait for it to finish, then try again`;
+    else {
+      const recovered = recover(dir, holder, me);
+      if (recovered === true) continue;
+      blocked = `${path} was left by a stopped command, and ${recovered}`;
     }
-    if (Date.now() > deadline) {
-      throw new Error(
-        holder !== undefined && holder.host !== hostname()
-          ? `${path} is held by a process on ${holder.host}. If that command has stopped, remove the file by hand.`
-          : `${path} is held by another artroom command (process ${holder?.pid ?? "unknown"}). Wait for it to finish, then try again.`,
-      );
-    }
+    if (Date.now() > deadline) throw new Error(`${blocked}.`);
     sleep(10);
   }
   const stillHeld = () => {

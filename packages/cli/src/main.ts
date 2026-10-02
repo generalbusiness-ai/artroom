@@ -345,13 +345,15 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
           }
           const ours = (p: Party | undefined) => p !== undefined && local.installs.includes(p.install);
           const cancel = o.reservation !== undefined && local.reservations.includes(o.reservation.install);
-          if (!ours(o.installed) && !ours(o.installing) && !cancel) return undefined;
-          const { installed, installing, reservation, ...rest } = o;
+          const pending = o.pending ?? [];
+          if (!ours(o.installed) && !pending.some(ours) && !cancel) return undefined;
+          const { installed, pending: _settled, reservation, ...rest } = o;
+          const unsettled = pending.filter((p) => !ours(p));
           return {
             ...rest,
             rev: o.rev + 1,
             ...(installed && !ours(installed) ? { installed } : {}),
-            ...(installing && !ours(installing) ? { installing } : {}),
+            ...(unsettled.length > 0 ? { pending: unsettled } : {}),
             ...(reservation && !cancel ? { reservation } : {}),
           };
         });
@@ -688,14 +690,16 @@ const COMMANDS: Record<string, Command> = {
         owned = true;
         const me: Party = { install, room: id, lane, lease: grant.leaseGeneration };
         // Recorded before the file is replaced, so a crash in between leaves evidence of what may be in it.
-        save({ ...o, rev: o.rev + 1, installing: me });
+        // Added to, never replacing, earlier unsettled installations: their credentials may still be in the file.
+        save({ ...o, rev: o.rev + 1, pending: [...(o.pending ?? []), me] });
         ctx.step("workspace-installing");
         configureWorkspace(ctx.io.cwd, grant.remote, grant.token, lane, grant.leaseGeneration, install);
         updateRoom(ctx, id, (r) => {
           r.workspaces = { ...r.workspaces, [lane]: { file, lease: grant.leaseGeneration, install } };
         });
         ctx.step("workspace-mapped");
-        const { installing: _done, reservation: _used, ...rest } = o;
+        // The file now holds this installation's credential: every earlier one, installed or pending, is provably replaced.
+        const { pending: _settled, reservation: _used, ...rest } = o;
         return { ...rest, rev: o.rev + 2, installed: me };
       });
       if (!owned) {
@@ -810,9 +814,9 @@ const COMMANDS: Record<string, Command> = {
           for (const dir of room.destinations ?? []) {
             const o = readOwner(dir);
             const mine = (p: Party | undefined) => p !== undefined && p.room === id && p.lane === lane;
-            for (const p of [o.installed, o.installing]) if (mine(p)) installs.add(p!.install);
+            for (const p of [o.installed, ...(o.pending ?? [])]) if (mine(p)) installs.add(p!.install);
             if (mine(o.reservation)) reservations.add(o.reservation!.install);
-            dirs.set(dir, (dirs.get(dir) ?? false) || mine(o.installed) || mine(o.installing));
+            dirs.set(dir, (dirs.get(dir) ?? false) || mine(o.installed) || (o.pending ?? []).some(mine));
           }
           return {
             kind: "release-lane",
