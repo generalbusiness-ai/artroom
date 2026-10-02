@@ -3,7 +3,7 @@
 // verifier over what landed.
 import { describe, expect, test } from "vitest";
 import { spawnSync, execFile } from "node:child_process";
-import { mkdtempSync, mkdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Sha } from "@generalbusiness/artroom-contract";
@@ -345,3 +345,67 @@ describe("review b618eca1: an object larger than one transfer is staged in parts
     expect(report).toMatchObject({ ok: true, head });
   }, 600_000);
 });
+
+describe("review de5289a5: staging recovers a complete file whose final append's answer was lost", () => {
+  /** The checker's scenario: the exec answer of the append that completes a staged object is lost, once. */
+  function losingFinalAppend(sizes: Map<string, number>) {
+    const state = { armed: false, interrupted: false };
+    const lossy: Exec = async (argv, opts) => {
+      const r = await exec(argv, opts);
+      if (state.armed && !state.interrupted && r.code === 0 && argv[0] === "sh" && argv[2] === 'cat >> "$1"') {
+        const file = argv[4]!;
+        const size = sizes.get(file.split("/").pop()!);
+        if (size !== undefined && statSync(file).size === size) {
+          state.interrupted = true;
+          throw new Error("simulated: the final append applied and its answer was lost");
+        }
+      }
+      return r;
+    };
+    return { lossy, state };
+  }
+
+  for (const restart of [false, true]) {
+    test(restart ? "the publisher stops, the sandbox client restarts with the filesystem kept, and the reopened publisher lands the same commit" : "the same publisher's next attempt lands the same commit", async () => {
+      const { remote } = setup();
+      const root = join(remote, "..");
+      const sizes = new Map<string, number>();
+      const { lossy, state } = losingFinalAppend(sizes);
+      mkdirSync(join(root, "p"));
+      const ops = () => new GitOps({ exec: lossy, workdir: join(root, "p"), config: ["protocol.file.allow=always"] });
+      const tiny = { objects: 100_000, bytes: 1024 };
+      class Watching extends SandboxRemote {
+        override stage(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]) {
+          for (const w of want) sizes.set(w.sha, w.size);
+          return super.stage(cohort, want, parts);
+        }
+      }
+      const r = new Watching(remote, ops());
+      const dry = setup();
+      const ref = await goldenLog(new SandboxRemote(dry.remote, dry.sandbox("dry")));
+      const expected = (await ref.sim.publish(ref.publisher)).commit;
+      const g = await goldenLog(r);
+      r.limits = tiny;
+      state.armed = true;
+      if (!restart) {
+        const p = await LogPublisher.open(r, { maxTransfer: tiny });
+        expect((await g.sim.publish(p)).commit).toBe(expected);
+      } else {
+        const first = await LogPublisher.open(r, { maxTransfer: tiny, attempts: 1 });
+        await expect(g.sim.publish(first)).rejects.toMatchObject({ code: "unresolved" });
+        expect(git(remote, "rev-parse", LOG_REF)).toBe(g.c3.commit);
+        const again = new Watching(remote, ops()); // a new client over the same sandbox filesystem
+        again.limits = tiny;
+        const p = await LogPublisher.open(again, { maxTransfer: tiny });
+        expect((await p.publish(g.sim.entries, g.sim.checkpoint(), g.sim.retained)).commit).toBe(expected);
+      }
+      expect(state.interrupted).toBe(true);
+      expect(git(remote, "rev-parse", LOG_REF)).toBe(expected);
+      git(remote, "fsck", "--strict", "--no-dangling");
+      const reader = GitCli.open(remote);
+      await reader.fetch(LOG_REF);
+      expect((await verifyLog(reader)).failures).toEqual([]);
+    });
+  }
+});
+

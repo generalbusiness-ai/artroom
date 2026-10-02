@@ -1,7 +1,7 @@
 // The publisher's git sequences, run against real git and local bare repos.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, chmodSync, appendFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { Fixture, edit, lines, localExec, sh } from "./support.ts";
 import { type Exec, GitOps, HARDENING, LOG_REF, integrationRef, objectsRef, pinnedRef } from "../src/publisher/gitops.ts";
@@ -533,4 +533,127 @@ test("a stageLog request is checked before git: ids, types, sizes, offsets, base
   refused({ parts: [{ ...ok.parts[0], data: "a+b" }] });
   refused({}, { objects: 0, bytes: 100 });
   refused({}, { objects: 10, bytes: 2 });
+});
+
+// ------------------------------------------------------------------ review de5289a5: staging recovery
+
+/**
+ * A fixture whose exec can lose the answer of, or fail, the next command
+ * matching `when`: "lose" runs it and then throws (the change applied, the
+ * reply was lost); "fail" answers a failure without running it.
+ */
+async function faulty() {
+  const faults: { when: (argv: readonly string[]) => boolean; mode: "lose" | "fail" }[] = [];
+  const exec: Exec = async (argv, opts) => {
+    const i = faults.findIndex((x) => x.when(argv));
+    const fault = i >= 0 ? faults.splice(i, 1)[0] : undefined;
+    if (fault?.mode === "fail") return { code: 1, stdout: "", stderr: "simulated failure" };
+    const r = await localExec(argv, opts);
+    if (fault?.mode === "lose") throw new Error("simulated: the command ran and its answer was lost");
+    return r;
+  };
+  const f = await new Fixture(exec).init();
+  return { f, faults };
+}
+const isAppend = (argv: readonly string[]) => argv[0] === "sh" && argv[2] === 'cat >> "$1"';
+const isHashFile = (argv: readonly string[]) => argv.includes("hash-object") && argv.includes("--");
+const isRemove = (argv: readonly string[]) => argv[0] === "sh" && argv[2] === 'rm "$1"';
+
+async function stagingFile(f: Fixture, cohort: string, sha: string) {
+  return join(await f.ops.repo(f.canonical), "artroom-stage", cohort, sha);
+}
+/** Stage the rest of `c` whole and push it: it must land as `c.commit`. */
+async function finish(ops: GitOps, f: Fixture, c: ReturnType<typeof bigCommit>) {
+  const wants = c.all.map(want);
+  let r = await ops.stageLog(f.canonical, c.commit.sha, wants, []);
+  assert.ok(r.ok, JSON.stringify(r));
+  const missing = new Set(r.missing.map((m) => m.sha));
+  r = await ops.stageLog(f.canonical, c.commit.sha, wants, c.all.filter((o) => missing.has(o.sha) && o !== c.blob).map((o) => chunk(o, 0, o.data.length)));
+  assert.deepEqual(r, { ok: true, missing: [] });
+  assert.equal((await ops.pushLog(f.canonical, [], c.commit.sha, null)).outcome.outcome, "landed");
+  assert.equal(await ops.readLogRef(f.canonical), c.commit.sha);
+}
+
+test("de5289a5: the final append applied and its answer was lost; the next call finds the complete file and stores it", async (t) => {
+  const { f, faults } = await faulty();
+  t.after(() => f.dispose());
+  const c = bigCommit(new Uint8Array(6000).fill(6), null);
+  const wants = c.all.map(want);
+  await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 4000)]);
+  faults.push({ when: isAppend, mode: "lose" });
+  const lost = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 4000, 2000)]);
+  assert.ok(!lost.ok);
+  assert.equal(statSync(await stagingFile(f, c.commit.sha, c.blob.sha)).size, 6000, "the complete file survived");
+  // The probe settles it: the blob is stored and no longer missing.
+  const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
+  assert.ok(probe.ok);
+  assert.ok(!probe.missing.some((m) => m.sha === c.blob.sha));
+  assert.equal(existsSync(await stagingFile(f, c.commit.sha, c.blob.sha)), false);
+  await finish(f.ops, f, c);
+});
+
+test("de5289a5: interrupted between the append and the hashing, the caller restarted (filesystem kept): a new sandbox client stores the file", async (t) => {
+  const { f } = await faulty();
+  t.after(() => f.dispose());
+  const c = bigCommit(new Uint8Array(6000).fill(8), null);
+  const wants = c.all.map(want);
+  await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 4000)]);
+  appendFileSync(await stagingFile(f, c.commit.sha, c.blob.sha), c.blob.data.subarray(4000)); // the append ran; nothing after it did
+  const restarted = new GitOps({ exec: localExec, workdir: join(f.root, "publisher"), config: ["protocol.file.allow=always"] });
+  const probe = await restarted.stageLog(f.canonical, c.commit.sha, wants, []);
+  assert.ok(probe.ok && !probe.missing.some((m) => m.sha === c.blob.sha));
+  await finish(restarted, f, c);
+});
+
+test("de5289a5: a lost hash-object answer, a failed hash-object and a failed cleanup are each settled by the next call", async (t) => {
+  for (const [what, fault] of [
+    ["lost hash-object answer", { when: isHashFile, mode: "lose" }],
+    ["failed hash-object", { when: isHashFile, mode: "fail" }],
+    ["failed cleanup", { when: isRemove, mode: "fail" }],
+  ] as const) {
+    const { f, faults } = await faulty();
+    t.after(() => f.dispose());
+    const c = bigCommit(new Uint8Array(6000).fill(9), null);
+    const wants = c.all.map(want);
+    await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 4000)]);
+    faults.push(fault);
+    const first = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 4000, 2000)]);
+    if (what === "failed cleanup") assert.ok(first.ok && !first.missing.some((m) => m.sha === c.blob.sha), what);
+    else assert.ok(!first.ok, what);
+    if (what === "failed hash-object") assert.equal(statSync(await stagingFile(f, c.commit.sha, c.blob.sha)).size, 6000, "kept for the next call");
+    const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
+    assert.ok(probe.ok && !probe.missing.some((m) => m.sha === c.blob.sha), what);
+    assert.equal(existsSync(await stagingFile(f, c.commit.sha, c.blob.sha)), false, `${what}: the file is gone`);
+    await finish(f.ops, f, c);
+  }
+});
+
+test("de5289a5: a complete file with the wrong bytes, or too many bytes, is discarded and the call fails; staging again from the start lands", async (t) => {
+  for (const bad of [new Uint8Array(6000).fill(1), new Uint8Array(6001).fill(10)]) {
+    const { f } = await faulty();
+    t.after(() => f.dispose());
+    const c = bigCommit(new Uint8Array(6000).fill(10), null);
+    const wants = c.all.map(want);
+    await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 1000)]);
+    writeFileSync(await stagingFile(f, c.commit.sha, c.blob.sha), bad);
+    const r = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
+    assert.ok(!r.ok && /discarded/.test(r.detail), r.ok ? "ok" : r.detail);
+    const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
+    assert.ok(probe.ok);
+    assert.equal(probe.missing.find((m) => m.sha === c.blob.sha)?.have, 0);
+    await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 3000)]);
+    await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 3000, 3000)]);
+    await finish(f.ops, f, c);
+  }
+});
+
+test("de5289a5: an object counts as stored only with the exact type and size wanted", async (t) => {
+  const f = await new Fixture().init();
+  t.after(() => f.dispose());
+  const c = bigCommit(new Uint8Array(100).fill(2), null);
+  await f.ops.stageLog(f.canonical, c.commit.sha, [want(c.blob)], [chunk(c.blob, 0, 100)]);
+  const r = await f.ops.stageLog(f.canonical, c.commit.sha, [{ ...want(c.blob), type: "tree" }], []);
+  assert.ok(!r.ok && /stored as a blob/.test(r.detail));
+  const sized = await f.ops.stageLog(f.canonical, c.commit.sha, [{ ...want(c.blob), size: 99 }], []);
+  assert.ok(!sized.ok && /stored as a blob of 100/.test(sized.detail));
 });
