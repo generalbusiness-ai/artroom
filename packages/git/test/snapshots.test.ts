@@ -511,3 +511,21 @@ test("a job with a short deadline brings the wake-up forward to that deadline", 
   await snaps.reconcile();
   assert.equal(ns.repos.has(r.name), false);
 });
+
+test("a duty table from revision 3 (no snapshot column) is migrated, and its owed deletion still runs", async () => {
+  const clock = new Clock();
+  const ns = new Fake(clock);
+  const sql = nodeSql();
+  sql.all(
+    "CREATE TABLE artroom_snap_duty (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, kind TEXT NOT NULL, token_id TEXT, " +
+      "expires_at INTEGER, reason TEXT NOT NULL, state TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, " +
+      "last_error TEXT, done_at INTEGER, done_reason TEXT)",
+  );
+  await ns.create("canon--snap-old");
+  sql.all("INSERT INTO artroom_snap_duty (name, kind, reason, state, next_at) VALUES ('canon--snap-old', 'delete', 'created', 'owed', ?)", clock.t);
+  const snaps = new SnapshotRepos({ sql, artifacts: ns, prefix: "canon", now: clock.now, sleep: async () => {} });
+  assert.equal(snaps.pending(), 1);
+  assert.equal(await snaps.reconcile(), 0);
+  assert.equal(ns.repos.has("canon--snap-old"), false);
+  await snaps.prepare(C1, async () => C1);
+});

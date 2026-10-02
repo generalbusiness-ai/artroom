@@ -139,6 +139,13 @@ export class SnapshotRepos {
         "token_id TEXT, expires_at INTEGER, reason TEXT NOT NULL, state TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, " +
         "last_error TEXT, done_at INTEGER, done_reason TEXT)",
     );
+    // Tables from before review 96d1fbc9 have no `snapshot` column. Their duties (owed or done deletes and
+    // revokes, by repository name) still run: they are grouped under the empty commit.
+    try {
+      this.sql.all("SELECT snapshot FROM artroom_snap_duty LIMIT 0");
+    } catch {
+      this.sql.all("ALTER TABLE artroom_snap_duty ADD COLUMN snapshot TEXT NOT NULL DEFAULT ''");
+    }
   }
 
   // ---------------------------------------------------------------- storage

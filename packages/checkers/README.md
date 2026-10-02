@@ -76,7 +76,8 @@ set by what its job's repository holds and what its token reaches
   files, the checker and the digest (`snapshotCommitId` computes it without
   git).
 - **One repository per snapshot commit.** Each snapshot commit gets a new,
-  empty Artifacts repository, named by the commit. The publisher
+  empty Artifacts repository, named by the commit and the creation
+  attempt (`<prefix>--snap-<commit>-<attempt>`). The publisher
   (`Publisher.writeSnapshot` in the git package) writes that commit into it
   at `refs/artroom/snapshot` and refuses a repository that already has any
   ref. So the repository holds exactly the commit, its trees and its
@@ -87,9 +88,18 @@ set by what its job's repository holds and what its token reaches
   snapshot's repository only and expires by the job's deadline. The runner
   never learns the canonical repository's token or another snapshot's.
 - **Retirement.** When a job ends, its token is revoked. When the last job
-  ends, or its deadline passes, the repository is deleted with every token.
+  ends, or its deadline passes, the repository is deleted with every token;
+  a repository that no job uses is deleted 15 minutes after it was made.
   Both are durable duties, retried until Artifacts confirms; during an
   outage they stay owed, and the repository is not used again.
+- **Unknown creates.** A create whose answer is lost is recorded before it
+  is sent and stays open until Artifacts answers it definitely or its
+  repository is seen, and then deleted. A repository that is merely absent
+  does not close it; it is checked again on a backoff for as long as it is
+  open. A retry is a new attempt with a new name.
+- **Wake-ups.** The cleanup alarm is set before each repository is
+  created, and a restarted object sets it from the debt it finds, so a
+  host that stops at any point leaves its cleanup scheduled.
 - The runner recomputes the snapshot digest from the files it received and
   refuses a file outside the declared paths.
 - Like every job, a scoped job runs in its own new container, destroyed
@@ -196,7 +206,7 @@ node measure/live.mjs
 The script makes its own repos in the `gitseq-spike` namespace, deletes
 them afterwards, and saves redacted results in `measure/results/`. The
 `/h/*` routes it uses play the room: they build jobs, mint read tokens,
-prepare snapshot repositories (`artroom-lg--snap-<commit>`, deleted when
+prepare snapshot repositories (`artroom-lg--snap-<commit>-<attempt>`, deleted when
 their jobs end) and record checks in `HarnessLedger`. They need the
 `x-lg-key` header.
 
