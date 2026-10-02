@@ -1299,7 +1299,8 @@ from 5 seconds to at most every 6 hours, and never stops. A late usable
 answer, after the attempt was superseded, still finds the record: its
 token is ended by its ID, and the record settles. The open duties are
 readable through the Room object's `jobTokenDuties()` operator method (no
-attention item fits: the contract's attention kinds have none for it). In
+attention item fits: the contract's attention kinds have none for it; a
+user-facing projection is a separate request). In
 practice an unknown mint whose answer never comes stays open indefinitely,
 visible there. Source and test comments no longer say that the attempt's
 deadline bounds an unknown mint's lifetime.
@@ -1325,6 +1326,60 @@ answer's token not ended (caught after the "minted in time" control was
 added: the first late answer was refused by its expiry instead); a lost
 answer treated as no token; no record before the call; open duties not
 reported.
+
+## Review 271dbd53
+
+The checker's review of revision 6 (`132be1ff`) credited the fix of review
+013dad0c and found one P2: when a known token changed owner, the old owner
+was released before the new one was written. A usable answer deleted the
+mint record before the token's revocation debt was inserted, and
+completion marked the job done with no token before it; the insert's error
+was then swallowed. One injected persistence failure left a live token
+with neither record, across a restart.
+
+**The fix** ([src/jobs.ts](src/jobs.ts)). From the moment its ID is known,
+a canonical token is owned by its own `job_tokens` row:
+
+- A usable answer writes the token's row and deletes the mint record in one
+  transaction: both happen or neither does. An accepted token's row is due
+  at its expiry, which is no later than the attempt's deadline; a refused
+  token's row is due at once.
+- Ending a token (completion, refusal, a superseded or expired attempt,
+  work no longer current) only makes its row due, by a write that is not
+  swallowed. Marking a job done or clearing its token no longer releases
+  anything: the row keeps the token until Artifacts confirms the
+  revocation or the token's known expiry has passed.
+- If the transfer itself cannot be written, the mint record stays. While
+  the token's ID is still known in memory, the token is revoked at once,
+  and only once Artifacts confirms that is the mint record settled;
+  otherwise the record stays an open duty.
+- The rows are also the one list of tokens the Room accounts for when it
+  observes an unknown mint.
+- `jobTokenDuties()` tells held tokens from ended ones. It gives a known
+  token's real expiry, an unknown mint's as unknown (null), and when each
+  record is next checked (`nextCheckAt`).
+
+Controls in [test/workerd/review-271dbd53.test.ts](test/workerd/review-271dbd53.test.ts),
+on the real Room Durable Object and SQLite. Each injects one failure of the
+Room's own SQLite write at a handoff, then aborts the object and checks
+that a fresh one still owns the token and revokes it.
+
+| Test | Handoff whose write fails once | Outcome |
+|---|---|---|
+| "a late usable answer whose token outlives the deadline …" | the checker's first control: ending a refused late token | its row, due at once, survives; the token is revoked after the restart |
+| "normal completion …" | the checker's second control: ending the token after the service answered | the job is done, its token still held by its row (shown as `held` with its real expiry), revoked after the restart |
+| "an attempt in flight when the room restarts, then expired …" | ending the expired attempt's token | the token's row revokes it |
+| "work no longer current at dispatch …" | ending the prepared token | revoked after the restart |
+| "the transfer itself fails once …" | the transfer | nothing is sent; the token, known in memory, is revoked, and the mint record settles |
+| "the transfer fails once and the revocation fails too …" | the transfer, with Artifacts unable to revoke | the mint record stays an open duty across a restart; nothing is sent |
+
+**Mutations.** All 8 were caught, three after a test was strengthened: the
+transfer outside one transaction; no row for the known token; a refused
+token's row not due at once (after the test checked it); a failed transfer
+not revoking; a failed transfer settling the mint record without a
+revocation; completion dropping the token's row; held tokens not counted as
+accounted for (after the accounted list became the rows alone); the duty
+projection not telling held tokens apart (after the test checked it).
 
 ## Founding gaps (request b6b51de7)
 
