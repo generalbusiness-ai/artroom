@@ -51,7 +51,16 @@ export type AttentionWhy =
   | { readonly why: "evidence-invalidated"; readonly proposal: ProposalRef; readonly obligation: ObligationId }
   | { readonly why: "publication-unresolved"; readonly op: OpId; readonly since: Timestamp }
   | { readonly why: "revert-lane"; readonly lane: LaneId; readonly of: OpId }
-  | { readonly why: "policy"; readonly rule: RuleId; readonly act: ActId; readonly text: string };
+  | { readonly why: "policy"; readonly rule: RuleId; readonly act: ActId; readonly text: string }
+  /**
+   * Admins only. The log is not being published (R-LOG-20): the remote
+   * refused a push, an object would exceed the object bound, another writer
+   * moved the ref, or no publication has been confirmed for an hour with a
+   * push still outstanding. `detail` is the remote's answer, such as
+   * `artifacts_git_receive_pack_object_too_large`, with any token removed.
+   * The item stays open until a publication is confirmed.
+   */
+  | { readonly why: "log-publication-stalled"; readonly reason: "refused" | "object-too-large" | "unexpected-writer" | "unresolved"; readonly detail: string; readonly since: Timestamp };
 
 export type AttentionItem = AttentionWhy & {
   readonly id: string;
