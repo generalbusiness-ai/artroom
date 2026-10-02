@@ -117,12 +117,15 @@ interface Site {
   readonly purpose: RegExp;
   /** Whether the token is claimed into `job_tokens` (a check job), rather than released by the ledger. */
   readonly claimed?: boolean;
+  /** The lifetime the site asks for, in seconds, unchanged by this design; a check job's ends before its deadline. */
+  readonly lifetime: number | "by the deadline";
   readonly prepare: () => Promise<{ readonly r: TestRoom; readonly run: () => Promise<unknown>; readonly lost?: () => Promise<void> }>;
 }
 
 const SITES: readonly Site[] = [
   {
     name: "integrate (the landing's staging)",
+    lifetime: 60,
     purpose: /^integrate:/,
     prepare: async () => {
       const r = await makeRoom();
@@ -140,6 +143,7 @@ const SITES: readonly Site[] = [
   },
   {
     name: "pinObjects (the canonical half)",
+    lifetime: 600,
     purpose: /^pin-objects:/,
     prepare: async () => {
       const r = await makeRoom();
@@ -151,6 +155,7 @@ const SITES: readonly Site[] = [
   },
   {
     name: "pinRef",
+    lifetime: 60,
     purpose: /^pin-ref:/,
     prepare: async () => {
       const r = await makeRoom();
@@ -163,6 +168,7 @@ const SITES: readonly Site[] = [
   },
   {
     name: "preview (a merge in the sandbox)",
+    lifetime: 60,
     purpose: /^preview:/,
     prepare: async () => {
       const r = await makeRoom();
@@ -177,6 +183,7 @@ const SITES: readonly Site[] = [
   },
   {
     name: "the log remote's readRef",
+    lifetime: 60,
     purpose: /^log-read:/,
     prepare: async () => {
       const r = await makeRoom();
@@ -189,6 +196,7 @@ const SITES: readonly Site[] = [
   },
   {
     name: "the log remote's push",
+    lifetime: 60,
     purpose: /^log-push:/,
     prepare: async () => {
       const r = await makeRoom();
@@ -199,6 +207,7 @@ const SITES: readonly Site[] = [
   },
   {
     name: "snapshot preparation's canonical read",
+    lifetime: 300,
     purpose: /^snapshot:/,
     prepare: async () => {
       const { r, jobs } = await jobRoom(scoped);
@@ -207,6 +216,7 @@ const SITES: readonly Site[] = [
   },
   {
     name: "a whole-tree check job",
+    lifetime: "by the deadline",
     purpose: /^job:/,
     claimed: true,
     prepare: async () => {
@@ -334,6 +344,10 @@ describe("mint lane C (2): a failed revocation at each canonical site is owed, a
           expect(failed.id, "the site's token was revoked and the revocation failed").not.toBeNull();
           const id = failed.id!;
           expect(token(r, id).revoked).toBe(false);
+          // The lifetime asked is the site's own, as before this design.
+          const t = token(r, id);
+          // A check job's ends 5 s before its deadline, the checker's timeout plus 300 s after the send (no delay here).
+          expect(t.expiresAt - t.createdAt).toBe(site.lifetime === "by the deadline" ? (whole.timeoutSeconds + 300 - 5) * 1000 : site.lifetime * 1000);
           // The debt is kept, with safe metadata only: the ledger's owed record, or the check job's token row.
           if (site.claimed) {
             expect(await jobTokens(r)).toEqual([expect.objectContaining({ token_id: id, last_error: "revocation failed: an error of another kind INTERNAL_ERROR (10400)" })]);
