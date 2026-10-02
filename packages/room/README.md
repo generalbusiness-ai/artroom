@@ -1216,6 +1216,14 @@ and verify, and its cleanup reaches the base name, every incarnation and
 their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.test.ts`
 covers both.
 
+Recovery: whether an older Room may have tried is now a durable fact of the
+registry binding (migration 2: `ledger` is NULL on bindings an older Worker
+made, 1 on every new one), read on every attempt, not the `bind` answer and
+this Room's attempt record. The earlier rule lost the adoption when a found
+was interrupted after recording its attempt and before adopting, and adopted
+spuriously after a lost bind answer or an interrupted first found; real-DO
+controls interrupt each window.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it

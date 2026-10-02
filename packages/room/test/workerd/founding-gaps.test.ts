@@ -19,7 +19,7 @@ import { draftRoom, foundRoom } from "../../src/founding.ts";
 import { roomIdOf } from "../../src/ids.ts";
 import { hex } from "../../src/crypto.ts";
 import type { RoomEnv } from "../../src/config.ts";
-import { FakeArtifactsHost, artifactsErrors, type Registry, type Room } from "../../src/index.ts";
+import { FakeArtifactsHost, artifactsErrors, setFault, type Registry, type Room } from "../../src/index.ts";
 import { Client, advance, call, clock, expectOk, failure, grant, logOf, newKeyPair, placeRepo, randomBytes, sign, tick, worldFor, type TestRoom, type World } from "./support.ts";
 
 const worker = exports.default as unknown as {
@@ -73,6 +73,14 @@ async function landLane(room: TestRoom, host: FakeArtifactsHost, files: Record<s
   const l = await room.admin.ok<Landing>("land", { lane: claim.lane, generation: 1 }, { lease: 1, head });
   await tick(room, 3);
   return { lane: claim.lane, head, op: await landOp(room, l.op.id) };
+}
+
+/** Make a registry binding look as an older Worker made it: before the ledger column (review 700b74ea). */
+async function markOlderBinding(repo: string): Promise<void> {
+  await runInDurableObject(reg() as never, (r: Registry, state: DurableObjectState) => {
+    void r;
+    state.storage.sql.exec("UPDATE bindings SET ledger = NULL WHERE repo = ?", repo);
+  });
 }
 
 /** Lane B's cleanup duties, from inside the room's Durable Object. */
@@ -384,10 +392,11 @@ describe("review 3eb7bc44: each creation attempt is its own incarnation, and a d
 // ------------------------------------------------------------------ review 700b74ea: a pending founding an older Room began
 
 describe("review 700b74ea: the base name an older Room may have created, before the incarnation ledger", () => {
-  /** An older Room's attempt: the registry binding made, and (optionally) the base repository created with its token, nothing recorded. */
+  /** An older Room's attempt: the registry binding made by an older Worker, and (optionally) the base repository created with its token, nothing recorded. */
   async function olderAttempt(f: Founded, created: boolean): Promise<string> {
     const g = f.drafted.genesis;
     await call(reg().bind(g.repo, roomIdOf(g), g.name));
+    await markOlderBinding(g.repo);
     const base = g.repo.split("/")[1]!;
     if (created) await f.world.artifacts.binding.create(base);
     return base;
@@ -491,3 +500,75 @@ it("review 700b74ea, the checker's control: a base repository that exists with i
   expect(a.repos.has(base)).toBe(false);
   expect((await duties(id)).filter((d) => d.reason === "legacy" && d.state === "in-flight")).toHaveLength(1);
 });
+
+// ------------------------------------------------------------------ review 700b74ea, recovery: the decision is a durable fact
+
+describe("review 700b74ea, recovery windows: legacy adoption is read from the registry binding on every attempt", () => {
+  const legacyOpen = async (id: string) => (await duties(id)).filter((d) => d.reason === "legacy" && d.state === "in-flight").length;
+  const failAt = (point: string) =>
+    setFault((p) => {
+      if (p === point) {
+        setFault(null);
+        throw new Error(`interrupted at ${point}`);
+      }
+    });
+
+  it("an older binding, interrupted after the attempt is on record and before the adoption: the retry still adopts, and a late old create is deleted", async () => {
+    const f = await draftPublic();
+    const a = f.world.artifacts;
+    const g = f.drafted.genesis;
+    await call(reg().bind(g.repo, roomIdOf(g), g.name));
+    await markOlderBinding(g.repo);
+    failAt("found:before-prepare");
+    await rejects(worker.found(g, f.sig, f.drafted.draft), "unavailable");
+    const id = roomIdOf(g);
+    await evictDurableObject(roomStub(id));
+    expect(await worker.found(g, f.sig, f.drafted.draft)).toBe(id);
+    expect(await legacyOpen(id)).toBe(1);
+    // The old create applies after the seal: deleted.
+    const base = g.repo.split("/")[1]!;
+    const sealed = a.canonical;
+    await a.binding.create(base);
+    a.canonical = sealed;
+    advance(10 * 60_000);
+    await tick(testRoom(f, id), 2);
+    expect(a.repos.has(base)).toBe(false);
+  });
+
+  it("an older binding, interrupted between the adoption and the first create: the retry keeps one adoption and founds", async () => {
+    const f = await draftPublic();
+    const a = f.world.artifacts;
+    const g = f.drafted.genesis;
+    await call(reg().bind(g.repo, roomIdOf(g), g.name));
+    await markOlderBinding(g.repo);
+    a.failRemote("create", artifactsErrors.transport());
+    a.failRemote("create", artifactsErrors.transport());
+    a.failRemote("create", artifactsErrors.transport());
+    await rejects(worker.found(g, f.sig, f.drafted.draft), "unavailable");
+    const id = roomIdOf(g);
+    expect(await legacyOpen(id)).toBe(1);
+    await evictDurableObject(roomStub(id));
+    expect(await worker.found(g, f.sig, f.drafted.draft)).toBe(id);
+    expect(await legacyOpen(id)).toBe(1);
+  });
+
+  it("a new binding whose answer was lost, or whose found was interrupted before anything was recorded: the retry, seeing already-bound, adopts nothing", async () => {
+    for (const interrupt of ["lost-bind-answer", "before-prepare"] as const) {
+      const f = await draftPublic();
+      const g = f.drafted.genesis;
+      const id = roomIdOf(g);
+      if (interrupt === "lost-bind-answer") {
+        // This Worker's bind applied; its answer never came back.
+        await call(reg().bind(g.repo, id, g.name));
+      } else {
+        failAt("found:before-prepare");
+        await rejects(worker.found(g, f.sig, f.drafted.draft), "unavailable");
+        await evictDurableObject(roomStub(id));
+      }
+      expect(await worker.found(g, f.sig, f.drafted.draft), interrupt).toBe(id);
+      expect(await legacyOpen(id), interrupt).toBe(0);
+      expect((await reg().byRepo(g.repo))?.legacy, interrupt).toBe(false);
+    }
+  });
+});
+

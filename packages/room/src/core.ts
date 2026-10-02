@@ -76,6 +76,8 @@ export interface CoreOptions {
   readonly committed: () => void;
   /** Does the registry bind this repository to this room ID and name (R-GEN-13)? */
   readonly bound: (repo: string, room: RoomId, name: string) => Promise<boolean>;
+  /** Was the registry's binding of this repository made by an older Worker (review 700b74ea)? A durable fact of the binding. */
+  readonly legacyBinding?: (repo: string) => Promise<boolean>;
 }
 
 export interface ActivePolicyFull extends ActivePolicy {
@@ -147,6 +149,7 @@ export class RoomCore {
   readonly defer: (p: Promise<unknown>) => void;
   readonly committed: () => void;
   readonly bound: CoreOptions["bound"];
+  private readonly legacyBinding: NonNullable<CoreOptions["legacyBinding"]>;
   readonly remotes: Remotes;
   /** The runner environment digest attested now for a checker; none means checks do not carry. */
   private readonly runnerDigest: (checker: string) => Digest | null;
@@ -183,6 +186,7 @@ export class RoomCore {
     this.leaseMs = opts.leaseMs;
     this.defer = opts.defer;
     this.bound = opts.bound;
+    this.legacyBinding = opts.legacyBinding ?? (async () => false);
     this.committed = () => {
       opts.committed();
       for (const w of [...this.waiters]) w();
@@ -325,7 +329,7 @@ export class RoomCore {
    * object, seal it as entry 0, and activate the initial policy at seq 1
    * from main, or the default (R-GEN-1, R-POL-9).
    */
-  async found(genesis: Genesis, sig: string, roomSeed: Uint8Array, rebound = false): Promise<RoomId> {
+  async found(genesis: Genesis, sig: string, roomSeed: Uint8Array): Promise<RoomId> {
     if (this.founded) {
       const id = this.roomId;
       if (id === roomIdOf(genesis)) return id;
@@ -342,12 +346,9 @@ export class RoomCore {
     let checkers: ActivePolicyFull["checkers"] = {};
     let main: Sha | null = null;
     let remote: string;
-    // A binding made before this call, with no attempt of this Room on record: an older Room may have created the
-    // base name and lost the answer (review 700b74ea).
-    const legacyBase = rebound && getMeta(this.sql, "founding_repo") === null;
     setMeta(this.sql, "founding_repo", genesis.repo);
     try {
-      if (!genesis.onboarding) await this.newRepository(genesis, legacyBase);
+      if (!genesis.onboarding) await this.newRepository(genesis);
       main = await this.ports.artifacts.readMain();
       if (main === null && !genesis.onboarding) throw new Error("main has no first commit");
       remote = await this.ports.artifacts.canonicalRemote();
@@ -409,12 +410,17 @@ export class RoomCore {
    * what is owed. One step at a time, and never after the room is founded,
    * when the Room's own tokens may be live there.
    */
-  private newRepository(genesis: Genesis, legacyBase: boolean): Promise<void> {
+  private newRepository(genesis: Genesis): Promise<void> {
     return this.serial(async () => {
       if (this.founded) return;
       const push = this.remotes.firstCommit;
       if (!push) throw new Error("this deployment cannot push a first commit");
       const base = locate(genesis.repo, [this.remotes.namespace, ...Object.keys(this.remotes.bindings ?? {})])!.name;
+      // An older Worker's binding: its Room may have created the base name and recorded nothing (review 700b74ea). Read
+      // from the registry, a durable fact, on every attempt, so a retry after any interruption reaches the same answer;
+      // the ledger records the adoption in one transaction, and adoption is idempotent.
+      const legacyBase = await this.legacyBinding(genesis.repo);
+      fault("found:before-prepare");
       // A refused push leaves main as it is; the ledger reads it next.
       const name = await this.workspaces.prepareCanonical(base, (remote, token) => push(remote, token, Date.parse(genesis.createdAt)), { legacyBase });
       // From here the room's repository is this incarnation: reads, forks, landing and the log all reach it.

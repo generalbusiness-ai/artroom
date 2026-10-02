@@ -242,9 +242,8 @@ export async function foundRoom(env: RoomEnv, genesisInput: unknown, sig: unknow
   // 5. Bind repository, room ID and name (R-GEN-13). The registry judges an import's deadline
   // with its own clock, in the same step as the first binding; the same binding again
   // completes forward after the deadline.
-  const bound = unwire((await reg.bind(genesis.repo, id, genesis.name, deadline)) as Wire<string>);
-  // 6. Create or read the repository, then seal entries 0 and 1. A binding made before this call may be an older
-  // Room's, whose attempt left nothing on record (review 700b74ea).
+  unwire((await reg.bind(genesis.repo, id, genesis.name, deadline)) as Wire<string>);
+  // 6. Create or read the repository, then seal entries 0 and 1.
   const stub = env.ROOMS.get(env.ROOMS.idFromName(id)) as unknown as DurableObjectStub<Room>;
-  return unwire((await stub.found(genesis, sig, b64url(seed), bound === "already-bound")) as Wire<RoomId>);
+  return unwire((await stub.found(genesis, sig, b64url(seed))) as Wire<RoomId>);
 }
