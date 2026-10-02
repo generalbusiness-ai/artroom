@@ -42,9 +42,9 @@ export type { DiffBounds, DiffResult, DiffStats, TreeEntry, TreeReader } from ".
 export { ContainerPublisher, Pinning } from "./publisher/client.ts";
 export type { LogRemoteStub, PublisherClientOptions, PublisherStub } from "./publisher/client.ts";
 export { GitOps, HARDENING, LOG_REF, integrationMessage, integrationRef, objectsRef, pinnedRef } from "./publisher/gitops.ts";
-export { decodeLogPush, fromB64url, toB64url, toLogOutcome, LOG_PUSH_LIMITS } from "./publisher/log-push.ts";
-export type { LogPushOutcome, LogPushRequest } from "./publisher/log-push.ts";
-export type { Exec, ExecResult, BuildResult, PinResult, PreviewResult } from "./publisher/gitops.ts";
+export { decodeLogPush, decodeLogStage, fromB64url, toB64url, toLogOutcome, LOG_PUSH_LIMITS } from "./publisher/log-push.ts";
+export type { LogPushOutcome, LogPushRequest, LogStageRequest } from "./publisher/log-push.ts";
+export type { Exec, ExecResult, BuildResult, LogObject, PinResult, PreviewResult, StageChunk, StageResult, StageWant } from "./publisher/gitops.ts";
 export { GitPublisher, landMessage } from "./publisher/git-publisher.ts";
 export { classifyGitPush, definitelyNotApplied } from "./publisher/push-outcome.ts";
 export type { PushOutcome } from "./publisher/push-outcome.ts";

@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { Fixture, edit, lines, localExec, sh } from "./support.ts";
 import { type Exec, GitOps, HARDENING, LOG_REF, integrationRef, objectsRef, pinnedRef } from "../src/publisher/gitops.ts";
-import { decodeLogPush, toB64url, toLogOutcome } from "../src/publisher/log-push.ts";
+import { decodeLogPush, decodeLogStage, toB64url, toLogOutcome } from "../src/publisher/log-push.ts";
 import { createHash } from "node:crypto";
 
 const lane = "act_1001_abcdef01";
@@ -424,3 +424,113 @@ for (const type of ["tree", "blob"] as const) {
     assert.equal(await f.ops.readLogRef(f.canonical), c1.commit, "the ref did not move");
   });
 }
+
+// ------------------------------------------------------------------ review b618eca1: staging
+
+function blobOf(bytes: Uint8Array) {
+  return object("blob", bytes);
+}
+/** A log commit whose tree holds one blob `big`. */
+function bigCommit(big: Uint8Array, parent: string | null) {
+  const blob = blobOf(big);
+  const tree = object("tree", new Uint8Array([...new TextEncoder().encode("100644 segment\0"), ...Buffer.from(blob.sha, "hex")]));
+  const body = `tree ${tree.sha}\n${parent ? `parent ${parent}\n` : ""}author room <r@x> 0 +0000\ncommitter room <r@x> 0 +0000\n\nbig\n`;
+  const commit = object("commit", new TextEncoder().encode(body));
+  return { blob, tree, commit, all: [blob, tree, commit] };
+}
+const want = (o: { type: "blob" | "tree" | "commit"; data: Uint8Array; sha: string }) => ({ sha: o.sha, type: o.type, size: o.data.length });
+const chunk = (o: { type: "blob" | "tree" | "commit"; data: Uint8Array; sha: string }, offset: number, n: number) => ({ ...want(o), offset, data: o.data.subarray(offset, offset + n) });
+
+test("stageLog: a blob larger than one part is staged in order, checked by its ID, then the commit alone is pushed and lands", async (t) => {
+  const f = await new Fixture().init();
+  t.after(() => f.dispose());
+  const big = new Uint8Array(10_000).map((_, i) => (i * 7) % 251);
+  const c = bigCommit(big, null);
+  const cohort = c.commit.sha;
+  const wants = c.all.map(want);
+  // Probe: everything missing, nothing staged.
+  assert.deepEqual(await f.ops.stageLog(f.canonical, cohort, wants, []), { ok: true, missing: wants.map((w) => ({ sha: w.sha, have: 0 })) });
+  let r = await f.ops.stageLog(f.canonical, cohort, wants, [chunk(c.blob, 0, 4000)]);
+  assert.ok(r.ok);
+  assert.equal(r.missing.find((m) => m.sha === c.blob.sha)?.have, 4000);
+  // The same part again is skipped; a part out of order is ignored and the answer says where to resume.
+  r = await f.ops.stageLog(f.canonical, cohort, wants, [chunk(c.blob, 0, 4000), chunk(c.blob, 8000, 2000)]);
+  assert.ok(r.ok);
+  assert.equal(r.missing.find((m) => m.sha === c.blob.sha)?.have, 4000);
+  r = await f.ops.stageLog(f.canonical, cohort, wants, [chunk(c.blob, 4000, 4000), chunk(c.blob, 8000, 2000), chunk(c.tree, 0, c.tree.data.length), chunk(c.commit, 0, c.commit.data.length)]);
+  assert.deepEqual(r, { ok: true, missing: [] });
+  const pushed = await f.ops.pushLog(f.canonical, [], cohort, null);
+  assert.equal(pushed.outcome.outcome, "landed");
+  assert.equal(await f.ops.readLogRef(f.canonical), cohort);
+  assert.equal(await sh(f.root, "--git-dir", f.canonical, "cat-file", "-s", c.blob.sha), "10000");
+});
+
+test("stageLog: an object that does not hash to its ID is refused and its staged bytes dropped; a part that does not match what is wanted is refused", async (t) => {
+  const f = await new Fixture().init();
+  t.after(() => f.dispose());
+  const big = new Uint8Array(3000).fill(1);
+  const c = bigCommit(big, null);
+  const wants = c.all.map(want);
+  await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 1000)]);
+  const forged = { ...chunk(c.blob, 1000, 2000), data: new Uint8Array(2000).fill(2) };
+  const r = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [forged]);
+  assert.ok(!r.ok && /hashes to/.test(r.detail));
+  const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
+  assert.ok(probe.ok);
+  assert.equal(probe.missing.find((m) => m.sha === c.blob.sha)?.have, 0, "the staged bytes were dropped");
+  const outside = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [{ ...chunk(c.blob, 0, 1000), offset: 2500 }]);
+  assert.ok(!outside.ok && /outside the object/.test(outside.detail));
+  const whole = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [{ ...chunk(c.tree, 0, c.tree.data.length), sha: c.blob.sha, size: c.tree.data.length }]);
+  assert.ok(!whole.ok && /does not match/.test(whole.detail));
+  const wrongId = await f.ops.stageLog(f.canonical, c.commit.sha, [{ ...want(c.tree), sha: c.blob.sha }], [{ ...chunk(c.tree, 0, c.tree.data.length), sha: c.blob.sha }]);
+  assert.ok(!wrongId.ok && /hashes to/.test(wrongId.detail));
+});
+
+test("stageLog: staging is lost on a restart; pushLog then sends nothing and says so, and staging again lands the same commit", async (t) => {
+  const f = await new Fixture().init();
+  t.after(() => f.dispose());
+  const c = bigCommit(new Uint8Array(5000).fill(3), null);
+  const wants = c.all.map(want);
+  await f.ops.stageLog(f.canonical, c.commit.sha, wants, c.all.map((o) => chunk(o, 0, o.data.length)));
+  mkdirSync(join(f.root, "restarted"));
+  const restarted = new GitOps({ exec: localExec, workdir: join(f.root, "restarted"), config: ["protocol.file.allow=always"] });
+  const r = await restarted.pushLog(f.canonical, [], c.commit.sha, null);
+  assert.equal(r.outcome.outcome, "error");
+  const o = toLogOutcome(r);
+  assert.ok(!o.ok && o.reason === "unknown" && /nothing was sent.*stage it again/.test(o.detail));
+  assert.equal(await restarted.readLogRef(f.canonical), null);
+  const probe = await restarted.stageLog(f.canonical, c.commit.sha, wants, []);
+  assert.ok(probe.ok && probe.missing.length === 3);
+  await restarted.stageLog(f.canonical, c.commit.sha, wants, c.all.map((o2) => chunk(o2, 0, o2.data.length)));
+  assert.equal((await restarted.pushLog(f.canonical, [], c.commit.sha, null)).outcome.outcome, "landed");
+});
+
+test("stageLog: staging another cohort discards the previous cohort's partial bytes", async (t) => {
+  const f = await new Fixture().init();
+  t.after(() => f.dispose());
+  const a = bigCommit(new Uint8Array(4000).fill(4), null);
+  const b = bigCommit(new Uint8Array(4000).fill(5), null);
+  await f.ops.stageLog(f.canonical, a.commit.sha, a.all.map(want), [chunk(a.blob, 0, 1000)]);
+  await f.ops.stageLog(f.canonical, b.commit.sha, b.all.map(want), [chunk(b.blob, 0, 1000)]);
+  const back = await f.ops.stageLog(f.canonical, a.commit.sha, a.all.map(want), []);
+  assert.ok(back.ok);
+  assert.equal(back.missing.find((m) => m.sha === a.blob.sha)?.have, 0);
+});
+
+test("a stageLog request is checked before git: ids, types, sizes, offsets, base64url, within the limits", () => {
+  const sha = "c".repeat(40);
+  const ok = { cohort: sha, want: [{ sha, type: "blob", size: 3 }], parts: [{ sha, type: "blob", size: 3, offset: 0, data: toB64url(new Uint8Array([1, 2, 3])) }] };
+  const d = decodeLogStage(ok);
+  assert.ok("parts" in d && d.parts[0]!.data.length === 3);
+  const refused = (req: object, limits?: { objects: number; bytes: number }) => {
+    const r = decodeLogStage({ ...ok, ...req }, limits);
+    assert.ok("refused" in r && !r.refused.ok, JSON.stringify(req).slice(0, 80));
+  };
+  refused({ cohort: "HEAD" });
+  refused({ want: [{ sha, type: "tag", size: 3 }] });
+  refused({ want: [{ sha, type: "blob", size: -1 }] });
+  refused({ parts: [{ ...ok.parts[0], offset: 1.5 }] });
+  refused({ parts: [{ ...ok.parts[0], data: "a+b" }] });
+  refused({}, { objects: 0, bytes: 100 });
+  refused({}, { objects: 10, bytes: 2 });
+});

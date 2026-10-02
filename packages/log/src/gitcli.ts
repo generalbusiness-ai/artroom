@@ -12,7 +12,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Sha } from "@generalbusiness/artroom-contract";
-import type { GitObject, GitRemote, ObjectType, PushOutcome } from "./git.ts";
+import { StagingArea, type GitObject, type GitRemote, type ObjectType, type PushOutcome, type StageOutcome, type StagePart, type StageWant } from "./git.ts";
 
 /** Hide Artifacts tokens and URL credentials in anything shown or thrown. */
 export function redact(text: string): string {
@@ -78,6 +78,23 @@ export class GitCli implements GitRemote {
     if (this.run(["cat-file", "-e", sha]).code !== 0) for (const ref of this.seen) await this.fetch(ref);
     const type = this.must(["cat-file", "-t", sha]).toString().trim() as ObjectType;
     return { type, data: new Uint8Array(this.must(["cat-file", type, sha])) };
+  }
+
+  /** Staging into the private staging repository: a completed object is written there and pushed with `next`. */
+  private readonly staging = new StagingArea(
+    (sha) => this.run(["cat-file", "-e", sha]).code === 0,
+    (o) => {
+      const sha = this.must(["hash-object", "-w", "-t", o.type, "--stdin"], true, o.data).toString().trim();
+      if (sha !== o.sha) throw new Error(`git computed ${sha} for object ${o.sha}`);
+    },
+  );
+
+  async stage(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): Promise<StageOutcome> {
+    try {
+      return this.staging.stage(cohort, want, parts);
+    } catch (e) {
+      return { ok: false, detail: redact((e as Error).message) };
+    }
   }
 
   async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<PushOutcome> {

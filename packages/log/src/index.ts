@@ -18,11 +18,15 @@ export {
   gitObject,
   parseCommit,
   parseTree,
+  StagingArea,
   type GitObject,
   type GitReader,
   type GitRemote,
   type ObjectType,
   type PushOutcome,
+  type StageOutcome,
+  type StagePart,
+  type StageWant,
   type TreeEntry,
 } from "./git.ts";
 export {

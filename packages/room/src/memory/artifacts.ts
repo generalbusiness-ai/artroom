@@ -19,13 +19,17 @@ import {
   gitObject,
   parseCommit,
   parseTree,
+  StagingArea,
   type GitObject,
   type GitRemote,
   type ObjectType,
   type PushOutcome as GitPushOutcome,
+  type StageOutcome,
+  type StagePart,
+  type StageWant,
 } from "@generalbusiness/artroom-log";
 import type { PinResult, PreviewResult, BuildResult, PublisherStub, PushOutcome } from "@generalbusiness/artroom-git";
-import { decodeLogPush, forkName, integrationMessage, type LogPushOutcome, type LogRemoteStub } from "@generalbusiness/artroom-git";
+import { decodeLogPush, decodeLogStage, forkName, integrationMessage, type LogPushOutcome, type LogRemoteStub } from "@generalbusiness/artroom-git";
 import { utf8 } from "../canonical.ts";
 import { randomToken } from "../crypto.ts";
 
@@ -82,6 +86,16 @@ export class FakeRepo implements GitRemote {
   readonly refs = new Map<string, Sha>();
   readonly objects = new Set<string>();
   readonly tokens = new Map<string, Token>();
+  /**
+   * The sandbox's staging for this repository's log pushes (lane B's
+   * `stageLog`): lane L's `StagingArea`, completing objects into `staged`.
+   * A push moves the staged objects into the repository with its ref.
+   */
+  readonly staged = new Map<string, GitObject>();
+  readonly staging = new StagingArea(
+    (sha) => this.objects.has(sha) || this.staged.has(sha),
+    (o) => void this.staged.set(o.sha, o),
+  );
 
   constructor(
     readonly host: FakeArtifactsHost,
@@ -270,11 +284,17 @@ export class FakeRepo implements GitRemote {
     }
     const current = this.refs.get(ref) ?? null;
     if (current !== lease) return { ok: false, reason: "lease-mismatch", current };
-    for (const o of objects) {
-      if (gitObject(o.type, o.data).sha !== o.sha) throw new Error(`object ${o.sha} does not match its content`);
+    for (const o of objects) if (gitObject(o.type, o.data).sha !== o.sha) throw new Error(`object ${o.sha} does not match its content`);
+    // As git's receiving side does: the new commit's tree must be complete from what was sent, what was staged
+    // ahead of the push, and what the repository holds. Nothing moves otherwise.
+    const sent = new Map<string, GitObject>([...this.staged, ...objects.map((o) => [o.sha, o] as const)]);
+    const missing = this.unreachable(next, sent);
+    if (missing) return { ok: false, reason: "unknown", detail: `the push is missing object ${missing}; nothing was updated` };
+    for (const o of sent.values()) {
       this.host.store.set(o.sha, { type: o.type, data: o.data });
       this.objects.add(o.sha);
     }
+    this.staged.clear();
     this.refs.set(ref, next);
     if (log.faults.lostPushReply > 0) {
       log.faults.lostPushReply--;
@@ -282,9 +302,30 @@ export class FakeRepo implements GitRemote {
     }
     return { ok: true };
   }
+
+  /** The first object `next`'s commit, its tree or its parents need that is neither sent nor held; null when none. */
+  private unreachable(next: Sha, sent: ReadonlyMap<string, GitObject>): string | null {
+    const read = (sha: string) => sent.get(sha) ?? (this.objects.has(sha) ? this.host.store.get(sha) : undefined);
+    const commit = read(next);
+    if (!commit) return next;
+    const c = parseCommit(commit.data);
+    for (const p of c.parents) if (!read(p)) return p;
+    const trees: string[] = [c.tree];
+    while (trees.length) {
+      const t = trees.pop()!;
+      const o = read(t);
+      if (!o) return t;
+      for (const e of parseTree(o.data)) {
+        if (e.mode === "40000") trees.push(e.sha);
+        else if (!read(e.sha)) return e.sha;
+      }
+    }
+    return null;
+  }
 }
 
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
 
 /** Push controls for the sandbox: hold a push in flight, or make pushes fail without an answer. */
 export interface PushControls {
@@ -708,6 +749,13 @@ export class FakeArtifactsHost {
         req.next as Sha,
         req.lease as Sha | null,
       ) as Promise<LogPushOutcome>;
+    },
+    // No token: the sandbox stages into its own repository, and only `pushLog` writes to the canonical one.
+    stageLog: async (req) => {
+      const d = decodeLogStage(req);
+      if ("refused" in d) return d.refused;
+      const r: StageOutcome = this.byRemote(req.canonical.remote).staging.stage(d.cohort as Sha, d.want as StageWant[], d.parts as StagePart[]);
+      return r.ok ? { ok: true, missing: [...r.missing] } : r;
     },
     readLogRef: async (req) => {
       const canonical = this.authorized(req.canonical, "read");

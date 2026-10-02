@@ -83,8 +83,9 @@ describe("review f7d273e1 (2): incremental transfer", () => {
     expect(retry!.map((o) => o.sha)).toEqual(first!.map((o) => o.sha));
   });
 
-  test("a cohort over the bound is refused as cohort-too-large before anything is sent", async () => {
+  test("a cohort over the bound, to a remote that cannot stage, is refused as cohort-too-large before anything is sent", async () => {
     const git = new Recording();
+    (git as { stage?: unknown }).stage = undefined; // a remote without staging
     const g = await goldenLog(git);
     const pushes = git.pushes;
     const small = await LogPublisher.open(git, { maxTransfer: { objects: LOG_TRANSFER_LIMITS.objects, bytes: 100 } });

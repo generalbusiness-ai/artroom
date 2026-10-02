@@ -1367,26 +1367,16 @@ export class RoomCore {
             setMeta(this.sql, "pending_publication", JSON.stringify(p));
             return p;
           });
-        for (;;) {
-          const entries = entriesAfter(this.sql, -1, cohort.through + 1);
-          const retained = this.retainedFiles(cohort.retained);
-          // The Room's own fence: the ref holds the parent it confirmed, or exactly the pending
-          // commit (a push whose reply was lost). Anything else, even with the same entries, is
-          // another writer, and publication stops; it is never built on (R-LOG-8).
-          if (publisher.head !== cohort.parent && publisher.head !== cohort.expected)
-            throw Object.assign(new Error("the log ref holds a commit the room did not write"), { code: "unexpected-writer" });
-          try {
-            result = await publisher.publish(entries, cohort.checkpoint, retained);
-          } catch (e) {
-            if ((e as { code?: string }).code !== "cohort-too-large") throw e;
-            // Nothing was sent: publish a smaller cohort, stored with its exact commit before any remote write.
-            const smaller = this.shrinkPublication(publisher, cohort);
-            if (!smaller) throw e;
-            cohort = smaller;
-            continue;
-          }
-          break;
-        }
+        const entries = entriesAfter(this.sql, -1, cohort.through + 1);
+        const retained = this.retainedFiles(cohort.retained);
+        // The Room's own fence: the ref holds the parent it confirmed, or exactly the pending
+        // commit (a push whose reply was lost). Anything else, even with the same entries, is
+        // another writer, and publication stops; it is never built on (R-LOG-8).
+        if (publisher.head !== cohort.parent && publisher.head !== cohort.expected)
+          throw Object.assign(new Error("the log ref holds a commit the room did not write"), { code: "unexpected-writer" });
+        // A cohort larger than one transfer is staged in bounded parts by lane L, through the log remote's
+        // required `stage`, and then pushed with no objects (lane B follow-up revision 3).
+        result = await publisher.publish(entries, cohort.checkpoint, retained);
         if (result.commit !== cohort.expected) throw Object.assign(new Error("the publisher confirmed a commit other than the pending one"), { code: "unexpected-writer" });
       } catch (e) {
         // Reopen from the ref next time: the read-back decides what happened.
@@ -1398,14 +1388,6 @@ export class RoomCore {
             setMeta(this.sql, "publication_error", code);
             if (code === "unexpected-writer" && was !== code)
               this.attendAdmins(this.headSeq(), null, { why: "publication-unresolved", op: "op_log", since: iso(this.now()) }, "Another writer moved refs/artroom/log. Publication of the log has stopped.");
-            // One entry, with what it retains, is more than one push can carry: never skipped, so publication stops here.
-            if (code === "cohort-too-large" && was !== code)
-              this.attendAdmins(
-                this.headSeq(),
-                null,
-                { why: "publication-unresolved", op: "op_log", since: iso(this.now()) },
-                `Entry ${Number(getMeta(this.sql, "published_through") ?? "-1") + 1} of the log, with the files it retains, is more than one push to refs/artroom/log can carry. Publication of the log has stopped.`,
-              );
           }),
         );
         // Wake subscriptions: the admins' item is new even though no entry is.
@@ -1428,43 +1410,6 @@ export class RoomCore {
     } finally {
       this.publishing = false;
     }
-  }
-
-  /**
-   * The pending cohort was more than one push can carry, and nothing was
-   * sent. Store a smaller one: half the unpublished entries (at least one),
-   * the retained files those entries name, a checkpoint for its last entry,
-   * and its exact commit, before any remote write. Null when the cohort is
-   * already a single entry.
-   */
-  private shrinkPublication(publisher: PublisherPort, cohort: PendingPublication): PendingPublication | null {
-    const published = Number(getMeta(this.sql, "published_through") ?? "-1");
-    if (cohort.through <= published + 1) return null;
-    return this.sql.transaction(() => {
-      const now = this.pendingPublication();
-      if (!now || now.through !== cohort.through || now.expected !== cohort.expected) throw Object.assign(new Error("the pending cohort changed"), { code: "transport" });
-      const n = published + Math.ceil((cohort.through - published) / 2);
-      // Always smaller, so shrinking ends: at one entry, or at a cohort that fits.
-      if (n >= cohort.through) return null;
-      const through = entryAt(this.sql, n)!;
-      const entries = entriesAfter(this.sql, -1, n + 1);
-      const cp = checkpoint(this.roomId, this.genesis.roomKey, this.seed(), through, iso(this.now()));
-      const digests = this.referencedRetained(entries);
-      const expected = publisher.commitFor(cohort.parent, entries, cp, this.retainedFiles(digests));
-      const p: PendingPublication = { v: 2, parent: cohort.parent, expected, through: n, hash: through.hash, checkpoint: cp, retained: digests };
-      setMeta(this.sql, "pending_publication", JSON.stringify(p));
-      return p;
-    });
-  }
-
-  /** The retained files these entries name (decision inputs, policies, checker configurations), by digest. */
-  private referencedRetained(entries: readonly LogEntry[]): Digest[] {
-    const named = new Set<string>();
-    for (const e of entries) for (const m of canonicalize(e).matchAll(/sha256:[0-9a-f]{64}/g)) named.add(m[0]);
-    return this.sql
-      .all("SELECT digest FROM retained ORDER BY digest")
-      .map((r) => str(r, "digest") as Digest)
-      .filter((d) => named.has(d));
   }
 
   private retainedFiles(digests: readonly Digest[]): RetainedFile[] {

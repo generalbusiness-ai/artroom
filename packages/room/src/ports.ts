@@ -211,6 +211,13 @@ export interface PublisherPort {
   ): Promise<{ readonly commit: Sha; readonly through: Seq; readonly hash: Digest; readonly publishedThrough: Seq }>;
 }
 
+/**
+ * Lane L's git remote for the log ref, with `stage` required: a publication
+ * larger than one transfer is staged in bounded parts and then pushed with
+ * no objects, so lane L never refuses it with `cohort-too-large`.
+ */
+export type StagingRemote = import("@generalbusiness/artroom-log").GitRemote & Required<Pick<import("@generalbusiness/artroom-log").GitRemote, "stage">>;
+
 // ---------------------------------------------------------------- remotes
 
 /**
@@ -226,8 +233,8 @@ export interface Remotes {
   readonly namespace: string;
   /** The room's publisher sandbox (lane B's Publisher Durable Object). */
   readonly publisher: import("@generalbusiness/artroom-git").PublisherStub;
-  /** Lane L's git remote for `refs/artroom/log` on the room's repository. */
-  readonly logRemote: (repo: import("./artifacts.ts").RepoLocation) => Promise<import("@generalbusiness/artroom-log").GitRemote>;
+  /** Lane L's git remote for `refs/artroom/log` on the room's repository. It must stage. */
+  readonly logRemote: (repo: import("./artifacts.ts").RepoLocation) => Promise<StagingRemote>;
   /** The most one log push may carry (lane L's `maxTransfer`); default lane L's `LOG_TRANSFER_LIMITS`. */
   readonly logTransfer?: { readonly objects: number; readonly bytes: number } | undefined;
   /** Waits between remote retries. Tests make them instant. */

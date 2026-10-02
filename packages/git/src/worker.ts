@@ -20,7 +20,7 @@ import { Landing } from "./landing/engine.ts";
 import type { LaneFacts, LandingRoom, LandRecord, Readiness } from "./landing/types.ts";
 import { ContainerPublisher, type LogRemoteStub, Pinning, type PublisherStub } from "./publisher/client.ts";
 import { LOG_REF } from "./publisher/gitops.ts";
-import type { LogPushRequest } from "./publisher/log-push.ts";
+import type { LogPushRequest, LogStageRequest } from "./publisher/log-push.ts";
 import { Workspaces, forkName } from "./workspace/workspaces.ts";
 import { type ArtifactsNamespace, canonicalTokens, withRetry } from "./artifacts.ts";
 import { TreeCache, changedPaths, previewPlan } from "./diff/treediff.ts";
@@ -333,6 +333,86 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
         }
         const active = (await r.listTokens()).tokens.filter((x) => x.state === "active").length;
         return { ...(value as object), revoked, activeTokens: active, ms: lap() };
+      }
+      case "logstage": {
+        // Lane A's stage: no token, the sandbox's own staging area.
+        const repo = this.need(this.meta("repo"), "repo");
+        const stub = this.env.PUBLISHER.getByName(repo) as unknown as LogRemoteStub;
+        const remote = this.need(this.meta("remote"), "remote");
+        try {
+          return { result: await stub.stageLog({ canonical: { remote }, cohort: String(body["cohort"]), want: body["want"] as LogStageRequest["want"], parts: body["parts"] as LogStageRequest["parts"] }), ms: lap() };
+        } catch (e) {
+          return { threw: e instanceof Error ? e.message : String(e), ms: lap() };
+        }
+      }
+      case "logbig": {
+        // One blob of `mib` MiB on the log ref, built here, staged in `chunkMib` MiB parts over RPC,
+        // then pushed as the commit alone under a 60 s write token: an object larger than one transfer.
+        const repo = this.need(this.meta("repo"), "repo");
+        const remote = this.need(this.meta("remote"), "remote");
+        const r = await this.env.ARTIFACTS.get(repo);
+        const stub = this.env.PUBLISHER.getByName(repo) as unknown as LogRemoteStub;
+        const size = Math.round(Number(body["mib"]) * 1024 * 1024);
+        const chunk = Math.round(Number(body["chunkMib"]) * 1024 * 1024);
+        const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+        const object = async (type: string, data: Uint8Array) => {
+          const head = new TextEncoder().encode(`${type} ${data.length}\0`);
+          const all = new Uint8Array(head.length + data.length);
+          all.set(head);
+          all.set(data, head.length);
+          return { type, data, sha: hex(await crypto.subtle.digest("SHA-1", all)) };
+        };
+        const b64 = (bytes: Uint8Array) => {
+          // In 48 KiB slices (a multiple of 3), so no full-size intermediate strings are made.
+          const out: string[] = [];
+          for (let i = 0; i < bytes.length; i += 49152) {
+            const s = bytes.subarray(i, i + 49152);
+            let bin = "";
+            for (let j = 0; j < s.length; j += 8192) bin += String.fromCharCode(...s.subarray(j, j + 8192));
+            out.push(btoa(bin).replace(/\+/g, "-").replace(/\//g, "_"));
+          }
+          return out.join("").replace(/=+$/, "");
+        };
+        const tokenCall = async <T>(scope: "read" | "write", f: (token: string) => Promise<T>) => {
+          const t = await withRetry(() => r.createToken(scope, 60));
+          try {
+            return await f(t.plaintext);
+          } finally {
+            await withRetry(() => r.revokeToken(t.id)).catch(() => false);
+          }
+        };
+        const lease = await tokenCall("read", (token) => stub.readLogRef({ canonical: { remote, token }, ref: LOG_REF }));
+        const data = new Uint8Array(size);
+        for (let i = 0; i < size; i++) data[i] = (i * 31 + (i >>> 13)) & 0xff;
+        let blob: { type: string; data: Uint8Array; sha: string } | null = await object("blob", data);
+        const blobSha = blob.sha;
+        const raw = new Uint8Array(blobSha.match(/../g)!.map((x) => parseInt(x, 16)));
+        const tree = await object("tree", new Uint8Array([...new TextEncoder().encode("100644 big-segment\0"), ...raw]));
+        const who = "Artroom Room <room@artroom.invalid> 1790000000 +0000";
+        const commit = await object("commit", new TextEncoder().encode(`tree ${tree.sha}\n${lease ? `parent ${lease}\n` : ""}author ${who}\ncommitter ${who}\n\nbig\n`));
+        const want = [blob, tree, commit].map((o) => ({ sha: o.sha, type: o.type, size: o.data.length }));
+        const calls: { parts: number; bytes: number; ms: number; missing: unknown }[] = [];
+        const stage = async (parts: { o: { type: string; data: Uint8Array; sha: string }; offset: number; n: number }[]) => {
+          const t0s = Date.now();
+          const res = await stub.stageLog({
+            canonical: { remote },
+            cohort: commit.sha,
+            want,
+            parts: parts.map((p) => ({ sha: p.o.sha, type: p.o.type, size: p.o.data.length, offset: p.offset, data: b64(p.o.data.subarray(p.offset, p.offset + p.n)) })),
+          });
+          calls.push({ parts: parts.length, bytes: parts.reduce((n, p) => n + p.n, 0), ms: Date.now() - t0s, missing: res.ok ? res.missing : res.detail });
+          return res;
+        };
+        let res = await stage([]);
+        for (let offset = 0; offset < size && res.ok; offset += chunk) res = await stage([{ o: blob, offset, n: Math.min(chunk, size - offset) }]);
+        blob = null; // let the bytes go before the push
+        if (res.ok) res = await stage([tree, commit].map((o) => ({ o, offset: 0, n: o.data.length })));
+        const outcome = res.ok && res.missing.length === 0
+          ? await tokenCall("write", (token) => stub.pushLog({ canonical: { remote, token }, objects: [], ref: LOG_REF, next: commit.sha, lease }))
+          : { notPushed: res };
+        const readBack = await tokenCall("read", (token) => stub.readLogRef({ canonical: { remote, token }, ref: LOG_REF }));
+        const active = (await r.listTokens()).tokens.filter((x) => x.state === "active").length;
+        return { size, chunk, blob: blobSha, commit: commit.sha, lease, calls, outcome, readBack, activeTokens: active, ms: lap() };
       }
       case "logobjects": {
         // The binding's reads by object ID, raw, for lane A's readObject to be checked against.

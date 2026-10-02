@@ -13,17 +13,22 @@
  *   null, so each kind is tried in turn; the hash check keeps that safe.
  * - Pushes go to the sandbox (`pushLog`) under a write token of at most 60
  *   seconds, revoked afterwards. The answer is lane L's `PushOutcome`.
+ * - A publication larger than one transfer is staged first, in bounded
+ *   parts, through the sandbox (`stageLog`, no token: the sandbox stages
+ *   locally), and then pushed with no objects. The answer is lane L's
+ *   `StageOutcome`, returned as the sandbox gives it.
  */
 
 import type { Sha } from "@generalbusiness/artroom-contract";
 import type { LogRemoteStub } from "@generalbusiness/artroom-git";
-import { encodeCommit, encodeTree, gitObject, type GitObject, type GitRemote, type ObjectType, type PushOutcome, type TreeEntry } from "@generalbusiness/artroom-log";
+import { encodeCommit, encodeTree, gitObject, type GitObject, type ObjectType, type PushOutcome, type StageOutcome, type StagePart, type StageWant, type TreeEntry } from "@generalbusiness/artroom-log";
 import { b64url } from "./crypto.ts";
 import type { ArtifactsBinding, RepoLocation } from "./artifacts.ts";
+import type { StagingRemote } from "./ports.ts";
 
 export type { LogRemoteStub };
 
-export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStub, repo: RepoLocation): GitRemote {
+export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStub, repo: RepoLocation): StagingRemote {
   const handle = () => binding.get(repo.name);
   const exact = (type: ObjectType, data: Uint8Array, sha: string) => {
     const o = gitObject(type, data);
@@ -78,6 +83,15 @@ export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStu
       return withToken("write", (canonical) =>
         stub.pushLog({ canonical, objects: objects.map((o) => ({ type: o.type, data: b64url(o.data) })), ref, next, lease }) as Promise<PushOutcome>,
       );
+    },
+    async stage(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): Promise<StageOutcome> {
+      const remote = (await (await handle()).info()).remote;
+      return stub.stageLog({
+        canonical: { remote },
+        cohort,
+        want,
+        parts: parts.map((p) => ({ sha: p.sha, type: p.type, size: p.size, offset: p.offset, data: b64url(p.data) })),
+      }) as Promise<StageOutcome>;
     },
   };
 }

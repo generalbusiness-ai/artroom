@@ -58,6 +58,7 @@ const productionServices: ServicesFactory = (env, roomObject) => {
   };
   const logStub: LogRemoteStub = {
     pushLog: (r) => publisher().pushLog(r),
+    stageLog: (r) => publisher().stageLog(r),
     readLogRef: (r) => publisher().readLogRef(r),
   };
   return {

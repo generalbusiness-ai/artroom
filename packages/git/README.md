@@ -139,18 +139,34 @@ pushLog({ canonical: { remote, token }, objects: [{ type, data /* unpadded base6
   → { ok: true } | { ok: false, reason: "lease-mismatch", current } | { ok: false, reason: "unknown", detail }
 readLogRef({ canonical: { remote, token }, ref: "refs/artroom/log" })
   → the commit ID, or null when the ref does not exist; throws when it cannot be read
+stageLog({ canonical: { remote }, cohort: next, want: [{ sha, type, size }], parts: [{ sha, type, size, offset, data /* base64url */ }] })
+  → { ok: true, missing: [{ sha, have }] } | { ok: false, detail }
 ```
+
+`stageLog` is lane L's `GitRemote.stage`, for a publication larger than
+one call (the active segment alone can be). It needs no token and makes
+no network request. A whole object is written after git checks its type
+and ID; a part of a larger object is appended, in order, to a staging
+file for that cohort, and written as an object when complete, ID
+checked. A part already stored or out of order is skipped; the answer
+says how many bytes of each wanted object are staged, so the caller
+resumes there. Staging another cohort discards the previous cohort's
+partial files. A restart loses staging; `pushLog` then answers `unknown`
+("stage it again") and lane L stages again before its next attempt.
+The default call size is 8 MiB: measured live, parts of 6, 8 and 12 MiB
+crossed the Durable Object RPC, and 16 MiB parts exhausted a Durable
+Object's 128 MB memory.
 
 For each call the caller mints a token of at most 60 seconds (write for
 `pushLog`, read for `readLogRef`) and revokes it after.
 The sandbox checks the request (only `refs/artroom/log`, commit IDs, at
-most 100,000 objects and 64 MiB in one push: `LOG_PUSH_LIMITS`), writes
+most 100,000 objects and 8 MiB in one call: `LOG_PUSH_LIMITS`), writes
 the objects, and sends nothing unless `next` is a commit, checked by its
 exact type, whose only parent is `lease` (none when `lease` is null) and
-whose whole history is present. The bound is on one push, not on the
+whose whole history is present. The bound is on one call, not on the
 log: lane L's publisher sends only the objects its lease does not hold,
-and refuses a cohort over the same bound itself (`cohort-too-large`). It
-then pushes through the
+and stages a publication over one call first (below). It then pushes
+through the
 same lease push as `main`, and the gateway lets through only
 `refs/artroom/log: lease → next`. The answer maps the publisher's push
 outcome conservatively: only a confirmed push is `ok`; a lease refusal
