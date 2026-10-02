@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/wrangler.jsonc","body":{"commit":"7cf6aae025c192e2d2a5e38e72e745773a46d2cd","path":"packages/room/wrangler.jsonc"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1abdf8aa67e5c0863e930d0aa9a7a8420bc41b91","text":"Merge retired a covered predecessor; the successor is at packages/room/README.md."}
