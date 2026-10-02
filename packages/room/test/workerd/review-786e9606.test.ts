@@ -102,6 +102,37 @@ describe("review 786e9606 P2 1: the step that loses the claim never ends the win
     });
 });
 
+describe("review 786e9606 P2 1: a preparation that outlives its deadline sends nothing", () => {
+  it("whole-tree: a step held past the attempt's deadline, while the next step issues attempt 2, ends its own token and sends nothing", async () => {
+    const { r, alice } = await checkRoom(whole);
+    const { seen } = service(r);
+    await propose(r, alice, { "src/app.ts": "v2" });
+    await settled(r);
+    const a = r.world.artifacts;
+    const calls = a.remoteCalls.get("createToken") ?? 0;
+    a.holdToken = (repo, scope) => scope === "read" && repo === a.canonical;
+    const first = inDO(r, (room) => room.core.steps.jobs());
+    await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls);
+    expect(await jobsOf(r)).toMatchObject([{ state: "sent", attempt: 1 }]);
+    // The claimed attempt's deadline passes; the next step issues attempt 2, whose mint is held too.
+    const deadline = (await inDO(r, (room) => room.core.sql.all("SELECT next_ms FROM check_jobs")[0]!["next_ms"])) as number;
+    clock.now = deadline + 1;
+    const second = inDO(r, (room) => room.core.steps.jobs());
+    await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls + 1);
+    expect(await jobsOf(r)).toMatchObject([{ state: "sent", attempt: 2 }]);
+    const before = a.canonicalRepo().tokens.size;
+    a.holdToken = null;
+    await Promise.all([first, second]);
+    await settled(r);
+    // Only attempt 2 was sent; attempt 1's token, minted late, was ended.
+    expect(seen.map((s) => s.job.id.slice(-2))).toEqual(["_2"]);
+    const late = [...a.canonicalRepo().tokens.values()].slice(before).filter((t) => t.plaintext !== tokenOf(seen[0]!.job));
+    expect(late.length).toBeGreaterThan(0);
+    expect(late.every((t) => t.revoked)).toBe(true);
+    expect(await jobsOf(r)).toMatchObject([{ state: "done", attempt: 2, outcome: "refused: check-binding" }]);
+  });
+});
+
 type Change = "owner" | "generation" | "configuration" | "obligation";
 
 describe("review 786e9606 P2 2: work that changed while its credentials were prepared is not sent, and its credentials are retired", () => {
