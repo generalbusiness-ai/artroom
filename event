@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/README.md","body":{"commit":"77d2e6c5d17b954a442f0b09b1e951fc4e451c3d","path":"plans/README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:01c3ec343ce89497ba4f52eb3787a10b7ee6f501","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/cleanup.mjs."}
