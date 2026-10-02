@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/log/README.md at exact 18bd7bc2fef02129c382d63be0b70b050edaa224 on request/laneA-room, under promise git:sha1…a64779c on request git:sha1…7d280b4","body":{"commit":"18bd7bc2fef02129c382d63be0b70b050edaa224","path":"packages/log/README.md"}}
+{"kind":"artifact","text":"packages/log/src/git.ts at exact 18bd7bc2fef02129c382d63be0b70b050edaa224 on request/laneA-room, under promise git:sha1…a64779c on request git:sha1…7d280b4","body":{"commit":"18bd7bc2fef02129c382d63be0b70b050edaa224","path":"packages/log/src/git.ts"}}
