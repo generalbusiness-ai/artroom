@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:764f7feeed84a8cc8ea6f03493521cc41e19b0cd","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/results/rows-idle-after-2026-10-02T19-47.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7bad2e9a75762a5337ff2a2aa570a4972a9a8f0e","text":"Merge retired a covered predecessor; the successor is at packages/contract/src/pagination.ts."}
