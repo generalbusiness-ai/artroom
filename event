@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/cli/src/main.ts","body":{"commit":"7cf6aae025c192e2d2a5e38e72e745773a46d2cd","path":"packages/cli/src/main.ts"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/cli/test/checker-hygiene-marker.test.ts","body":{"commit":"7cf6aae025c192e2d2a5e38e72e745773a46d2cd","path":"packages/cli/test/checker-hygiene-marker.test.ts"}}
