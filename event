@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/wrangler.spike.jsonc","body":{"commit":"9d0d0cbd2ec30a18e046417a4d4c9a00e7ed5f61","path":"packages/room/wrangler.spike.jsonc"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:000e94961adfdcb51fb5eb772de4634e002acb40","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/deploy.test.ts."}
