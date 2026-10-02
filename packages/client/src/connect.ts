@@ -149,7 +149,7 @@ export async function join(
   try {
     const retries = options.retries ?? 3;
     let out = await withRetries(() => wire.redeem({ custody: "client", join: signed }), retries, key);
-    if (isRefusal(out) && out.rule === "invitation-invalid") out = (await recoverJoin(wire, room, signed, invitation.signer, retries)) ?? out;
+    if (isRefusal(out) && out.rule === "invitation-invalid") out = (await recoverJoin(wire, room, signed, invitation.signer, retries, options.now ?? Date.now)) ?? out;
     if (!isRefusal(out) && out.custody !== "client") throw artroomError("internal", "The room answered a client-custody join with a room-custody result.");
     if (!isRefusal(out)) redactor.add(out.session.token);
     return out as Result<Joined>;
@@ -158,11 +158,15 @@ export async function join(
   }
 }
 
-/** The `Joined` of a join the room admitted earlier with this key, or null when it admitted none. */
-async function recoverJoin(wire: HttpWire | RpcWire, room: RoomId, signed: SignedEnvelope, signer: Signer, retries: number): Promise<Joined | null> {
+/**
+ * The `Joined` of a join the room admitted earlier with this key, or null
+ * when it admitted none. `now` is the caller's clock (`ClientOptions.now`):
+ * the session request's `notAfter` must fall in the room's window (R-CRED-6).
+ */
+async function recoverJoin(wire: HttpWire | RpcWire, room: RoomId, signed: SignedEnvelope, signer: Signer, retries: number, now: () => number): Promise<Joined | null> {
   const record = await withRetries(() => wire.submit(signed), retries, signed.envelope.idempotencyKey);
   if (isRefusal(record) || record.kind !== "roster" || record.by.via !== "join") return null;
-  const session = await withRetries(async () => wire.request(await signRequest(room, { signer }, { kind: "session", ttlSeconds: 3600 })), retries, undefined);
+  const session = await withRetries(async () => wire.request(await signRequest(room, { signer }, { kind: "session", ttlSeconds: 3600 }, now())), retries, undefined);
   if (isRefusal(session) || !("member" in session)) return null;
   return { custody: "client", member: record.by.member, role: record.by.role, key: signer.key, record, session };
 }

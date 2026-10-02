@@ -18,7 +18,7 @@ import {
   redeem,
   signEnvelope,
 } from "../src/index.ts";
-import type { FakeRoom } from "./support/fake-room.ts";
+import { FakeRoom } from "./support/fake-room.ts";
 import { startRoom, type Url } from "./support/setup.ts";
 
 let room: FakeRoom;
@@ -96,6 +96,24 @@ describe("client custody: a key the caller made (R-CRED-1, R-CRED-2)", () => {
     expect(room.requests.filter((r) => r.route === "/requests")).toHaveLength(1);
     expect(joins()).toHaveLength(1);
     expect((joined as Joined).record.id).toBe(`act_${joins()[0]!.seq}_${joins()[0]!.hash.slice(7, 15)}`);
+  });
+});
+
+describe("join() recovery uses the caller's clock (ClientOptions.now)", () => {
+  test("a lost join response is recovered against a room whose clock is a day behind, with the same clock passed in", async () => {
+    const at = Date.now() - 24 * 3600_000;
+    const behind = await FakeRoom.create({ clock: () => at });
+    const behindUrl = (await behind.start()) as Url;
+    try {
+      const { invitation, secret } = await behind.invite("@alice");
+      const { signer } = await generateSigner();
+      behind.faults.push({ route: "POST /redeem", kind: "drop" });
+      const joined = await join({ url: behindUrl }, behind.id, { invitation, secret, signer }, { now: () => at });
+      expect(isRefusal(joined)).toBe(false);
+      expect((joined as Joined).session.member).toBe("@alice");
+    } finally {
+      behind.stop();
+    }
   });
 });
 
