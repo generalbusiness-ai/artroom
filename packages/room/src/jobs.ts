@@ -158,6 +158,8 @@ function ownerNow(core: RoomCore, j: JobRow, advisory: boolean): { readonly land
   if (isPreview(j.owner)) {
     const row = one(core.sql, "SELECT generation, body FROM previews WHERE id = ?", j.owner);
     const body = row ? (JSON.parse(str(row, "body")!) as { state?: string; integration?: string }) : null;
+    // A landed generation's preview owns no work: its landing did.
+    if (generationRow(core.sql, j.lane, j.generation)?.landed) return null;
     return body?.state === "clean" && body.integration === j.integration && num(row, "generation") === j.generation ? {} : null;
   }
   const op = core.landing.view(j.owner);

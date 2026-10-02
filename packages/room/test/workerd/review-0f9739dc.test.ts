@@ -169,7 +169,7 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
 
 describe("review 0f9739dc P2 2: a preview's integration gets jobs (R-EXEC-8)", () => {
   it("preview before land: the preview's job, with the preview's base and no landOp, meets the obligation, and the landing lands on it without another job", async () => {
-    const { r, alice, ci } = await checkRoom();
+    const { r, alice, bob, ci } = await checkRoom();
     const { seen } = service(r, ci);
     const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
     await tick(r);
@@ -183,6 +183,46 @@ describe("review 0f9739dc P2 2: a preview's integration gets jobs (R-EXEC-8)", (
     await tick(r, 3);
     expect(await op(r, l.op.id)).toMatchObject({ state: "landed", integration: pv.integration });
     expect(seen).toHaveLength(1);
+    // Main moves again: the landed generation's preview is computed again, and owns no job.
+    const other = await proposed(r, bob, ["docs/**"], { "docs/guide.md": "more" });
+    const second = await bob.ok<Landing>("land", { lane: other.lane, generation: 1 }, { lease: 1, head: other.head });
+    await tick(r, 4);
+    expect(await op(r, second.op.id)).toMatchObject({ state: "landed" });
+    expect(seen).toHaveLength(1);
+    expect((await jobsOf(r)).filter((j) => j["state"] !== "done")).toEqual([]);
+  });
+
+  it("an owed preview job whose preview moved to another integration is not issued", async () => {
+    const { r, alice, ci } = await checkRoom();
+    await hold(r, ["jobs"]);
+    const { seen } = service(r, ci);
+    await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    await settled(r);
+    expect(await jobsOf(r)).toMatchObject([{ state: "owed" }]);
+    await inDO(r, (room) => room.core.sql.all("UPDATE previews SET body = json_set(body, '$.integration', ?)", "e".repeat(40)));
+    await inDO(r, async (room) => {
+      await room.core.steps.jobs();
+      await room.core.idle();
+    });
+    expect(await jobsOf(r)).toMatchObject([{ state: "done", outcome: "not-needed" }]);
+    expect(seen).toEqual([]);
+  });
+
+  it("a room the registry does not bind issues no job, and its jobs wait in the future rather than due now", async () => {
+    const { r, alice, ci } = await checkRoom();
+    await hold(r, ["jobs"]);
+    const { seen } = service(r, ci);
+    await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    await settled(r);
+    const out = await inDO(r, async (room) => {
+      (room.core as { isBound: () => Promise<boolean> }).isBound = async () => false;
+      await room.core.steps.jobs();
+      return { rows: room.core.sql.all("SELECT state, next_ms FROM check_jobs"), alarm: room.core.nextAlarm() };
+    });
+    expect(seen).toEqual([]);
+    expect(out.rows).toMatchObject([{ state: "owed" }]);
+    expect(out.rows[0]!["next_ms"] as number).toBeGreaterThan(clock.now);
+    expect(out.alarm).toBeGreaterThan(clock.now);
   });
 
   it("preview refresh after main moves: the new preview integration gets its own job, with the new base", async () => {

@@ -12,6 +12,7 @@ import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { Check, CheckBody, CheckerConfig, CheckJob, Claim, Landing, LandOp, Proposal, Refusal, Result, Sha } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
+import { encodeCommit, encodeTree, gitObject } from "@generalbusiness/artroom-log";
 import type { Room } from "../../src/index.ts";
 import { artifactsErrors, type FakeRepo } from "../../src/memory/artifacts.ts";
 import { addMember, Client, clock, makeRoom, pushChange, tick, type TestRoom } from "./support.ts";
@@ -96,6 +97,31 @@ function service(r: TestRoom, ci: Client, plan: Answer[] = []) {
 }
 
 const duties = (r: TestRoom) => inDO(r, (room) => room.core.snapshotRepos.duties());
+
+describe("R-CARRY-15: the filtered files", () => {
+  it("a submodule entry is never part of a snapshot", async () => {
+    const { r } = await checkRoom();
+    const a = r.world.artifacts;
+    const blob = a.put(gitObject("blob", new TextEncoder().encode("export const a = 1;\n")));
+    const src = a.put(gitObject("tree", encodeTree([{ name: "a.ts", mode: "100644", sha: blob as Sha }, { name: "vendored", mode: "160000" as never, sha: "1".repeat(40) as Sha }])));
+    const root = a.put(gitObject("tree", encodeTree([{ name: "src", mode: "40000", sha: src as Sha }])));
+    const who = "Test <t@example.invalid> 0 +0000";
+    const commit = a.put(gitObject("commit", encodeCommit({ tree: root as Sha, parents: [], author: who, committer: who, message: "with a submodule\n" })));
+    const canonical = a.canonicalRepo();
+    for (const o of [blob, src, root, commit]) canonical.objects.add(o);
+    // Lane L's tree parser, under the fake, reads every non-tree mode as 100644; the live binding gives the real mode.
+    const readTree = canonical.readTree.bind(canonical);
+    (canonical as { readTree: (hash: string) => Promise<unknown> }).readTree = async (hash: string) =>
+      hash === src
+        ? [
+            { name: "a.ts", mode: "100644", hash: blob, type: "blob" as const },
+            { name: "vendored", mode: "160000", hash: "1".repeat(40), type: "blob" as const },
+          ]
+        : readTree(hash);
+    const snap = await inDO(r, (room) => room.core.ports.artifacts.snapshot(commit as Sha, ["src/**"]));
+    expect(snap!.entries.map(([p, mode]) => [p, mode])).toEqual([["src/a.ts", "100644"]]);
+  });
+});
 
 describe("R-CARRY-16: one repository per snapshot commit", () => {
   it("older snapshot, omitted file: the newer job's repository has neither the older snapshot's commit nor the omitted file's blob, advertises only refs/artroom/snapshot at its own commit, and its token reaches nothing else", async () => {
@@ -196,6 +222,9 @@ describe("R-CARRY-16: one repository per snapshot commit", () => {
     const orphan = snapshotRepos(r).map((x) => x.name);
     expect(orphan).toHaveLength(1);
     expect(await duties(r)).toContainEqual(expect.objectContaining({ name: orphan[0], kind: "create", state: "in-flight" }));
+    // The job and the unresolved create are both due later, not now.
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT state, next_ms FROM check_jobs"))).toEqual([{ state: "owed", next_ms: expect.any(Number) }]);
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT next_ms FROM check_jobs")[0]!["next_ms"] as number)).toBeGreaterThan(clock.now);
     clock.now += 120_000;
     await tick(r);
     expect(seen).toHaveLength(1);
