@@ -113,20 +113,33 @@ async function json(response, label) {
  * token. Messages made here hold only metadata; this also covers an
  * exception from the transport.
  */
-export function safeMessage(e, token) {
-  let m = String(e?.message ?? e).slice(0, 1_000);
+export function safeMessage(e, token, limit = 1_000) {
+  // Redact the whole text first, then bound it: a bound taken first could cut a credential and keep its prefix.
+  let m = String(e?.message ?? e);
   if (token) m = m.split(token).join("<redacted>");
-  return m.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").replace(/art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g, "<token>");
+  m = m.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").replace(/art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g, "<token>");
+  if (m.length <= limit) return m;
+  m = m.slice(0, limit);
+  // Fail closed at the cut: drop a tail that could be the start of the token (a prefix of 4 or more characters). Bearer
+  // and Artifacts tokens were already replaced whole, so a cut can leave only their harmless labels.
+  if (token) for (let k = Math.min(token.length - 1, m.length); k >= 4; k--) if (m.endsWith(token.slice(0, k))) return `${m.slice(0, -k)}…`;
+  return `${m}…`;
 }
 
 /**
- * The first interval start a window must query. Cloudflare stamps a periodic
- * sample with the START of its (up to) one-minute interval, so a sample
- * stamped up to 60 s before `from` can hold writes inside the window. One
- * helper for the gate and the per-act driver.
+ * How far before `from` the storage-sample query starts. Cloudflare stamps a
+ * periodic sample with the START of its interval. Every interval measured
+ * was 60 s or shorter, but that is an assumption about the provider, not a
+ * guarantee (measure/README.md, "The sample-interval assumption"). Looking
+ * back two nominal intervals counts any sample whose interval is up to
+ * 120 s long and overlaps the window; the cost is over-counting at most one
+ * extra sample per object at the start of a window.
  */
+export const SAMPLE_LOOKBACK_MS = 120_000;
+
+/** The first storage-sample start a window must query. One helper for the gate and the per-act driver. */
 export function sampleQueryStart(from) {
-  return new Date(Date.parse(from) - 60_000).toISOString();
+  return new Date(Date.parse(from) - SAMPLE_LOOKBACK_MS).toISOString();
 }
 
 /** Whether the namespace list has another page: by its metadata when it has any, else while pages come back full. */
@@ -148,14 +161,23 @@ export async function workerNamespaces({ accountId, token, worker, fetchImpl = f
       if (row?.script !== worker) continue;
       const id = typeof row.id === "string" ? row.id : "";
       const className = typeof row.class === "string" ? row.class : "";
-      if (id && className) out.push({ id, name: typeof row.name === "string" ? row.name : `${worker}/${className}`, className, script: worker });
+      // A namespace this Worker owns that cannot be queried is missing evidence, not a namespace to skip.
+      if (!id || !className) throw new Error(`Durable Object namespace list: a namespace of ${worker} has no id or class`);
+      out.push({ id, name: typeof row.name === "string" ? row.name : `${worker}/${className}`, className, script: worker });
     }
     if (!morePages(page, body.result, body.result_info)) break;
   }
   return out.sort((a, b) => a.className.localeCompare(b.className));
 }
 
-export const STORAGE_QUERY = `
+/**
+ * One query per dataset, each with its own window. Storage (periodic)
+ * samples are stamped with the start of their interval, so their query
+ * starts at `sampleQueryStart(from)`. Invocations are stamped with each
+ * request's own time (measured 2026-10-02: `datetime` values at single
+ * seconds, 17:36:50, :51, :52 ...), so their query is the exact window.
+ */
+export const PERIODIC_QUERY = `
 query DurableObjectRows($accountTag: String!, $start: Time!, $end: Time!, $namespaceId: String!) {
   viewer {
     accounts(filter: { accountTag: $accountTag }) {
@@ -163,6 +185,14 @@ query DurableObjectRows($accountTag: String!, $start: Time!, $end: Time!, $names
         dimensions { objectId name namespaceId }
         sum { rowsWritten rowsRead }
       }
+    }
+  }
+}`;
+
+export const INVOCATIONS_QUERY = `
+query DurableObjectInvocations($accountTag: String!, $start: Time!, $end: Time!, $namespaceId: String!) {
+  viewer {
+    accounts(filter: { accountTag: $accountTag }) {
       durableObjectsInvocationsAdaptiveGroups(limit: ${ROW_LIMIT}, filter: { datetime_geq: $start, datetime_lt: $end, namespaceId: $namespaceId }) {
         dimensions { objectId namespaceId }
         sum { requests }
@@ -171,24 +201,31 @@ query DurableObjectRows($accountTag: String!, $start: Time!, $end: Time!, $names
   }
 }`;
 
-/** One namespace's objects in the window, by rows written (most first). */
-async function namespaceRows({ accountId, token, namespace, from, to, fetchImpl }) {
-  const label = `Durable Object rows query for ${namespace.name}`;
+/** One dataset's rows for one namespace and window, failing closed: errors, no account, no dataset, truncation. */
+async function datasetRows({ accountId, token, query, dataset, namespace, start, end, label, fetchImpl }) {
   const body = await json(
     await fetchImpl(`${API}/graphql`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ query: STORAGE_QUERY, variables: { accountTag: accountId, start: from, end: to, namespaceId: namespace.id } }),
+      body: JSON.stringify({ query, variables: { accountTag: accountId, start, end, namespaceId: namespace.id } }),
     }),
     label,
   );
   if (body.errors?.length) throw new Error(`${label}: GraphQL ${errorCodes(body.errors)}`);
   const account = body.data?.viewer?.accounts?.[0];
   if (!account) throw new Error(`${label} returned no account`);
-  const periodic = account.durableObjectsPeriodicGroups;
-  const invocations = account.durableObjectsInvocationsAdaptiveGroups;
-  if (!Array.isArray(periodic) || !Array.isArray(invocations)) throw new Error(`${label} omitted a required dataset`);
-  if (periodic.length >= ROW_LIMIT || invocations.length >= ROW_LIMIT) throw new Error(`${label} reached its ${ROW_LIMIT}-row limit (truncated)`);
+  const rows = account[dataset];
+  if (!Array.isArray(rows)) throw new Error(`${label} omitted a required dataset`);
+  if (rows.length >= ROW_LIMIT) throw new Error(`${label} reached its ${ROW_LIMIT}-row limit (truncated)`);
+  return rows;
+}
+
+/** One namespace's objects in the window, by rows written (most first). */
+async function namespaceRows({ accountId, token, namespace, from, sampledFrom, to, fetchImpl }) {
+  const label = `Durable Object rows query for ${namespace.name}`;
+  const common = { accountId, token, namespace, end: to, label, fetchImpl };
+  const periodic = await datasetRows({ ...common, query: PERIODIC_QUERY, dataset: "durableObjectsPeriodicGroups", start: sampledFrom });
+  const invocations = await datasetRows({ ...common, query: INVOCATIONS_QUERY, dataset: "durableObjectsInvocationsAdaptiveGroups", start: from });
   const objects = new Map();
   const at = (objectId) => {
     let o = objects.get(objectId);
@@ -225,9 +262,10 @@ export async function queryWorkerRows({ accountId, token, worker, from, to, requ
   if (namespaces.length === 0) throw new Error(`worker ${worker} owns no Durable Object namespace`);
   const missing = required.filter((c) => !namespaces.some((n) => n.className === c));
   if (missing.length) throw new Error(`worker ${worker} is missing required Durable Object namespaces: ${missing.join(", ")}`);
-  // Samples are stamped with their interval's start: one stamped up to a minute before `from` can hold writes in the window.
+  // Storage samples are stamped with their interval's start, so their query starts earlier (sampleQueryStart);
+  // invocations are stamped with their own time, so their query is the exact window [from, to).
   const sampledFrom = sampleQueryStart(from);
-  const objects = (await Promise.all(namespaces.map((namespace) => namespaceRows({ accountId, token, namespace, from: sampledFrom, to, fetchImpl })))).flat();
+  const objects = (await Promise.all(namespaces.map((namespace) => namespaceRows({ accountId, token, namespace, from, sampledFrom, to, fetchImpl })))).flat();
   const total = (k) => objects.reduce((s, o) => s + o[k], 0);
   return { worker, from, to, sampledFrom, namespaces, objects, totalRowsWritten: total("rowsWritten"), totalRowsRead: total("rowsRead"), totalRequests: total("requests") };
 }
@@ -314,6 +352,14 @@ query DurableObjectSamples($accountTag: String!, $start: Time!, $end: Time!, $na
         dimensions { datetime objectId name }
         sum { rowsWritten rowsRead }
       }
+    }
+  }
+}`;
+
+export const MINUTE_INVOCATIONS_QUERY = `
+query DurableObjectMinuteInvocations($accountTag: String!, $start: Time!, $end: Time!, $namespaceId: String!) {
+  viewer {
+    accounts(filter: { accountTag: $accountTag }) {
       durableObjectsInvocationsAdaptiveGroups(limit: ${ROW_LIMIT}, filter: { datetime_geq: $start, datetime_lt: $end, namespaceId: $namespaceId }, orderBy: [datetimeMinute_ASC]) {
         dimensions { datetimeMinute objectId }
         sum { requests }
@@ -325,7 +371,8 @@ query DurableObjectSamples($accountTag: String!, $start: Time!, $end: Time!, $na
 /**
  * Every periodic sample of `worker`'s objects whose interval overlaps
  * [from, to) (stamped from `sampleQueryStart(from)`), and invocations by
- * minute, with the same fail-closed rules as `queryWorkerRows`.
+ * minute in exactly [from, to), with the same fail-closed rules as
+ * `queryWorkerRows`.
  */
 export async function querySamples({ accountId, token, worker, from, to, required = REQUIRED_CLASSES[worker] ?? [], fetchImpl = fetch }) {
   if (!token) throw new Error("ARTROOM_CF_ANALYTICS_TOKEN is not set");
@@ -337,20 +384,9 @@ export async function querySamples({ accountId, token, worker, from, to, require
   const start = sampleQueryStart(from);
   for (const ns of namespaces) {
     const label = `Durable Object samples query for ${ns.name}`;
-    const body = await json(
-      await fetchImpl(`${API}/graphql`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ query: SAMPLES_QUERY, variables: { accountTag: accountId, start, end: to, namespaceId: ns.id } }),
-      }),
-      label,
-    );
-    if (body.errors?.length) throw new Error(`${label}: GraphQL ${errorCodes(body.errors)}`);
-    const account = body.data?.viewer?.accounts?.[0];
-    const periodic = account?.durableObjectsPeriodicGroups;
-    const inv = account?.durableObjectsInvocationsAdaptiveGroups;
-    if (!Array.isArray(periodic) || !Array.isArray(inv)) throw new Error(`${label} omitted a required dataset`);
-    if (periodic.length >= ROW_LIMIT || inv.length >= ROW_LIMIT) throw new Error(`${label} reached its ${ROW_LIMIT}-row limit (truncated)`);
+    const common = { accountId, token, namespace: ns, end: to, label, fetchImpl };
+    const periodic = await datasetRows({ ...common, query: SAMPLES_QUERY, dataset: "durableObjectsPeriodicGroups", start });
+    const inv = await datasetRows({ ...common, query: MINUTE_INVOCATIONS_QUERY, dataset: "durableObjectsInvocationsAdaptiveGroups", start: from });
     for (const g of periodic) {
       const d = g?.dimensions ?? {};
       if (typeof d.objectId !== "string" || !d.objectId || !Number.isFinite(Date.parse(d.datetime))) throw new Error(`${label}: a periodic row has no objectId or datetime`);

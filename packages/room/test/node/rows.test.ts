@@ -130,15 +130,25 @@ describe("row gate: attribution", () => {
       ["Room", "room_aaaa", 100, 500, 12, 2],
       ["Room", "room_bbbb", 7, 3, 1, 1],
     ]);
-    // One GraphQL query per namespace, bounded by the window, asking both datasets for rows written and read.
+    // Two GraphQL queries per namespace, one per dataset, each with its own window.
     const gql = fake.calls.filter((c) => c.url.endsWith("/graphql"));
-    expect(gql.map((c) => c.body?.variables?.["namespaceId"]).sort()).toEqual(["ns-publisher", "ns-registry", "ns-room"]);
-    for (const c of gql) {
-      // A minute early: a sample stamped up to 60 s before `from` overlaps the window.
-      expect(c.body?.variables).toMatchObject({ accountTag: "acct", start: "2026-10-02T11:59:00.000Z", end: WINDOW.to });
-      expect(c.body?.query).toMatch(/durableObjectsPeriodicGroups[\s\S]*sum \{ rowsWritten rowsRead \}/);
-      expect(c.body?.query).toMatch(/durableObjectsInvocationsAdaptiveGroups[\s\S]*sum \{ requests \}/);
+    const periodic = gql.filter((c) => /durableObjectsPeriodicGroups/.test(c.body?.query ?? ""));
+    const invocations = gql.filter((c) => /durableObjectsInvocationsAdaptiveGroups/.test(c.body?.query ?? ""));
+    expect(periodic.map((c) => c.body?.variables?.["namespaceId"]).sort()).toEqual(["ns-publisher", "ns-registry", "ns-room"]);
+    expect(invocations.map((c) => c.body?.variables?.["namespaceId"]).sort()).toEqual(["ns-publisher", "ns-registry", "ns-room"]);
+    expect(gql).toHaveLength(6);
+    for (const c of periodic) {
+      // Storage samples are start-stamped: the query starts SAMPLE_LOOKBACK_MS (two minutes) early.
+      expect(c.body?.variables).toMatchObject({ accountTag: "acct", start: "2026-10-02T11:58:00.000Z", end: WINDOW.to });
+      expect(c.body?.query).toMatch(/sum \{ rowsWritten rowsRead \}/);
+      expect(c.body?.query).not.toMatch(/durableObjectsInvocationsAdaptiveGroups/);
       expect(c.body?.query).toMatch(/datetime_geq: \$start, datetime_lt: \$end/);
+    }
+    for (const c of invocations) {
+      // Invocations are stamped with their own time: the exact window.
+      expect(c.body?.variables).toMatchObject({ accountTag: "acct", start: WINDOW.from, end: WINDOW.to });
+      expect(c.body?.query).toMatch(/sum \{ requests \}/);
+      expect(c.body?.query).not.toMatch(/durableObjectsPeriodicGroups/);
     }
   });
 
@@ -184,10 +194,17 @@ describe("rows per act: per-minute samples", () => {
     const r = await querySamples({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl });
     expect(r.samples).toHaveLength(7);
     expect(r.invocations).toHaveLength(3);
-    expect(r.sampledFrom).toBe("2026-10-02T11:59:00.000Z");
-    for (const c of fake.calls.filter((x) => x.url.endsWith("/graphql"))) {
-      expect(c.body?.variables).toMatchObject({ start: "2026-10-02T11:59:00.000Z", end: WINDOW.to });
+    expect(r.sampledFrom).toBe("2026-10-02T11:58:00.000Z");
+    const gql = fake.calls.filter((x) => x.url.endsWith("/graphql"));
+    const periodic = gql.filter((c) => /durableObjectsPeriodicGroups/.test(c.body?.query ?? ""));
+    const minutes = gql.filter((c) => /durableObjectsInvocationsAdaptiveGroups/.test(c.body?.query ?? ""));
+    expect([periodic.length, minutes.length, gql.length]).toEqual([3, 3, 6]);
+    for (const c of periodic) {
+      expect(c.body?.variables).toMatchObject({ start: "2026-10-02T11:58:00.000Z", end: WINDOW.to });
       expect(c.body?.query).toMatch(/dimensions \{ datetime objectId name \}/);
+    }
+    for (const c of minutes) {
+      expect(c.body?.variables).toMatchObject({ start: WINDOW.from, end: WINDOW.to });
       expect(c.body?.query).toMatch(/dimensions \{ datetimeMinute objectId \}/);
     }
     await expect(querySamples({ accountId: "acct", token: null, worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl })).rejects.toThrow("ARTROOM_CF_ANALYTICS_TOKEN is not set");
@@ -243,15 +260,16 @@ describe("row gate: fails closed", () => {
   });
 
   it("GraphQL errors, a missing account or dataset, and a result at the row limit", async () => {
-    const answer = (ns: string, r: Response) => fakeCloudflare({ graphql: (n) => (n === ns ? r : undefined) });
-    await expect(query(answer("ns-room", json({ data: null, errors: [{ message: "unknown field rowsRead", path: ["viewer"] }] })))).rejects.toThrow("GraphQL 1 error");
-    await expect(query(answer("ns-room", json({ data: { viewer: { accounts: [] } }, errors: null })))).rejects.toThrow("returned no account");
-    await expect(query(answer("ns-registry", json({ data: { viewer: { accounts: [{ durableObjectsPeriodicGroups: [] }] } }, errors: null })))).rejects.toThrow("omitted a required dataset");
-    await expect(query(answer("ns-room", json({ errors: [{ message: "rate limited" }] }, 429)))).rejects.toThrow("HTTP 429");
+    // A fresh response for every query: each namespace is now asked twice, once per dataset.
+    const answer = (ns: string, r: () => Response) => fakeCloudflare({ graphql: (n) => (n === ns ? r() : undefined) });
+    await expect(query(answer("ns-room", () => json({ data: null, errors: [{ message: "unknown field rowsRead", path: ["viewer"] }] })))).rejects.toThrow("GraphQL 1 error");
+    await expect(query(answer("ns-room", () => json({ data: { viewer: { accounts: [] } }, errors: null })))).rejects.toThrow("returned no account");
+    await expect(query(answer("ns-registry", () => json({ data: { viewer: { accounts: [{ durableObjectsPeriodicGroups: [] }] } }, errors: null })))).rejects.toThrow("omitted a required dataset");
+    await expect(query(answer("ns-room", () => json({ errors: [{ message: "rate limited" }] }, 429)))).rejects.toThrow("HTTP 429");
     const full = Array.from({ length: ROW_LIMIT }, (_, i) => ({ dimensions: { objectId: `o${i}`, namespaceId: "ns-room" }, sum: { rowsWritten: 1, rowsRead: 0 } }));
-    await expect(query(answer("ns-room", json({ data: { viewer: { accounts: [{ durableObjectsPeriodicGroups: full, durableObjectsInvocationsAdaptiveGroups: [] }] } }, errors: null })))).rejects.toThrow("truncated");
+    await expect(query(answer("ns-room", () => json({ data: { viewer: { accounts: [{ durableObjectsPeriodicGroups: full, durableObjectsInvocationsAdaptiveGroups: [] }] } }, errors: null })))).rejects.toThrow("truncated");
     // rowGate turns each into an incomplete gate with its reason, never a pass.
-    const g = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: answer("ns-room", json({ data: { viewer: { accounts: [] } }, errors: null })).fetchImpl });
+    const g = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: answer("ns-room", () => json({ data: { viewer: { accounts: [] } }, errors: null })).fetchImpl });
     expect(g.state).toBe("incomplete");
     expect(g.failures[0]).toContain("returned no account");
   });
@@ -354,10 +372,11 @@ describe("row gate: review of caefe17d (checker controls)", () => {
   });
 
   it("4. a sample stamped before `from` whose minute overlaps the window is counted; one stamped at `to` is not", async () => {
-    expect(sampleQueryStart("2026-10-02T12:00:00Z")).toBe("2026-10-02T11:59:00.000Z");
+    expect(sampleQueryStart("2026-10-02T12:00:00Z")).toBe("2026-10-02T11:58:00.000Z");
     // Start-stamped samples of the room object; the fake applies the query's datetime filter, as the API does.
     const stamped = [
       { t: "2026-10-02T11:59:01Z", rowsWritten: 5_000 }, // holds a write at 12:00:00.5, inside the window
+      { t: "2026-10-02T11:58:59Z", rowsWritten: 300 }, // a 63-second interval (the checker's stress case): counted too
       { t: "2026-10-02T12:30:00Z", rowsWritten: 1 },
       { t: "2026-10-02T13:00:00Z", rowsWritten: 9_999 }, // starts at `to`: after the window
     ];
@@ -373,8 +392,58 @@ describe("row gate: review of caefe17d (checker controls)", () => {
       },
     });
     const g = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl });
-    expect(g).toMatchObject({ state: "violation", totalRowsWritten: 5_001, sampledFrom: "2026-10-02T11:59:00.000Z" });
-    expect(g.failures).toContain("artroom-spike-room_Room/room_aaaa rows written 5001 > 2100");
+    expect(g).toMatchObject({ state: "violation", totalRowsWritten: 5_301, sampledFrom: "2026-10-02T11:58:00.000Z" });
+    expect(g.failures).toContain("artroom-spike-room_Room/room_aaaa rows written 5301 > 2100");
+  });
+});
+
+describe("row gate: review of 487edd74 (checker extra controls)", () => {
+  it("a credential crossing the message bound is redacted before the cut, and a partial one at the cut is dropped", () => {
+    const token = "synthetic-credential-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    // The token straddles character 1,000: redaction first means no prefix of it survives.
+    const m = safeMessage(new Error("x".repeat(985) + token + " tail"), token);
+    expect(m).not.toContain(token.slice(0, 4));
+    expect(m).toContain("<redacted>");
+    // Text that is not the token but starts like it at the cut (an echo split across two errors) is dropped too.
+    const cut = safeMessage(new Error("y".repeat(995) + token.slice(0, 10)), token, 1_000);
+    expect(cut).not.toContain(token.slice(0, 4));
+    expect(cut.endsWith("…")).toBe(true);
+    // A partial Bearer or Artifacts token at the cut is dropped.
+    expect(safeMessage(new Error("z".repeat(995) + " Bearer"), null, 1_000)).not.toMatch(/Bearer/);
+    expect(safeMessage(new Error("z".repeat(990) + " art_v2_abcdefgh"), null, 1_000)).not.toMatch(/art_v/);
+    // Short messages are unchanged apart from redaction.
+    expect(safeMessage(new Error("plain"), token)).toBe("plain");
+  });
+
+  it("an invocation before `from` cannot make an empty requested window complete", async () => {
+    // The fake applies each query's own window: one invocation at 11:59:30, and a storage sample stamped 11:59:30.
+    const fake = fakeCloudflare({
+      graphql: (ns) => {
+        const v = fake.calls.at(-1)!.body!.variables!;
+        const q = String(fake.calls.at(-1)!.body!.query);
+        const inWindow = Date.parse("2026-10-02T11:59:30Z") >= Date.parse(String(v["start"]));
+        const account = /durableObjectsPeriodicGroups/.test(q)
+          ? { durableObjectsPeriodicGroups: ns === "ns-room" && inWindow ? [{ dimensions: { objectId: "o-room", name: "room_aaaa", namespaceId: ns }, sum: { rowsWritten: 1, rowsRead: 0 } }] : [] }
+          : { durableObjectsInvocationsAdaptiveGroups: ns === "ns-room" && inWindow ? [{ dimensions: { objectId: "o-room", namespaceId: ns }, sum: { requests: 1 } }] : [] };
+        return json({ data: { viewer: { accounts: [account] } }, errors: null });
+      },
+    });
+    const g = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl });
+    expect(g).toMatchObject({ state: "incomplete", totalRequests: 0, totalRowsWritten: 1 });
+    expect(g.failures).toEqual(["no Durable Object invocations were visible in the window"]);
+  });
+
+  it("an owned namespace without an id or class makes the gate incomplete, even with the required classes present", async () => {
+    for (const bad of [{ class: "Room", script: "artroom-spike-room", name: "unattributable" }, { id: "ns-x", script: "artroom-spike-room" }, { id: "", class: "Room", script: "artroom-spike-room" }]) {
+      const fake = fakeCloudflare({ namespaces: [...NAMESPACES, bad] });
+      const g = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl });
+      expect(g.state, JSON.stringify(bad)).toBe("incomplete");
+      expect(g.failures[0]).toBe("Durable Object namespace list: a namespace of artroom-spike-room has no id or class");
+      await expect(querySamples({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl })).rejects.toThrow("has no id or class");
+    }
+    // Another Worker's malformed entry is not ours and is ignored.
+    const other = fakeCloudflare({ namespaces: [...NAMESPACES, { class: "X", script: "someone-else" }] });
+    expect((await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: other.fetchImpl })).state).toBe("pass");
   });
 });
 

@@ -133,7 +133,10 @@ export declare const SMOKE_BUDGET: Budget;
 export declare const HOURLY_BUDGET: Budget;
 export declare const SETTLE_MS: number;
 export declare const ROW_LIMIT: number;
-export declare const STORAGE_QUERY: string;
+export declare const PERIODIC_QUERY: string;
+export declare const INVOCATIONS_QUERY: string;
+export declare const MINUTE_INVOCATIONS_QUERY: string;
+export declare const SAMPLE_LOOKBACK_MS: number;
 
 export function workerNamespaces(input: { accountId: string; token: string; worker: string; fetchImpl?: Fetch }): Promise<Namespace[]>;
 export function queryWorkerRows(input: {
@@ -148,7 +151,7 @@ export function queryWorkerRows(input: {
 export function evaluateRows(report: WorkerRows, budget: Budget): Decision;
 export function reportForOutput(report: WorkerRows): Omit<GateResult, keyof Decision | "budget">;
 export function rowGate(input: { accountId: string; token: string | null; worker: string; from: string; to: string; budget?: Budget; fetchImpl?: Fetch }): Promise<GateResult>;
-export function safeMessage(e: unknown, token: string | null | undefined): string;
+export function safeMessage(e: unknown, token: string | null | undefined, limit?: number): string;
 export function sampleQueryStart(from: string): string;
 export function morePages(page: number, result: readonly unknown[], info: { readonly total_pages?: unknown } | null | undefined, perPage?: number): boolean;
 export function gateOk(gate: { readonly state?: string | undefined } | null | undefined): boolean;
