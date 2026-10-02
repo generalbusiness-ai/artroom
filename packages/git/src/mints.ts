@@ -628,9 +628,11 @@ export class MintLedger {
 
   /**
    * Start a pass over at most 20 eligible owed records, earliest due first,
-   * unless one is running. Those whose readable expiry has passed are
-   * settled first, in their own transaction, with no revocation call, so
-   * they never wait on the repository or on another revocation.
+   * unless one is running. If any of them has a readable expiry that has
+   * passed, this pass only settles those, with no revocation call and no
+   * wait, and ends: the others are revoked by the next pass, 1 s later
+   * (`nextDue()`). So a pass makes one summary write, and settlement at
+   * expiry never waits on the repository or on a revocation.
    */
   private startPass(): void {
     if (this.pass) return;
@@ -640,7 +642,7 @@ export class MintLedger {
       .map((r) => ({ id: Number(r["id"]), token: text(r, "token") ?? "", expiresAt: num(r, "expires_at"), backoff: num(r, "backoff") }));
     if (batch.length === 0) return;
     const expired = batch.filter((r) => r.expiresAt !== null && r.expiresAt <= now);
-    let rest = batch;
+    let run: Promise<void>;
     if (expired.length > 0) {
       try {
         this.sql.transaction(() => {
@@ -648,14 +650,17 @@ export class MintLedger {
           for (const r of expired) gone += this.drop(r.id, "owed") ? 1 : 0;
           this.count(-gone, 0);
         });
-        rest = batch.filter((r) => !expired.includes(r));
+        this.passUntil = now;
+        run = Promise.resolve();
       } catch {
-        // Not settled: they go through the pass, whose completion settles them or gives them their backoff.
+        // Not settled: a revocation pass takes the batch, and settles them at its end, or gives them their backoff.
+        this.passUntil = now + this.waitMs;
+        run = this.revoke(batch).catch(() => undefined);
       }
+    } else {
+      this.passUntil = now + this.waitMs;
+      run = this.revoke(batch).catch(() => undefined);
     }
-    if (rest.length === 0) return;
-    this.passUntil = now + this.waitMs;
-    const run = this.revoke(rest).catch(() => undefined);
     this.pass = run.then(async () => {
       this.pass = null;
       // A backlog continues 1 s after the pass ends.
@@ -665,32 +670,31 @@ export class MintLedger {
   }
 
   /**
-   * Revoke each record by its own ID, or settle it once its readable expiry
-   * has passed, with no revocation call. The repository is looked up when
-   * the first revocation needs it, within the bounded wait; a lookup that
-   * fails or does not answer is a failure for every record left. Then one
-   * transaction: at most one write per record and one summary write. A
-   * completion that cannot commit counts as a failure.
+   * Revoke each record by its own ID. The repository is looked up first,
+   * within the bounded wait. Then, immediately before each revocation, the
+   * record's readable expiry is checked again: one that passed meanwhile,
+   * during the lookup or an earlier revocation, is settled with no
+   * revocation call, on the failure path too. A failed or timed-out lookup
+   * is a failure for every other record. Then one transaction: at most one
+   * write per record and one summary write. A completion that cannot
+   * commit counts as a failure.
    */
   private async revoke(batch: readonly { id: number; token: string; expiresAt: number | null; backoff: number | null }[]): Promise<void> {
     const results: { id: number; done: boolean; backoff: number | null; expiresAt: number | null; note: string }[] = [];
-    let repo: MintRepo | null | undefined; // undefined: not looked up yet
+    let repo: MintRepo | null = null;
     let lookupNote = "";
+    this.passUntil = this.now() + this.waitMs;
+    try {
+      repo = await this.lookup();
+      if (!repo) lookupNote = "the repository was not reached in time";
+    } catch (e) {
+      lookupNote = errorNote("repository lookup failed", e);
+    }
     for (const r of batch) {
       const x = { id: r.id, backoff: r.backoff, expiresAt: r.expiresAt };
       if (r.expiresAt !== null && r.expiresAt <= this.now()) {
         results.push({ ...x, done: true, note: "" });
         continue;
-      }
-      if (repo === undefined) {
-        this.passUntil = this.now() + this.waitMs;
-        try {
-          repo = await this.lookup();
-          if (!repo) lookupNote = "the repository was not reached in time";
-        } catch (e) {
-          repo = null;
-          lookupNote = errorNote("repository lookup failed", e);
-        }
       }
       if (!repo) {
         results.push({ ...x, done: false, note: lookupNote });

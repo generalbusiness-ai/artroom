@@ -50,6 +50,9 @@ interface Tok {
 /** A full answer, as Artifacts gives it. */
 const full = (t: Tok): unknown => ({ id: t.id, plaintext: t.plaintext, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() });
 
+/** An answer with the token's ID and expiry, but no text: owed at once. */
+const idOnly = (t: Tok): unknown => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() });
+
 /** What one createToken call does. */
 type Plan =
   | "ok" //          applies and answers
@@ -718,7 +721,6 @@ test("(8) the takeover time is in nextDue() while a record is in flight; a run o
 });
 
 test("(8) nextDue(): overdue work is due 1 s after now, never sooner; a still-future takeover, observation or revocation time is returned on time", async () => {
-  const idOnly = (t: Tok) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() });
   // An overdue revocation alone: now plus exactly 1 s, however overdue.
   const r = room();
   r.repo.plans = [idOnly];
@@ -896,13 +898,14 @@ test("(9) one pass at a time: while a revocation waits on its answer, no second 
  */
 function countingSql() {
   const inner = nodeSql();
-  const stats = { on: false, read: 0, written: new Map<string, number>(), scans: new Set<string>() };
+  const stats = { on: false, read: 0, written: new Map<string, number>(), scans: new Set<string>(), countWrites: 0 };
   const sql: Sql = {
     transaction: (fn) => inner.transaction(fn),
     all(query, ...bindings) {
       const out = inner.all(query, ...bindings);
       if (!stats.on) return out;
       const w = /^\s*(?:INSERT INTO|UPDATE|DELETE FROM)\s+(\w+)/i.exec(query);
+      if (/UPDATE artroom_mint_summary SET owed/.test(query)) stats.countWrites++;
       if (w) {
         const n = /RETURNING/i.test(query) ? out.length : Number(inner.db.prepare("SELECT changes() AS n").get()?.["n"]);
         stats.written.set(w[1]!, (stats.written.get(w[1]!) ?? 0) + n);
@@ -918,6 +921,7 @@ function countingSql() {
   const reset = () => {
     stats.read = 0;
     stats.written.clear();
+    stats.countWrites = 0;
   };
   return { sql, stats, reset };
 }
@@ -925,22 +929,28 @@ function countingSql() {
 test("(10) scale: 10,000 kept unknown records, 1,000 known IDs and new unknowns every turn; each turn's work is bounded by the batch, the page and the listing", async () => {
   const c = countingSql();
   const r = room({ sql: c.sql, waitMs: 2_000 });
-  // 900 tokens other Room records hold.
-  for (let i = 0; i < 900; i++) r.known.add(r.repo.foreign().id);
+  // 890 tokens other Room records hold.
+  for (let i = 0; i < 890; i++) r.known.add(r.repo.foreign().id);
   // 10,000 unknown records: creates whose outcome was lost.
   r.repo.defaultPlan = "drop";
   for (let i = 0; i < 10_000; i++) await assert.rejects(r.ledger.mint(`bulk:${i}`, "read", ttl60));
-  // A backlog of 100 owed records, all due at once, in due order: the other 100 known IDs.
-  const idOnly = (t: Tok) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() });
+  // A backlog of 100 owed records, all due at once, in due order: the other 100 known IDs. Then 10 more, due
+  // earliest, whose readable expiry will have passed.
+  for (let i = 0; i < 10; i++) {
+    r.repo.plans = [idOnly];
+    await assert.rejects(r.ledger.mint(`expiring:${i}`, "write", ttl60));
+  }
+  r.clock.advance(10);
   for (let i = 0; i < 100; i++) {
     r.repo.plans = [idOnly];
     await assert.rejects(r.ledger.mint(`owed:${i}`, "write", () => 86_400));
     r.clock.advance(10);
   }
-  const owedIds = r.sql.all("SELECT token FROM artroom_mint WHERE state = 'owed' ORDER BY due, id").map((x) => String(x["token"]));
+  const owedIds = r.sql.all("SELECT token FROM artroom_mint WHERE state = 'owed' AND purpose LIKE 'owed:%' ORDER BY due, id").map((x) => String(x["token"]));
   assert.equal(owedIds.length, 100);
+  assert.equal(r.ledger.duties().owed, 110);
   assert.equal(r.ledger.duties().unknown, 10_000);
-  r.clock.advance(5_000);
+  r.clock.advance(61_000);
 
   c.stats.on = true;
   const observations: number[] = [];
@@ -962,15 +972,20 @@ test("(10) scale: 10,000 kept unknown records, 1,000 known IDs and new unknowns 
     assert.ok(r.repo.lists - lists <= 1, "at most one listTokens()");
     assert.ok(r.knownCalls - known <= 1_000, "at most one lookup per listed token");
     assert.ok((s.written.get("artroom_mint") ?? 0) <= 20, `at most 20 record writes, not ${s.written.get("artroom_mint")}`);
-    assert.ok((s.written.get("artroom_mint_summary") ?? 0) <= 3, "at most one summary write each: takeover, observation, revocations");
+    assert.ok((s.written.get("artroom_mint_summary") ?? 0) <= 3, "at most one summary write each: takeover, observation, the pass");
+    assert.ok(s.countWrites <= 1, `one count write a pass, not ${s.countWrites}`);
     assert.ok(s.read <= 20 + 1_000 + 20, `rows read bounded by the batch and the listing, not ${s.read}`);
     if (r.repo.lists > lists) {
       observations.push(r.clock.t);
       assert.notEqual(r.ledger.duties().observation.at, seenAt);
-      assert.equal(r.ledger.duties().observation.unaccounted, 0, "every listed token is known: 900 by other records, the rest by the ledger's own");
+      assert.equal(r.ledger.duties().observation.unaccounted, 0, "every listed token is known: 890 by other records, the rest by the ledger's own");
     }
     const revoked = r.repo.revokes.slice(revokes);
-    if (revoked.length > 0) {
+    if (turn === 0) {
+      assert.deepEqual(revoked, [], "the first pass settles the 10 expired records only, with no call");
+      assert.equal(r.ledger.duties().owed, 100);
+      assert.equal(r.ledger.nextDue(), r.clock.t + 1_000);
+    } else if (revoked.length > 0) {
       assert.deepEqual(revoked, owedIds.slice(passes * 20, passes * 20 + 20), "each pass takes the next 20, earliest due first");
       passes++;
       if (passes < 5) {
@@ -1150,7 +1165,6 @@ test("(checker 1) a repository lookup that answers only after the wait: the pass
 
 test("(checker 1) a held lookup never delays a record whose readable expiry has passed: it is settled before the repository is asked for", async () => {
   const r = room({ waitMs: 2_000 });
-  const idOnly = (t: Tok) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() });
   r.repo.plans = [idOnly, idOnly];
   await assert.rejects(r.ledger.mint("expiring", "write", ttl60));
   await assert.rejects(r.ledger.mint("lasting", "write", () => 86_400));
@@ -1244,4 +1258,81 @@ test("(checker 2) errorNote keeps only the stage, an allowed name, a known Artif
   assert.equal(errorNote("create failed", Object.assign(new Error("x"), { code: "SOMETHING_NEW", numericCode: 1.5, status: 9_999 })), "create failed: Error");
   assert.equal(errorNote("create failed", "a thrown string with a secret"), "create failed: not an error");
   assert.equal(errorNote("create failed", Object.assign(new Error("x"), { name: "ArtifactsError" })), "create failed: an error of another kind");
+});
+
+// ------------------------------------------------- the checker's extra controls on 19f6e389
+
+/** Counts the summary writes that change the counts (`UPDATE artroom_mint_summary SET owed …`). */
+function countWrites(sql: Sql): { n: number } {
+  const c = { n: 0 };
+  const all = sql.all.bind(sql);
+  sql.all = (q, ...b) => {
+    if (/UPDATE artroom_mint_summary SET owed/.test(q)) c.n++;
+    return all(q, ...b);
+  };
+  return c;
+}
+
+test("(checker 3) a readable expiry that passes while the lookup is held is settled, never revoked: when the lookup answers, and when it times out", async () => {
+  for (const answers of [true, false]) {
+    const r = room({ waitMs: 200 });
+    r.repo.plans = [idOnly];
+    await assert.rejects(r.ledger.mint("a", "write", ttl60));
+    const gate = deferred<void>();
+    r.lookupGate = gate;
+    const run = r.ledger.reconcile();
+    await until(() => r.lookups === 2, "the pass's lookup");
+    r.clock.advance(61_000); // the expiry passes during the hold
+    if (answers) gate.resolve();
+    await run;
+    await r.ledger.idle();
+    assert.equal(r.repo.revokes.length, 0, `no revocation (lookup ${answers ? "answered" : "timed out"})`);
+    assert.equal(rows(r.sql).length, 0, "settled at its expiry");
+    assert.equal(r.ledger.duties().owed, 0);
+    gate.resolve();
+  }
+});
+
+test("(checker 3) a mixed due batch, expired and revocable records: one summary write per pass, every record settled within two passes", async () => {
+  const r = room();
+  r.repo.plans = [idOnly, idOnly, idOnly, idOnly];
+  await assert.rejects(r.ledger.mint("expiring-1", "write", ttl60));
+  await assert.rejects(r.ledger.mint("lasting-1", "write", () => 86_400));
+  await assert.rejects(r.ledger.mint("expiring-2", "write", ttl60));
+  await assert.rejects(r.ledger.mint("lasting-2", "write", () => 86_400));
+  r.clock.advance(61_000);
+  const writes = countWrites(r.sql);
+  // Pass 1: the expired records only, with no call and no wait.
+  await alarm(r);
+  assert.equal(writes.n, 1);
+  assert.equal(r.repo.revokes.length, 0);
+  assert.deepEqual(rows(r.sql).map((x) => x["purpose"]), ["lasting-1", "lasting-2"]);
+  assert.equal(r.ledger.duties().owed, 2);
+  assert.equal(r.ledger.nextDue(), r.clock.t + 1_000, "the rest continue 1 s later");
+  // Pass 2: the revocations.
+  r.clock.t = Number(r.ledger.nextDue());
+  await alarm(r);
+  assert.equal(writes.n, 2);
+  assert.deepEqual(r.repo.revokes, ["tok_2", "tok_4"]);
+  assert.equal(rows(r.sql).length, 0);
+  assert.equal(r.ledger.duties().owed, 0);
+  assert.equal(r.ledger.nextDue(), null);
+});
+
+test("(checker 3) a record that expires during a pass's revocations is settled in that pass's one summary write", async () => {
+  const r = room({ waitMs: 2_000 });
+  r.repo.plans = [idOnly, idOnly];
+  await assert.rejects(r.ledger.mint("lasting", "write", () => 86_400));
+  await assert.rejects(r.ledger.mint("expiring", "write", ttl60));
+  const writes = countWrites(r.sql);
+  r.repo.holdRevokes = true;
+  const run = r.ledger.reconcile();
+  await until(() => r.repo.heldRevokes.length === 1, "the first revocation");
+  r.clock.advance(61_000); // the second record's expiry passes while the first revocation waits
+  r.repo.heldRevokes[0]!.gate.resolve();
+  await run;
+  await r.ledger.idle();
+  assert.deepEqual(r.repo.revokes, ["tok_1"], "the expired record is not revoked");
+  assert.equal(rows(r.sql).length, 0);
+  assert.equal(writes.n, 1);
 });
