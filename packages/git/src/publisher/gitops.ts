@@ -30,7 +30,7 @@ export interface ExecResult {
  */
 export type Exec = (
   argv: readonly string[],
-  opts: { readonly cwd?: string; readonly env: Readonly<Record<string, string>>; readonly timeoutMs?: number },
+  opts: { readonly cwd?: string; readonly env: Readonly<Record<string, string>>; readonly timeoutMs?: number; readonly stdin?: Uint8Array },
 ) => Promise<ExecResult>;
 
 export interface GitOpsOptions {
@@ -92,7 +92,14 @@ export function integrationRef(op: string, attempt: number): string {
 }
 
 export type PreviewResult =
-  | { readonly kind: "clean"; readonly base: string; readonly tree: string }
+  /**
+   * A clean preview carries its integration commit: `head` itself when it
+   * fast-forwards `base`, otherwise the merge commit, built by the same
+   * planner as the landing, so a landing on the same main lands exactly this
+   * commit. A merge commit is stored in the canonical repo at
+   * `refs/artroom/objects/<integration>`.
+   */
+  | { readonly kind: "clean"; readonly base: string; readonly tree: string; readonly integration: string; readonly fastForward: boolean }
   | { readonly kind: "conflict"; readonly base: string; readonly paths: readonly string[] };
 
 export type BuildResult =
@@ -108,8 +115,9 @@ export interface IntegrateRequest {
     readonly head: string;
     readonly headRef: string;
     readonly storeRef: string;
-    readonly message: string;
-    readonly committedAt: number;
+    /** For the commit message. The message and dates depend only on the inputs, so a rebuild is the same commit. */
+    readonly lane: string;
+    readonly generation: number;
   }
 
 /** One file of a snapshot: path, git mode and blob SHA (the order R-CARRY-9 digests). */
@@ -134,6 +142,38 @@ export interface IntegrateHooks {
   /** Called with the new merge commit before it is pushed to `storeRef`, so the gateway can allow exactly that update. */
   readonly beforeStore?: (integration: string) => Promise<void>;
 }
+
+/** The message of an integration commit. It names only the inputs, so preview and landing build the same commit. */
+export function integrationMessage(lane: string, generation: number): string {
+  return `Land ${lane} generation ${generation}\n`;
+}
+
+/** An object for `pushLog`: lane L's git object, without its SHA (git computes and checks it). */
+export interface LogObject {
+  readonly type: "blob" | "tree" | "commit";
+  readonly data: Uint8Array;
+}
+
+/** An object lane L will stage, by ID, type and length. */
+export interface StageWant {
+  readonly sha: string;
+  readonly type: LogObject["type"];
+  readonly size: number;
+}
+
+/** Bytes `offset` to `offset + data.length` of one object. */
+export interface StageChunk extends StageWant {
+  readonly offset: number;
+  readonly data: Uint8Array;
+}
+
+/** Lane L's `StageOutcome`. */
+export type StageResult = { readonly ok: true; readonly missing: { readonly sha: string; readonly have: number }[] } | { readonly ok: false; readonly detail: string };
+
+const isLogType = (t: string): t is LogObject["type"] => t === "blob" || t === "tree" || t === "commit";
+
+/** The ref lane L publishes the log to (R-LOG-8). The only ref `pushLog` writes. */
+export const LOG_REF = "refs/artroom/log";
 
 export class GitError extends Error {
   readonly step: string;
@@ -168,11 +208,12 @@ export class GitOps {
   }
 
   /** Run git with the hardening settings. */
-  async git(args: readonly string[], extraEnv: Readonly<Record<string, string>> = {}): Promise<ExecResult> {
+  async git(args: readonly string[], extraEnv: Readonly<Record<string, string>> = {}, stdin?: Uint8Array): Promise<ExecResult> {
     const config = [...HARDENING, ...(this.opts.config ?? [])].flatMap((c) => ["-c", c]);
     return this.opts.exec(["git", ...config, ...args], {
       env: { ...this.env, ...extraEnv },
       timeoutMs: this.opts.timeoutMs ?? 120_000,
+      ...(stdin ? { stdin } : {}),
     });
   }
 
@@ -234,7 +275,18 @@ export class GitOps {
     return r.code === 0 ? { clean: true, tree } : { clean: false, paths: [...new Set(lines.slice(1))].sort() };
   }
 
-  /** Main of a remote, read with ls-remote. Null if it has no main. */
+  /**
+   * Where lane L's log ref is on `canonical` (R-LOG-8), or null when it does
+   * not exist. Read with `git ls-remote`, which sees refs outside
+   * `refs/heads/` (the Artifacts binding's `log({ ref })` does not). Throws
+   * when the remote cannot be read: unreadable is never reported as absent.
+   */
+  readLogRef(canonical: string, ref: string = LOG_REF): Promise<string | null> {
+    if (ref !== LOG_REF) return Promise.reject(new Error(`readLogRef reads only ${LOG_REF}`));
+    return this.lsRemote(canonical, LOG_REF);
+  }
+
+  /** A ref of a remote, read with ls-remote. Null if it does not exist. */
   async lsRemote(remote: string, ref: string): Promise<string | null> {
     const out = await this.ok("ls-remote", ["ls-remote", remote, assertRef(ref)]);
     const line = out.split("\n").find((l) => l.endsWith(`\t${ref}`));
@@ -281,14 +333,23 @@ export class GitOps {
   }
 
   /** Push `sha` to a ref that must not exist yet; an existing ref at the same commit is fine. */
+  /**
+   * The one push: move `ref` on `remote` to `sha` under a lease (`lease`
+   * null: the ref must not exist), and classify the answer (push-outcome.ts).
+   * Pinning, staging, publication to main and the log all push through here.
+   */
+  private async pushWithLease(dir: string, remote: string, sha: string, ref: string, lease: string | null): Promise<PushOutcome> {
+    const r = await this.git(["-C", dir, "push", "--porcelain", `--force-with-lease=${assertRef(ref)}:${lease === null ? "" : assertSha(lease, "lease")}`, remote, `${assertSha(sha)}:${ref}`]);
+    return classifyGitPush(r.code, r.stdout, r.stderr, ref);
+  }
+
   private async createRef(dir: string, remote: string, sha: string, ref: string): Promise<PinResult> {
-    const r = await this.git(["-C", dir, "push", "--porcelain", `--force-with-lease=${ref}:`, remote, `${assertSha(sha)}:${ref}`]);
-    const outcome = classifyGitPush(r.code, r.stdout, r.stderr, ref);
-    if (outcome.outcome === "landed") return { kind: "pinned", already: /\[up to date\]/.test(r.stdout) };
+    const outcome = await this.pushWithLease(dir, remote, sha, ref, null);
+    if (outcome.outcome === "landed") return { kind: "pinned", already: /\[up to date\]/.test(outcome.detail) };
     const observed = await this.lsRemote(remote, ref);
     if (observed === sha) return { kind: "pinned", already: true };
     if (observed !== null) return { kind: "conflict", observed };
-    throw new GitError(`push ${ref}`, r);
+    throw new Error(`push ${ref} failed: ${outcome.outcome}: ${outcome.detail.slice(-300)}`);
   }
 
   // ------------------------------------------------------------ preview and integration
@@ -304,23 +365,64 @@ export class GitOps {
     return { dir, main };
   }
 
-  /** A merge preview of a pinned head against main (R-PROP-7). */
-  preview(canonical: string, head: string, headRef: string): Promise<PreviewResult> {
-    return this.exclusive(canonical, () => this.previewNow(canonical, head, headRef));
+  /** A merge preview of a pinned head against main (R-PROP-7), with its integration commit. */
+  preview(canonical: string, head: string, headRef: string, lane: string, generation: number, hooks: IntegrateHooks = {}): Promise<PreviewResult> {
+    return this.exclusive(canonical, () => this.previewNow(canonical, head, headRef, lane, generation, hooks));
   }
 
-  private async previewNow(canonical: string, head: string, headRef: string): Promise<PreviewResult> {
+  private async previewNow(canonical: string, head: string, headRef: string, lane: string, generation: number, hooks: IntegrateHooks): Promise<PreviewResult> {
     const { dir, main } = await this.syncFor(canonical, head, headRef);
-    const m = await this.mergeTree(dir, main, head);
-    return m.clean ? { kind: "clean", base: main, tree: m.tree } : { kind: "conflict", base: main, paths: m.paths };
+    const plan = await this.planIntegration(dir, main, head, lane, generation);
+    if (plan.kind === "conflict") return { kind: "conflict", base: main, paths: plan.paths };
+    if (!plan.fastForward) {
+      await hooks.beforeStore?.(plan.integration);
+      const stored = await this.createRef(dir, canonical, plan.integration, objectsRef(plan.integration));
+      if (stored.kind !== "pinned") throw new Error(`could not store the previewed integration ${plan.integration}`);
+    }
+    return { kind: "clean", base: main, tree: plan.tree, integration: plan.integration, fastForward: plan.fastForward };
+  }
+
+  /**
+   * The integration planner, shared by preview and landing (R-LAND-4 step 1,
+   * R-PROP-7): `head` itself when it fast-forwards `base`; otherwise a merge
+   * commit with parents (base, head), the merged tree, the message
+   * `integrationMessage(lane, generation)`, and author and committer dates
+   * equal to the later of the two parents' commit times. Every input of the
+   * commit is fixed by (base, head, lane, generation), so the same inputs
+   * always give the same commit.
+   */
+  private async planIntegration(
+    dir: string,
+    base: string,
+    head: string,
+    lane: string,
+    generation: number,
+  ): Promise<{ kind: "clean"; integration: string; tree: string; fastForward: boolean } | { kind: "conflict"; paths: string[] }> {
+    if (await this.isAncestor(dir, base, head)) {
+      return { kind: "clean", integration: head, tree: await this.ok("rev-parse", ["-C", dir, "rev-parse", `${assertSha(head)}^{tree}`]), fastForward: true };
+    }
+    const m = await this.mergeTree(dir, base, head);
+    if (!m.clean) return { kind: "conflict", paths: m.paths };
+    const times = (await this.ok("show", ["-C", dir, "show", "-s", "--format=%ct", assertSha(base), assertSha(head)])).split("\n").map(Number);
+    const at = Math.max(...times.filter((t) => Number.isSafeInteger(t)));
+    if (!Number.isSafeInteger(at)) throw new Error("could not read the parents' commit times");
+    const date = `@${at} +0000`;
+    const integration = assertSha(
+      await this.ok("commit-tree", ["-C", dir, "commit-tree", m.tree, "-p", assertSha(base), "-p", assertSha(head), "-m", integrationMessage(lane, generation)], {
+        GIT_AUTHOR_DATE: date,
+        GIT_COMMITTER_DATE: date,
+      }),
+      "integration",
+    );
+    return { kind: "clean", integration, tree: m.tree, fastForward: false };
   }
 
   /**
    * Build the integration commit (R-LAND-4 step 1): `head` itself when it
    * fast-forwards `expectedMain`, otherwise a merge commit with parents
-   * (expectedMain, head). The commit is deterministic for the same inputs and
-   * `committedAt`, and is pushed to `storeRef` in the canonical repo so that
-   * checkers and every later push use exactly this commit.
+   * (expectedMain, head), from the same planner as the preview. The commit is
+   * deterministic for the same inputs, and is pushed to `storeRef` in the
+   * canonical repo so that checkers and every later push use exactly it.
    */
   integrate(req: IntegrateRequest, hooks: IntegrateHooks = {}): Promise<BuildResult> {
     return this.exclusive(req.canonical, () => this.integrateNow(req, hooks));
@@ -331,20 +433,10 @@ export class GitOps {
     if (!(await this.hasCommit(dir, req.expectedMain))) {
       throw new Error(`expected main ${req.expectedMain} is not in the canonical repo`);
     }
-    if (await this.isAncestor(dir, req.expectedMain, req.head)) {
-      return { kind: "clean", integration: req.head, ref: req.headRef, fastForward: true };
-    }
-    const m = await this.mergeTree(dir, req.expectedMain, req.head);
-    if (!m.clean) return { kind: "conflict", paths: m.paths };
-    const date = `@${Math.floor(req.committedAt)} +0000`;
-    const integration = assertSha(
-      await this.ok(
-        "commit-tree",
-        ["-C", dir, "commit-tree", m.tree, "-p", assertSha(req.expectedMain), "-p", assertSha(req.head), "-m", req.message],
-        { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
-      ),
-      "integration",
-    );
+    const plan = await this.planIntegration(dir, req.expectedMain, req.head, req.lane, req.generation);
+    if (plan.kind === "conflict") return { kind: "conflict", paths: plan.paths };
+    if (plan.fastForward) return { kind: "clean", integration: req.head, ref: req.headRef, fastForward: true };
+    const integration = plan.integration;
     await hooks.beforeStore?.(integration);
     const stored = await this.createRef(dir, req.canonical, integration, assertRef(req.storeRef));
     if (stored.kind !== "pinned") throw new Error(`could not store the integration at ${req.storeRef}`);
@@ -434,16 +526,188 @@ export class GitOps {
     } catch (e) {
       return { outcome: "error", detail: `before the push: ${e instanceof Error ? e.message : String(e)}`.slice(0, 600) };
     }
-    const target = "refs/heads/main";
-    const r = await this.git([
-      "-C",
-      dir,
-      "push",
-      "--porcelain",
-      `--force-with-lease=${target}:${assertSha(expectedMain)}`,
-      canonical,
-      `${assertSha(integration)}:${target}`,
-    ]);
-    return classifyGitPush(r.code, r.stdout, r.stderr, target);
+    return this.pushWithLease(dir, canonical, integration, "refs/heads/main", expectedMain);
+  }
+
+  // ------------------------------------------------------------ the log (lane L)
+
+  /** Run a fixed shell script with arguments (never interpolated into the script). For staging files only. */
+  private sh(script: string, args: readonly string[], stdin?: Uint8Array): Promise<ExecResult> {
+    return this.opts.exec(["sh", "-c", script, "sh", ...args], {
+      env: this.env,
+      timeoutMs: this.opts.timeoutMs ?? 120_000,
+      ...(stdin ? { stdin } : {}),
+    });
+  }
+
+  /**
+   * Stage lane L's log objects for the publication of commit `cohort`, in
+   * bounded parts, ahead of `pushLog` (lane L's `GitRemote.stage`). A whole
+   * object is written into the sandbox's repository after git checks its
+   * type and ID. A part of a larger object is appended, in order, to a
+   * staging file for this cohort; when the file is complete, git writes it
+   * as an object and the ID is checked. Parts already stored are skipped,
+   * so a call is idempotent per part. Staging another cohort discards the
+   * previous cohort's partial files. Answers which of `want` are not yet
+   * stored, with the bytes staged so far. A restart loses partial files and
+   * stored objects alike; the answer then says so, and lane L stages again.
+   */
+  stageLog(canonical: string, cohort: string, want: readonly StageWant[], parts: readonly StageChunk[]): Promise<StageResult> {
+    return this.exclusive(canonical, async () => {
+      try {
+        assertSha(cohort, "cohort");
+        const dir = await this.repo(canonical);
+        const root = `${dir}/artroom-stage`;
+        const area = `${root}/${cohort}`;
+        const r = await this.sh('mkdir -p "$1/$2" && cd "$1" && for d in *; do [ "$d" = "$2" ] || rm -r "$d" || exit 1; done', [root, cohort]);
+        if (r.code !== 0) throw new GitError("stage", r);
+        const wanted = new Map<string, StageWant>();
+        for (const w of want) {
+          assertSha(w.sha, "object");
+          if (!isLogType(w.type) || !Number.isSafeInteger(w.size) || w.size < 0) throw new Error(`${w.sha} is not a git object type and size`);
+          wanted.set(w.sha, w);
+        }
+        for (const p of parts) {
+          const w = wanted.get(p.sha);
+          if (!w || w.type !== p.type || w.size !== p.size) throw new Error(`a part of ${p.sha} does not match what is wanted`);
+          if (!Number.isSafeInteger(p.offset) || p.offset < 0 || p.offset + p.data.length > p.size) throw new Error(`a part of ${p.sha} is outside the object`);
+          if ((await this.git(["-C", dir, "cat-file", "-e", p.sha])).code === 0) continue; // already stored
+          if (p.offset === 0 && p.data.length === p.size) {
+            const got = await this.git(["-C", dir, "hash-object", "-w", "-t", p.type, "--stdin"], {}, p.data);
+            if (got.code !== 0) throw new GitError("hash-object", got);
+            if (got.stdout.trim() !== p.sha) throw new Error(`the ${p.type} sent as ${p.sha} hashes to ${got.stdout.trim()}`);
+            continue;
+          }
+          const have = (await this.stagedSizes(area)).get(p.sha) ?? 0;
+          if (p.offset !== have) continue; // already staged, or out of order: the answer says where to resume
+          const a = await this.sh('cat >> "$1"', [`${area}/${p.sha}`], p.data);
+          if (a.code !== 0) throw new GitError("stage", a);
+        }
+        // Settle the staging, every call: a file completed by these parts or by an earlier call whose
+        // answer was lost is stored here, not by the append.
+        const stored = await this.reconcile(dir, area, wanted);
+        const sizes = await this.stagedSizes(area);
+        return { ok: true, missing: want.filter((w) => !stored.has(w.sha)).map((w) => ({ sha: w.sha, have: sizes.get(w.sha) ?? 0 })) };
+      } catch (e) {
+        return { ok: false, detail: (e instanceof Error ? e.message : String(e)).slice(0, 600) };
+      }
+    });
+  }
+
+  /**
+   * Settle a cohort's staging against what is wanted; idempotent, and
+   * safe to repeat after any lost answer or restart. Returns the wanted
+   * objects stored in the repository, each confirmed by its exact ID, type
+   * and size. For each staging file:
+   * - its object is stored: the file is removed (a failed removal is
+   *   retried by the next call);
+   * - it holds exactly the object's size: git writes it as an object, and
+   *   it counts only if the ID is the one wanted; then the file is removed;
+   * - it holds more than the object, or its complete bytes hash to another
+   *   ID: it is discarded, and the call fails, so the caller stages that
+   *   object again from the start.
+   * A failed write keeps the file for the next call.
+   */
+  private async reconcile(dir: string, area: string, wanted: ReadonlyMap<string, StageWant>): Promise<Set<string>> {
+    const storedNow = async () => {
+      const check = await this.git(["-C", dir, "cat-file", "--batch-check"], {}, new TextEncoder().encode([...wanted.keys()].map((sha) => `${sha}\n`).join("")));
+      if (check.code !== 0) throw new GitError("cat-file", check);
+      const stored = new Set<string>();
+      for (const line of check.stdout.split("\n")) {
+        const [sha, type, size] = line.split(" ");
+        const w = sha ? wanted.get(sha) : undefined;
+        if (!w || type === "missing") continue;
+        if (type !== w.type || Number(size) !== w.size) throw new Error(`${sha} is stored as a ${type} of ${size} bytes, not the ${w.type} of ${w.size} wanted`);
+        stored.add(sha!);
+      }
+      return stored;
+    };
+    const stored = await storedNow();
+    let corrupt: string | null = null;
+    for (const [sha, have] of await this.stagedSizes(area)) {
+      const w = wanted.get(sha);
+      if (!w) continue; // another batch of this cohort
+      const file = `${area}/${sha}`;
+      if (stored.has(sha)) {
+        await this.sh('rm "$1"', [file]);
+        continue;
+      }
+      if (have < w.size) continue; // still arriving
+      if (have === w.size) {
+        const got = await this.git(["-C", dir, "hash-object", "-w", "-t", w.type, "--", file]);
+        if (got.code !== 0) throw new GitError("hash-object", got); // the file is kept: the next call writes it again
+        if (got.stdout.trim() === sha) {
+          await this.sh('rm "$1"', [file]);
+          continue;
+        }
+        corrupt = `the staged ${w.type} ${sha} hashes to ${got.stdout.trim()}; its bytes were discarded`;
+      } else corrupt = `the staged ${w.type} ${sha} holds ${have} bytes, more than its ${w.size}; its bytes were discarded`;
+      const rm = await this.sh('rm "$1"', [file]);
+      if (rm.code !== 0) throw new GitError("stage", rm);
+    }
+    if (corrupt) throw new Error(corrupt);
+    // Confirm what the writes stored: exact ID, type and size, read back from the repository.
+    return storedNow();
+  }
+
+  /** Bytes staged so far per object in a cohort's staging directory. */
+  private async stagedSizes(area: string): Promise<Map<string, number>> {
+    const r = await this.sh('cd "$1" 2>/dev/null || exit 0; for f in *; do [ -f "$f" ] && printf "%s %s\\n" "$f" "$(wc -c < "$f" | tr -d " ")"; done; exit 0', [area]);
+    if (r.code !== 0) throw new GitError("stage", r);
+    const out = new Map<string, number>();
+    for (const line of r.stdout.split("\n")) {
+      const m = /^([0-9a-f]{40}) (\d+)$/.exec(line.trim());
+      if (m) out.set(m[1]!, Number(m[2]));
+    }
+    return out;
+  }
+
+  /**
+   * Push lane L's log commit to `refs/artroom/log` under a lease (R-LOG-8):
+   * write the given objects, check that `next` is a commit whose only parent
+   * is `lease` (none when `lease` is null) and whose whole history is
+   * present, then push it with the lease. Returns the push outcome and, on a
+   * lease refusal, where the ref is now. Anything that fails before the push
+   * runs sent nothing (`error`).
+   */
+  pushLog(
+    canonical: string,
+    objects: readonly LogObject[],
+    next: string,
+    lease: string | null,
+  ): Promise<{ readonly outcome: PushOutcome; readonly current?: string | null }> {
+    return this.exclusive(canonical, async () => {
+      const ref = LOG_REF;
+      let dir: string;
+      try {
+        dir = await this.repo(canonical);
+        assertSha(next, "next");
+        // Where the ref is now. Fetching it also brings the parent's history, so only the new objects are sent.
+        const current = await this.lsRemote(canonical, ref);
+        if (current !== lease) return { outcome: { outcome: "rejected", reason: "lease", detail: `${ref} is at ${current ?? "nothing"}, not the lease` }, current };
+        if (lease !== null) await this.fetch(dir, canonical, [`+${ref}:refs/artroom-remote/log`]);
+        for (const o of objects) {
+          if (o.type !== "blob" && o.type !== "tree" && o.type !== "commit") throw new Error("not a git object type");
+          const w = await this.git(["-C", dir, "hash-object", "-w", "-t", o.type, "--stdin"], {}, o.data);
+          if (w.code !== 0) throw new GitError("hash-object", w);
+        }
+        // The exact type first: rev-list accepts a tree or blob with an empty answer, which would pass as "no parent".
+        if ((await this.git(["-C", dir, "cat-file", "-e", next])).code !== 0) throw new Error(`${next} is not here: send or stage it again`);
+        const type = await this.git(["-C", dir, "cat-file", "-t", next]);
+        if (type.code !== 0 || type.stdout.trim() !== "commit") throw new Error(`${next} is not a commit`);
+        const parents = (await this.ok("rev-list", ["-C", dir, "rev-list", "--parents", "-n", "1", next])).split(" ").slice(1);
+        if (parents.join(" ") !== (lease ?? "")) throw new Error(`${next} does not have exactly the lease as its parent`);
+        const connected = await this.git(["-C", dir, "rev-list", "--objects", next]);
+        if (connected.code !== 0) throw new Error(`objects reachable from ${next} are missing: send or stage them again`);
+      } catch (e) {
+        return { outcome: { outcome: "error", detail: `before the push: ${e instanceof Error ? e.message : String(e)}`.slice(0, 600) } };
+      }
+      const outcome = await this.pushWithLease(dir, canonical, next, ref, lease);
+      if (outcome.outcome === "rejected" && outcome.reason === "lease") {
+        const current = await this.lsRemote(canonical, ref).catch(() => undefined);
+        return current === undefined ? { outcome } : { outcome, current };
+      }
+      return { outcome };
+    });
   }
 }

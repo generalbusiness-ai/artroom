@@ -45,7 +45,7 @@ export function nodeSql(path = ":memory:"): Sql & { db: DatabaseSync } {
 export const localExec: Exec = (argv, opts) =>
   new Promise((resolve) => {
     const [cmd, ...args] = argv;
-    execFile(
+    const child = execFile(
       cmd!,
       args,
       { cwd: opts.cwd, env: { ...opts.env, PATH: process.env["PATH"] ?? "/usr/bin:/bin" }, timeout: opts.timeoutMs, maxBuffer: 64 << 20 },
@@ -54,6 +54,7 @@ export const localExec: Exec = (argv, opts) =>
         resolve({ code, stdout: String(stdout), stderr: String(stderr) });
       },
     );
+    child.stdin?.end(opts.stdin ? Buffer.from(opts.stdin) : undefined);
   });
 
 export function tmp(prefix = "artroom-git-"): string {
