@@ -49,6 +49,8 @@ export interface CheckObligation extends ObligationBase {
   readonly kind: "check";
   readonly check: CheckerName;
   readonly by: readonly Principal[];
+  /** Present when the checker's configuration says `advisory: true`. It never blocks a landing (R-OBL-7). */
+  readonly advisory?: true;
 }
 
 /** Why an obligation is open again after it was met. */
@@ -157,6 +159,11 @@ export interface CheckCarryFacts {
     readonly snapshot: Digest | null;
     /** From the active checker configuration (R-CARRY-7). */
     readonly config: Digest;
+    /**
+     * The runner environment the active configuration pins (R-CARRY-14),
+     * never the earlier check's value. The room asks only when one is pinned;
+     * an unpinned checker's checks do not carry.
+     */
     readonly runner: Digest;
   };
   readonly volatile: boolean;

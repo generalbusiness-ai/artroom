@@ -138,6 +138,19 @@ export interface CheckerConfig {
   readonly volatile: boolean;
   /** Wall-clock budget for one run, in seconds. */
   readonly timeoutSeconds: number;
+  /**
+   * Absent or false: the default. True: every obligation for this checker is
+   * advisory. Its checks are requested and recorded, but never block a
+   * landing (R-OBL-7).
+   */
+  readonly advisory?: boolean;
+  /**
+   * The runner environment digest this checker must run in: the image and
+   * its toolchain, as the checker service measures it (R-EXEC-11). A check
+   * must state exactly this digest. Absent: no environment is pinned, and the
+   * checker's checks never carry (R-CARRY-14).
+   */
+  readonly runner?: Digest;
 }
 
 // ------------------------------------------------------------- rule inputs

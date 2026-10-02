@@ -65,6 +65,14 @@ describe("validation (R-POL-1)", () => {
     expect(validateCheckerConfig({ format: "artroom-checker-v1", volatile: false, timeoutSeconds: 600 }).ok).toBe(true);
     expect(validateCheckerConfig({ format: "artroom-checker-v1", inputs: [], volatile: "no", timeoutSeconds: 0 })).toMatchObject({ ok: false });
   });
+
+  test("checker configuration: advisory and a pinned runner (R-OBL-7, R-EXEC-11)", () => {
+    const base = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 600 };
+    expect(validateCheckerConfig({ ...base, advisory: true, runner: `sha256:${"a".repeat(64)}` }).ok).toBe(true);
+    expect(validateCheckerConfig({ ...base, advisory: "yes" }).ok).toBe(false);
+    expect(validateCheckerConfig({ ...base, runner: "sha256:ABC" }).ok).toBe(false);
+    expect(validateCheckerConfig({ ...base, runner: `sha256:${"A".repeat(64)}` }).ok).toBe(false);
+  });
 });
 
 describe("globs (R-PATH-1 to 3)", () => {

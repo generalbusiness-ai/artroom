@@ -29,6 +29,7 @@ import type { SignedEnvelope } from "./envelope.ts";
 import type { LaneEffect } from "./lanes.ts";
 import type { AbortAttempt, FailReason, ReadBack, RetryReason } from "./landing.ts";
 import type { Decision } from "./policy.ts";
+import type { CarryReason, NotCarried } from "./evidence.ts";
 import type { Genesis } from "./roster.ts";
 import type { Refusal } from "./errors.ts";
 
@@ -115,6 +116,28 @@ export type SystemEvent =
       readonly reopened: readonly ObligationId[];
       /** Present when a `require` rule failed deterministically; `land` is refused with it (R-POL-9). */
       readonly blocked?: Omit<Refusal, "act">;
+    }
+  /**
+   * Whether an earlier check carries onto a new integration, judged during
+   * preparation (R-CARRY-13). One event per judgment, carried or not. A
+   * check counts as carried only on `integration`, under `policy`, and only
+   * after this event is sealed.
+   */
+  | {
+      readonly type: "check-carried";
+      readonly op: OpId;
+      readonly lane: LaneId;
+      readonly generation: Generation;
+      /** The new integration the check would count for. */
+      readonly integration: Sha;
+      readonly obligation: ObligationId;
+      /** The earlier `check` act. */
+      readonly act: ActId;
+      /** The policy version that judged it: the operation's. */
+      readonly policy: PolicyVersion;
+      readonly outcome: { readonly carried: true; readonly reason: CarryReason } | { readonly carried: false; readonly notCarried: NotCarried };
+      /** The `carry` rule decisions; empty when no rule applied or a platform condition failed first. */
+      readonly decisions: readonly Decision[];
     }
   /**
    * The land rules evaluated during preparation on the prospective

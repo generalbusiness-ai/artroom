@@ -139,7 +139,11 @@ export interface ReviewBody {
 export interface CheckBody {
   readonly obligation: ObligationId;
   readonly check: CheckerName;
-  /** The exact integration commit the runner checked out and confirmed (R-EXEC-4). */
+  /**
+   * The exact commit the runner checked out and confirmed (R-EXEC-4): the
+   * integration, or, with filtered input, the snapshot commit the room
+   * recorded for that integration (R-CARRY-15).
+   */
   readonly integration: Sha;
   readonly input: CheckInput;
   /** sha256 of the checker's configuration from the active policy version (R-CARRY-7). */
