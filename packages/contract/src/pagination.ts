@@ -59,8 +59,11 @@ export type AttentionWhy =
    * push still outstanding. `detail` is the remote's answer, such as
    * `artifacts_git_receive_pack_object_too_large`, with any token removed.
    * The item stays open until a publication is confirmed.
+   * `repository-gone`: Artifacts answers NOT_FOUND for the canonical
+   * repository. The room stops publishing and landing until a publication
+   * is confirmed, and tries again only after a later entry (request 3da1d82b).
    */
-  | { readonly why: "log-publication-stalled"; readonly reason: "refused" | "object-too-large" | "unexpected-writer" | "unresolved"; readonly detail: string; readonly since: Timestamp };
+  | { readonly why: "log-publication-stalled"; readonly reason: "refused" | "object-too-large" | "unexpected-writer" | "unresolved" | "repository-gone"; readonly detail: string; readonly since: Timestamp };
 
 export type AttentionItem = AttentionWhy & {
   readonly id: string;
