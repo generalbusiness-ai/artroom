@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Builder takes mint lane B now that lane A has landed (main 7be42275); lane C follows B, serialised at core.ts."}
+{"kind":"artifact","text":"docs/protocol.md at exact 685c068bf7bf4323ef27bf0449e7d39aa1b1edfb on request/idle-writes, under promise git:sha1…6fe9286 on request git:sha1…84eee84","body":{"commit":"685c068bf7bf4323ef27bf0449e7d39aa1b1edfb","path":"docs/protocol.md"}}
