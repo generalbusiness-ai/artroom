@@ -18,6 +18,7 @@ import type {
   Carried,
   Checkpoint,
   CheckerConfig,
+  CheckerService,
   Decision,
   Digest,
   Glob,
@@ -247,17 +248,36 @@ export interface Remotes {
   readonly landingFault?: (point: import("@generalbusiness/artroom-git").FaultPoint, op: OpId) => void;
 }
 
-/** What the Room is given: the policy runtime and the remotes. */
+/**
+ * Snapshot repositories (R-CARRY-16): the seam for lane G's `SnapshotRepos`,
+ * which is not on main yet. No deployment gives one, so the Room issues no
+ * filtered job (fail closed); it never issues one against a shared store.
+ */
+export interface SnapshotPort {
+  /**
+   * Have the publisher write the snapshot commit into its own new repository,
+   * and return the commit it wrote. The Room issues the job only if that is
+   * the commit it recorded (R-CARRY-15 step 4).
+   */
+  prepare(snapshot: {
+    readonly commit: Sha;
+    readonly integration: Sha;
+    readonly checker: string;
+    readonly digest: Digest;
+    readonly paths: readonly Glob[];
+  }): Promise<{ readonly commit: Sha; readonly remote: `https://${string}` }>;
+  /** A read token for that repository only, expiring no later than `deadline` (ms). */
+  mint(commit: Sha, job: string, deadline: number): Promise<{ readonly token: string; readonly expiresAt: number }>;
+}
+
+/** What the Room is given: the policy runtime, the remotes and the checker services. */
 export interface RoomServices {
   readonly policy: PolicyPort;
   readonly remotes: Remotes;
-  /**
-   * The runner environment digest attested now for a checker, or null. A
-   * check carries onto a new integration only if the runner that would run
-   * it now is attested to be the earlier check's (R-CARRY-6). No deployment
-   * attests one yet, so checks do not carry (review a711f7b6; amendment 3).
-   */
-  readonly runnerDigest?: (checker: string) => Digest | null;
+  /** The checker's service binding (R-EXEC-8), or null when the deployment binds none for it. */
+  readonly checkers?: (checker: string) => CheckerService | null;
+  /** Snapshot repositories for filtered jobs (R-CARRY-16). Absent: no filtered job is issued. */
+  readonly snapshots?: SnapshotPort | undefined;
 }
 
 /** The ports the Room's code uses, built by the Room over its services. */

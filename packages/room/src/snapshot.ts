@@ -5,9 +5,8 @@
  *
  * The commit is a function of its inputs only: a tree holding exactly the
  * filtered files (each at its path, mode and blob), no parents, a fixed
- * identity and time, and the message lane G's job flow uses. A publisher
- * that writes the snapshot must write exactly this commit; that format is a
- * contract change proposed for amendment 3 (see README).
+ * identity and time, and a fixed message. A publisher that writes the
+ * snapshot must write exactly this commit (R-CARRY-15).
  */
 
 import type { Digest, Sha } from "@generalbusiness/artroom-contract";

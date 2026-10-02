@@ -19,7 +19,7 @@ import { addMember, advance, clock, Client, expectOk, expectRefusal, iso, makeRo
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const op = async (r: TestRoom, id: string) => (await r.admin.read({ q: "op", op: id as never })) as LandOp & { integration?: string; waiting?: string[] };
-const RUNNER = `sha256:${"0".repeat(64)}`;
+const RUNNER = `sha256:${"0".repeat(64)}` as const;
 
 async function proposed(r: TestRoom, who: Client, scope: string[], changes: Record<string, string>) {
   const c = await who.ok<Claim>("claim", null, { goal: "work", scope });
@@ -28,7 +28,8 @@ async function proposed(r: TestRoom, who: Client, scope: string[], changes: Reco
   return { lane: c.lane, head };
 }
 
-const scoped: CheckerConfig = { format: "artroom-checker-v1", inputs: ["src/**"], volatile: false, timeoutSeconds: 60 };
+/** A scoped checker whose configuration pins the runner every test check states (R-CARRY-14). */
+const scoped: CheckerConfig = { format: "artroom-checker-v1", inputs: ["src/**"], volatile: false, timeoutSeconds: 60, runner: RUNNER };
 
 async function checkRoom(cfg: CheckerConfig = scoped) {
   const doc = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
@@ -53,7 +54,6 @@ function body(cfg: CheckerConfig, integration: string, input: unknown, extra: Pa
  */
 async function carriedAndReady() {
   const { r, doc, alice, ci } = await checkRoom();
-  r.world.runnerDigest = () => RUNNER;
   const bob = await addMember(r, "@bob", "member");
   // The background steps that would reserve it are held back; this test drives the engine itself.
   await inDO(r, async (room) => {
@@ -171,12 +171,14 @@ describe("1. a stored check carry counts only under the policy version that judg
 
 // ------------------------------------------------------------------ 4b, 4c, 4e
 
-describe("4. check carry fails closed; the signed volatile flag must be the configuration's", () => {
-  async function carryUnder(attested: string | null, extraRule?: PolicyDocument["rules"][number]) {
+describe("4. check carry needs a pinned runner; the signed volatile flag must be the configuration's", () => {
+  async function carryUnder(pinned: boolean, extraRule?: PolicyDocument["rules"][number]) {
     const base = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
     const doc: PolicyDocument = extraRule ? { ...base, rules: [...base.rules, extraRule] } : base;
-    const r = await makeRoom({ policy: doc, files: { ".artroom/checkers/unit.json": JSON.stringify(scoped), "package.json": "{}" } });
-    r.world.runnerDigest = () => attested;
+    const { runner: _pin, ...unpinned } = scoped;
+    void _pin;
+    const cfg: CheckerConfig = pinned ? scoped : unpinned;
+    const r = await makeRoom({ policy: doc, files: { ".artroom/checkers/unit.json": JSON.stringify(cfg), "package.json": "{}" } });
     const alice = await addMember(r, "@alice", "member");
     const bob = await addMember(r, "@bob", "member");
     const ci = await addMember(r, "@ci", "checker");
@@ -187,26 +189,22 @@ describe("4. check carry fails closed; the signed volatile flag must be the conf
     await tick(r);
     const i1 = (await op(r, l.op.id)).integration!;
     const paths = checkerInputs(scoped.inputs, doc.carry)!;
-    await ci.ok("check", { lane: mine.lane, generation: 1 }, body(scoped, i1, { kind: "filtered", snapshot: await snapshotOf(r, i1, paths), paths }));
+    await ci.ok("check", { lane: mine.lane, generation: 1 }, body(cfg, i1, { kind: "filtered", snapshot: await snapshotOf(r, i1, paths), paths }));
     await tick(r, 4);
     return op(r, l.op.id);
   }
 
-  it("no runner environment attested for the checker: the check does not carry (R-CARRY-6 cannot be judged), and the landing waits", async () => {
-    expect(await carryUnder(null)).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
+  it("no runner environment pinned for the checker: the check does not carry (R-CARRY-14), and the landing waits", async () => {
+    expect(await carryUnder(false)).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
   });
 
-  it("another runner environment attested: the check does not carry", async () => {
-    expect(await carryUnder(`sha256:${"9".repeat(64)}`)).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
+  it("the pinned runner: the check carries and the landing completes", async () => {
+    expect(await carryUnder(true)).toMatchObject({ state: "landed" });
   });
 
-  it("the same runner attested: the check carries and the landing completes", async () => {
-    expect(await carryUnder(RUNNER)).toMatchObject({ state: "landed" });
-  });
-
-  it("a carry rule for reviews only does not stop a check carrying; one for checks does (its decision cannot be sealed yet)", async () => {
-    expect(await carryUnder(RUNNER, { id: "reviews", kind: "carry", evidence: "review", allow: "true" })).toMatchObject({ state: "landed" });
-    expect(await carryUnder(RUNNER, { id: "checks", kind: "carry", evidence: "any", allow: "true" })).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
+  it("a carry rule for reviews only does not stop a check carrying; one for checks is evaluated, and allows it (amendment 3 seals its decision)", async () => {
+    expect(await carryUnder(true, { id: "reviews", kind: "carry", evidence: "review", allow: "true" })).toMatchObject({ state: "landed" });
+    expect(await carryUnder(true, { id: "checks", kind: "carry", evidence: "any", allow: "true" })).toMatchObject({ state: "landed" });
   });
 
   for (const configured of [false, true])
@@ -263,7 +261,7 @@ describe("4d. a scoped check binds the snapshot commit the room recorded for the
       config: digestJson(scoped),
       volatile: scoped.volatile,
       advisory: false,
-      runner: null,
+      runner: RUNNER,
       landOp: l.op.id,
       deadline: iso(clock.now + 900_000),
     };

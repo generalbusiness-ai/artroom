@@ -214,8 +214,10 @@ describe("workspace lease races and delayed cleanup (R-WS, R-CRED-8, R-LANE-8)",
 // ------------------------------------------------------------------ checks
 
 describe("policy activation and recompute, scoped check carry and filtered checker inputs (R-POL-9, R-CARRY-6 to 10, R-OBL-3)", () => {
-  const scoped: CheckerConfig = { format: "artroom-checker-v1", inputs: ["src/**"], volatile: false, timeoutSeconds: 60 };
-  const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60 };
+  /** The runner every test check reports, pinned by the configuration (R-CARRY-14). */
+  const RUNNER = `sha256:${"0".repeat(64)}` as const;
+  const scoped: CheckerConfig = { format: "artroom-checker-v1", inputs: ["src/**"], volatile: false, timeoutSeconds: 60, runner: RUNNER };
+  const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: RUNNER };
 
   async function checkRoom(cfg: CheckerConfig) {
     const doc = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
@@ -255,12 +257,8 @@ describe("policy activation and recompute, scoped check carry and filtered check
     expect(await op(r, l.op.id)).toMatchObject({ state: "landed" });
   });
 
-  /** The runner every test check reports, attested as the one that would run now. */
-  const RUNNER = `sha256:${"0".repeat(64)}`;
-
-  async function carryCase(cfg: CheckerConfig, mainChange: Record<string, string>, attested: string | null = RUNNER) {
+  async function carryCase(cfg: CheckerConfig, mainChange: Record<string, string>) {
     const { r, doc, alice, ci } = await checkRoom(cfg);
-    r.world.runnerDigest = () => attested;
     const bob = await addMember(r, "@bob", "member");
     // Bob's landing moves main first; Alice's is prepared on the old main.
     const other = await proposed(r, bob, Object.keys(mainChange).map((p) => p.split("/")[0] + "/**"), mainChange);
@@ -516,7 +514,7 @@ describe("the adapters' boundaries", () => {
     await expect(verifyLog(artifactsLogRemote(lying, a.logStub, { namespace: a.namespace, name: a.canonical }))).rejects.toThrow(/could not be read/);
   });
 
-  it("with a policy carry rule in force, a check does not carry: it reruns", async () => {
+  it("with a policy carry rule in force but no runner pinned, a check does not carry: it reruns (R-CARRY-14)", async () => {
     const scopedCfg: CheckerConfig = { format: "artroom-checker-v1", inputs: ["src/**"], volatile: false, timeoutSeconds: 60 };
     const base = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
     const doc: PolicyDocument = { ...base, rules: [...base.rules, { id: "keep", kind: "carry", evidence: "check", allow: "true" }] };

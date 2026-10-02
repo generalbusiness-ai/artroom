@@ -9,7 +9,7 @@
  */
 
 import type { PublisherStub } from "@generalbusiness/artroom-git";
-import type { LaneId } from "@generalbusiness/artroom-contract";
+import type { CheckerService, LaneId } from "@generalbusiness/artroom-contract";
 import type { ArtifactsBinding } from "./artifacts.ts";
 import { artifactsLogRemote, type LogRemoteStub } from "./logremote.ts";
 import { lanePolicy } from "./policy.ts";
@@ -64,8 +64,15 @@ const productionServices: ServicesFactory = (env, roomObject) => {
   return {
     policy: lanePolicy(),
     remotes: { artifacts: binding, namespace, publisher: stub, logRemote: async (repo) => artifactsLogRemote(binding, logStub, repo) },
+    // Each checker's service binding, by name (R-EXEC-8). No snapshot repositories yet: no filtered job is issued (R-CARRY-16).
+    checkers: (name) => ((env as unknown as Record<string, CheckerService | undefined>)[checkerBinding(name)] ?? null),
   };
 };
+
+/** The service binding a deployment gives a checker: `CHECKER_` and its name in capitals, `-` as `_` (`llm-review` is `CHECKER_LLM_REVIEW`). */
+export function checkerBinding(name: string): string {
+  return `CHECKER_${name.toUpperCase().replaceAll("-", "_")}`;
+}
 
 let factory: ServicesFactory = productionServices;
 let clockFn: () => number = () => Date.now();

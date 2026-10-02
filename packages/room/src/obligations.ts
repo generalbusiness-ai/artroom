@@ -14,6 +14,7 @@ import type {
   ActId,
   Authority,
   CheckBody,
+  CheckerConfig,
   Evidence,
   MemberId,
   Obligation,
@@ -42,6 +43,20 @@ export function adminObligation(policy: string, paths: readonly RepoPath[]): Obl
   const hit = paths.filter((p) => matchGlob(p, ADMIN_SCOPE));
   if (!hit.length) return null;
   return { id: ADMIN_APPROVAL, rule: "admin-approval", policy: policy as ObligationSpec["policy"], paths: hit, kind: "review", from: ["role:admin"], count: 1, allowSelf: false };
+}
+
+/**
+ * Mark each check obligation whose checker's configuration says `advisory: true`
+ * (R-OBL-7). The configuration is the one in the policy version that made the
+ * obligations, so recomputation at activation sets it again (R-POL-9).
+ */
+export function withAdvisory(specs: readonly ObligationSpec[], checkers: Readonly<Record<string, { readonly config: CheckerConfig }>>): ObligationSpec[] {
+  return specs.map((s) => (s.kind === "check" && checkers[s.check]?.config.advisory === true ? { ...s, advisory: true } : s));
+}
+
+/** Does an obligation hold up a landing? An advisory check obligation never does (R-OBL-7). */
+export function blocking(o: ObligationSpec): boolean {
+  return !(o.kind === "check" && o.advisory === true);
 }
 
 /** `allowSelf` takes effect only when every path is documentation (R-OBL-2). */
@@ -208,11 +223,12 @@ export function obligationStatus(sql: Sql, gen: GenerationRow, spec: ObligationS
     evidence.push({ basis: "here", act: r.act, kind: "check", generation: gen.generation, head: gen.head });
   }
   // Checks carried onto an integration of this generation (R-CARRY-6 to 10), still valid evidence (R-REV-1).
-  // A carry counts only on the integration and under the policy version that judged it (review a711f7b6).
+  // A carry counts only on the integration and under the policy version that judged it (review a711f7b6), and only
+  // with its sealed `check-carried` event (R-CARRY-13).
   const version = getMeta(sql, "policy");
   const carriedRows = opts.integration
-    ? sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ? AND integration = ? AND policy = ?", gen.lane, gen.generation, spec.id, opts.integration, version)
-    : sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ? AND policy = ?", gen.lane, gen.generation, spec.id, version);
+    ? sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ? AND integration = ? AND policy = ? AND event IS NOT NULL", gen.lane, gen.generation, spec.id, opts.integration, version)
+    : sql.all("SELECT act, evidence FROM check_carries WHERE lane = ? AND generation = ? AND obligation = ? AND policy = ? AND event IS NOT NULL", gen.lane, gen.generation, spec.id, version);
   for (const c of carriedRows) {
     const r = evidenceByAct(sql, c["act"] as string);
     if (!r || exclude.has(r.act) || acts.includes(r.act) || !valid(r)) continue;

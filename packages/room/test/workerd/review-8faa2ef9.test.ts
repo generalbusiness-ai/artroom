@@ -526,7 +526,7 @@ describe("5. durable storage upgrades through versioned migrations", () => {
         admission: { teams: [], author: true },
         attempts: 0,
         kinds: delegableBy("member"),
-        version: 7,
+        version: 8,
         // The previous revision's workspace is legacy access: its end imports the cleanup it is owed into lane B's duties.
         workspace: "legacy",
       });

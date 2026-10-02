@@ -93,6 +93,7 @@ import {
   qualification,
   statusesOf,
   transitions,
+  withAdvisory,
 } from "./obligations.ts";
 import type { ArtroomConfig, DiffResult, Evaluation, ObligationSpec } from "./ports.ts";
 import { activeAdmins, activeKeys, delegableBy, delegation, invitation, keyRow, memberRow, recoveryKey, revocationOf, teamsOf } from "./roster.ts";
@@ -731,7 +732,7 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
     );
     ctx.evaluations.push(...req.evaluations);
     if (req.refusal) return refused(ctx, req.refusal);
-    for (const o of req.obligations) if (!specs.some((s) => s.id === o.id)) specs.push(o);
+    for (const o of withAdvisory(req.obligations, ctx.policy.checkers)) if (!specs.some((s) => s.id === o.id)) specs.push(o);
   }
   // Carrying earlier verdicts (R-CARRY), through the policy port: platform conditions first, then carry rules.
   const carried: { obligation: ObligationId; evidence: Carried }[] = [];
@@ -1095,6 +1096,9 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   if (!cfg || cfg.digest !== body.config) return binding("The check's configuration digest is not the active configuration's.");
   // R-CARRY-10: the signed flag must be the configuration's; a check is never carried on a flag it contradicts.
   if (body.volatile !== cfg.config.volatile) return binding(`The check says volatile ${String(body.volatile)}, but the checker's configuration says ${String(cfg.config.volatile)}.`);
+  // R-CARRY-14: a configuration that pins a runner environment admits only checks that state it.
+  if (cfg.config.runner !== undefined && body.runner !== cfg.config.runner)
+    return binding(`The check says runner ${body.runner}, but the checker's configuration pins ${cfg.config.runner}.`);
   let canonical = body.integration;
   if (snapshotRows.length) {
     const input = body.input;
