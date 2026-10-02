@@ -505,7 +505,7 @@ These are for the checker to confirm or reject.
 7. **The landing row stores Artifacts' reported expiry** when the mint gives one; the one-time fill stores NULL, as the operation never recorded it. The expiry is shown nowhere and decides nothing: a landing row ends only with `tokenRevoked`.
 8. **A pass's last wake-up stays.** When the last pass of a backlog ends, the alarm already stored for the attempt's timeout (at most 30 s ahead) is kept, because a wake never moves an alarm later; it runs, finds nothing due and writes nothing. The backlog control shows this between the last pass and the lease alarm. Review f060871b accepted the same for the landing's cleanup pass.
 9. **The backlog control's "a publication lands meanwhile".** The publication's own landing work is due at once, so while it runs the Room stores an alarm for now, as it always has. The control checks the bounds (no stored alarm under 1 s ahead, none past the held attempt's timeout) before the publication and again after the landing's alarm has run. All the ledger's own wake-ups stay within those bounds throughout.
-10. **Pre-existing provider text in the landing record is not changed here.** The engine still stores `message(e)` for a failed read of main (`readBackFailed`), a push that did not answer, and a failed integration. Lane B changed only the mint's failure, which it now owns. A separate request should apply the safe-metadata rule there.
+10. **Pre-existing provider text in the landing record is not changed here.** The engine still stores `message(e)` for a failed read of main (`readBackFailed`), a push that did not answer, and a failed integration. Lane B changed only the mint's failure, which it now owns. A separate request should apply the safe-metadata rule there. (Done by request `d29c09fa`: see [below](#request-d29c09fa-safe-error-metadata-at-durable-sinks).)
 11. **Test hooks.** The Room controls run the room clock a week ahead of real time with no alarm delay, so a stored alarm is the room's own time and never fires by itself; they set hooks on one object only (its `schedule`, `storeAlarm`, the engine's `tokens.revoke`, the ledger's `waitMs` and `reconcile`, and the canonical fake's `revokeToken`), and restore the suite's existing clock and alarm delay. The idle control counts rows written through a spy on that object's `Sql`.
 
 ### Tests: rule map
@@ -598,3 +598,103 @@ Run at the exact head that carries this section, serially, with logs in `/privat
 ### Not changed here
 
 Lane C's sites keep their own mints: the publisher client's `withToken` (integrate, pinning, previews), the log remote, snapshot preparation's canonical read token and check jobs (`watchMint` and its `mint:` rows). The Room's `known` already includes `job_tokens`, so lane C's claim into that table needs no change here. `mints.ts` is unchanged. Showing the ledger's records to admins stays with the cleanup projection request (`8d249233`).
+
+## Request d29c09fa: safe error metadata at durable sinks
+
+Status: DONE, pending checker review. Gitseq request `d29c09fa`, branch `request/land-errors`, cut from main `574568b2`. The head for review is the commit that carries this section.
+
+**The rule** (review `0ab6dac3`, lane A's standard). A durable or projected error field keeps lane A's `errorNote(stage, error)` and nothing more: a fixed stage phrase, the error's name if it is in a fixed list, an Artifacts code if `artifacts.ts` classifies it, and an integer numeric code or HTTP status. It never keeps the provider's message, even redacted: no token format in the contract lets a pattern find every credential. Operator logs are different. The Room's `diagnose` (`src/diag.ts`, request `d268d249`) logs the error's name and its redacted, bounded message; that is unchanged.
+
+**What changed.** `errorNote` stays in `packages/git/src/mints.ts`, so lane C's edits there merge mechanically. Its `ErrorStage` type gains the new phrases, and the package exports `errorNote`, `ErrorStage` and `knownArtifactsCode` (the error's code if it is a known Artifacts code, else null). `publisher/push-outcome.ts` adds `outcomeNote(outcome)`: `push answered: <outcome>`, the kind of refusal, and an Artifacts refusal code from `ARTIFACTS_REFUSALS`.
+
+### Sinks
+
+Fixed (the stored text before, and now):
+
+| Sink | Where | Before | Now |
+|---|---|---|---|
+| Landing record `lastError`, main not read back after a push (also `PublicationStatus.lastError`) | `landing/engine.ts` `readBackAndApply` → `core.readBackFailed` | `main could not be read: <message>` | `errorNote("main could not be read", e)` |
+| Push attempt `detail`, a push that did not answer | `engine.ts` `publishStep` | `push did not answer: <message>` | `errorNote("push did not answer", e)` |
+| Push attempt `detail`, a push that answered | `engine.ts` `publishStep` | git's stdout and stderr from the sandbox (only `art_v…` tokens redacted) | `outcomeNote(answer)` |
+| Landing record `lastError`, a failed integration (the engine's catch) | `engine.ts` `prepare` → `core.prepared` | `<message>` | `errorNote("integration failed", e)` |
+| `IntegrateResult.detail`, which the record keeps, from the Room's publisher | `publisher/client.ts` `ContainerPublisher.integrate` | `<message>` (token lookup, mint or sandbox error) | `errorNote("integration failed", e)` |
+| `IntegrateResult.detail` from the Node publisher | `publisher/git-publisher.ts` | `GitError` message: git's stderr | `errorNote("integration failed", e)` |
+| Landing record `lastError`, readiness that cannot be computed | `engine.ts` `evaluateNow` → `core.readinessFailed` | `<message>` (policy runtime, Artifacts reads) | `errorNote("readiness could not be computed", e)` |
+| Workspace `artroom_ws.error`, and the failed workspace operation's `error.message` (its view, and act records that hold it) | `workspace/workspaces.ts` `failure` | `Could not provision the workspace: <message>`, token pattern redacted | `errorNote("could not provision the workspace", e)` |
+| `artroom_ws_duty.last_error`, a failed or refused remote step | `workspaces.ts` `failedStep`, `answered` | `String(e)`, token pattern redacted | `errorNote("workspace step failed", e)` |
+| `artroom_ws_duty.last_error`, cleanup owed after a failure (8 call sites, all through `defer`) | `workspaces.ts` `defer` | the same | `errorNote("workspace cleanup failed", e)`; `defer` now takes the error, not text |
+| `artroom_snap_duty.last_error`: a failed create, an unresolved create's check, failed cleanup | `snapshot/repos.ts` create, `recheck`, `defer` | `String(e)`, token pattern redacted | `errorNote("snapshot create failed" / "snapshot create not yet seen" / "snapshot cleanup failed", e)` |
+| Room `job_tokens.last_error`, and `jobTokenDuties().status` (operators): a lost mint, an unreadable inventory, a failed revocation | `room/src/jobs.ts` | `redact(String(e))` (`diag.ts`) | `answer lost: errorNote("create failed", e)`, `outcome unknown; errorNote("the token inventory could not be read", e)`, `errorNote("revocation failed", e)` |
+| Room `meta.publication_error`, and the code in the caller's `unavailable` message | `room/src/core.ts` `publish` | the thrown error's `code`, any string | a known code (lane L's `PublishErrorCode`, the Room's `unknown-version` and `cohort-mismatch`), else a known Artifacts code, else `transport` |
+
+Left as they are, with the reason:
+
+| Sink | Why it is left |
+|---|---|
+| `artroom_mint.last_error`, the observation, `MintLedger.duties()` | Lane A: already `errorNote` |
+| Push attempt `detail` `token not minted (…)` and `abort attempt before the push started` | Lane B's `errorNote`, and a fixed phrase |
+| `job_tokens.last_error` values `ended`, `held`, `minting`, `refused`, `malformed answer`; the observation `N live token(s) … not accounted for at <time>`; the inventory's `… is incomplete or malformed` | The Room's own text, with counts and times. `jobs.ts` no longer runs them through `redact`, as they hold no provider text |
+| `notify_queue.last_error` | Fixed phrases: `policy runtime failure`, `runtime failure` |
+| `check_jobs.outcome` | `not-needed`, `unbound`, `refused: <rule>`, or a report's ID |
+| `reason` and `done_reason` of `artroom_ws_duty` and `artroom_snap_duty`; a refused first commit (`the first commit was refused`) | Fixed codes and phrases |
+| A workspace failure from `CleanupOwed` or `NotOurFork` | The Room's own messages: a count, repository names |
+| Landing `reason` and `fix`, `land-outcome` events; a `policy-invalid` refusal naming the first configuration problem | Retry and failure codes and the Room's fix text. A configuration problem comes from parsing and validating `.artroom/*.json` in the integration: repository content the members wrote, not provider text |
+| Previews' `failed` body | A fixed `ArtroomError` ("The preview could not be computed.") |
+| Attention and admin items | Built from fixed templates with IDs, lanes, generations and times; none from an error. `log-publication-stalled` names `NOT_FOUND` and the repository, in fixed text |
+| `keys.reason`, `revoked_keys.reason`, a check report's `detail` | Text from signed acts, written by members |
+| Operator logs: `RoomCore.diagnose` | A log, not a row or a projection: the error's name and its redacted message (request `d268d249`). The Room tests here check that the diagnoses hold none of the three samples either |
+| Fields read at runtime and never stored: `PushOutcome.detail` inside the publisher (pinning reads `[up to date]`, `toLogOutcome` its refusal code), lane L's `PublishError` message and refusal detail (they reach the diagnosis log; `publication_error` keeps the code), `FirstCommitOutcome.detail`, `StageResult.detail`, `GitError` messages, and errors to clients (`toArtroomError` gives unknown errors a fixed message) | Not durable and not projected. `outcomeNote` is applied at the engine, not in the publisher, because pinning and the log push read the publisher's text at runtime |
+
+### Choices for the checker
+
+1. **The publishers return safe metadata**, and the engine stores `IntegrateResult.detail` as it comes. Both publishers and the engine's own catch use `errorNote`; the type says the field is safe metadata only.
+2. **No migration.** A row written before this change keeps its text until that field is next written (every sink above overwrites it) or the row ends.
+3. **Names.** `errorNote`'s list of allowed names is unchanged, so an Artifacts binding error (`ArtifactsError`) reads `an error of another kind`, with its code and numbers.
+4. **A publication code that is not known becomes `transport`.** The alarm's backoff and the gone-repository probe (`NOT_FOUND`, a known Artifacts code) are unchanged.
+5. **Request `d268d249`'s job-token test** now expects metadata only at its three sinks, and also checks every row of every table and `jobTokenDuties()`.
+
+### Tests
+
+Each test makes the provider throw (or answer) with a message echoing an `art_v1_…` token, an `Authorization: Bearer` header's credential and a URL query's secret (assembled at runtime, so the source holds no credential-shaped literal). Each checks the exact stored metadata, and that none of the three appears in any row of any table or in what is shown.
+
+| File | Tests | Shown and checked |
+|---|---|---|
+| `packages/git/test/safe-errors.test.ts` (new, 7) | integration (engine catch), integration through `ContainerPublisher`, integration through `GitPublisher` (git stderr), readiness, unanswered push, answered push (and `outcomeNote` for every outcome), main not read back | every row, `view`, `activeViews`, `status`, `slot`, the room's log |
+| `packages/git/test/workspaces.test.ts` (3 new) | provisioning that keeps failing (the view, `artroom_ws`, the steps), a refused step (`answered`), failed cleanup (`defer`) | every row, `view`, `duties`, the returned view |
+| `packages/git/test/snapshots.test.ts` (2 new) | a failed create, then its check; failed retirement (revoke and delete) | every row, `duties` |
+| `packages/room/test/workerd/safe-errors-d29c09fa.test.ts` (new, 5) | the production Room: integration through `ContainerPublisher` then readiness; an answered push with main not read back, then an unanswered push; a publication failing with a credential as its code, with no code, and with a known Artifacts code | every row of every table, the `log`, `attention`, `lanes` and `op` reads, `PublicationStatus`, the operator diagnoses, the caller's error |
+| `packages/room/test/workerd/request-d268d249.test.ts` (1 changed) | the lost mint, the unreadable inventory, the failed revocation of job tokens | `job_tokens`, every row of every table, `jobTokenDuties()` |
+
+### Mutation table
+
+Each mutant was applied alone by a script (`/private/tmp/claude-501/landerr/mutants/run.py`) at the committed implementation `e5f990d1`. Git mutants ran against `safe-errors.test.ts`, `workspaces.test.ts` and `snapshots.test.ts`; those the Room reaches also ran, as did the Room mutants, against `safe-errors-d29c09fa.test.ts` and `request-d268d249.test.ts`. The file was restored from the commit after each. 21 mutants, all red; every new test is red under at least one. "The provider's text" below is the error's message, or for M8 the push's output.
+
+| Mutant | Mutation | Red tests |
+|---|---|---|
+| M1 | `readBackFailed` given the provider's text | Node: main not read back; Room: answered push, main not read back |
+| M2 | an unanswered push's detail with the provider's text | Node: unanswered push; Room: the same test |
+| M3 | an answered push's detail kept as the publisher gave it | Node: answered push; Room: the same test |
+| M4 | the engine's integration catch keeping the provider's text | Node: integration (engine catch) |
+| M5 | `readinessFailed` given the provider's text | Node: readiness; Room: integration then readiness |
+| M6 | `ContainerPublisher.integrate` returning the provider's text | Node: integration through `ContainerPublisher`; Room: integration then readiness |
+| M7 | `GitPublisher.integrate` returning the `GitError` message | Node: integration through `GitPublisher` |
+| M8 | `outcomeNote` appending the push's output | Node: answered push; Room: the same test |
+| M9 | the workspace failure's message with the provider's text (the old form) | Node: provisioning that keeps failing; a refused step |
+| M10 | `failedStep` storing `String(e)` | Node: provisioning that keeps failing |
+| M11 | `answered` storing `String(e)` | Node: a refused step |
+| M12 | the workspace `defer` storing `String(e)` | Node: failed cleanup |
+| M13 | a failed snapshot create storing `String(e)` | Node: a failed create, then its check |
+| M14 | the snapshot `recheck` storing `String(e)` | Node: a failed create, then its check |
+| M15 | the snapshot `defer` storing `String(e)` | Node: failed retirement |
+| M16 | a lost job-token mint storing `String(e)` | Room: job tokens (request d268d249's test) |
+| M17 | an unreadable inventory storing `String(e)` | Room: job tokens |
+| M18 | a failed job-token revocation storing `String(e)` | Room: job tokens |
+| M19 | `publication_error` from the thrown code as it is (the old form) | Room: a code that is provider text |
+| M20 | `knownArtifactsCode` keeping any code | Room: a code that is provider text |
+| M21 | `publicationCode` keeping any code | Room: a code that is provider text |
+
+Lane A's mutants guard `errorNote` itself (F7: `errorNote` keeping the message).
+
+### Gates
+
+Run at the exact head that carries this section, serially, with logs in `/private/tmp/claude-501/landerr/`; the exit codes are in the delivery report. In this order: `npm run typecheck -w @generalbusiness/artroom-git`, `npm test -w @generalbusiness/artroom-git` (Node) and `npm run test:workers -w @generalbusiness/artroom-git`; `npm run typecheck -w @generalbusiness/artroom-room`, `npm run test:node -w @generalbusiness/artroom-room` and `npm run test:workerd -w @generalbusiness/artroom-room`; then from the root `npm ci`, `npm run typecheck` and `npm test`.
