@@ -783,3 +783,27 @@ At `8f350653`:
 | `wrangler deploy --dry-run` of `wrangler.jsonc` and `wrangler.harness.jsonc` | exit 0 each; production binds only `RUNNER`, `ROOM` and `AI` |
 
 No deploy and no live run, as asked.
+
+### The accepted namespaces, and the merge of main fecd69eb
+
+The namespace guards were mutated after committing (`4815dcb3`); each
+mutant made a test fail, and the tree was clean afterwards:
+
+| Mutant | Failing tests |
+|---|---|
+| Any namespace accepted | "a job may read from any accepted namespace, and from no other"; the binding case "another namespace" |
+| Only the first listed namespace accepted | "a job may read from any accepted namespace …" |
+| An empty or malformed list accepted | "ARTIFACTS_NAMESPACES: …"; "production: an entrypoint will not start …" |
+| A missing list accepted | the same two |
+| Entrypoints start without checking the list | "production: an entrypoint will not start …" |
+| The production default unset | "production: an entrypoint will not start …" |
+
+Main `fecd69eb` (amendment 4, lanes L and B) merged without conflicts, as
+`27563fc6`. Gates there, after `npm ci`:
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | exit 0 |
+| Root `npm test` | exit 0: checkers 45; cli 102; client 86 Node and 2 workerd; git (Node) 193; log 198 Node and 193 workerd; mcp 73 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 107 Node and 308 workerd; ui 141 |
+| `packages/git` `npm run test:workers` | exit 0, 8 tests |
+| `wrangler deploy --dry-run` of `wrangler.jsonc` and `wrangler.harness.jsonc` | exit 0 each; production's `ARTIFACTS_NAMESPACES` is `artroom-public` |
