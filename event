@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c0c074330bd747867a751699e637d5f4bd95151d","text":"Merge retired a covered predecessor; the successor is at packages/log/src/publisher.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c2472dd3a9fcab5c3ba4c3e69c0db7315a84204b","text":"Merge retired a covered predecessor; the successor is at notes/log-bounded.md."}
