@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "lib": ["ES2024", "ESNext.Disposable"],
+    "types": ["@cloudflare/vitest-pool-workers/types"],
+    "skipLibCheck": true,
+    "paths": { "@generalbusiness/artroom-log": ["../.types/log/src/index.d.ts"] }
+  },
+  "include": ["./**/*.ts", "../src/**/*.ts", "../vitest.*.config.ts"]
+}

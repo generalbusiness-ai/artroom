@@ -68,6 +68,8 @@ test("the scenario plays end to end and each screen shows its idea", async ({ pa
   await stepTo(page, /Rate limit is ready/);
   await expect(page.locator("[data-op='unresolved']")).toContainText("pushes the same reserved commit forward again");
   await expect(page.locator("[data-op='ready']")).toContainText("Waiting for the publication slot");
+  // Each check carry judgment is a check-carried event in the feed (R-CARRY-13).
+  await expect(page.getByRole("region", { name: "Activity" })).toContainText("carried to integration");
 
   // Lease expiry, then the forward push lands and main moves.
   await stepTo(page, /lease expires/);
@@ -134,6 +136,20 @@ for (const scheme of ["light", "dark"] as const) {
     await capture(page, `policy-${scheme}`);
   });
 }
+
+test("screenshot, check carry and an advisory check", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  // Step 28: main moved, so the rate limit's checks were judged again for the new integration.
+  await page.goto("/?step=28#/room");
+  const href = await laneHref(page, "Rate-limit /api/login");
+  await page.goto(`/?step=28${href}/2`);
+  await expect(page.locator("[data-obligation='tests'] [data-carry='carried']")).toBeVisible();
+  await expect(page.locator("[data-obligation='tests'] [data-carry='not-carried']")).toContainText("The integration tree changed");
+  await expect(page.locator("[data-obligation='advisory-review']")).toHaveAttribute("data-advisory", "true");
+  await expect(page.getByRole("region", { name: "Advisory checks" })).toContainText("never blocking");
+  await expect(page.locator("[data-file='src/lib/authz/check.ts']")).toBeVisible();
+  await capture(page, "proposal-carry-light");
+});
 
 test("screenshot, phone width", async ({ page }) => {
   await page.setViewportSize(PHONE);

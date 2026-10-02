@@ -1,0 +1,120 @@
+{
+  "calls": {
+    "create": 1,
+    "init": 1,
+    "logref": 7,
+    "logpush": 3,
+    "logobjects": 51,
+    "reset": 1
+  },
+  "tokens": {
+    "revoked": 10,
+    "notRevoked": 0,
+    "activeAfter": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "laneAReadFailures": [
+    "b7af55e357d6ac8fca60a5278f965cdf02da9aad: readCommit threw: An internal error occurred.",
+    "77576bdc4c00443fb44fde72d54694d518e0d241: readCommit threw: An internal error occurred.",
+    "6c654fe50c3c32b5812b5769e3237a2e2fd5b081: readCommit threw: An internal error occurred.",
+    "ef501ea1a89933d60f8798c551e8ab45de75453a: readCommit threw: An internal error occurred.",
+    "091cce35cc767d471cc90c55ba65890deff1b014: readCommit threw: An internal error occurred.",
+    "1a3efd7b9f12b04db00c60eb4f10f5f7f17d8528: readCommit threw: An internal error occurred.",
+    "8c4f21403ae9cb5c9a099d16d065fedc50cd0333: readCommit threw: An internal error occurred.",
+    "9c049bbd48436e78e066e0b33a63c9957166e62e: readCommit threw: An internal error occurred.",
+    "af4db7ed22f4918b396c33bb08fad688670bb835: readCommit threw: An internal error occurred.",
+    "fba2c4d9040efe34705bf765aa9eb998332ad4fe: readCommit threw: An internal error occurred.",
+    "f5b0b64c59012c7431dc889dfbd109f94b6264b6: readCommit threw: An internal error occurred.",
+    "4df71e337fd6672036fad007e55baf0161ab80a5: readCommit threw: An internal error occurred.",
+    "42498bb1b2cebd656eb934c20993d5d2a0a7622d: readCommit threw: An internal error occurred.",
+    "2c01b22b52cf2b5c5ccbf3df11e8789931ae2407: readCommit threw: An internal error occurred.",
+    "3647ae44696385f5764bcb3b0af6b449d94ecf8f: readCommit threw: An internal error occurred.",
+    "4e48f7577c312b72a918164258d3f355e77bae5e: readCommit threw: An internal error occurred.",
+    "dcc20079f97eaac0ba7df459db4d0634c3a598fe: readCommit threw: An internal error occurred.",
+    "091cce35cc767d471cc90c55ba65890deff1b014: readCommit threw: An internal error occurred.",
+    "f75fca0071ce5eef32b53909d9d695e882cc7365: readCommit threw: An internal error occurred.",
+    "1f78def0dc787fefc95522424266f251b9c93999: readCommit threw: An internal error occurred.",
+    "8c4f21403ae9cb5c9a099d16d065fedc50cd0333: readCommit threw: An internal error occurred.",
+    "104d8174a33186621a35e14f0a9ef06d75bf21fd: readCommit threw: An internal error occurred.",
+    "066a1ec5cdd68051d0853cbff8fc16aad6a28c9a: readCommit threw: An internal error occurred.",
+    "9c049bbd48436e78e066e0b33a63c9957166e62e: readCommit threw: An internal error occurred.",
+    "af4db7ed22f4918b396c33bb08fad688670bb835: readCommit threw: An internal error occurred.",
+    "fba2c4d9040efe34705bf765aa9eb998332ad4fe: readCommit threw: An internal error occurred.",
+    "f5b0b64c59012c7431dc889dfbd109f94b6264b6: readCommit threw: An internal error occurred.",
+    "c693cab582cb89216d5c18caf35106e2c8422a0e: readCommit threw: An internal error occurred.",
+    "5b94d9b0ba89127d67093ff8090498a791f502b3: readCommit threw: An internal error occurred.",
+    "a1c2fc58f303b4abd54ee198e6e43c3994c7faff: readCommit threw: An internal error occurred.",
+    "9c6e1b7f1b34e7fc27ebaa4d8b32c88574dd35bf: readCommit threw: An internal error occurred.",
+    "d284db4d28f056e3eab85a1cf0a5821be90505e6: readCommit threw: An internal error occurred.",
+    "9b90e5632a3470e5a30defa9472e8c4b5056d3d8: readCommit threw: An internal error occurred.",
+    "091cce35cc767d471cc90c55ba65890deff1b014: readCommit threw: An internal error occurred.",
+    "f75fca0071ce5eef32b53909d9d695e882cc7365: readCommit threw: An internal error occurred.",
+    "1f78def0dc787fefc95522424266f251b9c93999: readCommit threw: An internal error occurred.",
+    "8c4f21403ae9cb5c9a099d16d065fedc50cd0333: readCommit threw: An internal error occurred.",
+    "104d8174a33186621a35e14f0a9ef06d75bf21fd: readCommit threw: An internal error occurred.",
+    "066a1ec5cdd68051d0853cbff8fc16aad6a28c9a: readCommit threw: An internal error occurred.",
+    "9c049bbd48436e78e066e0b33a63c9957166e62e: readCommit threw: An internal error occurred.",
+    "af4db7ed22f4918b396c33bb08fad688670bb835: readCommit threw: An internal error occurred.",
+    "fba2c4d9040efe34705bf765aa9eb998332ad4fe: readCommit threw: An internal error occurred.",
+    "f5b0b64c59012c7431dc889dfbd109f94b6264b6: readCommit threw: An internal error occurred.",
+    "19b1717cd2bf2077816317159d4f9cc4d618efe2: readCommit threw: An internal error occurred.",
+    "e0595277bbafbee34c7f87c6e54112dac7ab7a91: readCommit threw: An internal error occurred."
+  ],
+  "objectsRead": {
+    "commit": 6,
+    "tree": 18,
+    "blob": 27
+  },
+  "bindingBehaviour": {
+    "commit: tree threw": 6,
+    "tree: commit threw": 18,
+    "blob: commit+tree threw": 27
+  },
+  "pushed": [
+    {
+      "objects": 14,
+      "bytes": 7154
+    },
+    {
+      "objects": 11,
+      "bytes": 12527
+    },
+    {
+      "objects": 7,
+      "bytes": 11054
+    }
+  ],
+  "publishMs": 4007,
+  "commits": [
+    "d0a164b395f19116924e22191a35405ef7b38a48",
+    "3db69c9bc59235249ee4c4c26cc4e1768b03d126",
+    "f1470fd7d59f2d2bc776bdcf8fdc00bd4b589e05"
+  ],
+  "verifyMs": 5924,
+  "verify": {
+    "ok": true,
+    "head": "f1470fd7d59f2d2bc776bdcf8fdc00bd4b589e05",
+    "commits": 3,
+    "verifiedThrough": 10,
+    "publishedThrough": 10,
+    "failures": []
+  },
+  "otherRefRead": "refused",
+  "deleted": [
+    {
+      "name": "artroom-lb-loglive-muq62oxw",
+      "deleted": true,
+      "tokensRevokedAtCleanup": 0
+    }
+  ]
+}

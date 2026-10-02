@@ -42,6 +42,7 @@ import type {
   Rule,
   Seq,
   Sha,
+  SystemEvent,
   Timestamp,
   Verdict,
 } from "./contract.ts";
@@ -75,6 +76,21 @@ export interface FeedEntry {
   /** For a system event about a landing operation: that operation. */
   readonly op?: OpId;
   readonly flags: readonly Flag[];
+}
+
+/** A `check-carried` system event (R-CARRY-13). */
+export type CheckCarriedEvent = Extract<SystemEvent, { readonly type: "check-carried" }>;
+
+/**
+ * One sealed judgment of whether an earlier check counts on a new
+ * integration, with the entry that holds it. A check carries only by such an
+ * event; one that did not carry has its event too.
+ */
+export interface CheckCarry {
+  readonly id: ActId;
+  readonly seq: Seq;
+  readonly at: Timestamp;
+  readonly event: CheckCarriedEvent;
 }
 
 /** One rule outcome on one act, for the Policy screen. */
@@ -122,6 +138,8 @@ export interface RoomSnapshot {
   readonly reviews: readonly Review[];
   readonly checks: readonly Check[];
   readonly notes: readonly Note[];
+  /** The `check-carried` events loaded, oldest first. Covered by `coverage.feed`. */
+  readonly checkCarries: readonly CheckCarry[];
   readonly landOps: readonly LandOp[];
   /** The publication slot, or null when the transport cannot read it. Never guessed as free. */
   readonly slot: PublicationSlot | null;

@@ -5,8 +5,9 @@
  * runtime's evaluator (test/policy-runtime.test.ts).
  */
 
-import type { Glob, PolicyDocument, Role } from "../contract.ts";
+import type { CheckerConfig, Digest, Glob, PolicyDocument, Role } from "../contract.ts";
 import { compileTargets, refuseClaimExpr, refusesClaimTwin } from "../refuse-claim.ts";
+import { fakeSha } from "./ids.ts";
 
 const MIGRATIONS = (() => {
   const c = compileTargets(["migrations/**"]);
@@ -60,6 +61,13 @@ export const POLICY: PolicyDocument = {
       obligation: { type: "check", check: "tests", by: ["@ci"] },
     },
     {
+      id: "advisory-review",
+      kind: "require",
+      description: "Rate-limit changes get a review from the LLM reviewer. Its checker is advisory.",
+      paths: ["src/lib/ratelimit/**"],
+      obligation: { type: "check", check: "llm-review", by: ["@ci"] },
+    },
+    {
       id: "authz-changes",
       kind: "notify",
       description: "Tell @platform whenever authorization code changes.",
@@ -70,6 +78,21 @@ export const POLICY: PolicyDocument = {
     },
   ],
 };
+
+const digest = (label: string): Digest => `sha256:${fakeSha(label)}${fakeSha(`${label}#2`).slice(0, 24)}`;
+
+/**
+ * The scenario room's `.artroom/checkers/<name>.json`. `llm-review` is
+ * advisory (R-OBL-7) and volatile, so its checks never carry (R-CARRY-10).
+ * Both pin their runner environment (R-CARRY-14).
+ */
+export const CHECKERS: Readonly<Record<string, CheckerConfig>> = {
+  tests: { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 600, runner: digest("runner-tests") },
+  "llm-review": { format: "artroom-checker-v1", volatile: true, timeoutSeconds: 300, advisory: true, runner: digest("runner-llm") },
+};
+
+/** The digest of a checker's configuration, as `policy-activated` names it. */
+export const checkerDigest = (name: string): Digest => digest(`checker:${name}`);
 
 /** The TypeScript twin of `agents-stay-out-of-migrations`. */
 export function refusesClaim(role: Role, scope: readonly Glob[]): boolean {
