@@ -3,7 +3,10 @@
 // Object, which hosts a pi-durable Harness on its own SQLite. ARTROOM is a
 // service binding to this Worker's own default entrypoint (lane A's
 // `ArtroomService`), so the agent reaches the Room the way a separate
-// Worker would. Not deployed: the Room's fake remotes exist only in tests.
+// Worker would. AI is the Workers AI binding, the live run's default model
+// provider; it has no local simulator, so it reaches Cloudflare (a remote
+// binding), and vitest.config.ts connects it only for a live run on it.
+// Not deployed: the Room's fake remotes exist only in tests.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "artroom-spike-pd",
@@ -19,6 +22,7 @@
     ]
   },
   "services": [{ "binding": "ARTROOM", "service": "artroom-spike-pd" }],
+  "ai": { "binding": "AI", "remote": true },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Registry", "Agent", "Scratch"] }],
   "vars": {
     "LEASE_SECONDS": "1800",

@@ -28,10 +28,13 @@ what changed.
   storage conformance suite, 23 cases, passes on it inside workerd. [Spike]
 - **A pi-durable agent claimed, proposed and landed a change** in lane A's
   Room over a service binding, signing as a Worker under a member's
-  delegation. This ran with a scripted model, and with a real model
-  (`openai/gpt-4.1-mini` on OpenRouter). The landing is shown by the room's
-  operation after its alarm ran, not by the model: the live model said the
-  change "has been landed" while the room said `accepted`. [Spike]
+  delegation. This ran with a scripted model, and with real models: by
+  default Workers AI (`@cf/zai-org/glm-4.7-flash`) through the Worker's `AI`
+  binding, with no model key, which passed 19 of 20 runs; and
+  `openai/gpt-4.1-mini` on OpenRouter, which stays an option. The landing is
+  shown by the room's operation after its alarm ran, not by the model: a
+  live model said the change "has been landed" while the room said
+  `accepted`. [Spike]
 - **Crash and resume works with one rule, in the spike.** An Artroom act
   tool must be `replay: "safe"`, must store its prepared, signed envelope
   where it outlives the tool (the Agent's outbox table) before it first
@@ -158,6 +161,18 @@ It reaches the Room through a service binding, with lane E's client:
 `connect(env.ARTROOM, roomId, { kind: "delegation", signer, as })`. The
 Worker holds the agent's signing key as a secret (R-CRED-4).
 
+The model is **Workers AI through the Worker's `AI` binding**. The binding
+carries the account's identity, so the agent holds no model key, and
+inference is billed to the account that runs the Worker. pi-ai 1.0.0 has a
+provider for Workers AI's REST API (`cloudflare-workers-ai`, which needs an
+API token and the account ID) but none for the binding; the spike's
+`workers-ai` provider (`spikes/pi-durable/src/models.ts`) is pi-ai's own
+Workers AI catalog and OpenAI chat-completions client with a `fetch` that
+hands each request to `AI.run(model, body, { returnRawResponse: true })`.
+That works for models whose binding answer is in the OpenAI chat-completion
+shape, as the newer catalog models' is. Another provider, such as OpenRouter,
+is a matter of configuration and a key. [Spike]
+
 An agent identity is one of two things:
 
 - **an agent acting for a person**: a delegation from that person to the
@@ -250,7 +265,8 @@ agent identity, one conversation per lane, the client over `env.ARTROOM`,
 signing under a delegation.
 
 - [Spike] pi-durable 1.0.0 and pi-ai 1.0.0 load in workerd with
-  `nodejs_compat` (the spike runs the openrouter provider too).
+  `nodejs_compat` (the spike runs pi-ai's openai-completions client for
+  Workers AI, and the openrouter provider, too).
 - [Spike] pi-durable's `SqliteStorage` runs on Durable Object SQLite through
   the facade, and passes pi-durable's 23-case storage conformance suite
   inside a Durable Object (`test/do-sqlite.test.ts`).
@@ -449,8 +465,10 @@ All in workerd under `@cloudflare/vitest-pool-workers` 0.22.0:
   `note` to the agent's key, which never joins;
 - a scripted model: pi-ai's faux provider with a response factory that reads
   the transcript, so its answer after a restart is the same as before;
-- a live run with `openai/gpt-4.1-mini` on OpenRouter in place of the
-  scripted model.
+- a live run with a real model in place of the scripted one: by default
+  `@cf/zai-org/glm-4.7-flash` on Workers AI through the `AI` binding; by
+  configuration, the same model over Workers AI's REST API, or
+  `openai/gpt-4.1-mini` on OpenRouter.
 
 A **reset** is `ctx.abort()` in the Agent Durable Object at a named point.
 workerd discards the instance and any writes not yet committed; the next call
@@ -490,12 +508,13 @@ Set before the runs:
 | 2 | Pass | "runs the task end to end" |
 | 3 | Pass at all twelve points | "crash and resume across an act" (12 cases) |
 | 4 | Pass: each ablation fails as predicted | "ablations" (3 cases) |
-| 5 | Pass in five runs; the latest recorded | `results/live-2026-10-01.json` |
+| 5 | Workers AI (the default): pass in 19 of 20 runs; Workers AI over REST and OpenRouter: pass, once each. Before the change of default, OpenRouter: pass in five runs | `results/live-runs-2026-10-02.txt`, `results/live-workers-ai-2026-10-02.json`, `results/live-2026-10-01.json` |
 | Review f2212c63 | Pass | `test/review-f2212c63.test.ts` (9 cases), `scripts/check-test.sh` (7 cases) |
 | Review 6d392973 | Pass | `scripts/check-test.sh` (case 8), `test/review-6d392973.test.ts` (3 cases), and a checkout with no root `node_modules` |
 
-The whole suite: 53 tests pass, plus the live test when a key is present
-(`results/scripted-2026-10-01.txt`).
+The whole suite: 68 tests pass, plus the live test when `SPIKE_LIVE` asks
+for it. The 53 recorded in `results/scripted-2026-10-01.txt` predate the
+15 provider tests in `test/models.test.ts`.
 
 **Crash and resume, by point.** "Sends" lists what the act tool handed to
 the client: `prepared` is a new signed envelope; `replayed` is the stored
@@ -534,7 +553,43 @@ every mutant failed at least one test. The results are in the section
 stored, all crash and lost-reply cases still pass and only the "without the
 stored envelope" ablation fails: the stored envelope carries exactly-once.
 
-**Live run.** Model `openai/gpt-4.1-mini` through OpenRouter, as pi-ai
+**Live run on Workers AI (the default).** Model `@cf/zai-org/glm-4.7-flash`
+through the Worker's `AI` binding, connected to Cloudflare as a remote
+binding from the local workerd test pool with wrangler's login; no Worker
+was deployed and no model key was used. One reset after the room admitted
+`propose`, as below. 20 runs (`results/live-runs-2026-10-02.txt`):
+
+- 19 passed: one `claim`, one `propose` and one `land` admitted, the
+  `propose` sent once and its outcome found in the outbox after the reset,
+  the landing `landed` after the room's alarm, and `main` at the pushed
+  head.
+- In 9 of the 19, the model asked for all four tools in its first turn; the
+  Harness ran them in order (`toolExecution: "sequential"`). The write's
+  content and the proposal were then chosen before the claim's result was
+  seen. In the other 10 it called one tool per turn.
+- 1 failed (run 5): after the reset, the turn after `propose` came back
+  empty, with no text and no tool call, so the conversation ended and
+  `land` was never sent. The room was left with an open proposal and no
+  double act. This is the model, not the resume rule; a deployment needs a
+  check that a lane task ends with a landing, or a report of why not.
+  [Judgement]
+- In every run the final answer said the landing had started, or was
+  accepted, which matched the room; no answer claimed it had landed.
+- Each run took 6 to 30 seconds and 1,925 to 5,164 tokens: USD 0.00024 to
+  0.00051 by pi-ai's price table, which matches Cloudflare's published
+  per-token prices. The 20 runs cost about USD 0.0073 together. Workers AI
+  bills in neurons, with a daily free allocation; the account's bill was not
+  read.
+
+The model choice is in the spike's README ("Live run"): multi-turn tool
+calling, an OpenAI-shaped answer through the binding, a 131,072-token
+context, and the lowest input price among the catalog models with those.
+
+The outside-Worker path, pi-ai's `cloudflare-workers-ai` provider over the
+REST API with a local token, passed once with the same model (USD 0.00046).
+The OpenRouter path passed once with `openai/gpt-4.1-mini` (USD 0.0010).
+
+**Live run on OpenRouter (the earlier default).** Model `openai/gpt-4.1-mini` through OpenRouter, as pi-ai
 1.0.0's openrouter provider names it; OpenRouter reported the response model
 as `openai/gpt-4.1-mini`, with no dated snapshot. One reset after the room
 admitted `propose`. The model called the four tools once each, in order. One
@@ -659,7 +714,8 @@ and the suites run. Every mutant failed at least one test.
 - cross-identity context handoff: a reviewer fork signing as its own
   identity (Q5);
 - viewer and steerer identity, and secret custody (Q8; the delegate key is
-  in the agent's SQLite in the spike);
+  in the agent's SQLite in the spike; on Workers AI through the binding
+  there is no model key to keep);
 - adversarial authorization tests.
 
 ## Review 6d392973
