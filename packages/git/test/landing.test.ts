@@ -858,6 +858,12 @@ test("R-PUB-3: a held publication's tokens stay with its own publication steps; 
   gate.reject(new Error("Artifacts unavailable (revoke)"));
   await assert.rejects(old, EngineStopped);
   assert.deepEqual(w.current().core.tokenCleanup(), owed, "the stopped instance's failure rescheduled nothing");
+  // The new instance revokes each of the operation's two tokens by its own ID.
+  w.tokens.revoke = real;
+  await w.current().reconcile();
+  assert.deepEqual(w.tokens.revoked, ["tok_1", "tok_2"]);
+  assert.deepEqual([...w.tokens.live], []);
+  assert.deepEqual(w.current().core.tokenCleanup(), []);
 });
 
 test("R-PUB-3: a room stored before the cleanup records existed owes its ended operations' unrevoked tokens once, at start", async (t) => {
