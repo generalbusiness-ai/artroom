@@ -560,6 +560,9 @@ for (const variant of [{}, { migrated: true }, { settled: true }] as const) {
       [["create", "in-flight", "legacy", name]],
     );
     assert.equal(sql.all("SELECT * FROM artroom_snap").length, 0, "a legacy repository is never reused");
+    // No weaker legacy path: the old duty was closed by the upgrade, never by a retirement that found nothing.
+    assert.ok(snaps.duties().every((d) => d.doneReason !== "repository-deleted"));
+    if (!("settled" in variant)) assert.equal(snaps.duties().find((d) => d.kind === "delete")!.doneReason, "upgraded");
     // The old create applies now, with its write token.
     await ns.create(name);
     assert.equal(ns.repos.get(name)!.active().filter((t) => t.scope === "write").length, 1);
