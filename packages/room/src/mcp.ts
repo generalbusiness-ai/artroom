@@ -16,6 +16,7 @@ import { connect } from "@generalbusiness/artroom-client";
 import { isArtroomError, type ArtroomService, type Room, type RoomName, type RoomWire } from "@generalbusiness/artroom-contract";
 import { createMcpFetch } from "@generalbusiness/artroom-mcp/worker";
 import type { RoomEnv } from "./config.ts";
+import { report, toConsole, type DiagnosisSink } from "./diag.ts";
 import { artroomError, HTTP_STATUS, toArtroomError } from "./errors.ts";
 
 /** The MCP route. `:room` is a room ID or a percent-encoded room name (R-API-3). */
@@ -57,7 +58,7 @@ export async function bearerRoom(wire: (room: string) => Promise<RoomWire>, room
  * URL) is an `ArtroomError` body with its HTTPS status (R-API-1), never a
  * token.
  */
-export function mcpEndpoint(wire: (env: RoomEnv, room: string) => Promise<RoomWire>): (request: Request, env: RoomEnv) => Promise<Response> {
+export function mcpEndpoint(wire: (env: RoomEnv, room: string) => Promise<RoomWire>, log: DiagnosisSink = toConsole): (request: Request, env: RoomEnv) => Promise<Response> {
   const serve = createMcpFetch<RoomEnv>({
     room: (request, env, bearer) => bearerRoom((r) => wire(env, r), roomOf(request), bearer),
   });
@@ -65,6 +66,8 @@ export function mcpEndpoint(wire: (env: RoomEnv, room: string) => Promise<RoomWi
     try {
       return await serve(request, env);
     } catch (e) {
+      // The client sees only `internal`; the Worker's log gets the step and the redacted error (request d268d249).
+      if (!isArtroomError(e)) report(log, "mcp-failed", "mcp", e);
       const err = toArtroomError(e);
       return new Response(JSON.stringify(err), { status: HTTP_STATUS[err.code], headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
     }

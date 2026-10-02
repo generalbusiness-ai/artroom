@@ -64,6 +64,7 @@ import { issueJobs, oweJobs } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
+import { report, toConsole } from "./diag.ts";
 import { matchGlob } from "./glob.ts";
 
 export interface CoreOptions {
@@ -386,6 +387,15 @@ export class RoomCore {
     return this.clock();
   }
 
+  /**
+   * Log a failure the client sees only as a fixed message: the step and the
+   * error's name, with its message redacted and bounded (request d268d249).
+   * Never throws.
+   */
+  diagnose(event: string, step: string, e: unknown): void {
+    report(this.services.diagnose ?? toConsole, event, step, e);
+  }
+
   // ------------------------------------------------------------ founding (R-GEN)
 
   /**
@@ -411,18 +421,23 @@ export class RoomCore {
     let main: Sha | null = null;
     let remote: string;
     setMeta(this.sql, "founding_repo", genesis.repo);
+    let step = "newRepository";
     try {
       if (!genesis.onboarding) await this.newRepository(genesis);
+      step = "readMain";
       main = await this.ports.artifacts.readMain();
       if (main === null && !genesis.onboarding) throw new Error("main has no first commit");
+      step = "canonicalRemote";
       remote = await this.ports.artifacts.canonicalRemote();
-    } catch {
+    } catch (e) {
+      this.diagnose("found-failed", step, e);
       // Wake the alarm: it settles whatever the new repository still owes (request b6b51de7).
       this.committed();
       throw artroomError("unavailable", "The canonical repository could not be created or read. Retry the same found.");
     }
     if (main !== null) {
-      const cfg = await this.ports.artifacts.readConfig(main).catch(() => {
+      const cfg = await this.ports.artifacts.readConfig(main).catch((e: unknown) => {
+        this.diagnose("found-failed", "readConfig", e);
         throw artroomError("unavailable", "The canonical repository could not be read. Try again.");
       });
       const parsed = this.parseConfig(cfg.policy, cfg.checkers);
@@ -438,7 +453,8 @@ export class RoomCore {
       if (!genesis.onboarding) {
         try {
           this.workspaces.sealCanonical(getMeta(this.sql, "canonical_name") ?? "");
-        } catch {
+        } catch (e) {
+          this.diagnose("found-failed", "sealCanonical", e);
           throw artroomError("unavailable", "The canonical repository still owes cleanup. Retry the same found.");
         }
       }
@@ -1283,7 +1299,8 @@ export class RoomCore {
           p.kind === "clean"
             ? { state: "clean", base: p.base, integration: p.integration }
             : { state: "conflict", base: p.base, paths: p.paths };
-      } catch {
+      } catch (e) {
+        this.diagnose("preview-failed", "preview", e);
         body = { state: "failed", error: artroomError("unavailable", "The preview could not be computed.") };
       }
       const prev = json<Record<string, unknown>>(one(this.sql, "SELECT body FROM previews WHERE id = ?", id), "body")!;
@@ -1550,6 +1567,7 @@ export class RoomCore {
         // Reopen from the ref next time: the read-back decides what happened.
         this.publisherCache = null;
         const code = (e as { code?: string }).code ?? "transport";
+        this.diagnose("publication-failed", "publish", e);
         await this.serial(async () =>
           this.sql.transaction(() => {
             const was = getMeta(this.sql, "publication_error");

@@ -160,7 +160,8 @@ export async function proposal(core: RoomCore, ref: ProposalRef): Promise<Propos
   if (pin && num(pin, "done") === 0) {
     try {
       await core.completePins();
-    } catch {
+    } catch (e) {
+      core.diagnose("read-failed", "completePins", e);
       throw artroomError("unavailable", "The proposal's pinned ref is not written yet. Retry.");
     }
   }

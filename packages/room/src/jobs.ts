@@ -39,6 +39,7 @@ import { checkerInputs } from "@generalbusiness/artroom-policy";
 import { completeInventory } from "@generalbusiness/artroom-git";
 import type { ActivePolicyFull, RoomCore } from "./core.ts";
 import { hex, randomBytes } from "./crypto.ts";
+import { redact } from "./diag.ts";
 import { iso } from "./ids.ts";
 import { generationRow, laneRow } from "./model.ts";
 import { obligationsFor } from "./obligations.ts";
@@ -69,9 +70,6 @@ interface JobRow {
 }
 
 const isPreview = (owner: string) => owner.startsWith("op_preview_");
-
-/** An error's text without any token in it, short enough to keep. */
-const redact = (s: string) => s.replace(/art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g, "<token>").slice(0, 300);
 
 /**
  * Artifacts error codes that mean the request was refused and changed
