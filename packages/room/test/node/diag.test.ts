@@ -24,7 +24,7 @@ describe("redact", () => {
     ["a bearer credential", "with bearer zzzzzzzzzzzz", "zzzzzzzzzzzz", "with bearer <redacted>"],
     ["a basic credential", "Basic dXNlcjpwYXNzd29yZA==", "dXNlcjpwYXNzd29yZA==", "Basic <redacted>"],
     ["a token=value pair", "api_token=qwertyuiop failed", "qwertyuiop", "api_token=<redacted> failed"],
-    ["a password: value pair, by the secret scan's detector", 'password: "hunter22"', "hunter22", '<secret>"'],
+    ["a password: value pair", 'password: "hunter22"', "hunter22", "password: <redacted>"],
     ["a GitHub token by the secret scan's detector", `using ${join("gh", "p_", fill(36))}`, join("gh", "p_"), "using <secret>"],
     ["a long random token", `id ${fill(48, RANDOM)} rejected`, fill(48, RANDOM), "id <secret> rejected"],
   ];
@@ -61,6 +61,41 @@ describe("redact", () => {
     expect(r).not.toContain(random.slice(0, 8));
     expect(r).not.toMatch(/art_v1/);
   });
+});
+
+describe("redact: credentials known by their syntax, whatever their length or entropy (checker, review of 0e058f13)", () => {
+  // [what, input, the parts that must go, the exact result]
+  const cases: [string, string, string[], string][] = [
+    ["a double-quoted password with spaces", 'login password="hunter two three" then failed', ["hunter", "two", "three"], "login password=<redacted> then failed"],
+    ["a single-quoted password with spaces", "login password='hunter two' then failed", ["hunter", "two"], "login password=<redacted> then failed"],
+    ["a double-quoted password with an escaped quote", String.raw`password="ab\"cd ef" then`, ["ab", "cd", "ef"], "password=<redacted> then"],
+    ["a single-quoted password with an escaped quote", String.raw`password='it\'s mine' then`, ["it", "mine"], "password=<redacted> then"],
+    ["a JSON password with spaces", '{"password": "x y z", "user": "u"}', ["x y", "z\""], '{"password": <redacted>, "user": "u"}'],
+    ["a JSON client secret with an escaped quote", String.raw`{"client_secret":"s\"t u","n":1}`, ["s\\", "t u"], '{"client_secret":<redacted>,"n":1}'],
+    ["a password: bare value", "password: hunter2 rejected", ["hunter2"], "password: <redacted> rejected"],
+    ["a password= bare value", "password=hunter2 rejected", ["hunter2"], "password=<redacted> rejected"],
+    ["a one-character value", "token=x ok", ["=x"], "token=<redacted> ok"],
+    ["a bare value holding separators, to the next space", "password=p&ss;w,rd x", ["p&ss", "w,rd"], "password=<redacted> x"],
+    ["an auth pair", "x-auth: q1 sent", ["q1"], "x-auth: <redacted> sent"],
+    ["a passphrase pair", "passphrase=q1 sent", ["q1"], "passphrase=<redacted> sent"],
+    ["spaces around the separator", 'PASSWORD = "x y"', ["x y"], "PASSWORD = <redacted>"],
+    ["an unclosed quote, to the end", 'password="abc def', ["abc", "def"], "password=<redacted>"],
+    ["JSON inside a string, to the end of the line", String.raw`body {\"password\":\"a b\",\"user\":\"u\"}` + "\nnext", ["a b", "user"], String.raw`body {\"password\":<redacted>` + "\nnext"],
+    ["a short Bearer credential", "sent Bearer x, rejected", ["x,"], "sent Bearer <redacted>, rejected"],
+    ["a two-character bearer credential", "bearer ab", ["ab"], "bearer <redacted>"],
+    ["a Basic credential with padding", "Basic YQ== failed", ["YQ=="], "Basic <redacted> failed"],
+    ["a Digest parameter list, to the end of the line", 'Digest username="u", response="r"\nthen', ['"u"', '"r"'], "Digest <redacted>\nthen"],
+    ["a short DPoP credential", "DPoP abc", ["abc"], "DPoP <redacted>"],
+    ["a short Authorization header", "Authorization: Bearer x\nthen", ["Bearer x"], "Authorization: <redacted>\nthen"],
+    ["a JSON authorization header", '{"authorization": "Basic a"}', ["Basic a"], '{"authorization": <redacted>'],
+    ["a Proxy-Authorization header", "Proxy-Authorization: Negotiate y", ["Negotiate y"], "Proxy-Authorization: <redacted>"],
+  ];
+  for (const [what, input, gone, out] of cases)
+    it(`removes ${what}`, () => {
+      const r = redact(input);
+      for (const g of gone) expect(r).not.toContain(g);
+      expect(r).toBe(out);
+    });
 });
 
 describe("diagnosis and report", () => {

@@ -12,7 +12,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { env, exports } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
-import type { Claim, DraftedRoom, Genesis, LogEntry, Proposal, RoomId } from "@generalbusiness/artroom-contract";
+import type { CheckerConfig, Claim, DraftedRoom, Genesis, LogEntry, Proposal, RoomId } from "@generalbusiness/artroom-contract";
+import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import type { Registry, Room, RoomEnv } from "../../src/index.ts";
 import type { Diagnosis } from "../../src/diag.ts";
 import { route } from "../../src/http.ts";
@@ -370,5 +371,72 @@ describe("request d268d249: the parallel catch-all 5xx mappings log the same way
     await expect(r.admin.read({ q: "proposal", ref: { lane: c.lane, generation: 1 } })).rejects.toMatchObject({ code: "unavailable" });
     expect(r.world.diagnoses).toEqual([expect.objectContaining({ event: "read-failed", step: "completePins", name: "ArtifactsError" })]);
     noSecrets(JSON.stringify(r.world.diagnoses));
+  });
+});
+
+/**
+ * Checker report on 0e058f13: credentials known by their syntax were kept
+ * when short or quoted. Each case goes through a real Room's `pinObjects`
+ * failure, as the checker's controls did, and through a retained job error.
+ */
+const SYNTAX_CASES: [string, string, string[]][] = [
+  ["a double-quoted password with spaces", 'login password="hunter two three" then failed', ["hunter", "two", "three"]],
+  ["a double-quoted password with an escaped quote", String.raw`login password="ab\"cd ef" then failed`, ["ab", "cd", "ef"]],
+  ["a single-quoted password with an escaped quote", String.raw`login password='it\'s mine' then failed`, ["it", "mine"]],
+  ["a JSON password", '{"password": "x y z", "user": "u"}', ["x y", "z\""]],
+  ["a short Bearer credential", "sent Bearer q, rejected", ["Bearer q"]],
+  ["a short Basic credential", "sent Basic YQ== rejected", ["YQ=="]],
+  ["a short Authorization header", "Authorization: Bearer q\nthen", ["Bearer q"]],
+  ["a one-character token pair", "token=q ok", ["=q"]],
+];
+
+describe("request d268d249: credentials known by their syntax are redacted whatever their length (checker, 0e058f13)", () => {
+  for (const [what, message, gone] of SYNTAX_CASES)
+    it(`pinObjects fails with ${what}: the old 503, nothing recorded, one diagnosis, the same act retried, and no credential`, async () => {
+      const r = await makeRoom();
+      const c = await claimed(r);
+      const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+      const d = await failsAt(r, r.admin.signed("propose", { lane: c.lane }, proposeBody(head)), "pinObjects", "propose.pinObjects", Object.assign(new Error(message), { name: "ArtifactsError" }));
+      expect(d.message).toContain("<redacted>");
+      for (const g of gone) expect(JSON.stringify(d)).not.toContain(g);
+    });
+
+  it("a retained job error uses the same redaction: a canonical token mint whose answer is lost", async () => {
+    const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: `sha256:${"0".repeat(64)}` };
+    const r = await makeRoom({ policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })), files: { ".artroom/checkers/unit.json": JSON.stringify(whole), "package.json": "{}" } });
+    await inDO(r, async (room) => {
+      await room.core.idle();
+      const run = room.core.run.bind(room.core);
+      room.core.run = (s) => {
+        if (s !== "jobs" && s !== "landing") run(s);
+      };
+    });
+    const alice = await addMember(r, "@alice", "member");
+    await addMember(r, "@ci", "checker");
+    r.world.checkers["unit"] = { handle: async () => ({ refused: true, rule: "check-binding", reason: "test", fix: "none" }) as never };
+    const c = await alice.ok<Claim>("claim", null, { goal: "work", scope: ["src/**"] });
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    await alice.ok<Proposal>("propose", { lane: c.lane }, proposeBody(head));
+    const message = SYNTAX_CASES.map(([, m]) => m).join("; ");
+    const rows = await inDO(r, async (room) => {
+      await room.core.idle();
+      // The canonical repository's mint fails with every case's credential in its message, on this room's object only.
+      const binding = room.core.artifacts as { get: (name: string) => Promise<object> };
+      const get = binding.get.bind(binding);
+      binding.get = async (name) =>
+        Object.assign(Object.create(await get(name)), {
+          createToken: async () => {
+            throw Object.assign(new Error(message), { name: "ArtifactsError" });
+          },
+        });
+      await room.core.steps.jobs();
+      await room.core.idle();
+      binding.get = get;
+      return room.core.sql.all("SELECT last_error FROM job_tokens");
+    });
+    const kept = rows.map((x) => String(x["last_error"])).find((e) => e.startsWith("answer lost"));
+    expect(kept).toBeDefined();
+    expect(kept).toContain("<redacted>");
+    for (const [, , gone] of SYNTAX_CASES) for (const g of gone) expect(kept).not.toContain(g);
   });
 });
