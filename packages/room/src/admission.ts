@@ -368,6 +368,7 @@ function rosterSemantics(core: RoomCore, env: Envelope, by: Authority): Refusal 
 async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
   const a = core.ports.artifacts;
   const unavailable = () => artroomError("unavailable", "The repository could not be read. Nothing was recorded; retry with the same idempotency key.", { maybeRecorded: false });
+  let noMain = false;
   try {
     if (env.kind === "propose") {
       const lane = laneOf(env)!;
@@ -397,12 +398,18 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
       if (b.input?.kind === "filtered" && Array.isArray(b.input.paths)) return { tree, snapshot: (await a.snapshot(b.integration, b.input.paths))?.digest ?? null };
       return { tree };
     }
-    if (env.kind === "land" && core.landing.core.main() === null) await core.landing.refreshMain();
-    return {};
+    if (env.kind === "land" && core.landing.core.main() === null) {
+      if ((await a.readMain()) === null) noMain = true;
+      else await core.landing.refreshMain();
+    }
   } catch (e) {
     void e;
     throw unavailable();
   }
+  // A repository with no main can take no landing, and a retry changes nothing (request b6b51de7).
+  if (noMain)
+    throw artroomError("not-found", "The room's repository has no main branch, so there is nothing to land onto (R-LAND-2). Nothing was recorded. Landing cannot succeed until main has a first commit.");
+  return {};
 }
 
 // =============================================================== steps 7 to 9

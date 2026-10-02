@@ -200,7 +200,9 @@ Worker's `draft` and `found` (`ArtroomFounder`).
    4. authorizes the repository: for `new`, it must be the fresh identity
       derived from the draft value in the public namespace; for `import`,
       the grant must be signed by a configured operator key, for this
-      repository and this admin key;
+      repository and this admin key, in the deployment's import namespace.
+      A source whose namespace the deployment has no binding for is
+      refused here, and at `draft`, with `forbidden`;
    5. binds repository, room ID and name in the registry, in one atomic
       step (R-GEN-13). For an import, the registry also judges the grant's
       `notAfter` there, with its own clock: a first binding at or after it
@@ -208,7 +210,9 @@ Worker's `draft` and `found` (`ArtroomFounder`).
       completes;
    6. only then has the room create or read the repository and seal
       entries 0 and 1. The room itself refuses to do this unless the
-      registry binds it.
+      registry binds it. A new repository gets one commit on `main`, with
+      no files, and no live token, before the genesis is sealed (see
+      "Founding gaps").
 
 A failure in steps 1 to 5 binds nothing. A failure in step 6 is
 `unavailable`; the binding stays, and the same `found` again completes the
@@ -251,10 +255,12 @@ Before the first deploy (the file's header says the same):
 | `ROOM_KEY_SECRET` (secret) | Derives each new room's signing key and, for public founding, its repository identity |
 | `OPERATOR_KEYS` | Operator key IDs, comma-separated, whose onboarding grants are accepted (R-GEN-12) |
 | `PUBLIC_NAMESPACE` | The repository namespace reserved for public founding, default `artroom-public` |
-| `ARTIFACTS` (binding) | The Artifacts binding for the deployment's namespace |
-| `ARTIFACTS_NAMESPACE` | The namespace that binding reaches, default `PUBLIC_NAMESPACE` |
+| `ARTIFACTS` (binding) | The Artifacts binding for the public founding namespace |
+| `ARTIFACTS_NAMESPACE` | The namespace that binding reaches, default `PUBLIC_NAMESPACE`. If it is not `PUBLIC_NAMESPACE`, public founding is refused |
+| `IMPORT_ARTIFACTS` (binding) | Optional: the Artifacts binding for imported repositories. Without it (and `IMPORT_NAMESPACE`), imports are refused at `draft` |
+| `IMPORT_NAMESPACE` | The namespace `IMPORT_ARTIFACTS` reaches; the only one a grant may name. It must differ from `PUBLIC_NAMESPACE` (R-GEN-12) |
 | `PUBLISHER` (binding) | Lane B's `Publisher` Durable Object class (the git sandbox), one instance per room |
-| `ARTIFACTS_HOST` | The Artifacts host the sandbox's gateway lets the container reach, under `ARTIFACTS_NAMESPACE` |
+| `ARTIFACTS_HOST` | The Artifacts host the sandbox's gateway lets the container reach, under `ARTIFACTS_NAMESPACE` and `IMPORT_NAMESPACE` |
 
 A spike deployment, `artroom-spike-room` on the `gitseq-spike` namespace, is
 configured in [wrangler.spike.jsonc](wrangler.spike.jsonc) and deployed with
@@ -922,6 +928,301 @@ Gates at `2dac0041`, the merge:
 | `npm run test:node` (this package) | 0 | 67 |
 | `npm run test:workerd` (this package) | 0 | 275 |
 | `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles |
+
+## Founding gaps (request b6b51de7)
+
+The first live deploy (`notes/deploy-spike.md`) found three gaps in
+founding. This change closes them.
+
+**1. A new public room lands its first lane.** Founding now gives a new
+repository one commit on `main`, with no files. The contract's landing
+needs a main: `expectedMain` is a `Sha` in the landing operation and in
+`land-reserved`, and the push is a compare-and-swap from it (R-LAND-2,
+R-PUB-4). Landing onto a missing main would have changed the contract,
+lane B's engine and its sandbox git sequences, so the founding side was
+the smaller change. R-GEN-12 said only "fresh, empty"; one sentence now says
+that `main` gets a first commit with no files (the only amendment).
+
+- The commit is fixed by the genesis's `createdAt`: the empty tree, author
+  and committer `Artroom <room@artroom.invalid>`, a fixed message. A retried
+  founding pushes the same commit.
+- Artifacts has no call that writes a commit, so the Room pushes the two
+  objects itself, with one `git-receive-pack` request that creates
+  `refs/heads/main` only if it does not exist (lane B's
+  [first-commit.ts](../git/src/first-commit.ts), tested against real git's
+  `receive-pack`). Any answer but a clear `ok` is a refusal; `found` then
+  reads main, and fails with `unavailable` if it is still missing.
+- A `land` on a repository with no main (an empty import, or a room
+  founded before this change) fails with `not-found`, `retryable: false`,
+  and a message that does not say retry. Nothing is recorded.
+
+**2. The creation token is revoked durably.** Creating the repository is a
+step in lane B's workspace ledger, written before the call, like a fork's
+creation. Revised by review a35b4b61 (below): the answer's 24-hour write
+token pushes the first commit, is kept by value until its revocation is
+confirmed, and nothing is ever minted on the canonical repository before
+founding. The genesis is sealed only when nothing is owed; until then
+`found` is `unavailable`, the same `found` retries, and the Room's alarm
+settles the debt before founding, even if the founder never returns.
+
+**3. One deployment founds public rooms and imports.** The contract asks
+for both (R-GEN-12): an import's repository must be outside the public
+founding namespace, so it needs a second Artifacts binding. `IMPORT_ARTIFACTS`
+reaches `IMPORT_NAMESPACE`, the only namespace a grant may name. The Room
+resolves its binding from its repository's namespace (`Remotes.bindings`);
+lane B's workspaces, landing tokens and sandbox, and lane L's log remote,
+follow it. The sandbox's gateway allows both namespaces (`repoPathOf`).
+A source whose namespace has no binding is refused at `draft`, and at step
+4 of `found` before anything is bound, with `forbidden` and the reason, so
+it never leaves a binding that cannot complete. A deployment with one
+binding (production's `wrangler.jsonc`) founds public rooms and refuses
+imports, saying why. The spike has both bindings since revision 2
+(`gitseq-spike` and `gitseq-spike-import`), and its live run founds a public
+room and imports a repository on the same deployment.
+
+### Evidence
+
+| Gap | Tests |
+|---|---|
+| 1 | `test/workerd/founding-gaps.test.ts` (first lane lands; push fails, is refused or its answer is lost; land on no main); `packages/git/test/first-commit.test.ts` (the commit equals `git commit-tree`'s; real `receive-pack` accepts the pack and refuses an existing main; only a clear `ok` counts) |
+| 2 | `founding-gaps.test.ts` (no active token at sealing; a lost create; revocation fails, then the alarm settles it before founding); `packages/git/test/workspaces.test.ts`, five canonical-repository cases |
+| 3 | `founding-gaps.test.ts` (an import lands and publishes in its own namespace on a deployment that also founds publicly; refusals at draft and found); `test/node/config.test.ts` (production bindings and log remote); `packages/git/test/ref-fence.test.ts` (sandbox namespaces) |
+
+Each mutation below was made once, and the named suite run; every one
+failed at least one test (21 of 21 killed).
+
+| Mutation | A test that failed |
+|---|---|
+| No first commit at founding | first lane lands on it |
+| A refused first commit still founds | push fails, is refused, or its answer is lost |
+| Created without a clear `ok` | an answer that is not a clear ok is refused |
+| Wrong pack type bits | pushed to an empty repository (real git) |
+| Old value not all zeros | a repository whose main exists is never moved |
+| Land on no main says `unavailable` and retry | land on a repository with no main |
+| The create owes nothing (ledger, and in the Room) | settling revokes it; no token left at sealing |
+| The create recorded after its answer | a create whose answer is lost |
+| The inventory revokes nothing | no token left at sealing |
+| The first commit's token not revoked after use | the first commit's token is revoked after |
+| `found` seals while a token is owed | revocation fails, then the alarm |
+| No alarm work, or no alarm, before founding | revocation fails, then the alarm |
+| The alarm treats the canonical repository as a fork | a later run, by the alarm's reconcile |
+| Imports accepted with no import namespace | refuses an import at draft |
+| Public founding not checked at `found` | refuses public founding before anything is bound |
+| The Room locates, or binds, only the public namespace | an imported room lands in its own namespace |
+| The production log remote ignores the namespace | Node: production services |
+| The sandbox reaches one namespace | sandbox namespaces |
+
+The gap 2 rows above describe the first revision's ledger. Review a35b4b61
+replaced that code (no canonical mint, retirement by deletion, complete
+inventories); its own mutations are in "Review a35b4b61".
+
+The live re-runs are in [notes/deploy-spike.md](../../notes/deploy-spike.md).
+
+## Review a35b4b61
+
+The checker found three ways the founding cleanup and checks could still
+leave something unaccounted for. Each is now a test of the right outcome.
+
+**1. No canonical mint can be left with an unknown outcome.** The first
+version minted a 60-second token for the first commit, and settled a mint
+whose answer was lost once an inventory came back empty, although the mint
+could still apply. Now no token is minted on the canonical repository before
+founding at all: the create's own token pushes the first commit. The ledger
+(`Workspaces.prepareCanonical`, `sealCanonical`, `settleCanonical`) keeps
+the fork cleanup's distinction between unanswered and finished effects:
+
+- a create whose answer was lost stays in flight. Absence, time or an
+  inventory never settle it. It is superseded only when the room is sealed on
+  an answered create, because the name is then taken and a late create can
+  only be refused;
+- whenever the Room cannot vouch for every token on the repository (no
+  answered create holds it, its token is spent and main has no first commit,
+  the first commit was refused, or an active token nobody owes appears), it
+  deletes the repository, with every token on it, and makes it again. Review
+  3eb7bc44 changed "again": each attempt now has its own name (below);
+- the creation token is kept, by value, in its own table until a revocation
+  answers, and `sealCanonical` refuses (so the seal aborts) while anything is
+  owed.
+
+**2. An inventory proves absence only when complete.** The binding's
+`listTokens` has no paging. An inventory counts only when it has as many
+records as its `total` and every record has an ID, a scope, a state and an
+expiry. Otherwise founding waits and the inventory stays owed. After
+founding, `reconcile`, `nextDue` and `settleCanonical` never act on the
+canonical repository, so the Room's own publishing credentials are never
+swept.
+
+**3. A mode needs its binding, not only its name.** `draft`, and step 4 of
+`found` before `registry.bind`, refuse public founding without an `ARTIFACTS`
+binding and imports without an `IMPORT_ARTIFACTS` binding, with `forbidden`
+and the reason; nothing is reserved. `productionServices` installs no adapter
+for a missing binding. The workerd test config has stand-in values for both
+bindings, because the test pool cannot have Artifacts bindings.
+
+| Finding | Tests |
+|---|---|
+| 1 | `packages/git/test/workspaces.test.ts`: healthy (answered) control; no canonical mint; a lost create that applies late, across a restart and after a successful retry; the alarm deletes a late repository before founding; refused control; unconfirmed revocation; spent token; refused first commit; after founding nothing is touched. `founding-gaps.test.ts`: no `createToken` at founding; a lost create; the alarm before founding |
+| 2 | `workspaces.test.ts`: inventories incomplete, without a total, with a record without an ID, with an unknown state; an active token nobody owes |
+| 3 | `founding-gaps.test.ts`: `IMPORT_NAMESPACE` without `IMPORT_ARTIFACTS`, and no `ARTIFACTS`, refused at draft and found with the registry checked; the two-binding import control; `test/node/config.test.ts` |
+
+Mutations, made once each after committing, with the named suite run: 26
+of 28 were killed. The checker's three diagnostics are among the tests.
+
+| Mutation | A test that failed |
+|---|---|
+| The seal does not require a holder with nothing owed | an unconfirmed revocation blocks the seal |
+| A repository no answered create holds is adopted | a lost create that applies late, across a restart |
+| The inventory ignores its total | an incomplete inventory proves nothing |
+| The inventory accepts malformed records | a record that has no ID proves nothing |
+| Absence settles a create in flight | a lost create that applies after a successful retry |
+| The seal leaves creates in flight open | a lost create that applies late, across a restart |
+| An active token nobody owes counts as clean | an active token nobody owes |
+| The creation token is marked revoked without revoking it | healthy control |
+| A refused first commit is retried with the same token | a refused first commit is retired and made again |
+| The alarm retires an unheld repository after founding too | after founding nothing is touched |
+| Imports accepted without `IMPORT_ARTIFACTS` | `IMPORT_NAMESPACE` with no binding |
+| Public founding accepted without `ARTIFACTS` | no `ARTIFACTS` binding |
+| Production installs an adapter for a missing binding | Node: production services |
+| The first commit not pushed; created without a clear ok; wrong pack bits; old value not zero; land on no main says retry; no alarm work or scheduling before founding; the import and public checks; namespace routing (Room, log remote, sandbox) | as in "Founding gaps" |
+
+Two survived, and both are equivalent in the Room's flow, kept as defence in
+depth: `found`'s check that main is not null after `prepareCanonical` (which
+returns only once main holds the first commit), and `sealCanonical`'s check
+when run through the Room (which seals only after `prepareCanonical`
+settled everything). The second is killed at the ledger level.
+
+## Review 3eb7bc44
+
+**The finding.** After review a35b4b61, a retirement deleted the repository
+and made it again under the same name. A delete whose answer was lost could
+then apply after a later delete had answered and the room had been sealed
+on the new repository, erasing it, even after landings. A later answer is
+not proof that an earlier request completed or was cancelled.
+
+**The fix: one name per creation attempt.** A public room's identity stays
+`<namespace>/<base>` (R-GEN-12, derived from the draft value), but its
+repository is stored under an *incarnation* name, `<base>-<step>`, where
+`<step>` is the ID of the create step, recorded before the create is sent.
+
+- A name is created at most once and never reused. A delete is only ever
+  owed for an *abandoned* incarnation (one whose create's answer was lost,
+  or that the Room could not vouch for). So a late delete, or a late create,
+  can only reach an abandoned incarnation, never the one the room is sealed
+  on. This holds by construction, without any provider guarantee.
+- An abandoned incarnation's delete is retried until Artifacts answers;
+  deleting a missing repository is harmless. Seeing the incarnation proves
+  its single create applied; after that, NOT_FOUND settles it. A create in
+  flight whose repository is absent stays watched, before and after
+  founding, and is deleted if it appears.
+- These duties never block the seal, and the alarm runs them before founding
+  (`settleCanonical`) and after it (`reconcile`, which counts them in
+  `nextDue` and `pendingCleanup`). `Workspaces.duties()` lists them for
+  operators.
+- `sealCanonical(name)` requires that `name` is the holder, is not
+  abandoned, and owes nothing.
+- The Room records the sealed incarnation (meta `canonical_name`) and locates
+  its repository there. Forks, landing, the log and the sandbox follow. A
+  room founded before this change keeps its identity's name.
+- R-GEN-12 gains one sentence: the deployment may store the repository under
+  a name derived from the identity, one per creation attempt and never
+  reused.
+
+The checker's cases are tests: a delete whose answer is lost and applies
+late, across a restart; the same after the seal and a normal landing (the
+repository, its landed main and its log survive), at the ledger level and
+through the Room, with a real Durable Object eviction; and a lost delete
+followed by NOT_FOUND. The healthy control stays.
+
+Also from the review: the smoke script now reports an unknown token listing
+as unknown, using the deploy lane's `readListing`, instead of reading it as
+no tokens. The deploy notes' references to lane E (now on main) are dated.
+This revision has not been run live.
+
+Mutations, made once each after committing: 32 of 34 were killed.
+
+| Mutation | A test that failed |
+|---|---|
+| Every attempt reuses the identity's name (ledger, and Room) | healthy control; a refused or lost first commit |
+| A delete may be aimed at the holder | healthy control |
+| Seeing an incarnation does not settle its create | the late delete after the seal and a landing |
+| Absence settles a create in flight | a late create after the seal |
+| The seal accepts a name that is not the holder | the seal refuses a non-holder |
+| The seal does not require nothing owed | an unconfirmed revocation blocks the seal |
+| The Room ignores its sealed incarnation | the first lane lands |
+| Prepare leaves abandoned incarnations for later | the late delete across a restart |
+| The alarm after founding ignores abandoned incarnations | the late delete across a restart |
+| `nextDue` ignores abandoned incarnations | the late delete after the seal and a landing |
+| The earlier rows of "Review a35b4b61" and "Founding gaps", rerun | as there |
+
+Two survived, both equivalent: a delete aimed at the sealed incarnation
+(`abandonedNames` without excluding it), because the sealed incarnation has
+no open duty after the seal and so is never visited; and `found`'s check that
+main exists after `prepareCanonical`, which only returns once it does.
+
+## Review 700b74ea
+
+**The finding.** Before the incarnation ledger, the Room created a public
+founding's repository under its base name (the identity's own name) and
+recorded nothing. A pending founding begun by that Room and retried under
+revision 3 was sealed on `<base>-1`, and `<base>`, with its 24-hour write
+token, was never found, cleaned or reported. An old create whose answer was
+lost could also apply later.
+
+**The fix: adopt the base name, durably, before preparing.** The first time
+a pending public founding is prepared (`Workspaces.prepareCanonical`, called
+only from `found` for a public room that is not founded), the ledger adopts
+its base name when:
+
+- an older Room may have tried: the registry binding was made before this
+  `found` call (`bind` answers `already-bound`) and this Room has no attempt
+  on record (no `founding_repo`); or
+- an earlier revision's ledger has a row for the base name; or
+- the base repository exists now (only this founding can have made it,
+  R-GEN-12).
+
+Adoption records a `legacy` create step, in flight, and owes the base name's
+deletion. The legacy step is never settled: not by a read of absence, not by
+deleting the repository, and not by the new incarnation's seal, because more
+than one old create may still apply. The base name is never an incarnation,
+so the alarm deletes it whenever it appears, before and after founding, with
+every token on it. `Workspaces.duties()` shows the step. An already-founded
+room (whatever its storage name) and an import never reach this, and nothing
+else touches the base name. Cleanup scheduling no longer excludes the
+configured canonical name: it excludes the holder's founding duties, and the
+sealed incarnation has none.
+
+| Case | Tests |
+|---|---|
+| (a) a legacy base holding a token | `workspaces.test.ts` (a); `founding-gaps.test.ts` (a): deleted with its token before the seal, the room lands, the legacy step stays watched after eviction |
+| (b) an absent base whose old create applies after the seal | `workspaces.test.ts` (b), including a second appearance; `founding-gaps.test.ts` (b): the alarm deletes it after eviction, the landed main survives |
+| (c) an already-founded legacy room | `workspaces.test.ts` (c); `founding-gaps.test.ts` (c): a room turned into an older Room's (base name, no ledger), found again, lands, keeps a live publishing token through the alarm, and gets no legacy step |
+| Scope | a founding this Room began and retried adopts nothing; an earlier revision's ledger row is adopted, with the repository present or absent; the checker's control (a base that exists although the binding is new) |
+
+Mutations, made once each after committing: 12 of 12 were killed, after one
+test was added. Not adopting at all (ledger and Room); the Room never
+flagging an older attempt; flagging every first founding; ignoring this
+Room's own record; not looking for an existing base; ignoring an earlier
+ledger (it survived until the absent-base test was added); settling the
+legacy step when seen, when deleted, or on a read of absence; not scheduling
+it after founding; and not recording the adoption.
+
+Main `9bb700b6` (amendment 4, the bounded-memory publisher, the deploy
+cleanup and pi Workers AI) is merged. This revision has not been run live.
+
+The smoke script no longer takes `genesis.repo`'s name (the identity's base)
+for the public room's repository: it finds the sealed incarnation (the
+highest `<base>-<step>`, `incarnationOf`) for its founding checks, ref reads
+and verify, and its cleanup reaches the base name, every incarnation and
+their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.test.ts`
+covers both.
+
+Recovery: whether an older Room may have tried is now a durable fact of the
+registry binding (migration 2: `ledger` is NULL on bindings an older Worker
+made, 1 on every new one), read on every attempt, not the `bind` answer and
+this Room's attempt record. The earlier rule lost the adoption when a found
+was interrupted after recording its attempt and before adopting, and adopted
+spuriously after a lost bind answer or an interrupted first found; real-DO
+controls interrupt each window.
 
 ## Secrets
 

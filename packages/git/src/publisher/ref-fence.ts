@@ -112,3 +112,18 @@ export function checkUpdates(commands: readonly RefUpdate[], allowed: AllowedUpd
 export function isReceivePack(url: URL): boolean {
   return url.pathname.endsWith("/git-receive-pack") || url.searchParams.get("service") === "git-receive-pack";
 }
+
+/**
+ * The path of an Artifacts repository the sandbox may reach: an HTTPS remote
+ * on the Artifacts host, in one of the deployment's namespaces (the public
+ * one and, for imports, the import namespace; R-GEN-12), ending in `.git`,
+ * with no credentials or query. Throws otherwise.
+ */
+export function repoPathOf(remote: string, host: string, namespaces: readonly (string | undefined)[]): string {
+  const u = new URL(remote);
+  const ours = namespaces.filter((ns): ns is string => !!ns).map((ns) => `/git/${ns}/`);
+  if (u.protocol !== "https:" || u.hostname !== host || !ours.some((p) => u.pathname.startsWith(p)) || !u.pathname.endsWith(".git") || u.username || u.password || u.search) {
+    throw new Error("remote not allowed");
+  }
+  return u.pathname;
+}

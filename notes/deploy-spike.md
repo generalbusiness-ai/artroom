@@ -66,8 +66,9 @@ Objects' storage too.
 node packages/room/measure/spike-smoke.mjs
 ```
 
-There is no client or CLI package on main yet (lane E), so the script drives
-the Room's HTTPS API directly. It signs envelopes and requests with the
+When this was written there was no client or CLI package on main (lane E
+landed later, at main `3f44c993`); the script still drives the Room's HTTPS
+API directly. It signs envelopes and requests with the
 Room's own `src/crypto.ts`. It uses hugh's OAuth for the Artifacts REST API,
 to read refs, seed main and clean up. It saves a redacted result in
 `packages/room/measure/results/`.
@@ -151,37 +152,110 @@ are unpublished, or a minute after the oldest one (`publicationDue`).
 
 ## Gaps found
 
-1. **A room founded with `{ kind: "new" }` cannot land its first lane.** The
-   Room creates an empty repository. Claim, workspace, push, propose and the
-   preview all work. `land` then fails with 503 `unavailable`, "The
-   repository could not be read. … retry with the same idempotency key."
-   Retrying does not help: lane B's landing needs a known main
-   (`readMainVia` throws "main is missing", and `LandingCore.accept`
-   requires main). The smoke run seeded main out of band. Either founding
-   should give a new repository an initial commit, or the landing should
-   accept an absent main, pushing with a lease on an absent ref. At least
-   the error should not say "retry".
-2. **Founding leaves a 24-hour write token on the canonical repository.** At
-   cleanup, each run's canonical repository had one active token. The
-   second run recorded it: scope `write`, created at 02:49:39.234, during
-   `found` (the genesis is sealed at 02:49:39.886), expiring 24 hours later.
-   It is very likely the token Artifacts returns when a repository is
-   created. The Room's `createRepo` ignores the answer and never revokes it. Lane B's `Workspaces`
-   handles the same case for forks by an inventory that revokes every
-   token; the canonical repository needs the same, right after creation.
-3. **A deployment can found publicly or import, not both.** It has one
-   Artifacts binding. If `PUBLIC_NAMESPACE` is that namespace, a grant for a
-   repository in it is refused ("A grant cannot name a repository in the
-   public founding namespace"). If `PUBLIC_NAMESPACE` is another namespace,
-   public founding binds the name in the registry and then fails at step 6
-   with `unavailable`, for good. This spike keeps production's shape
-   (`PUBLIC_NAMESPACE` = `ARTIFACTS_NAMESPACE`), so public founding works and
-   imports cannot.
-4. **No client on main.** Lane E's client, CLI and MCP are not on main, so
-   the smoke run is a script over the HTTPS API. `artroom verify` is lane
-   L's CLI, which is on main.
+Gaps 1 to 3 are fixed by request b6b51de7 (see "Re-run after the founding
+fixes" below, and "Founding gaps" in
+[packages/room/README.md](../packages/room/README.md)).
+
+1. **Fixed: a room founded with `{ kind: "new" }` could not land its first
+   lane.** The Room created an empty repository; `land` then failed with
+   503 `unavailable`, "… retry with the same idempotency key", and retrying
+   could not help, because lane B's landing needs a known main. Now
+   founding gives `main` one commit with no files before the genesis is
+   sealed (R-GEN-12, amended in one sentence), and a `land` on a repository
+   with no main fails with `not-found`, not retryable, without "retry".
+2. **Fixed: founding left a 24-hour write token on the canonical
+   repository.** It was the token Artifacts returns when a repository is
+   created. Now the creation is a step in lane B's workspace ledger,
+   recorded before the call, and the token is owed revocation from its
+   answer; the genesis is sealed only when no token is active on the
+   repository, and the alarm retries the debt until Artifacts confirms it.
+3. **Fixed: a deployment could found publicly or import, not both.** A
+   deployment now takes a second, optional binding, `IMPORT_ARTIFACTS` for
+   `IMPORT_NAMESPACE`, and the Room follows its repository's namespace. A
+   mode whose binding is absent is refused at `draft` and before the
+   registry binding, with the reason (review a35b4b61), so it no longer
+   binds a name that can never complete. Since revision 2 the spike has
+   both bindings, `gitseq-spike` and `gitseq-spike-import` (approved by
+   hugh), and its live run imports a repository as well as founding a public
+   room.
+4. **No client on main (at the time).** Lane E's client, CLI and MCP were
+   not on main then (they landed at `3f44c993`), so the smoke run is a
+   script over the HTTPS API. `artroom verify` is lane L's CLI.
 5. **The first deploy needed a retry** for the container application (see
    "Deploy and redeploy").
+
+## Re-run after the founding fixes (request b6b51de7)
+
+The spike Worker was redeployed from `request/founding-gaps` with
+`scripts/deploy-spike.sh` (same container image; version
+`a0797ebb-1dfd-405e-ae34-a9735be127b6`), and the smoke script, changed so
+that lane 1 must land and nothing seeds main, ran once:
+[spike-smoke-2026-10-02T03-23-17-901Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T03-23-17-901Z.json).
+Every step passed.
+
+| Step | Result |
+|---|---|
+| Draft, found, found again, look up by name | 200; the same room; found took 3.0 s |
+| Main after founding | `add07530…`, the Room's first commit (no files), as computed from the genesis's time |
+| Active tokens on the new repository after founding | 0 |
+| Lane 1: claim, workspace, token, clone, push, propose, preview | all succeed; the preview is a clean fast-forward from the first commit |
+| Lane 1: `land` | accepted, then `landed` in 1.4 s; main is lane 1's head |
+| Lane 1: release; its token on the fork | released; `git ls-remote` exits 128 |
+| Lane 2: the same, on top of lane 1 | `landed`; main is lane 2's head |
+| Import drafts signed by the spike operator key | 403: "A grant cannot name a repository in the public founding namespace." and "This deployment does not import repositories: …" |
+| Log publication, `artroom verify` | published through entry 14; verify exit 0, 4 decisions replayed, no failures |
+| Cleanup | canonical repository and both forks: 0 active tokens, deleted; none left |
+
+Left behind, as before: the room `deploy-spike-smoke-muqeemmx` in the
+Room's Durable Objects and registry, bound to a deleted repository, and its
+read session, which expires 15 minutes after the run. The import drafts
+created, read and bound nothing.
+
+## Revision 2: a live import (request b6b51de7)
+
+The spike config binds `IMPORT_ARTIFACTS` to `gitseq-spike-import` and sets
+`IMPORT_NAMESPACE`. The smoke script, after the public founding, creates a
+throwaway repository with one commit in `gitseq-spike-import` (with hugh's
+OAuth; its creation token pushes the commit and is then revoked), signs an
+onboarding grant with the spike operator key (the seed is read from the env
+file into the process and never printed), drafts and founds a room on it,
+lands a lane, waits for the log and runs `artroom verify`. Cleanup is the
+deploy lane's `cleanupRun` (review 2485e992), once per namespace.
+
+| Run | Code | Outcome |
+|---|---|---|
+| [03:55:25](../packages/room/measure/results/spike-smoke-2026-10-02T03-55-25-370Z.json) | revision 2, before review a35b4b61 | Public founding passed. The import founded and landed, but its log never published: another actor redeployed `artroom-spike-room` at 03:57:21 from a config without the import binding (version `2092006a`), so the import room lost its namespace. |
+| [04:03:51](../packages/room/measure/results/spike-smoke-2026-10-02T04-03-51-743Z.json) | the same, redeployed | Every step passed. |
+| [04:21:13](../packages/room/measure/results/spike-smoke-2026-10-02T04-21-13-851Z.json) | review a35b4b61 answered, merged with main `b5864882` and `request/deploy-spike` `97f42684`; version `a9f55d45` | Every step and every cleanup duty passed (57 steps). |
+
+These runs predate review 3eb7bc44 (incarnation names). That revision was
+not run live: one coordinated redeploy follows.
+
+The 04:21:13 run, on one deployment:
+
+| Step | Result |
+|---|---|
+| Public founding | main is the Room's first commit, `6ff91167…`; 0 active tokens after founding |
+| Lanes 1 and 2 | both landed; lane 1's released token no longer reads its fork |
+| Import drafts for the public namespace and for `gitseq-spike-other` | 403, each with its reason |
+| Public log | published through entry 14; `artroom verify` exit 0, 4 decisions replayed |
+| Import repository | `gitseq-spike-import/9b1e9f52…`, one commit `76ace7c6…`; its creation token revoked, 0 active |
+| Import draft and found | 200; the genesis carries the grant by operator `key_YPyq…` |
+| Main after founding the import | still `76ace7c6…`: the Room wrote nothing |
+| Lane 3 on the import | landed; main is its integration, on `76ace7c6…` |
+| Import log | published through entry 8; `artroom verify` exit 0, 2 decisions replayed, reports the operator key |
+| Cleanup | both canonical repositories and three forks deleted; every duty done; no repository left |
+
+At cleanup, one active write token was on the public canonical repository:
+60 seconds, created at 04:24:33, two minutes after its first publication.
+It is the Room's own publishing credential for the next log publication (a
+checkpoint entry leaves the log unpublished again), in use or awaiting its
+revocation, not a founding token. Cleanup revoked it, then deleted the
+repository.
+
+Left behind: the rooms of each run in the Room's Durable Objects and
+registry, bound to deleted repositories, and their read sessions, which
+expire 15 minutes after each run.
 
 ## Gates
 

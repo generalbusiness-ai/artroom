@@ -1,14 +1,15 @@
 /**
  * What a Room is given, and its clock.
  *
- * Production: lane C's policy runtime; the Artifacts binding for the
- * deployment's namespace; lane B's publisher sandbox (one Durable Object
- * per room); and lane L's log remote over both. The Room builds the real
+ * Production: lane C's policy runtime; the Artifacts bindings for the
+ * deployment's namespaces (public founding, and imports); lane B's
+ * publisher sandbox (one Durable Object per room); and lane L's log remote
+ * over both. The Room builds the real
  * adapters over them (see `core.ts`). Tests replace the factory with fake
  * remotes.
  */
 
-import type { PublisherStub } from "@generalbusiness/artroom-git";
+import { pushFirstCommit, type PublisherStub } from "@generalbusiness/artroom-git";
 import type { LaneId } from "@generalbusiness/artroom-contract";
 import type { ArtifactsBinding } from "./artifacts.ts";
 import { artifactsLogRemote, type LogRemoteStub } from "./logremote.ts";
@@ -19,10 +20,19 @@ export interface RoomEnv {
   readonly ROOMS: DurableObjectNamespace;
   /** The deployment's one registry (R-GEN-13). */
   readonly REGISTRY: DurableObjectNamespace;
-  /** The Artifacts binding, for one namespace. */
+  /** The Artifacts binding, for one namespace: the public founding namespace. */
   readonly ARTIFACTS?: unknown;
   /** The namespace the binding reaches. Default: `PUBLIC_NAMESPACE`. */
   readonly ARTIFACTS_NAMESPACE?: string;
+  /**
+   * The Artifacts binding for imported repositories, in `IMPORT_NAMESPACE`.
+   * An import's repository must be outside the public founding namespace
+   * (R-GEN-12), so a deployment that both founds public rooms and imports
+   * needs this second binding. Without it, imports are refused at `draft`.
+   */
+  readonly IMPORT_ARTIFACTS?: unknown;
+  /** The namespace `IMPORT_ARTIFACTS` reaches, and the only one an onboarding grant may name. */
+  readonly IMPORT_NAMESPACE?: string;
   /** Lane B's publisher sandbox (its `Publisher` Durable Object class). */
   readonly PUBLISHER?: DurableObjectNamespace;
   /** Operator key IDs, comma-separated, whose onboarding grants this deployment accepts (R-GEN-12). */
@@ -44,11 +54,13 @@ const productionServices: ServicesFactory = (env, roomObject) => {
   const artifacts = (env.ARTIFACTS ?? null) as ArtifactsBinding | null;
   const namespace = env.ARTIFACTS_NAMESPACE ?? env.PUBLIC_NAMESPACE ?? "artroom-public";
   const publisher = (): PublisherStub & LogRemoteStub => (env.PUBLISHER ? (env.PUBLISHER.get(env.PUBLISHER.idFromName(roomObject)) as unknown as PublisherStub & LogRemoteStub) : missing("PUBLISHER"));
-  const binding: ArtifactsBinding = artifacts ?? {
-    get: async () => missing("ARTIFACTS"),
-    create: async () => missing("ARTIFACTS"),
-    delete: async () => missing("ARTIFACTS"),
-  };
+  const absent = (name: string): ArtifactsBinding => ({ get: async () => missing(name), create: async () => missing(name), delete: async () => missing(name) });
+  const binding: ArtifactsBinding = artifacts ?? absent("ARTIFACTS");
+  // The import namespace's own binding (R-GEN-12): repositories there are imported, never created.
+  const bindings: Record<string, ArtifactsBinding> = {};
+  // Only a binding the deployment has: a configured namespace without one has no repository here (review a35b4b61).
+  if (env.IMPORT_NAMESPACE && env.IMPORT_NAMESPACE !== namespace && env.IMPORT_ARTIFACTS) bindings[env.IMPORT_NAMESPACE] = env.IMPORT_ARTIFACTS as ArtifactsBinding;
+  const bindingOf = (ns: string): ArtifactsBinding => (ns === namespace ? binding : bindings[ns] ?? absent(`Artifacts binding for ${ns}`));
   // The stub is resolved per call, so a deployment without the sandbox still founds rooms and admits acts that need no repository work.
   const stub: PublisherStub = {
     pinObjects: (r) => publisher().pinObjects(r),
@@ -64,7 +76,14 @@ const productionServices: ServicesFactory = (env, roomObject) => {
   };
   return {
     policy: lanePolicy(),
-    remotes: { artifacts: binding, namespace, publisher: stub, logRemote: async (repo) => artifactsLogRemote(binding, logStub, repo) },
+    remotes: {
+      artifacts: binding,
+      namespace,
+      bindings,
+      publisher: stub,
+      logRemote: async (repo) => artifactsLogRemote(bindingOf(repo.namespace), logStub, repo),
+      firstCommit: (remote, token, at) => pushFirstCommit(remote, token, at),
+    },
   };
 };
 
