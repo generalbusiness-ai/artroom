@@ -1,0 +1,6 @@
+{
+  // A configuration error: the base it extends does not exist. scripts/check.sh must fail on it.
+  "extends": "./no-such-base.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["../../src/**/*.ts"]
+}

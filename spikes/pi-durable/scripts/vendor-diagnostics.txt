@@ -1,0 +1,10 @@
+# The vendored lane sources' known diagnostics under the spike's Workers lib,
+# with typescript 7.0.2 and the revisions in scripts/setup.sh. scripts/check.sh
+# allows exactly these; nothing in src/ or test/ may have one.
+vendor/artroom/packages/client/src/keys.ts(71,30): error TS2769
+vendor/artroom/packages/client/src/room.ts(416,23): error TS2345
+vendor/artroom/packages/client/src/room.ts(500,12): error TS2339
+vendor/artroom/packages/client/src/room.ts(504,12): error TS2339
+vendor/artroom/packages/client/src/room.ts(515,12): error TS2551
+vendor/artroom/packages/client/src/room.ts(522,12): error TS2339
+vendor/artroom/packages/log/src/canonical.ts(14,42): error TS2741
