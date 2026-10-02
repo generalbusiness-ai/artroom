@@ -5,7 +5,9 @@
 ownership"). Branch `request/mint-ownership`, cut from main `3ac55e96`.
 Revision 2 answers checker report `9ff903ab`; revision 3 answers the
 checker's two follow-up points on it (landing token IDs, and check jobs'
-deadline). Source line numbers are as at this revision's head, where no
+deadline); revision 4 makes four consistency repairs (`mint()`'s expiry, a
+check job's late token, overdue wake-ups, and removal of keyed records at
+expiry). Source line numbers are as at this revision's head, where no
 source file differs from `3ac55e96`.
 
 This is a design for review. It changes no source code. Approving it
@@ -22,7 +24,8 @@ section 31 (R-MINT-1 to R-MINT-7).
   in one transaction.
 - Before each request, the Room writes the record and stores a wake-up for
   taking it over. If either fails, nothing is sent. While a request is
-  outstanding or a token is in use, that wake-up is kept in the future.
+  outstanding or a token is in use, that wake-up is kept ahead. Overdue
+  work gets a wake-up 1 s ahead, never sooner.
 - Transient errors may still be retried, but each retry is a new record.
 - An answer that gives a token ID makes the token known, whenever it
   arrives. Only a known token with its text can be used, and only by a
@@ -47,7 +50,7 @@ A grep of every production source for `createToken(` finds these six.
 | 3 | `packages/git/src/publisher/client.ts:84`, `withToken`: `integrate` (106), the canonical half of `pinObjects` (159, 600 s), `pinRef` (179), `preview` (191) | canonical, write, 60 s or 600 s | `withRetry` as in 1. No record. A failed revocation is dropped (88) | Ledger |
 | 4 | `packages/room/src/logremote.ts:45`, `withToken`: `readRef` (62), `push` (87) | canonical, read or write, 60 s | No record. A failed revocation is dropped (49) | Ledger |
 | 5 | `packages/room/src/core.ts:202`, snapshot preparation's read of the canonical repository. Not named in the audit | canonical, read, 300 s | No record. A failed revocation is dropped (212) | Ledger |
-| 6 | `packages/room/src/jobs.ts:371`, a whole-tree check job's token | canonical, read, until the job's deadline | A record (`mint:<job>`) before the request (366–367), one request, handoff in one transaction (387–400). But no wake is stored before the request, and `watchMint` (203–231) writes every due record on each observation | Ledger until claimed; then `job_tokens`, as now |
+| 6 | `packages/room/src/jobs.ts:371`, a whole-tree check job's token | canonical, read, a lifetime asked to end before the job's deadline | A record (`mint:<job>`) before the request (366–367), one request, handoff in one transaction (387–400). But no wake is stored before the request, and `watchMint` (203–231) writes every due record on each observation | Ledger until claimed; then `job_tokens`, as now |
 
 Mints on other repositories have other owners and are outside this design:
 the workspace lease token (`workspaces.ts:446`, R-CRED-8), snapshot job
@@ -182,14 +185,17 @@ time. So an earlier alarm that runs for other work schedules the next one
 no later than the takeover time. When the takeover alarm runs:
 
 - on the same live host, with records still in flight: the takeover time
-  moves 60 s ahead. The next wake-up is always in the future, so the alarm
-  never spins;
+  moves 60 s ahead;
 - on a new object: the takeover above has already happened, and the alarm
   revokes the owed tokens and observes;
 - with nothing in flight: the takeover time is cleared.
 
 `nextDue()` also includes the earliest owed revocation and the next
-observation. While a revocation pass waits on an answer, its records are
+observation. It returns the earliest of these times, or, if that time has
+already passed, the current time plus 1 s. Overdue work, such as a backlog
+of owed revocations larger than one pass, is taken up again 1 s later, so
+the alarm neither spins nor stalls. (The Room's own clamp, `alarmTime` in
+`config.ts:122–124`, is only 10 ms.) While a revocation pass waits on an answer, its records are
 not due before that attempt's timeout (review f060871b).
 
 ### Bounded work per wake-up
@@ -217,10 +223,15 @@ token ID:
   plan 003's cleanup table once its operation has ended
   (`core.ts:155–167`). Neither can be read by token ID. The new table holds
   one row for every landing token not yet confirmed revoked, active or
-  ended. `pushToken` inserts the row in the transaction that records the
-  ID and claims it from the ledger. `tokenRevoked` (`core.ts:726–733`)
-  deletes it in the transaction that marks the token revoked. Those are the
-  only two places that change a token's state. A room stored before this
+  ended, with its reported expiry. `pushToken` inserts the row in the
+  transaction that records the ID and claims it from the ledger.
+  `tokenRevoked` (`core.ts:726–733`) deletes it in the transaction that
+  marks the token revoked. Those are the only two places that change a
+  token's state. R-MINT-7 also allows a keyed record to go once its
+  readable expiry has passed, as `job_tokens` rows and ledger records do;
+  lane B keeps landing rows until `tokenRevoked`, because plan 003 keeps
+  the revocation owed past expiry. An expired token is not counted by an
+  observation either way. A room stored before this
   change fills it once, under a meta key, from its active operations'
   unrevoked tokens and its cleanup table rows; an ended operation's
   unrevoked token is always in that table.
@@ -274,7 +285,9 @@ exports it; new `packages/git/test/mints.test.ts`. No caller changes.
 
 **API:** `new MintLedger({ sql, repo, now, wake, known, waitMs? })`,
 where `known(tokenId)` answers whether another Room record holds that ID;
-`mint(purpose, scope, ttl)` returns `{ id, plaintext, release(), claim() }`;
+`mint(purpose, scope, ttl)` returns `{ id, plaintext, scope, expiresAt,
+release(), claim() }`, where `expiresAt` is the expiry Artifacts reported,
+which an owner's own check (such as a check job's deadline) reads;
 `withToken(purpose, scope, ttl, fn)`; `reconcile()`; `nextDue()`;
 `duties({ after, limit })`.
 
@@ -318,8 +331,9 @@ test is red with no ledger, or with the mutation named.
     the observation, at most 20 record writes and one summary write for
     revocations, and rows read bounded by the batch, the page and the
     listing, not by the records kept. The next observation is never sooner
-    than 1 min after the last; `nextDue()` is in the future after each
-    turn; owed records due earlier are revoked before newer ones; paging
+    than 1 min after the last; with a backlog of 100 owed records all due
+    at once, `nextDue()` after each turn is exactly 1 s ahead while any
+    remain overdue, and each turn takes the next 20, earliest due first; owed records due earlier are revoked before newer ones; paging
     `duties()` reaches every record once; the counts are exact.
 
 **Mutation targets:** the record or the wake-up after the send; a failed
@@ -432,7 +446,11 @@ the ledger's duties.
    expiry is by the deadline, but the clock passes the deadline before
    dispatch. No job is sent, and the token is ended. A third: a token
    whose expiry fails the generic check is refused too. Each case is red
-   if `issue` relies only on the generic check.
+   if `issue` relies only on the generic check. And the cases where no
+   answer arrives in time, as in the retained `job-token-mint.test.ts`
+   tests: a lost answer keeps an unknown record past the deadline and past
+   the lifetime asked; an answer held past the bounded wait is never sent
+   to a runner, and its ID is owed and revoked.
 5. A source scan: outside the harnesses, `measure/` and tests, only
    `mints.ts`, `workspace/workspaces.ts`, `snapshot/repos.ts` and
    `publisher/client.ts` (the fork token only) call `createToken`.
@@ -448,8 +466,8 @@ deadline before dispatch removed.
   own request after approval.
 - Plan 003's cleanup records, which stay as they are.
 - Token lifetimes: 60 s for publication, staging, previews and logs, 300 s
-  for snapshot reads, 600 s for pinning, and up to the deadline for check
-  jobs, as adopted.
+  for snapshot reads, 600 s for pinning, and, for check jobs, a lifetime
+  asked to end before the deadline, as adopted.
 - Showing the records to admins: the cleanup projection request
   (`8d249233`, the successor of `c0f0592f`) reads `duties()` page by page.
 - Workspace, snapshot-repository and repository-creation tokens.

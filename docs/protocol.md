@@ -3256,7 +3256,8 @@ never apply. So these rules keep a durable record and a stored wake-up
 before each request, and never revoke a token that the Room cannot match
 to its own record by ID. Revision 2 answers checker report 9ff903ab;
 revision 3 answers the checker's follow-up on landing token IDs and check
-job deadlines.
+job deadlines; revision 4 makes four consistency repairs (a check job's
+late token, overdue wake-ups, and removal of keyed records at expiry).
 
 The design, the mint sites, the provider evidence, and each lane's edits
 and tests are in
@@ -3354,8 +3355,13 @@ runs from when Artifacts applies the create (open point 44), and nothing
 bounds when that is (open point 42). The lifetime is the only bound on
 the token's exposure. This amendment changes no lifetime: publication,
 staging, preview and log tokens last 60 seconds, snapshot preparation
-reads 300 seconds, pinning tokens 600 seconds, and check job tokens end by
-the job's deadline.
+reads 300 seconds, and pinning tokens 600 seconds. A check job asks for a
+lifetime that ends before the job's deadline, counted from when it sends
+the request. Its token is known to end by the deadline only when its
+answer arrives and passes the deadline check (R-MINT-3). A late-applied
+token, or one whose answer is lost, is bounded only by its lifetime, as
+above, and its record stays open: owed if a late answer gave its ID,
+unknown otherwise.
 
 **R-MINT-7. Wake-ups and bounded work.**
 - While any create request is outstanding, or any token is in use by a
@@ -3367,13 +3373,17 @@ the job's deadline.
 - Each owed revocation, and the next observation, has a stored wake-up no
   later than its due time. A fresh object schedules both at start, with no
   request needed.
-- Every wake-up the Room stores for this work is in the future, so no
-  alarm runs again at once.
+- The next wake-up for this work is its earliest due time. If that time
+  has already passed, because work is overdue, the next wake-up is the
+  current time plus a fixed minimum step of 1 second. So the alarm
+  neither runs again at once nor leaves overdue work waiting.
 - Every known canonical token ID has a record keyed by that ID, from the
-  transaction that records the ID to the one that marks it revoked. That
-  includes a publication token, whose ID is also in its landing operation.
-  So an observation finds whether the Room knows a listed token by point
-  lookups, without reading operations.
+  transaction that records the ID until Artifacts answers its revocation
+  or its readable reported expiry has passed, as in R-MINT-4. A token with
+  no readable expiry keeps its keyed record until its revocation is
+  answered. That includes a publication token, whose ID is also in its
+  landing operation. So an observation finds whether the Room knows a
+  listed, unexpired token by point lookups, without reading operations.
 - Each wake-up does work bounded independently of the number of records
   kept: at most 20 revocations, earliest due first, each with a bounded
   wait; at most one inventory, with a bounded wait and size; a fixed
