@@ -256,6 +256,11 @@ Before the first deploy (the file's header says the same):
 | `PUBLISHER` (binding) | Lane B's `Publisher` Durable Object class (the git sandbox), one instance per room |
 | `ARTIFACTS_HOST` | The Artifacts host the sandbox's gateway lets the container reach, under `ARTIFACTS_NAMESPACE` |
 
+A spike deployment, `artroom-spike-room` on the `gitseq-spike` namespace, is
+configured in [wrangler.spike.jsonc](wrangler.spike.jsonc) and deployed with
+`scripts/deploy-spike.sh`. Its live smoke run is `measure/spike-smoke.mjs`.
+See [notes/deploy-spike.md](../../notes/deploy-spike.md).
+
 ## Running the tests
 
 From the repository root, after `npm install`:
