@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review jj-refuse merged revision 3: verify the exact merge preserves approved policy behavior and amendment 3, then check strict compilation and both policy runtimes."}
+{"kind":"promise","text":"Independently review client revision 7: reproduce delayed workspace and cross-Room credential races, verify ownership before I/O, all artifacts and supported runtime/package checks."}
