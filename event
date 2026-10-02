@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/test/workerd/support.ts","body":{"commit":"99cc40447da8938fd1e2a5c07e59e4a583661502","path":"packages/room/test/workerd/support.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0e3a334ab0b692c3e7a6eb0873c4290c76aa4542","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/request-d268d249.test.ts."}
