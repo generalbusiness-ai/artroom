@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review lane E revision 10 and all 75 exact-head artifacts; verify manual cleanup duties survive unmapped credentials, interruption/retry and successor installation; architecture/security/simplification."}
+{"kind":"artifact","text":"packages/room/README.md at exact 34d4ba9d2dfa1249ecdea339aa47570355b7fe4e on request/deploy-spike, under promise git:sha1…3c72351 on request git:sha1…d47adc8","body":{"commit":"34d4ba9d2dfa1249ecdea339aa47570355b7fe4e","path":"packages/room/README.md"}}
