@@ -5,10 +5,12 @@
  *   blocks a landing, so screens never count it among what a landing needs.
  * - A check counts on a new integration only by a sealed `check-carried`
  *   event, and a check that did not carry has its event too (R-CARRY-13).
- *   The feed and the Proposal screen take the reason from that event.
+ *   The event binds the carry to one operation, one integration and one
+ *   policy version. The feed and the Proposal screen take the reason from
+ *   that event, and only from an event that matches all three exactly.
  */
 
-import type { ActId, Generation, Obligation } from "./contract.ts";
+import type { ActId, Generation, Obligation, Proposal } from "./contract.ts";
 import type { CheckCarriedEvent, CheckCarry, RoomSnapshot } from "./adapter.ts";
 
 const entryOf = (act: ActId) => act.split("_")[1] ?? act;
@@ -30,9 +32,18 @@ export function judgmentsFor(snap: RoomSnapshot, lane: ActId, generation: Genera
   return snap.checkCarries.filter((c) => c.event.lane === lane && c.event.generation === generation && c.event.obligation === obligation);
 }
 
-/** The latest event that carried `act` onto this generation, if one is loaded. */
-export function carriedBy(snap: RoomSnapshot, lane: ActId, generation: Generation, obligation: Obligation["id"], act: ActId): CheckCarry | undefined {
-  return judgmentsFor(snap, lane, generation, obligation)
-    .filter((c) => c.event.act === act && c.event.outcome.carried)
+/**
+ * The latest event that carried `act` onto this generation's current
+ * integration under the obligation's policy, if one is loaded. A
+ * generation's obligations count on its merge preview, so the event must
+ * name that preview operation and its integration, and the policy version
+ * that made the obligation (R-CARRY-13). When the preview has no
+ * integration, no event can be matched.
+ */
+export function carriedBy(snap: RoomSnapshot, p: Proposal, o: Obligation, act: ActId): CheckCarry | undefined {
+  if (p.preview.state !== "clean") return undefined;
+  const { id: op, integration } = p.preview;
+  return judgmentsFor(snap, p.lane, p.generation, o.id)
+    .filter((c) => c.event.act === act && c.event.outcome.carried && c.event.policy === o.policy && c.event.op === op && c.event.integration === integration)
     .at(-1);
 }

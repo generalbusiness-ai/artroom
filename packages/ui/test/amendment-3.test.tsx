@@ -12,7 +12,8 @@ import type { Carried, Cursor, HttpRoom, LogEntry, Obligation, Sha, Update } fro
 import { describeEntry } from "../src/room/live/describe.ts";
 import { LiveRoom } from "../src/room/live/live-room.ts";
 import { MockRoom } from "../src/room/mock/mock-room.ts";
-import { DEFAULT_STEP } from "../src/room/mock/scenario.ts";
+import { DEFAULT_STEP, STEPS } from "../src/room/mock/scenario.ts";
+import { World } from "../src/room/mock/world.ts";
 import { laneId, renderAt, stepOf } from "./helpers.tsx";
 
 afterEach(() => {
@@ -106,62 +107,158 @@ describe("check carry is shown from its check-carried event (R-CARRY-13)", () =>
     expect(within(carried).getByRole("button", { name: /Why/ })).toBeTruthy();
   });
 
-  test("a check judged and not carried is shown with why", () => {
+  test("a check judged and not carried is shown with why; a failed check is never judged", () => {
     const step = stepOf("Main moved: the rate limit prepares again");
     renderAt(`#/lane/${laneId(RATE, step)}/2`, { step });
     const tests = [...card("tests").querySelectorAll<HTMLElement>("[data-carry]")].map((x) => x.dataset["carry"]);
     expect(tests).toEqual(["carried", "not-carried"]);
     expect(card("tests").querySelector("[data-carry='not-carried']")!.textContent).toContain("Did not carry: The integration tree changed, so the check reruns.");
-    const llm = card("advisory-review").querySelectorAll<HTMLElement>("[data-carry='not-carried']");
-    expect(llm).toHaveLength(2);
-    expect(llm[0]!.textContent).toContain("The checker uses volatile inputs, so it reruns.");
+    // The advisory check failed, so there was nothing to carry and no judgment.
+    expect(card("advisory-review").querySelectorAll("[data-carry]")).toHaveLength(0);
   });
+});
 
-  test("carried check evidence takes its reason from the event, not from the evidence record", () => {
+/**
+ * Review a4241e41: a carried check's reason is taken only from the event that
+ * names the evidence's own destination (the generation's merge preview
+ * operation and its integration) and the obligation's policy version.
+ */
+describe("carried check evidence binds its reason to its destination and policy (review a4241e41)", () => {
+  function fixture() {
     const room = new MockRoom({ step: DEFAULT_STEP });
     const base = room.snapshot();
     const p = proposalOf(base, RATE, 2);
+    if (p.preview.state !== "clean") throw new Error("the fixture needs a clean preview");
+    const preview = p.preview;
     const tests = p.obligations.find((o) => o.rule === "tests")!;
     const act = base.checks.find((c) => c.lane === p.lane && c.check === "tests" && c.generation === 1)!.id;
+    const reason = { code: "tree-identical", tree: sha("1"), config: `sha256:${"2".repeat(64)}`, runner: `sha256:${"3".repeat(64)}` } as const;
     const carried: Carried = {
       basis: "carried",
       act,
       kind: "check",
       from: { generation: 1, head: proposalOf(base, RATE, 1).head },
-      reason: { code: "tree-identical", tree: sha("1"), config: `sha256:${"2".repeat(64)}`, runner: `sha256:${"3".repeat(64)}`, text: "a reason the event did not give" },
+      reason: { ...reason, text: "a reason the event did not give" },
       rules: [],
     };
-    const event: CheckCarriedEvent = {
-      type: "check-carried",
-      op: "op_land_99",
-      lane: p.lane,
-      generation: 2,
-      integration: sha("4"),
-      obligation: tests.id,
-      act,
-      policy: base.policy.version!,
-      outcome: { carried: true, reason: { ...carried.reason, text: "the reason the room sealed" } },
-      decisions: [],
-    };
-    const withEvidence = (s: RoomSnapshot, events: RoomSnapshot["checkCarries"]): RoomSnapshot => ({
-      ...s,
-      checkCarries: events,
-      proposals: s.proposals.map((x) => (x.id === p.id ? { ...x, obligations: x.obligations.map((o) => (o.id === tests.id ? ({ ...o, evidence: [carried] } as Obligation) : o)) } : x)),
+    /** An event for this evidence; by default it names the preview, its integration and the obligation's policy. */
+    const event = (seq: number, text: string, over: Partial<Pick<CheckCarriedEvent, "op" | "integration" | "policy">> = {}) => ({
+      id: `act_${seq}_aaaaaaaa` as const,
+      seq,
+      at: base.now,
+      event: {
+        type: "check-carried",
+        op: preview.id,
+        lane: p.lane,
+        generation: 2,
+        integration: preview.integration,
+        obligation: tests.id,
+        act,
+        policy: tests.policy,
+        outcome: { carried: true, reason: { ...reason, text } },
+        decisions: [],
+        ...over,
+      } satisfies CheckCarriedEvent,
     });
+    const show = (events: RoomSnapshot["checkCarries"], previewOver?: RoomSnapshot["proposals"][number]["preview"]) => {
+      cleanup();
+      room.snapshot = () => ({
+        ...base,
+        checkCarries: events,
+        proposals: base.proposals.map((x) =>
+          x.id === p.id
+            ? { ...x, ...(previewOver ? { preview: previewOver } : {}), obligations: x.obligations.map((o) => (o.id === tests.id ? ({ ...o, evidence: [carried] } as Obligation) : o)) }
+            : x,
+        ),
+      });
+      renderAt(`#/lane/${p.lane}/2`, room);
+      const text = card("tests").querySelector("[data-basis='carried'] [data-carry-reason]")!.textContent;
+      expect(card("tests").textContent).not.toContain("a reason the event did not give");
+      return text;
+    };
+    return { base, p, preview, tests, event, show };
+  }
 
-    room.snapshot = () => withEvidence(base, [...base.checkCarries, { id: "act_99_aaaaaaaa", seq: 99, at: base.now, event }]);
-    renderAt(`#/lane/${p.lane}/2`, room);
-    const reason = card("tests").querySelector("[data-basis='carried'] [data-carry-reason]")!;
-    expect(reason.textContent).toBe("Carried to generation 2 by entry 99: the reason the room sealed.");
-    expect(card("tests").textContent).not.toContain("a reason the event did not give");
-    cleanup();
+  const NONE = "No check-carried event for this carry, on this generation's integration and under this policy, is loaded here, so its reason is not shown.";
+  const OTHER_OP = "op_land_77" as const;
 
-    // Without a loaded event the UI shows no reason at all, rather than the evidence record's.
-    room.snapshot = () => withEvidence(base, []);
-    renderAt(`#/lane/${p.lane}/2`, room);
-    const none = card("tests").querySelector("[data-basis='carried'] [data-carry-reason]")!;
-    expect(none.textContent).toBe("No check-carried event for this carry is loaded here, so its reason is not shown.");
-    expect(card("tests").textContent).not.toContain("a reason the event did not give");
+  test("the event naming the preview, its integration and the obligation's policy gives the reason", () => {
+    const f = fixture();
+    expect(f.show([...f.base.checkCarries, f.event(99, "the reason the room sealed")])).toBe("Carried to generation 2 by entry 99: the reason the room sealed.");
+  });
+
+  test("successive integrations: only the event for the current integration counts, earlier or later", () => {
+    const f = fixture();
+    const earlier = f.event(98, "carried to an earlier integration", { op: "op_preview_5", integration: sha("5") });
+    const current = f.event(99, "carried to the current integration");
+    const later = f.event(100, "carried to a landing integration", { op: OTHER_OP, integration: sha("6") });
+    expect(f.show([earlier, current, later])).toBe("Carried to generation 2 by entry 99: carried to the current integration.");
+    // The same integration under another operation is not this destination.
+    expect(f.show([f.event(101, "same commit, other operation", { op: OTHER_OP })])).toBe(NONE);
+    // Every judgment stays in the history list.
+    f.show([earlier, current, later]);
+    expect(card("tests").querySelectorAll("[data-carry='carried']")).toHaveLength(3);
+  });
+
+  test("policy activation: an event under an earlier policy is history, not the current reason", () => {
+    const f = fixture();
+    const old = "act_1_deadbeef" as const;
+    expect(f.tests.policy).not.toBe(old);
+    const before = f.event(98, "carried under the earlier policy", { policy: old });
+    expect(f.show([before])).toBe(NONE);
+    const judged = card("tests").querySelector<HTMLElement>("[data-carry='carried']")!;
+    expect(judged.textContent).toContain("under another policy version, so it does not count under this one");
+    // Judged again under the new version, with a new event: that one is the reason.
+    expect(f.show([before, f.event(99, "carried under the current policy")])).toBe("Carried to generation 2 by entry 99: carried under the current policy.");
+  });
+
+  test("the reviewer's case: an older-policy event for another integration is not shown as the reason", () => {
+    const f = fixture();
+    expect(f.show([f.event(99, "a reason from a different policy and integration", { op: "op_land_99", integration: sha("4"), policy: "act_1_deadbeef" })])).toBe(NONE);
+  });
+
+  test("only historical events loaded, or none: no reason is shown", () => {
+    const f = fixture();
+    expect(f.show([f.event(98, "carried to an earlier integration", { op: "op_preview_5", integration: sha("5") })])).toBe(NONE);
+    expect(f.show([])).toBe(NONE);
+  });
+
+  test("a preview without an integration cannot identify the destination, so no event is matched", () => {
+    const f = fixture();
+    const pending = { id: f.preview.id, kind: "preview", updatedAt: f.preview.updatedAt, lane: f.preview.lane, generation: f.preview.generation, state: "pending" } as const;
+    expect(f.show([f.event(99, "carried to the current integration")], pending)).toBe(NONE);
+  });
+});
+
+describe("a failed required check keeps the landing waiting (review a4241e41)", () => {
+  test("preparing never carries a failed required check, and the obligation waits", () => {
+    const w = new World();
+    const stop = STEPS.findIndex((s) => s.label.startsWith("@cedar lands the logging lane"));
+    expect(stop).toBeGreaterThan(0);
+    for (const step of STEPS.slice(0, stop)) {
+      w.t = step.minute;
+      step.run(w);
+    }
+    w.check("@ci", "L3", 1, false, "required tests failed");
+    const failed = w.checks.at(-1)!;
+    expect(failed.ok).toBe(false);
+    w.land("@cedar", "L3");
+    w.prepare("L3");
+    expect(w.checkCarries.filter((c) => c.event.act === failed.id)).toEqual([]);
+    expect(w.checkCarries.some((c) => c.event.lane === w.lane("L3").id && c.event.outcome.carried)).toBe(false);
+    const op = w.landOp("L3");
+    expect(op.state).toBe("preparing");
+    expect(op.state === "preparing" && op.waiting).toEqual([failed.obligation]);
+  });
+
+  test("control: a failed advisory check still never holds up preparation", () => {
+    const s = new MockRoom({ step: stepOf("@ash lands the rate limit") }).snapshot();
+    const p = proposalOf(s, RATE, 2);
+    const advisory = p.obligations.find((o) => o.rule === "advisory-review")!;
+    const latest = s.checks.filter((c) => c.obligation === advisory.id).at(-1)!;
+    expect(latest.ok).toBe(false);
+    const op = s.landOps.find((o) => o.lane === p.lane)!;
+    expect(op.state === "preparing" && op.waiting).toEqual([]);
   });
 });
 

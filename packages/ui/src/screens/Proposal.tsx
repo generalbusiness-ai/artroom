@@ -38,7 +38,7 @@ function EvidenceRow({ ev, current, o }: { ev: Evidence; current: Proposal; o: O
   const source = isCarried(ev) ? ev.from : { generation: ev.generation, head: ev.head };
   const what = review ? (review.verdict === "approve" ? "approved" : "objected to") : check ? `ran ${check.check}: ${check.ok ? "passed" : "failed"}` : "recorded";
   // A check carries only by its sealed check-carried event (R-CARRY-13); the reason shown is that event's.
-  const event = isCarried(ev) && ev.kind === "check" ? carriedBy(snap, current.lane, current.generation, o.id, ev.act) : undefined;
+  const event = isCarried(ev) && ev.kind === "check" ? carriedBy(snap, current, o, ev.act) : undefined;
   return (
     <li class={`ev${isCarried(ev) ? " carried" : ""}`} data-basis={ev.basis}>
       <div class="row">
@@ -62,7 +62,7 @@ function EvidenceRow({ ev, current, o }: { ev: Evidence; current: Proposal; o: O
               Carried to generation {current.generation} by entry {event.seq}: {event.event.outcome.reason.text}.
             </>
           ) : (
-            <>No check-carried event for this carry is loaded here, so its reason is not shown.</>
+            <>No check-carried event for this carry, on this generation's integration and under this policy, is loaded here, so its reason is not shown.</>
           )}
         </p>
       )}
@@ -140,7 +140,7 @@ function CarryJudgments({ o, p }: { o: Obligation; p: Proposal }) {
   if (!judged.length) return null;
   return (
     <div class="stack-sm" aria-label="Carry judgments">
-      <h4 class="small">Judged for landing integrations</h4>
+      <h4 class="small">Carry judgments recorded by the room</h4>
       <ul class="evidence">
         {judged.map(({ id, seq, event }) => (
           <li key={id} class={`ev ${event.outcome.carried ? "carried" : "stale"}`} data-carry={event.outcome.carried ? "carried" : "not-carried"}>
@@ -165,7 +165,10 @@ function CarryJudgments({ o, p }: { o: Obligation; p: Proposal }) {
             ) : (
               <p class="stale-text">Did not carry: {event.outcome.notCarried.text}</p>
             )}
-            <p class="tested">Recorded by the room at entry {seq}.</p>
+            <p class="tested">
+              Recorded at entry {seq}
+              {event.policy === o.policy ? "." : ", under another policy version, so it does not count under this one."}
+            </p>
             <div>
               <WhyLink act={id} />
             </div>

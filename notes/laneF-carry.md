@@ -87,3 +87,45 @@ the suite green afterwards.
 | M6 Carried evidence shows the evidence record's reason, not the event's | carried check evidence takes its reason from the event, not from the evidence record |
 | M7 Feed sentence drops the carry reason | describes check-carried events…; check-carried events appear in the activity feed |
 | M8 Not-carried judgment drops why | a check judged and not carried is shown with why |
+
+## Review a4241e41
+
+Checker's review of `46d100d0` asked for two changes. `main` at `4892e114`
+is merged first (`64d90cf1`).
+
+1. **P2: the reason shown for carried check evidence is bound to its
+   policy and destination.** `carriedBy` (`src/room/checks.ts`) now matches
+   exactly, besides lane, generation, obligation, act and `carried`: the
+   event's `op` and `integration` must be the generation's merge preview
+   (`Proposal.preview`, state `clean`) and its integration, and its
+   `policy` must be the obligation's `policy`. A preview with no
+   integration matches nothing. Without a match the row shows the existing
+   fallback, reworded: "No check-carried event for this carry, on this
+   generation's integration and under this policy, is loaded here, so its
+   reason is not shown." The judgments list still shows every event; one
+   under another policy version says it does not count under this one.
+2. **P2: a failed required check keeps mock preparation waiting.**
+   `World.judgeCheck` judges only a passing latest check. A failed one is
+   not carried and gets no event, so a required obligation stays in
+   `waiting`. An advisory one still never waits. As a result the scenario's
+   failing LLM review is no longer judged, and its two `volatile-inputs`
+   events are gone; the tests check still shows a carried and a not-carried
+   judgment at step 28.
+
+Tests added in `test/amendment-3.test.tsx`, from the checker's diagnostic,
+asserting the right outcome:
+
+- carried check evidence binds its reason to its destination and policy (review a4241e41)
+  - the event naming the preview, its integration and the obligation's policy gives the reason
+  - successive integrations: only the event for the current integration counts, earlier or later
+  - policy activation: an event under an earlier policy is history, not the current reason
+  - the reviewer's case: an older-policy event for another integration is not shown as the reason
+  - only historical events loaded, or none: no reason is shown
+  - a preview without an integration cannot identify the destination, so no event is matched
+- a failed required check keeps the landing waiting (review a4241e41)
+  - preparing never carries a failed required check, and the obligation waits
+  - control: a failed advisory check still never holds up preparation
+
+Changed: "a check judged and not carried is shown with why; a failed check
+is never judged". Removed (replaced by the cases above): "carried check
+evidence takes its reason from the event, not from the evidence record".

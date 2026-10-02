@@ -116,10 +116,11 @@ for 44 minutes, in 37 steps:
    completes forward; main moves; the second prepares again and lands.
 5. An advisory LLM review fails on generation 2 of the rate limit and again on
    its landing integration. It is shown apart, as never blocking, and the
-   landing proceeds. Each landing preparation judges each check for the new
-   integration and records a `check-carried` event: the tests check carries
-   while main is unchanged and does not carry once main moves; the volatile
-   LLM review never carries.
+   landing proceeds. Each landing preparation judges each passing check for
+   the new integration and records a `check-carried` event: the tests check
+   carries while main is unchanged and does not carry once main moves. A
+   failed check is never carried: a required one keeps the landing waiting,
+   and an advisory one does not.
 6. @birch's lease expires with no handover note. Its proposal now conflicts
    with main. @cedar takes the lane over and recuts it.
 
@@ -262,7 +263,11 @@ Lane F's edits for amendment 3 (`docs/protocol.md` section 29.8). Tests are in
 2. **Check carry is shown from its event (R-CARRY-13).** `check-carried`
    events are in the activity feed and in `RoomSnapshot.checkCarries`. Each
    check obligation lists its judgments: carried, with the reason from the
-   event, or not carried, with why. Carried check evidence shows the reason
-   from its event; if no event is loaded, it says so and shows no reason.
+   event, or not carried, with why; a judgment under another policy version
+   says it does not count under this one. Carried check evidence shows the
+   reason only from an event that names the generation's merge preview, its
+   integration and the obligation's policy version (review `a4241e41`). If
+   no such event is loaded, or the preview has no integration, it says so
+   and shows no reason.
 3. **No per-change history in a live room (open point 39).** See contract
    gap 10.

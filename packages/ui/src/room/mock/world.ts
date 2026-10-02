@@ -845,10 +845,16 @@ export class World {
     this.ops.set(op.id, { ...f, expectedMain: this.main, attempts: f.attempts + 1, state: "preparing", waiting });
   }
 
-  /** Judge whether an obligation's latest check carries onto `integration`, and seal the judgment. */
+  /**
+   * Judge whether an obligation's latest check carries onto `integration`,
+   * and seal the judgment. Only a passing check can meet an obligation, so
+   * only a passing check is judged: a failed one is never carried, and the
+   * obligation keeps waiting for a new result. Identical tree, configuration
+   * and runner say only that the result would be the same.
+   */
   private judgeCheck(opId: OpId, lane: LaneRec, p: PropRec, o: OblRec, integration: Sha): boolean {
     const check = o.evidence.map((ev) => this.checks.find((c) => c.id === ev.act)).filter((c) => c !== undefined).at(-1);
-    if (!check || o.spec.kind !== "check") return false;
+    if (!check || !check.ok || o.spec.kind !== "check") return false;
     const cfg = checker(o.spec.check);
     const input: InputOf<"carry"> = {
       kind: "carry",
