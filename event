@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/log/test/transfer.test.ts","body":{"commit":"1a3ad0c819319eba0ddde212d14847b17efbd914","path":"packages/log/test/transfer.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:01524ad5a069fbc99e433a9d0df22d7f90e1a0f9","text":"Merge retired a covered predecessor; the successor is at packages/git/measure/results/live-2026-10-01T22-25-43-669Z.json."}
