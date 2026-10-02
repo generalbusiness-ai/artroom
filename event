@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1ab77b2c36630ce5082c5828c79383f0e97ba844","text":"Replaced by the review request for exact head 33a04f3aef732a3fe7f71c1f8d6f157122feecdc; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"promise","text":"Review lane E revision 10 and all 75 exact-head artifacts; verify manual cleanup duties survive unmapped credentials, interruption/retry and successor installation; architecture/security/simplification."}
