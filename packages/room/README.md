@@ -195,6 +195,13 @@ Every opening runs the steps above the stored version, each in its own
 transaction with its version, so a crash leaves a whole version. Each step
 is also safe to run twice.
 
+Each schema is at version 1, its base. The Room's earlier versions 2 to 8,
+the registry's version 2, and the upgrade paths that only the spike
+deployment's state needed were folded into the base when that state was
+wiped (decision D5, request 73eccbec; see
+[notes/deploy-spike.md](../../notes/deploy-spike.md)). The next change to a
+schema is version 2.
+
 ### Founding a room
 
 Founding is two steps with no credential (R-GEN-10). Over RPC they are the
@@ -259,12 +266,13 @@ Before the first deploy (the file's header says the same):
 - the container image is lane B's (`packages/git/container/image.sh`);
   use the digest it prints for the account's registry;
 - `wrangler secret put ROOM_KEY_SECRET`;
-- `OPERATOR_KEYS` lists the operator keys that sign onboarding grants.
+- `OPERATOR_KEYS` lists the operator keys that sign onboarding grants;
+- `PUBLIC_URL` has no default: `wrangler deploy --var PUBLIC_URL:https://<host>`.
 
 | Setting | Meaning |
 |---|---|
 | `LEASE_SECONDS` | Lease length, default 1800 |
-| `PUBLIC_URL` | Base URL, used for the MCP endpoint in `Redeemed` |
+| `PUBLIC_URL` | Required, no default: this deployment's `https://` origin, with nothing after the host. Redemption names `<PUBLIC_URL>/v1/rooms/<room>/mcp` in `Redeemed`, and a bearer token goes there. Without a valid one, the Worker and every Room object refuse to start |
 | `ROOM_KEY_SECRET` (secret) | Derives each new room's signing key and, for public founding, its repository identity |
 | `OPERATOR_KEYS` | Operator key IDs, comma-separated, whose onboarding grants are accepted (R-GEN-12) |
 | `PUBLIC_NAMESPACE` | The repository namespace reserved for public founding, default `artroom-public` |
@@ -434,7 +442,7 @@ lane E.
 | 2. Lease deadline during fork creation | yes: review-8faa2ef9 | yes | pending |
 | 3. Attention made later at an existing head | yes: review-8faa2ef9 | n/a | pending |
 | 4. Review reopening in sealed effects | yes: review-8faa2ef9 | n/a | pending |
-| 5. Upgrade of populated storage | yes: review-8faa2ef9 | n/a | pending |
+| 5. Upgrade of populated storage | retired with the migrations (decision D5); "a store without admission facts …" remains | n/a | n/a |
 | `"*"` fixed at the grant | yes: review-8faa2ef9 | n/a | pending |
 
 ### Review 1249097f findings
@@ -541,8 +549,8 @@ assert the correct outcomes in
 | 2. P2 A workspace became ready after its lease ran out | The lease is current only if held, the same lease generation, and before its deadline by the clock read now; checked before fork creation and again before readiness. A fenced op runs the lease-expiry and token-revocation steps at once | a lease that runs out during fork creation…; a lease already past its deadline before the resume creates no fork |
 | 3. P2 Attention made later fell behind live cursors | A monotonic attention position; live, update and page cursors carry it; a publication error wakes subscriptions; earlier cursor forms map to the position before the first item after their point | the admins' publication-unresolved item arrives on a cursor issued before it…; pages stay lossless…; an RPC subscription opened at the live head…; cursors in the earlier (seq, n) form still read… |
 | 4. P2 Sealed effects omitted a reopening | Review and check effects carry `opened` and `met` from the one calculator; a duplicate approval still seals none. A check only adds evidence, so it cannot reopen | Bob approves, then objects…; @ci passes, then fails on the same input… |
-| 5. P2 Old storage could not reopen | Versioned, transactional, idempotent migrations for the Room and the registry. Earlier attention keeps its order and gains positions; pending workspaces keep their attempts; earlier evidence gets admission facts that can only remove eligibility; a missing fact reads as "author" | a populated store in the a5a3406a schema / fa836d61 schema reopens, twice…; a store without admission facts is judged as an author… |
-| `"*"` delegation followed the grantor's current role | `"*"` is expanded at the grant to the kinds the grantor's role could sign then; earlier `"*"` grants are expanded by migration from the role in the grant's receipt | a member grants '*', then is promoted to admin… |
+| 5. P2 Old storage could not reopen | Versioned, transactional, idempotent migrations for the Room and the registry; a missing admission fact reads as "author". The upgrade steps, and their test of populated old stores, were retired when the spike's state was wiped (decision D5); the migration runner and the "author" fallback remain | a store without admission facts is judged as an author… |
+| `"*"` delegation followed the grantor's current role | `"*"` is expanded at the grant to the kinds the grantor's role could sign then (the migration that expanded earlier grants was retired by decision D5) | a member grants '*', then is promoted to admin… |
 
 Each new guard was broken once and the whole workerd suite run against the
 change. 19 of 21 mutations were caught, five of them only after a test was added
@@ -595,9 +603,7 @@ changed:
   runs it again before the engine's queue.
 - **Workspaces are lane B's.** Operation IDs are lane B's
   (`op_ws_<lane>_<lease generation>`). A workspace whose lease has ended is
-  not shown. A workspace opened by the previous revision is recorded as
-  ended (migration 6); lane B's first inventory of the fork revokes its
-  tokens when the holder opens it again.
+  not shown.
 - **Filtered checker inputs** (R-OBL-3, R-CARRY-8, R-CARRY-9). A filtered
   `check` binds only the Room's own snapshot of the integration over the
   checker's declared inputs plus the global inputs.
@@ -639,8 +645,8 @@ reproductions now fail; the correct outcomes are asserted in
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
-| 1. P1 A stored check carry survived a policy that turns carrying off | Each carry is stored with the policy version that judged it and counts only under that version and on its integration (migration 7). An activation leaves earlier carries uncounted; readiness judges again under the new policy, which carries nothing when `carry.checks` is false or a carry rule applies to checks. Reservation requires every obligation met on the integration. | "an activation with checks: false …"; "an activation with a carry rule that refuses checks …"; "reservation itself refuses a ready landing whose carried check stopped counting"; "reservation requires every obligation met on the integration …"; "the earlier check's key compromised after the carry …"; "the checker configuration changed …"; phase2b "does not carry when main changed a global input" |
-| 2. P2 Migration dropped outstanding workspace cleanup | Migration 7 keeps access opened before lane B's workspaces as `legacy`: its recorded token IDs, and an inventory for provisioning whose answer was never recorded. When the lease ends (release, expiry, take-over, with or without reopening) these become lane B's durable cleanup duties, in the transaction that marks it ended; they stay owed until Artifacts confirms them. | "release without reopening …"; "a mint whose answer was never recorded …"; "a recorded token is owed by its ID …"; "expiry without reopening …"; "take-over without reopening …, and with Artifacts down the cleanup stays owed …" |
+| 1. P1 A stored check carry survived a policy that turns carrying off | Each carry is stored with the policy version that judged it and counts only under that version and on its integration. An activation leaves earlier carries uncounted; readiness judges again under the new policy, which carries nothing when `carry.checks` is false or a carry rule applies to checks. Reservation requires every obligation met on the integration. | "an activation with checks: false …"; "an activation with a carry rule that refuses checks …"; "reservation itself refuses a ready landing whose carried check stopped counting"; "reservation requires every obligation met on the integration …"; "the earlier check's key compromised after the carry …"; "the checker configuration changed …"; phase2b "does not carry when main changed a global input" |
+| 2. P2 Migration dropped outstanding workspace cleanup | Migration 7 kept access opened before lane B's workspaces as `legacy` until its lease ended. Retired, with its tests, when the spike's state was wiped (decision D5). | — |
 | 3. P2 An older room had no canonical remote for the landing publisher | Before any landing work, the Room resolves the remote from its bound repository identity through the binding (refusing an answer for any other repository) and stores it. An outage throws and the alarm retries; the publisher never gets a guessed remote. | "the landing completes, with the bound repository's own remote stored"; "a binding that answers for another repository …"; "Artifacts is down: nothing is guessed …" |
 | 4a. Lane B's follow-up | Kept as adopted in `80d2351`. | phase2b, as listed under "Phase 2b cases" |
 | 4b. Runner digest | Check carry needs a runner environment attested now for the checker (`RoomServices.runnerDigest`); none is attested in production, so nothing carries there (fail closed). | "no runner environment attested …"; "another runner environment attested …"; "the same runner attested …" |
@@ -968,7 +974,7 @@ each test name starts with its rule or finding.
 | 6. Advisory obligations (R-OBL-7) | `withAdvisory` in [src/obligations.ts](src/obligations.ts) sets `CheckObligation.advisory` from the configuration, when a proposal is recorded and when obligations are recomputed at activation. Readiness neither waits for an advisory obligation nor fails on its failing check, and leaves its evidence out of the evidence the landing relies on. Reservation does not require it, and the land rule input leaves it out, so an advisory check that arrives after readiness changes nothing reservation compares. A compromised revocation that reopens only an advisory obligation does not make the landing retryable. The obligation still gets an attention item and a job, and its checks are recorded and shown. | "R-OBL-7 the obligation is advisory …"; "… an advisory checker's check fails …"; "… arrives between readiness and reservation …"; "R-OBL-7, R-REV-3 a landing does not rely on advisory evidence …"; "R-OBL-7, R-POL-9 an activation that makes the checker advisory …" |
 | 7. Volatile flag (R-EXEC-10) | Unchanged: a signed check whose `volatile` differs from its configuration's is `check-binding`, either way. A job's `volatile` is the configuration's. | "R-EXEC-10 the job's volatile is the configuration's (true) / (false) …"; review-a711f7b6 "a check whose volatile flag contradicts the configuration …" |
 
-Migration 8 adds `check_carries.event`, `check_judged` and `check_jobs`.
+The schema has `check_carries.event`, `check_judged` and `check_jobs` for this (migration 8 then, the base schema since decision D5).
 
 **Choices the contract leaves open.**
 - A job attempt lives for the checker's `timeoutSeconds` plus 300 seconds;
@@ -1200,7 +1206,7 @@ repository through the Room's namespace-aware binding (`core.artifacts`).
   obligation). An attempt past its deadline is not sent; its credentials
   are ended and the job is due again later.
 - Ending a canonical token is durable. The token is written to
-  `job_tokens` (migration 8) before Artifacts is asked to revoke it, and
+  `job_tokens` before Artifacts is asked to revoke it, and
   stays there, with its attempts and last error, until Artifacts confirms
   the revocation or the token's known expiry has passed. A token whose
   expiry is not known stays until it is revoked. The jobs step retries due
@@ -1613,53 +1619,15 @@ main exists after `prepareCanonical`, which only returns once it does.
 
 ## Review 700b74ea
 
-**The finding.** Before the incarnation ledger, the Room created a public
-founding's repository under its base name (the identity's own name) and
-recorded nothing. A pending founding begun by that Room and retried under
-revision 3 was sealed on `<base>-1`, and `<base>`, with its 24-hour write
-token, was never found, cleaned or reported. An old create whose answer was
-lost could also apply later.
-
-**The fix: adopt the base name, durably, before preparing.** The first time
-a pending public founding is prepared (`Workspaces.prepareCanonical`, called
-only from `found` for a public room that is not founded), the ledger adopts
-its base name when:
-
-- an older Room may have tried: the registry binding is a legacy one, made
-  by an older Worker before the registry kept its ledger (`ledger` is NULL;
-  every new binding records 1). This is a durable fact of the binding, read
-  on every attempt; see "Recovery" below. It replaced an earlier rule (the
-  `bind` answer was `already-bound` and this Room had no `founding_repo`),
-  which a lost bind answer or an interrupted `found` could get wrong; or
-- an earlier revision's ledger has a row for the base name; or
-- the base repository exists now (only this founding can have made it,
-  R-GEN-12).
-
-Adoption records a `legacy` create step, in flight, and owes the base name's
-deletion. The legacy step is never settled: not by a read of absence, not by
-deleting the repository, and not by the new incarnation's seal, because more
-than one old create may still apply. The base name is never an incarnation,
-so the alarm deletes it whenever it appears, before and after founding, with
-every token on it. `Workspaces.duties()` shows the step. An already-founded
-room (whatever its storage name) and an import never reach this, and nothing
-else touches the base name. Cleanup scheduling no longer excludes the
-configured canonical name: it excludes the holder's founding duties, and the
-sealed incarnation has none.
-
-| Case | Tests |
-|---|---|
-| (a) a legacy base holding a token | `workspaces.test.ts` (a); `founding-gaps.test.ts` (a): deleted with its token before the seal, the room lands, the legacy step stays watched after eviction |
-| (b) an absent base whose old create applies after the seal | `workspaces.test.ts` (b), including a second appearance; `founding-gaps.test.ts` (b): the alarm deletes it after eviction, the landed main survives |
-| (c) an already-founded legacy room | `workspaces.test.ts` (c); `founding-gaps.test.ts` (c): a room turned into an older Room's (base name, no ledger), found again, lands, keeps a live publishing token through the alarm, and gets no legacy step |
-| Scope | a founding this Room began and retried adopts nothing; an earlier revision's ledger row is adopted, with the repository present or absent; the checker's control (a base that exists although the binding is new) |
-
-Mutations, made once each after committing: 12 of 12 were killed, after one
-test was added. Not adopting at all (ledger and Room); the Room never
-flagging an older attempt; flagging every first founding; ignoring this
-Room's own record; not looking for an existing base; ignoring an earlier
-ledger (it survived until the absent-base test was added); settling the
-legacy step when seen, when deleted, or on a read of absence; not scheduling
-it after founding; and not recording the adoption.
+The finding was a public founding begun by a Room older than the
+incarnation ledger, which created the repository under its base name and
+recorded nothing. The fix adopted that base name durably (a `legacy` create
+step, never settled) when the registry binding was an older Worker's (the
+registry's `ledger` column, migration 2). Only the spike deployment ever
+had such state. The adoption, the registry's `ledger` column and their
+tests were retired when that state was wiped (decision D5, request
+73eccbec): every room now begins on this ledger, and a public room's
+repository is always an incarnation, `<base>-<step>`.
 
 Main `9bb700b6` (amendment 4, the bounded-memory publisher, the deploy
 cleanup and pi Workers AI) is merged. This revision has not been run live.
@@ -1671,13 +1639,190 @@ and verify, and its cleanup reaches the base name, every incarnation and
 their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.test.ts`
 covers both.
 
-Recovery: whether an older Room may have tried is now a durable fact of the
-registry binding (migration 2: `ledger` is NULL on bindings an older Worker
-made, 1 on every new one), read on every attempt, not the `bind` answer and
-this Room's attempt record. The earlier rule lost the adoption when a found
-was interrupted after recording its attempt and before adopting, and adopted
-spuriously after a lost bind answer or an interrupted first found; real-DO
-controls interrupt each window.
+## Client and deployment hygiene (request 55be0661)
+
+Request 55be0661 carries findings SEC-04, SEC-05 and SEC-11 of
+simplification review 55563589. Each finding was reproduced on main
+a6330262, and each has tests that fail there: 13 of 13 in the Room's node
+file, 4 of 6 in its workerd file, 2 of 4 in the MCP file, and 58 of 60 in
+the CLI's two files. The ones that pass on main pin behaviour that was
+already right and must stay so: the Room's declared-length pre-check, an
+exact 1 MiB body, the MCP route's 401 before reading, and the read-back of
+the whole credential file. (The CLI's "refusal does not repeat the token"
+also passes on main, only because `checkGrant` does not exist there.)
+
+The checker's report f593d8f7 found SEC-05 still open at e90cc7c0: the
+credential file's first-line mark carried the room's lane and lease
+unchecked. That is fixed below, with the redemption's values that the CLI
+saves and prints; 29 of the CLI's 60 tests fail at e90cc7c0,
+including the checker's own fixture
+(packages/cli/test/checker-hygiene-marker.test.ts).
+
+| Finding | Fix | Tests |
+|---|---|---|
+| SEC-04: `PUBLIC_URL` fell back to `https://artroom.example.workers.dev` (src/room.ts), and wrangler.jsonc set that placeholder. Redemption names that host in `Redeemed.mcp`, and the CLI prints a `claude mcp add` command that sends the bearer token there. | `publicUrl()` in src/config.ts requires an `https://` origin with nothing after the host, and has no default. The Worker entrypoint (src/worker.ts constructor) and every Room object (src/room.ts constructor) call it first, so neither starts without one, for HTTPS or RPC. wrangler.jsonc no longer sets `PUBLIC_URL`; a deploy passes `--var PUBLIC_URL:https://<host>`. | test/node/hygiene-55be0661.test.ts (the accepted and refused values; wrangler.jsonc has no `PUBLIC_URL` and names no example host; the spike's value is accepted). test/workerd/hygiene-55be0661.test.ts (the Worker and a Room object refuse to start without it, or with a value that is not an origin). |
+| SEC-05: the CLI wrote room-supplied values verbatim into the git config file the repository includes (packages/cli/src/git.ts): the workspace remote and token in the setting, and the lane and lease in the first-line comment that marks whose credential it is. A newline in any of them ends its line and adds settings: a remote ending `"]`, newline, `[core]`, newline, `sshCommand = ...`, a token, a `Claim.lane` or a lease with a newline each set `core.sshCommand`. All four were reproduced (the remote and token on main, the lane and lease on e90cc7c0). | Every value written into the file is checked before anything changes, in packages/cli/src/git.ts. `checkGrant`: the remote must be a plain `https://` URL in normal form (no credentials, query, fragment, dot segments or characters outside `A-Za-z0-9._~/-` in the path), and the token may hold only the RFC 6750 token characters and `?` and `=`, up to 4096. `checkMarker`: the lane must be a canonical lane ID (`act_<seq>_<8 hex>`), the lease a whole number, and the installation ID an idempotency key. In packages/cli/src/main.ts, a claim's lane is selected only if canonical; `laneOf` refuses any other `--lane` or stored lane before the destination is reserved; `workspace` checks the grant's remote, token and lease before anything is pending. `configureWorkspace` checks all five again at its own boundary. | packages/cli/test/hygiene-55be0661.test.ts: 14 refused remotes, 10 tokens, 7 lanes, 6 leases and 5 installation IDs, each named; the refusal does not repeat the token; `configureWorkspace` given an injecting remote, token, lane, lease or installation ID refuses and changes nothing; the whole file, written with every admitted character in every field, reads back through git as exactly one setting, every other line is a comment, and the ownership reader reads the mark back exactly; `artroom workspace` given an injecting remote or token exits 1, and a lease from a malicious room (in both the lane and the grant) exits 1, each with no remote, no credential, no `core.sshCommand` and nothing pending, after which a valid workspace installs and releases; a claim answered with an injecting lane exits 1 and selects nothing; an injecting `--lane` is a usage error before the destination is reserved. A redemption with an injecting MCP URL or bearer exits 1, saves nothing and prints no command. packages/cli/test/checker-hygiene-marker.test.ts: the checker's fixture, unchanged. |
+| SEC-11: the HTTPS routes read a body whole and then compared its length in UTF-16 units with 1 MiB, so a body without `Content-Length` was read entirely first (src/http.ts). The MCP route had no cap (packages/mcp/src/worker.ts). | Both count bytes as the body streams in and stop reading past 1 MiB: 413 `payload-too-large` on the HTTPS routes, a 413 JSON-RPC error on the MCP route. A declared `Content-Length` over 1 MiB is refused before any read. The MCP route reads the body only after the bearer is accepted. | test/workerd/hygiene-55be0661.test.ts: a 16 MiB stream with no length is refused after at most 1 MiB plus two chunks is pulled (main pulled all 16 MiB); 1.5 MiB of two-byte characters is refused; a large declared length is refused with nothing pulled; exactly 1 MiB is read. packages/mcp/test/workerd/body-cap.test.ts: the same three, an unknown bearer refused with nothing pulled, and exactly 1 MiB handed on. |
+
+**Where this departs from the request.** Item 2 asked that the credential
+file be written through `git config` arguments rather than by string
+templating. That would put the token in a command argument, which other
+users on the machine can read in the process list, and the CLI README
+promises the token never is one. The file is still written directly. The
+strict patterns are the fix: none of the remote, token, lane, lease or
+installation ID patterns admits a character that git config treats
+specially (quote, backslash, `#`, `;`, `]`, whitespace, newline), and a test
+writes every admitted character in every field and reads the whole file
+back through git as one comment mark and exactly one setting.
+
+**Mutants.** Each of 35 guards was broken in turn (the script restores the file
+from memory, not from git); every mutant turned at least one of the tests
+above red.
+
+| Mutant | Red |
+|---|---|
+| `publicUrl`: no not-set check | refuses a PUBLIC_URL that is not set |
+| `publicUrl`: any protocol | refuses plain http |
+| `publicUrl`: no origin-equality check | 8 refusals: not a URL, http, trailing slash, path, query, fragment, credentials, upper-case host |
+| Room constructor restores the fallback host | a Room object refuses to start |
+| Worker constructor without the check | the Worker refuses to start |
+| wrangler.jsonc restores the placeholder | wrangler.jsonc has no PUBLIC_URL |
+| HTTPS: no streaming count | the 16 MiB stream; two-byte characters |
+| HTTPS: no `Content-Length` pre-check | a declared length is refused before any read |
+| HTTPS: main's read-then-measure | the 16 MiB stream; two-byte characters; declared length |
+| MCP: no streaming count | the 16 MiB stream |
+| MCP: no `Content-Length` pre-check | a declared length is refused before any read |
+| MCP: the original request handed on, uncapped | the 16 MiB stream; declared length |
+| MCP: body read before authentication | an unknown bearer is 401 before the body is read |
+| CLI: no remote pattern | ext::, plain http, credentials, query, fragment |
+| CLI: no normal-form check | dot segment; an array remote |
+| CLI: no token type check | an array token |
+| CLI: no token pattern | 9 token refusals, the refusal not repeating the token, and both injecting-token tests |
+| CLI: token class widened to any non-space | quote, backslash, `#`, `;` |
+| CLI: no token length bound | more than 4096 characters |
+| CLI: `configureWorkspace` skips `checkGrant` | both boundary tests |
+| CLI: `workspace` skips `checkGrant` before the destination | both end-to-end tests (a pending entry was recorded) |
+| CLI: `checkMarker` accepts any lane | 7 lane refusals; the injecting lane at the boundary |
+| CLI: `checkMarker` lease without the integer check | the injecting lease, a string, a fraction, NaN, past a safe integer |
+| CLI: `checkMarker` lease without the sign check | a negative lease |
+| CLI: `checkMarker` installation ID without the type check | an array |
+| CLI: `checkMarker` installation ID without the pattern | the injecting ID, a dot, nothing, more than 64 |
+| CLI: `configureWorkspace` skips `checkMarker` | the three boundary tests for the mark |
+| CLI: `workspace` skips `checkMarker` before the destination | the malicious-lease test (a pending entry was recorded) |
+| CLI: `laneOf` accepts any lane | the injecting `--lane` test |
+| CLI: a claim's lane is selected unchecked | the injecting-claim test (the lane was stored) |
+| CLI: `checkRedeemed` without the MCP URL pattern | `checkRedeemed` refusals (`ftp:`) |
+| CLI: `checkRedeemed` without the normal-form check | `checkRedeemed` refusals (dot segment) |
+| CLI: `checkRedeemed` bearer without the type check | `checkRedeemed` refusals (an array) |
+| CLI: `checkRedeemed` bearer without the pattern | `checkRedeemed` refusals; the injecting-bearer redeem test |
+| CLI: `redeem` skips `checkRedeemed` | both redeem tests (the command was printed and the bearer saved) |
+
+Every room-supplied value the CLI writes into git config, the credential
+file, the bearer file or a printed shell command is now checked: the
+remote, token, lane and lease above, and a redemption's MCP URL and bearer
+token (`checkRedeemed`: the URL must be a plain `http` or `https` URL in
+normal form with only characters a shell takes literally, and the bearer
+only token characters, before the bearer file or config is written; the
+redeem test in packages/cli/test/hygiene-55be0661.test.ts). Other
+room-supplied values go only into JSON files (config, journal, owner
+record), whose encoding cannot be broken out of.
+
+Not changed, and outside this request: the "Next: artroom ..." hints the
+CLI prints name room-supplied IDs, cursors and, for a lane someone else
+left, its scope globs, unquoted (packages/cli/src/format.ts and `held` in
+main.ts). They are hints to read, not commands the CLI runs, but a pasted
+hint from a malicious room could carry shell syntax. Quoting them is a
+separate change.
+
+## Request c657d4ba: joins and redemption
+
+From simplification review 55563589 (SEC-01, SEC-02, SEC-07). Each
+behaviour was wrong on main `a6330262`; the tests in
+`test/workerd/request-c657d4ba.test.ts` fail there (12 of 13; the 13th is
+the control that other refusals are still recorded) and pass here.
+
+| Finding or condition | Fix | Tests |
+|---|---|---|
+| (1) SEC-01: a client-custody redemption minted a read session for whatever admission returned, including the stored result of a join copied from the log | `admission.ts` `admit` says whether its result is a replay (`submit` wraps it). `redeem` issues a session only for a join that call admitted; a replay is refused `invitation-invalid`, and the key that joined can get a session with a signed request (R-CRED-5) | (1): a copied join replayed through `POST /redeem` gets no session; a replay over the Durable Object and over RPC gets none, while the act still replays and the key still gets a session; two identical redemptions at once give one session |
+| (2) SEC-02: a `join` refused at steps 7 to 9 on `POST /acts` or `RoomWire.submit` was sealed with its envelope and `body.secret`, while the invitation stayed usable | `admit` never commits a refused join, on any path; the `recordRefusals` hook is gone | (2): `POST /acts`, refused by a policy rule, records nothing, keeps the secret out of the log and the idempotency table, leaves the invitation unused, and is judged afresh on retry; the same over RPC; control: a refused claim is still recorded |
+| (3) SEC-07: the limit keyed unvalidated input, never evicted, put every service-binding caller under one address, and did not count joins on `/acts` | `src/ratelimit.ts`: an invitation is counted only when the room issued it; windows are per room, dropped when they end, and capped at 10,000 (a full table refuses new windows until one ends); a service-binding caller has no address (`Room.redeem` takes `string \| null`; the Worker passes null); `admit` counts every join against its invitation, so `/acts`, `RoomWire.submit` and both redemptions share one limit | (3): one limit across `/acts` and `/redeem`; `/acts` alone; room-custody redemption after joins on `/acts`; an unissued or malformed invitation opens no counter; 22 RPC redemptions are not limited by address; an HTTPS address is limited to 20; ended windows dropped and the cap holds |
+| docs/protocol.md amended where R-ADM-8 and R-GEN-6 conflict | R-ADM-8 names the `join` exception; R-GEN-6, R-SEC-4 and R-CRED-9 say the same; section 31 lists the change | — |
+| Root gates | See "Gates" below | — |
+
+**Contract.** No types change. A repeated client redemption is now refused
+`invitation-invalid` where it used to return `Joined`. The client's `join()`
+recovers a lost response itself: it resubmits the same signed join, which
+returns the original record (R-IDEM-2), and signs a `session` request with
+the key. Its fake room refuses the repeat as the Room does, and
+`packages/client/test/redeem.test.ts` covers the recovery. `room.ts`
+changed by one line: the type of `redeem`'s `address`.
+
+**Limits are in memory.** A restart of the room's object starts the counts
+again. The protocol allows that; it requires the counters to be bounded.
+
+**Mutations**, made one at a time on the committed head; 13 of 13 turned a
+test red:
+
+| Mutant | Red tests |
+|---|---|
+| `redeem` issues a session on a replay | (1), all three |
+| `admit` never reports a replay | (1), all three |
+| a refused join is recorded | (2), `/acts` and RPC |
+| joins on `/acts` are not counted | (3), the three that mix or use `/acts` |
+| a room-custody redemption is not counted | (3) room-custody; `roster.test.ts` per-invitation limit |
+| any string invitation is keyed | (3) unissued invitation; HTTPS address |
+| a null address is counted | (3) RPC |
+| the Worker passes a shared address | (3) RPC |
+| ended windows are not dropped | (3) bounded; one limit across paths |
+| no cap on windows | (3) bounded |
+| the limit allows one more | (3), four tests |
+| the address limit is removed | (3) unissued invitation; HTTPS address |
+| the client's `join()` does not recover | client: lost join response |
+
+The type check `typeof id !== "string"` in `limitInvitation` is not a
+behaviour guard: a join whose invitation is not a string is refused at step
+4 either way.
+
+**Review of 812fb907 (report b3445eae): the client's clock.** The checker
+found that the client's `join()` recovery signed its `session` request with
+`Date.now`, not `ClientOptions.now`. A room on the supplied clock then
+refused the request's `notAfter`. `recoverJoin` now takes the caller's
+clock and reads it inside each attempt, so every retry of the session
+request is signed afresh at the clock's current time. Recovery still
+resubmits the original join bytes and idempotency key, still proves
+possession of the key with a signed session request, and the Room still
+refuses the replayed redemption.
+
+| Test | What it pins |
+|---|---|
+| `test/workerd/checker-join-recovery.test.ts` (the checker's fixture, unchanged) | Recovery over RPC after an eviction and over HTTPS; "checker: join recovery honors the supplied client clock for its signed session request", which failed at 812fb907 |
+| `request-c657d4ba.test.ts`, "virtual clock: a lost join reply is recovered, and a session request retried after the clock moves is signed again at the moved time" | Against the real Room: the first session request fails retryably after the clock moves ten minutes; the retry's `notAfter` is ten minutes later and is accepted; the log holds one join |
+| `packages/client/test/redeem.test.ts`, the two virtual-clock tests | The same two cases against the fake room |
+
+| Mutant in `connect.ts` | Red |
+|---|---|
+| the session request is signed without the clock (`Date.now`) | the checker's clock test; the client's clock test |
+| `Date.now` passed in place of `options.now` | the same two |
+| the clock read once, before the retries | both "retried after the clock moves" tests |
+
+The other clock reads in `packages/client/src` already use the injected
+clock: `RoomClient` signs requests and judges session expiry with
+`this.now()`, and `HttpWire` times calls with `opts.now`. The one remaining
+`Date.now` is the default of the exported `signRequest`'s `now` argument,
+for callers that have no clock of their own. It stays: every caller in the
+package now passes its clock, and making the argument required would change
+the public API. Envelopes carry no time, and the retry sleeps are delays,
+not clock reads.
+
+The three security repairs are unchanged. Main `7cf6aae0` (plan 003 and the
+client hygiene request 55be0661) is merged into this head. The only
+conflict was this README, resolved by keeping both report sections;
+`room.ts` and `worker.ts` merged without conflict.
+
+**Gates**, at the head of `request/sec-join` that adds this section:
+`npm ci`, the client and Room typechecks and suites, the root
+`npm run typecheck` and the root `npm test` exit 0. The Room's Node suite
+passes 125 tests in 12 files, and its workerd suite 411 tests in 31 files.
 
 ## Secrets
 

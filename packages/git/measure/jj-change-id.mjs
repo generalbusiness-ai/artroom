@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Does a jj `change-id` commit header survive real Artifacts? Through the
-// deployed Worker `artroom-lb-git`, as in live.mjs:
+// Worker `artroom-lb-git` (measure/harness/, deployed only for a run), as in
+// live.mjs:
 //
 //   LB_KEY_FILE=~/.artroom-lb-key node measure/jj-change-id.mjs
 //

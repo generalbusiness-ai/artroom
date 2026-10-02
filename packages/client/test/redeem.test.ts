@@ -18,7 +18,7 @@ import {
   redeem,
   signEnvelope,
 } from "../src/index.ts";
-import type { FakeRoom } from "./support/fake-room.ts";
+import { FakeRoom } from "./support/fake-room.ts";
 import { startRoom, type Url } from "./support/setup.ts";
 
 let room: FakeRoom;
@@ -84,15 +84,70 @@ describe("client custody: a key the caller made (R-CRED-1, R-CRED-2)", () => {
     expect(isRefusal(await join({ url }, room.id, { invitation, secret, signer }))).toBe(false);
   });
 
-  test("a lost join response is recovered: the same signed bytes return the original join (R-IDEM-2)", async () => {
+  test("a lost join response is recovered: the room refuses the repeated redemption a session, the same bytes return the original join (R-IDEM-2), and the key signs for a session (R-CRED-5)", async () => {
     const { invitation, secret } = await room.invite("@alice");
     const { signer } = await generateSigner();
     room.faults.push({ route: "POST /redeem", kind: "drop" });
     const joined = await join({ url }, room.id, { invitation, secret, signer });
     expect(isRefusal(joined)).toBe(false);
+    expect((joined as Joined).session.member).toBe("@alice");
     expect(redeemCalls()).toBe(2);
+    expect(room.requests.filter((r) => r.route === "/acts")).toHaveLength(1);
+    expect(room.requests.filter((r) => r.route === "/requests")).toHaveLength(1);
     expect(joins()).toHaveLength(1);
     expect((joined as Joined).record.id).toBe(`act_${joins()[0]!.seq}_${joins()[0]!.hash.slice(7, 15)}`);
+  });
+});
+
+describe("join() recovery uses the caller's clock (ClientOptions.now)", () => {
+  test("a lost join response is recovered against a room whose clock is a day behind, with the same clock passed in", async () => {
+    const at = Date.now() - 24 * 3600_000;
+    const behind = await FakeRoom.create({ clock: () => at });
+    const behindUrl = (await behind.start()) as Url;
+    try {
+      const { invitation, secret } = await behind.invite("@alice");
+      const { signer } = await generateSigner();
+      behind.faults.push({ route: "POST /redeem", kind: "drop" });
+      const joined = await join({ url: behindUrl }, behind.id, { invitation, secret, signer }, { now: () => at });
+      expect(isRefusal(joined)).toBe(false);
+      expect((joined as Joined).session.member).toBe("@alice");
+    } finally {
+      behind.stop();
+    }
+  });
+
+  test("virtual clock: a session request retried after the clock moves is signed again at the moved time", async () => {
+    let at = Date.now() - 24 * 3600_000;
+    const behind = await FakeRoom.create({ clock: () => at });
+    const behindUrl = (await behind.start()) as Url;
+    try {
+      const { invitation, secret } = await behind.invite("@alice");
+      const { signer } = await generateSigner();
+      behind.faults.push({ route: "POST /redeem", kind: "drop" });
+      const notAfters: number[] = [];
+      let first = true;
+      const fetcher: typeof fetch = async (input, init) => {
+        if (String(input).endsWith("/requests")) {
+          notAfters.push(Date.parse((JSON.parse(String(init?.body)) as { request: { notAfter: string } }).request.notAfter));
+          if (first) {
+            first = false;
+            at += 10 * 60_000; // past the first signature's window
+            return new Response(JSON.stringify({ name: "ArtroomError", code: "unavailable", message: "busy", retryable: true, retryAfterMs: 1, maybeRecorded: false }), {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+        }
+        return fetch(input, init);
+      };
+      const joined = await join({ url: behindUrl }, behind.id, { invitation, secret, signer }, { now: () => at, fetch: fetcher });
+      expect(isRefusal(joined)).toBe(false);
+      expect((joined as Joined).session.member).toBe("@alice");
+      expect(notAfters).toHaveLength(2);
+      expect(notAfters[1]! - notAfters[0]!).toBe(10 * 60_000);
+    } finally {
+      behind.stop();
+    }
   });
 });
 

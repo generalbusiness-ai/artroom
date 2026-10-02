@@ -325,7 +325,7 @@ const checkerKey = () => loadSpikeKeys(secrets).checker;
 
 /** The public room's identity name (`genesis.repo` without its namespace): the base of its repository's names. */
 let publicBase = null;
-/** The public room's repository: the incarnation `<base>-<step>` it was sealed on (reviews 3eb7bc44 and 700b74ea), never the base name. */
+/** The public room's repository: the incarnation `<base>-<step>` it was sealed on (review 3eb7bc44), never the base name. */
 let canonical = null;
 let canonicalRemote = null;
 const lanes = [];
@@ -884,7 +884,7 @@ async function cleanup() {
     const forks = lanes.filter((l) => l.fork && l.ns === ns && (!prefix || basename(l.fork, ".git").startsWith(`${prefix}--`))).map((l) => basename(l.fork, ".git"));
     return cleanupRun({ api: (m, p, b) => api(m, p, b, ns), canonical: base, expected: base ? [repo ?? base, ...forks] : [], minted: minted[ns], incarnations });
   };
-  // The public room: every repository named from its identity's base (incarnations, forks, an adopted base name).
+  // The public room: every repository named from its identity's base (incarnations, forks, and the base name if present).
   const parts = [[NS, await run(NS, publicBase, canonical, true)]];
   // Each imported repository: its own name and its forks (`<name>--<lane>`).
   for (const repo of importRepos) parts.push([IMPORT_NS, await run(IMPORT_NS, repo, repo, false, repo)]);

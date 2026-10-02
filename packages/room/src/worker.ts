@@ -31,7 +31,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { unwire, type Wire } from "./errors.ts";
-import { clock, type RoomEnv } from "./config.ts";
+import { clock, publicUrl, type RoomEnv } from "./config.ts";
 import { draftRoom, foundRoom } from "./founding.ts";
 import { roomStub, route } from "./http.ts";
 import { isMcpRoute, mcpEndpoint } from "./mcp.ts";
@@ -53,7 +53,8 @@ export class RoomWireTarget extends RpcTarget implements RoomWire {
     return unwire((await this.stub.request(req)) as Wire<WorkspaceOp | WorkspaceGrant | Session | Refusal>);
   }
   async redeem(redemption: Redemption): Promise<Joined | Redeemed | Refusal> {
-    return unwire((await this.stub.redeem(redemption, "service-binding")) as Wire<Joined | Redeemed | Refusal>);
+    // A Worker over a service binding has no client address; the invitation's limit still applies (R-CRED-9).
+    return unwire((await this.stub.redeem(redemption, null)) as Wire<Joined | Redeemed | Refusal>);
   }
   /** R-CRED-10: the room signs under the bearer's session key and delegation. */
   async bearerAct(bearer: string, act: BearerAct): Promise<ActRecord | Refusal> {
@@ -77,6 +78,12 @@ const mcp = mcpEndpoint(async (env, room) => new RoomWireTarget((await roomStub(
 
 /** The default export: `fetch` serves HTTPS; RPC methods serve `env.ARTROOM` bindings (`ArtroomService`, `ArtroomFounder`). */
 export default class Artroom extends WorkerEntrypoint<RoomEnv> implements Omit<ArtroomService, "room">, ArtroomFounder {
+  /** A deployment without a valid `PUBLIC_URL` serves nothing, HTTPS or RPC (request 55be0661). */
+  constructor(ctx: ExecutionContext, env: RoomEnv) {
+    super(ctx, env);
+    publicUrl(env);
+  }
+
   override async fetch(req: Request): Promise<Response> {
     // `POST /v1/rooms/:room/mcp`, the only HTTPS route that accepts a bearer for acts (R-CRED-10).
     if (isMcpRoute(new URL(req.url))) return mcp(req, this.env);

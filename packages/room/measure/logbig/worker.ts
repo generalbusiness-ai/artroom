@@ -23,7 +23,7 @@ import type { RoomCore } from "../../src/core.ts";
 import type { ActId, MemberId } from "@generalbusiness/artroom-contract";
 
 export { Registry } from "../../src/index.ts";
-export { Publisher, ArtifactsGateway } from "@generalbusiness/artroom-git/worker";
+export { Publisher, ArtifactsGateway } from "@generalbusiness/artroom-git/publisher";
 
 // The driver decides when to publish: no alarm publishes on its own.
 setAlarmDelay(24 * 3600_000);

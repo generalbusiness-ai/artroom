@@ -3,6 +3,15 @@
  * as an `http.<remote>.extraHeader` in a separate file that the repository
  * config includes. The token goes only into that file, which is readable
  * only by the user; it is never a command argument and never printed.
+ *
+ * Every value in that file is checked before anything is written: the
+ * room's remote and token (`checkGrant`), and the lane, lease and
+ * installation ID in its first-line mark (`checkMarker`). The lane and lease
+ * come from the room too. No pattern admits a character that git config
+ * treats specially (quote, backslash, `#`, `;`, `]`, whitespace or newline),
+ * so the file is always one comment mark and exactly one setting (request
+ * 55be0661). The file is written directly, not
+ * by `git config`, because that would put the token in a command argument.
  */
 
 import { execFileSync } from "node:child_process";
@@ -10,6 +19,7 @@ import { randomUUID } from "node:crypto";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
 import { hostname } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { isActId } from "@generalbusiness/artroom-contract";
 import { writePrivate } from "./config.ts";
 
 export const REMOTE = "artroom";
@@ -48,10 +58,64 @@ export function credentialPath(cwd: string): string | undefined {
 const marker = (lane: string, lease: number, install: string) => `# artroom workspace credential for lane ${lane}, lease ${lease}, installation ${install}.`;
 
 /**
+ * A grant's remote: an `https://` URL of a host, optional port and path,
+ * already in normal form, with no credentials, query or fragment, and none
+ * of the characters that are special to git config or a shell.
+ */
+const GRANT_REMOTE = /^https:\/\/[a-z0-9.-]+(:[0-9]{1,5})?(\/[A-Za-z0-9._~\/-]*)?$/;
+
+/** A grant's token: the bearer token characters (RFC 6750 b64token), and `?` and `=` for an Artifacts token's expiry. */
+const GRANT_TOKEN = /^[A-Za-z0-9._~+\/?=-]{1,4096}$/;
+
+/** Normal form, and a string: `href` equals only a string the parser would not rewrite. */
+function normal(u: unknown): boolean {
+  try {
+    return new URL(u as string).href === u;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * An MCP URL the CLI prints inside a shell command (`claude mcp add ...`):
+ * `http` or `https`, in normal form, with only characters a shell takes
+ * literally. A room that is not on https is the room's choice; what is
+ * checked here is that the printed command is the command it appears to be.
+ */
+const MCP_URL = /^https?:\/\/[a-z0-9.-]+(:[0-9]{1,5})?(\/[A-Za-z0-9._~\/-]*)?$/;
+
+/** Throws unless a redemption's MCP URL and bearer token are safe to save and print (request 55be0661). */
+export function checkRedeemed(mcp: unknown, bearer: unknown): void {
+  if (!MCP_URL.test(mcp as string) || !normal(mcp)) throw new Error("The room sent an MCP URL that is not a plain URL. Nothing was saved; tell the room's admin.");
+  if (typeof bearer !== "string" || !GRANT_TOKEN.test(bearer)) throw new Error("The room sent a bearer token with characters a token cannot have. Nothing was saved; tell the room's admin.");
+}
+
+/** Throws, naming neither value, unless the room's remote and token are safe to write (request 55be0661). */
+export function checkGrant(remote: string, token: string): void {
+  if (!GRANT_REMOTE.test(remote) || !normal(remote)) throw new Error("The room sent a workspace remote that is not a plain https:// URL. Nothing was written; tell the room's admin.");
+  if (typeof token !== "string" || !GRANT_TOKEN.test(token)) throw new Error("The room sent a workspace token with characters a token cannot have. Nothing was written; tell the room's admin.");
+}
+
+/**
+ * Throws unless the credential file's mark will be one comment line: the
+ * lane a canonical lane ID (`act_<seq>_<hash8>`), the lease a whole number,
+ * and the installation ID an idempotency key. The lane and lease come from
+ * the room (request 55be0661).
+ */
+export function checkMarker(lane: unknown, lease: unknown, install: unknown): void {
+  if (!isActId(lane)) throw new Error("The lane is not a lane ID (act_<number>_<8 hex digits>). Nothing was written; if the room sent it, tell the room's admin.");
+  if (!Number.isSafeInteger(lease) || (lease as number) < 0) throw new Error("The room sent a lease that is not a whole number. Nothing was written; tell the room's admin.");
+  if (typeof install !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(install)) throw new Error("The installation ID is not an idempotency key. Nothing was written.");
+}
+
+/**
  * Points the `artroom` remote at the fork and writes its credential, marked
  * with its lane, lease and installation ID. Returns the credential file's path.
+ * Every value written is checked first, before anything changes.
  */
 export function configureWorkspace(cwd: string, remote: string, token: string, lane: string, lease: number, install: string): string {
+  checkGrant(remote, token);
+  checkMarker(lane, lease, install);
   const dir = gitDir(cwd);
   if (dir === undefined) throw new Error("not a git repository");
   if (tryGit(cwd, ["remote", "get-url", REMOTE]) === undefined) git(cwd, ["remote", "add", REMOTE, remote]);

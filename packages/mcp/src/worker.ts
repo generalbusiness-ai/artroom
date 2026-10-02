@@ -20,6 +20,41 @@ export interface McpWorkerOptions<Env> {
   readonly allowedHostnames?: string[];
 }
 
+/** The largest request body the endpoint reads, as the Room's HTTPS routes. */
+const MAX_BODY = 1024 * 1024;
+
+/**
+ * The request with its body read into memory, counting bytes as they
+ * stream in, or null past `MAX_BODY`, where the read stops. A missing or
+ * false `Content-Length` makes no difference (request 55be0661).
+ */
+async function capped(request: Request): Promise<Request | null> {
+  if (Number(request.headers.get("content-length") ?? "0") > MAX_BODY) return null;
+  if (request.body === null) return request;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.byteLength;
+  }
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  return new Request(request.url, { method: request.method, headers, body: bytes });
+}
+
 const ROUTE = /^\/v1\/rooms\/[^/]+\/mcp$/;
 
 function jsonRpcError(status: number, message: string, headers: Record<string, string> = {}): Response {
@@ -42,6 +77,8 @@ export function createMcpFetch<Env>(opts: McpWorkerOptions<Env>): (request: Requ
     if (room === null) {
       return jsonRpcError(401, "The bearer token is unknown, expired or revoked. Ask an admin for a new MCP invitation.", { "www-authenticate": 'Bearer realm="artroom", error="invalid_token"' });
     }
+    const bounded = await capped(request);
+    if (bounded === null) return jsonRpcError(413, "The request body is larger than 1 MiB.");
     const handler = createMcpHandler(() => createArtroomServer(room), {
       route: url.pathname,
       // 2026-07-28 clients, and 2025-era clients (Codex by default, pi) served statelessly: a fresh server per
@@ -49,6 +86,6 @@ export function createMcpFetch<Env>(opts: McpWorkerOptions<Env>): (request: Requ
       legacy: "stateless",
       ...(opts.allowedHostnames ? { allowedHostnames: opts.allowedHostnames } : {}),
     });
-    return handler.fetch(request);
+    return handler.fetch(bounded);
   };
 }

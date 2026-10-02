@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Live smoke of lane B against real Artifacts repos, through the deployed
-// Worker `artroom-lb-git` (the publisher container and the harness Room).
+// Worker `artroom-lb-git` (the publisher container and the harness Room;
+// measure/harness/, deployed only for a run: see the README, "Live runs").
 //
 //   LB_KEY_FILE=~/.artroom-lb-key node measure/live.mjs
 //

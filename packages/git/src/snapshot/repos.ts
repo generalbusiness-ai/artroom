@@ -41,10 +41,6 @@
  * a token whose answer is lost. The alarm calls `reconcile()`. A repository
  * is deleted when its preparation stops (15 minutes at most after
  * creation), or when its last job ends or its last deadline passes.
- *
- * A ledger from revision 3, which recorded no create attempts, is upgraded
- * once (`upgrade`): each of its repository names becomes a `legacy` create
- * step, which deletes the repository whenever it appears and stays open.
  */
 
 import { type Sql, text } from "../sql.ts";
@@ -144,51 +140,6 @@ export class SnapshotRepos {
         "token_id TEXT, expires_at INTEGER, reason TEXT NOT NULL, state TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, " +
         "last_error TEXT, done_at INTEGER, done_reason TEXT)",
     );
-    this.sql.all("CREATE TABLE IF NOT EXISTS artroom_snap_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-    if (text(this.sql.all("SELECT value FROM artroom_snap_meta WHERE key = 'schema'")[0], "value") !== "2") {
-      this.sql.transaction(() => {
-        this.upgrade();
-        this.sql.all("INSERT OR REPLACE INTO artroom_snap_meta (key, value) VALUES ('schema', '2')");
-      });
-    }
-  }
-
-  /**
-   * Bring a ledger from revision 3 (before review 96d1fbc9) into this one.
-   * Revision 3 sent creates without recording them, under one name per
-   * commit for every attempt, so for none of its repository names can it be
-   * proved that no create is still pending. Each legacy name becomes a
-   * `legacy` create step, in flight: whenever its repository is seen, it is
-   * deleted, and the step stays open and scheduled, because another old
-   * attempt on the same name may still apply. Its old duties are closed as
-   * `upgraded` (the step does their work), and its rows are dropped, so a
-   * legacy repository is never reused. Legacy rows are those of revision 3's
-   * table (no `snapshot` column) or with an empty `snapshot`, as an earlier
-   * column-only migration left them.
-   */
-  private upgrade(): void {
-    try {
-      this.sql.all("SELECT snapshot FROM artroom_snap_duty LIMIT 0");
-    } catch {
-      this.sql.all("ALTER TABLE artroom_snap_duty ADD COLUMN snapshot TEXT NOT NULL DEFAULT ''");
-    }
-    const names = new Set<string>([
-      ...this.sql.all("SELECT DISTINCT name FROM artroom_snap_duty WHERE snapshot = ''").map((r) => text(r, "name")!),
-      ...this.sql
-        .all("SELECT name FROM artroom_snap WHERE name NOT IN (SELECT name FROM artroom_snap_duty WHERE kind = 'create')")
-        .map((r) => text(r, "name")!),
-    ]);
-    this.sql.all("UPDATE artroom_snap_duty SET state = 'done', done_at = ?, done_reason = 'upgraded' WHERE snapshot = '' AND state != 'done'", this.now());
-    for (const name of names) {
-      this.sql.all("DELETE FROM artroom_snap WHERE name = ?", name);
-      const commit = /--snap-([0-9a-f]{40})$/.exec(name)?.[1] ?? name;
-      this.sql.all(
-        "INSERT INTO artroom_snap_duty (snapshot, name, kind, reason, state, next_at) VALUES (?, ?, 'create', 'legacy', 'in-flight', ?)",
-        commit,
-        name,
-        this.now(),
-      );
-    }
   }
 
   // ---------------------------------------------------------------- storage
@@ -468,9 +419,7 @@ export class SnapshotRepos {
       return;
     }
     this.sql.transaction(() => {
-      // A legacy step stays open: another old attempt on the same name may still apply.
-      if (d.reason === "legacy") this.recheck(d.id, "seen; deleting it");
-      else this.done([d.id], "observed");
+      this.done([d.id], "observed");
       this.oweDelete(d.snapshot, d.name, this.now(), "orphan");
     });
   }

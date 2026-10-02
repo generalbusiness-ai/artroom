@@ -64,7 +64,7 @@ Use an isolated `request/founding-pre-effect-wake` branch and normal gitseq arti
 - [ ] Actual DO control proves persisted alarm before the first provider create.
 - [ ] A stopped host's debt is serviced through a fresh object's alarm without a founder retry.
 - [ ] Wake failure sends no provider effect; earliest shared alarm is preserved.
-- [ ] Healthy founding, legacy adoption and sealed repository isolation still pass.
+- [ ] Healthy founding, legacy adoption and sealed repository isolation still pass. (Legacy adoption was retired later by decision D5, request 73eccbec.)
 - [ ] All gates pass; gitseq exact-head delivery and index status are recorded.
 
 ## STOP conditions and maintenance
