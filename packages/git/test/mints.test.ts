@@ -438,6 +438,7 @@ test("(4) an ID without text is owed and revoked by that ID", async () => {
   assert.deepEqual(r.repo.revokes, ["tok_1"]);
   assert.equal(rows(r.sql).length, 0);
   assert.equal(r.ledger.duties().owed, 0);
+  assert.equal(r.repo.lists, 0, "with no unknown record, no inventory is read");
 });
 
 test("(4) an unreadable expiry is owed with no expiry, and stays owed through any time until a revocation is answered", async () => {
@@ -542,6 +543,17 @@ test("(5) a late refusal deletes the unknown record; a late lost answer leaves i
   await r.ledger.idle();
   assert.deepEqual(rows(r.sql).map((x) => [x["purpose"], x["state"]]), [["b", "unknown"]]);
   assert.equal(r.ledger.duties().unknown, 1);
+});
+
+test("(5) a late answer to a record whose given-up state could not be stored is still never held: its ID is owed", async () => {
+  const r = room({ waitMs: 30 });
+  r.sql.all("CREATE TRIGGER no_unknown BEFORE UPDATE ON artroom_mint WHEN NEW.state = 'unknown' BEGIN SELECT RAISE(ABORT, 'storage failure'); END");
+  r.repo.plans = ["hold"];
+  await assert.rejects(r.ledger.mint("publish:op:1", "write", ttl60), /did not answer/);
+  assert.equal(only(r.sql)["state"], "sent", "the given-up state could not be stored");
+  r.repo.held[0]!.answer();
+  await r.ledger.idle();
+  assert.deepEqual([only(r.sql)["state"], only(r.sql)["token"]], ["owed", "tok_1"], "no caller waits, so the token is owed, not held");
 });
 
 // ------------------------------------------------------------------ (6)
@@ -941,6 +953,7 @@ test("(10) scale: 10,000 kept unknown records, 1,000 known IDs and new unknowns 
     if (r.repo.lists > lists) {
       observations.push(r.clock.t);
       assert.notEqual(r.ledger.duties().observation.at, seenAt);
+      assert.equal(r.ledger.duties().observation.unaccounted, 0, "every listed token is known: 900 by other records, the rest by the ledger's own");
     }
     const revoked = r.repo.revokes.slice(revokes);
     if (revoked.length > 0) {
