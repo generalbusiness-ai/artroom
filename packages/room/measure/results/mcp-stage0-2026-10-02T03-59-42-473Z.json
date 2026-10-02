@@ -1,0 +1,353 @@
+{
+  "run": "2026-10-02T03-59-42-473Z",
+  "url": "https://artroom-spike-room.inguz.workers.dev",
+  "namespace": "gitseq-spike",
+  "steps": [
+    {
+      "step": "found: draft",
+      "ok": true,
+      "atMs": 182,
+      "detail": {
+        "status": 200,
+        "repo": "gitseq-spike/2e88729e491481042eb3511c342e6ccf"
+      }
+    },
+    {
+      "step": "found: found",
+      "ok": true,
+      "atMs": 2356,
+      "detail": {
+        "status": 200,
+        "room": "room_44e051e5c2b4490cd9407054b19b7e6a"
+      }
+    },
+    {
+      "step": "route: no bearer is 401 with WWW-Authenticate",
+      "ok": true,
+      "atMs": 2877,
+      "detail": {
+        "status": 401,
+        "wwwAuthenticate": "Bearer realm=\"artroom\""
+      }
+    },
+    {
+      "step": "route: an unknown bearer is 401 invalid_token",
+      "ok": true,
+      "atMs": 2922,
+      "detail": {
+        "status": 401,
+        "wwwAuthenticate": "Bearer realm=\"artroom\", error=\"invalid_token\""
+      }
+    },
+    {
+      "step": "redeem @mcp-driver",
+      "ok": true,
+      "atMs": 3086,
+      "detail": {
+        "status": 200,
+        "member": "@mcp-driver",
+        "role": "agent",
+        "delegation": "act_4_2860a1c8",
+        "mcp": "https://artroom-spike-room.inguz.workers.dev/v1/rooms/room_44e051e5c2b4490cd9407054b19b7e6a/mcp",
+        "expiresAt": "2026-10-02T04:59:45.422Z"
+      }
+    },
+    {
+      "step": "legacy mode: connect and tools/list",
+      "ok": true,
+      "atMs": 3421,
+      "detail": {
+        "protocol": "2025-11-25",
+        "era": "legacy",
+        "tools": [
+          "claim",
+          "workspace",
+          "propose",
+          "note",
+          "review",
+          "land",
+          "renew",
+          "release",
+          "attention",
+          "explain"
+        ]
+      }
+    },
+    {
+      "step": "2026-07-28: connect, instructions and tools/list",
+      "ok": true,
+      "atMs": 3522,
+      "detail": {
+        "protocol": "2026-07-28",
+        "instructionsLength": 378,
+        "instructions": "Artroom coordinates changes to one git repository. Call attention first to see what needs you. To change code: claim the paths, get a workspace, push with git, propose the commit, land it, then release. A refusal is an answer, not a failure: read rule, reason and fix, and do the fix. After a timeout, repeat the call with the same idempotencyKey. Never print or commit a token.",
+        "tools": [
+          {
+            "name": "claim",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "workspace",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "propose",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "note",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "review",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "land",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "renew",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "release",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "attention",
+            "outputSchemaRoot": "object",
+            "refusalForm": false
+          },
+          {
+            "name": "explain",
+            "outputSchemaRoot": "object",
+            "refusalForm": false
+          }
+        ]
+      }
+    },
+    {
+      "step": "claim",
+      "ok": true,
+      "atMs": 3610,
+      "detail": {
+        "ms": 88,
+        "lane": "act_5_d0f22a95",
+        "lease": {
+          "holder": "@mcp-driver",
+          "generation": 1,
+          "expiresAt": "2026-10-02T04:29:45.975Z"
+        },
+        "by": {
+          "via": "delegation",
+          "member": "@mcp-driver",
+          "role": "agent",
+          "key": "key_WuIas9GY9gTp8tcgUKAvDxawEBdXCAaSqyleGSyip-E",
+          "delegation": "act_4_2860a1c8",
+          "grantor": "key_giJWUlavBmaGSaP3-u33Yw47XLCcIcmkXNmqU4LVoCA"
+        },
+        "text": "Claimed lane act_5_d0f22a95 with lease 1."
+      }
+    },
+    {
+      "step": "claim retried with the same idempotencyKey returns the same act",
+      "ok": true,
+      "atMs": 3663,
+      "detail": {
+        "first": "act_5_d0f22a95",
+        "retry": "act_5_d0f22a95"
+      }
+    },
+    {
+      "step": "workspace: ready, with a grant",
+      "ok": true,
+      "atMs": 6045,
+      "detail": {
+        "ms": 2382,
+        "op": {
+          "id": "op_ws_act_5_d0f22a95_1",
+          "kind": "workspace",
+          "lane": "act_5_d0f22a95",
+          "updatedAt": "2026-10-02T03:59:48.345Z",
+          "state": "ready",
+          "detail": {
+            "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/2e88729e491481042eb3511c342e6ccf--act_5_d0f22a95.git",
+            "leaseGeneration": 1
+          }
+        },
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/2e88729e491481042eb3511c342e6ccf--act_5_d0f22a95.git",
+        "expiresAt": "2026-10-02T04:29:40.335Z",
+        "text": "Workspace ready: push to grant.remote with grant.token."
+      }
+    },
+    {
+      "step": "git clone the fork",
+      "ok": true,
+      "atMs": 6489,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "git push to the fork",
+      "ok": true,
+      "atMs": 6867,
+      "detail": {
+        "head": "7399bbb844d580bf06cf9cf866bdf2ba5a28c54d",
+        "code": 0
+      }
+    },
+    {
+      "step": "propose",
+      "ok": true,
+      "atMs": 8416,
+      "detail": {
+        "ms": 1549,
+        "generation": 1,
+        "changed": [
+          {
+            "status": "added",
+            "path": "mcp0/driver.md"
+          }
+        ],
+        "obligations": [],
+        "preview": {
+          "id": "op_preview_6",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T03:59:50.733Z",
+          "lane": "act_5_d0f22a95",
+          "generation": 1,
+          "state": "pending"
+        },
+        "text": "Proposed generation 1."
+      }
+    },
+    {
+      "step": "a refusal conforms to the advertised outputSchema (validated by the MCP client)",
+      "ok": true,
+      "atMs": 9103,
+      "detail": {
+        "rule": "generation-moved",
+        "reason": "The lane is at generation 1, not 0.",
+        "fix": "Propose on the current generation.",
+        "text": "Refused (generation-moved): The lane is at generation 1, not 0. Fix: Propose on the current generation."
+      }
+    },
+    {
+      "step": "land",
+      "ok": true,
+      "atMs": 10854,
+      "detail": {
+        "ms": 1701,
+        "op": {
+          "id": "op_land_8",
+          "kind": "land",
+          "updatedAt": "2026-10-02T03:59:53.127Z",
+          "lane": "act_5_d0f22a95",
+          "generation": 1,
+          "head": "7399bbb844d580bf06cf9cf866bdf2ba5a28c54d",
+          "act": "act_8_235be70c",
+          "leaseGeneration": 1,
+          "expectedMain": "551bc99ef7a8829d5b3b31d8abb3cc4f15e10a0d",
+          "policyVersion": "act_1_6e07bfd2",
+          "attempts": 1,
+          "integration": "7399bbb844d580bf06cf9cf866bdf2ba5a28c54d",
+          "evidence": [],
+          "publication": 1,
+          "reservedAt": 10,
+          "state": "landed",
+          "receipt": "act_11_99aa5526"
+        },
+        "text": "Landing op_land_8 is landed."
+      }
+    },
+    {
+      "step": "attention after the cursor: the room's updates for this agent",
+      "ok": true,
+      "atMs": 10900,
+      "detail": {
+        "items": [
+          {
+            "text": "Landing op_land_8 is landed.",
+            "open": true
+          }
+        ],
+        "cursor": "c1.eyJrIjoiYXR0ZW50aW9uIiwibiI6MTEsInAiOjF9",
+        "publishedThrough": -1
+      }
+    },
+    {
+      "step": "explain the landing act",
+      "ok": true,
+      "atMs": 10956,
+      "detail": {
+        "act": "act_8_235be70c",
+        "kind": "land",
+        "outcome": "accepted",
+        "decisions": 1
+      }
+    },
+    {
+      "step": "release",
+      "ok": true,
+      "atMs": 11065,
+      "detail": {
+        "text": "Done: act_12_cb031ede."
+      }
+    },
+    {
+      "step": "canonical main after the run",
+      "ok": true,
+      "atMs": 11955,
+      "detail": {
+        "main": "7399bbb844d580bf06cf9cf866bdf2ba5a28c54d",
+        "landed": [
+          {
+            "who": "driver",
+            "lane": "act_5_d0f22a95",
+            "integration": "7399bbb844d580bf06cf9cf866bdf2ba5a28c54d"
+          }
+        ]
+      }
+    }
+  ],
+  "cleanup": {
+    "agents": [
+      {
+        "member": "@mcp-driver",
+        "revoked": true,
+        "bearerAfter": 401
+      }
+    ],
+    "repos": [
+      {
+        "repo": "2e88729e491481042eb3511c342e6ccf--act_5_d0f22a95",
+        "activeTokens": 0,
+        "revoked": 0,
+        "deleted": true
+      },
+      {
+        "repo": "2e88729e491481042eb3511c342e6ccf",
+        "activeTokens": 0,
+        "revoked": 0,
+        "deleted": true
+      }
+    ],
+    "reposLeft": []
+  },
+  "repo": "gitseq-spike/2e88729e491481042eb3511c342e6ccf",
+  "room": "room_44e051e5c2b4490cd9407054b19b7e6a",
+  "name": "mcp-stage0-muqfpg9j",
+  "main": "7399bbb844d580bf06cf9cf866bdf2ba5a28c54d",
+  "ok": true,
+  "ms": 14497
+}

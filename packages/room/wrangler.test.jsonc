@@ -19,6 +19,11 @@
     "LEASE_SECONDS": "1800",
     "PUBLIC_URL": "https://artroom.test",
     "PUBLIC_NAMESPACE": "artroom-public",
+    "IMPORT_NAMESPACE": "acme-import",
+    // Stand-ins for the ARTIFACTS and IMPORT_ARTIFACTS bindings, which the test pool cannot have: founding
+    // refuses a mode whose binding is absent, and the test services factory supplies the fake remotes.
+    "ARTIFACTS": "test-stand-in",
+    "IMPORT_ARTIFACTS": "test-stand-in",
     "OPERATOR_KEYS": ""
   }
 }

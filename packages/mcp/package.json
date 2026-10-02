@@ -23,8 +23,9 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@modelcontextprotocol/client": "2.0.0",
     "@types/node": "22.20.4",
-    "vitest": "4.1.11",
-    "@cloudflare/vitest-pool-workers": "0.22.0"
+    "vitest": "4.1.11"
   }
 }

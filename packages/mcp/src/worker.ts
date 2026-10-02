@@ -1,6 +1,7 @@
 /**
  * The MCP endpoint on Workers: `POST /v1/rooms/:room/mcp` (HttpRoutes),
- * served by the Agents SDK's stateless handler. Each request builds a fresh
+ * served by the Agents SDK's stateless handler, for 2026-07-28 clients and,
+ * in its legacy stateless mode, for 2025-era clients. Each request builds a fresh
  * server bound to the room handle for its bearer token (R-CRED-3).
  *
  * The room Worker supplies `room()`: it checks the bearer and returns a
@@ -43,6 +44,9 @@ export function createMcpFetch<Env>(opts: McpWorkerOptions<Env>): (request: Requ
     }
     const handler = createMcpHandler(() => createArtroomServer(room), {
       route: url.pathname,
+      // 2026-07-28 clients, and 2025-era clients (Codex by default, pi) served statelessly: a fresh server per
+      // request, no session, and 405 for the 2025 GET and DELETE session operations.
+      legacy: "stateless",
       ...(opts.allowedHostnames ? { allowedHostnames: opts.allowedHostnames } : {}),
     });
     return handler.fetch(request);

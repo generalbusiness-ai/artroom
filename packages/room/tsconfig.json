@@ -7,7 +7,13 @@
     // Lane L's sources assume a lib whose TextDecoder options differ from the
     // Workers runtime types, so the Room checks against declarations generated
     // from them by `npm run typecheck` (as the UI does for the policy runtime).
-    "paths": { "@generalbusiness/artroom-log": ["./.types/log/src/index.d.ts"] }
+    // Lane E's client and MCP server (the MCP endpoint, src/mcp.ts) assume the
+    // DOM lib, so the same holds for them.
+    "paths": {
+      "@generalbusiness/artroom-log": ["./.types/log/src/index.d.ts"],
+      "@generalbusiness/artroom-client": ["./.types/client/src/index.d.ts"],
+      "@generalbusiness/artroom-mcp/worker": ["./.types/mcp/src/worker.d.ts"]
+    }
   },
   "include": ["src"]
 }

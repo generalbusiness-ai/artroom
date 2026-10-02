@@ -32,7 +32,7 @@ describe("the ten tools (R-API-9)", () => {
   test("exactly the contract's ten names, each calling the method of the same name", () => {
     expect(TOOL_LIST.map((t) => t.name).sort()).toEqual([...CONTRACT_TOOLS].sort());
     for (const t of TOOL_LIST) expect(t.method).toBe(t.name);
-    expect(listedTools().map((t) => Object.keys(t).sort())).toEqual(TOOL_LIST.map(() => ["description", "inputSchema", "name"]));
+    expect(listedTools().map((t) => Object.keys(t).sort())).toEqual(TOOL_LIST.map(() => ["description", "inputSchema", "name", "outputSchema"]));
   });
 
   test("required fields are the contract's required fields", () => {
