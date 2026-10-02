@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0a96bcf17adfc3d77e8795c7c25d87a934043f11","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa; the successor stands at packages/room/src/worker.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c6952d981eb90cb73e126208ba3de20469a4b702","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/room/test/node/config.test.ts: the pointer is withdrawn with no successor."}
