@@ -419,6 +419,12 @@ lane E.
 | 1. Upgrade of a stored cohort without its exact commit | yes: review-1249097f | yes (lane L's `commitFor`) | pending |
 | 2. Grant deadline at the first binding | yes: review-1249097f | n/a | pending |
 
+### Review 95323c2b findings
+
+| Case | Room in workerd, real SQLite (test file) | Real B and L integration | Deployed |
+|---|---|---|---|
+| P2. Two integrations with one snapshot commit: each check binds its own landing's integration; a wrong `landOp` is refused | yes: review-95323c2b | yes (lane B's landing engine) | pending |
+
 ## Mutation spot-checks
 
 Each rule below was broken once, and the matching suite run against the
@@ -667,6 +673,108 @@ the admins, and the alarm keeps retrying the same entry.
 cohort is stored with its exact commit before any remote write, and a
 restart resumes it …", "one entry still too large is a surfaced
 publication error …".
+
+## Review 95323c2b
+
+The checker's review of revision 6 (`d0b09ca2`) found one P2, and
+revision 7 had the same defect. This revision merges main `fb2bd41`
+(contract amendment 3) and fixes it. The checker's reproduction now fails;
+the correct outcomes are asserted in
+[test/workerd/review-95323c2b.test.ts](test/workerd/review-95323c2b.test.ts).
+
+**The finding.** Two integrations can share one filtered snapshot commit,
+because its ID depends only on the files, the checker and the digest
+(R-CARRY-15). The Room records one `check_snapshots` row for each
+integration, checker and configuration, so the shared commit has several
+rows. Admission (`check()` in [src/admission.ts](src/admission.ts)) and
+evidence counting (`underlyingIntegration()` in `src/obligations.ts`)
+selected one row by `commit_sha` alone. A fresh check on the second
+integration was refused `check-binding`, and a check could count for the
+wrong integration.
+
+**The fix.** A check is bound to one canonical integration when it is
+admitted, and that binding is stored with the evidence (`canonical`).
+Nothing looks the integration up again from the snapshot commit.
+
+- At admission, the candidates are the integrations the Room prepared for
+  the check's lane and generation: its clean preview's and its active
+  landings'. If the check names `landOp`, only that landing's integration
+  is a candidate. A `landOp` that is not an active landing of this
+  generation is refused `check-binding`.
+- A check that names a recorded snapshot commit must match a row whose
+  integration is a candidate, with the same checker, configuration digest,
+  snapshot digest and paths (R-CARRY-15 step 5). That row's integration
+  is the canonical integration. Rows are not changed, so one snapshot
+  commit stays shared by every integration that produced it.
+- If more than one candidate row matched (a preview and a landing of one
+  generation with different integrations but the same snapshot, and no
+  `landOp`), the check is refused rather than given an arbitrary binding.
+  The Room records rows only for landing integrations, so this does not
+  happen in practice.
+- A tree check, or a filtered check that names the integration itself,
+  binds the integration it names, which must be a candidate.
+
+Every reader of `check_snapshots` was changed or checked:
+
+| Place | Before | Now |
+|---|---|---|
+| `check()` admission ([src/admission.ts](src/admission.ts)) | one row by `commit_sha` | rows by `commit_sha`, kept only if their integration is a candidate for this lane, generation and `landOp` |
+| `obligationStatus()` ([src/obligations.ts](src/obligations.ts)) | `underlyingIntegration()` | the evidence's stored `canonical` |
+| check-failed detection in readiness ([src/core.ts](src/core.ts)) | `underlyingIntegration()` | `canonical` |
+| carry candidates in `carryChecks()` ([src/core.ts](src/core.ts)) | `underlyingIntegration()` | `canonical` |
+| the admission pre-read ([src/admission.ts](src/admission.ts)) | `underlyingIntegration(c) !== c` | whether any row has that commit: a test of existence, not a choice of row |
+| `recordSnapshots()` ([src/core.ts](src/core.ts)) | reads by `(integration, checker, config)` | unchanged |
+
+`underlyingIntegration()` is removed. Evidence admitted before this change
+has no stored `canonical`, and is treated as bound to the commit it names.
+A scoped check that named a snapshot commit therefore counts for no
+integration, and its obligation waits for a new check (fail closed). Lane A
+is not yet on main, so no deployed room holds such evidence.
+
+This matches amendment 3's split: the job and its check name the snapshot
+commit as `integration`, and the canonical integration is recorded beside
+the snapshot (R-CARRY-15 steps 3 and 5). The rest of amendment 3's lane A
+edits (sealed carry events, the runner pin, one repository per snapshot,
+the new job fields, advisory obligations) are a separate request. The
+merge only adds amendment 3's new `CheckJob` fields to the contract-shaped
+fixture in `review-a711f7b6.test.ts`, which the type check requires.
+
+**Tests**, all in `review-95323c2b.test.ts`, use the reviewer's layout: two
+active landings both change `src/app.ts` to v2, and the second also
+changes `docs/a.md`, outside the checker's inputs. The two canonical
+integrations differ and their snapshot commits are the same.
+
+| Test | What it shows |
+|---|---|
+| "fresh volatile checks on two integrations with the same snapshot commit …" | Both rows are kept. The second landing's fresh check, naming its own snapshot and `landOp`, is admitted and bound to the second integration, though a lookup by commit finds the first row. It counts there and not on the first integration, and the second landing lands. The first landing, prepared again on the new main, has the same snapshot commit; its own check is bound to its new integration, and it lands. |
+| "without landOp, a check naming the shared snapshot commit binds the one integration this generation has" | A check without `landOp` binds the second lane's own integration, and the landing lands |
+| "a failing check on the second integration fails the second landing with check-failed" | Readiness finds the failure on the right integration |
+| "wrong job or operation: …" | The shared snapshot commit with the other lane's `landOp`, from either side, or with an unknown operation, is `check-binding`. So is a tree check that names the other lane's integration with its own `landOp`. No check evidence is recorded |
+| "carry: an earlier check on the shared snapshot commit carries to the lane's new integration, whatever order the snapshot rows are stored in" | After main moves, the earlier check is still a carry candidate for the new integration when the new integration's row is stored first, and it carries by the identical snapshot |
+
+**Mutations.** Each was made on the fix commit, the whole workerd suite
+was run, and the change was reverted.
+
+| Mutation | Tests that failed |
+|---|---|
+| Admission selects the first row by commit alone | "fresh volatile checks …", "without landOp …", "a failing check …" (3) |
+| Obligation status looks the integration up by commit | "fresh volatile checks …", "without landOp …" (2) |
+| check-failed detection looks the integration up by commit | "a failing check …" (1) |
+| Carry candidates look the integration up by commit | "carry: …" (1) |
+| The `landOp` restriction and its refusal removed | "wrong job or operation …" (1) |
+| `canonical` not stored with the evidence | the four tests above that count a check, and review-a711f7b6's "contract-shaped CheckJob fixture …" (5) |
+| The refusal of more than one matching row removed | none: it survives. The case does not arise, as explained above |
+
+**Gates** at `385a106`, the fix commit; the commit that adds this section
+changes only this file:
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | git 132; log 105 Node and 100 workerd; policy 190 Node and 189 workerd (1 skipped); room 67 Node and 272 workerd; ui 88 |
+| `npm run test:node` (this package) | 0 | 67 in 7 files |
+| `npm run test:workerd` (this package) | 0 | 272 in 17 files |
+| `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles with the Room, Registry and Publisher Durable Objects, the Artifacts binding and the Publisher container |
 
 ## Secrets
 
