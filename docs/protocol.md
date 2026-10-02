@@ -3289,7 +3289,8 @@ before each request, and never revoke a token that the Room cannot match
 to its own record by ID. Revision 2 answers checker report 9ff903ab;
 revision 3 answers the checker's follow-up on landing token IDs and check
 job deadlines; revision 4 makes four consistency repairs (a check job's
-late token, overdue wake-ups, and removal of keyed records at expiry).
+late token, overdue wake-ups, and removal of keyed records at expiry);
+revision 5 answers checker report 851b215b.
 
 The design, the mint sites, the provider evidence, and each lane's edits
 and tests are in
@@ -3311,9 +3312,11 @@ covered.
 **R-MINT-2. A record and a wake-up before each request.**
 - Before the Room sends a create request, it writes a durable record of
   it: its owner (the operation, attempt or purpose), its scope and the
-  lifetime asked for. It then stores a wake-up no later than the record's
-  takeover time (R-MINT-7). If either cannot be stored, the request is not
-  sent.
+  lifetime asked for, and any absolute bound (`notAfter`) on the token's
+  expiry. It then stores a wake-up no later than the record's takeover
+  time (R-MINT-7). If either cannot be stored, the request is not sent.
+- The lifetime asked is computed after the wake-up is stored, just before
+  the request is sent, so a slow wake-up cannot carry it past `notAfter`.
 - Each request has its own record. A request is never sent again under
   the same record. A retry after a transient error is a new request with
   its own record, sent only after the earlier record holds that request's
@@ -3327,11 +3330,12 @@ record became unknown:
   with the expiry Artifacts reported, or with no expiry if it is
   unreadable.
 - The token may be used only if the answer also gives its text, the scope
-  asked, and a readable expiry no later than the answer's arrival plus the
-  lifetime asked, and only by a caller still waiting for it. Otherwise it
-  is owed revocation at once, and no one uses its text.
-- An owner's stricter bounds stand beside that check. A check job's token
-  is accepted only if its reported expiry is by the job's deadline, and an
+  asked, and a readable expiry no later than both the answer's arrival
+  plus the lifetime asked and the request's `notAfter`, and only by a
+  caller still waiting for it. This check runs before the token is given
+  to any caller or claimed by any owner. Otherwise it is owed revocation
+  at once, and no one uses its text.
+- A check job's request carries the job's deadline as `notAfter`, and an
   attempt whose deadline has passed is never sent; its token is ended
   instead (R-EXEC-9).
 - An Artifacts error that says the request was refused and changed
@@ -3347,8 +3351,10 @@ record became unknown:
 **R-MINT-4. A known token has one owner.**
 - From the moment its ID is recorded, a known token is owned by exactly
   one durable record. The record ends only when Artifacts answers the
-  token's revocation, or when a readable expiry that Artifacts reported
-  has passed.
+  token's revocation or, where its owner's rule allows, when a readable
+  expiry that Artifacts reported has passed. Settlement at expiry records
+  no revocation. A token with no readable expiry is never settled by
+  time.
 - Ownership moves only in one transaction, which writes the new owner's
   record and removes the old one. A record changes only by its own
   identity and expected state, so a late completion never changes another
@@ -3389,10 +3395,11 @@ the token's exposure. This amendment changes no lifetime: publication,
 staging, preview and log tokens last 60 seconds, snapshot preparation
 reads 300 seconds, and pinning tokens 600 seconds. A check job asks for a
 lifetime that ends before the job's deadline, counted from when it sends
-the request. Its token is known to end by the deadline only when its
-answer arrives and passes the deadline check (R-MINT-3). A late-applied
-token, or one whose answer is lost, is bounded only by its lifetime, as
-above, and its record stays open: owed if a late answer gave its ID,
+the request. The deadline guarantee (R-EXEC-9) covers only tokens accepted
+and issued to checkers, which passed `notAfter` (R-MINT-3). An unknown or
+late-applied create is bounded only by the lifetime asked, counted from
+when Artifacts applies it under the assumption above, so it can outlast
+the deadline. Its record stays open: owed if a late answer gave its ID,
 unknown otherwise.
 
 **R-MINT-7. Wake-ups and bounded work.**
@@ -3405,17 +3412,24 @@ unknown otherwise.
 - Each owed revocation, and the next observation, has a stored wake-up no
   later than its due time. A fresh object schedules both at start, with no
   request needed.
-- The next wake-up for this work is its earliest due time. If that time
-  has already passed, because work is overdue, the next wake-up is the
-  current time plus a fixed minimum step of 1 second. So the alarm
-  neither runs again at once nor leaves overdue work waiting.
-- Every known canonical token ID has a record keyed by that ID, from the
-  transaction that records the ID until Artifacts answers its revocation
-  or its readable reported expiry has passed, as in R-MINT-4. A token with
-  no readable expiry keeps its keyed record until its revocation is
-  answered. That includes a publication token, whose ID is also in its
-  landing operation. So an observation finds whether the Room knows a
-  listed, unexpired token by point lookups, without reading operations.
+- A due time is eligibility: the earliest time the work may run, not a
+  promise that it runs then. While a revocation pass waits on an answer,
+  its owed records are not eligible before that attempt's timeout.
+- The next wake-up for this work is the earliest eligible time, if that is
+  in the future, so a takeover or observation time is stored on time. If
+  it has passed, because work is overdue or backlogged, the next wake-up
+  is the current time plus a fixed step of 1 second. So the alarm never
+  runs again at once, and overdue work never waits for an unrelated
+  wake-up. Storing a wake-up never moves an earlier stored alarm later.
+- Every known canonical token ID has a record keyed by that ID, which
+  lives exactly as long as the token's owning record (R-MINT-4): from the
+  transaction that records the ID to the one that ends the owning record,
+  by a confirmed revocation or by settlement at a readable known expiry.
+  It is never ended by marking a token revoked that was not. That includes
+  a publication token, whose ID is also in its landing operation. An
+  unknown create has no ID and no keyed record; it stays a separate
+  unknown record (R-MINT-5). So an observation finds whether the Room
+  knows a listed token by point lookups, without reading operations.
 - Each wake-up does work bounded independently of the number of records
   kept: at most 20 revocations, earliest due first, each with a bounded
   wait; at most one inventory, with a bounded wait and size; a fixed

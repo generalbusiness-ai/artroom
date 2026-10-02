@@ -7,8 +7,11 @@ Revision 2 answers checker report `9ff903ab`; revision 3 answers the
 checker's two follow-up points on it (landing token IDs, and check jobs'
 deadline); revision 4 makes four consistency repairs (`mint()`'s expiry, a
 check job's late token, overdue wake-ups, and removal of keyed records at
-expiry). Source line numbers are as at this revision's head, where no
-source file differs from `3ac55e96`.
+expiry); revision 5 answers checker report `851b215b` and merges main
+`5822204f`, after which this amendment is protocol section 32. Source line
+numbers are as at this revision's head. Of the cited files, only
+`packages/room/src/config.ts` and `room.ts` changed on main since
+`3ac55e96`.
 
 This is a design for review. It changes no source code. Approving it
 authorizes no live operation and no implementation: lanes A, B and C below
@@ -50,7 +53,7 @@ A grep of every production source for `createToken(` finds these six.
 | 3 | `packages/git/src/publisher/client.ts:84`, `withToken`: `integrate` (106), the canonical half of `pinObjects` (159, 600 s), `pinRef` (179), `preview` (191) | canonical, write, 60 s or 600 s | `withRetry` as in 1. No record. A failed revocation is dropped (88) | Ledger |
 | 4 | `packages/room/src/logremote.ts:45`, `withToken`: `readRef` (62), `push` (87) | canonical, read or write, 60 s | No record. A failed revocation is dropped (49) | Ledger |
 | 5 | `packages/room/src/core.ts:202`, snapshot preparation's read of the canonical repository. Not named in the audit | canonical, read, 300 s | No record. A failed revocation is dropped (212) | Ledger |
-| 6 | `packages/room/src/jobs.ts:371`, a whole-tree check job's token | canonical, read, a lifetime asked to end before the job's deadline | A record (`mint:<job>`) before the request (366–367), one request, handoff in one transaction (387–400). But no wake is stored before the request, and `watchMint` (203–231) writes every due record on each observation | Ledger until claimed; then `job_tokens`, as now |
+| 6 | `packages/room/src/jobs.ts:371`, a whole-tree check job's token | canonical, read; a token accepted and issued to a checker ends by the job's deadline; an unknown or late-applied create is bounded only by the lifetime asked (which ends before the deadline counted from the send) from when it applies, an assumption (open point 44) | A record (`mint:<job>`) before the request (366–367), one request, handoff in one transaction (387–400). But no wake is stored before the request, and `watchMint` (203–231) writes every due record on each observation | Ledger until claimed; then `job_tokens`, as now |
 
 Mints on other repositories have other owners and are outside this design:
 the workspace lease token (`workspaces.ts:446`, R-CRED-8), snapshot job
@@ -106,7 +109,7 @@ asked for, the time it was sent, and a state:
 |---|---|---|
 | `sent` | The request is out; no answer recorded | An answer; the bounded wait (becomes `unknown`); a takeover (becomes `unknown`) |
 | `held` | Known by ID and text; given to a caller on this live host | Released, claimed by another owner, or a takeover (becomes `owed`) |
-| `owed` | Known by ID; revocation due | Artifacts answers the revocation, or a readable reported expiry passes |
+| `owed` | Known by ID; revocation due | Artifacts answers the revocation, or a readable reported expiry passes (settled by expiry, with no revocation recorded) |
 | `unknown` | The create may or may not have applied | The request's own later answer, or a provider fence (open point 42) |
 
 A record is deleted when it ends. Every change to a record is a
@@ -124,14 +127,18 @@ and next due time). Counts change in the same transaction as each record.
   the takeover time (below). The Room's `wake` reads the stored alarm and
   writes only if there is none, or a later one. If the record or the
   wake-up cannot be stored, the record is deleted and nothing is sent.
+  Only then is the lifetime to ask computed, so a slow wake-up cannot
+  carry it past the request's `notAfter` bound (below).
 - **The answer.** It is classified once, whenever it arrives:
   - an ID and text, with the scope asked and a readable expiry no later
-    than the answer's arrival plus the lifetime asked, while the caller
-    still waits: the record becomes `held`, and the caller gets the token.
-    This is the ledger's generic check. An owner may add a stricter one:
-    a check job also needs the expiry by its absolute deadline (lane C);
-  - an ID, but no text, another scope, an unreadable or longer expiry, or
-    a caller that no longer waits: the record becomes `owed`, with the
+    than the answer's arrival plus the lifetime asked (the generic check)
+    and no later than the request's absolute `notAfter` bound if it has
+    one, while the caller still waits: the record becomes `held`, and the
+    caller gets the token. A check job passes its deadline as `notAfter`
+    (lane C);
+  - an ID, but no text, another scope, an unreadable expiry, an expiry
+    that fails the generic check or `notAfter`, or a caller that no longer
+    waits: the record becomes `owed`, with the
     reported expiry, or none if it is unreadable. No caller gets the text.
     A token with no readable expiry stays owed until a revocation is
     answered;
@@ -190,13 +197,24 @@ no later than the takeover time. When the takeover alarm runs:
   revokes the owed tokens and observes;
 - with nothing in flight: the takeover time is cleared.
 
-`nextDue()` also includes the earliest owed revocation and the next
-observation. It returns the earliest of these times, or, if that time has
-already passed, the current time plus 1 s. Overdue work, such as a backlog
-of owed revocations larger than one pass, is taken up again 1 s later, so
-the alarm neither spins nor stalls. (The Room's own clamp, `alarmTime` in
-`config.ts:122–124`, is only 10 ms.) While a revocation pass waits on an answer, its records are
-not due before that attempt's timeout (review f060871b).
+A due time is eligibility: the earliest time the work may run, not a
+promise that it runs then. `nextDue()` takes the earliest of the owed
+revocations' due times, the next observation and the takeover time, and
+then:
+
+- while a revocation pass waits on an answer, owed records are not
+  eligible before that attempt's timeout (review f060871b), so a held
+  revocation causes no repeated wake-ups;
+- if the earliest time is still in the past, because work is overdue (a
+  backlog larger than one pass, say), it returns the current time plus a
+  fixed step of 1 s. The Room's own clamp, `alarmTime` in
+  `config.ts:142–144`, is only 10 ms;
+- otherwise it returns the earliest time itself, so a future takeover or
+  observation time is stored on time.
+
+The Room's `wake` and `schedule` only ever move the stored alarm earlier,
+so an earlier alarm for unrelated work is kept. The alarm never spins, and
+overdue work is taken up again within a second of the last pass.
 
 ### Bounded work per wake-up
 
@@ -205,7 +223,7 @@ proportion to the number of records kept.
 
 | Work | Bound per wake-up |
 |---|---|
-| Owed revocations | One pass at a time, off the publication queue, never awaited by the alarm. At most 20 records, earliest due first, then by row ID, so older debt goes first however many new mints arrive. At most 30 s per revocation. At most 20 record writes and one summary write |
+| Owed revocations | One pass at a time, off the publication queue, never awaited by the alarm. At most 20 eligible records, earliest due first, then by row ID, so older debt goes first however many new mints arrive. At most 30 s per revocation. At most 20 record writes and one summary write. A backlog continues 1 s after the pass ends |
 | Observation | At most one, when due. One `listTokens()` call, waited on for at most 30 s. If the listing is incomplete (`completeInventory`) or has more than 1,000 records, that is the result, and nothing is counted. Otherwise each active, unexpired token's ID is looked up by primary key or index in three tables (below): at most 3,000 point lookups. One summary write: the time, the result and the next due time. No record is written, and no operation body is read |
 | Observation schedule | After each observation, the next is due after a wait that doubles from 1 min to 6 h. A new unknown record brings it forward, but never sooner than 1 min after the last one. So there is at most one inventory a minute, whatever the rate of new unknowns |
 | Takeover at start | One update of the `sent` and `held` records, whose number is the host's work in flight, not the history |
@@ -227,11 +245,14 @@ token ID:
   transaction that records the ID and claims it from the ledger.
   `tokenRevoked` (`core.ts:726–733`) deletes it in the transaction that
   marks the token revoked. Those are the only two places that change a
-  token's state. R-MINT-7 also allows a keyed record to go once its
-  readable expiry has passed, as `job_tokens` rows and ledger records do;
-  lane B keeps landing rows until `tokenRevoked`, because plan 003 keeps
-  the revocation owed past expiry. An expired token is not counted by an
-  observation either way. A room stored before this
+  token's state. A keyed record lives exactly as long as its owning
+  record (R-MINT-7). For a ledger record or a `job_tokens` row, the keyed
+  record is that row, which ends at a revocation answer or by settlement
+  at a readable known expiry. A landing row ends only with `tokenRevoked`,
+  because the attempt and plan 003's cleanup record keep the revocation
+  owed past expiry. No keyed record is removed by marking a token revoked
+  that was not. Unknown creates have no ID and are not keyed records; they
+  stay in the ledger's `unknown` state. A room stored before this
   change fills it once, under a meta key, from its active operations'
   unrevoked tokens and its cleanup table rows; an ended operation's
   unrevoked token is always in that table.
@@ -285,9 +306,16 @@ exports it; new `packages/git/test/mints.test.ts`. No caller changes.
 
 **API:** `new MintLedger({ sql, repo, now, wake, known, waitMs? })`,
 where `known(tokenId)` answers whether another Room record holds that ID;
-`mint(purpose, scope, ttl)` returns `{ id, plaintext, scope, expiresAt,
-release(), claim() }`, where `expiresAt` is the expiry Artifacts reported,
-which an owner's own check (such as a check job's deadline) reads;
+`mint(purpose, scope, ttl, { notAfter? })` returns `{ id, plaintext,
+scope, expiresAt, release(), claim() }`. `ttl` is a function of the send
+time, called after the wake-up is stored. `notAfter` is an absolute bound
+in room-clock milliseconds: a token whose reported expiry is later is never
+returned; its record becomes `owed` and the ledger revokes it. So
+`expiresAt` is always readable, and no later than `notAfter`. With
+`claim()`, these are the handoff metadata an owner records: `id`,
+`expiresAt` and `scope` (for `job_tokens`: `token_id = id`, `expires_at =
+expiresAt`, `next_ms = expiresAt`, `last_error = 'held'`). `claim()`
+deletes the ledger record and must run inside the owner's transaction;
 `withToken(purpose, scope, ttl, fn)`; `reconcile()`; `nextDue()`;
 `duties({ after, limit })`.
 
@@ -306,8 +334,12 @@ test is red with no ledger, or with the mutation named.
 3. A refusal that changed nothing deletes the record, with no retry.
 4. Answers: an ID without text is owed and revoked by that ID; an
    unreadable expiry is owed with no expiry and stays owed through any
-   time until a revocation is answered; another scope or a longer expiry
-   is owed at once; no ID is unknown.
+   time until a revocation is answered; another scope, a longer expiry,
+   or an expiry after `notAfter` that passes the generic check is owed at
+   once and never returned; no ID is unknown. An owed record with a
+   readable expiry, whose revocations keep failing, is settled once that
+   expiry passes: the record goes with no revocation recorded and no
+   further revocation call.
 5. A held answer past 30 s: the caller gets an error and the record is
    `unknown`. The answer then arrives with an ID: no caller gets the text,
    and the record becomes `owed` and is revoked by that ID. A late refusal
@@ -332,9 +364,9 @@ test is red with no ledger, or with the mutation named.
     revocations, and rows read bounded by the batch, the page and the
     listing, not by the records kept. The next observation is never sooner
     than 1 min after the last; with a backlog of 100 owed records all due
-    at once, `nextDue()` after each turn is exactly 1 s ahead while any
-    remain overdue, and each turn takes the next 20, earliest due first; owed records due earlier are revoked before newer ones; paging
-    `duties()` reaches every record once; the counts are exact.
+    at once, `nextDue()` after each pass is exactly 1 s ahead while any
+    remain overdue, and each pass takes the next 20, earliest due first;
+    paging `duties()` reaches every record once; the counts are exact.
 
 **Mutation targets:** the record or the wake-up after the send; a failed
 wake-up that still sends; settling an unknown record by inventory, by
@@ -343,7 +375,10 @@ given to the caller; a takeover time left out of `nextDue()`, or not moved
 ahead; an observation written to each record; a new unknown that resets
 the schedule to under 1 min; a revocation batch ordered by newest; an
 unconditional update by row ID; a retry under one record; a swallowed
-revocation failure; a `claim()` in its own transaction.
+revocation failure; a `claim()` in its own transaction; `notAfter` checked
+after the token is returned; `ttl` computed before the wake-up; an overdue
+`nextDue()` returned as is, or as now plus less than 1 s; settlement at an
+unreadable expiry.
 
 ### Lane B: the publication token, and the ledger in the Room
 
@@ -352,7 +387,10 @@ revocation failure; a `claim()` in its own transaction.
 (`pushToken` takes `claim`; the `artroom_land_token` table, written by
 `pushToken` and `tokenRevoked`, filled once for a stored room, and read by
 `knownToken(id)`),
-`packages/git/src/worker.ts` (the harness builds its own ledger),
+the Git harness (the harness builds its own ledger; it is
+`packages/git/src/worker.ts` today and moves to `measure/harness` under
+D5, `request/d5-retire`, not yet landed, so the lane request targets the
+path current when it is filed),
 `packages/git/test/support.ts`, `packages/git/test/landing.test.ts`,
 `packages/git/test-workers/landing-do.test.ts`, `packages/room/src/core.ts`
 (build the ledger with `CoreOptions.wake`; a `mints` step; `nextAlarm()`),
@@ -399,7 +437,19 @@ and a new Room workerd test file.
      and revokes the token by its ID;
    - a wake-up that cannot be stored sends no create;
    - several alarms on a live host with a long-held token: each moves the
-     takeover time ahead, and none is stored less than 1 s ahead.
+     takeover time ahead, and none is stored less than 1 s ahead;
+   - a backlog: 45 owed revocations already due (three batches), the first
+     revocation held unanswered, and no further request. While it is held,
+     no stored alarm is less than 1 s ahead and none is later than the
+     attempt's timeout; a publication reserves, pushes and lands
+     meanwhile; the held attempt times out and takes its backoff; then,
+     through alarms alone, every record is revoked, earliest due first,
+     with each batch's next alarm 1 s after the pass. An earlier alarm
+     stored for a lease expiry is kept, and a future observation time is
+     stored on time;
+   - a ledger record with a readable expiry, whose revocations fail, ends
+     when that expiry passes, with no revocation recorded; a landing row for
+     the same case stays until `tokenRevoked`, with plan 003's record.
 
 **Mutation targets:** no `claim`; `claim` outside `pushToken`'s
 transaction; the landing row written outside `pushToken`'s transaction,
@@ -416,13 +466,18 @@ ledger for canonical tokens; the fork token is unchanged),
 receives the ledger), `packages/room/src/core.ts:202–212`,
 `packages/room/src/jobs.ts`, and tests.
 
-**Check jobs:** `issue` mints through the ledger and claims inside the
-`job_tokens` transaction. It keeps its own deadline checks, which are
-stricter than the ledger's generic one: it asks for a lifetime that ends
-before the deadline (`jobs.ts:371`); it accepts a token only if its
-reported expiry is by the attempt's absolute deadline (`jobs.ts:385–386`),
-and otherwise ends it at once; and it never sends an attempt once the
-deadline has passed, ending its token instead (`jobs.ts:424–429`). `watchMint` and its `mint:<job>` rows go. A room
+**Check jobs:** `issue` mints through the ledger, with `notAfter` set to
+the attempt's deadline, and claims inside the `job_tokens` transaction,
+recording the handoff metadata above. Its deadline checks stay, stronger
+than the ledger's generic check: the lifetime asked ends before the
+deadline, computed after the wake-up (`jobs.ts:371` today); the absolute
+expiry check (`jobs.ts:385–386`) becomes the ledger's `notAfter`, which
+runs before the token is returned or claimed, so no caller ever holds a
+token that outlives the deadline; and `issue` still never sends an attempt
+once the deadline has passed, ending its token instead (`jobs.ts:424–429`).
+`notAfter` is chosen over leaving the check in `issue` because it rejects
+the token in one place, before any owner can expose or claim it, and the
+ledger then owns its revocation. `watchMint` and its `mint:<job>` rows go. A room
 stored before this change moves its open `mint:` rows into the ledger as
 `unknown` records once, under a meta key, so no unknown create is lost.
 The tests in `job-token-mint.test.ts` keep their meaning, checked through
@@ -438,26 +493,37 @@ the ledger's duties.
    at a later alarm.
 3. A stored room with open `mint:` rows: after the move, each is an
    unknown ledger record, once, and none is lost.
-4. The deadline, beside the generic check: the room clock moves 20 s while the
-   create's answer is held, so the answer passes the ledger's generic
-   check (expiry no later than its arrival plus the lifetime asked) but
-   its expiry is after the job's deadline. The token is not accepted, no
-   job is sent, and the token is revoked by its ID. A second case: the
-   expiry is by the deadline, but the clock passes the deadline before
-   dispatch. No job is sent, and the token is ended. A third: a token
-   whose expiry fails the generic check is refused too. Each case is red
-   if `issue` relies only on the generic check. And the cases where no
-   answer arrives in time, as in the retained `job-token-mint.test.ts`
-   tests: a lost answer keeps an unknown record past the deadline and past
-   the lifetime asked; an answer held past the bounded wait is never sent
-   to a runner, and its ID is owed and revoked.
-5. A source scan: outside the harnesses, `measure/` and tests, only
+4. The deadline, in the real Room through `issue` and the production
+   ledger, with the in-memory Artifacts fake's holds and the room clock:
+   - wake delay: storing the wake-up takes 20 s of room time; the
+     lifetime is asked after it, so the token's expiry is by the deadline,
+     and the job is sent;
+   - create delay: the create applies 20 s after it is sent and answers at
+     once. Its expiry passes the generic check but is after the deadline.
+     No caller gets the token, its ID is owed and revoked, and no job is
+     sent;
+   - answer delay: the create applies at once and its answer is held
+     20 s. The expiry is by the deadline, so the token is claimed;
+   - the boundaries: an expiry equal to the deadline is accepted; dispatch
+     at a clock equal to the deadline sends no job and ends the token;
+     dispatch 1 ms before it sends the job;
+   - the retained control `job-token-mint.test.ts:123–177` (a mint held
+     past its deadline, a second attempt sent, then the first applies with
+     a late or a lost answer) keeps its meaning: a late answer's ID is
+     owed and revoked, and never sent to a runner; a lost answer stays an
+     unknown record past the deadline and past the lifetime asked.
+   Each case is red if `issue` relies only on the generic check, or
+   computes the lifetime before the wake-up.
+5. A `job_tokens` row whose revocation fails settles once its known
+   expiry passes, with no revocation recorded, as today; there is no such
+   settlement for a ledger record with no readable expiry.
+6. A source scan: outside the harnesses, `measure/` and tests, only
    `mints.ts`, `workspace/workspaces.ts`, `snapshot/repos.ts` and
    `publisher/client.ts` (the fork token only) call `createToken`.
 
 **Mutation targets:** a site that calls `createToken` directly; a dropped
 revocation failure; the move run at every start, or not at all; `issue`'s
-expiry check against the deadline removed; `issue`'s check for a passed
+`notAfter` left out of the job's mint; `issue`'s check for a passed
 deadline before dispatch removed.
 
 ## Out of scope
@@ -465,14 +531,19 @@ deadline before dispatch removed.
 - The fork read token in `pinObjects` (`client.ts:155`): builder files its
   own request after approval.
 - Plan 003's cleanup records, which stay as they are.
-- Token lifetimes: 60 s for publication, staging, previews and logs, 300 s
-  for snapshot reads, 600 s for pinning, and, for check jobs, a lifetime
-  asked to end before the deadline, as adopted.
+- Token lifetimes, as adopted: 60 s for publication, staging, previews and
+  logs, 300 s for snapshot reads, 600 s for pinning. A check job asks for
+  a lifetime that ends before its deadline, counted from the send; only a
+  token accepted and issued to a checker is known to end by the deadline.
+  An unknown or late-applied create lasts the lifetime asked from when it
+  applies, which is assumed (open point 44) and can pass the deadline.
 - Showing the records to admins: the cleanup projection request
   (`8d249233`, the successor of `c0f0592f`) reads `duties()` page by page.
 - Workspace, snapshot-repository and repository-creation tokens.
 - The harnesses and `measure/` scripts, beyond keeping the Git harness
-  compiling.
+  compiling. The Git harness moves to `measure/harness` under D5
+  (`request/d5-retire`, not yet landed); lane requests target the path
+  current when they are filed.
 - A revocation that answers `false` still counts as done, as before.
 
 ## Open provider questions
