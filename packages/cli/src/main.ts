@@ -34,6 +34,7 @@ import {
   type HttpRoomClient,
   type PreparedAct,
 } from "@generalbusiness/artroom-client";
+import { isActId } from "@generalbusiness/artroom-contract";
 import type {
   ActId,
   Claim,
@@ -58,7 +59,7 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import { SCHEMA, SchemaError, Store, type Config, type JournalEntry, type LocalIntent, type RoomConfig } from "./config.ts";
 import { attentionText, claimText, errorText, explainText, landText, logText, proposalText, refusalText, short } from "./format.ts";
-import { checkGrant, configureWorkspace, credentialFileIn, credentialOwner, gitDir, head as gitHead, readOwner, REMOTE, withDestination, type Party } from "./git.ts";
+import { checkGrant, checkMarker, configureWorkspace, credentialFileIn, credentialOwner, gitDir, head as gitHead, readOwner, REMOTE, withDestination, type Party } from "./git.ts";
 import { parseInvitation } from "./link.ts";
 
 export interface Io {
@@ -236,6 +237,8 @@ function updateRoom(ctx: Ctx, id: RoomId, change: (room: RoomConfig) => void): v
 function laneOf(ctx: Ctx, room: RoomConfig): LaneId {
   const lane = (str(ctx.values, "lane") ?? room.lane) as LaneId | undefined;
   if (lane === undefined) throw new UsageError("No lane chosen. Claim one with artroom claim, or pass --lane LANE.");
+  // A lane ID reaches file names, the credential's mark and printed commands: only the canonical form (request 55be0661).
+  if (!isActId(lane)) throw new UsageError("That is not a lane ID. A lane ID looks like act_12_0a1b2c3d.");
   return lane;
 }
 
@@ -317,6 +320,8 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
       return local.steps.map((step) => `Manual local step: ${step}`);
     case "select-lane": {
       const lane = (out as Claim).lane;
+      // Never stored unless canonical: a selected lane is later written into the workspace credential's mark (request 55be0661).
+      if (!isActId(lane)) throw new Error("The room answered the claim with a lane ID that is not one, so it was not selected. Tell the room's admin.");
       updateRoom(ctx, id, (r) => {
         if (r.laneBy === key) return;
         if ((r.laneRev ?? 0) === local.rev) setLane(r, lane, key);
@@ -692,6 +697,7 @@ const COMMANDS: Record<string, Command> = {
       ctx.secrets.add(grant.token);
       // The room's remote and token are written into git config: refuse a malformed one before touching the destination.
       checkGrant(grant.remote, grant.token);
+      checkMarker(lane, grant.leaseGeneration, install);
 
       // Install only if the reservation still owns this repository's destination, whichever Room or command
       // touched it since, and only for the lease it was made for. The remote, credential and mapping change together.

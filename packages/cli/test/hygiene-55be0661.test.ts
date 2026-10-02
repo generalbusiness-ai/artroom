@@ -6,12 +6,19 @@
  * command. The CLI refuses a grant whose remote is not a plain https URL or
  * whose token has characters a token cannot have, before it touches the
  * repository; `configureWorkspace` refuses the same at its own boundary.
+ *
+ * The file's first line, a comment, marks whose credential it is: the lane,
+ * lease and installation ID. The lane and lease come from the room too
+ * (`Claim.lane`, the lane's and grant's lease), so a newline in either would
+ * end the comment and add settings (checker report f593d8f7). Each must have
+ * its canonical form: checked when a claim's lane is selected, when a lane
+ * is chosen, before the destination is touched, and at the boundary.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { checkGrant, configureWorkspace } from "../src/git.ts";
+import { checkGrant, checkMarker, configureWorkspace, credentialOwner } from "../src/git.ts";
 import { EXIT } from "../src/main.ts";
 import { useHarness } from "./harness.ts";
 
@@ -21,6 +28,9 @@ const GOOD_REMOTE = "https://artifacts.example/acme/web-act_3_0a1b2c3d.git";
 const GOOD_TOKEN = "art_v1_0123456789abcdef?expires=1790000000";
 /** Closes the `[http "<remote>"]` header and opens `[core]`: on a6330262 this set `core.sshCommand`. */
 const INJECT = '"]\n[core]\n\tsshCommand = touch pwned\n[x "y';
+/** Ends the mark's comment line and opens `[core]`: on e90cc7c0 a lane or lease like this set `core.sshCommand`. */
+const MARK_INJECT = "\n[core]\n\tsshCommand = touch pwned\n#";
+const LANE = "act_3_0a1b2c3d";
 
 const BAD_REMOTES: readonly [string, unknown][] = [
   ["a quote and newline that open a [core] section", `https://artifacts.example/x.git${INJECT}`],
@@ -71,7 +81,62 @@ describe("checkGrant", () => {
   });
 });
 
+const BAD_LANES: readonly [string, unknown][] = [
+  ["a newline that opens a [core] section", `${"act_3_0a1b2c3d"}${MARK_INJECT}`],
+  ["a space", "act_3_0a1b2c3d x"],
+  ["upper-case hex", "act_3_0A1B2C3D"],
+  ["a leading zero in its number", "act_03_0a1b2c3d"],
+  ["another ID's form", "op_land_1"],
+  ["nothing", ""],
+  ["an array, which a pattern test would coerce to its string", ["act_3_0a1b2c3d"]],
+];
+
+const BAD_LEASES: readonly [string, unknown][] = [
+  ["a newline that opens a [core] section", `1${MARK_INJECT}`],
+  ["a number as a string", "1"],
+  ["a negative number", -1],
+  ["a fraction", 1.5],
+  ["NaN", Number.NaN],
+  ["more than a safe integer", 2 ** 53],
+];
+
+const BAD_INSTALLS: readonly [string, unknown][] = [
+  ["a newline that opens a [core] section", `i1${MARK_INJECT}`],
+  ["a dot", "i.1"],
+  ["nothing", ""],
+  ["more than 64 characters", "a".repeat(65)],
+  ["an array", ["i1"]],
+];
+
+describe("checkMarker", () => {
+  test("accepts a canonical lane, a whole-number lease and an idempotency key", () => {
+    expect(() => checkMarker(LANE, 1, "AZaz09_-")).not.toThrow();
+    expect(() => checkMarker("act_9007199254740991_ffffffff", 0, "a".repeat(64))).not.toThrow();
+  });
+  test.each(BAD_LANES)("refuses a lane with %s", (_why, lane) => {
+    expect(() => checkMarker(lane, 1, "i1")).toThrow(/not a lane ID/);
+  });
+  test.each(BAD_LEASES)("refuses a lease that is %s", (_why, lease) => {
+    expect(() => checkMarker(LANE, lease, "i1")).toThrow(/lease that is not a whole number/);
+  });
+  test.each(BAD_INSTALLS)("refuses an installation ID with %s", (_why, install) => {
+    expect(() => checkMarker(LANE, 1, install)).toThrow(/not an idempotency key/);
+  });
+});
+
 describe("configureWorkspace refuses at its own boundary", () => {
+  test.each([
+    ["lane", `${LANE}${MARK_INJECT}`, 1, "i1"],
+    ["lease", LANE, `1${MARK_INJECT}`, "i1"],
+    ["installation ID", LANE, 1, `i1${MARK_INJECT}`],
+  ])("an injecting %s in the mark adds no git setting, remote or credential file", (_which, lane, lease, install) => {
+    const dir = repo();
+    expect(() => configureWorkspace(dir, GOOD_REMOTE, GOOD_TOKEN, lane as string, lease as number, install as string)).toThrow();
+    expect(() => git(dir, "config", "--get", "core.sshCommand")).toThrow();
+    expect(git(dir, "remote")).toBe("");
+    expect(existsSync(join(dir, ".git", "artroom", "credentials"))).toBe(false);
+  });
+
   test.each([
     ["remote", `https://artifacts.example/x.git${INJECT}`, GOOD_TOKEN],
     ["token", GOOD_REMOTE, `${GOOD_TOKEN}\n[core]\n\tsshCommand = touch pwned`],
@@ -83,13 +148,18 @@ describe("configureWorkspace refuses at its own boundary", () => {
     expect(existsSync(join(dir, ".git", "artroom", "credentials"))).toBe(false);
   });
 
-  test("every character the patterns admit reads back, through git, as exactly the one setting", () => {
+  test("every character the patterns admit, in every field, reads back through git as the whole file: one mark and exactly one setting", () => {
     const dir = repo();
     const remote = "https://a-b.0.example:65535/AZaz09._~-/x.git";
     const token = "AZaz09._~+/?=-";
-    const file = configureWorkspace(dir, remote, token, "act_3_0a1b2c3d", 1, "install-1");
+    const [lane, lease, install] = ["act_9007199254740991_0123abcd", Number.MAX_SAFE_INTEGER, "AZaz09_-"];
+    const file = configureWorkspace(dir, remote, token, lane, lease, install);
     expect(git(dir, "config", "--file", file, "--null", "--list")).toBe(`http.${remote}.extraheader\nAuthorization: Bearer ${token}\0`);
     expect(git(dir, "config", "--get", `http.${remote}.extraheader`)).toBe(`Authorization: Bearer ${token}`);
+    // Every line but the setting's two is a comment, and the ownership reader reads the mark back exactly.
+    const lines = readFileSync(file, "utf8").split("\n").filter((l) => l !== "");
+    expect(lines.filter((l) => !l.startsWith("#"))).toEqual([`[http "${remote}"]`, `\textraHeader = Authorization: Bearer ${token}`]);
+    expect(credentialOwner(file)).toEqual({ lane, lease, install });
   });
 });
 
@@ -120,5 +190,85 @@ describe("artroom workspace refuses a malformed grant before touching the reposi
     const owner = JSON.parse(readFileSync(join(dir, ".git", "artroom", "owner.json"), "utf8"));
     expect(owner.pending ?? []).toEqual([]);
     expect(owner.installed).toBeUndefined();
+  });
+});
+
+describe("a malicious room's mark metadata never reaches the repository", () => {
+  const nothingInstalled = (dir: string) => {
+    expect(() => git(dir, "config", "--get", "core.sshCommand")).toThrow();
+    expect(git(dir, "remote")).toBe("");
+    expect(existsSync(join(dir, ".git", "artroom", "credentials"))).toBe(false);
+    const ownerFile = join(dir, ".git", "artroom", "owner.json");
+    const owner = existsSync(ownerFile) ? JSON.parse(readFileSync(ownerFile, "utf8")) : {};
+    expect(owner.pending ?? []).toEqual([]);
+    expect(owner.installed).toBeUndefined();
+  };
+  const config = (home: string) => JSON.parse(readFileSync(join(home, "config.json"), "utf8")).rooms[h.room.id];
+
+  test("a claim answered with an injecting lane: exit 1, the lane is not selected, and workspace has no lane to install", async () => {
+    const home = join(h.tmp, "alice");
+    const dir = repo();
+    await login(home, "@alice");
+    const evil: typeof fetch = async (input, init) => {
+      const res = await fetch(input, init);
+      if (!String(input).endsWith("/acts") || typeof init?.body !== "string" || !init.body.includes('"claim"')) return res;
+      const out = (await res.json()) as Record<string, unknown>;
+      out["lane"] = `${String(out["lane"])}${MARK_INJECT}`;
+      return new Response(JSON.stringify(out), { status: res.status, headers: res.headers });
+    };
+    const claimed = await cli(home, ["claim", "src/**", "--goal", "g"], dir, { fetch: evil });
+    const ws = await cli(home, ["workspace"], dir);
+    nothingInstalled(dir);
+    expect(config(home).lane).toBeUndefined();
+    expect(ws.code).toBe(EXIT.usage);
+    expect(claimed.code).toBe(EXIT.failed);
+    expect(claimed.err).toContain("a lane ID that is not one, so it was not selected");
+  });
+
+  test("an injecting --lane is a usage error before the destination is reserved", async () => {
+    const home = join(h.tmp, "alice");
+    const dir = repo();
+    await login(home, "@alice");
+    const res = await cli(home, ["workspace", "--lane", `${LANE}${MARK_INJECT}`], dir);
+    expect(res.code).toBe(EXIT.usage);
+    expect(res.err).toContain("That is not a lane ID");
+    nothingInstalled(dir);
+    expect(existsSync(join(dir, ".git", "artroom", "owner.json"))).toBe(false);
+  });
+
+  test("an injecting lease, in both the lane and the grant: exit 1 before anything is pending, and a valid workspace still installs and releases", async () => {
+    const home = join(h.tmp, "alice");
+    const dir = repo();
+    await login(home, "@alice");
+    expect((await cli(home, ["claim", "src/**", "--goal", "g"], dir)).code).toBe(EXIT.ok);
+    const lane = config(home).lane as string;
+    const lease = `1${MARK_INJECT}`;
+    const remote = "https://artifacts.example/acme/evil.git";
+    const reply = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    // The room controls both leases, so they agree; it answers the workspace requests itself.
+    const evil: typeof fetch = async (input, init) => {
+      const body = typeof init?.body === "string" ? init.body : "";
+      if (String(input).endsWith("/requests") && body.includes('"workspace-token"')) {
+        return reply({ op: "op_ws_evil", lane, leaseGeneration: lease, remote, token: "art_v1_evil0123456789", expiresAt: "2099-01-01T00:00:00.000Z" });
+      }
+      if (String(input).endsWith("/requests") && /"kind":"workspace"/.test(body)) {
+        return reply({ id: "op_ws_evil", kind: "workspace", updatedAt: "2026-10-02T00:00:00.000Z", lane, state: "ready", detail: { remote, leaseGeneration: lease } });
+      }
+      const res = await fetch(input, init);
+      if (!String(input).includes(`/lanes/${lane}`)) return res;
+      const l = (await res.json()) as { lease: { generation: unknown } };
+      l.lease.generation = lease;
+      return reply(l);
+    };
+    const res = await cli(home, ["workspace"], dir, { fetch: evil });
+    nothingInstalled(dir);
+    expect(res.code).toBe(EXIT.failed);
+    expect(res.err).toContain("lease that is not a whole number");
+
+    // Valid ownership and release are unchanged.
+    expect((await cli(home, ["workspace"], dir)).code).toBe(EXIT.ok);
+    expect(credentialOwner(join(dir, ".git", "artroom", "credentials"))).toMatchObject({ lane, lease: 1 });
+    expect((await cli(home, ["release", "-m", "done"], dir)).code).toBe(EXIT.ok);
+    expect(existsSync(join(dir, ".git", "artroom", "credentials"))).toBe(false);
   });
 });
