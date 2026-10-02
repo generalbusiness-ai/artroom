@@ -6,8 +6,9 @@
  * are lane B's `Workspaces`, which the Room hosts directly.
  *
  * A room's repository identity is `<namespace>/<name>` (R-GEN-12). A
- * deployment binds one Artifacts namespace; an identity in any other
- * namespace has no repository here, and every call for it is unavailable.
+ * deployment binds the public founding namespace and, to import, a second
+ * one; an identity in any other namespace has no repository here, and every
+ * call for it is unavailable.
  */
 
 import type { Glob, LaneId, PathChange, RepoPath, Sha } from "@generalbusiness/artroom-contract";
@@ -47,12 +48,13 @@ export interface RepoLocation {
 }
 
 /** Map a repository identity to its location, or null when this deployment has no binding for its namespace. */
-export function locate(identity: string, namespace: string): RepoLocation | null {
+export function locate(identity: string, namespaces: string | readonly string[]): RepoLocation | null {
   const slash = identity.indexOf("/");
   if (slash <= 0) return null;
   const ns = identity.slice(0, slash);
   const name = identity.slice(slash + 1);
-  return ns === namespace && /^[A-Za-z0-9._-]{1,100}$/.test(name) ? { namespace: ns, name } : null;
+  const bound = typeof namespaces === "string" ? [namespaces] : namespaces;
+  return bound.includes(ns) && /^[A-Za-z0-9._-]{1,100}$/.test(name) ? { namespace: ns, name } : null;
 }
 
 export interface ArtifactsAdapterOptions {
@@ -104,15 +106,6 @@ export class ArtifactsAdapter implements ArtifactsPort {
   private async pinning(): Promise<Pinning> {
     const remote = await this.canonicalRemote();
     return new Pinning({ stub: this.o.stub, artifacts: this.o.binding, canonical: { name: this.name, remote }, ...(this.o.sleep ? { sleep: this.o.sleep } : {}) });
-  }
-
-  async createRepo(): Promise<void> {
-    try {
-      await this.retry(() => this.o.binding.create(this.name, { description: "Artroom room repository" }));
-    } catch (e) {
-      // A repository from an earlier attempt of this same founding: the binding is exact (R-GEN-13).
-      if ((e as { code?: string }).code !== "ALREADY_EXISTS") throw e;
-    }
   }
 
   async readMain(): Promise<Sha | null> {

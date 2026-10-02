@@ -318,7 +318,11 @@ two sources:
   again and refuses, with `forbidden`, a genesis that names any other
   repository or carries `onboarding`. The repository is created at step 6,
   after the registry binding, so an existing repository at that identity
-  can only be this founding's own, from an earlier attempt.
+  can only be this founding's own, from an earlier attempt. At step 6 the
+  deployment also gives `main` one commit with no files, so that the room's
+  first landing has a main to land on (R-LAND-2, R-PUB-4), and revokes every
+  credential that creating the repository and that commit produced before it
+  seals the genesis.
 - **`import`: an existing repository.** The draft carries a
   `SignedOnboardingGrant`, and the genesis carries it as `onboarding`, so
   the first admin's signature covers it. At `found` the deployment checks
@@ -2111,7 +2115,7 @@ Cases added for amendment 2 (section 27). Each is normative.
 
 | Case | Expected result | Rules |
 |---|---|---|
-| **Isolated public creation.** Draft with repository source `new`, sign, found; found again with the same body | `genesis.repo` is a fresh identity in the public namespace, with no `onboarding`; the repository is created empty after the registry binding; entry 0 is the genesis, entry 1 `policy-activated` with `checkers`; the second `found` returns the same room ID | R-GEN-10, R-GEN-12, R-GEN-13, R-POL-9 |
+| **Isolated public creation.** Draft with repository source `new`, sign, found; found again with the same body | `genesis.repo` is a fresh identity in the public namespace, with no `onboarding`; the repository is created after the registry binding, with `main` at one commit with no files and no live credential; entry 0 is the genesis, entry 1 `policy-activated` with `checkers`; the second `found` returns the same room ID | R-GEN-10, R-GEN-12, R-GEN-13, R-POL-9 |
 | **Unauthorized existing repository.** Draft `import` with a grant signed by a key that is not an operator key, or with a grant for a different admin key; separately, found a `new` draft whose genesis names an existing repository | `forbidden` at `draft` and at `found`; no repository contents read, no token minted, no entry sealed, nothing bound | R-GEN-10, R-GEN-12 |
 | **Repository altered after draft.** An authorized import draft whose genesis is edited to name another repository, keeping the grant, and re-signed by the admin key | `forbidden`, because `grant.repo` differs from `genesis.repo`; nothing read, minted, sealed or bound | R-GEN-12 |
 | **Authorized import.** An operator grants repository R to admin key K; K drafts and founds | Founded; `genesis.onboarding` holds the grant; `artroom verify` checks the grant's signature and binding, and reports the operator key | R-GEN-12, R-LOG-10 |

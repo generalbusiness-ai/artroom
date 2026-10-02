@@ -43,6 +43,13 @@
  * The Room's alarm calls `reconcile()` and sets its next alarm from
  * `nextDue()`. Cleanup checks provenance first, and never touches a
  * repository that is not this canonical repo's fork.
+ *
+ * The same ledger covers creating the canonical repository at public
+ * founding (`createCanonical`, `withCanonicalToken`, `settleCanonical`;
+ * request b6b51de7): the create's 24-hour token and the first commit's
+ * token are owed revocation until an inventory of the canonical repository
+ * confirms none is active. That inventory revokes every active token, so the
+ * Room runs it only before the room is founded.
  */
 
 import type {
@@ -215,7 +222,7 @@ export class Workspaces {
    * A non-idempotent remote step is about to be sent. Written first, so that
    * if the host stops before the answer, the step is known to be unresolved.
    */
-  private beginStep(fork: string, kind: "fork-create" | "mint"): number {
+  private beginStep(fork: string, kind: "fork-create" | "mint" | "repo-create"): number {
     return this.insertDuty(fork, kind, "in-flight", kind, null, null);
   }
 
@@ -617,7 +624,8 @@ export class Workspaces {
       .map((r) => text(r, "fork")!);
     for (const f of forks) {
       // One fork's unexpected failure must not stop the others; its duties were advanced by cleanFork.
-      await this.exclusive(f, () => this.cleanFork(f)).catch(() => undefined);
+      // The canonical repository's own duties (public founding) are its, not a fork's.
+      await this.exclusive(f, () => (f === this.canonical ? this.cleanCanonical(f) : this.cleanFork(f))).catch(() => undefined);
     }
     return this.pendingCleanup();
   }
@@ -692,9 +700,135 @@ export class Workspaces {
     if (!ended) return 0;
     return this.exclusive(r.fork, () => this.cleanFork(r.fork));
   }
+
+  // ---------------------------------------------------------------- the canonical repository (public founding)
+
+  /**
+   * Public founding (R-GEN-12): create the canonical repository. The create
+   * is a remote step, recorded before it is sent. Its answer carries a write
+   * token that lasts 24 hours; from that answer on, in the same transaction,
+   * an inventory of the canonical repository is owed, which revokes it
+   * (`settleCanonical`). The token is never used. An existing repository (an
+   * earlier attempt's: the registry binding is exact, R-GEN-13) is not an
+   * error.
+   */
+  createCanonical(): Promise<void> {
+    const name = this.canonical;
+    return this.exclusive(name, async () => {
+      const step = this.beginStep(name, "repo-create");
+      try {
+        await this.artifacts.create(name, { description: "Artroom room repository", setDefaultBranch: "main" });
+      } catch (e) {
+        this.failedStep(step, e);
+        if (artifactsCode(e) === "ALREADY_EXISTS" && refusedUnchanged(e)) return;
+        throw e;
+      }
+      this.sql.transaction(() => {
+        this.answered(step);
+        this.owe(name, "inventory", "created");
+      });
+    });
+  }
+
+  /**
+   * Run `fn` with a write token on the canonical repository that lasts
+   * Artifacts' minimum (60 seconds), for the first commit on main. The mint
+   * is a step recorded before it is sent; from its answer on the token is
+   * owed revocation by ID, and it is revoked after `fn`, whatever happens.
+   */
+  withCanonicalToken<T>(fn: (token: string) => Promise<T>): Promise<T> {
+    const name = this.canonical;
+    return this.exclusive(name, async () => {
+      const repo = await withRetry(() => this.artifacts.get(name), this.retryOpts());
+      const step = this.beginStep(name, "mint");
+      let t: Awaited<ReturnType<RepoHandle["createToken"]>>;
+      try {
+        t = await repo.createToken("write", MIN_TOKEN_TTL_S);
+      } catch (e) {
+        this.failedStep(step, e);
+        throw e;
+      }
+      const expires = Date.parse(t.expiresAt);
+      const duty = this.sql.transaction(() => {
+        this.answered(step);
+        return this.owe(name, "token", "first-commit", t.id, Number.isFinite(expires) ? expires : null);
+      });
+      try {
+        return await fn(t.plaintext);
+      } finally {
+        try {
+          await withRetry(() => repo.revokeToken(t.id), this.retryOpts());
+          this.done([duty], "revoked");
+        } catch (e) {
+          this.defer([duty], String(e));
+        }
+      }
+    });
+  }
+
+  /**
+   * Settle the canonical repository's founding duties: revoke the tokens
+   * owed by ID, then every active token on the repository. The Room calls
+   * this only before the room is founded, while no token of its own is live
+   * there, and does not seal the genesis until it returns 0. Returns how many
+   * duties are still open; the Room's alarm retries them.
+   */
+  settleCanonical(): Promise<number> {
+    const name = this.canonical;
+    return this.exclusive(name, () => this.cleanCanonical(name));
+  }
+
+  /**
+   * One run of the canonical repository's duties. The caller holds its lock,
+   * so every duty open now began before this run. An inventory that revokes
+   * every active token settles them all, including a step still in flight (a
+   * create or a mint whose answer never arrived): the repository exists, so
+   * the create has applied or never will, and a token whose answer never
+   * arrived is held by no one. Absence never settles a create step.
+   */
+  private async cleanCanonical(name: string): Promise<number> {
+    const runStart = this.now();
+    try {
+      const duties = this.open_(name);
+      if (duties.length === 0) return 0;
+      let repo: RepoHandle;
+      try {
+        repo = await this.artifacts.get(name);
+        await repo.info();
+      } catch (e) {
+        if (artifactsCode(e) === "NOT_FOUND") {
+          // No repository, so no token. A create still in flight may yet make one.
+          this.done(duties.filter((d) => d.state !== "in-flight").map((d) => d.id), "no-repository");
+        } else this.defer(duties.filter((d) => d.state !== "in-flight").map((d) => d.id), String(e));
+        return this.open_(name).length;
+      }
+      for (const d of duties.filter((x) => x.kind === "token" && x.state === "owed")) {
+        try {
+          await withRetry(() => repo.revokeToken(d.tokenId!), this.retryOpts());
+          this.done([d.id], "revoked");
+        } catch (e) {
+          if (d.expiresAt !== null && d.expiresAt <= this.now()) this.done([d.id], "expired");
+          else this.defer([d.id], String(e));
+        }
+      }
+      try {
+        const { tokens } = await withRetry(() => repo.listTokens(), this.retryOpts());
+        for (const t of tokens) if (t.state === "active") await withRetry(() => repo.revokeToken(t.id), this.retryOpts());
+      } catch (e) {
+        this.defer(this.open_(name).map((d) => d.id), String(e));
+        return this.open_(name).length;
+      }
+      // No token is active on the repository now: every duty open when this run started is settled.
+      this.done(this.open_(name).map((d) => d.id), "inventory");
+      return 0;
+    } finally {
+      const stale = this.open_(name).filter((d) => this.nextAt(d.id) <= runStart);
+      this.recheck(stale.map((d) => d.id));
+    }
+  }
 }
 
-type DutyKind = "inventory" | "token" | "fork-create" | "mint";
+type DutyKind = "inventory" | "token" | "fork-create" | "mint" | "repo-create";
 type DutyState = "in-flight" | "answered" | "owed" | "done";
 interface Duty {
   readonly id: number;

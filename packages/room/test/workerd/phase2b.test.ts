@@ -438,11 +438,15 @@ describe("the adapters' boundaries", () => {
     const admin = newKeyPair();
     const repo = `elsewhere/${hex(randomBytes(16))}`;
     const input = { name: `nb-${hex(randomBytes(6))}`, repo: { kind: "import", grant: grant(repo, admin.key) }, admin: { handle: "@founder", key: admin.key }, recovery: newKeyPair().key };
-    const d = await draftRoom(env as unknown as RoomEnv, input, clock.now);
+    // The deployment imports only from its import namespace: refused at draft (request b6b51de7).
+    await expect(draftRoom(env as unknown as RoomEnv, input, clock.now)).rejects.toMatchObject({ code: "forbidden", message: expect.stringContaining("acme-import") });
+    // A Worker configured for `elsewhere`, over a Room with no binding for it: the Room's own guard.
+    const misconfigured = { ...env, IMPORT_NAMESPACE: "elsewhere" } as unknown as RoomEnv;
+    const d = await draftRoom(misconfigured, input, clock.now);
     const world = worldFor(roomIdOf(d.genesis as Genesis));
     placeRepo(world, `test-import/${repo.split("/")[1]}`);
     world.artifacts.main = world.artifacts.commit(null, { "README.md": "# here\n" });
-    await expect(foundRoom(env as unknown as RoomEnv, d.genesis, sign(admin.seed, "artroom-genesis-v1", d.genesis), d.draft)).rejects.toMatchObject({ code: "unavailable" });
+    await expect(foundRoom(misconfigured, d.genesis, sign(admin.seed, "artroom-genesis-v1", d.genesis), d.draft)).rejects.toMatchObject({ code: "unavailable" });
     expect(world.artifacts.remoteCalls.get("log") ?? 0).toBe(0);
   });
 

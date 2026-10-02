@@ -1,0 +1,66 @@
+// The spike deployment of the Room Worker (request 25ecefb8). It is the same
+// Worker as wrangler.jsonc, deployed as `artroom-spike-room` against the
+// `gitseq-spike` Artifacts namespace, for live smoke runs. The production
+// file, wrangler.jsonc, is unchanged.
+//
+// Deploy and redeploy with packages/room/scripts/deploy-spike.sh, which puts
+// ROOM_KEY_SECRET with `wrangler secret put` (on stdin, never in the repo)
+// and then deploys this file. See notes/deploy-spike.md.
+//
+// Public founding and the binding use the same namespace, as in production:
+// a room founded with `{ "kind": "new" }` gets a fresh repository in
+// gitseq-spike. A grant cannot name a repository in the public namespace
+// (R-GEN-12), so importing needs a second binding, for another namespace:
+//
+//   "artifacts": [ …, { "binding": "IMPORT_ARTIFACTS", "namespace": "<import namespace>", "remote": true } ],
+//   "vars": { …, "IMPORT_NAMESPACE": "<import namespace>" }
+//
+// (request b6b51de7). The spike is allowed one namespace, gitseq-spike, so
+// it has no import binding: it founds public rooms, and refuses an import at
+// draft with that reason.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "artroom-spike-room",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": {
+    "LEASE_SECONDS": "1800",
+    // The deployed workers.dev URL.
+    "PUBLIC_URL": "https://artroom-spike-room.inguz.workers.dev",
+    "PUBLIC_NAMESPACE": "gitseq-spike",
+    "ARTIFACTS_NAMESPACE": "gitseq-spike",
+    "ARTIFACTS_HOST": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
+    // The spike operator's key ID (its seed is in ~/.config/generalbusiness/artroom-spike.env).
+    "OPERATOR_KEYS": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
+  },
+  "secrets": { "required": ["ROOM_KEY_SECRET"] },
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "gitseq-spike", "remote": true }],
+  "containers": [
+    {
+      "class_name": "Publisher",
+      "scheduling_policy": "durable_object",
+      // Lane B's image: alpine/git copied into the account's registry by
+      // packages/git/container/image.sh, pinned by digest.
+      "images": {
+        "git": {
+          "image": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lb-git@sha256:4a54f21b0d8e4a065ea83a7c51a707682036428f9ddd1362069dcd28d36c0c68"
+        }
+      }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" },
+      { "name": "REGISTRY", "class_name": "Registry" },
+      { "name": "PUBLISHER", "class_name": "Publisher" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room", "Registry"] },
+    { "tag": "v2", "new_sqlite_classes": ["Publisher"] }
+  ]
+}
