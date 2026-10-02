@@ -1728,10 +1728,33 @@ The type check `typeof id !== "string"` in `limitInvitation` is not a
 behaviour guard: a join whose invitation is not a string is refused at step
 4 either way.
 
+**Review of 812fb907: the client's clock.** The checker found that the
+client's `join()` recovery signed its `session` request with `Date.now`, not
+`ClientOptions.now`. A room on the supplied clock then refused the
+request's `notAfter`. `recoverJoin` now takes the caller's clock. The
+checker's fixture is `test/workerd/checker-join-recovery.test.ts`: recovery
+over RPC after an eviction, over HTTPS, and with a room clock a day behind.
+The third test failed at 812fb907. `packages/client/test/redeem.test.ts`
+adds the same clock case against the fake room. Both mutants turn both
+tests red: signing without the clock, and passing `Date.now` in place of
+`options.now`.
+
+The other clock reads in `packages/client/src` already use the injected
+clock: `RoomClient` signs requests and judges session expiry with
+`this.now()`, and `HttpWire` times calls with `opts.now`. The one remaining
+`Date.now` is the default of the exported `signRequest`'s `now` argument,
+for callers that have no clock of their own. It stays: every caller in the
+package now passes its clock, and making the argument required would change
+the public API. Envelopes carry no time, and the retry sleeps are delays,
+not clock reads.
+
+The three security repairs are unchanged. Main `3ac55e96` merges into this
+head without conflict (`git merge-tree`), so it is not merged here.
+
 **Gates**, at the head of `request/sec-join` that adds this section:
-`npm ci`, the root `npm run typecheck` and the root `npm test` exit 0. The
-Room's Node suite passes 125 tests in 12 files, and its workerd suite 407
-tests in 30 files.
+`npm ci`, the client and Room typechecks and suites, the root
+`npm run typecheck` and the root `npm test` exit 0. The Room's Node suite
+passes 125 tests in 12 files, and its workerd suite 410 tests in 31 files.
 
 ## Secrets
 
