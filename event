@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0fe6e1ead3eeba5fae24a443baf1a4b49bacb38d","text":"Merge retired a covered predecessor; the successor is at spikes/pi-durable/results/live-2026-10-01.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:14f53ebf0bbf7e917ce94a9a07db45872d946901","text":"Merge retired a covered predecessor; the successor is at spikes/pi-durable/test/do-sqlite.test.ts."}
