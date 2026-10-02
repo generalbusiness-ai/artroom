@@ -47,7 +47,8 @@ const run = (fake: ReturnType<typeof fakeArtifacts>, minted = new Map<string, st
 
 describe("spike smoke cleanup (review 1b868265)", () => {
   it("clean: every token revoked, every repository deleted, the final inventory empty: ok", async () => {
-    const fake = fakeArtifacts({ others: ["unrelated-repo"] });
+    // Names the inventory's substring search also returns, which are not this run's.
+    const fake = fakeArtifacts({ others: [`${CANON}-copy`, `old-${CANON}`] });
     const c = await run(fake);
     expect(c.ok).toBe(true);
     expect(c.unresolved).toEqual([]);
@@ -62,7 +63,7 @@ describe("spike smoke cleanup (review 1b868265)", () => {
       ["final-inventory", null, "done"],
     ]);
     // Another run's repository is never touched, and no token value is kept.
-    expect(fake.repos.has("unrelated-repo")).toBe(true);
+    expect([...fake.repos.keys()]).toEqual([`${CANON}-copy`, `old-${CANON}`]);
     expect(JSON.stringify(c)).not.toContain("art_v2");
     expect(c.duties.find((d) => d.duty === "revoke-token")).toMatchObject({ token: "tok-canonical", meta: { id: "tok-canonical", scope: "write" } });
   });
@@ -101,6 +102,14 @@ describe("spike smoke cleanup (review 1b868265)", () => {
     expect(c.reposLeft).toBeNull();
     expect(c.unresolved.every((d) => d.outcome === "unknown" && d.detail === "inventory transport failure")).toBe(true);
     expect(c.unresolved.map((d) => d.duty)).toEqual(["revoke-minted-token", "inventory", "list-tokens", "delete-repo", "list-tokens", "delete-repo", "final-inventory"]);
+  });
+
+  it("an inventory that fills its page proves nothing, even if everything it listed is then cleaned", async () => {
+    const forks = Array.from({ length: 199 }, (_, i) => `${CANON}--act_${i}_x`);
+    const fake = fakeArtifacts({ repos: Object.fromEntries([CANON, ...forks].map((n) => [n, []])) });
+    const c = await cleanupRun({ api: fake.api, canonical: CANON, expected: [CANON] });
+    expect(c.ok).toBe(false);
+    expect(c.duties[0]).toMatchObject({ duty: "inventory", outcome: "unknown", detail: "incomplete listing" });
   });
 
   it("an inventory that fills its page, or reports a larger total, proves nothing: not ok", async () => {
