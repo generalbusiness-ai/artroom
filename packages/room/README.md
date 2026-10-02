@@ -1865,6 +1865,142 @@ conflict was this README, resolved by keeping both report sections;
 `npm run typecheck` and the root `npm test` exit 0. The Room's Node suite
 passes 125 tests in 12 files, and its workerd suite 411 tests in 31 files.
 
+## Request d268d249: diagnosable pre-admission failures
+
+During the D5 redeploy (request 73eccbec), a `propose` got 503
+`unavailable`, "The repository could not be read", after 59 seconds, and
+the cause could not be found: `preAdmission` in `src/admission.ts` caught
+every error from its reads and discarded it (`void e`). It still answers
+the same way, but now it also writes one line to the Worker's log.
+
+**What is logged.** One JSON line through `console.error`, which Workers
+Logs keeps (`observability` is on in both Wrangler configurations):
+
+```json
+{"event":"pre-admission-failed","step":"propose.pinObjects","name":"ArtifactsError","message":"git fetch https://<credentials>@artifacts.example/ns/repo.git?<query> failed with <token>; Authorization: <redacted>"}
+```
+
+`step` names the read that threw:
+
+| Act | Steps, in order |
+|---|---|
+| `propose` | `propose.headInFork`, `propose.pinObjects`, `propose.readMain`, `propose.diff`, `propose.readConfig` (only when `.artroom/` changed), `propose.changedBetween` (earlier generations) |
+| `check` | `check.treeOf`, `check.snapshot` (a scoped check's filtered input) |
+| `land` | `land.readMain`, `land.refreshMain` (only when the landing engine has not recorded main) |
+
+`name` is the error's name (or the type of a thrown value that is not an
+error), and `message` is its message, redacted and at most 300 characters.
+The client still gets exactly the old 503: the same code, message,
+`retryable: true` and `maybeRecorded: false`. Admission decisions and
+retries do not change: nothing is recorded, and the same signed act is
+admitted on retry.
+
+The helper is `src/diag.ts` (`redact`, `diagnosis`, `report`). The Room
+calls `RoomCore.diagnose(event, step, error)`, which writes to
+`RoomServices.diagnose` when it is given (tests capture records there) and
+to the console otherwise. A sink that throws never changes the response.
+
+**Redaction.** `redact` replaces, in this order:
+
+1. Artifacts tokens, `art_v<n>_…` with any `?expires=<n>`: `<token>`.
+2. URL userinfo: `https://<credentials>@host`.
+3. Any query string, with or without a scheme: `?<query>`.
+4. `Authorization`, `Proxy-Authorization`, `Cookie` and `Set-Cookie`
+   values, to the end of the line: `<redacted>`.
+5. `Bearer` and `Basic` credentials: `<redacted>`.
+6. `name=value` or `name: value` where the name contains token, secret,
+   password, passwd, pwd, key, signature, sig or credential: `<redacted>`.
+7. Every format detector of the secret scan (`src/secrets.ts`, R-SEC-1):
+   `<secret>`.
+8. Long tokens the secret scan judges random (`highEntropy`): `<secret>`.
+   Commit IDs, key IDs and room IDs stay, because diagnoses need them.
+
+A message longer than 4,096 characters is cut at the last space before
+that point, before redaction, so no part of a token is left at the cut.
+The result is cut to 300 characters. The Room's check-job errors
+(`src/jobs.ts`) used their own token-only redaction; they now use this
+one.
+
+**Parallel places.** Every catch on the act paths that maps an error to a
+5xx and discards it was checked.
+
+| Place | Client sees | Now logged as |
+|---|---|---|
+| `Room` RPC `wire`, every method (`submit`, `request`, `redeem`, `bearerAct`, `bearerRequest`, `read`, `poll`, `found`, `publishLog`, `jobTokenDuties`, `tick`): an error that is not an `ArtroomError` | 500 `internal`, fixed message | `rpc-failed`, step the method's name |
+| `Registry.bind` (no services, so to the console directly) | 500 `internal` | `rpc-failed`, `registry.bind` |
+| `route` in `src/http.ts` (the Worker's HTTPS routes) | 500 `internal` | `http-failed`, `route` |
+| `mcpEndpoint` in `src/mcp.ts`, outside a tool call | 500 `internal` | `mcp-failed`, `mcp` |
+| `RoomCore.found`: repository create, main, remote; main's config; sealing the new repository | 503 `unavailable` | `found-failed`, `newRepository`, `readMain`, `canonicalRemote`, `readConfig`, `sealCanonical` |
+| Preview computation | the proposal's preview `failed` | `preview-failed`, `preview` |
+| Log publication | 503 `unavailable`, with the error's code | `publication-failed`, `publish` |
+| `proposal` read completing a pinned ref | 503 `unavailable` | `read-failed`, `completePins` |
+
+`route` and `mcpEndpoint` take the sink as an optional last argument,
+console by default. `wire` takes an optional callback for errors that are
+not `ArtroomError`s; an `ArtroomError` is not logged, because its own
+message already reaches the client.
+
+Left unchanged, with the reason:
+
+| Place | Why |
+|---|---|
+| `admit` and `redeem`: "The room is busy" after six attempts | No error is discarded: the cause, the log moving under each attempt, is the message |
+| `admission.ts` "The diff was not computed" | Not a catch: a missing pre-admission read, an internal invariant |
+| Catches that map to 400 or 401 (envelope, request and redemption shapes, JSON bodies, read cursors, room names in URLs, WebSocket tokens and cursors) | Not 5xx: the cause is the client's input, and the message says what is wrong |
+| `RoomCore.kick`, `runAll`, `Room.alarm`, the constructor's `recover`, `schedule`, `wake` | Background work, not an act's response. Each step leaves its durable state and the alarm retries it. Logging every retry is a separate decision about volume |
+| Job issue and preparation (`src/jobs.ts`), notify evaluation | Background and retried; they already keep a redacted `last_error` |
+| `foundingDue`, `nextAlarm`, `simulate`, founding's `refreshMain` after the seal | Scheduling reads, control flow, or background work retried by the alarm |
+| `src/worker.ts` RPC entry (`RoomWireTarget`, `Artroom`) | No catch: `unwire` rethrows the Room's `ArtroomError` to the caller |
+
+**Tests.** `test/workerd/request-d268d249.test.ts` (22 tests) and
+`test/node/diag.test.ts` (19 tests).
+
+- One test per pre-admission step (10). Each fails the step once at the
+  Artifacts port (`failNext`, which now takes the error to throw) or, for
+  `land.refreshMain`, on the room's landing engine. It checks that the
+  client gets exactly the old 503, that nothing is recorded, that exactly
+  one diagnosis names the step and the error's name, and that the same
+  signed act succeeds on retry.
+- Redaction, end to end: an Artifacts failure whose message carries an
+  Artifacts token with its expiry, URL userinfo, a URL query, an
+  Authorization header, a GitHub token and a JWT. None of them is in the
+  diagnosis or the client's response. A 10,000-character message is cut
+  to 300.
+- Redaction, unit: one case per rule, identifiers kept, the 300-character
+  bound, the cut at a space, names of non-errors, and a throwing sink.
+- One test per parallel place, with the founding steps `readMain`,
+  `canonicalRemote` and `readConfig` each tested. The registry test spies
+  on `console.error` inside the test only, which also shows that the
+  default sink writes one JSON line with exactly `event`, `step`, `name`
+  and `message`.
+
+**Mutants**, one at a time on `60f825db`, running both new test files
+(script and logs under `/private/tmp/claude-501/preadm/mut/`). 37 of 37
+turned a test red:
+
+| Mutant | Red |
+|---|---|
+| each of the 10 step labels changed | that step's test (`propose.pinObjects` also the redaction test) |
+| `preAdmission` does not log | the 10 step tests and both end-to-end redaction tests |
+| each redaction rule removed (8), the expiry part of the token rule, the message not redacted | the unit case for the rule; the end-to-end redaction test for the token, userinfo, query and Authorization rules |
+| no 300-character bound; bound 400 | the unit bound test and the end-to-end long-message test |
+| no cut at a space | the unit cut test |
+| a sink's error escapes | the throwing-sink test |
+| `wire` does not report | the RPC test and the registry test |
+| the Room's RPC label changed | the RPC test |
+| the HTTPS route, MCP endpoint, registry, preview, publication or pin read does not log | that place's test |
+| founding labels `readMain`, `canonicalRemote` changed; `readConfig` not logged | that step's founding test |
+| `RoomServices.diagnose` ignored | 19 workerd tests |
+
+Not covered by a test: the founding labels `newRepository` and
+`sealCanonical`. They need a public founding with an injected create
+failure, and a new repository that still owes cleanup; the founding tests
+own those setups. The code that logs them is the same as for the tested
+labels.
+
+**Gates**, at the head of `request/preadm-diag` that adds this section:
+see the report for this request.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
