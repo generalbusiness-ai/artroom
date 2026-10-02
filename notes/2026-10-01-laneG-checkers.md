@@ -558,3 +558,116 @@ Gates on the merged tree (`28d86e94`):
 
 The live run above was made before this merge. It was not repeated, because
 the merge changes no snapshot or checker code.
+
+## Review 13b98054
+
+Revision 5. The checker credited both revision 4 findings for new
+attempts, and found one P2 at the upgrade boundary. This revision first
+merges main `ad19956b` (lanes A and F). That merge had no textual
+conflicts, but lane A's `packages/room` stopped typechecking against this
+lane's Artifacts port: its `ArtifactsBinding` narrowed `create` to
+`{ name, remote }` and had no `delete`. One commit makes the smallest fix,
+without changing any behaviour of lane A, and lane A's tests pass unchanged
+(67 Node, 275 workerd):
+- `ArtifactsBinding` inherits `create` (with its token, as the binding
+  returns it) and `delete` from the port.
+- The missing-binding stub in `config.ts` answers `delete` as it answers
+  `get` and `create`.
+- The in-memory binding gains `delete`.
+
+### P2: the migration kept the old unknown-create defect
+
+**What was wrong.** Revision 4's migration only added the `snapshot`
+column, so each revision 3 delete duty was taken as a known creation, and
+absence or `delete(false)` closed it. Revision 3 wrote that duty before
+sending `create`, and never recorded whether the create applied. The
+checker's diagnostic used revision 3's own code: a lost reply, 24 hours, an
+upgrade, and one cleanup while the repository was absent left nothing owed.
+Then the old create applied, and its repository and write token stayed.
+
+**Fix.** The upgrade now follows the new ledger, as the coordinator
+proposed, with no separate path for legacy state:
+- It runs once (`artroom_snap_meta`, schema 2). It applies to a revision 3
+  table, and to one that revision 4's column-only migration already
+  touched; legacy rows are those with an empty `snapshot`. (The deployed
+  harness was in the second state.)
+- Every legacy repository name, from old duties (open or closed) and old
+  rows, becomes a create step in flight with reason `legacy`. Old open
+  duties are closed as `upgraded`, because the step does their work. Old
+  rows are dropped, so a legacy repository is never reused.
+- Revision 3 used one name for every attempt on a commit. So seeing a
+  legacy repository, and deleting it, proves only that one old attempt
+  applied, not that no other is pending. A legacy step therefore deletes
+  its repository whenever it appears, and stays open, scheduled on the
+  recheck backoff. Elapsed time, absence, `delete(false)` and the old
+  reason "created" never close it. Legacy state stays explicitly
+  unresolved; nothing is assumed complete.
+- New attempts keep their own names (`…-<step>`) and the readiness fence,
+  so a legacy step cannot touch them.
+
+### Tests
+
+In `packages/git/test/snapshots.test.ts`. `revision3()` builds exactly the
+state revision 3 leaves after a lost create: its tables, a `creating` row,
+and the delete duty with reason "created", due 24 hours later.
+- "upgrade (…): a legacy create whose reply was lost stays unresolved, and
+  its repository is deleted whenever it appears (P2, review 13b98054)", in
+  three variants: straight from revision 3; after revision 4's column-only
+  migration; and with the duty already closed by revision 3. After more
+  than 24 hours, the first cleanup after the upgrade, with the repository
+  absent, closes nothing. The old duty is closed as `upgraded`, never as
+  `repository-deleted`, and the step stays in flight and scheduled. The
+  delayed create then applies, with its write token, and is deleted. After
+  a restart it applies again and is deleted again. A new attempt for the
+  same commit gets its own name and is untouched.
+- "the upgrade runs once: a second start adds no legacy steps, and a new
+  ledger has none"
+
+The checker's diagnostic (`laneG-checker-G4-legacy.test.ts`) was also run as
+written, against revision 3's own `SnapshotRepos`, from a scratch worktree
+at `17a79543`, with its assertions turned to the right outcome: still open
+after the first cleanup after the upgrade; the late repository and its
+write token deleted; the legacy name still watched. It passes. The scratch
+worktree was removed afterwards.
+
+**Mutation checks** (after committing; tree clean afterwards):
+
+| Mutant | Failing tests | Revision 3 diagnostic |
+|---|---|---|
+| Column-only migration (revision 4's) | all three upgrade variants; runs once | fails |
+| A legacy step closed once its repository is seen | all three variants | fails |
+| Legacy names taken only from open duties | the "already closed" variant | passes |
+| Old open duties kept (the weaker retirement path) | two variants | fails |
+| Legacy rows kept | two variants | passes |
+| The upgrade runs at every start | all three variants; runs once | fails |
+
+The "old duties kept" mutant was at first caught only by the revision 3
+diagnostic. The upgrade test now asserts how the old duty is closed. While
+adding that assertion, I first committed it in a form that failed the
+"already closed" variant on unmutated code (that duty keeps revision 3's
+own reason), and fixed it in the next commit. The mutation table is from
+the fixed tests.
+
+### Gates
+
+At `778cc8aa`, after the merge of `ad19956b`:
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | exit 0 |
+| Root `npm test` | exit 0: checkers 33; git (Node) 162; log 127 Node and 122 workerd; policy 199 Node and 198 workerd (1 skipped); room 67 Node and 275 workerd; ui 107 |
+| `packages/git` `npm run test:workers` | exit 0, 8 tests |
+| `wrangler deploy --dry-run`, `packages/checkers` and `packages/git` | exit 0 each |
+
+### Live run
+
+[live-2026-10-02T02-25-28-613Z.json](../packages/checkers/measure/results/live-2026-10-02T02-25-28-613Z.json).
+Worker `artroom-lg-checkers`, redeployed over its existing Durable Object,
+whose ledger held revision 3's rows after revision 4's column-only
+migration. On its first start the upgrade turned revision 3's four
+repository names into `legacy` creates in flight, scheduled. Every check
+then gave the same result as before. The scoped probe still could not
+fetch the older snapshot's commit, tree or excluded blob by ID, and the
+control fetched the job's own tree, blob and commit. Afterwards 40 of 44
+duties were done; the 4 open ones are the legacy steps, which stay
+scheduled by design. No `artroom-lg` repository is left in the namespace.
