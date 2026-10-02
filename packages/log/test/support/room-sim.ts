@@ -18,6 +18,7 @@ import type {
   KeyId,
   LogEntry,
   MemberId,
+  ObligationId,
   PolicyDocument,
   Receipt,
   RefusalReceipt,
@@ -27,7 +28,7 @@ import type {
   SignedEnvelope,
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
-import { evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, ownersFor, policy, rule, type ActivePolicy, type RuleEvaluation } from "@generalbusiness/artroom-policy";
+import { evaluateCarry, evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, ownersFor, policy, rule, type ActivePolicy, type RuleEvaluation } from "@generalbusiness/artroom-policy";
 import { digestJson, keyPairFromSeed, sign, type KeyPair } from "../../src/crypto.ts";
 import { entryId, makeCheckpoint, retain, roomIdOf, seal, type Retained } from "../../src/entries.ts";
 import { LogPublisher, type PublishResult } from "../../src/publisher.ts";
@@ -224,6 +225,29 @@ export class RoomSim {
   async landEvaluated(lane: ActId, paths: readonly string[], under: ActivePolicy = this.policy): Promise<LogEntry> {
     const r = await evaluateLand(under, { kind: "land", actor: policyActor, lane: policyLane(lane), proposal: proposalOf(this.policy.doc, paths), obligations: [], reviews: [], stage: "reservation" });
     return this.system({ type: "land-evaluated", op: `op_land_${this.entries.length}`, integration: "a".repeat(40) as Sha, landInput: r.retained?.digest ?? digestJson(null), decisions: this.keep(r.evaluations) });
+  }
+
+  /**
+   * Whether the earlier check `act` carries onto a new integration with the
+   * same tree, judged under the active policy, as a `check-carried` event
+   * (R-CARRY-13). `named` is the version the event names.
+   */
+  async checkCarried(act: ActId, lane: ActId, obligation: ObligationId = "obl_test", named = this.policy.version): Promise<LogEntry> {
+    const tree = "b".repeat(40) as Sha;
+    const binding = { config: digestJson(DEMO_CHECKERS["test"]), runner: `sha256:${"c".repeat(64)}` as const };
+    const r = await evaluateCarry(
+      this.policy,
+      {
+        kind: "carry",
+        evidence: { act, kind: "check", verdict: null, by: policyActor, from: { generation: 1, head: "a".repeat(40) as Sha }, scope: [], dependsOn: [] },
+        changedSince: ["src/a.ts"],
+        proposal: { ...proposalOf(this.policy.doc, ["src/a.ts"]), generation: 2 },
+        policy: { same: true },
+      },
+      { check: { before: { integration: "a".repeat(40) as Sha, input: { kind: "tree", tree }, ...binding }, now: { integration: "d".repeat(40) as Sha, tree, snapshot: null, ...binding }, volatile: false } },
+    );
+    const outcome = r.carried ? { carried: true as const, reason: r.carried.reason } : { carried: false as const, notCarried: r.notCarried! };
+    return this.system({ type: "check-carried", op: `op_land_${this.entries.length}`, lane, generation: 2, integration: "d".repeat(40) as Sha, obligation, act, policy: named, outcome, decisions: this.keep(r.evaluations) });
   }
 
   checkpoint() {
