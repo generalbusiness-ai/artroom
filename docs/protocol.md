@@ -1685,7 +1685,9 @@ produced:
    `publishedThrough` to N.
 
 The checkpoint event is an entry after N, so it is published by the next
-commit, never by the commit it names.
+commit, never by the commit it names. Unpublished `checkpoint` events alone
+never make a publication due; they wait for the next other entry (request
+3da1d82b).
 
 **R-LOG-9.** The tree of each log commit:
 
@@ -3065,6 +3067,12 @@ and a stalled log attends the admins.**
   operation.
 - **The guard** (R-LOG-19) gives the item with the reason
   `object-too-large`. The Room tries again after an hour or a restart.
+- **A gone repository** (request 3da1d82b). When a publication fails and
+  Artifacts answers NOT_FOUND for the canonical repository itself, the
+  Room gives the item once, with the reason `repository-gone`. It keeps
+  every outstanding commit and every owed cleanup, and settles nothing. It
+  stops publishing and landing, and tries again only after a later entry
+  is sealed, or when publication is forced.
 - The item closes when a publication is confirmed.
 
 ### 30.6 Verification (amends R-LOG-10)

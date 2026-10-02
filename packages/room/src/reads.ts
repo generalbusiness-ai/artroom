@@ -217,6 +217,8 @@ function stillOpen(core: RoomCore, item: AttentionItem): boolean {
     const o = obligationsFor(core.sql, item.proposal.lane, item.proposal.generation, { doc: core.activePolicy().doc }).find((x) => x.id === item.obligation);
     return !!o && o.state !== "met";
   }
+  // Open while the repository is still gone, as recorded when this item was made (request 3da1d82b).
+  if (item.why === "log-publication-stalled" && item.reason === "repository-gone") return core.canonicalGone()?.since === item.since;
   return item.open;
 }
 

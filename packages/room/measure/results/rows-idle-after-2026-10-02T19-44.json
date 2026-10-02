@@ -1,0 +1,88 @@
+{
+  "worker": "artroom-spike-room",
+  "from": "2026-10-02T19:44:00Z",
+  "to": "2026-10-02T20:44:00Z",
+  "sampledFrom": "2026-10-02T19:42:00.000Z",
+  "totalRowsWritten": 493,
+  "totalRowsRead": 4755,
+  "totalRequests": 3,
+  "namespaces": [
+    {
+      "id": "3388b66bd8f345438705519a063d6bd7",
+      "name": "artroom-spike-room_Publisher",
+      "className": "Publisher"
+    },
+    {
+      "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+      "name": "artroom-spike-room_Registry",
+      "className": "Registry"
+    },
+    {
+      "id": "fd8efe823eb6430bb910ee34d469681b",
+      "name": "artroom-spike-room_Room",
+      "className": "Room"
+    }
+  ],
+  "objects": [
+    {
+      "className": "Publisher",
+      "object": "48d4bf60d12daa85c01734117d1e7e575f788bc961a56b2585539d9faf08b42d",
+      "objectId": "04e0fb74405e2e84c515e799966cdb453e4bf36cfd84d44a3c8c607d4125e97d",
+      "rowsWritten": 0,
+      "rowsRead": 0,
+      "requests": 0,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Publisher",
+      "object": "836fd4cb80888ab2cbc1b26545db8495ddc4bbcb84660c3a1abbe92958b81b97",
+      "objectId": "331ada3719618ccfd138f6cb0168710a8637978fef509ab3c3a39b97183b16e1",
+      "rowsWritten": 0,
+      "rowsRead": 0,
+      "requests": 0,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Registry",
+      "object": "registry",
+      "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+      "rowsWritten": 4,
+      "rowsRead": 4,
+      "requests": 2,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_80be25cf1ac970a6a8bd65a6fbb8d156",
+      "objectId": "48d4bf60d12daa85c01734117d1e7e575f788bc961a56b2585539d9faf08b42d",
+      "rowsWritten": 443,
+      "rowsRead": 3527,
+      "requests": 0,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_e7dca7e8da56a779fe2236341b009cbd",
+      "objectId": "2ade20c519c4787507022ec62eb746d13ca6c84bb7d3f97f5ad0a7033981bc23",
+      "rowsWritten": 38,
+      "rowsRead": 942,
+      "requests": 1,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_498314731b721f6dad0e77958a841571",
+      "objectId": "836fd4cb80888ab2cbc1b26545db8495ddc4bbcb84660c3a1abbe92958b81b97",
+      "rowsWritten": 8,
+      "rowsRead": 282,
+      "requests": 0,
+      "periodicSamples": 1
+    }
+  ],
+  "budget": {
+    "maxRowsWritten": 23000,
+    "maxRowsWrittenPerObject": 2100
+  },
+  "state": "pass",
+  "failures": []
+}

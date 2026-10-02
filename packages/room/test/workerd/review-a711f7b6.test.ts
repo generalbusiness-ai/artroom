@@ -331,6 +331,10 @@ describe("3. a room founded before the canonical remote was stored resolves it b
     expect(await remote(r)).toBeNull();
     expect(r.world.artifacts.remoteCalls.get("push") ?? 0).toBe(0);
     r.world.artifacts.recover();
+    // The failed read backs the landing step off (request 3da1d82b): the next alarm is when it ends.
+    const next = (await inDO(r, (room) => room.core.nextAlarm()))!;
+    expect(next).toBeGreaterThan(clock.now);
+    clock.now = next;
     await tick(r, 3);
     expect(await op(r, l.op.id)).toMatchObject({ state: "landed" });
     expect(r.world.artifacts.main).toBe(head);

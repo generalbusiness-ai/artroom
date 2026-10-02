@@ -305,6 +305,72 @@ describe("mint lane B: the publication token through the canonical mint ledger, 
       expect(a.canonicalRepo().activeTokens()).toEqual([]);
     }));
 
+  it("the mints step is its own kind of loop work (request 3da1d82b): a failure of the step takes that kind's backoff; an earlier alarm for other work skips it and keeps the backoff; the ledger's next time waits for it; then it runs and clears it", () =>
+    ahead(async () => {
+      const r = await makeRoom();
+      // One owed revocation, due 1 s after its release failed; the log published, so nothing else is due.
+      r.world.artifacts.failRemote("revokeToken", new FakeArtifactsError("INTERNAL_ERROR", 10400));
+      const calls = { n: 0 };
+      await inDO(r, async (room) => {
+        const t = await room.core.mints.mint("test:owed", "read", () => 60);
+        await t.release();
+        await room.core.publish(true);
+        // The step fails once, before the ledger runs: as a storage failure would.
+        const real = room.core.mints.reconcile.bind(room.core.mints);
+        room.core.mints.reconcile = async () => {
+          if (++calls.n === 1) throw new Error("storage failed");
+          return real();
+        };
+      });
+      expect((await records(r)).owed).toBe(1);
+      clock.now += 2_000;
+      expect(await alarm(r)).toBe(true);
+      const failed = await inDO(r, (room) => ({ fence: room.core.loopBackoff().mints, due: room.core.mints.nextDue(), next: room.core.nextAlarm(), now: clock.now }));
+      expect(calls.n).toBe(1);
+      expect(failed.fence).toEqual({ attempts: 1, next: failed.now + 5_000 });
+      expect(failed.due).toBe(failed.now + 1_000); // the ledger's own time is earlier …
+      expect(failed.next).toBe(failed.fence!.next); // … and waits for the step's backoff
+      expect(await stored(r)).toBe(failed.fence!.next);
+      // An alarm for other work, before the backoff ends: the step is skipped, and its backoff kept.
+      clock.now += 1_000;
+      await inDO(r, (room) => room.core.runAll());
+      expect(calls.n).toBe(1);
+      expect(await inDO(r, (room) => room.core.loopBackoff().mints)).toEqual(failed.fence);
+      // At the backoff's end it runs: the revocation is made, and the backoff cleared.
+      clock.now = failed.fence!.next;
+      expect(await alarm(r)).toBe(true);
+      await inDO(r, (room) => room.core.mints.idle());
+      expect(calls.n).toBe(2);
+      expect((await records(r)).owed).toBe(0);
+      expect(await inDO(r, (room) => room.core.loopBackoff().mints)).toBeUndefined();
+    }));
+
+  it("while the canonical repository is gone, the ledger's work is kept, and neither run nor scheduled (request 3da1d82b)", () =>
+    ahead(async () => {
+      const r = await makeRoom();
+      r.world.artifacts.failRemote("revokeToken", new FakeArtifactsError("INTERNAL_ERROR", 10400));
+      const calls = { n: 0 };
+      await inDO(r, async (room) => {
+        const t = await room.core.mints.mint("test:owed", "read", () => 60);
+        await t.release();
+        room.core.sql.all("INSERT INTO meta (k, v) VALUES ('canonical_gone', ?)", JSON.stringify({ since: new Date(clock.now).toISOString(), head: room.core.headSeq() }));
+        const real = room.core.mints.reconcile.bind(room.core.mints);
+        room.core.mints.reconcile = async () => {
+          calls.n++;
+          return real();
+        };
+      });
+      clock.now += 2_000;
+      const s = await inDO(r, async (room) => {
+        await room.core.runAll();
+        return { due: room.core.mints.nextDue(), next: room.core.nextAlarm(), owed: room.core.mints.duties().owed };
+      });
+      expect(calls.n).toBe(0);
+      expect(s.owed).toBe(1);
+      expect(s.due).not.toBeNull();
+      expect(s.next).toBeNull();
+    }));
+
   it("several alarms on a live host with a long-held token: each moves the takeover time ahead, and none stores an alarm less than 1 s ahead", () =>
     ahead(async () => {
       const r = await makeRoom();
