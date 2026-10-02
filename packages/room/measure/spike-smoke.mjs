@@ -269,6 +269,12 @@ const lanes = [];
 
 async function main() {
   log(`smoke run ${RUN} against ${BASE}`);
+  // SPIKE_PHASE=import runs only the import, for a rerun of that part.
+  if (process.env.SPIKE_PHASE === "import") {
+    const op = operatorKey();
+    if (!op) throw new Error("no spike operator key");
+    return importPhase(op);
+  }
   admin = newKeyPair();
   const recovery = newKeyPair();
   const name = `deploy-spike-smoke-${Date.now().toString(36)}`;
