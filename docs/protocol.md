@@ -42,7 +42,8 @@ sections 4 to 11 and 13.
 25. Review d12b67d6
 26. Policy amendment (81c31bc7)
 27. Amendment 2 (82a0b25a): integration gaps from lanes A, E and L
-28. Amendment 3 (66d6fb14): `refuse` rules before the claim check
+28. Amendment 66d6fb14: `refuse` rules before the claim check
+29. Contract amendment 3 (bc351fa8): checks, check jobs and snapshots
 
 ## 1. Terms
 
@@ -2388,7 +2389,7 @@ required lane edits above include them.
 | (a) Policy for a queued `notify` | R-LOG-13 pins it to the version active when the entry was sealed; R-LOG-10 replays it with that version | — | Notify across an activation |
 | (b) Bearer expiry versus R-IDEM-2 | R-CRED-10, "Retries and idempotency" | — | Bearer receipt after revocation |
 
-## 28. Amendment 3 (66d6fb14): `refuse` rules before the claim check
+## 28. Amendment 66d6fb14: `refuse` rules before the claim check
 
 Request 66d6fb14 added the `jj-conflicts` rule to the default policy pack
 (docs/policy-pack.md). Its condition is that a proposal adding
@@ -2405,3 +2406,411 @@ conflict data left untouched on the lane's base is not refused. A check of
 the whole head would need a Room-owned, bounded fact about the proposed
 head's root entries in the `refuse` rule input. That is a candidate for a
 later amendment.
+
+## 29. Contract amendment 3 (bc351fa8): checks, check jobs and snapshots
+
+Request bc351fa8 asked the contract to define how checks carry, where the
+runner environment comes from, the filtered snapshot commit, and the check
+job, so that lanes A (the Room) and G (the checkers) can integrate. It also
+asked for two decisions about jj support. This section holds every new
+rule, so that the rest of the document changes as little as possible.
+Where a rule here amends an earlier one, it says so; the earlier rule is
+read with the amendment. Section 28 is left to request 66d6fb14, which
+changes the order of `refuse` rules for `propose`.
+
+### 29.1 Check carry is recorded (R-CARRY-13)
+
+**R-CARRY-13. A check carries only by a sealed `check-carried` event.**
+- When preparation judges whether an earlier check counts for a check
+  obligation on a new integration, the Room seals a `check-carried` system
+  event in the transaction that stores the judgment. It records the
+  operation, the lane and generation, the new integration, the obligation,
+  the earlier `check` act, the policy version that judged it, the outcome,
+  and the `carry` rule decisions.
+- The outcome is `carried` with its `CarryReason`, or `notCarried` with its
+  `NotCarried`. Both are sealed: a check that does not carry is history,
+  not silence (R-CARRY-5).
+- The platform conditions are judged first: R-CARRY-6 to R-CARRY-12 and
+  R-CARRY-14. Only if they hold are the `carry` rules whose `evidence` is
+  `check` or `any` evaluated, with one act meter for the judgment
+  (R-EVAL-9). `decisions` is empty when a platform condition failed or no
+  rule applies.
+- A carried check counts only on that integration, under that policy
+  version, and only once its event is sealed. After a policy activation the
+  Room judges again under the new version, with a new event.
+- **Fail closed.** A Room that does not seal `check-carried` events never
+  carries a check. Each check obligation is then met only by a check bound
+  to the integration itself.
+- Amends R-LOG-5 (the event is added to the system events), R-LOG-13 (a
+  post-admission outcome in its own entry) and R-LOG-10: `artroom verify`
+  replays each `check-carried` event's decisions with the policy version it
+  names, and checks that `act` is an earlier accepted `check` of the same
+  lane and obligation.
+
+### 29.2 The runner environment (R-CARRY-14, R-EXEC-11)
+
+**R-CARRY-14. The runner environment is pinned by the configuration.**
+- A checker configuration may pin its runner environment:
+  `CheckerConfig.runner`, a digest. Like the rest of the configuration, it
+  changes only by an admin-approved proposal (R-CARRY-7, R-ADMIN-1).
+- R-CARRY-6's runner condition compares the earlier check's `runner` with
+  the digest pinned by the configuration active now. It never reuses the
+  earlier check's own value as the current one, and never takes a value
+  the checker service states after the fact.
+- A check whose `runner` differs from the digest its configuration pins is
+  refused `check-binding` (amends R-OBL-3).
+- A checker with no pinned runner can still meet obligations with checks
+  on the integration itself, but its checks never carry: `NotCarried` code
+  `runner-changed`, text "No runner environment is pinned".
+
+Why a pin, not an attestation by the checker service before each job: the
+service's statement before a job is the same claim its signed check
+already makes. A pin makes the environment a reviewed policy fact, and the
+signed check confirms that the service ran in it.
+
+**R-EXEC-11. The checker service measures its runner.** In each new runner
+sandbox, before any job code runs, the service measures the environment's
+digest (for example, a SHA-256 over the image reference and the tool
+versions) and states it as the check's `runner`. When the job pins a runner
+(`CheckJob.runner`) and the measured digest differs, the service runs
+nothing, signs nothing, and returns a refusal `check-binding`. The service
+shows the digest it measured in each check's `detail`, so that an admin can
+pin it.
+
+### 29.3 Filtered snapshot commits (R-CARRY-15)
+
+**R-CARRY-15. A filtered snapshot is one fixed commit.**
+1. **Files.** For a scoped checker and an integration, the filtered files
+   are every entry of the integration's tree with mode `100644`, `100755`
+   or `120000` whose path matches the checker's declared inputs or a global
+   input (R-CARRY-8). Submodule (`160000`) entries are never included. The
+   digest is that of R-CARRY-9.
+2. **Commit.** The snapshot commit is exactly this git commit object, with
+   no other header (no `parent`, `encoding`, `gpgsig` or `change-id`):
+
+   ```
+   tree <tree of exactly the filtered files>
+   author Artroom Snapshot <snapshot@artroom.invalid> 0 +0000
+   committer Artroom Snapshot <snapshot@artroom.invalid> 0 +0000
+
+   Artroom filtered snapshot for <checker>
+
+   Digest: <digest>
+   ```
+
+   The message ends with one newline. So the commit's ID is a function of
+   the files, the checker name and the digest, and anyone can compute it
+   again (`SnapshotIdentity`, `SnapshotMessage`).
+3. **Record.** Before it issues a filtered job, the Room derives the
+   commit and records it with the canonical integration, the checker, the
+   configuration digest, the snapshot digest and the paths.
+4. **Store.** The publisher writes the commit into its own snapshot
+   repository (R-CARRY-16). The Room issues the job only if the commit the
+   publisher wrote has the ID the Room recorded; otherwise it issues
+   nothing and retries later.
+5. **Binding.** A filtered job's `integration`, and its check's
+   `integration`, is the snapshot commit, not the canonical integration.
+   The Room admits a filtered check only if its `integration` is a snapshot
+   commit it recorded for this checker and generation, and `input.snapshot`
+   and `input.paths` equal the recorded digest and paths. The check then
+   counts for the canonical integration recorded with the snapshot. Any
+   other filtered check is refused `check-binding`. Amends R-OBL-3.
+
+**R-CARRY-16. A filtered job reads only its own snapshot.** A runner must
+not be able to read any file outside its own snapshot, whatever it asks
+the server for: an advertised ref, or the ID of another commit, tree or
+blob it learned elsewhere (R-CARRY-9, R-EXEC-7). So isolation comes from
+what the repository holds and what the token reaches. It never depends on
+what the runner checks out, on the snapshot having no parents, on IDs
+being undisclosed, or on refs being removed.
+- **One repository per snapshot commit.** The Room creates a new, empty
+  repository for each snapshot commit. The publisher writes into it that
+  commit and exactly the trees and blobs it reaches, under one ref,
+  `refs/artroom/snapshot`, and nothing else, ever. A repository is never
+  given a second snapshot, and no object or ref is added to it later.
+- **One token per job.** For each filtered job the Room mints a read token
+  for that repository only, expiring no later than the job's `deadline`.
+  The job's `readUrl` is that repository (R-EXEC-9). A token never reaches
+  another snapshot's repository, the canonical repository, or a fork.
+- **Reuse only for the same commit.** Jobs that name the same snapshot
+  commit, and so the same files, may share its repository, each with its
+  own token. A job for any other snapshot, including the same checker after
+  its configuration or the integration changed, gets its own repository.
+- **Retirement.** The Room deletes the repository, and revokes every token
+  minted for it, when its last job ends, or at the latest 24 hours after,
+  if it keeps the repository for reuse by the same commit. Deletion and
+  revocation are durable cleanup duties: recorded when owed, and retried
+  until Artifacts confirms them, as for workspace tokens (R-WS-3).
+- Amends R-CARRY-9, whose words "the runner receives only that snapshot"
+  this rule makes concrete, and replaces the per-checker snapshot
+  repository that amendment 3 first proposed.
+
+### 29.4 Check jobs (R-EXEC-8 to R-EXEC-10, R-OBL-7)
+
+**R-EXEC-8. The Room issues jobs, over a service binding only.**
+- The Room issues every `CheckJob`, and nothing else does. It issues one
+  when a check obligation waits on an integration: a preview's or a
+  landing operation's. For a scoped checker it issues the job only after
+  R-CARRY-15 steps 3 and 4.
+- A job travels only over a Workers service binding, from the Room's
+  Worker to the checker service's `CheckerService.handle`. The service
+  exposes no other route that accepts or builds a job. The service binding
+  is the job's authentication: only a Worker that the operator binds to
+  the service can call it. Jobs are not signed, and no signing domain
+  exists for them.
+- **The trust boundary is the operator's.** A deployment binds only
+  trusted Room producers to the checker service, and a production
+  deployment excludes any harness route that builds jobs. A caller bound
+  to the service is trusted to submit only jobs the Room recorded. The
+  service does not otherwise verify a job's origin: a bound caller can make
+  it run code against any repository its token reaches.
+- Within that boundary, two checks catch mistakes. The service checks the
+  job's binding before it starts a sandbox (room, checker, the read URL's
+  host, the `gitAuthEnv` shape, the deadline), and refuses with
+  `check-binding`. The Room admits a resulting check only if it binds an
+  integration or a snapshot that the Room recorded (R-OBL-3, R-CARRY-15).
+
+**R-EXEC-9. Git's credential and the runner's environment.**
+- `CheckJob.gitAuthEnv` is exactly three variables (`GitAuthEnv`):
+  `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=http.extraHeader`, and
+  `GIT_CONFIG_VALUE_0=Authorization: Bearer <token>`. The token is
+  read-only, for the repository of `readUrl` only, and expires no later
+  than `deadline`. For a filtered job, that repository holds only the
+  job's own snapshot (R-CARRY-16).
+- The service may route the runner's git through a gateway that holds the
+  token, so that the token never enters the runner. Then the runner's
+  process environment holds `PATH` and the variables that name the
+  gateway's certificate authority (`GIT_SSL_CAINFO`,
+  `NODE_EXTRA_CA_CERTS`), and nothing else. Amends R-EXEC-3, which allowed
+  only `gitAuthEnv` and `PATH`.
+- The token never appears in a check, its detail, or any log (R-WS-4).
+
+**R-EXEC-10. What a job carries besides the commit.**
+- `base`: the canonical main commit that the integration was built on,
+  that is the landing's `expectedMain` or the preview's base. A
+  review-style checker compares `base` with `integration`. A filtered job's
+  runner cannot read `base`.
+- `volatile`, `advisory` and `runner`: copied from the configuration whose
+  digest is `config`.
+- A signed check's `volatile` must equal its configuration's `volatile`,
+  either way. Otherwise the Room refuses it with `check-binding`. A checker
+  whose own inputs are volatile refuses a job that says `volatile: false`,
+  with `check-binding`, rather than sign a false flag.
+
+**R-OBL-7. Advisory obligations.**
+- A check obligation is advisory when its checker's configuration says
+  `advisory: true`, in the policy version that made the obligation
+  (`CheckObligation.advisory`). It is recomputed at activation like any
+  obligation (R-POL-9).
+- The Room requests it like any check obligation: an attention item and a
+  job. Its checks follow every binding rule, are recorded as evidence, and
+  are shown.
+- It never blocks a landing. `land` admission (R-LAND-1), readiness
+  (R-LAND-4) and reservation (R-LAND-7) do not wait for it. A failing
+  advisory check never fails a landing with `check-failed`, and
+  `obligation-open` never names it.
+- Only an admin-approved change to `.artroom/checkers/**` makes a checker
+  advisory (R-ADMIN-1). A `require` rule cannot.
+
+### 29.5 Two decisions about jj
+
+38. **No fact about the proposed head's root entries (kept open).** The
+    `jj-conflicts` rule (request 66d6fb14) refuses a proposal that adds or
+    changes jj conflict data. A whole-head check would need a Room-owned,
+    bounded fact in the `refuse` rule input: the names of the head tree's
+    root entries. It is not added, for three reasons:
+    - Conflict data already on the lane's base came through `main`. A
+      changes-only rule refuses it when it is introduced, so it reaches
+      `main` only if it predates the rule or came through a
+      configuration-recovery lane.
+    - A whole-head refusal would refuse every proposal on every lane while
+      `main` holds such data, instead of the one lane that should remove
+      it.
+    - No consumer of the fact has landed, and the reviewed rule is
+      changes-only by design.
+
+    A later amendment can add `PolicyProposal.headRoot`: the root entry
+    names, sorted, at most 1,024, with a flag when there are more. It would
+    be a value, never a key (R-EVAL-3), and part of the replay context.
+39. **No Room read of a generation's commits (kept open).** Lane F's
+    per-change history needs, for each proposal generation, the commits
+    from base to head with their parents, subjects and `change-id` headers,
+    and the trees or interdiffs of those commits under lane B's bounds. It
+    is not added, for three reasons:
+    - No Room read returns commits or file contents today. Which members
+      may read the canonical repository's objects through the Room is an
+      access decision of its own.
+    - The view is author-supplied, and never an input to obligations,
+      evidence or carrying, so nothing depends on it for correctness.
+    - Lane F's screen already shows nothing extra when the read is absent.
+
+    A later amendment can add a read session route,
+    `GET /v1/rooms/:room/lanes/:lane/:generation/commits`, returning at most
+    2,000 commits (`id`, `parents`, `subject`, raw `change-id` header),
+    with per-commit diffs under lane B's tree-diff bounds.
+
+These points continue section 22's list.
+
+### 29.6 Acceptance cases
+
+Each is normative.
+
+| Case | Expected result | Rules |
+|---|---|---|
+| **Check carried.** A pinned, non-volatile checker passed on integration I1; main moves; I2 has the same tree; a carry rule for checks allows it | A `check-carried` event with outcome `carried`, reason `tree-identical`, and the rule's decision; the check counts on I2 only after the event; `artroom verify` replays the decision | R-CARRY-13 |
+| A carry rule for checks refuses it | A `check-carried` event with `notCarried` code `policy-rejected` and the decision; a new job is issued for I2 | R-CARRY-13, R-CARRY-4 |
+| A policy activation after the carry | The carry stops counting; a new `check-carried` event under the new version | R-CARRY-13 |
+| A Room that seals no `check-carried` events | No check carries; each obligation waits for a check on I2 | R-CARRY-13 |
+| **Runner.** The configuration pins runner R; a check states runner S | Refused `check-binding` | R-CARRY-14, R-OBL-3 |
+| The pin changes from R to S by an approved proposal; a check made under R is judged for carrying | `notCarried`, code `config-changed` or `runner-changed`: the current pin, not the earlier value, is compared | R-CARRY-14 |
+| No runner pinned | The check meets the obligation on its own integration; it never carries (`runner-changed`) | R-CARRY-14 |
+| The job pins R and the service measures S | The service runs nothing and returns `check-binding` | R-EXEC-11 |
+| **Snapshot.** Two Rooms, or the Room and a third party, compute the snapshot commit for the same files, checker and digest | The same commit ID | R-CARRY-15 |
+| The publisher writes a snapshot commit with another identity or time | Its ID differs from the recorded one; no job is issued | R-CARRY-15 |
+| A filtered check names an unrecorded commit, another checker's snapshot, or another digest | Refused `check-binding` | R-CARRY-15 |
+| A filtered check names the recorded snapshot | Admitted; it counts for the canonical integration recorded with the snapshot | R-CARRY-15 |
+| **Older snapshot, omitted file.** Snapshot S1 included `src/secret.txt`; the current snapshot S2 omits it. The S2 job's runner fetches S1's commit, and the blob of `src/secret.txt`, by their known IDs, and lists the server's advertised refs | Each fetch fails: the S2 repository has no such object. The only advertised ref is `refs/artroom/snapshot`, at S2. The runner cannot read the file | R-CARRY-16, R-CARRY-9 |
+| **Exact current commit.** The same runner fetches S2's commit by its ID and checks it out | It succeeds, and `HEAD` is S2 | R-CARRY-16, R-EXEC-4 |
+| **Concurrent jobs, different snapshots.** Two filtered jobs, for snapshots S2 and S3, run at once | Each job's token reads only its own repository; each runner fails to fetch the other's commit or blobs, by ID or by ref | R-CARRY-16 |
+| **Configuration change.** An approved proposal changes the checker's declared inputs; the next job's snapshot is S4 | S4 gets a new repository; the S2 job's token cannot read it, and the S4 job's token cannot read S2's | R-CARRY-16 |
+| **Retirement.** The last job for S2 ends | Within 24 hours the S2 repository is deleted and every token minted for it is revoked; an Artifacts outage leaves both owed and retried | R-CARRY-16 |
+| **Jobs.** A request to the checker service from anything but the service binding | No route accepts it | R-EXEC-8 |
+| A job with a `gitAuthEnv` of any other shape, or for another host | Refused `check-binding` before any sandbox starts | R-EXEC-8, R-EXEC-9 |
+| A signed check whose `volatile` differs from its configuration, either way | Refused `check-binding` | R-EXEC-10 |
+| A volatile checker receives a job that says `volatile: false` | The service refuses it; nothing is signed | R-EXEC-10 |
+| **Advisory.** An advisory checker's check fails on the landing's integration | The landing proceeds; the failing check is recorded and shown; `obligation-open` is never raised for it | R-OBL-7 |
+
+### 29.7 Conditions and changes
+
+| Condition | Rules | Types (`packages/contract`) |
+|---|---|---|
+| (1) Check carry recorded, or fail closed | R-CARRY-13; amends R-LOG-5, R-LOG-10, R-LOG-13 | `SystemEvent` gains `check-carried` |
+| (2) Runner environment | R-CARRY-14, R-EXEC-11; amends R-CARRY-6, R-OBL-3 | `CheckerConfig.runner?`; `CheckJob.runner`; `CheckCarryFacts.now.runner` documented as the current pin |
+| (3) Filtered snapshot commit, binding, who issues jobs | R-CARRY-15, R-CARRY-16 (one repository per snapshot commit, one token per job), R-EXEC-8; amends R-OBL-3 and R-CARRY-9 | `SnapshotIdentity`, `SnapshotMessage`; comments on `CheckJob.integration` and `CheckBody.integration` |
+| (4) Jobs: authentication, `gitAuthEnv`, advisory, base, volatile | R-EXEC-8 (service binding), R-EXEC-9, R-EXEC-10, R-OBL-7; amends R-EXEC-3 | `GitAuthEnv`; `CheckJob` gains `base`, `volatile`, `advisory`, `runner`; `CheckerConfig.advisory?`; `CheckObligation.advisory?` |
+| (5) jj decisions | Open points 38 (head root entries) and 39 (commit history read), each with reasons and the shape a later amendment would add | — |
+| (6) Additive, lane edits, gates | This section | `CheckerConfig` and `CheckObligation` fields are optional. `CheckJob` fields are required, because the Room is the only producer and a job without them is incomplete. `packages/policy`'s checker configuration validator accepts `advisory` and `runner`, with a test. `examples/check-job.ts` compiles a filtered job and a `check-carried` event |
+
+The contract adopts what lanes A and G built wherever it is sound: lane
+A's snapshot commit (`src/snapshot.ts`) and its message, lane A's
+fail-closed carry and volatile check, lane A's proposed `check-carried`
+event, lane G's `gitAuthEnv` shape and gateway, and lane G's measured
+runner digest. It departs in three places:
+- **Every check carry needs a sealed event**, not only one judged by a
+  carry rule. Lane A carries a check by platform conditions alone without
+  recording the judgment.
+- **The snapshot commit has a fixed identity.** Lane G's `writeSnapshot`
+  fixes the time but takes the author and committer from the sandbox's git
+  configuration, so the Room refuses its commits.
+- **Each snapshot commit has its own repository** (review 1fe39980). Lane
+  G keeps every snapshot of a checker in one repository, so a runner with
+  that repository's token can fetch an older snapshot and read a file its
+  own snapshot omits.
+
+### 29.8 Required lane edits
+
+"(type)" marks an edit that a lane's typecheck forces once it builds on
+this contract. Packages on main (`git`, `log`, `policy`, `ui`) typecheck
+unchanged at this amendment's head. Lane B was not in the request's list,
+but review 1fe39980 needs its Artifacts port and cleanup duties.
+
+**Lane A (`packages/room`)**
+1. Seal a `check-carried` event for every check carry judgment, carried or
+   not, in the transaction that stores it, and count a carry only with its
+   event. Until this is done, carry no check at all: today a check carries
+   on platform conditions without an event (R-CARRY-13).
+2. Runner: take the current runner from the active configuration's pin
+   (`CheckerConfig.runner`), not from `RoomServices.runnerDigest`. Refuse a
+   check whose `runner` differs from the pin with `check-binding`. A
+   checker with no pin never carries (R-CARRY-14).
+3. Snapshot: keep `snapshotCommit`, which matches R-CARRY-15. Before
+   issuing a filtered job, check that the commit the publisher wrote has
+   the recorded ID.
+4. Snapshot repositories (R-CARRY-16): create a new, empty repository for
+   each snapshot commit, and have the publisher write only that commit and
+   its closure into it, at `refs/artroom/snapshot`. Mint each filtered
+   job's read token for that repository only, expiring by the job's
+   deadline, and set `readUrl` to it. Reuse a repository only for jobs
+   naming the same snapshot commit. When its last job ends, or at most 24
+   hours later, record its deletion and the revocation of its tokens as
+   durable cleanup duties, retried until Artifacts confirms them.
+5. Jobs: issue every job, only through the checker's service binding, with
+   `base`, `volatile`, `advisory`, `runner` and a `GitAuthEnv`
+   (R-EXEC-8 to R-EXEC-10). (type, for code and fixtures that build a
+   `CheckJob`)
+6. Advisory obligations: set `CheckObligation.advisory` from the
+   configuration. `land` admission, readiness and reservation do not wait
+   for them, and a failing advisory check does not fail a landing
+   (R-OBL-7).
+7. The volatile check already matches R-EXEC-10.
+
+**Lane G (`packages/checkers`, and its copy of `packages/git`)**
+1. `writeSnapshot`: set the author and committer to
+   `Artroom Snapshot <snapshot@artroom.invalid>` as well as the time 0, and
+   use the message the Room gives (R-CARRY-15). Write into the snapshot's
+   own new repository, at `refs/artroom/snapshot` only (R-CARRY-16). Lane
+   B's package takes the same change when this publisher operation lands
+   there.
+2. Expect a per-snapshot repository: drop the per-checker store
+   (`<repo>--snap-<checker>`) from the harness, and test that a filtered
+   runner cannot fetch an older snapshot's commit or blobs by ID or by
+   ref, while the job's own commit fetches (R-CARRY-16).
+3. `gitAuthEnvFor` returns `GitAuthEnv`. (type)
+4. `checkJob`: refuse with `check-binding` a job whose `runner` differs
+   from the measured digest, and, for a volatile checker, a job that says
+   `volatile: false`. Sign `volatile` as the job states it (R-EXEC-10,
+   R-EXEC-11).
+5. Accept jobs only through the service binding. The live harness's
+   job-building route must not be part of a production deployment; a
+   deployment binds only the Room to the service (R-EXEC-8).
+6. The LLM reviewer compares `job.base` with the integration, instead of
+   the integration's first parent. Its configuration says `advisory: true`
+   (R-EXEC-10, R-OBL-7).
+7. Show the measured runner digest in each check's `detail` (R-EXEC-11).
+8. Tests and fixtures that build a `CheckJob` add `base`, `volatile`,
+   `advisory` and `runner`. (type)
+
+**Lane B (`packages/git`)**
+1. The Artifacts port (`ArtifactsNamespace`) gains creating an empty
+   repository and deleting one. Today it has only `get` (R-CARRY-16).
+2. The durable cleanup duties, which today cover workspace tokens, also
+   cover deleting a snapshot repository and revoking its tokens: recorded
+   when owed, retried until Artifacts confirms them (R-CARRY-16).
+3. When `listTree` and `writeSnapshot` land in this package, `writeSnapshot`
+   writes the fixed commit of R-CARRY-15 into a new repository, at
+   `refs/artroom/snapshot` only, and adds nothing to it afterwards.
+
+**Lane E (`packages/client`, `packages/mcp`, `packages/cli`)**: none. MCP is
+outside this amendment.
+
+**Lane F (`packages/ui`)**
+1. Show an advisory obligation as not blocking (R-OBL-7).
+2. Show `check-carried` events in the feed, and carried checks' reasons
+   from them (R-CARRY-13).
+3. The per-change history stays unavailable in a live room (open point
+   39).
+
+**Lane L (`packages/log`)**
+1. Decode `check-carried` events: add the type to the decoder's list of
+   system events and read its decisions. Today the decoder refuses an
+   unknown event, so this must ship before any Room seals one.
+2. `artroom verify` replays each `check-carried` event's decisions with
+   the policy version it names, and checks that `act` is an earlier
+   accepted `check` of the same lane and obligation (R-CARRY-13,
+   R-LOG-10).
+
+**Lane D (`packages/policy` pack and `docs/policy-pack.md`)**
+1. No change is required. The checker configuration validator in
+   `packages/policy` now accepts `advisory` and `runner`; this branch makes
+   that edit, with a test. The guide may show an advisory checker and a
+   pinned runner.
+
+### 29.9 Review 1fe39980
+
+Checker's review of `56eb2316` confirmed conditions 1 to 4, and found one
+P2 and one wording fault.
+
+| Finding | Change | Cases (29.6) | Lane edits (29.8) |
+|---|---|---|---|
+| P2 A filtered runner could fetch an older snapshot from the shared per-checker repository and read a file its own snapshot omits | New R-CARRY-16: one new repository per snapshot commit, holding only its closure under one ref; one read token per job for that repository only; reuse only for the same commit; deletion and token revocation within 24 hours of the last job, as durable cleanup. R-CARRY-15 step 4 and R-EXEC-9 point to it | Older snapshot, omitted file (by known ID and by advertised ref); exact current commit; concurrent jobs, different snapshots; configuration change; retirement | A 4; G 1 and 2; B 1 to 3 |
+| Wording: a forged job was said to produce only a refused check | R-EXEC-8 now states the operator's trust boundary: only trusted Room producers are bound to the checker service, the harness route is excluded in production, and a bound caller is trusted to submit only jobs the Room recorded | — | G 5 |
