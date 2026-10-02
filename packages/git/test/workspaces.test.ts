@@ -62,6 +62,7 @@ class FakeRepo implements RepoHandle {
       state: t.state === "active" && t.expiresAt <= this.ns.clock.t ? ("expired" as const) : t.state,
       expiresAt: new Date(t.expiresAt).toISOString(),
     }));
+    if (this.ns.listingFault) return this.ns.listingFault(tokens) as never;
     return { tokens, total: tokens.length };
   }
   async info() {
@@ -117,6 +118,8 @@ class FakeNamespace implements ArtifactsNamespace {
   failRevoke = false;
   /** Revocation fails, listing works. */
   failRevokeOnly = false;
+  /** While set, every listing answers this instead of the complete one (plan 001: an incomplete or malformed inventory). */
+  listingFault: ((tokens: TokenInfo[]) => unknown) | null = null;
   constructor(clock: Clock) {
     this.clock = clock;
     this.repos.set("canon", new FakeRepo(this, "canon", null));
@@ -927,6 +930,231 @@ test("no open duty is left due after a run, whichever way the run ends", async (
   assert.ok(ws.nextDue()! > clock.t);
 });
 
+// ------------------------------------------------------------------ plan 001: a fork inventory counts only when complete and well formed
+
+const FAR = new Date(2e12).toISOString();
+/** Listings that do not account for every token: each proves nothing is absent. */
+const INCOMPLETE: readonly (readonly [string, (tokens: TokenInfo[]) => unknown])[] = [
+  ["an empty page and a positive total", (t) => ({ tokens: [], total: Math.max(t.length, 1) })],
+  ["no total", (t) => ({ tokens: t })],
+  ["no list of records", (t) => ({ total: t.length })],
+  ["a record with no ID", (t) => ({ tokens: [...t, { scope: "write", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record with an empty ID", (t) => ({ tokens: [...t, { id: "", scope: "write", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record of an unknown scope", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "admin", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record of an unknown state", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "live", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record with no readable expiry", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "active", expiresAt: "soon" }], total: t.length + 1 })],
+  ["a record whose expiry is not a timestamp string", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "active", expiresAt: 2026 }], total: t.length + 1 })],
+];
+
+for (const [label, listing] of INCOMPLETE) {
+  test(`plan 001: a fork inventory with ${label} proves nothing: the workspace is not ready and gets no grant; across a restart a complete one ends the creation token and keeps the lease's`, async () => {
+    const { clock, ns, ws, lane, fork } = setup();
+    const canon = ns.repos.get("canon")!.mintRaw("write", 3600); // the canonical repository's own token, unrelated
+    ns.listingFault = listing;
+    ws.open(lane, 1, clock.t + LEASE_MS);
+    const v = await ws.provision(lane);
+    assert.notEqual(v.state, "ready");
+    assert.ok("refused" in ws.grant(lane, 1), "no grant");
+    assert.equal(fork().live().length, 1, "the fork's 24-hour creation token is still live: nothing proved it gone");
+    assert.ok(ws.pendingCleanup() > 0 && ws.nextDue() !== null, "the cleanup stays owed and scheduled");
+    // A restart over the same storage: the incomplete observation still settles nothing, however often it is seen.
+    const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+    for (let i = 0; i < 3; i++) {
+      clock.t = Math.max(clock.t, restarted.nextDue()!);
+      assert.ok((await restarted.reconcile()) > 0);
+    }
+    assert.ok(restarted.nextDue()! > clock.t, "the next check is in the future");
+    restarted.open(lane, 1, clock.t + LEASE_MS);
+    assert.notEqual((await restarted.provision(lane)).state, "ready");
+    assert.ok("refused" in restarted.grant(lane, 1));
+    // A complete listing: the creation token is ended, the lease's recorded token is kept, and the grant is given.
+    ns.listingFault = null;
+    restarted.open(lane, 1, clock.t + LEASE_MS);
+    assert.equal((await restarted.provision(lane)).state, "ready");
+    const g = restarted.grant(lane, 1);
+    assert.ok(!("refused" in g));
+    assert.deepEqual(fork().live(), [g.token.match(/art_v1_(tid_\d+)/)![1]], "exactly one live token: the lease's");
+    assert.equal(restarted.pendingCleanup(), 0);
+    assert.deepEqual(ns.repos.get("canon")!.live(), [canon.id], "the canonical repository is never swept");
+  });
+}
+
+test("plan 001: an incomplete inventory after the lease token is minted: not ready, no grant; a complete one makes it ready with only the lease's token", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  // Complete until the lease's token exists, then an empty page that claims a token.
+  ns.listingFault = (t) => (ns.minted.length >= 2 ? { tokens: [], total: t.length } : { tokens: t, total: t.length });
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.notEqual((await ws.provision(lane)).state, "ready");
+  assert.ok("refused" in ws.grant(lane, 1));
+  ns.listingFault = null;
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "ready");
+  assert.equal(fork().live().length, 1);
+  assert.ok(!("refused" in ws.grant(lane, 1)));
+});
+
+test("plan 001: an unrecorded token on a released fork, while inventories are incomplete: the cleanup stays owed across a restart until a complete one revokes it; the canonical token is untouched", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const canon = ns.repos.get("canon")!.mintRaw("write", 3600);
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "ready");
+  const orphan = fork().mintRaw("write", 3600); // minted, its answer lost: nobody recorded it
+  ns.listingFault = (t) => ({ tokens: t.filter((x) => x.id !== orphan.id), total: t.length });
+  assert.ok((await ws.revoke(lane, 1)) > 0, "the inventory owed on release is not settled");
+  const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  for (let i = 0; i < 4; i++) {
+    clock.t = Math.max(clock.t, restarted.nextDue()!);
+    assert.ok((await restarted.reconcile()) > 0);
+    assert.ok(restarted.nextDue()! > clock.t);
+  }
+  assert.equal(fork().tokens.get(orphan.id)?.state, "active");
+  ns.listingFault = null;
+  clock.t = Math.max(clock.t, restarted.nextDue()!);
+  assert.equal(await restarted.reconcile(), 0);
+  assert.deepEqual(fork().live(), []);
+  assert.equal(restarted.nextDue(), null);
+  assert.deepEqual(ns.repos.get("canon")!.live(), [canon.id]);
+});
+
+// ------------------------------------------------------------------ plan 002: a foreign occupant is an observation, not an unknown step's answer
+
+/** A repository not of this canonical repo, recording every call made on it. Only `info` (the provenance check) may be. */
+function foreign(ns: FakeNamespace, name: string): { repo: FakeRepo; calls: string[]; theirs: string } {
+  const repo = new FakeRepo(ns, name, "artifacts:ns/other-canon");
+  const theirs = repo.mintRaw("write", 7 * 24 * 3600).id;
+  const calls: string[] = [];
+  const methods = repo as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+  for (const m of ["createToken", "revokeToken", "listTokens", "info", "fork", "log", "readTree", "readCommit"]) {
+    const real = methods[m]!.bind(repo);
+    methods[m] = async (...a: unknown[]) => {
+      calls.push(m);
+      return real(...a);
+    };
+  }
+  return { repo, calls, theirs };
+}
+
+/** A fork creation sent by a host that then stops: no answer ever arrives. Returns a function that applies it late. */
+function lostForkCreate(ns: FakeNamespace): { sent: Promise<void>; apply: () => Promise<void> } {
+  const canon = ns.repos.get("canon")!;
+  const realFork = canon.fork.bind(canon);
+  const sent = deferred();
+  let name = "";
+  canon.fork = async (n: string) => {
+    name = n;
+    canon.fork = realFork;
+    sent.resolve();
+    return await new Promise<never>(() => {});
+  };
+  return {
+    sent: sent.promise,
+    apply: async () => {
+      await realFork(name);
+    },
+  };
+}
+
+const restartOf = (ws: Workspaces, ns: FakeNamespace, clock: Clock) =>
+  new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+const forkCreates = (ws: Workspaces) => ws.duties().filter((d) => d.kind === "fork-create").map((d) => d.state);
+
+test("plan 002: a fork creation whose answer is lost, a foreign repository at the name, swept and removed, then the old create applies: the step stays in flight and a restarted host revokes the late creation token", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const name = forkName("canon", lane);
+  const late = lostForkCreate(ns);
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  void ws.provision(lane);
+  await late.sent;
+  const host = restartOf(ws, ns, clock);
+  const other = foreign(ns, name);
+  ns.repos.set(name, other.repo);
+  assert.equal(await host.sweep(), 1, "the unknown create is still open");
+  assert.deepEqual(forkCreates(host), ["in-flight"]);
+  assert.ok(host.nextDue() !== null && host.nextDue()! > clock.t, "and scheduled in the future");
+  assert.ok(other.calls.every((c) => c === "info"), `only provenance was read: ${other.calls.join(", ")}`);
+  assert.deepEqual(other.repo.live(), [other.theirs], "the foreign repository is unchanged");
+  assert.equal(ns.deleteCalls, 0);
+  // The foreign repository goes away, and the old request applies: a fork of ours, with its 24-hour token.
+  ns.repos.delete(name);
+  await late.apply();
+  assert.equal(fork().live().length, 1);
+  const again = restartOf(ws, ns, clock);
+  clock.t = Math.max(clock.t, again.nextDue()!);
+  await again.reconcile();
+  assert.deepEqual(fork().live(), [], "the late creation token is revoked");
+  assert.deepEqual(forkCreates(again), ["in-flight"], "still never settled: it was never answered");
+  assert.ok(again.nextDue()! > clock.t);
+});
+
+test("plan 002: foreign, absent, foreign and ours again, each seen by a restarted host: the unknown create stays in flight on a growing, capped backoff, and the foreign repository is never touched", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const name = forkName("canon", lane);
+  const late = lostForkCreate(ns);
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  void ws.provision(lane);
+  await late.sent;
+  const other = foreign(ns, name);
+  const gaps: number[] = [];
+  const observe = async (occupant: "foreign" | "absent" | "ours") => {
+    if (occupant === "foreign") ns.repos.set(name, other.repo);
+    else if (occupant === "absent") ns.repos.delete(name);
+    const host = restartOf(ws, ns, clock);
+    clock.t = Math.max(clock.t, host.nextDue()!);
+    await host.reconcile();
+    assert.deepEqual(forkCreates(host), ["in-flight"], occupant);
+    const due = host.nextDue()!;
+    assert.ok(due > clock.t, `${occupant}: the next check is in the future`);
+    gaps.push(due - clock.t);
+  };
+  for (const o of ["foreign", "foreign", "absent", "foreign", "foreign", "absent", "foreign", "foreign"] as const) await observe(o);
+  assert.ok(gaps[gaps.length - 1]! > gaps[0]!, "the backoff grows");
+  assert.ok(Math.max(...gaps) <= 30 * 60_000, "and is capped at 30 minutes");
+  assert.ok(other.calls.every((c) => c === "info"), other.calls.join(", "));
+  assert.deepEqual(other.repo.live(), [other.theirs]);
+  // The name frees and the late create applies: ours, and its token is revoked when next checked.
+  ns.repos.delete(name);
+  await late.apply();
+  await observe("ours");
+  assert.deepEqual(fork().live(), []);
+  assert.equal(ns.deleteCalls, 0);
+});
+
+test("plan 002: a fork creation refused unchanged, then a foreign occupant: the definite answer settles the step, and nothing is owed or touched", async () => {
+  const { clock, ns, ws, lane } = setup();
+  const name = forkName("canon", lane);
+  const canon = ns.repos.get("canon")!;
+  const other = foreign(ns, name);
+  canon.fork = async () => {
+    ns.repos.set(name, other.repo); // another creator took the name first
+    throw new ArtifactsError("ALREADY_EXISTS", 10409);
+  };
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  const v = await ws.provision(lane);
+  assert.ok(v.state === "failed" && v.error.code === "forbidden");
+  assert.equal(await ws.sweep(), 0);
+  assert.deepEqual(forkCreates(ws), ["done"]);
+  assert.equal(ws.nextDue(), null);
+  assert.ok(other.calls.every((c) => c === "info"));
+  assert.deepEqual(other.repo.live(), [other.theirs]);
+});
+
+test("plan 002: an ordinary fork creation that answered, not yet swept, then a foreign occupant: the answered step settles; only in-flight steps are kept", async () => {
+  const { clock, ns, ws, lane } = setup();
+  const name = forkName("canon", lane);
+  ns.failRevoke = true; // the sweep after the create cannot run, so the answered step stays open
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "failed");
+  assert.deepEqual(forkCreates(ws), ["answered"]);
+  ns.failRevoke = false;
+  const other = foreign(ns, name);
+  ns.repos.set(name, other.repo); // our fork, and every token on it, is gone; another repository holds the name
+  assert.equal(await ws.sweep(), 0);
+  assert.deepEqual(forkCreates(ws), ["done"]);
+  assert.equal(ws.nextDue(), null);
+  assert.ok(other.calls.every((c) => c === "info"));
+  assert.deepEqual(other.repo.live(), [other.theirs]);
+});
+
 // ------------------------------------------------------------------ request b6b51de7, reviews a35b4b61 and 3eb7bc44: the canonical repository at public founding
 
 const FIRST = "f".repeat(40);
@@ -1314,4 +1542,62 @@ test("review 700b74ea: an earlier revision's ledger row for the base name is ado
   ws.sealCanonical(name);
   assert.equal(legacyOpen(ws), 1);
   assert.equal(ns.repos.has("canon"), false);
+});
+
+// ------------------------------------------------------------------ plan 004: a wake-up is stored before each founding create is sent
+
+/** Public founding with a `wake` that records what was on record when it was called, and rejects the first `fail` calls. */
+function setupWaking(fail = 0) {
+  const base = setupFounding();
+  const wakes: { at: number; createCalls: number; storedBeforeCreate: boolean; open: string[][] }[] = [];
+  let failures = fail;
+  const ws: Workspaces = new Workspaces({
+    sql: base.sql,
+    artifacts: base.ns,
+    canonical: "canon",
+    namespace: "ns",
+    now: base.clock.now,
+    sleep: async () => {},
+    wake: async (at) => {
+      const w = { at, createCalls: base.ns.createCalls, storedBeforeCreate: false, open: open(ws) };
+      wakes.push(w);
+      await new Promise((r) => setTimeout(r, 1)); // storage takes a moment
+      if (failures-- > 0) throw new Error("the alarm could not be stored");
+      w.storedBeforeCreate = base.ns.createCalls === w.createCalls; // nothing was sent while it was being stored
+    },
+  });
+  return { ...base, ws, wakes };
+}
+
+test("plan 004: the founding wake-up is stored after the create step is on record and before the create is sent, for the earliest outstanding work", async () => {
+  const { clock, ns, ws, wakes, firstCommit } = setupWaking();
+  ns.createFailures.push("lost-after-create"); // the first create applies and its answer is lost: a second is made
+  const name = await ws.prepareCanonical("canon", firstCommit);
+  assert.equal(ns.createCalls, 2);
+  assert.equal(wakes.length, 2, "one wake-up before each create");
+  assert.deepEqual(wakes.map((w) => w.createCalls), [0, 1], "each before its create was sent");
+  assert.ok(wakes.every((w) => w.storedBeforeCreate), "and each create waited until its wake-up was stored");
+  assert.deepEqual(wakes[0]!.open, [["repo-create", "in-flight"]], "after the step was recorded");
+  assert.ok(wakes.every((w) => w.at <= clock.t), "at the earliest outstanding work: the new step is due now");
+  ws.sealCanonical(name);
+});
+
+test("plan 004: a wake-up that cannot be stored sends no create; the step is closed as never sent, the debt already recorded is kept, and the next attempt founds", async () => {
+  const { ns, ws, wakes, firstCommit } = setupWaking(1);
+  // An older Room's binding: the base name's adoption is recorded debt before any create.
+  await assert.rejects(ws.prepareCanonical("canon", firstCommit, { legacyBase: true }), /alarm could not be stored/);
+  assert.equal(ns.createCalls, 0, "nothing was sent");
+  assert.equal(wakes.length, 1);
+  assert.deepEqual(
+    ws.duties().map((d) => [d.kind, d.state, d.reason, d.doneReason]),
+    [
+      ["repo-create", "in-flight", "legacy", null],
+      ["repo-delete", "owed", "legacy base name", null],
+      ["repo-create", "done", "repo-create", "not-sent"],
+    ],
+  );
+  assert.ok(ws.canonicalDue() !== null, "the recorded debt stays scheduled for the alarm");
+  const name = await ws.prepareCanonical("canon", firstCommit, { legacyBase: true });
+  assert.equal(ns.createCalls, 1);
+  ws.sealCanonical(name);
 });

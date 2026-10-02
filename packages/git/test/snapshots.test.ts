@@ -49,6 +49,10 @@ class Repo implements RepoHandle {
   }
   async revokeToken(tokenOrId: string) {
     if (this.ns.down.revoke) throw outage();
+    if (this.ns.revokeFailures > 0) {
+      this.ns.revokeFailures--;
+      throw outage();
+    }
     const t = this.tokens.find((x) => x.id === tokenOrId || x.plaintext === tokenOrId);
     if (!t || t.state !== "active") return false;
     t.state = "revoked";
@@ -57,6 +61,7 @@ class Repo implements RepoHandle {
   async listTokens() {
     if (this.ns.down.list) throw outage();
     const tokens = this.tokens.map((t) => ({ id: t.id, scope: t.scope, state: t.state === "active" && t.expiresAt <= this.ns.clock.t ? ("expired" as const) : t.state, expiresAt: new Date(t.expiresAt).toISOString() }));
+    if (this.ns.listingFault) return this.ns.listingFault(tokens) as never;
     return { tokens, total: tokens.length };
   }
   async info() {
@@ -88,6 +93,10 @@ class Fake implements ArtifactsNamespace {
   /** Tokens of repositories that were deleted: deletion removes them all. */
   readonly gone: Tok[] = [];
   readonly down = { create: false, delete: false, revoke: false, list: false, get: false };
+  /** The next this many revocations fail without an answer. */
+  revokeFailures = 0;
+  /** While set, every listing answers this instead of the complete one (plan 001). */
+  listingFault: ((tokens: TokenInfo[]) => unknown) | null = null;
   readonly clock: Clock;
   constructor(clock: Clock) {
     this.clock = clock;
@@ -298,6 +307,69 @@ test("a job that never reports its end still bounds the repository: it is delete
   clock.advance(deadline - clock.t);
   await snaps.reconcile();
   assert.equal(ns.repos.has(r.name), false);
+});
+
+// ------------------------------------------------------------------ plan 001: a snapshot is ready only after a complete inventory
+
+const FAR = new Date(2e12).toISOString();
+/** Listings that do not account for every token: each proves nothing is absent. */
+const INCOMPLETE: readonly (readonly [string, (tokens: TokenInfo[]) => unknown])[] = [
+  ["an empty page and a positive total", (t) => ({ tokens: [], total: Math.max(t.length, 1) })],
+  ["no total", (t) => ({ tokens: t })],
+  ["no list of records", (t) => ({ total: t.length })],
+  ["a record with no ID", (t) => ({ tokens: [...t, { scope: "write", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record with an empty ID", (t) => ({ tokens: [...t, { id: "", scope: "write", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record of an unknown scope", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "admin", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record of an unknown state", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "live", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record with no readable expiry", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "active", expiresAt: "soon" }], total: t.length + 1 })],
+  ["a record whose expiry is not a timestamp string", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "active", expiresAt: 2026 }], total: t.length + 1 })],
+];
+
+for (const [label, listing] of INCOMPLETE) {
+  test(`plan 001: the creation token's revocation fails and the inventory has ${label}: no snapshot is issued, its deletion stays owed, and a complete inventory recovers`, async () => {
+    const { ns, snaps, writer, deadline } = setup();
+    ns.repos.set("canon", new Repo(ns, "canon"));
+    const canon = ns.repos.get("canon")!.mint("write", 3600); // unrelated: snapshots never touch it
+    ns.revokeFailures = 1; // the creation token's revocation by plaintext has no answer
+    ns.listingFault = listing;
+    await assert.rejects(snaps.prepare(C1, writer(C1)), /incomplete or malformed/);
+    const [first] = ns.created;
+    assert.equal(ns.repos.get(first!)!.active().length, 1, "the creation write token is still active");
+    await assert.rejects(snaps.mint(C1, "job_1", deadline()), /not ready/);
+    assert.deepEqual(snaps.duties().map((d) => [d.kind, d.state]), [["create", "done"], ["delete", "owed"]], "its deletion debt is kept");
+    ns.listingFault = null;
+    const r = await snaps.prepare(C1, writer(C1));
+    assert.notEqual(r.name, first, "the unready repository is never finished or reused");
+    assert.deepEqual(ns.repos.get(r.name)!.active(), []);
+    await snaps.reconcile();
+    assert.equal(ns.repos.has(first!), false, "deleted, with its creation token");
+    assert.ok(await snaps.mint(C1, "job_1", deadline()));
+    assert.deepEqual(ns.repos.get("canon")!.active().map((t) => t.id), [canon.id]);
+    assert.ok(!ns.deleted.includes("canon"));
+  });
+}
+
+test("plan 001: across a restart, an incomplete inventory never makes a snapshot ready; a complete one does, the unready repositories are deleted, and the canonical token is untouched", async () => {
+  const { clock, ns, host } = durable();
+  ns.repos.set("canon", new Repo(ns, "canon"));
+  const canon = ns.repos.get("canon")!.mint("write", 3600);
+  const writer: SnapshotWriter = async () => C1;
+  ns.revokeFailures = 1;
+  ns.listingFault = (t) => ({ tokens: t.filter((x) => x.scope !== "write"), total: t.length });
+  await assert.rejects(host().prepare(C1, writer), /incomplete or malformed/);
+  // A new host over the same storage, while listings are still incomplete.
+  const again = host();
+  await assert.rejects(again.mint(C1, "job_1", clock.t + 600_000), /not ready/);
+  await assert.rejects(again.prepare(C1, writer), /incomplete or malformed/);
+  assert.equal(ns.created.length, 2);
+  ns.listingFault = null;
+  const third = host();
+  const r = await third.prepare(C1, writer);
+  assert.deepEqual(ns.repos.get(r.name)!.active(), []);
+  await third.reconcile();
+  assert.deepEqual(ns.deleted.sort(), ns.created.filter((n) => n !== r.name).sort(), "both unready repositories are deleted");
+  assert.ok(await third.mint(C1, "job_1", clock.t + 600_000));
+  assert.deepEqual(ns.repos.get("canon")!.active().map((t) => t.id), [canon.id]);
 });
 
 // ------------------------------------------------------------------ review 96d1fbc9

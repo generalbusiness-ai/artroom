@@ -27,7 +27,9 @@
  * - `done`: settled, with the reason.
  *
  * An inventory run lists the fork's tokens and revokes every active one that
- * no ready or installing lease has recorded. When it succeeds, it settles
+ * no ready or installing lease has recorded. Only a complete, well-formed
+ * listing counts (`completeInventory`); any other leaves every duty owed and
+ * scheduled. When it succeeds, it settles
  * every `owed` inventory and every step answered before it started. A step
  * still `in-flight` is never settled, by any snapshot or by elapsed time:
  * it keeps an inventory on a capped backoff (every minute at first, then
@@ -42,7 +44,9 @@
  * fork lock coordinates one live host only; it is never restart evidence.
  * The Room's alarm calls `reconcile()` and sets its next alarm from
  * `nextDue()`. Cleanup checks provenance first, and never touches a
- * repository that is not this canonical repo's fork.
+ * repository that is not this canonical repo's fork. Such a repository at the
+ * fork's name settles answered and owed duties (our fork is gone, with its
+ * tokens), never a step in flight: occupancy is not that step's answer.
  *
  * The same ledger covers the canonical repository at public founding
  * (`prepareCanonical`, `sealCanonical`, `settleCanonical`; request b6b51de7,
@@ -61,7 +65,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { type Sql, type SqlRow, text } from "../sql.ts";
-import { type ArtifactsNamespace, type RepoHandle, type TokenInfo, artifactsCode, refusedUnchanged, withRetry } from "../artifacts.ts";
+import { type ArtifactsNamespace, type RepoHandle, type TokenInfo, artifactsCode, completeInventory, refusedUnchanged, withRetry } from "../artifacts.ts";
 
 /** The reason of the step that stands for an old Room's unrecorded creates of a public founding's base name (review 700b74ea). */
 const LEGACY = "legacy";
@@ -78,6 +82,13 @@ export interface WorkspacesOptions {
   readonly namespace: string;
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
+  /**
+   * Persist a wake-up at or before `at` (ms), for example the Room's alarm,
+   * which then calls `settleCanonical()` before founding. Public founding
+   * awaits it after recording each repository create and before sending it
+   * (plan 004); a rejection sends nothing.
+   */
+  readonly wake?: (at: number) => Promise<void>;
 }
 
 /** How often an unresolved remote step's inventory runs: first after 1 minute, backing off to every 30 minutes. */
@@ -138,6 +149,7 @@ export class Workspaces {
   private readonly namespace: string;
   private readonly now: () => number;
   private readonly sleep: ((ms: number) => Promise<void>) | undefined;
+  private readonly wake: ((at: number) => Promise<void>) | undefined;
   private readonly inFlight = new Map<LaneId, Promise<WorkspaceOp>>();
   private readonly locks = new Map<string, Promise<unknown>>();
 
@@ -148,6 +160,7 @@ export class Workspaces {
     this.namespace = opts.namespace;
     this.now = opts.now ?? Date.now;
     this.sleep = opts.sleep;
+    this.wake = opts.wake;
     this.sql.all(
       "CREATE TABLE IF NOT EXISTS artroom_ws (lane TEXT PRIMARY KEY, lease INTEGER NOT NULL, state TEXT NOT NULL, fork TEXT NOT NULL, " +
         "remote TEXT, lease_expires_at INTEGER NOT NULL, token_id TEXT, token_expires_at INTEGER, error TEXT, updated_at INTEGER NOT NULL)",
@@ -559,8 +572,11 @@ export class Workspaces {
       state = await this.forkState(name);
     } catch (e) {
       if (e instanceof NotOurFork) {
-        // Not ours: never touched, and nothing of ours can be live in it.
-        this.done(duties.map((d) => d.id), "not-our-repository");
+        // Not ours: never touched. Our fork no longer holds the name, so no token of ours is live there, and every
+        // answered or owed duty is settled. A step still in flight is not (plan 002): another repository at the name
+        // is an observation, not that request's answer, and if the name frees the request may still apply. It keeps its
+        // inventory on the capped backoff (`cleanFork`'s finally), and does not block.
+        this.done(duties.filter((d) => d.state !== "in-flight").map((d) => d.id), "not-our-repository");
         return 0;
       }
       this.defer(duties.map((d) => d.id), String(e));
@@ -589,7 +605,8 @@ export class Workspaces {
     const sweep = duties.filter((x) => x.kind !== "token");
     if (sweep.length > 0) {
       try {
-        const { tokens } = await withRetry(() => fork.listTokens(), this.retryOpts());
+        // Only a complete inventory settles anything (plan 001): an incomplete or malformed one throws, and the debt stays scheduled.
+        const tokens = completeInventory(await withRetry(() => fork.listTokens(), this.retryOpts()), `the token inventory of ${name}`);
         // Keep only tokens a ready or installing lease has recorded on this fork.
         const keep = new Set(
           this.sql
@@ -791,9 +808,23 @@ export class Workspaces {
   /** Create a new incarnation of `base`: its name, when its create answered; null when it did not (it is then abandoned). */
   private async createIncarnation(base: string): Promise<string | null> {
     // The step, and so the name, is on record before the create is sent.
-    const step = this.beginStep(base, "repo-create");
-    const name = `${base}-${step}`;
-    this.sql.all("UPDATE artroom_ws_duty SET fork = ? WHERE id = ?", name, step);
+    const { step, name } = this.sql.transaction(() => {
+      const step = this.beginStep(base, "repo-create");
+      const name = `${base}-${step}`;
+      this.sql.all("UPDATE artroom_ws_duty SET fork = ? WHERE id = ?", name, step);
+      return { step, name };
+    });
+    // Then a wake-up is stored for now, when the new step is due (and no earlier than any other founding debt), so a
+    // host that stops while the create is outstanding leaves it scheduled (plan 004). If it cannot be stored, the
+    // create is never sent, and the step says so.
+    if (this.wake) {
+      try {
+        await this.wake(this.now());
+      } catch (e) {
+        this.done([step], "not-sent");
+        throw e;
+      }
+    }
     let made: Awaited<ReturnType<ArtifactsNamespace["create"]>>;
     try {
       made = await this.artifacts.create(name, { description: "Artroom room repository", setDefaultBranch: "main" });
@@ -854,23 +885,7 @@ export class Workspaces {
    */
   private async inventoryOf(name: string): Promise<readonly TokenInfo[]> {
     const repo = await withRetry(() => this.artifacts.get(name), this.retryOpts());
-    const r = (await withRetry(() => repo.listTokens(), this.retryOpts())) as { tokens?: unknown; total?: unknown } | null;
-    const tokens = r?.tokens;
-    const wellFormed = (t: unknown): t is TokenInfo => {
-      const x = t as Partial<TokenInfo> | null;
-      return (
-        !!x &&
-        typeof x.id === "string" &&
-        x.id.length > 0 &&
-        (x.scope === "read" || x.scope === "write") &&
-        (x.state === "active" || x.state === "expired" || x.state === "revoked") &&
-        typeof x.expiresAt === "string" &&
-        Number.isFinite(Date.parse(x.expiresAt))
-      );
-    };
-    if (!Array.isArray(tokens) || typeof r?.total !== "number" || r.total !== tokens.length || !tokens.every(wellFormed)) {
-      throw new Error("the canonical repository's token inventory is incomplete or malformed");
-    }
+    const tokens = completeInventory(await withRetry(() => repo.listTokens(), this.retryOpts()), "the canonical repository's token inventory");
     return tokens.filter((t) => t.state === "active" && Date.parse(t.expiresAt) > this.now());
   }
 
