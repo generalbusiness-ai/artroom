@@ -115,6 +115,40 @@ describe("join() recovery uses the caller's clock (ClientOptions.now)", () => {
       behind.stop();
     }
   });
+
+  test("virtual clock: a session request retried after the clock moves is signed again at the moved time", async () => {
+    let at = Date.now() - 24 * 3600_000;
+    const behind = await FakeRoom.create({ clock: () => at });
+    const behindUrl = (await behind.start()) as Url;
+    try {
+      const { invitation, secret } = await behind.invite("@alice");
+      const { signer } = await generateSigner();
+      behind.faults.push({ route: "POST /redeem", kind: "drop" });
+      const notAfters: number[] = [];
+      let first = true;
+      const fetcher: typeof fetch = async (input, init) => {
+        if (String(input).endsWith("/requests")) {
+          notAfters.push(Date.parse((JSON.parse(String(init?.body)) as { request: { notAfter: string } }).request.notAfter));
+          if (first) {
+            first = false;
+            at += 10 * 60_000; // past the first signature's window
+            return new Response(JSON.stringify({ name: "ArtroomError", code: "unavailable", message: "busy", retryable: true, retryAfterMs: 1, maybeRecorded: false }), {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+        }
+        return fetch(input, init);
+      };
+      const joined = await join({ url: behindUrl }, behind.id, { invitation, secret, signer }, { now: () => at, fetch: fetcher });
+      expect(isRefusal(joined)).toBe(false);
+      expect((joined as Joined).session.member).toBe("@alice");
+      expect(notAfters).toHaveLength(2);
+      expect(notAfters[1]! - notAfters[0]!).toBe(10 * 60_000);
+    } finally {
+      behind.stop();
+    }
+  });
 });
 
 describe("room custody: an MCP bearer token (R-CRED-3, R-SEC-5)", () => {

@@ -16,6 +16,7 @@ import { exports } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { Joined, LogEntry, RosterRecord, SignedEnvelope } from "@generalbusiness/artroom-contract";
 import { policy, rule } from "@generalbusiness/artroom-policy/helpers";
+import { generateSigner, join } from "@generalbusiness/artroom-client";
 import type { Room } from "../../src/index.ts";
 import { MAX_WINDOWS, openWindows, rateLimit, WINDOW_MS } from "../../src/ratelimit.ts";
 import {
@@ -261,3 +262,40 @@ describe("(3) the redemption rate limit (SEC-07, R-CRED-9)", () => {
     });
   });
 });
+
+// ------------------------------------------------------------------ review of 812fb907
+
+describe("the client's join() recovery runs on the caller's clock (review of 812fb907)", () => {
+  it("virtual clock: a lost join reply is recovered, and a session request retried after the clock moves is signed again at the moved time", async () => {
+    const r = await makeRoom();
+    const inv = await invite(r, "@clocked");
+    const { signer } = await generateSigner();
+    let redemptions = 0;
+    const notAfters: number[] = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      if (String(input).endsWith("/requests")) {
+        notAfters.push(Date.parse((JSON.parse(String(init?.body)) as { request: { notAfter: string } }).request.notAfter));
+        if (notAfters.length === 1) {
+          advance(10 * 60_000); // past the first signature's 300-second window
+          return new Response(JSON.stringify({ name: "ArtroomError", code: "unavailable", message: "busy", retryable: true, retryAfterMs: 1, maybeRecorded: false }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      }
+      const response = await exports.default.fetch(input, init);
+      if (String(input).endsWith("/redeem") && ++redemptions === 1) throw new TypeError("reply lost");
+      return response;
+    };
+    const out = await join({ url: "https://artroom.test" }, r.id, { invitation: inv.id as never, secret: inv.secret as never, signer }, { fetch: fetcher, retries: 2, now: () => clock.now });
+    expect(isRefusal(out)).toBe(false);
+    expect((out as Joined).session.member).toBe("@clocked");
+    expect(redemptions).toBe(2);
+    expect(notAfters).toHaveLength(2);
+    expect(notAfters[1]! - notAfters[0]!).toBe(10 * 60_000);
+    // One join, signed once: the recovery resubmitted the original bytes.
+    const joins = (await entries(r)).filter((e) => e.entry.type === "act" && (e.entry.act.envelope.body as { op?: string }).op === "join" && e.entry.act.envelope.actor === signer.key);
+    expect(joins).toHaveLength(1);
+  });
+});
+
