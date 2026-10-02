@@ -36,6 +36,7 @@
 import type { CheckInput, CheckJob, Digest, Glob, LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { checkerInputs } from "@generalbusiness/artroom-policy";
+import { completeInventory } from "@generalbusiness/artroom-git";
 import type { ActivePolicyFull, RoomCore } from "./core.ts";
 import { hex, randomBytes } from "./crypto.ts";
 import { iso } from "./ids.ts";
@@ -212,12 +213,13 @@ async function watchMint(core: RoomCore, mint: string, notBefore: number, attemp
   try {
     const repo = await core.artifacts.get(core.location().name);
     const inventory = await repo.listTokens();
-    const tokens = inventory?.tokens;
-    const wellFormed =
-      Array.isArray(tokens) &&
-      tokens.length === inventory.total &&
-      tokens.every((t) => typeof t?.id === "string" && t.id !== "" && ["active", "expired", "revoked"].includes(t.state) && Number.isFinite(Date.parse(t.expiresAt)));
-    if (!wellFormed) return note("the canonical repository's token inventory is incomplete or malformed");
+    // The shared rule (follow-up c9cd4cd8): every record accounted for and well formed, scope included.
+    let tokens: ReturnType<typeof completeInventory>;
+    try {
+      tokens = completeInventory(inventory, "the canonical repository's token inventory");
+    } catch (e) {
+      return note(e instanceof Error ? e.message : String(e));
+    }
     // Accounted for: every token the Room knows by its ID, each owned by its row here (held by a job, or ended).
     const known = new Set(core.sql.all("SELECT token_id FROM job_tokens WHERE token_id NOT LIKE 'mint:%'").map((r) => str(r, "token_id")!));
     const unaccounted = tokens.filter((t) => t.state === "active" && Date.parse(t.expiresAt) > core.now() && !known.has(t.id)).length;

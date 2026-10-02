@@ -51,7 +51,7 @@ export { GitPublisher, landMessage } from "./publisher/git-publisher.ts";
 export { ARTIFACTS_REFUSALS, artifactsRefusal, classifyGitPush, definitelyNotApplied } from "./publisher/push-outcome.ts";
 export type { PushOutcome } from "./publisher/push-outcome.ts";
 export { checkUpdates, readCommands, FenceError } from "./publisher/ref-fence.ts";
-export { canonicalTokens, readMainVia, withRetry } from "./artifacts.ts";
+export { canonicalTokens, completeInventory, readMainVia, withRetry } from "./artifacts.ts";
 export { EMPTY_TREE_SHA, FIRST_COMMIT_IDENTITY, FIRST_COMMIT_MESSAGE, firstCommit, pushFirstCommit } from "./first-commit.ts";
 export type { FirstCommitOutcome, LooseObject } from "./first-commit.ts";
 export type { ArtifactsNamespace, CreatedRepo, RepoHandle } from "./artifacts.ts";

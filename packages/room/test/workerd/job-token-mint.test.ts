@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import { runInDurableObject } from "cloudflare:test";
+import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Check, CheckerConfig, CheckJob, Claim, Proposal, Refusal, Result } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import type { Room } from "../../src/index.ts";
@@ -270,5 +270,54 @@ describe("a whole-tree job's token mint whose outcome is unknown stays an open d
     expect(seen).toEqual([]);
     expect(readTokens(r, from).every((t) => t.revoked)).toBe(true);
     expect(await ledger(r)).toEqual([]);
+  });
+});
+
+// ------------------------------------------------------------------ follow-up c9cd4cd8 (2) and (3)
+
+describe("follow-up c9cd4cd8: an unknown mint's watch", () => {
+  const storage = <T>(r: TestRoom, fn: (state: DurableObjectState) => Promise<T>) =>
+    runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, (_room: Room, state: DurableObjectState) => fn(state));
+  const rowOf = async (r: TestRoom, token: unknown) => (await ledger(r)).find((x) => x["token_id"] === token)!;
+
+  for (const [label, odd] of [
+    ["a record of an unknown scope", { scope: "admin" }],
+    ["a record whose expiry is not a timestamp string", { expiresAt: 2026 }],
+  ] as const)
+    it(`(3) an inventory with ${label} is noted as incomplete, never counted; the unknown mint stays open`, async () => {
+      const { r } = await owed();
+      const a = r.world.artifacts;
+      a.loseReply("createToken");
+      await step(r);
+      const [recorded] = await ledger(r);
+      const repo = a.canonicalRepo();
+      const list = repo.listTokens.bind(repo);
+      (repo as { listTokens: unknown }).listTokens = async () => {
+        const inv = await list();
+        const record = { id: "tid_odd", scope: "read", state: "active", expiresAt: new Date(clock.now + 3_600_000).toISOString(), ...odd };
+        return { tokens: [...inv.tokens, record], total: inv.total + 1 };
+      };
+      clock.now = recorded!["expires_at"] as number;
+      await step(r);
+      const row = await rowOf(r, recorded!["token_id"]);
+      expect(row).toMatchObject({ last_error: expect.stringMatching(/incomplete or malformed/) });
+      expect(row["next_ms"] as number).toBeGreaterThan(clock.now);
+      (repo as { listTokens: unknown }).listTokens = list;
+    });
+
+  it("(2) with no alarm stored, a fresh object stores one, and its alarm observes the unknown mint without settling it", async () => {
+    const { r } = await owed();
+    r.world.artifacts.loseReply("createToken");
+    await step(r);
+    const [recorded] = await ledger(r);
+    await storage(r, (s) => s.storage.deleteAlarm());
+    const after = await restarted(r);
+    expect(await storage(after, (s) => s.storage.getAlarm()), "the fresh object stored an alarm").not.toBeNull();
+    clock.now = Math.max(recorded!["expires_at"] as number, recorded!["next_ms"] as number) + 1;
+    expect(await runDurableObjectAlarm(after.stub as unknown as DurableObjectStub<Room>)).toBe(true);
+    const row = await rowOf(after, recorded!["token_id"]);
+    expect(row, "never settled by time or a clean inventory").toBeDefined();
+    expect(row).toMatchObject({ last_error: expect.stringMatching(/^outcome unknown; /) });
+    expect(row["next_ms"] as number).toBeGreaterThan(clock.now);
   });
 });

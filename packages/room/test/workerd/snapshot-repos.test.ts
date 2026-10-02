@@ -9,11 +9,11 @@
 
 import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import { runInDurableObject } from "cloudflare:test";
+import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Check, CheckBody, CheckerConfig, CheckJob, Claim, Landing, LandOp, Proposal, Refusal, Result, Sha } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import { encodeCommit, encodeTree, gitObject } from "@generalbusiness/artroom-log";
-import type { Room } from "../../src/index.ts";
+import { setFault, type Room } from "../../src/index.ts";
 import { artifactsErrors, type FakeRepo } from "../../src/memory/artifacts.ts";
 import { addMember, Client, clock, makeRoom, pushChange, tick, type TestRoom } from "./support.ts";
 
@@ -308,4 +308,99 @@ describe("review 1701f73e: an imported room's jobs stay in its import namespace"
       expect(r.world.artifacts.repos.size).toBe(0);
       expect(r.world.artifacts.remoteCalls.size).toBe(0);
     });
+});
+
+// ------------------------------------------------------------------ follow-up c9cd4cd8, 1: the snapshot wake-up is stored before the create
+
+/** A new stub for the room's object: after an abort, the old stub stays broken. */
+const freshStub = (r: TestRoom) => env.ROOMS.get(env.ROOMS.idFromName(r.id)) as unknown as DurableObjectStub<Room>;
+
+describe("follow-up c9cd4cd8 (1): a snapshot create is sent only after its wake-up is in storage", () => {
+  const storage = <T>(r: TestRoom, fn: (state: DurableObjectState) => Promise<T>) =>
+    runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, (_room: Room, state: DurableObjectState) => fn(state));
+
+  /** A room with one filtered job owed and not yet run, and no alarm in storage: only the snapshot's own wake-up can store one. */
+  async function owedJob() {
+    const { r, alice, ci } = await checkRoom();
+    await hold(r, ["jobs"]);
+    const { seen } = service(r, ci);
+    await propose(r, alice, { "src/app.ts": "v2" });
+    await settled(r);
+    await storage(r, (s) => s.storage.deleteAlarm());
+    return { r, seen };
+  }
+
+  it("the alarm is in storage while the snapshot create is outstanding; after the host stops, a fresh object's alarm deletes the late repository", async () => {
+    const { r } = await owedJob();
+    const a = r.world.artifacts;
+    // The snapshot create is dispatched and never answers. (A plain flag: resolving a test promise from inside the
+    // object keeps the test pool from aborting it.)
+    const real = a.binding.create;
+    let name: string | null = null;
+    a.binding.create = async (n: string, o?: { readOnly?: boolean; description?: string; setDefaultBranch?: string }) => {
+      if (!n.includes("--snap-")) return real(n, o);
+      a.binding.create = real;
+      name = n;
+      return new Promise<never>(() => {});
+    };
+    await inDO(r, (room) => {
+      void room.core.steps.jobs().catch(() => undefined);
+    });
+    while (name === null) await pause(2);
+    const created: string = name;
+    expect(await duties(r)).toContainEqual(expect.objectContaining({ name: created, kind: "create", state: "in-flight" }));
+    expect(await storage(r, (s) => s.storage.getAlarm()), "an alarm is stored before the provider was asked").not.toBeNull();
+    await storage(r, async (s) => s.abort("host stopped")).catch(() => undefined);
+    await real(created); // the create applies late
+    expect(a.repos.has(created)).toBe(true);
+    clock.now += 2 * 60_000; // past the unresolved create's first check
+    const stub = freshStub(r);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(a.repos.has(created)).toBe(false);
+    expect((await runInDurableObject(stub, (room: Room) => room.core.snapshotRepos.duties())).filter((d) => d.name === created && d.state !== "done")).toEqual([]);
+  });
+
+  it("a snapshot wake-up that cannot be stored: no create is sent, the step is closed as never sent, and the job is tried again", async () => {
+    const { r, seen } = await owedJob();
+    const a = r.world.artifacts;
+    const creates = () => a.remoteCalls.get("create") ?? 0;
+    const before = creates();
+    let left = 1;
+    setFault((p) => {
+      if (p === "room:set-alarm" && left-- > 0) throw new Error("the alarm could not be stored");
+    });
+    try {
+      await inDO(r, (room) => room.core.steps.jobs());
+      expect(left, "the wake-up asked storage").toBe(0);
+    } finally {
+      setFault(null);
+    }
+    expect(creates()).toBe(before);
+    expect(await duties(r)).toEqual([expect.objectContaining({ kind: "create", state: "done", doneReason: "not-sent" })]);
+    expect(snapshotRepos(r)).toEqual([]);
+    clock.now = (await inDO(r, (room) => room.core.sql.all("SELECT next_ms FROM check_jobs")[0]!["next_ms"] as number));
+    await inDO(r, (room) => room.core.steps.jobs());
+    await settled(r);
+    expect(creates()).toBe(before + 1);
+    expect(seen).toHaveLength(1);
+  });
+});
+
+describe("follow-up c9cd4cd8 (2): a fresh object schedules snapshot debt it finds", () => {
+  it("a snapshot repository's owed deletion, with no alarm stored: the fresh object stores one, and its alarm deletes the repository", async () => {
+    const { r } = await checkRoom();
+    const a = r.world.artifacts;
+    const commit = "a".repeat(40);
+    const ready = await inDO(r, (room) => room.core.snapshotRepos.prepare(commit, async () => commit));
+    expect(a.repos.has(ready.name)).toBe(true);
+    const before = r.stub as unknown as DurableObjectStub<Room>;
+    await runInDurableObject(before, (_room: Room, s: DurableObjectState) => s.storage.deleteAlarm());
+    await runInDurableObject(before, (_room: Room, s: DurableObjectState) => s.abort("restart")).catch(() => undefined);
+    const stub = freshStub(r);
+    expect(await runInDurableObject(stub, (_room: Room, s: DurableObjectState) => s.storage.getAlarm()), "the fresh object stored an alarm").not.toBeNull();
+    clock.now += 16 * 60_000; // the unused repository's deletion is due after the preparation window
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(a.repos.has(ready.name)).toBe(false);
+    expect((await runInDurableObject(stub, (room: Room) => room.core.snapshotRepos.duties())).filter((d) => d.state !== "done")).toEqual([]);
+  });
 });

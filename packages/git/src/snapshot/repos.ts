@@ -306,7 +306,16 @@ export class SnapshotRepos {
         this.sql.all("INSERT INTO artroom_snap (snapshot, name, state, remote, created_at) VALUES (?, ?, 'creating', NULL, ?)", commit, name, this.now());
         return { step, name };
       });
-      await this.wake();
+      try {
+        await this.wake();
+      } catch (e) {
+        // Not stored: the create is never sent, so this step can never apply (follow-up c9cd4cd8).
+        this.sql.transaction(() => {
+          this.done([step], "not-sent");
+          this.sql.all("DELETE FROM artroom_snap WHERE name = ?", name);
+        });
+        throw e;
+      }
       let created: Awaited<ReturnType<ArtifactsNamespace["create"]>>;
       try {
         // One attempt: a retry is a new step, with a new name.
