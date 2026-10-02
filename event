@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Independently review G2 at exact 922d2ed6: verify per-job sandbox isolation, cold restart, immutable job capture and lossless structured Git output; review all artifacts and retain the actual Room integration gate."}
+{"kind":"artifact","text":"package-lock.json at exact 6f470379b382a9eb0579b010f7e6e69fcbe29160 on request/laneE-clients, under promise git:sha1…68876e3 on request git:sha1…cf2e531","body":{"commit":"6f470379b382a9eb0579b010f7e6e69fcbe29160","path":"package-lock.json"}}
