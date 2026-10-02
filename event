@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/git/src/workspace/workspaces.ts","body":{"commit":"77d2e6c5d17b954a442f0b09b1e951fc4e451c3d","path":"packages/git/src/workspace/workspaces.ts"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/git/test/snapshots.test.ts","body":{"commit":"77d2e6c5d17b954a442f0b09b1e951fc4e451c3d","path":"packages/git/test/snapshots.test.ts"}}
