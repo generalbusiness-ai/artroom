@@ -260,3 +260,52 @@ describe("R-CARRY-16: one repository per snapshot commit", () => {
     expect((await duties(r)).filter((d) => d.state !== "done")).toEqual([]);
   });
 });
+
+describe("review 1701f73e: an imported room's jobs stay in its import namespace", () => {
+  for (const [kind, cfg] of [
+    ["whole-tree", { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: R } as CheckerConfig],
+    ["filtered", scoped],
+  ] as const)
+    it(`${kind}: the job reads the import namespace through the Room's binding for it, and the public namespace is untouched`, async () => {
+      const r = await makeRoom({
+        policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })),
+        files: { ".artroom/checkers/unit.json": JSON.stringify(cfg), "package.json": "{}", "docs/private.md": "not for a scoped runner\n" },
+        importNamespace: "acme-import",
+      });
+      const imports = r.world.imports!;
+      const alice = await addMember(r, "@alice", "member");
+      await addMember(r, "@ci", "checker");
+      const seen: { job: CheckJob; own: string; ownObjects: ReadonlySet<string>; readsOwn: boolean; readsCanonical: boolean }[] = [];
+      r.world.checkers["unit"] = {
+        async handle(job): Promise<Result<Check>> {
+          const own = [...imports.repos.values()].find((x) => x.remote === job.readUrl)!;
+          seen.push({ job, own: own.name, ownObjects: new Set(own.objects), readsOwn: own.admits(tokenOf(job), "read"), readsCanonical: imports.canonicalRepo().admits(tokenOf(job), "read") });
+          return refusal;
+        },
+      };
+      const c = await alice.ok<Claim>("claim", null, { goal: "work", scope: ["src/**"] });
+      const head = imports.commit(imports.main, { "src/app.ts": "v2" });
+      imports.push(c.lane, head);
+      await alice.ok<Proposal>("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "change" });
+      await tick(r, 2);
+      expect(seen).toHaveLength(1);
+      const s = seen[0]!;
+      expect(s.readsOwn).toBe(true);
+      if (kind === "whole-tree") {
+        expect(s.own).toBe(imports.canonical);
+        expect(s.job.input).toMatchObject({ kind: "tree" });
+      } else {
+        // A snapshot repository of its own, in the import namespace, without the file outside the checker's inputs.
+        expect(s.own).toContain("--snap-");
+        expect(s.readsCanonical).toBe(false);
+        const privateBlob = imports.blobs(imports.main!).get("docs/private.md")!;
+        expect(s.ownObjects.has(privateBlob)).toBe(false);
+        expect(s.ownObjects.has(s.job.integration)).toBe(true);
+      }
+      // Its credentials end with the job; the public namespace has no repository and was never called.
+      expect(imports.canonicalRepo().admits(tokenOf(s.job), "read")).toBe(false);
+      expect([...imports.repos.keys()].filter((n) => n.includes("--snap-"))).toEqual([]);
+      expect(r.world.artifacts.repos.size).toBe(0);
+      expect(r.world.artifacts.remoteCalls.size).toBe(0);
+    });
+});

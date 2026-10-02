@@ -240,7 +240,8 @@ setServicesFactory((_env, objectId) => {
         return world.imports ? { [world.imports.namespace]: world.imports.binding as unknown as ArtifactsBinding } : {};
       },
       publisher,
-      writeSnapshot: host.writeSnapshot,
+      // The sandbox writes a snapshot into a repository beside the canonical one: in the import namespace for an imported room.
+      writeSnapshot: (req) => hostFor(req.store.remote).writeSnapshot(req),
       // The production log remote, over the fake binding and the fake sandbox's pushLog and readLogRef.
       logRemote: async (loc) => artifactsLogRemote(hostFor(loc.namespace).binding as unknown as ArtifactsBinding, hostFor(loc.namespace).logStub, loc),
       firstCommit: (remote, token, at) => hostFor(remote).firstCommit(remote, token, at),
@@ -402,14 +403,22 @@ export function grant(repo: string, admin: KeyId, notAfter = iso(clock.now + day
 }
 
 /** A room founded from a signed genesis, with main holding `files` (R-GEN-1). */
-export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<string, string> } = {}): Promise<TestRoom> {
+export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<string, string>; importNamespace?: string } = {}): Promise<TestRoom> {
   const world = newWorld();
   // An imported repository, with an operator's grant (R-GEN-12), bound in the registry before founding (R-GEN-13).
-  const repo = `test-import/${hex(randomBytes(16))}`;
-  placeRepo(world, repo);
+  // With `importNamespace`, it is in the deployment's second namespace (`world.imports`), and the primary is left empty.
+  const repo = `${opts.importNamespace ?? "test-import"}/${hex(randomBytes(16))}`;
   const files: Record<string, string> = { "README.md": "# test\n", "src/app.ts": "export const app = 1;\n", ...(opts.files ?? {}) };
   if (opts.policy) files[".artroom/policy.json"] = JSON.stringify(opts.policy);
-  world.artifacts.main = world.artifacts.commit(null, files);
+  if (opts.importNamespace) {
+    const imports = new FakeArtifactsHost(opts.importNamespace, () => clock.now);
+    imports.canonical = repo.split("/")[1]!;
+    imports.main = imports.commit(null, files);
+    world.imports = imports;
+  } else {
+    placeRepo(world, repo);
+    world.artifacts.main = world.artifacts.commit(null, files);
+  }
   const admin = newKeyPair();
   const recovery = newKeyPair();
   const seed = randomBytes(32);

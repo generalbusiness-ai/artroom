@@ -1293,6 +1293,18 @@ on the real Room Durable Object and SQLite:
 | "a refusal that changed nothing settles the mint at once" | No record is left |
 | "an answer still outstanding …" | The record exists while the call is out; a late answer's token is ended and the record settled |
 
+The review also accepted the namespace-aware binding: an imported room's
+jobs, tokens and snapshot repositories live in its import namespace. The
+shared test fixture now routes the sandbox's `writeSnapshot` to the
+namespace that holds the store, and `makeRoom({ importNamespace })` founds
+a room there. Controls in snapshot-repos ("an imported room's jobs stay in
+its import namespace", whole-tree and filtered): the job reads the import
+namespace, a filtered job's repository there lacks a file outside its
+inputs and its token cannot read the canonical repository, its credentials
+end with the job, and the public namespace has no repository and no call.
+With the fixture's routing undone, the filtered control fails; with jobs
+reading through the public binding, the whole-tree control fails.
+
 **Mutations.** 11 of 12 were caught: no record before the call; a lost
 answer treated as no token; a refusal kept unresolved; a malformed answer
 accepted; a usable answer leaving the record; settling by the deadline
