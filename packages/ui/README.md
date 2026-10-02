@@ -488,3 +488,12 @@ which almost always rejects the same regions. The same fuzz, run 40,000
 times over two-letter files (the most repetitive), gave identical results
 with and without it. It is kept as the plain statement that a line main
 deleted has no place, but it is not counted as tested.
+
+The screenshots `proposal-changes-light.png` and `proposal-changes-dark.png`
+are regenerated: the identical-edit sentence now says "at the same places".
+
+**Gates**, all exit 0, after `npm ci` (main added `packages/room`): root
+`npm run typecheck`; root `npm test` (git 143; log 127, and 122 in workerd;
+policy 199, and 198 with 1 skipped in workerd; room 67, and 275 in workerd;
+UI 141); `npm run build` in `packages/ui`; `npm run e2e` (Playwright, 8
+tests, including lane F's carry screenshot).
