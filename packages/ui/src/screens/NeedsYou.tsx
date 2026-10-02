@@ -103,6 +103,21 @@ export function explainItem(snap: RoomSnapshot, item: AttentionItem): Explained 
     }
     case "revert-lane":
       return { icon: "refresh", tone: "bad", why: <>The room opened a revert lane.</>, action: { label: "See the lane", href: href.proposal(item.lane) } };
+    case "log-publication-failed":
+      return {
+        icon: "cloudOff",
+        tone: "bad",
+        why: <>You are an admin. The log stopped publishing. The room tries again after an hour, or when it restarts.</>,
+        detail: <>{item.detail}</>,
+        action: { label: "See the log", href: href.room() },
+      };
+    case "log-entry-too-large":
+      return {
+        icon: "cloudOff",
+        tone: "bad",
+        why: <>You are an admin. A {item.event} event of {item.bytes} bytes was over the entry bound, so it was not recorded.</>,
+        action: { label: "See the log", href: href.room() },
+      };
     case "policy": {
       const rule = snap.policy.document?.rules.find((r) => r.id === item.rule);
       return {

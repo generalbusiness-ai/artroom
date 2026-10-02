@@ -5,7 +5,7 @@
 
 import type { ActId, Cursor, LaneId, ObligationId, OpId, RuleId, Seq, Timestamp } from "./ids.ts";
 import type { ProposalRef } from "./acts.ts";
-import type { EntrySummary, LogEntry } from "./log.ts";
+import type { EntrySummary, LogEntry, SystemEvent } from "./log.ts";
 import type { Principal } from "./roster.ts";
 
 export interface PageRequest {
@@ -51,7 +51,17 @@ export type AttentionWhy =
   | { readonly why: "evidence-invalidated"; readonly proposal: ProposalRef; readonly obligation: ObligationId }
   | { readonly why: "publication-unresolved"; readonly op: OpId; readonly since: Timestamp }
   | { readonly why: "revert-lane"; readonly lane: LaneId; readonly of: OpId }
-  | { readonly why: "policy"; readonly rule: RuleId; readonly act: ActId; readonly text: string };
+  | { readonly why: "policy"; readonly rule: RuleId; readonly act: ActId; readonly text: string }
+  /**
+   * Admins only. Publication of the log stopped on a definite failure
+   * (R-LOG-20): the remote refused the push, an object would exceed the
+   * object bound, or another writer moved the ref. `detail` is the remote's
+   * answer, such as `artifacts_git_receive_pack_object_too_large`. The item
+   * stays open until a publication is confirmed.
+   */
+  | { readonly why: "log-publication-failed"; readonly reason: "refused" | "object-too-large" | "unexpected-writer"; readonly detail: string; readonly since: Timestamp }
+  /** Admins only. A system event over the entry bound was not sealed, and its effect did not happen (R-LOG-18). */
+  | { readonly why: "log-entry-too-large"; readonly event: SystemEvent["type"]; readonly bytes: number };
 
 export type AttentionItem = AttentionWhy & {
   readonly id: string;

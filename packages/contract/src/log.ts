@@ -241,18 +241,38 @@ export interface Checkpoint {
   readonly hash: Digest;
   readonly at: Timestamp;
   readonly roomKey: KeyId;
+  /**
+   * The commit's layout (R-LOG-16). Absent: layout 1, as R-LOG-9 was first
+   * written. Once a log commit has a layout, every later one has the same.
+   */
+  readonly layout?: LogLayout;
   /** Ed25519 by the room key over `artroom-checkpoint-v1\n` + JCS of the fields above. */
   readonly sig: Base64Url;
 }
 
-/** The tree layout of each commit on `refs/artroom/log` (R-LOG-9). */
+/**
+ * Layout 2 of a log commit (R-LOG-16 to R-LOG-19): segments close at a byte
+ * bound as well as at 1,000 entries, and retained files are fanned out by
+ * digest. Named in the signed checkpoint.
+ */
+export interface LogLayout {
+  readonly version: 2;
+  /**
+   * The first seq placed by the byte rule (R-LOG-17): 0 for a log that
+   * began in layout 2, otherwise the `through` of the last layout 1 commit
+   * plus one. It never changes.
+   */
+  readonly from: Seq;
+}
+
+/** The tree layout of each commit on `refs/artroom/log` (R-LOG-9, R-LOG-16). */
 export interface PublishedLayout {
   readonly "artroom-log/v1/genesis.json": Genesis;
-  /** Entries `first`..`first + 999` as JCS lines. */
+  /** Entries from `first`, as JCS lines joined by newlines. Layout 1: `first`..`first + 999`. Layout 2: closed by R-LOG-17. */
   readonly [segment: `artroom-log/v1/segments/${string}.jsonl`]: string;
-  /** Retained replay contexts (R-EVAL-8), by digest. */
+  /** Retained replay contexts (R-EVAL-8), by digest. Layout 2 adds a directory of the first two hex characters (R-LOG-19). */
   readonly [input: `artroom-log/v1/inputs/${string}.json`]: unknown;
-  /** Every activated policy document and checker configuration, by digest. */
+  /** Every activated policy document and checker configuration, by digest; fanned out in layout 2 as `inputs/` is. */
   readonly [policy: `artroom-log/v1/policies/${string}.json`]: unknown;
   readonly "artroom-log/v1/checkpoint.json": Checkpoint;
 }
