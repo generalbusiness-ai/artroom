@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4121aeac6deb5078024ad83d4a3edccaa7f72286","text":"Republished at 4d065546ec6951d13a46d4d8a685af0a6ebf4988; the successor stands at packages/checkers/test/isolation.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:679b0533d3fa2fddc048dcbc62fbb60438ae3bf3","text":"Republished at 4d065546ec6951d13a46d4d8a685af0a6ebf4988; the successor stands at packages/checkers/test/snapshot-isolation.test.ts."}
