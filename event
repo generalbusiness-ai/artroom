@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Checker reviews exact head 17a7954378cbcb413be64831aa6c8495fc527f48 on all 42 artifacts, immutable snapshot isolation, token ownership and cleanup, with Architecture, Security and Simplification conclusions."}
+{"kind":"artifact","text":"packages/ui/README.md at exact 3203660e7919d4a1e76780c57e927d0ecc814ee4 on request/laneF-carry, under promise git:sha1…4fc18c0 on request git:sha1…f7cc884","body":{"commit":"3203660e7919d4a1e76780c57e927d0ecc814ee4","path":"packages/ui/README.md"}}
