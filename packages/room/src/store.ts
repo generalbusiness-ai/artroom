@@ -229,6 +229,11 @@ export const ROOM_MIGRATIONS: readonly Migration[] = [
         obligation TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, integration TEXT NOT NULL, base TEXT NOT NULL,
         state TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, next_ms INTEGER NOT NULL, token TEXT, outcome TEXT,
         UNIQUE (owner, integration, obligation, config))`);
+      // Canonical read tokens of job attempts that the Room has ended but Artifacts has not yet confirmed revoked:
+      // retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose expiry
+      // is not known is retried until it is revoked.
+      sql.all(`CREATE TABLE IF NOT EXISTS job_tokens (token_id TEXT PRIMARY KEY, expires_at INTEGER, next_ms INTEGER NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)`);
     },
   },
 ];

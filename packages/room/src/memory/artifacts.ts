@@ -120,6 +120,8 @@ export class FakeRepo implements GitRemote {
     while (this.host.holdToken?.(this.name, scope, ttl)) await new Promise((r) => setTimeout(r, 2));
     if (ttl < 60 || ttl > 31_536_000) throw new FakeArtifactsError("INVALID_TTL", 10003);
     const t = this.mint(scope, ttl);
+    // The answer held after the token was minted: its expiry ran from the request, its reply comes late.
+    while (this.host.holdTokenReply?.(this.name, scope, ttl)) await new Promise((r) => setTimeout(r, 2));
     this.host.answer("createToken");
     return t;
   }
@@ -386,6 +388,8 @@ export class FakeArtifactsHost {
 
   /** Tests only: hold `createToken` calls in flight while this says so. */
   holdToken: ((repo: string, scope: "read" | "write", ttl: number) => boolean) | null = null;
+  /** Tests only: hold `createToken` answers after the token is minted, while this says so. */
+  holdTokenReply: ((repo: string, scope: "read" | "write", ttl: number) => boolean) | null = null;
 
   /** Clear every planned failure: the remote has recovered. */
   recover(): void {

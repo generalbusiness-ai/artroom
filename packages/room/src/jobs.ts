@@ -49,6 +49,8 @@ export const JOB_MARGIN_S = 300;
 export const JOB_RETRY_MS = 30_000;
 /** When the room cannot issue jobs now (not bound to its repository), they wait this long. */
 export const JOB_IDLE_MS = 300_000;
+/** A canonical token is asked to expire this long before the job's deadline, as `SnapshotRepos.mint` does. */
+export const TOKEN_MARGIN_S = 5;
 
 interface JobRow {
   readonly id: `job_${string}`;
@@ -109,9 +111,10 @@ function move(core: RoomCore, j: JobRow, set: string, ...values: (string | numbe
   return core.sql.all(`UPDATE check_jobs SET ${set} WHERE id = ? AND attempt = ? AND state = ? RETURNING id`, ...values, j.id, j.attempt, j.state).length > 0;
 }
 
-/** Issue every job that is due; an attempt past its deadline is due again. */
+/** Issue every job that is due; an attempt past its deadline is due again. Ended tokens not yet revoked are tried first. */
 export async function issueJobs(core: RoomCore): Promise<void> {
   if (!core.founded) return;
+  for (const r of core.sql.all("SELECT token_id FROM job_tokens WHERE next_ms <= ?", core.now())) await settleToken(core, str(r, "token_id")!);
   const now = core.now();
   // A room the registry does not bind issues nothing (R-PUB-10); its debt waits, never past due.
   if (!(await core.isBound())) {
@@ -133,10 +136,11 @@ export async function issueJobs(core: RoomCore): Promise<void> {
       attempt: num(r, "attempt") ?? 0,
       token: str(r, "token"),
     };
-    // An expired attempt: stop waiting for it, and end its token (it expired by the deadline in any case).
+    // An expired attempt: stop waiting for it, and end its token. A recorded token was accepted only if it expires
+    // by the attempt's deadline, which is `next_ms`.
     if (j.state === "sent") {
       waitsOf(core).get(`${j.id}_${j.attempt}`)?.();
-      if (j.token) await endToken(core, j.token, `${j.id}_${j.attempt}`).catch(() => undefined);
+      if (j.token) await endToken(core, j.token, `${j.id}_${j.attempt}`, num(r, "next_ms")).catch(() => undefined);
     }
     await issue(core, j).catch(() => move(core, j, "next_ms = ?", core.now() + JOB_RETRY_MS));
   }
@@ -145,12 +149,42 @@ export async function issueJobs(core: RoomCore): Promise<void> {
 /**
  * End an attempt's token. `token` is a canonical read token's ID, or
  * `snapshot:<commit>` for a filtered job's token, which the snapshot
- * repositories revoke, retiring the repository once no job is left.
+ * repositories revoke (with their own durable duties), retiring the
+ * repository once no job is left. A canonical token is recorded in
+ * `job_tokens` before it is revoked, and stays there until Artifacts
+ * confirms the revocation or its known expiry has passed.
  */
-async function endToken(core: RoomCore, token: string, job: string): Promise<unknown> {
+async function endToken(core: RoomCore, token: string, job: string, expiresAt: number | null): Promise<unknown> {
   if (token.startsWith("snapshot:")) return core.snapshots.end(token.slice("snapshot:".length) as Sha, job);
-  const repo = await core.artifacts.get(core.location().name);
-  return repo.revokeToken(token);
+  core.sql.all(
+    "INSERT INTO job_tokens (token_id, expires_at, next_ms) VALUES (?, ?, ?) ON CONFLICT (token_id) DO UPDATE SET expires_at = COALESCE(job_tokens.expires_at, excluded.expires_at), next_ms = excluded.next_ms",
+    token,
+    expiresAt,
+    core.now(),
+  );
+  return settleToken(core, token);
+}
+
+/** Try one ended canonical token's revocation. Settled by Artifacts' answer, or by its known expiry passing; otherwise retried. */
+async function settleToken(core: RoomCore, token: string): Promise<void> {
+  const row = one(core.sql, "SELECT expires_at, attempts FROM job_tokens WHERE token_id = ?", token);
+  if (!row) return;
+  try {
+    const repo = await core.artifacts.get(core.location().name);
+    await repo.revokeToken(token);
+    core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", token);
+  } catch (e) {
+    const expires = num(row, "expires_at");
+    if (expires !== null && expires <= core.now()) return void core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", token);
+    const attempts = (num(row, "attempts") ?? 0) + 1;
+    core.sql.all(
+      "UPDATE job_tokens SET attempts = ?, next_ms = ?, last_error = ? WHERE token_id = ?",
+      attempts,
+      core.now() + Math.min(5_000 * 2 ** attempts, 300_000),
+      String(e).replace(/art_v\d+_[A-Za-z0-9_]+/g, "<token>").slice(0, 300),
+      token,
+    );
+  }
 }
 
 /** The owner's hold on this integration now, or null: the land operation a check names, if any. */
@@ -202,8 +236,9 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
   if (!move(core, j, "state = 'sent', attempt = ?, next_ms = ?, token = NULL", attempt, deadline)) return;
   const mine: JobRow = { ...j, state: "sent", attempt, token: null };
   let tokenId: string | null = null;
+  let tokenExpires: number | null = null;
   let target: { integration: Sha; input: CheckInput; readUrl: `https://${string}`; token: string };
-  const end = () => (tokenId ? endToken(core, tokenId, jobId).catch(() => undefined) : Promise.resolve());
+  const end = () => (tokenId ? endToken(core, tokenId, jobId, tokenExpires).catch(() => undefined) : Promise.resolve());
   try {
     const inputs = checkerInputs(cfg.config.inputs, policy.doc.carry);
     if (inputs) {
@@ -227,9 +262,13 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       if (!tree) throw new Error("the integration's tree could not be read");
       const readUrl = (await core.canonicalRemoteReady()) as `https://${string}`;
       const repo = await core.artifacts.get(core.location().name);
-      // Expiring no later than the deadline claimed above (R-EXEC-9).
-      const t = await repo.createToken("read", Math.floor((deadline - core.now()) / 1000));
+      // Asked to expire before the deadline claimed above; what Artifacts returns is checked below (R-EXEC-9).
+      const t = await repo.createToken("read", Math.floor((deadline - core.now()) / 1000) - TOKEN_MARGIN_S);
       tokenId = t.id;
+      tokenExpires = Date.parse(t.expiresAt);
+      if (!Number.isFinite(tokenExpires)) tokenExpires = null;
+      // A token that is not read-only, or whose expiry is unknown or after the deadline, is refused and ended.
+      if (t.scope !== "read" || tokenExpires === null || tokenExpires > deadline) throw new Error("Artifacts minted a token that would outlive the job");
       move(core, mine, "token = ?", tokenId);
       target = { integration: j.integration, input: { kind: "tree", tree }, readUrl, token: t.plaintext };
     }
@@ -243,6 +282,12 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
   // obligation are judged again, with no await before the dispatch. Work that no longer belongs to its owner is
   // retired with its credentials.
   if (!move(core, mine, "next_ms = next_ms")) return void (await end());
+  // An attempt past its own deadline is never sent: its credentials are ended and the job is due again later.
+  if (core.now() >= deadline) {
+    move(core, mine, "state = 'owed', next_ms = ?, token = NULL", core.now() + JOB_RETRY_MS);
+    await end();
+    return;
+  }
   if (!current(core, mine)) {
     move(core, mine, "state = 'done', outcome = 'not-needed', token = NULL");
     await end();

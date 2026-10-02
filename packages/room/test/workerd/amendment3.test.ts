@@ -392,7 +392,8 @@ describe("R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding", ()
     const token = /^Authorization: Bearer (.+)$/.exec(job.gitAuthEnv.GIT_CONFIG_VALUE_0)![1]!;
     const minted = [...canonical.tokens.values()].find((t) => t.plaintext === token)!;
     expect(minted.scope).toBe("read");
-    expect(job.deadline).toBe(iso(minted.expiresAt));
+    // The token expires before the job's deadline, by Room's margin (review 90f30a3b).
+    expect(minted.expiresAt).toBeLessThanOrEqual(Date.parse(job.deadline));
     expect(canonical.admits(token, "read")).toBe(false);
     expect(await inDO(r, (room) => room.core.sql.all("SELECT state, outcome FROM check_jobs WHERE id || '_' || attempt = ?", job.id))).toEqual([{ state: "done", outcome: expect.stringMatching(/^act_/) }]);
   });

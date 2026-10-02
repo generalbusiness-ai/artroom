@@ -1689,6 +1689,9 @@ export class RoomCore {
     // Check jobs owed, and jobs sent whose deadline passed with no answer.
     const job = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM check_jobs WHERE state != 'done'"), "t");
     if (job !== null) times.push(job);
+    // Ended job tokens whose revocation Artifacts has not confirmed yet.
+    const revoke = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM job_tokens"), "t");
+    if (revoke !== null) times.push(revoke);
     const now = this.now();
     const pending =
       this.endedWorkspaces().length > 0 ||
