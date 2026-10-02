@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:538191228b61b4657a7d29da1f087719c215ea10","text":"Republished at 38057c0a74baac4654daa8b107973ac9f4cf127c; the successor stands at packages/room/measure/spike-smoke.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:661f108a38239175a893cf02235d6eb78f4fdc5d","text":"Republished at 38057c0a74baac4654daa8b107973ac9f4cf127c, which no longer changes packages/room/scripts/deploy-spike.sh: the pointer is withdrawn with no successor."}
