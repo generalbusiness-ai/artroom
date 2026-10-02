@@ -61,7 +61,7 @@ describe("HTTPS routes", () => {
     expect((await get(room, "attention", token)).status).toBe(200);
   });
 
-  it("POST /requests and /redeem; an unknown room is 404; the MCP route is not served here", async () => {
+  it("POST /requests and /redeem; an unknown room is 404; the MCP route needs a bearer (test/workerd/mcp.test.ts)", async () => {
     const room = await makeRoom();
     const res = await post(room, "requests", room.admin.signedRequest({ kind: "session", ttlSeconds: 60 }));
     expect(res.status).toBe(200);
@@ -71,7 +71,7 @@ describe("HTTPS routes", () => {
     expect(r.status).toBe(409);
     const unknown = await exports.default.fetch(`${base}/no-such-room/members`, { headers: { Authorization: "Bearer x" } });
     expect(unknown.status).toBe(404);
-    expect((await post(room, "mcp", {})).status).toBe(404);
+    expect((await post(room, "mcp", {})).status).toBe(401);
   });
 
   it("the RPC entrypoint: room(id) returns a RoomWire whose refusals are values and failures are thrown", async () => {

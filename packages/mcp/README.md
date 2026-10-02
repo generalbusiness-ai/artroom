@@ -21,6 +21,15 @@ on each likely refusal. A refusal is a normal result (`isError: false`)
 with the `Refusal` as structured content. A failure is a tool error
 (`isError: true`) with the `ArtroomError` as structured content (R-API-1).
 
+`tools/list` advertises each tool's `outputSchema`. Every root is an
+object. The eight tools that can refuse (`claim`, `workspace`, `propose`,
+`note`, `review`, `land`, `renew`, `release`) have `oneOf` their result and
+`Refusal`, so a refusal's structured content conforms too, as MCP
+2026-07-28 requires. Because the root is an object, a 2025-era client gets
+the same schema and the same structured content, never wrapped in
+`{ result }`. The server instructions are 378 characters, under the 512
+that Codex keeps.
+
 ## On Workers
 
 ```ts
@@ -42,9 +51,15 @@ export default {
 ```
 
 It uses the Agents SDK's stateless handler (`agents/mcp/server`), which
-makes a new server for each request. Requests without a valid bearer get
-HTTP 401 with a message that says how to get a token. For a custom domain,
-pass `allowedHostnames`.
+makes a new server for each request. It serves 2026-07-28 clients and, in
+its legacy stateless mode (`legacy: "stateless"`), 2025-era clients such
+as Codex by default and pi; GET and DELETE, the 2025 session operations,
+are 405. Requests without a valid bearer get HTTP 401 with a message that
+says how to get a token. For a custom domain, pass `allowedHostnames`.
+
+The Room Worker serves this handler at `/v1/rooms/:room/mcp`
+(`packages/room/src/mcp.ts`), with the `RoomApi` described at the end of
+this file.
 
 ## On stdio
 
