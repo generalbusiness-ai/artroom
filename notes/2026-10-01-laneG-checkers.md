@@ -671,3 +671,139 @@ fetch the older snapshot's commit, tree or excluded blob by ID, and the
 control fetched the job's own tree, blob and commit. Afterwards 40 of 44
 duties were done; the 4 open ones are the legacy steps, which stay
 scheduled by design. No `artroom-lg` repository is left in the namespace.
+
+## Request ace84f20: amendment 3's lane G items, and one deployment for every room
+
+Branch `request/laneG-carry`, from main `c5825470`. Lane A's dispatch
+(`request/laneA-carry` at `def67da6`: `src/jobs.ts`, `checkerBinding` in
+`src/config.ts`, the `checkers` port) was read, and this side matches its job:
+`room` is the Room's ID; `base`, `volatile`, `advisory`, `runner` and a
+`GitAuthEnv` are filled from the configuration; IDs are
+`job_<24 hex>_<attempt>`; and the Room calls `handle(job)` on `CHECKER_<NAME>`.
+`packages/room` was not edited.
+
+### Section 29.8, lane G items
+
+| Item | State | Tests |
+|---|---|---|
+| 1. Snapshot author and message (R-CARRY-15) | Landed with revision 5: `GitOps.writeSnapshot` writes the fixed identity at time 0 with the Room's message | git `gitops.test.ts` "filtered snapshot: the fixed commit of R-CARRY-15 …"; checkers `snapshot-isolation.test.ts` "the Room's snapshot commit ID equals the commit the publisher writes …" |
+| 2. A repository per snapshot, the per-checker store dropped, the isolation test (R-CARRY-16) | Landed with revision 5 | checkers `snapshot-isolation.test.ts` (older snapshot by known ID, exact current commit, configuration change, concurrent snapshots, retirement); git `snapshots.test.ts` |
+| 3. `GitAuthEnv` | Landed with revision 3 (`gitAuthEnvFor` returns it) | type-checked; binding cases "extra environment", "no token" |
+| 4. `check-binding` for a runner or volatile mismatch (R-EXEC-10, R-EXEC-11) | New. A job whose pinned runner differs from the digest measured in its new container is refused, with nothing checked out, run or signed, and its container destroyed. A volatile checker refuses a job that says `volatile: false` before any runner starts. The check states `volatile` as the job does | `carry.test.ts`: "R-EXEC-11: a job that pins another runner digest is refused check-binding; nothing is checked out, run or signed"; "R-EXEC-10: a volatile checker refuses a job that says volatile: false, before any runner starts"; "R-EXEC-10: the check states volatile as the job does" |
+| 5. Jobs only over the service binding; the harness route not in production (R-EXEC-8) | New. `src/worker.ts` and `wrangler.jsonc` are production only: the three entrypoints and the runner sandbox, and a `fetch` that answers 404 to everything. The `/h/*` routes, `HarnessLedger` and the publisher are `src/harness.ts` and `wrangler.harness.jsonc` (`artroom-lg-checkers`), never deployed with production | `carry.test.ts` "production: the Worker has no route that accepts or builds a job, and no harness" (routes, exports, imports, both configurations) |
+| 6. The LLM reviewer compares `job.base`; advisory (R-EXEC-10, R-OBL-7) | New. It fetches `job.base` by its ID and diffs the integration against it, not against its first parent. `config/llm-review.json` says `advisory: true` and `volatile: true`; `tests.json` and `types.json` are beside it | `checkers.test.ts`: "LLM reviewer: the change is the integration against the job's base, not its first parent (R-EXEC-10)"; "LLM reviewer: its configuration is advisory and volatile, and each shipped configuration is valid and matches its checker …" |
+| 7. The runner digest in the detail (R-EXEC-11) | New: `Runner environment: sha256:…` | `carry.test.ts` "R-EXEC-11: each check's detail shows the runner digest the service measured" |
+| 8. Fixtures with `base`, `volatile`, `advisory`, `runner` | Landed with revision 3. The binding now also requires them | `checkers.test.ts` binding cases "bad base", "no volatile flag", "no advisory flag", "a malformed runner digest" |
+
+**The snapshot-cleanup findings of the earlier G reviews.** Review 96d1fbc9
+(on revision 3) found two: an unknown create settled by absence and time,
+and the cleanup wake-up armed after preparation's effects. Revision 4 fixed
+both, and review 13b98054 credited them. Its one remaining finding, the
+upgrade from revision 3, was fixed in revision 5, which landed. Nothing is
+still open, so nothing is carried forward.
+
+### One checker deployment for every room
+
+Before, the checker Worker took `ROOM_ID` and `CHECKER_DELEGATION` at
+deploy time, and its `ROOM` binding was "not bound yet". Now:
+- `ROOM` is a real service binding to the Room Worker (`artroom-room`, its
+  default entrypoint, the contract's `ArtroomService`), and production
+  requires it: without it `handle` throws `unavailable` and nothing runs.
+- The room is each job's own. `job.room` must be a room ID (R-ID-3; a name
+  is refused `check-binding`). It is resolved through
+  `ArtroomService.room(job.room)` before any sandbox starts, and the signed
+  check, and the LLM reviewer's note, go to that room. A room the binding
+  cannot resolve stops the job as `unavailable`. That room then admits the
+  check only if it binds a job the room recorded (R-OBL-3). No room is
+  configured, so one deployment serves every room on the binding.
+- `ROOM_ID` and `CHECKER_DELEGATION` are gone from production. The service
+  signs as a member's own key (R-ADM-3, case a), so its key must be a
+  member's key, with a role that may sign `check` and `note`, in each room
+  whose checks it signs.
+
+Tests: `carry.test.ts` "one service serves many rooms: each job's check goes
+to the job's own room, resolved through the binding" (two rooms; an
+unknown room runs nothing; a name is refused before the binding is asked);
+"production: the ROOM binding is required, and resolves each job's room by
+its ID".
+
+**Stopped: a delegation per job, and a job verified against the Room's
+signature, need a contract change.** `CheckJob` has no delegation field.
+R-EXEC-8 says jobs are not signed and no signing domain exists for them, so
+there is no Room signature to verify a job against. Taking a delegation
+from the job, verified against a signed job, would need both:
+`CheckJob.delegation` (or a Room-signed job carrying it), and a job-signing
+domain that amends R-EXEC-8. Neither is made here, and
+`docs/protocol.md` is unchanged. Until then a checker key signs as a member
+key. The spike's smoke room can add the checker's key as a member (an
+invitation and a `join`) instead of a delegation.
+
+**Namespaces.** The Artifacts namespaces a job may read from are set at
+deploy time: `ARTIFACTS_NAMESPACES`, comma-separated (production default
+`artroom-public`; the spike sets its own, for example
+`gitseq-spike,gitseq-spike-import`). A read URL outside the list is refused
+`check-binding`. An entrypoint will not start if the list is missing, empty
+or malformed. Tests (`carry.test.ts`): "ARTIFACTS_NAMESPACES: a
+comma-separated list of namespace names; missing, empty or malformed is
+refused"; "a job may read from any accepted namespace, and from no other";
+"production: an entrypoint will not start with a missing, empty or
+malformed ARTIFACTS_NAMESPACES; the shipped configurations parse".
+
+### Mutation checks
+
+Each guard was broken, one at a time, after committing (`8f350653`); each
+mutant made a test fail, and the tree was clean afterwards.
+
+| Mutant | Failing test |
+|---|---|
+| No runner pin check | "R-EXEC-11: a job that pins another runner digest …" |
+| No volatile refusal | "R-EXEC-10: a volatile checker refuses a job that says volatile: false …" |
+| The checker's volatile signed, not the job's | "R-EXEC-10: the check states volatile as the job does" |
+| No runner digest in the detail | "R-EXEC-11: each check's detail shows the runner digest …" |
+| The reviewer ignores the base (the whole tree) | "LLM reviewer: the change is the integration against the job's base …" |
+| The reviewer diffs against the integration itself | that test, and "LLM reviewer: an advisory, volatile check …" |
+| `llm-review.json` not advisory | "LLM reviewer: its configuration is advisory and volatile …" |
+| Every job submitted to one fixed room | "one service serves many rooms …" |
+| No room-ID check | "one service serves many rooms …" |
+| The production `fetch` answers a route | "production: the Worker has no route …" |
+| Production exports the harness ledger | "production: the Worker has no route …" |
+| The production config fixes a room | "production: the Worker has no route …" |
+| Production runs without a `ROOM` binding | "production: the ROOM binding is required …" |
+| No base check / no flag check / no runner-digest check in the binding | "every malformed or misdirected job is refused check-binding …" (three mutants) |
+
+### Gates
+
+At `8f350653`:
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | exit 0 |
+| Root `npm test` | exit 0: checkers 42; cli 102; client 86 Node and 2 workerd; git (Node) 191; log 145 Node and 140 workerd; mcp 73 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 107 Node and 308 workerd; ui 141 |
+| `packages/git` `npm run test:workers` | exit 0, 8 tests |
+| `wrangler deploy --dry-run` of `wrangler.jsonc` and `wrangler.harness.jsonc` | exit 0 each; production binds only `RUNNER`, `ROOM` and `AI` |
+
+No deploy and no live run, as asked.
+
+### The accepted namespaces, and the merge of main fecd69eb
+
+The namespace guards were mutated after committing (`4815dcb3`); each
+mutant made a test fail, and the tree was clean afterwards:
+
+| Mutant | Failing tests |
+|---|---|
+| Any namespace accepted | "a job may read from any accepted namespace, and from no other"; the binding case "another namespace" |
+| Only the first listed namespace accepted | "a job may read from any accepted namespace …" |
+| An empty or malformed list accepted | "ARTIFACTS_NAMESPACES: …"; "production: an entrypoint will not start …" |
+| A missing list accepted | the same two |
+| Entrypoints start without checking the list | "production: an entrypoint will not start …" |
+| The production default unset | "production: an entrypoint will not start …" |
+
+Main `fecd69eb` (amendment 4, lanes L and B) merged without conflicts, as
+`27563fc6`. Gates there, after `npm ci`:
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | exit 0 |
+| Root `npm test` | exit 0: checkers 45; cli 102; client 86 Node and 2 workerd; git (Node) 193; log 198 Node and 193 workerd; mcp 73 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 107 Node and 308 workerd; ui 141 |
+| `packages/git` `npm run test:workers` | exit 0, 8 tests |
+| `wrangler deploy --dry-run` of `wrangler.jsonc` and `wrangler.harness.jsonc` | exit 0 each; production's `ARTIFACTS_NAMESPACES` is `artroom-public` |

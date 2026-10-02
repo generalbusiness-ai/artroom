@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Live runs of the checkers against a small Artifacts repo, through the
-// deployed Worker `artroom-lg-checkers`.
+// deployed harness Worker `artroom-lg-checkers` (wrangler.harness.jsonc).
 //
 //   LG_KEY_FILE=~/.artroom-lg-key node measure/live.mjs
 //
