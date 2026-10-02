@@ -1230,6 +1230,39 @@ strengthened.
 | The alarm not set from due revocations | "cleanup fails …" |
 | A failed revocation retried at once | "cleanup fails …" (after it asserted the retry is due later) |
 
+### A token mint whose answer is lost
+
+A preliminary finding on revision 4 (`277c2375`): a whole-tree job's
+canonical `createToken` can apply at Artifacts while its answer is lost.
+What each failure did:
+
+- refused before anything changed (an Artifacts error that says so): no
+  token existed; the job was due again later. Correct.
+- applied, then the answer lost (a transport error), or no answer at all:
+  a live token existed that nothing recorded, revoked or watched, until its
+  own expiry. Nothing was sent on it.
+- a malformed answer: with no token ID, the same untracked token; with an
+  ID but no token text, the job could be sent as `Bearer undefined`.
+
+Now the mint is recorded before Artifacts is asked (`mint:<job>` in
+`job_tokens`). A usable answer (ID and text) settles the record in the
+step that records the token by its ID. A definite refusal settles it at
+once. A lost or malformed answer leaves it unresolved, with the error,
+until the token it may have made could no longer be live: the attempt's
+deadline, later than any expiry the mint asked for. The jobs step and the
+alarm settle due records, so a restart keeps them, and nothing is ever
+sent on an unknown mint. An inventory of the canonical repository's tokens
+cannot settle it sooner: the repository holds other owners' tokens
+(pinning, the log, landings, other jobs), and without the token's ID the
+Room cannot tell which one is its own.
+
+Controls in [test/workerd/job-token-mint.test.ts](test/workerd/job-token-mint.test.ts),
+on the real Room Durable Object and SQLite: applied then lost, with and
+without a restart; a malformed answer; a refusal that changed nothing; an
+answer still outstanding past the deadline. Mutations: 6 of 7 caught. The
+equivalent one settles a record before its deadline: a record is only
+reached once it is due, and it is due at its deadline.
+
 ## Founding gaps (request b6b51de7)
 
 The first live deploy (`notes/deploy-spike.md`) found three gaps in
