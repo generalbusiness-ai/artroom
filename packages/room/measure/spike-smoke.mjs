@@ -384,23 +384,33 @@ export function outcomeOf(answer) {
   return "unknown";
 }
 
+/** A repository record names an Artifacts repository; a token record carries a token ID (review 2485e992). */
+const NAME = /^[A-Za-z0-9._-]{1,100}$/;
+const TOKEN_ID = /^[A-Za-z0-9_-]{1,128}$/;
+export const isRepoRecord = (r) => r !== null && typeof r === "object" && typeof r.name === "string" && NAME.test(r.name);
+export const isTokenRecord = (t) => t !== null && typeof t === "object" && typeof t.id === "string" && TOKEN_ID.test(t.id);
+
 /**
- * The items of a listing, only if it proves the whole set: it succeeded, has
- * an array, fills less than a page, and reports no larger total. Otherwise
- * null: a refused, malformed or partial listing proves nothing is absent.
+ * A listing's outcome, decided once. It is `done`, with its items, only if it
+ * proves the whole set: `success: true`, an array, less than a page, no
+ * larger `total_count`, and every record usable (`usable`, its identity). A
+ * refusal is `refused`; anything else is `unknown`. Either way there are no
+ * items: a refused, partial or malformed listing proves nothing is absent,
+ * and a malformed record is never filtered into apparent absence.
  */
-export function completeListing(answer, page) {
-  if (answer?.success !== true || !Array.isArray(answer.result)) return null;
+export function readListing(answer, page, usable) {
+  if (answer?.success === false) return { outcome: "refused", items: null, detail: why(answer) };
+  if (answer?.success !== true || !Array.isArray(answer.result)) return { outcome: "unknown", items: null, detail: why(answer) };
   const total = answer.result_info?.total_count;
-  if (answer.result.length >= page || (typeof total === "number" && total > answer.result.length)) return null;
-  return answer.result;
+  if (answer.result.length >= page || (typeof total === "number" && total > answer.result.length)) return { outcome: "unknown", items: null, detail: "incomplete listing" };
+  if (!answer.result.every(usable)) return { outcome: "unknown", items: null, detail: "a record without a usable identity" };
+  return { outcome: "done", items: answer.result };
 }
 
 function why(answer) {
   if (answer === undefined || answer === null) return "no answer";
   const errors = Array.isArray(answer.errors) ? answer.errors.map((e) => `${e.code ?? ""} ${e.message ?? ""}`.trim()).join("; ") : "";
   if (errors) return errors;
-  if (answer.success === true) return "incomplete listing";
   return "no success field in the answer";
 }
 
@@ -432,11 +442,10 @@ export async function cleanupRun({ api, canonical, expected = [], minted = new M
       return record(duty, "unknown", e.message).outcome;
     }
   };
-  const listing = async (duty, path, page) => {
+  const listing = async (duty, path, page, usable) => {
     try {
-      const answer = await api("GET", path);
-      const items = completeListing(answer, page);
-      record(duty, items ? "done" : answer?.success === false ? "refused" : "unknown", why(answer));
+      const { outcome, items, detail } = readListing(await api("GET", path), page, usable);
+      record(duty, outcome, detail);
       return items;
     } catch (e) {
       record(duty, "unknown", e.message);
@@ -447,17 +456,18 @@ export async function cleanupRun({ api, canonical, expected = [], minted = new M
     if ((await settle({ duty: "revoke-minted-token", repo, token: id }, () => api("DELETE", `/tokens/${id}`))) === "done") minted.delete(id);
   }
   if (canonical) {
-    const mine = (r) => typeof r?.name === "string" && (r.name === canonical || r.name.startsWith(`${canonical}--`));
-    const inventory = (duty) => listing({ duty, repos: expected }, `/repos?limit=${REPO_PAGE}&search=${canonical}`, REPO_PAGE);
+    // Records are validated by the listing; this only tells this run's repositories from others the search returns.
+    const mine = (r) => r.name === canonical || r.name.startsWith(`${canonical}--`);
+    const inventory = (duty) => listing({ duty, repos: expected }, `/repos?limit=${REPO_PAGE}&search=${canonical}`, REPO_PAGE, isRepoRecord);
     const found = await inventory("inventory");
     // Without a complete inventory, still clean what the run knows it made; the run fails on the inventory duty.
     const names = found ? found.filter(mine).map((r) => r.name) : [...new Set(expected)];
     for (const name of names) {
-      const tokens = await listing({ duty: "list-tokens", repo: name }, `/repos/${name}/tokens?state=active&per_page=${TOKEN_PAGE}`, TOKEN_PAGE);
+      const tokens = await listing({ duty: "list-tokens", repo: name }, `/repos/${name}/tokens?state=active&per_page=${TOKEN_PAGE}`, TOKEN_PAGE, isTokenRecord);
       for (const t of tokens ?? []) {
         // Token metadata only: the ID, scope and times, never the token.
-        const meta = Object.fromEntries(Object.entries(t ?? {}).filter(([k]) => !/plaintext|token|secret/i.test(k)));
-        await settle({ duty: "revoke-token", repo: name, token: t?.id, meta }, () => api("DELETE", `/tokens/${t?.id}`));
+        const meta = Object.fromEntries(Object.entries(t).filter(([k]) => !/plaintext|token|secret/i.test(k)));
+        await settle({ duty: "revoke-token", repo: name, token: t.id, meta }, () => api("DELETE", `/tokens/${t.id}`));
       }
       await settle({ duty: "delete-repo", repo: name }, () => api("DELETE", `/repos/${name}`));
     }

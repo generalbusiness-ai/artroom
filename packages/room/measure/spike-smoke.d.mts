@@ -29,6 +29,12 @@ export interface CleanupOutcome {
 export type Api = (method: string, path: string, body?: unknown) => Promise<Answer | undefined>;
 
 export function outcomeOf(answer: Answer | null | undefined): Outcome;
-export function completeListing(answer: Answer | null | undefined, page: number): unknown[] | null;
+export function isRepoRecord(r: unknown): boolean;
+export function isTokenRecord(t: unknown): boolean;
+export function readListing(
+  answer: Answer | null | undefined,
+  page: number,
+  usable: (record: unknown) => boolean,
+): { readonly outcome: Outcome; readonly items: unknown[] | null; readonly detail?: string };
 export function cleanupRun(opts: { api: Api; canonical: string | null; expected?: readonly string[]; minted?: Map<string, string> }): Promise<CleanupOutcome>;
 export function smokeOk(result: { readonly steps: readonly { readonly ok: boolean }[]; readonly cleanup?: { readonly ok: boolean } | null }, failed: boolean): boolean;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanupRun, completeListing, outcomeOf, smokeOk, type Answer, type Api } from "../../measure/spike-smoke.mjs";
+import { cleanupRun, isRepoRecord, isTokenRecord, outcomeOf, readListing, smokeOk, type Answer, type Api } from "../../measure/spike-smoke.mjs";
 
 /**
  * Review 1b868265: the smoke run's cleanup has one explicit outcome, and it
@@ -170,14 +170,69 @@ describe("spike smoke cleanup (review 1b868265)", () => {
     expect(smokeOk({ steps: [], cleanup: done }, false)).toBe(false);
   });
 
-  it("outcomeOf and completeListing classify answers strictly", () => {
+  // Review 2485e992: a record without a usable identity makes its listing unknown; it is never filtered into apparent absence.
+  const malformed: unknown[] = [{}, null, 7, "x", [], { name: "" }, { name: 5 }, { name: null }, { name: "a/b" }];
+
+  it("2485e992: the checker's case: both inventories answer [{}] while the canonical repository is present: not ok, reposLeft null, and the known repositories are still deleted", async () => {
+    const fake = fakeArtifacts({ fault: (m, p) => (m === "GET" && p.startsWith("/repos?") ? { success: true, result: [{}] } : undefined) });
+    const c = await run(fake);
+    expect(c.ok).toBe(false);
+    expect(c.reposLeft).toBeNull();
+    expect(c.unresolved.map((d) => [d.duty, d.outcome, d.detail])).toEqual([
+      ["inventory", "unknown", "a record without a usable identity"],
+      ["final-inventory", "unknown", "a record without a usable identity"],
+    ]);
+    expect(fake.calls.filter((x) => x.startsWith("DELETE /repos/"))).toEqual([`DELETE /repos/${CANON}`, `DELETE /repos/${FORK}`]);
+    expect(smokeOk({ steps: [{ ok: true }], cleanup: c }, false)).toBe(false);
+  });
+
+  it("2485e992: every kind of malformed repository record, alone or mixed with valid ones, makes the inventory unknown and the run not ok", async () => {
+    for (const bad of malformed) {
+      for (const result of [[bad], [{ name: CANON }, bad], [bad, { name: FORK }]]) {
+        const fake = fakeArtifacts({ fault: (m, p) => (m === "GET" && p.startsWith("/repos?") ? { success: true, result } : undefined) });
+        const c = await run(fake);
+        expect(c.ok, JSON.stringify(result)).toBe(false);
+        expect(c.reposLeft).toBeNull();
+        expect(c.duties[0]).toMatchObject({ duty: "inventory", outcome: "unknown" });
+        // The fallback cleans the known repositories, not what the malformed listing named.
+        expect(fake.repos.has(CANON) || fake.repos.has(FORK)).toBe(false);
+      }
+    }
+  });
+
+  it("2485e992: a malformed token record, alone or mixed, makes the token listing unknown; no listed token ID is revoked from it, and the repository is still deleted", async () => {
+    const tokenBad: unknown[] = [{}, null, 7, "x", { id: "" }, { id: 5 }, { id: null }, { id: "../repos/x" }, { id: "a b" }];
+    for (const bad of tokenBad) {
+      for (const result of [[bad], [{ id: "tok-ok", scope: "write" }, bad]]) {
+        const fake = fakeArtifacts({ fault: (m, p) => (m === "GET" && p.startsWith(`/repos/${CANON}/tokens`) ? { success: true, result } : undefined) });
+        const c = await run(fake);
+        expect(c.ok, JSON.stringify(result)).toBe(false);
+        expect(c.unresolved).toEqual([expect.objectContaining({ duty: "list-tokens", repo: CANON, outcome: "unknown", detail: "a record without a usable identity" })]);
+        expect(fake.calls.filter((x) => x.startsWith("DELETE /tokens/"))).toEqual([]);
+        expect(fake.repos.has(CANON)).toBe(false);
+      }
+    }
+  });
+
+  it("isRepoRecord and isTokenRecord need a usable identity", () => {
+    expect(isRepoRecord({ name: CANON })).toBe(true);
+    expect(isRepoRecord({ name: FORK, remote: "https://x" })).toBe(true);
+    for (const bad of malformed) expect(isRepoRecord(bad)).toBe(false);
+    expect(isTokenRecord({ id: "vld1c20kwx4mwnlv", scope: "write" })).toBe(true);
+    for (const bad of [{}, null, 7, { id: "" }, { id: 5 }, { id: "a/b" }]) expect(isTokenRecord(bad)).toBe(false);
+  });
+
+  it("outcomeOf and readListing classify answers strictly", () => {
     expect(outcomeOf({ success: true })).toBe("done");
     expect(outcomeOf({ success: false })).toBe("refused");
     expect(outcomeOf({})).toBe("unknown");
     expect(outcomeOf(undefined)).toBe("unknown");
     expect(outcomeOf({ success: "true" })).toBe("unknown");
-    expect(completeListing({ success: true, result: [1] }, 10)).toEqual([1]);
-    expect(completeListing({ success: true }, 10)).toBeNull();
-    expect(completeListing({ success: false, result: [] }, 10)).toBeNull();
+    const any = () => true;
+    expect(readListing({ success: true, result: [1] }, 10, any)).toEqual({ outcome: "done", items: [1] });
+    expect(readListing({ success: true, result: [] }, 10, isRepoRecord)).toEqual({ outcome: "done", items: [] });
+    expect(readListing({ success: true }, 10, any)).toMatchObject({ outcome: "unknown", items: null });
+    expect(readListing({ success: false, result: [] }, 10, any)).toMatchObject({ outcome: "refused", items: null });
+    expect(readListing({ success: true, result: [{ name: "a" }, {}] }, 10, isRepoRecord)).toMatchObject({ outcome: "unknown", items: null });
   });
 });
