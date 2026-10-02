@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:935366fa01d6369a65123f6717d72226c9a04286","text":"Merge retired a covered predecessor; the successor is at packages/cli/src/git.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9de8031a0fbba8d85fd0598ebf6fcac36e885a96","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/hygiene-55be0661.test.ts."}
