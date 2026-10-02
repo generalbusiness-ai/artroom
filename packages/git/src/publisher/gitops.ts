@@ -498,28 +498,76 @@ export class GitOps {
             if (got.stdout.trim() !== p.sha) throw new Error(`the ${p.type} sent as ${p.sha} hashes to ${got.stdout.trim()}`);
             continue;
           }
-          const file = `${area}/${p.sha}`;
           const have = (await this.stagedSizes(area)).get(p.sha) ?? 0;
           if (p.offset !== have) continue; // already staged, or out of order: the answer says where to resume
-          const a = await this.sh('cat >> "$1"', [file], p.data);
+          const a = await this.sh('cat >> "$1"', [`${area}/${p.sha}`], p.data);
           if (a.code !== 0) throw new GitError("stage", a);
-          if (have + p.data.length === p.size) {
-            const got = await this.git(["-C", dir, "hash-object", "-w", "-t", p.type, "--", file]);
-            const rm = await this.sh('rm "$1"', [file]);
-            if (got.code !== 0) throw new GitError("hash-object", got);
-            if (rm.code !== 0) throw new GitError("stage", rm);
-            if (got.stdout.trim() !== p.sha) throw new Error(`the staged ${p.type} ${p.sha} hashes to ${got.stdout.trim()}`);
-          }
         }
-        const check = await this.git(["-C", dir, "cat-file", "--batch-check"], {}, new TextEncoder().encode(want.map((w) => `${w.sha}\n`).join("")));
-        if (check.code !== 0) throw new GitError("cat-file", check);
-        const stored = new Set(check.stdout.split("\n").filter((l) => l && !l.endsWith(" missing")).map((l) => l.slice(0, 40)));
+        // Settle the staging, every call: a file completed by these parts or by an earlier call whose
+        // answer was lost is stored here, not by the append.
+        const stored = await this.reconcile(dir, area, wanted);
         const sizes = await this.stagedSizes(area);
         return { ok: true, missing: want.filter((w) => !stored.has(w.sha)).map((w) => ({ sha: w.sha, have: sizes.get(w.sha) ?? 0 })) };
       } catch (e) {
         return { ok: false, detail: (e instanceof Error ? e.message : String(e)).slice(0, 600) };
       }
     });
+  }
+
+  /**
+   * Settle a cohort's staging against what is wanted; idempotent, and
+   * safe to repeat after any lost answer or restart. Returns the wanted
+   * objects stored in the repository, each confirmed by its exact ID, type
+   * and size. For each staging file:
+   * - its object is stored: the file is removed (a failed removal is
+   *   retried by the next call);
+   * - it holds exactly the object's size: git writes it as an object, and
+   *   it counts only if the ID is the one wanted; then the file is removed;
+   * - it holds more than the object, or its complete bytes hash to another
+   *   ID: it is discarded, and the call fails, so the caller stages that
+   *   object again from the start.
+   * A failed write keeps the file for the next call.
+   */
+  private async reconcile(dir: string, area: string, wanted: ReadonlyMap<string, StageWant>): Promise<Set<string>> {
+    const storedNow = async () => {
+      const check = await this.git(["-C", dir, "cat-file", "--batch-check"], {}, new TextEncoder().encode([...wanted.keys()].map((sha) => `${sha}\n`).join("")));
+      if (check.code !== 0) throw new GitError("cat-file", check);
+      const stored = new Set<string>();
+      for (const line of check.stdout.split("\n")) {
+        const [sha, type, size] = line.split(" ");
+        const w = sha ? wanted.get(sha) : undefined;
+        if (!w || type === "missing") continue;
+        if (type !== w.type || Number(size) !== w.size) throw new Error(`${sha} is stored as a ${type} of ${size} bytes, not the ${w.type} of ${w.size} wanted`);
+        stored.add(sha!);
+      }
+      return stored;
+    };
+    const stored = await storedNow();
+    let corrupt: string | null = null;
+    for (const [sha, have] of await this.stagedSizes(area)) {
+      const w = wanted.get(sha);
+      if (!w) continue; // another batch of this cohort
+      const file = `${area}/${sha}`;
+      if (stored.has(sha)) {
+        await this.sh('rm "$1"', [file]);
+        continue;
+      }
+      if (have < w.size) continue; // still arriving
+      if (have === w.size) {
+        const got = await this.git(["-C", dir, "hash-object", "-w", "-t", w.type, "--", file]);
+        if (got.code !== 0) throw new GitError("hash-object", got); // the file is kept: the next call writes it again
+        if (got.stdout.trim() === sha) {
+          await this.sh('rm "$1"', [file]);
+          continue;
+        }
+        corrupt = `the staged ${w.type} ${sha} hashes to ${got.stdout.trim()}; its bytes were discarded`;
+      } else corrupt = `the staged ${w.type} ${sha} holds ${have} bytes, more than its ${w.size}; its bytes were discarded`;
+      const rm = await this.sh('rm "$1"', [file]);
+      if (rm.code !== 0) throw new GitError("stage", rm);
+    }
+    if (corrupt) throw new Error(corrupt);
+    // Confirm what the writes stored: exact ID, type and size, read back from the repository.
+    return storedNow();
   }
 
   /** Bytes staged so far per object in a cohort's staging directory. */

@@ -147,8 +147,9 @@ stageLog({ canonical: { remote }, cohort: next, want: [{ sha, type, size }], par
 one call (the active segment alone can be). It needs no token and makes
 no network request. A whole object is written after git checks its type
 and ID; a part of a larger object is appended, in order, to a staging
-file for that cohort, and written as an object when complete, ID
-checked. A part already stored or out of order is skipped; the answer
+file for that cohort. Every call then settles the staging (see Review
+de5289a5 below): a complete file is written as an object, ID checked.
+A part already stored or out of order is skipped; the answer
 says how many bytes of each wanted object are staged, so the caller
 resumes there. Staging another cohort discards the previous cohort's
 partial files. A restart loses staging; `pushLog` then answers `unknown`
@@ -350,3 +351,46 @@ meanwhile:
    contract.
 9. **Workspace operation IDs** are `op_ws_<lane>_<lease generation>`; fork
    names are `<canonical>--<lane>`.
+
+## Review de5289a5
+
+Finding (P2): `stageLog` stored a chunked object only in the call whose
+append completed it. If that append applied and its answer was lost, the
+complete file stayed in staging; every later call reported the object
+missing with all its bytes staged, lane L had nothing left to send, and
+the publication stopped for good.
+
+Fix: settling the staging is the recovery step of every call, not a
+consequence of the final append. After applying its parts, each
+`stageLog` call settles every wanted object of the cohort
+(`GitOps.reconcile`):
+
+- stored already (by exact ID, type and size, read back with
+  `cat-file --batch-check`): its staging file is removed; a removal that
+  fails is retried by the next call;
+- staging file of exactly the object's size: git writes it as an object;
+  it counts only if git computes the wanted ID, and the file is then
+  removed; a write that fails keeps the file for the next call;
+- staging file with more bytes than the object, or complete bytes of
+  another ID: discarded, and the call fails; the next call reports the
+  object with 0 bytes staged, so lane L sends it again from the start;
+- an object stored with another type or size: the call fails.
+
+Then the stored set is read back from the repository, and the answer is
+built from it. Each step is safe to repeat, so a lost answer, a failed
+write, a failed cleanup and a restarted caller over the same container
+filesystem all converge on the next call. The cohort, the commit and the
+lease do not change, and `pushLog`'s type, parent and closure checks are
+as before.
+
+Tests (`test/gitops.test.ts`, "de5289a5: …"): the final append applied
+with its answer lost; an interruption between append and hashing with a
+new client over the same filesystem; a lost hash-object answer, a failed
+hash-object and a failed cleanup; a complete file with wrong or too many
+bytes; exact type and size; another batch's staging left alone. In
+`test-log/pushlog.test.ts`, the checker's scenario through lane L's real
+publisher: the same publisher lands the same commit, and so does a
+reopened publisher over a new client after the first stopped. Each test
+fails on the code before the fix; each guard has a mutant that a test
+kills.
+
