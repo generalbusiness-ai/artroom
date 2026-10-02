@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ebdaa926d9428be7a7e3bd62f969548ac2e2da0f","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa; the successor stands at package-lock.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f2646ab69ef278e2fcd8a17cc826ca1075c1feaa","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/git/src/first-commit.ts: the pointer is withdrawn with no successor."}
