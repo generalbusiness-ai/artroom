@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review exact head 6abe1ce86a505ebc6ee5d47a7875f10187ea2c17 and all 55 artifacts for served MCP stage 0, authentication, protocol behavior, recovery, architecture and full scope; report independently through gitseq."}
+{"kind":"artifact","text":"packages/cli/src/format.ts at exact 53537a58559861905b1b050487fcfd5f7f22341b on request/amend4-contract, under promise git:sha1…6c8e89c on request git:sha1…24b01c9","body":{"commit":"53537a58559861905b1b050487fcfd5f7f22341b","path":"packages/cli/src/format.ts"}}
