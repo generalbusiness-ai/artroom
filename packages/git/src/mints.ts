@@ -736,7 +736,9 @@ export class MintLedger {
 
   /**
    * At most one observation, when due and while any record is unknown: one
-   * listing, waited on for at most `waitMs`; one summary write. An
+   * repository lookup and one listing, which share one deadline, `waitMs`
+   * from the start, so the whole observation waits at most `waitMs`; one
+   * summary write. An
    * incomplete listing, or one over 1,000 records, counts nothing. No
    * record is written, and none is settled.
    */
@@ -749,6 +751,8 @@ export class MintLedger {
       let result = "";
       let unaccounted: number | null = null;
       let repo: MintRepo | null = null;
+      // One deadline for the lookup and the listing together, in real time, as the waits are.
+      const deadline = Date.now() + this.waitMs;
       try {
         repo = await this.lookup();
         if (!repo) result = "no inventory: the repository was not reached in time";
@@ -756,10 +760,11 @@ export class MintLedger {
         result = errorNote("no inventory: repository lookup failed", e);
       }
       let listing: unknown = null;
-      if (repo) {
-        this.observeUntil = this.now() + this.waitMs;
+      const left = deadline - Date.now();
+      if (repo && left <= 0) result = "no inventory: no time was left for the listing";
+      else if (repo) {
         try {
-          listing = await within(repo.listTokens(), this.waitMs, TIMEOUT);
+          listing = await within(repo.listTokens(), left, TIMEOUT);
           if (listing === TIMEOUT) result = "no inventory: the listing did not answer in time";
         } catch (e) {
           result = errorNote("no inventory: the listing failed", e);

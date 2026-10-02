@@ -1336,3 +1336,42 @@ test("(checker 3) a record that expires during a pass's revocations is settled i
   assert.equal(rows(r.sql).length, 0);
   assert.equal(writes.n, 1);
 });
+
+// ------------------------------------------------- review 6a979799 (P3): one deadline per observation
+
+test("(checker 4) an observation's lookup and listing share one deadline: a slow lookup leaves less time for the listing, and the observation ends by the deadline", async () => {
+  const r = room({ waitMs: 300 });
+  r.repo.plans = ["lose"];
+  await assert.rejects(r.ledger.mint("a", "read", ttl60));
+  const gate = deferred<void>();
+  r.lookupGate = gate;
+  setTimeout(() => gate.resolve(), 200); // the lookup answers after 200 ms of the 300
+  r.repo.listTokens = () => new Promise(() => {}); // the listing never answers
+  const started = Date.now();
+  await r.ledger.reconcile();
+  const took = Date.now() - started;
+  assert.ok(took < 450, `ended by the shared deadline (about 300 ms), not lookup plus a full listing wait (500 ms): took ${took} ms`);
+  assert.equal(r.ledger.duties().observation.result, "no inventory: the listing did not answer in time");
+  assert.equal(only(r.sql)["state"], "unknown");
+});
+
+test("(checker 4) a lookup that uses the whole deadline leaves no time for the listing: it is not called", async () => {
+  const r = room({ waitMs: 300 });
+  r.repo.plans = ["lose"];
+  await assert.rejects(r.ledger.mint("a", "read", ttl60));
+  const gate = deferred<void>();
+  r.lookupGate = gate;
+  const realNow = Date.now;
+  try {
+    const run = r.ledger.reconcile();
+    await until(() => r.lookups === 2, "the observation's lookup");
+    const skew = 301;
+    Date.now = () => realNow() + skew; // the deadline passes as the lookup answers
+    gate.resolve();
+    await run;
+  } finally {
+    Date.now = realNow;
+  }
+  assert.equal(r.repo.lists, 0, "no listing is started");
+  assert.equal(r.ledger.duties().observation.result, "no inventory: no time was left for the listing");
+});
