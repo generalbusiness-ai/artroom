@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { FeedEntry } from "../room/adapter.ts";
 import type { Lane, LandOp } from "../room/contract.ts";
+import { isAdvisory } from "../room/checks.ts";
 import { Actor, Badge, Glob, LandBadge, RefusalNotice, Sha, When, WhyLink } from "../ui/bits.tsx";
 import { useApp } from "../ui/context.ts";
 import { clock, laneGoal, latest, onlyCheckpointWaits, plural, relative, unpublished } from "../ui/format.ts";
@@ -104,7 +105,10 @@ function LaneCard({ lane }: { lane: Lane }) {
   const op = lane.landing ? snap.landOps.find((o) => o.id === lane.landing) : undefined;
   const isLanded = landed(lane);
   const hits = new Set(lane.overlaps.map((o) => o.mine));
-  const met = p ? p.obligations.filter((o) => o.state === "met").length : 0;
+  // Advisory obligations never block a landing (R-OBL-7): they are not counted here.
+  const blocking = p ? p.obligations.filter((o) => !isAdvisory(o)) : [];
+  const met = blocking.filter((o) => o.state === "met").length;
+  const advisory = p ? p.obligations.length - blocking.length : 0;
   const expiresSoon = lane.state === "held" && Date.parse(lane.lease.expiresAt) - Date.parse(snap.now) <= 5 * 60_000;
   const holderBefore = lane.state === "unheld" ? snap.feed.filter((f) => f.lane === lane.lane && f.kind === "lease-expired").at(-1) : undefined;
   const handover = lane.state === "unheld" && lane.handover ? snap.feed.find((f) => f.id === lane.handover) : undefined;
@@ -131,7 +135,8 @@ function LaneCard({ lane }: { lane: Lane }) {
               <span>{isLanded ? "Released after landing" : "Nobody holds this lane"}</span>
             )}
             <span>{lane.generation ? `Generation ${lane.generation}` : "No code yet: claim only"}</span>
-            {p && !isLanded && <span>{plural(met, "obligation")} met of {p.obligations.length}</span>}
+            {p && !isLanded && <span>{plural(met, "obligation")} met of {blocking.length}</span>}
+            {p && !isLanded && advisory > 0 && <span data-advisory-count>{plural(advisory, "advisory check")}, not blocking</span>}
           </div>
         </div>
         <div class="row" style={{ justifyContent: "flex-end" }}>

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { FileDiff, RoomSnapshot } from "../room/adapter.ts";
 import type { ActId, Evidence, Lane, NotCarried, Note, Obligation, Proposal, Refusal, Review } from "../room/contract.ts";
 import { isCarried, isRefusal } from "../room/contract.ts";
+import { carriedBy, isAdvisory, judgmentsFor } from "../room/checks.ts";
 import { Actor, Badge, Glob, LandBadge, RefusalNotice, Sha, When, WhyLink } from "../ui/bits.tsx";
 import { useApp } from "../ui/context.ts";
 import { clock, join, plural, relative, ruleTitle, short } from "../ui/format.ts";
@@ -29,13 +30,15 @@ function reviewOf(snap: RoomSnapshot, act: ActId): Review | undefined {
   return snap.reviews.find((r) => r.id === act);
 }
 
-function EvidenceRow({ ev, current }: { ev: Evidence; current: Proposal }) {
+function EvidenceRow({ ev, current, o }: { ev: Evidence; current: Proposal; o: Obligation }) {
   const { snap } = useApp();
   const review = reviewOf(snap, ev.act);
   const check = snap.checks.find((c) => c.id === ev.act);
   const who = review?.by.member ?? check?.by.member ?? null;
   const source = isCarried(ev) ? ev.from : { generation: ev.generation, head: ev.head };
-  const what = review ? (review.verdict === "approve" ? "approved" : "objected to") : check ? (check.ok ? "ran tests: passed" : "ran tests: failed") : "recorded";
+  const what = review ? (review.verdict === "approve" ? "approved" : "objected to") : check ? `ran ${check.check}: ${check.ok ? "passed" : "failed"}` : "recorded";
+  // A check carries only by its sealed check-carried event (R-CARRY-13); the reason shown is that event's.
+  const event = isCarried(ev) && ev.kind === "check" ? carriedBy(snap, current.lane, current.generation, o.id, ev.act) : undefined;
   return (
     <li class={`ev${isCarried(ev) ? " carried" : ""}`} data-basis={ev.basis}>
       <div class="row">
@@ -52,7 +55,18 @@ function EvidenceRow({ ev, current }: { ev: Evidence; current: Proposal }) {
           <Actor handle={who} plain /> {what} generation {source.generation} at <Sha sha={source.head} />
         </span>
       </div>
-      {isCarried(ev) && (
+      {isCarried(ev) && ev.kind === "check" && (
+        <p class="because" data-carry-reason>
+          {event?.event.outcome.carried ? (
+            <>
+              Carried to generation {current.generation} by entry {event.seq}: {event.event.outcome.reason.text}.
+            </>
+          ) : (
+            <>No check-carried event for this carry is loaded here, so its reason is not shown.</>
+          )}
+        </p>
+      )}
+      {isCarried(ev) && ev.kind === "review" && (
         <>
           <p class="because">Carried to generation {current.generation}: {ev.reason.text}.</p>
           {ev.reason.code === "paths-unchanged" && (
@@ -85,6 +99,7 @@ function EvidenceRow({ ev, current }: { ev: Evidence; current: Proposal }) {
         </p>
       )}
       {check && <p class="tested">{check.detail} · integration <Sha sha={check.integration} /></p>}
+      {check && !check.ok && isAdvisory(o) && <p class="tested">Advisory: this failure does not block a landing.</p>}
       <div>
         <WhyLink act={ev.act} />
       </div>
@@ -118,9 +133,53 @@ function StaleRow({ n }: { n: NotCarried }) {
   );
 }
 
+/** Each sealed check-carried event for this obligation: carried with its reason, or not carried with why (R-CARRY-13). */
+function CarryJudgments({ o, p }: { o: Obligation; p: Proposal }) {
+  const { snap } = useApp();
+  const judged = judgmentsFor(snap, p.lane, p.generation, o.id);
+  if (!judged.length) return null;
+  return (
+    <div class="stack-sm" aria-label="Carry judgments">
+      <h4 class="small">Judged for landing integrations</h4>
+      <ul class="evidence">
+        {judged.map(({ id, seq, event }) => (
+          <li key={id} class={`ev ${event.outcome.carried ? "carried" : "stale"}`} data-carry={event.outcome.carried ? "carried" : "not-carried"}>
+            <div class="row">
+              {event.outcome.carried ? (
+                <Badge tone="carried" icon="carry">
+                  Carried
+                </Badge>
+              ) : (
+                <Badge tone="warn" icon="refresh">
+                  Not carried
+                </Badge>
+              )}
+              <span class="small">
+                The check in entry {event.act.split("_")[1]}, to integration <Sha sha={event.integration} />
+              </span>
+            </div>
+            {event.outcome.carried ? (
+              <p class="because" data-carry-reason>
+                It counts there: {event.outcome.reason.text}.
+              </p>
+            ) : (
+              <p class="stale-text">Did not carry: {event.outcome.notCarried.text}</p>
+            )}
+            <p class="tested">Recorded by the room at entry {seq}.</p>
+            <div>
+              <WhyLink act={id} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ObligationCard({ o, p, stale }: { o: Obligation; p: Proposal; stale: readonly NotCarried[] }) {
   const { snap } = useApp();
   const met = o.state === "met";
+  const advisory = isAdvisory(o);
   const need =
     o.kind === "review" ? (
       <>
@@ -128,11 +187,11 @@ function ObligationCard({ o, p, stale }: { o: Obligation; p: Proposal; stale: re
       </>
     ) : (
       <>
-        Needs the <code>{o.check}</code> check from {join(o.by as string[])}.
+        {advisory ? "Asks for" : "Needs"} the <code>{o.check}</code> check from {join(o.by as string[])}.{advisory && " Advisory: it never blocks a landing."}
       </>
     );
   return (
-    <li class="card obl" data-obligation={o.rule} data-state={o.state}>
+    <li class={`card obl${advisory ? " advisory" : ""}`} data-obligation={o.rule} data-state={o.state} data-advisory={advisory ? "true" : "false"}>
       <div class="obl-head">
         <span class={`check-circle${met ? " met" : ""}`} aria-hidden="true">
           <Icon name="check" size={13} />
@@ -140,7 +199,10 @@ function ObligationCard({ o, p, stale }: { o: Obligation; p: Proposal; stale: re
         <div class="grow stack-sm">
           <div class="row" style={{ justifyContent: "space-between" }}>
             <h3>{ruleTitle(snap, o.rule)}</h3>
-            {met ? <Badge tone="ok">Met</Badge> : o.state === "open" && o.reopened ? <Badge tone="warn">Reopened</Badge> : <Badge tone="outline">Open</Badge>}
+            <span class="row" style={{ gap: "6px" }}>
+              {advisory && <Badge tone="outline">Advisory</Badge>}
+              {met ? <Badge tone="ok">Met</Badge> : o.state === "open" && o.reopened ? <Badge tone="warn">Reopened</Badge> : <Badge tone="outline">Open</Badge>}
+            </span>
           </div>
           <p class="small muted">{need}</p>
         </div>
@@ -153,13 +215,14 @@ function ObligationCard({ o, p, stale }: { o: Obligation; p: Proposal; stale: re
       {(o.evidence.length > 0 || stale.length > 0) && (
         <ul class="evidence">
           {o.evidence.map((ev) => (
-            <EvidenceRow key={ev.act} ev={ev} current={p} />
+            <EvidenceRow key={ev.act} ev={ev} current={p} o={o} />
           ))}
           {stale.map((n) => (
             <StaleRow key={n.act} n={n} />
           ))}
         </ul>
       )}
+      {o.kind === "check" && <CarryJudgments o={o} p={p} />}
     </li>
   );
 }
@@ -572,6 +635,9 @@ export function ProposalScreen({ laneId, generation, focus }: { laneId: ActId; g
   const op = snap.landOps.filter((o) => o.lane === lane.lane && p && o.generation === p.generation).at(-1);
   const discussion = snap.notes.filter((n) => "act" in n.anchor && snap.feed.find((f) => f.id === (n.anchor as { act: ActId }).act)?.lane === lane.lane);
   const landedGen = lane.generations.find((g) => g.landed);
+  // Advisory obligations never block a landing (R-OBL-7), so they are listed apart and not counted.
+  const blocking = p ? p.obligations.filter((o) => !isAdvisory(o)) : [];
+  const advisory = p ? p.obligations.filter(isAdvisory) : [];
 
   return (
     <>
@@ -684,15 +750,28 @@ export function ProposalScreen({ laneId, generation, focus }: { laneId: ActId; g
                 <div class="section-head" style={{ marginBottom: 0 }}>
                   <h2 id="obl-h">Before it can land</h2>
                   <p>
-                    {p.obligations.filter((o) => o.state === "met").length} of {p.obligations.length} met
+                    {blocking.filter((o) => o.state === "met").length} of {blocking.length} met
                   </p>
                 </div>
                 <ol class="obligations">
-                  {p.obligations.map((o) => (
+                  {blocking.map((o) => (
                     <ObligationCard key={o.id} o={o} p={p} stale={staleFor(snap, p, o)} />
                   ))}
                 </ol>
               </section>
+              {advisory.length > 0 && (
+                <section aria-labelledby="advisory-h" class="stack">
+                  <div class="section-head" style={{ marginBottom: 0 }}>
+                    <h2 id="advisory-h">Advisory checks</h2>
+                    <p>Shown, never blocking</p>
+                  </div>
+                  <ol class="obligations">
+                    {advisory.map((o) => (
+                      <ObligationCard key={o.id} o={o} p={p} stale={staleFor(snap, p, o)} />
+                    ))}
+                  </ol>
+                </section>
+              )}
               {!landedGen && <ReviewForm p={p} lane={lane} current={current} focus={focus === "review"} />}
               <LaneBox lane={lane} />
             </aside>

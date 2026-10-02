@@ -2,9 +2,10 @@
  * The scripted scenario: three agents (@ash, @birch, @cedar), two people
  * (@maya, security; @sam, platform and admin) and a checker (@ci), in one
  * room over 44 minutes. It covers overlapping claims, a policy refusal and a
- * platform refusal, a carried and a stale verdict, two landings prepared in
- * parallel, an unresolved publication, a conflict preview, and a lease
- * expiry handed over to another agent.
+ * platform refusal, a carried and a stale verdict, an advisory check that
+ * fails without blocking, check carries recorded as events, two landings
+ * prepared in parallel, an unresolved publication, a conflict preview, and a
+ * lease expiry handed over to another agent.
  *
  * Each step is one moment on the timeline. Replaying steps 0..n always gives
  * the same room.
@@ -184,9 +185,10 @@ export const STEPS: readonly Step[] = [
   },
   {
     minute: 19,
-    label: "@ci: tests pass on generation 2; the log is published",
+    label: "@ci: tests pass on generation 2; the advisory LLM review fails; the log is published",
     run: (w) => {
       w.check("@ci", "L1", 2, true, "15 passed, 0 failed (2.0 s)");
+      w.check("@ci", "L1", 2, false, "1 finding: the bucket map is never pruned, so memory grows with each new key.", undefined, "llm-review");
       w.checkpoint();
     },
   },
@@ -255,9 +257,10 @@ export const STEPS: readonly Step[] = [
   { minute: 31.5, label: "Main moved: the rate limit prepares again", run: (w) => w.prepare("L1") },
   {
     minute: 32,
-    label: "@ci checks the new integration; the rate limit is reserved",
+    label: "@ci checks the new integration; the advisory review fails again; the rate limit is reserved",
     run: (w) => {
       w.check("@ci", "L1", 2, true, "15 passed, 0 failed (2.1 s) on the landing integration", w.landOp("L1").id);
+      w.check("@ci", "L1", 2, false, "1 finding: the bucket map is never pruned, so memory grows with each new key.", w.landOp("L1").id, "llm-review");
       w.ready("L1");
       w.reserve("L1");
     },

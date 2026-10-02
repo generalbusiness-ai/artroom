@@ -386,6 +386,7 @@ a.lane-goal:hover { text-decoration: underline; }
 
 .obligations { display: grid; gap: 12px; }
 .obl { padding: 14px 16px; display: grid; gap: 10px; }
+.obl.advisory { border-style: dashed; }
 .obl-head { display: flex; gap: 10px; align-items: flex-start; }
 .check-circle { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center; border: 2px solid var(--border-strong); color: transparent; margin-top: 1px; }
 .check-circle.met { background: var(--ok); border-color: var(--ok); color: var(--surface); }

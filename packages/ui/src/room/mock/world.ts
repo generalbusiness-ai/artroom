@@ -46,11 +46,12 @@ import type {
   Sha,
   Verdict,
 } from "../contract.ts";
-import type { FeedEntry, Person, PolicyOutcome, RoomSnapshot, Why } from "../adapter.ts";
-import { defaultDependsOn, ownersFor, reviewConditions } from "@generalbusiness/artroom-policy";
+import type { CheckCarry, CheckCarriedEvent, FeedEntry, Person, PolicyOutcome, RoomSnapshot, Why } from "../adapter.ts";
+import { checkConditions, defaultDependsOn, ownersFor, reviewConditions } from "@generalbusiness/artroom-policy";
+import { checkCarriedText } from "../checks.ts";
 import { matches, matchesAny, overlap } from "../glob.ts";
 import { actId, at, cursorAt, fakeKey, fakeSha, hex8 } from "./ids.ts";
-import { notifiesAuthz, POLICY, refusesClaim } from "./policy.ts";
+import { CHECKERS, checkerDigest, notifiesAuthz, POLICY, refusesClaim } from "./policy.ts";
 
 export const PEOPLE: readonly Person[] = [
   { handle: "@maya", name: "Maya Okafor", role: "maintainer", kind: "person", teams: ["@security"] },
@@ -63,8 +64,19 @@ export const PEOPLE: readonly Person[] = [
 
 const LEASE_MINUTES = 15;
 const ROOM_ID = `room_${fakeSha("acme/web").slice(0, 32)}` as const;
-const CONFIG = `sha256:${fakeSha("tests-config")}${fakeSha("tests-config2").slice(0, 24)}` as const;
-const RUNNER = `sha256:${fakeSha("runner")}${fakeSha("runner2").slice(0, 24)}` as const;
+/** A checker's configuration; every checker in the scenario room has one. */
+const checker = (name: string) => {
+  const c = CHECKERS[name];
+  if (!c?.runner) throw new Error(`no pinned checker ${name}`);
+  return { ...c, runner: c.runner, digest: checkerDigest(name) };
+};
+/** The tree of a head merged onto a main. The mock's trees are equal exactly when both are. */
+const treeOf = (head: Sha, main: Sha) => fakeSha(`tree:${head}:${main}`);
+/** "not carried: the x changed" becomes "The x changed." */
+const sentence = (text: string) => {
+  const t = text.replace(/^not carried: /, "");
+  return `${t.charAt(0).toUpperCase()}${t.slice(1)}${t.endsWith(".") ? "" : "."}`;
+};
 
 const person = (m: MemberId) => PEOPLE.find((p) => p.handle === m)!;
 const roleOf = (m: MemberId): Role => person(m).role;
@@ -92,7 +104,7 @@ interface OblRec {
   id: `obl_${string}`;
   rule: string;
   paths: RepoPath[];
-  spec: { kind: "review"; from: ReviewerSpec[]; count: number; allowSelf: boolean } | { kind: "check"; check: string; by: Principal[] };
+  spec: { kind: "review"; from: ReviewerSpec[]; count: number; allowSelf: boolean } | { kind: "check"; check: string; by: Principal[]; advisory?: true };
   evidence: Evidence[];
   reopened?: Extract<Obligation, { state: "open" }>["reopened"];
 }
@@ -148,6 +160,9 @@ export interface ProposeSpec {
   because?: Reason[];
 }
 
+/** The landing integration commit for an operation on a main. */
+const landIntegration = (op: OpId, main: Sha) => fakeSha(`land:${op}:${main}`);
+
 const pathsOf = (changed: readonly PathChange[]) =>
   changed.flatMap((c) => (c.status === "renamed" ? [c.from, c.path] : [c.path]));
 
@@ -160,6 +175,7 @@ export class World {
   readonly proposals: PropRec[] = [];
   readonly reviews: Review[] = [];
   readonly checks: Check[] = [];
+  readonly checkCarries: CheckCarry[] = [];
   readonly notes: Note[] = [];
   readonly ops = new Map<OpId, LandOp>();
   slot: PublicationSlot = { state: "free", last: 6 };
@@ -224,7 +240,7 @@ export class World {
 
   private genesis() {
     this.entry("system", "genesis", "@sam", "@sam created the room acme/web.");
-    const p = this.entry("system", "policy-activated", "@sam", "The room's first policy became active: 5 rules.");
+    const p = this.entry("system", "policy-activated", "@sam", `The room's first policy became active: ${POLICY.rules.length} rules.`);
     this.policyVersion = p.id;
     for (const m of PEOPLE) {
       this.entry("act", "roster", m.handle, `${m.handle} joined as ${/^[aeiou]/.test(m.role) ? "an" : "a"} ${m.role}.`);
@@ -459,7 +475,10 @@ export class World {
         id: `obl_${rule.id}`,
         rule: rule.id,
         paths: hit,
-        spec: o.type === "review" ? { kind: "review", from: [...o.from], count: o.count, allowSelf: o.allowSelf } : { kind: "check", check: o.check, by: [...o.by] },
+        spec:
+          o.type === "review"
+            ? { kind: "review", from: [...o.from], count: o.count, allowSelf: o.allowSelf }
+            : { kind: "check", check: o.check, by: [...o.by], ...(CHECKERS[o.check]?.advisory ? { advisory: true as const } : {}) },
         evidence: [],
       });
       const d = this.decision(rule.id, "require", { result: "obligation", obligation: `obl_${rule.id}` });
@@ -557,7 +576,8 @@ export class World {
         }
       } else {
         for (const m of this.membersFor(o.spec.by, o.paths)) {
-          this.notify(m, { why: "check-requested", proposal: ref, obligation: o.id, lane: lane.id, seq: e.seq, text: `Run ${o.spec.check} on generation ${generation} of ${quote(lane.goal)}.` });
+          const advisory = o.spec.advisory ? " It is advisory: it never blocks a landing." : "";
+          this.notify(m, { why: "check-requested", proposal: ref, obligation: o.id, lane: lane.id, seq: e.seq, text: `Run ${o.spec.check} on generation ${generation} of ${quote(lane.goal)}.${advisory}` });
         }
       }
     }
@@ -704,13 +724,16 @@ export class World {
 
   // ------------------------------------------------------------- checks
 
-  check(by: MemberId, tag: string, generation: Generation, ok: boolean, detail: string, landOp?: OpId) {
+  check(by: MemberId, tag: string, generation: Generation, ok: boolean, detail: string, landOp?: OpId, name = "tests") {
     const lane = this.lane(tag);
     const p = this.prop(tag, generation)!;
-    const o = p.obligations.find((x) => x.spec.kind === "check")!;
+    const o = p.obligations.find((x) => x.spec.kind === "check" && x.spec.check === name)!;
+    const cfg = checker(name);
     const op = landOp ? this.ops.get(landOp) : undefined;
-    const integration = op && "integration" in op && op.integration ? op.integration : p.preview.state === "clean" ? p.preview.integration : p.head;
-    const e = this.entry("act", "check", by, `${by} ran tests on generation ${generation} of ${quote(lane.goal)}${landOp ? " for landing" : ""}: ${ok ? "passed" : "failed"}.`, { lane: lane.id });
+    const integration = op ? ("integration" in op && op.integration ? op.integration : landIntegration(op.id, op.expectedMain)) : p.preview.state === "clean" ? p.preview.integration : p.head;
+    const base = op ? op.expectedMain : p.base;
+    const advisory = o.spec.kind === "check" && o.spec.advisory ? " (advisory)" : "";
+    const e = this.entry("act", "check", by, `${by} ran ${name}${advisory} on generation ${generation} of ${quote(lane.goal)}${landOp ? " for landing" : ""}: ${ok ? "passed" : "failed"}.`, { lane: lane.id });
     const evidence: Evidence = { basis: "here", act: e.id, kind: "check", generation, head: p.head };
     o.evidence = landOp ? [evidence] : [...o.evidence, evidence];
     delete o.reopened;
@@ -719,19 +742,19 @@ export class World {
       lane: lane.id,
       generation,
       obligation: o.id,
-      check: "tests",
+      check: name,
       integration,
-      input: { kind: "tree", tree: fakeSha(`tree:${integration}`) },
-      config: CONFIG,
-      runner: RUNNER,
-      volatile: false,
+      input: { kind: "tree", tree: treeOf(p.head, base) },
+      config: cfg.digest,
+      runner: cfg.runner,
+      volatile: cfg.volatile,
       ok,
       detail,
       ...(landOp ? { landOp } : {}),
     };
     this.checks.push(check);
-    this.resolve((a) => a.item.why === "check-requested" && a.item.lane === lane.id);
-    this.why(e.id, e.seq, by, `${by} ran tests on generation ${generation}`, "accepted", [], [
+    this.resolve((a) => a.item.why === "check-requested" && a.item.lane === lane.id && a.item.obligation === o.id);
+    this.why(e.id, e.seq, by, `${by} ran ${name} on generation ${generation}`, "accepted", [], [
       { rule: "R-OBL-3", held: true, detail: `Bound to integration ${integration.slice(0, 7)}, the configuration and the runner digest.` },
     ]);
   }
@@ -798,15 +821,83 @@ export class World {
     return id;
   }
 
+  /**
+   * Prepare a landing on the current main. Each check obligation's latest
+   * check is judged for the new integration, and every judgment is sealed as
+   * a `check-carried` event (R-CARRY-13). A check obligation waits unless its
+   * check carried; an advisory one never waits (R-OBL-7).
+   */
   prepare(tag: string) {
     const op = this.landOp(tag);
     const f = this.opFields(op);
     const lane = this.lane(tag);
-    const waiting = f.expectedMain !== this.main ? ["obl_tests" as const] : [];
-    this.ops.set(op.id, { ...f, expectedMain: this.main, attempts: f.attempts + 1, state: "preparing", waiting });
+    const p = this.prop(tag)!;
     if (f.attempts > 0) {
-      this.entry("system", "land-retry", null, `Main moved, so ${quote(lane.goal)} is preparing again on the new main (attempt ${f.attempts + 1}). Its checks run again.`, { lane: lane.id });
+      this.entry("system", "land-retry", null, `Main moved, so ${quote(lane.goal)} is preparing again on the new main (attempt ${f.attempts + 1}). Its checks are judged again.`, { lane: lane.id });
     }
+    const integration = landIntegration(op.id, this.main);
+    const waiting: OblRec["id"][] = [];
+    for (const o of p.obligations) {
+      if (o.spec.kind !== "check") continue;
+      const carried = this.judgeCheck(op.id, lane, p, o, integration);
+      if (!carried && !o.spec.advisory) waiting.push(o.id);
+    }
+    this.ops.set(op.id, { ...f, expectedMain: this.main, attempts: f.attempts + 1, state: "preparing", waiting });
+  }
+
+  /** Judge whether an obligation's latest check carries onto `integration`, and seal the judgment. */
+  private judgeCheck(opId: OpId, lane: LaneRec, p: PropRec, o: OblRec, integration: Sha): boolean {
+    const check = o.evidence.map((ev) => this.checks.find((c) => c.id === ev.act)).filter((c) => c !== undefined).at(-1);
+    if (!check || o.spec.kind !== "check") return false;
+    const cfg = checker(o.spec.check);
+    const input: InputOf<"carry"> = {
+      kind: "carry",
+      evidence: { act: check.id, kind: "check", verdict: null, by: this.policyActor(check.by.member!), from: { generation: check.generation, head: p.head }, scope: [], dependsOn: [] },
+      changedSince: [],
+      proposal: this.policyProposal(p.generation, p.head, this.main, p.changed),
+      policy: { same: true },
+    };
+    const result = checkConditions(input, POLICY, {
+      revoked: null,
+      check: {
+        before: { integration: check.integration, config: check.config, runner: check.runner, input: check.input },
+        now: { integration, tree: treeOf(p.head, this.main), snapshot: null, config: cfg.digest, runner: cfg.runner },
+        volatile: cfg.volatile,
+      },
+    });
+    const outcome: CheckCarriedEvent["outcome"] = result.carries
+      ? {
+          carried: true,
+          reason:
+            result.basis.code === "tree-identical"
+              ? { ...result.basis, text: "the integration tree, the checker configuration and the runner are all unchanged" }
+              : result.basis.code === "snapshot-identical"
+                ? { ...result.basis, text: "the filtered snapshot, the checker configuration and the runner are all unchanged" }
+                : (() => {
+                    throw new Error("a check never carries on paths");
+                  })(),
+        }
+      : { carried: false, notCarried: { ...result.notCarried, text: sentence(result.notCarried.text) } };
+    const event: CheckCarriedEvent = {
+      type: "check-carried",
+      op: opId,
+      lane: lane.id,
+      generation: p.generation,
+      integration,
+      obligation: o.id,
+      act: check.id,
+      policy: this.policyVersion,
+      outcome,
+      decisions: [],
+    };
+    const text = checkCarriedText(event);
+    const e = this.entry("system", "check-carried", null, text, { lane: lane.id });
+    this.checkCarries.push({ id: e.id, seq: e.seq, at: at(this.t), event });
+    this.why(e.id, e.seq, null, text, "system", [], [
+      ...result.invariants,
+      { rule: "R-CARRY-13", held: true, detail: "Sealed in the transaction that stores the judgment. No carry rule applies to checks in this policy." },
+    ]);
+    return result.carries;
   }
 
   ready(tag: string) {
@@ -816,7 +907,7 @@ export class World {
     this.ops.set(op.id, {
       ...this.opFields(op),
       state: "ready",
-      integration: fakeSha(`land:${op.id}:${this.main}`),
+      integration: landIntegration(op.id, this.main),
       evidence,
       landInput: `sha256:${fakeSha(`li:${op.id}`)}${fakeSha(`li2:${op.id}`).slice(0, 24)}`,
     });
@@ -930,7 +1021,7 @@ export class World {
     const base = { id: o.id, rule: o.rule, policy: this.policyVersion, paths: o.paths };
     const kind = o.spec.kind === "review"
       ? { ...base, kind: "review" as const, from: o.spec.from, count: o.spec.count, allowSelf: o.spec.allowSelf }
-      : { ...base, kind: "check" as const, check: o.spec.check, by: o.spec.by };
+      : { ...base, kind: "check" as const, check: o.spec.check, by: o.spec.by, ...(o.spec.advisory ? { advisory: true as const } : {}) };
     const state = this.oblState(o);
     return state === "met"
       ? ({ ...kind, state: "met", evidence: o.evidence } as Obligation)
@@ -991,6 +1082,7 @@ export class World {
       proposals: this.proposals.map((p) => this.buildProposal(p)),
       reviews: [...this.reviews],
       checks: [...this.checks],
+      checkCarries: [...this.checkCarries],
       notes: [...this.notes],
       landOps: [...this.ops.values()],
       slot: this.slot,

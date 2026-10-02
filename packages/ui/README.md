@@ -6,7 +6,7 @@ The web interface for Artroom: four screens over one data adapter.
 |---|---|
 | **Needs you** | The viewer's attention queue. Each item says what to do, why it is theirs, and offers one action. |
 | **Room** | Claims and their overlaps (before any code exists), lanes and leases, the landing operations, the publication slot, and how far the log is published. Live. |
-| **Proposal** | One generation: the diff, notes anchored to path, line and head, the obligations as a checklist, each piece of evidence marked *reviewed here*, *carried* (with the reason) or *stale* (with the reason), and "why" links. |
+| **Proposal** | One generation: the diff, notes anchored to path, line and head, the obligations as a checklist, each piece of evidence marked *reviewed here*, *carried* (with the reason) or *stale* (with the reason), each check carry judgment from its `check-carried` event, advisory checks listed apart as never blocking, and "why" links. |
 | **Policy** | The rules in plain English, recent outcomes, and a dry run of a draft rule against the room's history. |
 
 It is built with Preact and Vite, with hand-written CSS. It has no component
@@ -16,7 +16,8 @@ library. It is served as Workers static assets.
 (contract unchanged since `ca61351`): the
 approved lane 0 contract (`940e2dca`) with the policy-runtime amendment
 (path/owner pairs, replay contexts, the per-act budget in `ProfileStamp`,
-check carry facts). It also uses the policy runtime
+check carry facts), and contract amendment 3 (`bc351fa8`, on `main` at
+`fb2bd41`): advisory obligations and `check-carried` events. It also uses the policy runtime
 (`@generalbusiness/artroom-policy`) for glob matching, carry decisions and
 the policy dry run.
 
@@ -64,6 +65,7 @@ asked for `ui/screenshots`; they are in `packages/ui/screenshots`:
 - `needs-you-light.png`, `needs-you-dark.png`, `needs-you-phone.png`
 - `room-light.png`, `room-dark.png`
 - `proposal-light.png`, `proposal-dark.png`, `proposal-phone.png`
+- `proposal-carry-light.png`: step 28, a carried and a not-carried check, and the advisory check
 - `policy-light.png`, `policy-dark.png`
 
 Laptop screenshots are 1280 pixels wide; phone screenshots are 390. The clock
@@ -112,7 +114,13 @@ for 44 minutes, in 37 steps:
 4. Two landings prepare in parallel. The first one's publication is
    unresolved, so it keeps the slot and the second waits, ready. The push
    completes forward; main moves; the second prepares again and lands.
-5. @birch's lease expires with no handover note. Its proposal now conflicts
+5. An advisory LLM review fails on generation 2 of the rate limit and again on
+   its landing integration. It is shown apart, as never blocking, and the
+   landing proceeds. Each landing preparation judges each check for the new
+   integration and records a `check-carried` event: the tests check carries
+   while main is unchanged and does not carry once main moves; the volatile
+   LLM review never carries.
+6. @birch's lease expires with no handover note. Its proposal now conflicts
    with main. @cedar takes the lane over and recuts it.
 
 The mock applies the platform's rules to the viewer's actions too: approve or
@@ -160,6 +168,9 @@ supplies them; the live adapter reports them as unavailable.
    so instead of claiming "nothing" or "all".
 9. **`connect()` is declared, not implemented**, so `LiveRoom` takes an
    `HttpRoom` from its caller, and `main.tsx` runs only the mock.
+10. **No read of a generation's commits** (open point 39). The per-change
+    history is not shown in a live room, and the UI does not build it from
+    anything else.
 
 The demo room admits acts synchronously, so each JSONata rule in its policy
 has a TypeScript twin. Tests check every twin against the policy runtime's
@@ -238,3 +249,20 @@ Tests are in `test/review-88a20f74.test.tsx`.
    before validation, and a valid draft of each kind still replays.
 3. **Screenshots.** The phone screenshot now waits for the diff to load, as the
    laptop one does, so it captures the whole page.
+
+## Contract amendment 3
+
+Lane F's edits for amendment 3 (`docs/protocol.md` section 29.8). Tests are in
+`test/amendment-3.test.tsx`.
+
+1. **Advisory obligations never block (R-OBL-7).** A check obligation with
+   `advisory: true` is listed under "Advisory checks", apart from "Before it
+   can land", and is not counted there or on the room's lane card. A failing
+   advisory check says that it does not block a landing.
+2. **Check carry is shown from its event (R-CARRY-13).** `check-carried`
+   events are in the activity feed and in `RoomSnapshot.checkCarries`. Each
+   check obligation lists its judgments: carried, with the reason from the
+   event, or not carried, with why. Carried check evidence shows the reason
+   from its event; if no event is loaded, it says so and shows no reason.
+3. **No per-change history in a live room (open point 39).** See contract
+   gap 10.
