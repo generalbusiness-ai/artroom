@@ -32,14 +32,18 @@ export {
 export {
   LOG_TRANSFER_LIMITS,
   LogPublisher,
+  READ_LIMITS,
   PublishError,
   publicationDue,
   readLogFiles,
   readPublishedEntries,
   type BatchPolicy,
+  type EntrySource,
+  type PublicationStats,
   type PublishErrorCode,
   type PublishResult,
   type PublisherOptions,
+  type RetainedRef,
 } from "./publisher.ts";
 export { RosterReplay, delegableBy, roleMaySign, type AuthorityFailure, type Judgement } from "./roster.ts";
 export { verifyLog, type VerifyFailure, type VerifyOptions, type VerifyReason, type VerifyReport } from "./verify.ts";

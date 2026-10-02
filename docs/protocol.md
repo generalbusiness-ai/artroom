@@ -2820,8 +2820,8 @@ P2 and one wording fault.
 
 Request 1c785ed8 asked the contract to keep every git object the log
 writes under Artifacts' object limit, and to report a refused push as a
-definite failure. The bounded-memory log work (request 5a7290b9, branch
-`request/log-bounded`, `notes/log-bounded.md`) measured the limit on
+definite failure. The bounded-memory log work (request a6aa60c9, landed at
+main b5864882; `notes/log-bounded.md`) measured the limit on
 2026-10-02: Artifacts accepts a git object of 33,554,432 bytes (32 MiB) and
 refuses one byte more with `artifacts_git_receive_pack_object_too_large`.
 
@@ -3056,31 +3056,49 @@ no default must handle them.
 ### 30.9 Required lane edits
 
 "(type)" marks an edit that a lane's typecheck forces. Packages on main
-typecheck at this amendment's head, because this branch adds the two
-attention cases to lane F's screen.
+(b5864882) typecheck at this amendment's head, because this branch adds
+the two attention cases to lane F's screen and lane E's CLI.
 
-**Lane L (`packages/log`, including `artroom verify`)**
-1. Write the layout the checkpoint names. For layout 2: segment starts by
-   R-LOG-17, from the lines' lengths and `from`; retained files at their
-   fanned-out paths. Layout 1 output does not change. `commitFor` stays
-   pure and synchronous: it needs nothing beyond its arguments.
-2. The guard (R-LOG-19): check every object to be written against B before
-   anything is sent, and fail with a new `PublishError` code
-   `object-too-large`, not retryable.
-3. `GitRemote.push`'s `PushOutcome` gains
+**Lane L (`packages/log`, including `artroom verify`)**. The publisher of
+request a6aa60c9 (main b5864882) streams each segment from an
+`EntrySource`, builds every commit in one synchronous `plan`, and keeps
+an `Index` of its last commit. Its edits:
+1. `plan` writes the layout the checkpoint names. For layout 2, the
+   segment starts follow R-LOG-17. The `Index` keeps each segment's
+   `first` and blob ID, not a list by multiples of 1,000. Closed segments
+   are still reused by ID and never read. New boundaries need only the
+   open segment's `first` and the lengths of its lines, which the size
+   pass already records. Retained files go to their fanned-out paths,
+   including in `digestPath`. Layout 1 output does not change, so the
+   comparison with `test/support/publisher-417a1618.ts` still holds for
+   layout 1 checkpoints.
+2. `commitFor` stays synchronous. With the publisher's last commit as the
+   parent, it uses the `Index`. With any other parent, it places every
+   segment from `entries` and the checkpoint's `from`, as `segmentStarts`
+   does. Either way it needs nothing beyond its arguments.
+3. The guard (R-LOG-19) goes in `plan`, over every planned object's size,
+   so `commitFor` and `publish` both refuse a cohort with an object over B,
+   with a new `PublishError` code `object-too-large`, not retryable.
+   Nothing is staged or pushed.
+4. `GitRemote.push`'s `PushOutcome` gains
    `{ ok: false, reason: "refused", code, detail }`. After it, read back:
    at the commit, done; at the lease, fail with a new code `refused`, not
    retryable, without pushing again; anything else, `unexpected-writer`.
    Today every outcome other than a lease mismatch pushes the same commit
    again until the attempts run out, then fails `unresolved`.
-4. `open` reads the layout from the head's checkpoint, and refuses as
-   `unexpected-writer` a head whose segments do not follow it.
-5. `decodeCheckpoint` accepts `layout` with `version: 2` and a seq `from`,
+5. `readIndex` (used by `open`) reads the layout from the head's checkpoint.
+   It still reads only trees and `checkpoint.json`, so it checks only the
+   shape: for layout 1, as today; for layout 2, segment names that start at
+   0, increase, cover at most 1,000 entries each and end at or before
+   `through`, and retained files at fanned-out paths. Any other head is
+   `unexpected-writer`. The full R-LOG-17 check is verify's.
+6. `decodeCheckpoint` accepts `layout` with `version: 2` and a seq `from`,
    and refuses any other value.
-6. `artroom verify` makes the checks of 30.6, with named failure reasons,
+7. `artroom verify` makes the checks of 30.6, with named failure reasons,
    and keeps every layout 1 check as it is.
-7. Tests for the cases of 30.7 that need no Room, including the old log, the
-   two switches and the edges at B and B + 1.
+8. Tests for the cases of 30.7 that need no Room, including the old log, the
+   two switches, the edges at B and B + 1, and `commitFor` with the last
+   commit and with another parent.
 
 **Lane B (`packages/git`)**
 1. `toLogOutcome` maps a `rejected` outcome other than a lease refusal to
@@ -3093,7 +3111,8 @@ attention cases to lane F's screen.
    `artifacts_git_receive_pack_object_too_large`. Add only codes that
    Artifacts answers before it updates any ref; keep the rule that an
    answer is never `rejected` when the ref might have changed. Test it with
-   the response recorded in the live probe of 2026-10-02.
+   the response recorded in the live probe of 2026-10-02
+   (`packages/room/measure/logbig/results/logbig-2026-10-02T02-52-36-597Z.json`).
 
 **Lane A (`packages/room`)**
 1. Choose `from` once (R-LOG-16), store it, and put
@@ -3123,8 +3142,8 @@ attention cases to lane F's screen.
 **Lane E (`packages/client`, `packages/mcp`, `packages/cli`)**, which
 landed on main (3f44c993) after this amendment's base (472b2380):
 1. CLI `where()` in `src/format.ts` falls through to `item.lane`, which the
-   two new items do not have. Give them a case that returns the item's
-   `seq`. (type)
+   two new items do not have. They need a case that returns the item's
+   `seq`. (type) This branch makes that edit, so main stays green.
 2. A schema that lists the attention reasons gains the two new ones.
 
 **Lane G (`packages/checkers`)**: none.
@@ -3132,9 +3151,8 @@ landed on main (3f44c993) after this amendment's base (472b2380):
 **Order.** Lane L's verify and decoder, and lane B's classifier, ship
 before any Room writes layout 2: a verifier from before this amendment
 fails a layout 2 log. Lane D's validator ships with the Room's entry bound.
-Request 5a7290b9 (`request/log-bounded`, in review) rewrites lane L's
-publisher; lane L's edits apply to whichever publisher is on main when
-they are made.
+Lane L's edits above are written against the bounded-memory publisher
+(request a6aa60c9), which is on main.
 
 ### 30.10 Open points
 
