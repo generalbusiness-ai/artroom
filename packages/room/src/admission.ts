@@ -694,6 +694,15 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
     return refused(ctx, nope("diff-too-large", "The change is too large to evaluate.", "Split the change into smaller proposals."), "R-PROP-6");
   const changed: readonly PathChange[] = pre.diff.changed;
   const paths = changedPaths(changed);
+  const generation = lane.generation + 1;
+  const prospective = { generation, head: body.head, base: pre.diff.base, changed };
+  const proposalInput = core.proposalInput(ctx.policy.doc, prospective);
+  // R-ADM-1 step 8 as amended by 66d6fb14: with the head known and the changed paths computed and bounded
+  // (R-PROP-1, R-PROP-3, R-PROP-6), policy `refuse` rules run before the claim check and the remaining
+  // invariants, so a rule can name a cause that would otherwise show only as `outside-claim`. Skipped on a
+  // recovery lane (R-ADMIN-5). `require` rules stay at step 9, on the same act meter (R-EVAL-9).
+  const r = await policyRefuse(ctx, lane, proposalInput);
+  if (r) return refused(ctx, r);
   // R-ADMIN-6 first on a recovery lane: its scope rule is the more specific one.
   if (lane.purpose === "config-recovery") {
     const bad = paths.filter((p) => !p.startsWith(".artroom/"));
@@ -710,12 +719,7 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
     if (!parsed.ok)
       return refused(ctx, nope("policy-invalid", `The proposed configuration is invalid: ${parsed.problems[0]}.`, "Correct the configuration and propose again."), "R-POL-1");
   }
-  const generation = lane.generation + 1;
-  const prospective = { generation, head: body.head, base: pre.diff.base, changed };
-  const proposalInput = core.proposalInput(ctx.policy.doc, prospective);
-  // Step 9: refuse, then require (R-POL-2, R-POL-3); none on a recovery lane (R-ADMIN-5, R-ADMIN-6).
-  const r = await policyRefuse(ctx, lane, proposalInput);
-  if (r) return refused(ctx, r);
+  // Step 9: require (R-POL-3); none on a recovery lane (R-ADMIN-5, R-ADMIN-6).
   const admin = adminObligation(ctx.policy.version, paths);
   const specs: ObligationSpec[] = admin ? [admin] : [];
   if (admin) ctx.invariants.push({ rule: "R-ADMIN-1", held: true, detail: "a changed path matches .artroom/**: obl_admin-approval added" });
