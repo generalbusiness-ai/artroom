@@ -21,7 +21,7 @@ Parent read every cited production path and test pattern. Read-only synthetic pr
 
 `packages/git/src/artifacts.ts:110,115` and `publisher/client.ts:84` retry non-idempotent canonical token creation after potentially applied internal errors (see artifacts.ts:60–68). `packages/room/src/logremote.ts:45` mints before its finally block. A lost answer can leave an unnamed token outside a cleanup owner's records; a usable publication answer can also be lost between mint and durable pushToken recording at landing/engine.ts:266–267. The ownership loss is evidenced, but a safe complete recovery design needs a contract decision: canonical inventories do not identify an owner and contain concurrent unrelated tokens. Do not turn this into a blanket revoke-all plan. Request explicit ownership of that design and its implementing lanes. Known tokens need durable handoffs; unknown effects need honest observation/retention or a documented provider completion fence. No unauthorized access or credential disclosure is claimed. Measured 60-second publication and longer pin token TTLs remain adopted behavior.
 
-Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A landed at `7be42275` (review `84b71c71`): see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lane B is implemented, pending review: see [Mint lane B](#mint-lane-b-request-78f0971c). Lane C is not yet implemented.
+Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A landed at `7be42275` (review `84b71c71`): see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lane B landed at `574568b2` (review `1266c4a7`): see [Mint lane B](#mint-lane-b-request-78f0971c). Lane C is implemented, pending review: see [Mint lane C](#mint-lane-c-request-5ff58c9a).
 
 ## Considered and excluded
 
@@ -460,7 +460,7 @@ Every caller: `canonicalTokens`, the landing engine and core, the publisher clie
 
 ## Mint lane B (request 78f0971c)
 
-Status: DONE, pending checker review. Gitseq request `78f0971c`, branch `request/mint-publication`, cut from main `7be42275` and merged with main `25a7b837` (idle write storms, request `3da1d82b`), so the head for review is the combined one. It implements lane B of [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md) ("Lane B: the publication token, and the ledger in the Room"), as approved in review `ad6cc052`, under [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). The head for review is the commit that carries this section.
+Status: DONE, landed at `574568b2`, approved in review `1266c4a7`. Gitseq request `78f0971c`, branch `request/mint-publication`, cut from main `7be42275` and merged with main `25a7b837` (idle write storms, request `3da1d82b`), so the head for review is the combined one. It implements lane B of [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md) ("Lane B: the publication token, and the ledger in the Room"), as approved in review `ad6cc052`, under [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). The head for review is the commit that carries this section.
 
 **Scope.** The note's lane B paths on main's current layout (post-D5): `packages/git/src/artifacts.ts` (`canonicalTokens` removed), `src/index.ts`, `src/landing/engine.ts`, `src/landing/core.ts`, the Git harness at `packages/git/measure/harness/worker.ts`, `packages/git/test/support.ts`, `test/landing.test.ts`, `test-workers/worker.ts` and `test-workers/landing-do.test.ts`, `packages/room/src/core.ts`, and a new Room workerd file, `packages/room/test/workerd/mint-publication-78f0971c.test.ts`. The two package READMEs name the new API where they named `canonicalTokens`. Nothing was deployed, no live Cloudflare call was made, and no credential was created.
 
@@ -598,3 +598,102 @@ Run at the exact head that carries this section, serially, with logs in `/privat
 ### Not changed here
 
 Lane C's sites keep their own mints: the publisher client's `withToken` (integrate, pinning, previews), the log remote, snapshot preparation's canonical read token and check jobs (`watchMint` and its `mint:` rows). The Room's `known` already includes `job_tokens`, so lane C's claim into that table needs no change here. `mints.ts` is unchanged. Showing the ledger's records to admins stays with the cleanup projection request (`8d249233`).
+
+## Mint lane C (request 5ff58c9a)
+
+Status: DONE, pending checker review. Gitseq request `5ff58c9a`, branch `request/mint-sites`, cut from main `574568b2`. It implements lane C of [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md) ("Lane C: the other canonical sites"), as approved in review `ad6cc052`, under [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). The head for review is the commit that carries this section.
+
+**Scope.** The note's lane C paths on main's current layout: `packages/git/src/publisher/client.ts`, `packages/room/src/artifacts.ts`, `logremote.ts`, `config.ts`, `ports.ts`, `core.ts` (the snapshot path, and the constructor, which now builds the ledger before the Artifacts adapter that needs it), `jobs.ts` and `store.ts` (a schema comment). Two small additions to lane A's `mints.ts`: `adopt()` for the one-time move, and `within` exported for the job tokens' bounded wait. The Git harness (`measure/harness/worker.ts`) and the Room's `measure/logbig/worker.ts` pass the ledger where they build these clients. Tests: a new Room workerd file `test/workerd/mint-sites-5ff58c9a.test.ts`, a node source scan `test/node/mint-sites-scan.test.ts`, and the earlier controls that described the old job mint records, restated through the ledger. The two package READMEs name the change. Nothing was deployed, no live Cloudflare call was made, and no credential was created.
+
+### What was built
+
+| Site | Purpose (ledger record) | Lifetime | Owner after the answer |
+|---|---|---|---|
+| `ContainerPublisher.integrate` | `integrate:<op>:<attempt>` | 60 s write | the ledger, released after the sandbox call |
+| `Pinning.pinObjects`, canonical half | `pin-objects:<head>` | 600 s write | the ledger, released |
+| `Pinning.pinRef` | `pin-ref:<lane>:<generation>` | 60 s write | the ledger, released |
+| `Pinning.preview` | `preview:<lane>:<generation>` | 60 s write | the ledger, released |
+| log remote `readRef` | `log-read:<ref>` | 60 s read | the ledger, released |
+| log remote `push` | `log-push:<commit>` | 60 s write | the ledger, released |
+| snapshot preparation's canonical read (`core.ts`) | `snapshot:<commit>` | 300 s read | the ledger, released |
+| a whole-tree check job (`jobs.ts` `issue`) | `job:<job>_<attempt>` | ends 5 s before the deadline | claimed into `job_tokens` |
+
+- **Released sites** use `mints.withToken(purpose, scope, () => ttl, fn)`: the record and wake-up before the request, a bounded wait, a lost answer kept as `unknown`, and a revocation by ID afterwards whose failure makes the record `owed` (due in 1 s, backed off to 5 min) for a later alarm. Nothing is dropped. The publisher clients take the ledger as `PublisherClientOptions.mints`; the Room's `ArtifactsAdapter` passes it to `Pinning`; `Remotes.logRemote(repo, mints)` receives it, and the Room passes `RoomCore.mints`. The log remote reads the repository's remote before minting, so the token's lifetime is not spent on that lookup.
+- **Check jobs.** `issue` calls `mints.mint(job:<id>, "read", (sentAt) => floor((deadline - sentAt) / 1000) - 5, { notAfter: deadline })`. The lifetime is a function of the send time, which the ledger calls after the wake-up is stored, and the pre-send record holds that recomputed lifetime (approval obligation 1). The three deadline checks: (1) the lifetime asked ends 5 s before the deadline, from the post-wake send time; (2) the reported expiry is by the deadline, now the ledger's `notAfter`, checked before any caller gets the token, so a token that would outlive the deadline is never returned or claimed, and the ledger owes its revocation; (3) `issue` still never dispatches at or after the deadline (`core.now() >= deadline`), and ends the token instead. The claim: one transaction writes the `job_tokens` row with the handoff metadata (`token_id = id`, `expires_at = expiresAt`, `next_ms = expiresAt`, `last_error = 'held'`) and calls `claim()`. If that transaction fails, the ledger still holds the token and `release()` revokes it at once (a failure there is owed).
+- **`watchMint` and the `mint:<job>` rows are gone.** The ledger's records and its shared observation replace them. A room stored before this change moves its open `mint:` rows into the ledger once, at the object's start (`moveJobMints`, meta key `job_mints_moved`), in one transaction: each becomes an `unknown` record (`job:<job>`, read, `notAfter` = the row's deadline) through `MintLedger.adopt` (one summary write), and the rows are deleted. A room with none only sets the key. After that, each start reads one meta row.
+- **Ended job tokens** (`settleToken`) keep their owner rule, as today: a row ends when Artifacts answers its revocation, or once its known expiry has passed, with no revocation; a row with no known expiry is never settled by time. The repository lookup and the revocation now share one bounded wait (30 s, `MINT_WAIT_MS`), the expiry is checked again after the lookup immediately before the send, nothing is sent once the wait has ended, and a late answer changes nothing. A failure is stored as `errorNote("revocation failed", e)`, never the provider's text.
+- **`jobTokenDuties()`** lists `held` and `revoke` rows only. An unknown job mint is a ledger record, read through `core.mints.duties()`.
+- **Safe metadata.** Integrate's detail for a failed mint is `token not minted (<errorNote("create failed", e)>)`, as lane B's publication attempt; every ledger record and job token row keeps `errorNote` text only.
+- **The fork read token** in `pinObjects` is unchanged (`withForkToken`, still a hidden retry and a dropped revocation), pending request `02836f9a`. The source scan names it as that pending exception.
+
+### Choices where the design left room
+
+These are for the checker to confirm or reject.
+
+1. **Job tokens are settled at their expiry before any revocation is tried** (standard 3, "re-check expiry right before any revocation"), not only after a failed one, as before. A row due at its expiry (a held token whose attempt ended without its end being written, or an attempt found past its deadline) is deleted with no call: the token no longer reads. Eight earlier controls asserted `revoked === true` for a token past its expiry; they now assert that it no longer reads and that its row has ended (below).
+2. **A token owed at once is revoked by the ledger's next pass**, not inside `issue` (lane A's choice 2). Controls that expected a refused job token revoked by the jobs step alone now run the `mints` step.
+3. **`moveJobMints` runs in the `RoomCore` constructor, unwrapped**, as lane B's `token-index` fill. A storage failure there fails the object's start, as `createSchema` would; a partial move is impossible (one transaction with the meta key). The moved records' `sent_at` is the move time: the old rows did not keep the send time; the note on each record says so.
+4. **The bounded wait for job tokens** is the ledger's constant; `setJobTokenWait(core, ms)` (a per-object `WeakMap`, like `jobs.ts`'s waits) lets the controls use 200 ms on one object. No process global is swapped.
+5. **Purposes** are per site and per operation (table above), so admins can tell the records apart in `duties()`; a `job:` purpose is the attempt's job ID.
+6. **Ledger writes per mint.** Each released mint writes four record statements (the record, the lifetime asked, the answer, the deletion), as the note's three rows plus lane A's post-wake lifetime update, and a summary write for the takeover time at most every 30 s. A failing log publication mints 11 tokens per retry (lane L's read-backs and pushes), so request 3da1d82b's backoff control now counts the ledger's writes separately and checks they are a fixed number per retry. Request `8bd623cc` may want to measure this.
+7. **The `RoomCore` constructor builds the ledger earlier**, before the Artifacts adapter that takes it. Its `known` callback still reads `landing` lazily. This is outside the snapshot path, but unavoidable.
+
+### Tests: rule map
+
+Room, `packages/room/test/workerd/mint-sites-5ff58c9a.test.ts` (26 tests, the production Room with real storage and alarms), and `packages/room/test/node/mint-sites-scan.test.ts` (3 tests). The note's tests 1 to 4 are red at `3ac55e96` by construction: no site there kept a record.
+
+| Note | Rules | Tests |
+|---|---|---|
+| (1) | R-MINT-2, R-MINT-5, R-MINT-7 | For each of the eight sites: the site's create applies and its answer is lost. One `unknown` record with the site's purpose; integrate's detail is safe metadata only. Restart: the fresh object schedules the overdue observation exactly 1 s ahead, with no request; two alarms, each followed by the next observation's still-future time, stored exactly (approval obligation 2). The record is kept and observed, and the applied token is never asked to be revoked |
+| (2) | R-MINT-4, R-MINT-7 | For each site: its token's first revocation fails. The debt is kept with `errorNote` text (the ledger's `owed` record, or the job's token row); a later alarm revokes it by its ID (two calls in all) and the record ends. Each site's lifetime is as before |
+| (3) | R-MINT-5 | A stored room with two open `mint:` rows and a held token row: at the next start, two `unknown` records with the right purposes and deadlines, counts 2/0, the held row kept, the observation scheduled 1 s ahead; a `mint:` row written after the move is not moved by a later start; the moved records are observed, never settled |
+| (4) | R-MINT-2, R-MINT-3, R-EXEC-9 | Through `issue` and the production ledger, each with a wake-up that takes 20 s of room time, and each checking the pre-send record: `notAfter` = the deadline and the lifetime computed from the post-wake send time. Wake delay: sent, expiry 5 s before the deadline, handoff metadata. Create delay (20 s): expiry 15 s past the deadline, passes the generic check; owed (`an expiry after notAfter`), never sent, revoked by its ID at the next pass. Answer delay (20 s): claimed and sent. Boundaries: a reported expiry equal to the deadline is accepted and sent, 1 ms later is owed; dispatch at the deadline sends nothing and ends the token, 1 ms before sends it |
+| (4) retained | R-EXEC-9, R-MINT-5 | `job-token-mint.test.ts` lines 121–180 (was 123–177), review 013dad0c's control: a mint held past its deadline, attempt 2 sent, then the first applies. Late usable answer: owed, revoked by its ID, never sent. Minted in time, answer late: claimed by the superseded attempt and ended. Lost answer: `unknown` past the deadline and past the lifetime asked, across a restart and an alarm |
+| (5) | R-MINT-4 | A job token row whose revocations fail is retried while the token reads, and settled once its expiry passes, with no further call. A job's ledger record with no readable expiry stays `owed` through 18 hours of failing passes. Bounded: a revocation that never answers ends within the wait, its late answer changes nothing; a lookup still out at the end sends nothing, then or later; an expiry that passes during the lookup settles the row with no call |
+| (6) | R-MINT-1 | Outside the harnesses, `measure/` and tests, `createToken` is called once each in `mints.ts`, `workspace/workspaces.ts`, `snapshot/repos.ts` and `publisher/client.ts`, and nowhere else. The client's one call is `withForkToken`'s, used once, for the fork (pending request `02836f9a`). The pattern finds property calls and value indexing, not declarations or type references |
+
+**Earlier controls restated through the ledger** (same meaning; only what the old `mint:` rows or an inline revocation showed changed): `job-token-mint.test.ts` (all 13: observations and backoff are the ledger's, a malformed answer with an ID is owed and revoked by that ID), `review-90f30a3b.test.ts` (refused tokens are the ledger's and revoked by its pass; cleanup across a restart through the ledger's backoff), `review-271dbd53.test.ts` (a refused token is never the job's; transfer failures leave the ledger owning it), `review-0f9739dc.test.ts` and `review-786e9606.test.ts` (an expired token's row ends with no call), `request-d268d249.test.ts` (the job sinks keep `errorNote` text, and no table holds the injected text, as request `d29c09fa` checks), `mint-publication-78f0971c.test.ts` (its holds and wake controls target the publication's create, now that integrate mints through the ledger too), `idle-writes-3da1d82b.test.ts` (choice 6), `phase2b.test.ts` and `config.test.ts` (the log remote takes the ledger).
+
+### Mutation table
+
+Each mutant was applied alone by a script (`/private/tmp/claude-501/mintC/mutants/run.py`) at `62048db6` (G14 again at `f61a3c00`, below), the suites named were run, and the file was restored from the commit (`git checkout`). Every mutant ran against the lane C workerd file, the restated controls (`job-token-mint`, `review-90f30a3b`, `review-271dbd53`, `request-d268d249`, `review-786e9606`, `review-0f9739dc`) and the source scan. T marks the note's lane C mutation targets, O the approval's two obligations, G the other guards. 29 mutants, all red, and every test in the lane C workerd file and the first two source-scan tests is red under at least one (the scan's third test checks the pattern itself). G14 survived the first run: no control checked that the log push still landed with its write token; "(2) the log remote's push" now does, and G14 is red. Lane A's own mutants of `mints.ts` (including O2a, the 1 s step postponing a future time when anything is overdue) stay with lane A's 47 tests, which pass unchanged.
+
+| Mutant | Kind | Mutation | Red tests |
+|---|---|---|---|
+| T1a | T | a site calls `createToken` directly (pinRef) | (1) and (2) pinRef; (6) both scan tests |
+| T1b | T | a site calls `createToken` directly (the log remote, as before lane C) | (1); (2) readRef and push; (6) |
+| T1c | T | a site calls `createToken` directly (snapshot preparation, as before lane C) | (1) and (2) snapshot; (6) |
+| T1d | T | a site calls `createToken` directly (a check job, with its own deadline check) | 26 tests: (1), (4) every case, (5) settlement, all of `job-token-mint` but the refusal, review-90f30a3b (4), review-271dbd53 (2), review-786e9606, request-d268d249, (6) |
+| T2a | T | a dropped revocation failure (publisher client: the record given up, revoked outside the ledger, failure swallowed) | (2) integrate, pinObjects, pinRef, preview |
+| T2b | T | a dropped revocation failure (the log remote) | (2) readRef and push |
+| T2c | T | a dropped revocation failure (snapshot preparation) | (2) snapshot |
+| T2d | T | a dropped revocation failure (a job token row deleted when its revocation fails) | (2) check job; (5) all four job-token controls; request-d268d249 |
+| T3a | T | the move run at every start | (3) |
+| T3b | T | the move not run at all | (3) |
+| T4 | T | `issue`'s `notAfter` left out of the job's mint | 17 tests: (4) every case; `job-token-mint` (9, the 013dad0c control among them); review-90f30a3b (2); review-271dbd53 |
+| T5 | T | `issue`'s check for a passed deadline before dispatch removed | (4) dispatch boundary; `job-token-mint` "an answer still outstanding …"; review-90f30a3b "an answer delayed past the attempt's deadline …" |
+| O1 | O | the lifetime computed before the wake-up, so the pre-send record does not hold the lifetime recomputed after it | (4) all five cases |
+| O2 | O | the 1 s continuation applied to a still-future time too (`nextDue`) | (1) (the next observation stored exactly); review-90f30a3b "cleanup fails, and the room restarts" |
+| G1 | G | the claim before the `job_tokens` transaction, not inside it | review-271dbd53 both transfer controls |
+| G2 | G | no release when the claim does not commit | review-271dbd53 both transfer controls |
+| G3 | G | handoff metadata: `next_ms` not the reported expiry | (4) wake delay; review-0f9739dc (3); review-271dbd53 (2) |
+| G4 | G | no expiry recheck after the lookup, before the send (job tokens) | (5) "an expiry that passes during the lookup …" |
+| G5a | G | a job token revocation not bounded | (5) "a revocation that never answers …" |
+| G5b | G | a job token revocation's lookup not bounded (a late lookup still sends) | (5) "a repository lookup still out …" |
+| G6 | G | a job token revocation failure stores the provider's text | (2) check job; (5) two; request-d268d249 |
+| G7 | G | the move drops the deadline (`notAfter`) | (3) |
+| G8 | G | the move keeps the old rows | (3) |
+| G9 | G | adopted records not counted (unknown count, observation) | (3) |
+| G10 | G | integrate stores the provider's text for a failed mint | (1) integrate |
+| G11 | G | no margin under the deadline for a job's lifetime | (2) check job lifetime; (4) all five; review-90f30a3b "a mint delayed by less than the room's margin" |
+| G12 | G | the pinning token's lifetime changed (600 s to 60 s) | (2) pinObjects |
+| G13 | G | the snapshot read's lifetime changed (300 s to 600 s) | (2) snapshot |
+| G14 | G | the log push minted as a read token | (2) push |
+
+### Gates
+
+Run at the exact head that carries this section, serially, with logs in `/private/tmp/claude-501/mintC/`; the exit codes are in the delivery report. In this order: `npm run typecheck -w @generalbusiness/artroom-git`, `npm test -w @generalbusiness/artroom-git` (Node) and `npm run test:workers -w @generalbusiness/artroom-git`; `npm run typecheck -w @generalbusiness/artroom-room`, `npm run test:node -w @generalbusiness/artroom-room` and `npm run test:workerd -w @generalbusiness/artroom-room`; then from the root `npm ci`, `npm run typecheck` and `npm test`; then `npm exec -w @generalbusiness/artroom-room -- wrangler deploy --dry-run` (bundles only; no credentials, nothing is uploaded). The Git harness is type-checked separately with a scratch tsconfig, as the package gates do not cover `measure/`.
+
+### Not changed here
+
+The fork read token in `pinObjects` (request `02836f9a`). `MintLedger`'s behaviour (lane A) and the publication token (lane B). Showing the ledger's records to admins stays with the cleanup projection request (`8d249233`). Requests `8bd623cc` (row writes) and `d29c09fa` (error sinks) touch `core.ts` and `jobs.ts`; this branch will merge main when they land.
