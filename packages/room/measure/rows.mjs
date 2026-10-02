@@ -78,10 +78,23 @@ export const ROW_LIMIT = 10_000;
 
 const API = "https://api.cloudflare.com/client/v4";
 
-const nonNegative = (v) => {
-  const n = Number(v ?? 0);
-  return Number.isFinite(n) && n >= 0 ? n : 0;
-};
+/**
+ * A billed quantity (rows written or read, requests) as the provider gave it.
+ * Missing, null, negative or not a number is missing evidence, never zero:
+ * it throws, and the gate is incomplete.
+ */
+function billed(v, field, label) {
+  if (typeof v !== "number" || !Number.isFinite(v) || v < 0) throw new Error(`${label}: a ${field} value is missing or not a non-negative number`);
+  return v;
+}
+
+/** A provider error, as safe metadata only: its numeric codes or short code classes. Never its text, which can echo the request. */
+function errorCodes(errors) {
+  const list = Array.isArray(errors) ? errors : [];
+  const safe = (c) => (typeof c === "number" && Number.isSafeInteger(c)) || (typeof c === "string" && /^[A-Za-z0-9_.-]{1,40}$/.test(c));
+  const codes = list.map((e) => e?.code ?? e?.extensions?.code).filter(safe);
+  return `${list.length} error${list.length === 1 ? "" : "s"}${codes.length ? ` (codes ${[...new Set(codes)].join(", ")})` : ""}`;
+}
 
 async function json(response, label) {
   const text = await response.text();
@@ -91,8 +104,36 @@ async function json(response, label) {
   } catch {
     throw new Error(`${label} returned non-JSON HTTP ${response.status}`);
   }
-  if (!response.ok) throw new Error(`${label} failed HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`);
+  if (!response.ok) throw new Error(`${label} failed HTTP ${response.status}: ${errorCodes(body?.errors)}`);
   return body;
+}
+
+/**
+ * A failure's message for a report that is printed and posted: never the
+ * token. Messages made here hold only metadata; this also covers an
+ * exception from the transport.
+ */
+export function safeMessage(e, token) {
+  let m = String(e?.message ?? e).slice(0, 1_000);
+  if (token) m = m.split(token).join("<redacted>");
+  return m.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").replace(/art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g, "<token>");
+}
+
+/**
+ * The first interval start a window must query. Cloudflare stamps a periodic
+ * sample with the START of its (up to) one-minute interval, so a sample
+ * stamped up to 60 s before `from` can hold writes inside the window. One
+ * helper for the gate and the per-act driver.
+ */
+export function sampleQueryStart(from) {
+  return new Date(Date.parse(from) - 60_000).toISOString();
+}
+
+/** Whether the namespace list has another page: by its metadata when it has any, else while pages come back full. */
+export function morePages(page, result, info, perPage = 100) {
+  if (result.length < perPage) return false;
+  const total = info?.total_pages;
+  return typeof total === "number" && Number.isFinite(total) ? page < total : true;
 }
 
 /** The Durable Object namespaces `worker` owns now, sorted by class. */
@@ -102,14 +143,14 @@ export async function workerNamespaces({ accountId, token, worker, fetchImpl = f
     if (page > 100) throw new Error("Durable Object namespace list did not end within 100 pages (truncated)");
     const url = `${API}/accounts/${accountId}/workers/durable_objects/namespaces?page=${page}&per_page=100`;
     const body = await json(await fetchImpl(url, { headers: { authorization: `Bearer ${token}` } }), "Durable Object namespace list");
-    if (body.success !== true || !Array.isArray(body.result)) throw new Error(`Durable Object namespace list was unsuccessful: ${JSON.stringify(body.errors ?? [])}`);
+    if (body.success !== true || !Array.isArray(body.result)) throw new Error(`Durable Object namespace list was unsuccessful: ${errorCodes(body.errors)}`);
     for (const row of body.result) {
       if (row?.script !== worker) continue;
       const id = typeof row.id === "string" ? row.id : "";
       const className = typeof row.class === "string" ? row.class : "";
       if (id && className) out.push({ id, name: typeof row.name === "string" ? row.name : `${worker}/${className}`, className, script: worker });
     }
-    if (page >= Number(body.result_info?.total_pages ?? page) || body.result.length < 100) break;
+    if (!morePages(page, body.result, body.result_info)) break;
   }
   return out.sort((a, b) => a.className.localeCompare(b.className));
 }
@@ -141,7 +182,7 @@ async function namespaceRows({ accountId, token, namespace, from, to, fetchImpl 
     }),
     label,
   );
-  if (body.errors?.length) throw new Error(`${label}: GraphQL errors ${JSON.stringify(body.errors).slice(0, 500)}`);
+  if (body.errors?.length) throw new Error(`${label}: GraphQL ${errorCodes(body.errors)}`);
   const account = body.data?.viewer?.accounts?.[0];
   if (!account) throw new Error(`${label} returned no account`);
   const periodic = account.durableObjectsPeriodicGroups;
@@ -159,17 +200,19 @@ async function namespaceRows({ accountId, token, namespace, from, to, fetchImpl 
   };
   for (const row of periodic) {
     const id = row?.dimensions?.objectId;
-    if (!id) continue;
+    // A row with no object cannot be attributed: missing evidence, not nothing.
+    if (typeof id !== "string" || !id) throw new Error(`${label}: a periodic row has no objectId`);
     const o = at(id);
     o.name = row.dimensions.name ?? o.name;
-    o.rowsWritten += nonNegative(row.sum?.rowsWritten);
-    o.rowsRead += nonNegative(row.sum?.rowsRead);
+    o.rowsWritten += billed(row.sum?.rowsWritten, "rowsWritten", label);
+    o.rowsRead += billed(row.sum?.rowsRead, "rowsRead", label);
     // Grouped by object with no time dimension, so this is a 0-or-more evidence marker, not a sample count.
     o.periodicSamples += 1;
   }
   for (const row of invocations) {
     const id = row?.dimensions?.objectId;
-    if (id) at(id).requests += nonNegative(row.sum?.requests);
+    if (typeof id !== "string" || !id) throw new Error(`${label}: an invocations row has no objectId`);
+    at(id).requests += billed(row.sum?.requests, "requests", label);
   }
   return [...objects.values()].sort((a, b) => b.rowsWritten - a.rowsWritten || a.objectId.localeCompare(b.objectId));
 }
@@ -182,9 +225,11 @@ export async function queryWorkerRows({ accountId, token, worker, from, to, requ
   if (namespaces.length === 0) throw new Error(`worker ${worker} owns no Durable Object namespace`);
   const missing = required.filter((c) => !namespaces.some((n) => n.className === c));
   if (missing.length) throw new Error(`worker ${worker} is missing required Durable Object namespaces: ${missing.join(", ")}`);
-  const objects = (await Promise.all(namespaces.map((namespace) => namespaceRows({ accountId, token, namespace, from, to, fetchImpl })))).flat();
+  // Samples are stamped with their interval's start: one stamped up to a minute before `from` can hold writes in the window.
+  const sampledFrom = sampleQueryStart(from);
+  const objects = (await Promise.all(namespaces.map((namespace) => namespaceRows({ accountId, token, namespace, from: sampledFrom, to, fetchImpl })))).flat();
   const total = (k) => objects.reduce((s, o) => s + o[k], 0);
-  return { worker, from, to, namespaces, objects, totalRowsWritten: total("rowsWritten"), totalRowsRead: total("rowsRead"), totalRequests: total("requests") };
+  return { worker, from, to, sampledFrom, namespaces, objects, totalRowsWritten: total("rowsWritten"), totalRowsRead: total("rowsRead"), totalRequests: total("requests") };
 }
 
 const objectLabel = (o) => `${o.namespace}/${o.name || o.objectId}`;
@@ -206,6 +251,7 @@ export function reportForOutput(report) {
     worker: report.worker,
     from: report.from,
     to: report.to,
+    sampledFrom: report.sampledFrom,
     totalRowsWritten: report.totalRowsWritten,
     totalRowsRead: report.totalRowsRead,
     totalRequests: report.totalRequests,
@@ -221,7 +267,7 @@ export async function rowGate({ accountId, token, worker, from, to, budget = SMO
     const decision = evaluateRows(report, budget);
     return { ...reportForOutput(report), budget, ...decision };
   } catch (e) {
-    return { worker, from, to, budget, state: "incomplete", failures: [String(e?.message ?? e).slice(0, 1_000)] };
+    return { worker, from, to, budget, state: "incomplete", failures: [safeMessage(e, token)] };
   }
 }
 
@@ -277,9 +323,9 @@ query DurableObjectSamples($accountTag: String!, $start: Time!, $end: Time!, $na
 }`;
 
 /**
- * Every periodic sample of `worker`'s objects whose interval starts in
- * [from, to), and invocations by minute, with the same fail-closed rules as
- * `queryWorkerRows`.
+ * Every periodic sample of `worker`'s objects whose interval overlaps
+ * [from, to) (stamped from `sampleQueryStart(from)`), and invocations by
+ * minute, with the same fail-closed rules as `queryWorkerRows`.
  */
 export async function querySamples({ accountId, token, worker, from, to, required = REQUIRED_CLASSES[worker] ?? [], fetchImpl = fetch }) {
   if (!token) throw new Error("ARTROOM_CF_ANALYTICS_TOKEN is not set");
@@ -288,17 +334,18 @@ export async function querySamples({ accountId, token, worker, from, to, require
   if (namespaces.length === 0 || missing.length) throw new Error(`worker ${worker} is missing Durable Object namespaces: ${missing.join(", ") || "all"}`);
   const samples = [];
   const invocations = [];
+  const start = sampleQueryStart(from);
   for (const ns of namespaces) {
     const label = `Durable Object samples query for ${ns.name}`;
     const body = await json(
       await fetchImpl(`${API}/graphql`, {
         method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ query: SAMPLES_QUERY, variables: { accountTag: accountId, start: from, end: to, namespaceId: ns.id } }),
+        body: JSON.stringify({ query: SAMPLES_QUERY, variables: { accountTag: accountId, start, end: to, namespaceId: ns.id } }),
       }),
       label,
     );
-    if (body.errors?.length) throw new Error(`${label}: GraphQL errors ${JSON.stringify(body.errors).slice(0, 500)}`);
+    if (body.errors?.length) throw new Error(`${label}: GraphQL ${errorCodes(body.errors)}`);
     const account = body.data?.viewer?.accounts?.[0];
     const periodic = account?.durableObjectsPeriodicGroups;
     const inv = account?.durableObjectsInvocationsAdaptiveGroups;
@@ -306,14 +353,16 @@ export async function querySamples({ accountId, token, worker, from, to, require
     if (periodic.length >= ROW_LIMIT || inv.length >= ROW_LIMIT) throw new Error(`${label} reached its ${ROW_LIMIT}-row limit (truncated)`);
     for (const g of periodic) {
       const d = g?.dimensions ?? {};
-      if (d.objectId && d.datetime) samples.push({ className: ns.className, objectId: d.objectId, name: d.name ?? "", t: d.datetime, rowsWritten: nonNegative(g.sum?.rowsWritten), rowsRead: nonNegative(g.sum?.rowsRead) });
+      if (typeof d.objectId !== "string" || !d.objectId || !Number.isFinite(Date.parse(d.datetime))) throw new Error(`${label}: a periodic row has no objectId or datetime`);
+      samples.push({ className: ns.className, objectId: d.objectId, name: d.name ?? "", t: d.datetime, rowsWritten: billed(g.sum?.rowsWritten, "rowsWritten", label), rowsRead: billed(g.sum?.rowsRead, "rowsRead", label) });
     }
     for (const g of inv) {
       const d = g?.dimensions ?? {};
-      if (d.objectId && d.datetimeMinute) invocations.push({ className: ns.className, objectId: d.objectId, minute: d.datetimeMinute, requests: nonNegative(g.sum?.requests) });
+      if (typeof d.objectId !== "string" || !d.objectId || !Number.isFinite(Date.parse(d.datetimeMinute))) throw new Error(`${label}: an invocations row has no objectId or minute`);
+      invocations.push({ className: ns.className, objectId: d.objectId, minute: d.datetimeMinute, requests: billed(g.sum?.requests, "requests", label) });
     }
   }
-  return { worker, from, to, samples, invocations };
+  return { worker, from, to, sampledFrom: start, samples, invocations };
 }
 
 const median = (xs) => {
@@ -437,7 +486,7 @@ if (isMain) {
   check(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (e) => {
-      console.error(String(e?.message ?? e));
+      console.error(safeMessage(e, process.env.ARTROOM_CF_ANALYTICS_TOKEN));
       process.exit(1);
     },
   );

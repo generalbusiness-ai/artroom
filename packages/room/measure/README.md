@@ -52,9 +52,21 @@ For one Worker and one window `[from, to)`:
 1. List the account's Durable Object namespaces. Keep the ones whose
    `script` is the Worker. This runs every time, because a redeploy can
    change the IDs.
-2. Run one GraphQL query per namespace, filtered by `namespaceId` and the
-   window. It returns rows written and rows read from the periodic dataset,
-   and requests from the invocations dataset, grouped by `objectId`.
+
+   Paging stops at a short or empty page. It also stops when
+   `result_info.total_pages` says so, but only if that field is present:
+   the provider marks the pagination metadata as optional (`morePages`).
+2. Run one GraphQL query per namespace, filtered by `namespaceId`. It
+   returns rows written and rows read from the periodic dataset, and
+   requests from the invocations dataset, grouped by `objectId`.
+
+   Cloudflare stamps each periodic sample with the *start* of an interval
+   of up to a minute. So the query starts one minute before `from`
+   (`sampleQueryStart`, the same helper the per-act driver uses). That way
+   a sample stamped just before `from`, whose minute overlaps the window,
+   is counted. It ends before `to` (exclusive). A sample stamped before
+   `to` counts in full even if it runs past `to`. Both edges can count too
+   much, but never too little.
 3. Add the results up by object. Each object keeps its class and its
    `idFromName` name: a room ID for `Room`, `registry` for `Registry`.
 4. Check two budgets: a total for the Worker, and a ceiling for each
@@ -62,9 +74,9 @@ For one Worker and one window `[from, to)`:
 
 A window is owned. If two runs share the spike at the same time, each
 run's window also counts the other run's rows. That makes a result too
-high, never too low. `rowTable` reports the rows of any object that is not
-the measured room in a separate column, so you can see a window that was
-not clean.
+high, never too low. `windowTable` reports the rows of any object that is
+not the measured room in a separate column, so you can see a window that
+was not clean.
 
 ## Fail closed
 
@@ -80,6 +92,25 @@ Each one has a test in `rows.test.ts`.
 | GraphQL errors, no account, a missing dataset, an HTTP error, or a result at the 10,000-row limit | "GraphQL errors, a missing account or dataset, and a result at the row limit" |
 | No invocations in the window, or an object with invocations but no periodic sample | "no invocation evidence, or invocations with no periodic sample, is incomplete, not zero rows" |
 | A smoke run with `ARTROOM_ROW_GATE=1` and no token fails before it starts | "runs when the token is present, skips without it, and fails closed when demanded without it" |
+| A billed value (`rowsWritten`, `rowsRead`, `requests`) is missing, null, negative or not a number, or a row names no object (or, in the samples query, no time) | "1. a missing, null, negative or non-numeric billed value is incomplete, never zero" and "1. the samples query fails closed the same way" |
+| A full page of namespaces with no pagination metadata: the next page is read, not skipped | "2. without pagination metadata, pages are read while they come back full" |
+| A sample stamped before `from` whose minute overlaps the window: counted, so a 5,000-row write in it fails the gate | "4. a sample stamped before `from` whose minute overlaps the window is counted; one stamped at `to` is not" |
+
+**Provider errors are reported as metadata only.** A report records a
+failure as the stage, the HTTP status, and the provider's numeric error
+codes or short code classes (`errorCodes`). It never records the provider's
+message, which can echo the request and its token.
+
+The printed report and the webhook payload use the same text. On top of
+that, any exception text (from the transport, for example) has the token's
+value, `Bearer …` and Artifacts tokens removed (`safeMessage`). The smoke
+run also adds the analytics token to the values its `redact` removes.
+
+Test: "3. a provider error that echoes the token reaches neither the report
+nor the webhook: metadata only".
+
+These cases came from the checker's controls on caefe17d. All five controls
+pass, and each new guard was mutated once to show that a test goes red.
 
 The end of a window is read only after the wait for the billing data to
 settle (`windowEndAfterSettle`, 120 s). Cloudflare stamps a periodic sample

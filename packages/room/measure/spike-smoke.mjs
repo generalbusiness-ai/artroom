@@ -66,7 +66,7 @@ import { iso } from "../src/ids.ts";
 import { firstCommit } from "../../git/src/first-commit.ts";
 import { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, readListing, REPO_PAGE, smokeOk } from "./cleanup.mjs";
 import { attentionFor, CHECK, CHECKED_PATHS, checkedChange, checkProject, checksIn, checksPolicy, importDraft, loadSpikeKeys, obligationOf, REVIEW_RULE, seedImportRepo } from "./checks.mjs";
-import { gateOk, gateOptions, querySamples, rowGate, SETTLE_MS, SMOKE_BUDGET, SPIKE_WORKER, windowEndAfterSettle, windowTable, windowTableMarkdown } from "./rows.mjs";
+import { gateOk, gateOptions, querySamples, rowGate, safeMessage, SETTLE_MS, SMOKE_BUDGET, SPIKE_WORKER, windowEndAfterSettle, windowTable, windowTableMarkdown } from "./rows.mjs";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
 const NS = "gitseq-spike";
@@ -338,6 +338,8 @@ async function main() {
   log(`smoke run ${RUN} against ${BASE}`);
   // First, before anything is made: a demanded gate with no token fails here.
   rowsGate = gateOptions(process.env);
+  // The analytics token is never printed or saved: redact() removes it from anything that echoes it.
+  if (rowsGate.run) secrets.add(rowsGate.token);
   rowsFrom = new Date().toISOString();
   // SPIKE_PHASE=import runs only the import, for a rerun of that part.
   if (["import", "checks", "rows"].includes(process.env.SPIKE_PHASE)) {
@@ -826,9 +828,8 @@ async function rowsPhase(operator, checker) {
 
 /** The samples of the phase, from the billing datasets, and the table; saved beside the run's result. */
 async function rowsReport() {
-  // Samples are stamped with their interval's start: begin a minute early, so the first window's first sample is in.
-  const from = new Date(Date.parse(windows[0].from) - 60_000).toISOString();
-  const samples = await querySamples({ accountId: rowsGate.accountId, token: rowsGate.token, worker: SPIKE_WORKER, from, to: windows.at(-1).to });
+  // querySamples starts a minute early (sampleQueryStart), so the first window's first sample is in.
+  const samples = await querySamples({ accountId: rowsGate.accountId, token: rowsGate.token, worker: SPIKE_WORKER, from: windows[0].from, to: windows.at(-1).to });
   const table = windowTable(windows, samples, out.rows.room);
   out.rows.table = table;
   out.rows.samples = samples.samples.filter((s) => s.name === out.rows.room || s.className !== "Room");
@@ -912,7 +913,7 @@ if (isMain) {
     if (rowsGate?.run) {
       log(`row gate: waiting ${SETTLE_MS} ms for the billing datasets`);
       const to = await windowEndAfterSettle(SETTLE_MS);
-      if (out.rows) await rowsReport().catch((e) => void (out.rows.error = redact(e.message)));
+      if (out.rows) await rowsReport().catch((e) => void (out.rows.error = redact(safeMessage(e, rowsGate.token))));
       out.rowGate = await rowGate({ accountId: rowsGate.accountId, token: rowsGate.token, worker: SPIKE_WORKER, from: rowsFrom, to, budget: SMOKE_BUDGET });
     } else out.rowGate = rowsGate ? { state: "skipped", reason: rowsGate.reason } : { state: "incomplete", failures: ["the row gate did not start (see error)"] };
     log(`row gate ${out.rowGate.state}${out.rowGate.totalRowsWritten !== undefined ? `: ${out.rowGate.totalRowsWritten} rows written` : ""}`, out.rowGate.failures ?? out.rowGate.reason ?? "");

@@ -28,6 +28,8 @@ export interface WorkerRows {
   readonly totalRowsWritten: number;
   readonly totalRowsRead: number;
   readonly totalRequests: number;
+  /** The first sample start queried: a minute before `from` (sampleQueryStart). */
+  readonly sampledFrom: string;
 }
 
 export interface Budget {
@@ -57,6 +59,7 @@ export interface GateResult extends Decision {
   readonly from: string;
   readonly to: string;
   readonly budget: Budget;
+  readonly sampledFrom?: string;
   readonly totalRowsWritten?: number;
   readonly totalRowsRead?: number;
   readonly totalRequests?: number;
@@ -93,6 +96,7 @@ export interface Samples {
   readonly worker: string;
   readonly from: string;
   readonly to: string;
+  readonly sampledFrom: string;
   readonly samples: readonly Sample[];
   readonly invocations: readonly MinuteInvocations[];
 }
@@ -144,6 +148,9 @@ export function queryWorkerRows(input: {
 export function evaluateRows(report: WorkerRows, budget: Budget): Decision;
 export function reportForOutput(report: WorkerRows): Omit<GateResult, keyof Decision | "budget">;
 export function rowGate(input: { accountId: string; token: string | null; worker: string; from: string; to: string; budget?: Budget; fetchImpl?: Fetch }): Promise<GateResult>;
+export function safeMessage(e: unknown, token: string | null | undefined): string;
+export function sampleQueryStart(from: string): string;
+export function morePages(page: number, result: readonly unknown[], info: { readonly total_pages?: unknown } | null | undefined, perPage?: number): boolean;
 export function gateOk(gate: { readonly state?: string | undefined } | null | undefined): boolean;
 export function gateOptions(env?: Record<string, string | undefined>): { run: false; reason: string } | { run: true; token: string; accountId: string };
 export function windowEndAfterSettle(ms: number, wait?: (ms: number) => Promise<void>, now?: () => Date): Promise<string>;
