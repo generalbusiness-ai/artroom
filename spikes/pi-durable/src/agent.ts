@@ -533,9 +533,9 @@ export class Agent extends DurableObject<AgentEnv> {
   }
 
   /** The transcript, oldest first, as role, tool and text. */
-  async transcript(): Promise<{ kind: string; role?: string; tool?: string; error?: boolean; model?: string; text: string }[]> {
+  async transcript(): Promise<{ kind: string; role?: string; tool?: string; error?: boolean; model?: string; stop?: string; thinking?: boolean; text: string }[]> {
     const root = await this.#harness.root(ctx0, { agent: { model: this.#model() } });
-    const out: { kind: string; role?: string; tool?: string; error?: boolean; model?: string; text: string }[] = [];
+    const out: { kind: string; role?: string; tool?: string; error?: boolean; model?: string; stop?: string; thinking?: boolean; text: string }[] = [];
     let cursor;
     for (;;) {
       const page = await root.entries({}, 100, cursor, ctx0);
@@ -545,7 +545,7 @@ export class Agent extends DurableObject<AgentEnv> {
           kind: e.kind,
           ...(m ? { role: m.role } : {}),
           ...(m?.role === "toolResult" ? { tool: m.toolName, error: m.isError === true } : {}),
-          ...(m?.role === "assistant" ? { tool: m.content.flatMap((c) => (c.type === "toolCall" ? [c.name] : [])).join(",") || undefined, model: m.responseModel ?? m.model } : {}),
+          ...(m?.role === "assistant" ? { tool: m.content.flatMap((c) => (c.type === "toolCall" ? [c.name] : [])).join(",") || undefined, model: m.responseModel ?? m.model, stop: m.errorMessage ? `${m.stopReason}: ${m.errorMessage}` : m.stopReason, thinking: m.content.some((c) => c.type === "thinking") || undefined } : {}),
           text: m ? text(m) : "",
         } as never);
       }

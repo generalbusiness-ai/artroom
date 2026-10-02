@@ -61,7 +61,7 @@ it.skipIf(!live)(`live: ${live?.provider}/${live?.modelId} claims, proposes and 
     mainIsHead: room.world.artifacts.main === lane.head,
     answer: out.answer,
     responseModels: [...new Set(transcript.flatMap((t) => (t.model ? [t.model] : [])))],
-    transcript: transcript.filter((t) => t.role !== "system").map((t) => ({ role: t.role ?? t.kind, ...(t.tool ? { tool: t.tool } : {}), ...(t.error ? { error: true } : {}), text: t.text.slice(0, 200) })),
+    transcript: transcript.filter((t) => t.role !== "system").map((t) => ({ role: t.role ?? t.kind, ...(t.tool ? { tool: t.tool } : {}), ...(t.error ? { error: true } : {}), ...(t.stop ? { stop: t.stop } : {}), ...(t.thinking ? { thinking: true } : {}), text: t.text.slice(0, 200) })),
     usage: await stub().usage(),
   };
   console.log(`SPIKE-LIVE ${JSON.stringify(summary)}`);
