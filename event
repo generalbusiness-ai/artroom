@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2f28a67a1a2ae0cae467ab0d901fa889482fdfe8","text":"Merge retired a covered predecessor; the successor is at packages/ui/e2e/smoke.spec.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2fc84fa4525de280f37aabafb5b11c46e61e3828","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/room/adapter.ts."}
