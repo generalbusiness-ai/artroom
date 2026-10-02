@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a6bdaeb2cfe443983881580f0ca453b8762ea41b","text":"Merge retired a covered predecessor; the successor is at packages/git/test/workspaces.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:accdcadb367c675da93c7b50a240250fd362b136","text":"Merge retired a covered predecessor; the successor is at plans/001-complete-token-inventories.md."}
