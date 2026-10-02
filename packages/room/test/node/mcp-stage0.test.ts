@@ -199,4 +199,23 @@ describe("review 66fec276: bearer sessions and the run's own result", () => {
     const { code } = await finish(fake("clean").api, { agents: [{ ...a, redeemed: "unknown", key: null, bearer: null }], endSession: io(200, 401) });
     expect(code).toBe(1);
   });
+
+  it("a deletion answered as success while the final inventory still lists the repository: exit 1, named as left", async () => {
+    const f = fake("clean");
+    const api: Api = async (method, path) => (method === "DELETE" && path.startsWith("/repos/") ? { success: true } : f.api(method, path));
+    const { code, out } = await finish(api);
+    expect(code).toBe(1);
+    expect(out.cleanup.unresolved).toEqual([]);
+    expect([...out.cleanup.reposLeft].sort()).toEqual([CANON, FORK].sort());
+  });
+
+  it("an exception inside the Artifacts cleanup that no duty catches: exit 1, recorded as an unknown duty", async () => {
+    const f = fake("clean");
+    // A token record whose keys cannot be read: cleanupRun throws while taking its metadata, outside any remote call.
+    const hostile = new Proxy({ id: "tok-hostile", scope: "write" }, { ownKeys: () => { throw new Error("unreadable record"); } });
+    const api: Api = async (method, path) => (method === "GET" && path.includes("/tokens?") ? { success: true, result: [hostile] } : f.api(method, path));
+    const { code, out } = await finish(api, { agents: [redeemed("@a")], endSession: ended });
+    expect(code).toBe(1);
+    expect(out.cleanup.unresolved).toEqual([{ duty: "artifacts-cleanup", outcome: "unknown", detail: "unreadable record" }]);
+  });
 });
