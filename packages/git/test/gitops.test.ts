@@ -352,14 +352,17 @@ test("lane L's PushOutcome and this package's LogPushOutcome are the same type",
   assert.deepEqual(b, { ok: true });
 });
 
-test("only a landed push is ok, only a read-back lease refusal is lease-mismatch; everything else is unknown, with the token redacted", () => {
+test("only a landed push is ok, only a read-back lease refusal is lease-mismatch, any other rejection is refused; everything else is unknown, with the token redacted", () => {
   const sha = "a".repeat(40);
   assert.deepEqual(toLogOutcome({ outcome: { outcome: "rejected", reason: "lease", detail: "stale" }, current: sha }), { ok: false, reason: "lease-mismatch", current: sha });
   assert.deepEqual(toLogOutcome({ outcome: { outcome: "rejected", reason: "lease", detail: "stale" }, current: null }), { ok: false, reason: "lease-mismatch", current: null });
+  // Contract amendment 4 (R-LOG-20): a refusal other than the lease is definite. The code is Artifacts', or the kind of status.
+  assert.deepEqual(toLogOutcome({ outcome: { outcome: "rejected", reason: "non-fast-forward", detail: "nff" } }), { ok: false, reason: "refused", code: "non-fast-forward", detail: "nff" });
+  assert.deepEqual(toLogOutcome({ outcome: { outcome: "rejected", reason: "remote-rejected", detail: "hook" } }), { ok: false, reason: "refused", code: "remote-rejected", detail: "hook" });
+  const big = "remote: artifacts_git_receive_pack_object_too_large\n\nfatal: the remote end hung up unexpectedly";
+  assert.deepEqual(toLogOutcome({ outcome: { outcome: "rejected", reason: "remote-rejected", detail: big } }), { ok: false, reason: "refused", code: "artifacts_git_receive_pack_object_too_large", detail: big });
   const unknown = [
     { outcome: { outcome: "rejected", reason: "lease", detail: "stale" } }, // the ref could not be read back
-    { outcome: { outcome: "rejected", reason: "non-fast-forward", detail: "nff" } },
-    { outcome: { outcome: "rejected", reason: "remote-rejected", detail: "hook" } },
     { outcome: { outcome: "error", detail: "auth" } },
     { outcome: { outcome: "unknown", detail: "hung up" } },
   ] as const;
@@ -370,6 +373,8 @@ test("only a landed push is ok, only a read-back lease refusal is lease-mismatch
   const token = ["art", "v1", "z".repeat(24)].join("_");
   const o = toLogOutcome({ outcome: { outcome: "unknown", detail: `https://x:${token}?expires=1@host ${"y".repeat(900)}` } });
   assert.ok(!o.ok && o.reason === "unknown" && !o.detail.includes(token) && o.detail.length <= 600);
+  const r = toLogOutcome({ outcome: { outcome: "rejected", reason: "remote-rejected", detail: `https://x:${token}?expires=1@host ${"y".repeat(900)}` } });
+  assert.ok(!r.ok && r.reason === "refused" && !r.detail.includes(token) && r.detail.length <= 600);
 });
 
 test("a pushLog request is checked before git: only refs/artroom/log, commit ids, known types, base64url, within the limits", () => {

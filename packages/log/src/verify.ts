@@ -29,6 +29,7 @@ import type {
   CheckBody,
   KeyId,
   Checkpoint,
+  LogLayout,
   Decision,
   Digest,
   Genesis,
@@ -44,10 +45,11 @@ import type {
 import { replay } from "@generalbusiness/artroom-policy";
 import { canonicalize } from "./canonical.ts";
 import { digestJson, sha256Hex, verifySig } from "./crypto.ts";
-import { LOG_REF, ROOT, SEGMENT_SIZE, contentOf, entryId, roomIdOf, segmentPath } from "./entries.ts";
+import { LOG_REF, ROOT, contentOf, entryId, roomIdOf } from "./entries.ts";
 import { parseCommit, type GitReader } from "./git.ts";
-import { decodeCheckpoint, decodeEntry, decodeRetained, segmentLines, textOf } from "./decode.ts";
-import { readLogFiles } from "./publisher.ts";
+import { decodeCheckpoint, decodeEntry, decodeRetained, textOf } from "./decode.ts";
+import { CHUNK_MISMATCH, commitLines, readLogCommit } from "./tree.ts";
+import { OBJECT_BOUND } from "./layout.ts";
 import { checkedTime } from "./time.ts";
 import { RosterReplay, type AuthorityFailure } from "./roster.ts";
 
@@ -64,6 +66,12 @@ export type VerifyReason =
   | "genesis-mismatch"
   | "retained-digest"
   | "malformed"
+  // layout 2 (contract amendment 4, section 30.6)
+  | "layout-changed"
+  | "segment-bound"
+  | "chunk-mismatch"
+  | "object-too-large"
+  | "fan-out"
   // entries
   | "seq-gap"
   | "entry-order"
@@ -134,6 +142,9 @@ interface CommitView {
   readonly files: Map<string, Uint8Array>;
   readonly lines: string[];
   readonly checkpoint: Checkpoint | null;
+  readonly layout: LogLayout | undefined;
+  /** Each segment's first seq and logical path, in order. */
+  readonly segments: readonly { readonly first: Seq; readonly path: string }[];
 }
 
 export interface VerifyOptions {
@@ -203,16 +214,14 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   }
   chain.reverse();
 
+  // Each commit is read in the layout its checkpoint names (R-LOG-16): in layout 2, shard
+  // directories are followed and chunked files reassembled, and their shape is checked (30.6).
   const views: CommitView[] = [];
   for (const sha of chain) {
-    const files = await readLogFiles(reader, sha);
-    const lines: string[] = [];
-    for (let first = 0; files.has(segmentPath(first)); first += SEGMENT_SIZE) {
-      const seg = segmentLines(files.get(segmentPath(first))!);
-      lines.push(...seg);
-      if (seg.length !== SEGMENT_SIZE && files.has(segmentPath(first + SEGMENT_SIZE)))
-        fail({ reason: "malformed", commit: sha, detail: `segment ${first} is not full but a later one exists` });
-    }
+    const { files, layout, problems } = await readLogCommit(reader, sha);
+    for (const p of problems) fail({ reason: p.reason, commit: sha, detail: p.detail });
+    const read = commitLines(files, layout);
+    for (const p of read.problems) fail({ reason: p.reason, commit: sha, ...(p.seq !== undefined ? { seq: p.seq } : {}), detail: p.detail });
     const cpBytes = files.get(`${ROOT}/checkpoint.json`);
     let checkpoint: Checkpoint | null = null;
     try {
@@ -221,27 +230,43 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       fail({ reason: "malformed", commit: sha, detail: (e as Error).message });
     }
     if (!checkpoint && !cpBytes) fail({ reason: "checkpoint-missing", commit: sha, detail: "the commit has no checkpoint.json" });
-    views.push({ sha, files, lines, checkpoint });
+    views.push({ sha, files, lines: read.lines, checkpoint, layout, segments: read.segments });
   }
+  // The layout (R-LOG-16): a log's first layout 2 commit has `from` one past its parent's `through`
+  // (0 with no parent); every later commit is layout 2 with the same `from`.
+  const layoutProblem = (v: CommitView, prev: CommitView | undefined): string | null => {
+    if (prev?.layout) return v.layout?.from === prev.layout.from ? null : `the commit is ${v.layout ? `layout 2 from ${v.layout.from}` : "layout 1"} after a layout 2 commit from ${prev.layout.from}`;
+    if (!v.layout) return null;
+    const from = prev ? (prev.checkpoint?.through ?? -1) + 1 : 0;
+    return v.layout.from === from ? null : `the first layout 2 commit has from ${v.layout.from}, not ${from}`;
+  };
+  if (views[0] && layoutProblem(views[0], undefined)) fail({ reason: "layout-changed", commit: views[0].sha, detail: layoutProblem(views[0], undefined)! });
 
-  // Each commit extends the previous one: earlier lines and full segments unchanged (R-LOG-9).
+  // Each commit extends the previous one: earlier lines and closed segments unchanged (R-LOG-9, 30.6).
   // The entries verified are those of the last commit before the first break.
   let basis = 0;
   for (let i = 1; i < views.length; i++) {
     const v = views[i]!;
     const prev = views[i - 1]!;
     let ok = true;
+    const changed = layoutProblem(v, prev);
+    if (changed) {
+      fail({ reason: "layout-changed", commit: v.sha, detail: changed });
+      ok = false;
+    }
     for (let n = 0; n < prev.lines.length; n++)
       if (v.lines[n] !== prev.lines[n]) {
         fail({ reason: "history-rewritten", commit: v.sha, seq: n, detail: `entry ${n} differs from the earlier log commit ${prev.sha}` });
         ok = false;
         break;
       }
-    for (let first = 0; prev.files.has(segmentPath(first + SEGMENT_SIZE)); first += SEGMENT_SIZE) {
-      const a = prev.files.get(segmentPath(first))!;
-      const b = v.files.get(segmentPath(first));
-      if (!b || a.length !== b.length || a.some((x, j) => x !== b[j])) {
-        fail({ reason: "segment-changed", commit: v.sha, detail: `full segment ${first} changed after ${prev.sha}` });
+    for (const [k, s] of prev.segments.entries()) {
+      const a = prev.files.get(s.path)!;
+      const b = v.files.get(s.path);
+      // Every segment but the last never changes; the last stays where it starts, and only grows.
+      const last = k === prev.segments.length - 1;
+      if (!b || (!last && (a.length !== b.length || a.some((x, j) => x !== b[j]))) || !v.segments.some((x) => x.first === s.first)) {
+        fail({ reason: "segment-changed", commit: v.sha, detail: `${last ? "the last" : "closed"} segment ${s.first} changed after ${prev.sha}` });
         ok = false;
       }
     }
@@ -258,6 +283,10 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   const entries: LogEntry[] = [];
   let firstBad = Number.POSITIVE_INFINITY;
   for (const [i, line] of top.lines.entries()) {
+    if (line.startsWith(CHUNK_MISMATCH)) {
+      firstBad = i; // already reported as chunk-mismatch
+      break;
+    }
     try {
       entries.push(decodeEntry(line));
     } catch (e) {
@@ -335,7 +364,9 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       const m = RETAINED.exec(path);
       if (!m) continue;
       if (!holds(v, path)) {
-        fail({ reason: "retained-digest", commit: v.sha, detail: `${path} does not match its digest` });
+        // A file over B in layout 2 was reassembled from chunks (R-LOG-18): a changed chunk is chunk-mismatch.
+        const chunked = v.layout !== undefined && bytes.length > OBJECT_BOUND;
+        fail({ reason: chunked ? "chunk-mismatch" : "retained-digest", commit: v.sha, detail: `${path}${chunked ? ", reassembled from its chunks," : ""} does not match its digest` });
         continue;
       }
       const d = decodeAs(m[1] === "inputs" ? "input" : "json", `sha256:${m[2]}`, bytes);

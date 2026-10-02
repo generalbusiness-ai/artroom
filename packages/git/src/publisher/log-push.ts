@@ -3,18 +3,23 @@
  *
  * `GitOps.pushLog` returns the publisher's own four-way outcome (landed,
  * rejected, error, unknown; push-outcome.ts). Lane L's `GitRemote.push`
- * answers with its `PushOutcome`, which has three cases. The mapping keeps
+ * answers with its `PushOutcome`, which has four cases. The mapping keeps
  * the rule that only a confirmed answer is ever reported as settled:
  * - landed: `{ ok: true }` (lane L still reads the ref back);
  * - rejected by the lease, with the ref's current value read back:
  *   `lease-mismatch`;
+ * - rejected otherwise (a `[rejected]` or `[remote rejected]` status, or an
+ *   Artifacts code given before any ref update, such as
+ *   `artifacts_git_receive_pack_object_too_large`): `refused`, with the
+ *   Artifacts code or the kind of status as `code` (contract amendment 4,
+ *   R-LOG-20). Lane L reads the ref back, and does not push again;
  * - everything else, including `error` (nothing was sent) and a lease
  *   refusal whose current value could not be read: `unknown`, with the
  *   detail. Lane L then reads the ref back to decide.
  */
 
 import type { Sha } from "@generalbusiness/artroom-contract";
-import type { PushOutcome } from "./push-outcome.ts";
+import { artifactsRefusal, type PushOutcome } from "./push-outcome.ts";
 import { LOG_REF, type LogObject, type StageChunk, type StageResult, type StageWant } from "./gitops.ts";
 
 /**
@@ -25,7 +30,8 @@ import { LOG_REF, type LogObject, type StageChunk, type StageResult, type StageW
 export type LogPushOutcome =
   | { readonly ok: true }
   | { readonly ok: false; readonly reason: "lease-mismatch"; readonly current: Sha | null }
-  | { readonly ok: false; readonly reason: "unknown"; readonly detail: string };
+  | { readonly ok: false; readonly reason: "unknown"; readonly detail: string }
+  | { readonly ok: false; readonly reason: "refused"; readonly code: string; readonly detail: string };
 
 const TOKEN = /art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g;
 
@@ -35,8 +41,10 @@ export function toLogOutcome(r: { readonly outcome: PushOutcome; readonly curren
   if (o.outcome === "rejected" && o.reason === "lease" && r.current !== undefined) {
     return { ok: false, reason: "lease-mismatch", current: (r.current ?? null) as Sha | null };
   }
+  const clean = (text: string) => text.replace(TOKEN, "<token>").slice(0, 600);
+  if (o.outcome === "rejected" && o.reason !== "lease") return { ok: false, reason: "refused", code: artifactsRefusal(o.detail) ?? o.reason, detail: clean(o.detail) };
   const what = o.outcome === "error" ? "nothing was sent" : o.outcome === "rejected" ? `refused (${o.reason})` : "no clear answer";
-  return { ok: false, reason: "unknown", detail: `${what}: ${o.detail}`.replace(TOKEN, "<token>").slice(0, 600) };
+  return { ok: false, reason: "unknown", detail: clean(`${what}: ${o.detail}`) };
 }
 
 /** Unpadded base64url, as lane A's log remote sends object data. */

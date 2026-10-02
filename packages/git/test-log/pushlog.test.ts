@@ -3,7 +3,7 @@
 // verifier over what landed.
 import { describe, expect, test } from "vitest";
 import { spawnSync, execFile } from "node:child_process";
-import { mkdtempSync, mkdirSync, statSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Sha } from "@generalbusiness/artroom-contract";
@@ -409,3 +409,21 @@ describe("review de5289a5: staging recovers a complete file whose final append's
   }
 });
 
+
+describe("contract amendment 4 (R-LOG-20): a refused push is definite", () => {
+  test("a remote that refuses the pack with Artifacts' code: pushLog reports rejected, lane L sees refused with the code, reads the ref back at the parent, and does not push again", async () => {
+    const { remote, sandbox } = setup();
+    const r = new SandboxRemote(remote, sandbox("publisher"));
+    const { sim, publisher, c3 } = await goldenLog(r);
+    // From now on the remote answers as Artifacts did on 2026-10-02 to an object over its limit.
+    writeFileSync(join(remote, "hooks", "pre-receive"), "#!/bin/sh\necho artifacts_git_receive_pack_object_too_large >&2\nexit 1\n");
+    chmodSync(join(remote, "hooks", "pre-receive"), 0o755);
+    sim.system({ type: "checkpoint", through: c3.through, hash: c3.hash, commit: c3.commit });
+    const pushes = r.pushes;
+    const e = await publisher.publish(sim.entries, sim.checkpoint(), sim.retained).catch((x: unknown) => x as PublishError);
+    expect(e).toBeInstanceOf(PublishError);
+    expect(e).toMatchObject({ code: "refused", retryable: false, refusal: { code: "artifacts_git_receive_pack_object_too_large" } });
+    expect(r.pushes - pushes).toBe(1);
+    expect(git(remote, "rev-parse", LOG_REF)).toBe(c3.commit);
+  });
+});
