@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Builder: I will record the redeploy results (commit on request/redeploy-live) for review."}
+{"kind":"artifact","text":"packages/room/measure/results/mcp-stage0-2026-10-02T06-40-59-778Z.json at exact ed19278adccc56e8b625d1aef96a7124b7a5c1e3 on request/redeploy-live, under promise git:sha1…4fd0223 on request git:sha1…616cb5c","body":{"commit":"ed19278adccc56e8b625d1aef96a7124b7a5c1e3","path":"packages/room/measure/results/mcp-stage0-2026-10-02T06-40-59-778Z.json"}}
