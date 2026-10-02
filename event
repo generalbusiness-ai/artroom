@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:96d46b304a5806fd7cc8aba467c88fc52f5780a2","text":"Merge retired a covered predecessor; the successor is at packages/checkers/wrangler.jsonc."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9851cc3e15936a1bb7a3e609381172c6fe726832","text":"Merge retired a covered predecessor with no successor at its old path."}
