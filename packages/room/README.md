@@ -195,6 +195,13 @@ Every opening runs the steps above the stored version, each in its own
 transaction with its version, so a crash leaves a whole version. Each step
 is also safe to run twice.
 
+Each schema is at version 1, its base. The Room's earlier versions 2 to 8,
+the registry's version 2, and the upgrade paths that only the spike
+deployment's state needed were folded into the base when that state was
+wiped (decision D5, request 73eccbec; see
+[notes/deploy-spike.md](../../notes/deploy-spike.md)). The next change to a
+schema is version 2.
+
 ### Founding a room
 
 Founding is two steps with no credential (R-GEN-10). Over RPC they are the
@@ -434,7 +441,7 @@ lane E.
 | 2. Lease deadline during fork creation | yes: review-8faa2ef9 | yes | pending |
 | 3. Attention made later at an existing head | yes: review-8faa2ef9 | n/a | pending |
 | 4. Review reopening in sealed effects | yes: review-8faa2ef9 | n/a | pending |
-| 5. Upgrade of populated storage | yes: review-8faa2ef9 | n/a | pending |
+| 5. Upgrade of populated storage | retired with the migrations (decision D5); "a store without admission facts …" remains | n/a | n/a |
 | `"*"` fixed at the grant | yes: review-8faa2ef9 | n/a | pending |
 
 ### Review 1249097f findings
@@ -541,8 +548,8 @@ assert the correct outcomes in
 | 2. P2 A workspace became ready after its lease ran out | The lease is current only if held, the same lease generation, and before its deadline by the clock read now; checked before fork creation and again before readiness. A fenced op runs the lease-expiry and token-revocation steps at once | a lease that runs out during fork creation…; a lease already past its deadline before the resume creates no fork |
 | 3. P2 Attention made later fell behind live cursors | A monotonic attention position; live, update and page cursors carry it; a publication error wakes subscriptions; earlier cursor forms map to the position before the first item after their point | the admins' publication-unresolved item arrives on a cursor issued before it…; pages stay lossless…; an RPC subscription opened at the live head…; cursors in the earlier (seq, n) form still read… |
 | 4. P2 Sealed effects omitted a reopening | Review and check effects carry `opened` and `met` from the one calculator; a duplicate approval still seals none. A check only adds evidence, so it cannot reopen | Bob approves, then objects…; @ci passes, then fails on the same input… |
-| 5. P2 Old storage could not reopen | Versioned, transactional, idempotent migrations for the Room and the registry. Earlier attention keeps its order and gains positions; pending workspaces keep their attempts; earlier evidence gets admission facts that can only remove eligibility; a missing fact reads as "author" | a populated store in the a5a3406a schema / fa836d61 schema reopens, twice…; a store without admission facts is judged as an author… |
-| `"*"` delegation followed the grantor's current role | `"*"` is expanded at the grant to the kinds the grantor's role could sign then; earlier `"*"` grants are expanded by migration from the role in the grant's receipt | a member grants '*', then is promoted to admin… |
+| 5. P2 Old storage could not reopen | Versioned, transactional, idempotent migrations for the Room and the registry; a missing admission fact reads as "author". The upgrade steps, and their test of populated old stores, were retired when the spike's state was wiped (decision D5); the migration runner and the "author" fallback remain | a store without admission facts is judged as an author… |
+| `"*"` delegation followed the grantor's current role | `"*"` is expanded at the grant to the kinds the grantor's role could sign then (the migration that expanded earlier grants was retired by decision D5) | a member grants '*', then is promoted to admin… |
 
 Each new guard was broken once and the whole workerd suite run against the
 change. 19 of 21 mutations were caught, five of them only after a test was added
@@ -595,9 +602,7 @@ changed:
   runs it again before the engine's queue.
 - **Workspaces are lane B's.** Operation IDs are lane B's
   (`op_ws_<lane>_<lease generation>`). A workspace whose lease has ended is
-  not shown. A workspace opened by the previous revision is recorded as
-  ended (migration 6); lane B's first inventory of the fork revokes its
-  tokens when the holder opens it again.
+  not shown.
 - **Filtered checker inputs** (R-OBL-3, R-CARRY-8, R-CARRY-9). A filtered
   `check` binds only the Room's own snapshot of the integration over the
   checker's declared inputs plus the global inputs.
@@ -639,8 +644,8 @@ reproductions now fail; the correct outcomes are asserted in
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
-| 1. P1 A stored check carry survived a policy that turns carrying off | Each carry is stored with the policy version that judged it and counts only under that version and on its integration (migration 7). An activation leaves earlier carries uncounted; readiness judges again under the new policy, which carries nothing when `carry.checks` is false or a carry rule applies to checks. Reservation requires every obligation met on the integration. | "an activation with checks: false …"; "an activation with a carry rule that refuses checks …"; "reservation itself refuses a ready landing whose carried check stopped counting"; "reservation requires every obligation met on the integration …"; "the earlier check's key compromised after the carry …"; "the checker configuration changed …"; phase2b "does not carry when main changed a global input" |
-| 2. P2 Migration dropped outstanding workspace cleanup | Migration 7 keeps access opened before lane B's workspaces as `legacy`: its recorded token IDs, and an inventory for provisioning whose answer was never recorded. When the lease ends (release, expiry, take-over, with or without reopening) these become lane B's durable cleanup duties, in the transaction that marks it ended; they stay owed until Artifacts confirms them. | "release without reopening …"; "a mint whose answer was never recorded …"; "a recorded token is owed by its ID …"; "expiry without reopening …"; "take-over without reopening …, and with Artifacts down the cleanup stays owed …" |
+| 1. P1 A stored check carry survived a policy that turns carrying off | Each carry is stored with the policy version that judged it and counts only under that version and on its integration. An activation leaves earlier carries uncounted; readiness judges again under the new policy, which carries nothing when `carry.checks` is false or a carry rule applies to checks. Reservation requires every obligation met on the integration. | "an activation with checks: false …"; "an activation with a carry rule that refuses checks …"; "reservation itself refuses a ready landing whose carried check stopped counting"; "reservation requires every obligation met on the integration …"; "the earlier check's key compromised after the carry …"; "the checker configuration changed …"; phase2b "does not carry when main changed a global input" |
+| 2. P2 Migration dropped outstanding workspace cleanup | Migration 7 kept access opened before lane B's workspaces as `legacy` until its lease ended. Retired, with its tests, when the spike's state was wiped (decision D5). | — |
 | 3. P2 An older room had no canonical remote for the landing publisher | Before any landing work, the Room resolves the remote from its bound repository identity through the binding (refusing an answer for any other repository) and stores it. An outage throws and the alarm retries; the publisher never gets a guessed remote. | "the landing completes, with the bound repository's own remote stored"; "a binding that answers for another repository …"; "Artifacts is down: nothing is guessed …" |
 | 4a. Lane B's follow-up | Kept as adopted in `80d2351`. | phase2b, as listed under "Phase 2b cases" |
 | 4b. Runner digest | Check carry needs a runner environment attested now for the checker (`RoomServices.runnerDigest`); none is attested in production, so nothing carries there (fail closed). | "no runner environment attested …"; "another runner environment attested …"; "the same runner attested …" |
@@ -968,7 +973,7 @@ each test name starts with its rule or finding.
 | 6. Advisory obligations (R-OBL-7) | `withAdvisory` in [src/obligations.ts](src/obligations.ts) sets `CheckObligation.advisory` from the configuration, when a proposal is recorded and when obligations are recomputed at activation. Readiness neither waits for an advisory obligation nor fails on its failing check, and leaves its evidence out of the evidence the landing relies on. Reservation does not require it, and the land rule input leaves it out, so an advisory check that arrives after readiness changes nothing reservation compares. A compromised revocation that reopens only an advisory obligation does not make the landing retryable. The obligation still gets an attention item and a job, and its checks are recorded and shown. | "R-OBL-7 the obligation is advisory …"; "… an advisory checker's check fails …"; "… arrives between readiness and reservation …"; "R-OBL-7, R-REV-3 a landing does not rely on advisory evidence …"; "R-OBL-7, R-POL-9 an activation that makes the checker advisory …" |
 | 7. Volatile flag (R-EXEC-10) | Unchanged: a signed check whose `volatile` differs from its configuration's is `check-binding`, either way. A job's `volatile` is the configuration's. | "R-EXEC-10 the job's volatile is the configuration's (true) / (false) …"; review-a711f7b6 "a check whose volatile flag contradicts the configuration …" |
 
-Migration 8 adds `check_carries.event`, `check_judged` and `check_jobs`.
+The schema has `check_carries.event`, `check_judged` and `check_jobs` for this (migration 8 then, the base schema since decision D5).
 
 **Choices the contract leaves open.**
 - A job attempt lives for the checker's `timeoutSeconds` plus 300 seconds;
@@ -1200,7 +1205,7 @@ repository through the Room's namespace-aware binding (`core.artifacts`).
   obligation). An attempt past its deadline is not sent; its credentials
   are ended and the job is due again later.
 - Ending a canonical token is durable. The token is written to
-  `job_tokens` (migration 8) before Artifacts is asked to revoke it, and
+  `job_tokens` before Artifacts is asked to revoke it, and
   stays there, with its attempts and last error, until Artifacts confirms
   the revocation or the token's known expiry has passed. A token whose
   expiry is not known stays until it is revoked. The jobs step retries due
@@ -1613,53 +1618,15 @@ main exists after `prepareCanonical`, which only returns once it does.
 
 ## Review 700b74ea
 
-**The finding.** Before the incarnation ledger, the Room created a public
-founding's repository under its base name (the identity's own name) and
-recorded nothing. A pending founding begun by that Room and retried under
-revision 3 was sealed on `<base>-1`, and `<base>`, with its 24-hour write
-token, was never found, cleaned or reported. An old create whose answer was
-lost could also apply later.
-
-**The fix: adopt the base name, durably, before preparing.** The first time
-a pending public founding is prepared (`Workspaces.prepareCanonical`, called
-only from `found` for a public room that is not founded), the ledger adopts
-its base name when:
-
-- an older Room may have tried: the registry binding is a legacy one, made
-  by an older Worker before the registry kept its ledger (`ledger` is NULL;
-  every new binding records 1). This is a durable fact of the binding, read
-  on every attempt; see "Recovery" below. It replaced an earlier rule (the
-  `bind` answer was `already-bound` and this Room had no `founding_repo`),
-  which a lost bind answer or an interrupted `found` could get wrong; or
-- an earlier revision's ledger has a row for the base name; or
-- the base repository exists now (only this founding can have made it,
-  R-GEN-12).
-
-Adoption records a `legacy` create step, in flight, and owes the base name's
-deletion. The legacy step is never settled: not by a read of absence, not by
-deleting the repository, and not by the new incarnation's seal, because more
-than one old create may still apply. The base name is never an incarnation,
-so the alarm deletes it whenever it appears, before and after founding, with
-every token on it. `Workspaces.duties()` shows the step. An already-founded
-room (whatever its storage name) and an import never reach this, and nothing
-else touches the base name. Cleanup scheduling no longer excludes the
-configured canonical name: it excludes the holder's founding duties, and the
-sealed incarnation has none.
-
-| Case | Tests |
-|---|---|
-| (a) a legacy base holding a token | `workspaces.test.ts` (a); `founding-gaps.test.ts` (a): deleted with its token before the seal, the room lands, the legacy step stays watched after eviction |
-| (b) an absent base whose old create applies after the seal | `workspaces.test.ts` (b), including a second appearance; `founding-gaps.test.ts` (b): the alarm deletes it after eviction, the landed main survives |
-| (c) an already-founded legacy room | `workspaces.test.ts` (c); `founding-gaps.test.ts` (c): a room turned into an older Room's (base name, no ledger), found again, lands, keeps a live publishing token through the alarm, and gets no legacy step |
-| Scope | a founding this Room began and retried adopts nothing; an earlier revision's ledger row is adopted, with the repository present or absent; the checker's control (a base that exists although the binding is new) |
-
-Mutations, made once each after committing: 12 of 12 were killed, after one
-test was added. Not adopting at all (ledger and Room); the Room never
-flagging an older attempt; flagging every first founding; ignoring this
-Room's own record; not looking for an existing base; ignoring an earlier
-ledger (it survived until the absent-base test was added); settling the
-legacy step when seen, when deleted, or on a read of absence; not scheduling
-it after founding; and not recording the adoption.
+The finding was a public founding begun by a Room older than the
+incarnation ledger, which created the repository under its base name and
+recorded nothing. The fix adopted that base name durably (a `legacy` create
+step, never settled) when the registry binding was an older Worker's (the
+registry's `ledger` column, migration 2). Only the spike deployment ever
+had such state. The adoption, the registry's `ledger` column and their
+tests were retired when that state was wiped (decision D5, request
+73eccbec): every room now begins on this ledger, and a public room's
+repository is always an incarnation, `<base>-<step>`.
 
 Main `9bb700b6` (amendment 4, the bounded-memory publisher, the deploy
 cleanup and pi Workers AI) is merged. This revision has not been run live.
@@ -1670,14 +1637,6 @@ highest `<base>-<step>`, `incarnationOf`) for its founding checks, ref reads
 and verify, and its cleanup reaches the base name, every incarnation and
 their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.test.ts`
 covers both.
-
-Recovery: whether an older Room may have tried is now a durable fact of the
-registry binding (migration 2: `ledger` is NULL on bindings an older Worker
-made, 1 on every new one), read on every attempt, not the `bind` answer and
-this Room's attempt record. The earlier rule lost the adoption when a found
-was interrupted after recording its attempt and before adopting, and adopted
-spuriously after a lost bind answer or an interrupted first found; real-DO
-controls interrupt each window.
 
 ## Secrets
 

@@ -8,7 +8,7 @@ import type { Check, CheckJob, Note, Sha } from "@generalbusiness/artroom-contra
 import { checkJob, gitAuthEnvFor, isRefusal } from "../src/job.ts";
 import { checkout } from "../src/runner.ts";
 import { generateKey, importSigner, signEnvelope, verifyEnvelope, type Signer } from "../src/signing.ts";
-import { Ledger } from "../src/ledger.ts";
+import { Ledger } from "./ledger.ts";
 import { TestsChecker, TypesChecker } from "../src/checkers.ts";
 import { LlmReviewer, parseFindings, type Model } from "../src/llm.ts";
 import type { CheckerServices } from "../src/checker.ts";

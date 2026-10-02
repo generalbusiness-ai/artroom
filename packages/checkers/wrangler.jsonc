@@ -9,7 +9,7 @@
 	//   { "binding": "CHECKER_LLM_REVIEW", "service": "artroom-checkers", "entrypoint": "LlmReviewService" }
 	// This Worker has no HTTPS routes (R-EXEC-8), and no room or delegation is
 	// configured: each job names its room, which the service resolves through
-	// ROOM. The live-run harness is wrangler.harness.jsonc, never deployed here.
+	// ROOM. The live-run harness is measure/harness/, never deployed here.
 	//
 	// Before `wrangler deploy`:
 	// - the Room Worker (ROOM's service) must be deployed;

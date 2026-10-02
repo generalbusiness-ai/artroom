@@ -71,8 +71,14 @@
       { "name": "PUBLISHER", "class_name": "Publisher" }
     ]
   },
+  // Production's migrations, then the spike's wipe (decision D5, request
+  // 73eccbec): v3 deletes every Room and Registry object with its storage, and
+  // v4 makes the classes again, empty, for the Room's folded base schema. See
+  // notes/deploy-spike.md.
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Room", "Registry"] },
-    { "tag": "v2", "new_sqlite_classes": ["Publisher"] }
+    { "tag": "v2", "new_sqlite_classes": ["Publisher"] },
+    { "tag": "v3", "deleted_classes": ["Room", "Registry"] },
+    { "tag": "v4", "new_sqlite_classes": ["Room", "Registry"] }
   ]
 }

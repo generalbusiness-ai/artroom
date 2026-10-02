@@ -68,7 +68,6 @@ export class Room extends DurableObject<RoomEnv> {
         const b = await registry(env).byRepo(repo);
         return b !== null && b.room === room && b.name === name;
       },
-      legacyBinding: async (repo) => (await registry(env).byRepo(repo))?.legacy === true,
       wake: (at) => this.wake(at),
     });
     // A fresh object schedules the founding debt it finds, with no new found request (plan 004).

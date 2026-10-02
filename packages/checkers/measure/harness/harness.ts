@@ -1,7 +1,10 @@
 /**
- * The harness Worker `artroom-lg-checkers` (wrangler.harness.jsonc), for
- * live runs only. It is never part of a production deployment: production is
- * src/worker.ts (wrangler.jsonc), whose `fetch` has no routes (R-EXEC-8).
+ * The harness Worker `artroom-lg-checkers` (measure/harness/wrangler.jsonc),
+ * for live measurements only (measure/live.mjs). It is never part of a
+ * production deployment: production is src/worker.ts (wrangler.jsonc), whose
+ * `fetch` has no routes (R-EXEC-8). Retired from src/ by decision D5 (request
+ * 73eccbec): not type-checked or tested by the package's gates, and not
+ * deployed. Deploy it for a run and delete it after (README, "Live runs").
  *
  * - It exports the production entrypoints and runner sandbox unchanged.
  * - `Publisher` (from the git package) builds filtered snapshots, in its own
@@ -18,18 +21,18 @@ import { DurableObject } from "cloudflare:workers";
 import type { ActRecord, CheckJob, Digest, Result, RoomId, Sha, SignedEnvelope } from "@generalbusiness/artroom-contract";
 import { checkerInputs, filterSnapshot, snapshotDigest, type SnapshotEntry } from "@generalbusiness/artroom-policy";
 import { type ArtifactsNamespace, SnapshotRepos, durableSql, withRetry } from "@generalbusiness/artroom-git";
-import type { RoomPort } from "./checker.ts";
-import { checkJob, gitAuthEnvFor, isRefusal, ownJob, parseNamespaces } from "./job.ts";
-import { checkout, git } from "./runner.ts";
-import { importSigner } from "./signing.ts";
-import { Ledger } from "./ledger.ts";
-import { CA } from "./container.ts";
-import { snapshotCommitId, snapshotMessage } from "./snapshot-commit.ts";
-import { CHECKERS, runners, type CheckerName, type Env as ProductionEnv } from "./worker.ts";
-import type { Publisher } from "@generalbusiness/artroom-git/worker";
+import type { RoomPort } from "../../src/checker.ts";
+import { checkJob, gitAuthEnvFor, isRefusal, ownJob, parseNamespaces } from "../../src/job.ts";
+import { checkout, git } from "../../src/runner.ts";
+import { importSigner } from "../../src/signing.ts";
+import { Ledger } from "../../test/ledger.ts";
+import { CA } from "../../src/container.ts";
+import { snapshotCommitId, snapshotMessage } from "../../src/snapshot-commit.ts";
+import { CHECKERS, runners, type CheckerName, type Env as ProductionEnv } from "../../src/worker.ts";
+import type { Publisher } from "@generalbusiness/artroom-git/publisher";
 
-export { RunnerBox, RunnerGateway, TestsCheckerService, TypesCheckerService, LlmReviewService } from "./worker.ts";
-export { Publisher, ArtifactsGateway } from "@generalbusiness/artroom-git/worker";
+export { RunnerBox, RunnerGateway, TestsCheckerService, TypesCheckerService, LlmReviewService } from "../../src/worker.ts";
+export { Publisher, ArtifactsGateway } from "@generalbusiness/artroom-git/publisher";
 
 interface Env extends ProductionEnv {
   readonly ARTIFACTS: Artifacts;

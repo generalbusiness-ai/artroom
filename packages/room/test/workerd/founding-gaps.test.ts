@@ -75,13 +75,6 @@ async function landLane(room: TestRoom, host: FakeArtifactsHost, files: Record<s
   return { lane: claim.lane, head, op: await landOp(room, l.op.id) };
 }
 
-/** Make a registry binding look as an older Worker made it: before the ledger column (review 700b74ea). */
-async function markOlderBinding(repo: string): Promise<void> {
-  await runInDurableObject(reg() as never, (_r: unknown, state: DurableObjectState) => {
-    state.storage.sql.exec("UPDATE bindings SET ledger = NULL WHERE repo = ?", repo);
-  });
-}
-
 /** Lane B's cleanup duties, from inside the room's Durable Object. */
 async function duties(id: string) {
   return runInDurableObject(roomStub(id), (room: Room) => room.core.workspaces.duties());
@@ -388,190 +381,6 @@ describe("review 3eb7bc44: each creation attempt is its own incarnation, and a d
   });
 });
 
-// ------------------------------------------------------------------ review 700b74ea: a pending founding an older Room began
-
-describe("review 700b74ea: the base name an older Room may have created, before the incarnation ledger", () => {
-  /** An older Room's attempt: the registry binding made by an older Worker, and (optionally) the base repository created with its token, nothing recorded. */
-  async function olderAttempt(f: Founded, created: boolean): Promise<string> {
-    const g = f.drafted.genesis;
-    await call(reg().bind(g.repo, roomIdOf(g), g.name));
-    await markOlderBinding(g.repo);
-    const base = g.repo.split("/")[1]!;
-    if (created) await f.world.artifacts.binding.create(base);
-    return base;
-  }
-  const legacyOpen = async (id: string) => (await duties(id)).filter((d) => d.reason === "legacy" && d.state === "in-flight").length;
-
-  it("(a) a legacy base holding a token: deleted with it before the seal; the room is founded on a new incarnation, lands, and the old creates stay watched after eviction", async () => {
-    const f = await draftPublic();
-    const a = f.world.artifacts;
-    const base = await olderAttempt(f, true);
-    expect(a.repo(base).activeTokens()).toHaveLength(1);
-    const id = await worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
-    const sealed = a.canonical;
-    expect(sealed).not.toBe(base);
-    expect(a.repos.has(base)).toBe(false);
-    expect(await legacyOpen(id)).toBe(1);
-    await evictDurableObject(roomStub(id));
-    const room = testRoom(f, id);
-    const { op } = await landLane(room, a, { "docs/a.md": "after the migration\n" });
-    expect(op).toMatchObject({ state: "landed" });
-    advance(10 * 60_000);
-    await tick(room, 2);
-    expect(await legacyOpen(id)).toBe(1);
-    expect(a.repos.has(sealed)).toBe(true);
-  });
-
-  it("(b) an absent base whose old create applies after the new seal: the alarm deletes it, with its token, and keeps watching; the room's repository and work survive", async () => {
-    const f = await draftPublic();
-    const a = f.world.artifacts;
-    const base = await olderAttempt(f, false);
-    const id = await worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
-    const sealed = a.canonical;
-    expect(await legacyOpen(id)).toBe(1);
-    const room = testRoom(f, id);
-    const { head } = await landLane(room, a, { "docs/b.md": "before the late create\n" });
-    // The old create applies late (the fake host keeps pointing at the room's repository).
-    await a.binding.create(base);
-    a.canonical = sealed;
-    expect(a.repo(base).activeTokens()).toHaveLength(1);
-    await evictDurableObject(roomStub(id));
-    advance(10 * 60_000);
-    await tick(room, 2);
-    expect(a.repos.has(base)).toBe(false);
-    expect(await legacyOpen(id)).toBe(1);
-    expect(a.main).toBe(head);
-  });
-
-  it("(c) an already-founded legacy room, stored under its base name with no ledger: found again, ordinary work and the alarm never touch it, and its publishing token survives", async () => {
-    const f = await draftPublic();
-    const a = f.world.artifacts;
-    const id = await worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
-    const base = f.drafted.genesis.repo.split("/")[1]!;
-    // Turn it into a room founded by the older Room: the repository under its base name, no incarnation, no ledger.
-    const incarnation = a.repo(a.canonical);
-    a.canonical = base;
-    const legacy = a.canonicalRepo();
-    for (const [k, v] of incarnation.refs) legacy.refs.set(k, v);
-    for (const o of incarnation.objects) legacy.objects.add(o);
-    a.repos.delete(incarnation.name);
-    await runInDurableObject(roomStub(id), (room: Room) => {
-      room.core.sql.all("DELETE FROM meta WHERE k IN ('canonical_name', 'canonical_remote')");
-      room.core.sql.all("DELETE FROM artroom_ws_duty");
-    });
-    await evictDurableObject(roomStub(id));
-    // The same found again, which an older client might send: the room is founded, so nothing is prepared or adopted.
-    expect(await worker.found(f.drafted.genesis, f.sig, f.drafted.draft)).toBe(id);
-    const room = testRoom(f, id);
-    const { head, op } = await landLane(room, a, { "docs/c.md": "ordinary work\n" });
-    expect(op).toMatchObject({ state: "landed" });
-    advance(10 * 60_000);
-    legacy.mint("write", 60); // the Room's own publishing credential, live during the alarm
-    await tick(room, 2);
-    expect(a.repos.has(base)).toBe(true);
-    expect(a.main).toBe(head);
-    expect(legacy.activeTokens().length).toBeGreaterThan(0);
-    expect(await duties(id)).toEqual(expect.not.arrayContaining([expect.objectContaining({ reason: "legacy" })]));
-    expect(a.remoteCalls.get("create")).toBe(1);
-  });
-
-  it("a founding this Room began, retried, adopts nothing", async () => {
-    const f = await draftPublic();
-    const a = f.world.artifacts;
-    a.failRemote("firstCommit");
-    await rejects(worker.found(f.drafted.genesis, f.sig, f.drafted.draft), "unavailable");
-    const id = await worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
-    expect(await legacyOpen(id)).toBe(0);
-  });
-});
-
-it("review 700b74ea, the checker's control: a base repository that exists with its token is adopted and deleted, though the binding is new", async () => {
-  const f = await draftPublic();
-  const a = f.world.artifacts;
-  const base = f.drafted.genesis.repo.split("/")[1]!;
-  await a.binding.create(base);
-  expect(a.repo(base).activeTokens()).toHaveLength(1);
-  const id = await worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
-  expect(a.canonical).not.toBe(base);
-  await evictDurableObject(roomStub(id));
-  advance(10 * 60_000);
-  await tick(testRoom(f, id), 3);
-  expect(a.repos.has(base)).toBe(false);
-  expect((await duties(id)).filter((d) => d.reason === "legacy" && d.state === "in-flight")).toHaveLength(1);
-});
-
-// ------------------------------------------------------------------ review 700b74ea, recovery: the decision is a durable fact
-
-describe("review 700b74ea, recovery windows: legacy adoption is read from the registry binding on every attempt", () => {
-  const legacyOpen = async (id: string) => (await duties(id)).filter((d) => d.reason === "legacy" && d.state === "in-flight").length;
-  const failAt = (point: string) =>
-    setFault((p) => {
-      if (p === point) {
-        setFault(null);
-        throw new Error(`interrupted at ${point}`);
-      }
-    });
-
-  it("an older binding, interrupted after the attempt is on record and before the adoption: the retry still adopts, and a late old create is deleted", async () => {
-    const f = await draftPublic();
-    const a = f.world.artifacts;
-    const g = f.drafted.genesis;
-    await call(reg().bind(g.repo, roomIdOf(g), g.name));
-    await markOlderBinding(g.repo);
-    failAt("found:before-prepare");
-    await rejects(worker.found(g, f.sig, f.drafted.draft), "unavailable");
-    const id = roomIdOf(g);
-    await evictDurableObject(roomStub(id));
-    expect(await worker.found(g, f.sig, f.drafted.draft)).toBe(id);
-    expect(await legacyOpen(id)).toBe(1);
-    // The old create applies after the seal: deleted.
-    const base = g.repo.split("/")[1]!;
-    const sealed = a.canonical;
-    await a.binding.create(base);
-    a.canonical = sealed;
-    advance(10 * 60_000);
-    await tick(testRoom(f, id), 2);
-    expect(a.repos.has(base)).toBe(false);
-  });
-
-  it("an older binding, interrupted between the adoption and the first create: the retry keeps one adoption and founds", async () => {
-    const f = await draftPublic();
-    const a = f.world.artifacts;
-    const g = f.drafted.genesis;
-    await call(reg().bind(g.repo, roomIdOf(g), g.name));
-    await markOlderBinding(g.repo);
-    a.failRemote("create", artifactsErrors.transport());
-    a.failRemote("create", artifactsErrors.transport());
-    a.failRemote("create", artifactsErrors.transport());
-    await rejects(worker.found(g, f.sig, f.drafted.draft), "unavailable");
-    const id = roomIdOf(g);
-    expect(await legacyOpen(id)).toBe(1);
-    await evictDurableObject(roomStub(id));
-    expect(await worker.found(g, f.sig, f.drafted.draft)).toBe(id);
-    expect(await legacyOpen(id)).toBe(1);
-  });
-
-  it("a new binding whose answer was lost, or whose found was interrupted before anything was recorded: the retry, seeing already-bound, adopts nothing", async () => {
-    for (const interrupt of ["lost-bind-answer", "before-prepare"] as const) {
-      const f = await draftPublic();
-      const g = f.drafted.genesis;
-      const id = roomIdOf(g);
-      if (interrupt === "lost-bind-answer") {
-        // This Worker's bind applied; its answer never came back.
-        await call(reg().bind(g.repo, id, g.name));
-      } else {
-        failAt("found:before-prepare");
-        await rejects(worker.found(g, f.sig, f.drafted.draft), "unavailable");
-        await evictDurableObject(roomStub(id));
-      }
-      expect(await worker.found(g, f.sig, f.drafted.draft), interrupt).toBe(id);
-      expect(await legacyOpen(id), interrupt).toBe(0);
-      expect((await reg().byRepo(g.repo))?.legacy, interrupt).toBe(false);
-    }
-  });
-});
-
-
 // ------------------------------------------------------------------ plan 004: a wake-up is persisted before the first founding create
 
 describe("plan 004: the founding debt has a persisted alarm before any create is sent, and a fresh object schedules what it finds", () => {
@@ -640,26 +449,19 @@ describe("plan 004: the founding debt has a persisted alarm before any create is
     expect(a.remoteCalls.get("create")).toBe(1);
   });
 
-  it("an alarm that cannot be stored: no create is sent, the recorded debt is kept, the alarm cache claims nothing, and the same found later completes", async () => {
+  it("an alarm that cannot be stored: no create is sent, the step is closed as never sent, the alarm cache claims nothing, and the same found later completes", async () => {
     const f = await draftPublic();
     const a = f.world.artifacts;
     const g = f.drafted.genesis;
     const id = roomIdOf(g);
-    // An older Worker's binding, so debt (the base name's adoption) is recorded before the first create.
-    await call(reg().bind(g.repo, id, g.name));
-    await markOlderBinding(g.repo);
-    failAt("room:set-alarm", 2); // the wake-up before the create, then the reschedule after the failure
+    failAt("room:set-alarm"); // the wake-up before the create
     await rejects(worker.found(g, f.sig, f.drafted.draft), "unavailable");
     expect(a.remoteCalls.get("create")).toBeUndefined();
-    expect((await duties(id)).map((d) => [d.kind, d.state, d.doneReason])).toEqual([
-      ["repo-create", "in-flight", null],
-      ["repo-delete", "owed", null],
-      ["repo-create", "done", "not-sent"],
-    ]);
+    expect((await duties(id)).map((d) => [d.kind, d.state, d.doneReason])).toEqual([["repo-create", "done", "not-sent"]]);
     expect(await alarmOf(id)).toBeNull();
-    // The next reschedule on the same object stores it: nothing claimed the rejected one.
-    await runInDurableObject(roomStub(id), (room: Room) => (room as unknown as { schedule(): void }).schedule());
-    expect(await alarmOf(id)).not.toBeNull();
+    // Nothing claimed the rejected alarm. (Debt recorded before a create, and kept, is shown in the git package's
+    // workspaces test "plan 004: a wake-up that cannot be stored …".)
+    expect(await runInDurableObject(roomStub(id), (room: Room) => (room as unknown as { scheduled: number | null }).scheduled)).toBeNull();
     expect(await worker.found(g, f.sig, f.drafted.draft)).toBe(id);
     expect(a.remoteCalls.get("create")).toBe(1);
   });
