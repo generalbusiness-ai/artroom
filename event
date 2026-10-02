@@ -1,1 +1,1 @@
-{"kind":"report","text":"Recorded: request c0f0592f (to builder) owns the cleanup-duty projection: contract attention reason and authenticated read, Room serving from durable duty tables, CLI/MCP and UI display. Sequenced after lane A's 23b96a18 lands; no cleanup timeout; settlement rules unchanged. Lane A revision 7 also renames the unknown-mint expiresAt (first check time) so unknown expiry reads as unknown."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:81627bc79158b84862d871c2514d7e3dc7b63a1c"}
