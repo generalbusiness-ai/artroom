@@ -120,6 +120,24 @@ export interface IntegrateRequest {
     readonly generation: number;
   }
 
+/** One file of a snapshot: path, git mode and blob SHA (the order R-CARRY-9 digests). */
+export type SnapshotFile = readonly [path: string, mode: string, blob: string];
+
+/** The one ref of a snapshot repository (R-CARRY-16). */
+export const SNAPSHOT_REF = "refs/artroom/snapshot";
+
+/** Author and committer of every snapshot commit (R-CARRY-15, `SnapshotIdentity`). */
+export const SNAPSHOT_AUTHOR = { name: "Artroom Snapshot", email: "snapshot@artroom.invalid" } as const;
+
+const SNAPSHOT_ENV = {
+  GIT_AUTHOR_NAME: SNAPSHOT_AUTHOR.name,
+  GIT_AUTHOR_EMAIL: SNAPSHOT_AUTHOR.email,
+  GIT_AUTHOR_DATE: "@0 +0000",
+  GIT_COMMITTER_NAME: SNAPSHOT_AUTHOR.name,
+  GIT_COMMITTER_EMAIL: SNAPSHOT_AUTHOR.email,
+  GIT_COMMITTER_DATE: "@0 +0000",
+};
+
 export interface IntegrateHooks {
   /** Called with the new merge commit before it is pushed to `storeRef`, so the gateway can allow exactly that update. */
   readonly beforeStore?: (integration: string) => Promise<void>;
@@ -423,6 +441,68 @@ export class GitOps {
     const stored = await this.createRef(dir, req.canonical, integration, assertRef(req.storeRef));
     if (stored.kind !== "pinned") throw new Error(`could not store the integration at ${req.storeRef}`);
     return { kind: "clean", integration, ref: req.storeRef, fastForward: false };
+  }
+
+  // ------------------------------------------------------------ filtered snapshots (R-CARRY-15, R-CARRY-16)
+
+  /** Every file in a commit's tree as `[path, mode, blob]`: regular files, executables and symlinks. */
+  listTree(canonical: string, commit: string): Promise<SnapshotFile[]> {
+    return this.exclusive(canonical, async () => {
+      const dir = await this.repo(canonical);
+      if (!(await this.hasCommit(dir, commit))) await this.fetch(dir, canonical, [assertSha(commit)]);
+      const out = await this.ok("ls-tree", ["-C", dir, "ls-tree", "-r", "-z", "--full-tree", assertSha(commit)]);
+      const files: SnapshotFile[] = [];
+      for (const rec of out.split("\0").filter(Boolean)) {
+        const tab = rec.indexOf("\t");
+        const [mode, type, sha] = rec.slice(0, tab).split(" ");
+        if (type !== "blob" || !mode || !sha) continue; // submodules (commit entries) are never included
+        files.push([rec.slice(tab + 1), mode, assertSha(sha, "blob")]);
+      }
+      return files;
+    });
+  }
+
+  /**
+   * Write a filtered snapshot (R-CARRY-15, R-CARRY-16): the fixed commit
+   * whose tree has exactly `files`, with no parent, author and committer
+   * `SNAPSHOT_AUTHOR` at time 0, and the Room's `message`. It goes into
+   * `store`, the snapshot's own new repository, at `SNAPSHOT_REF` only.
+   *
+   * `store` must be empty: a repository that already has any ref is refused
+   * and nothing is pushed, so a repository is never given a second snapshot
+   * or anything else. Pushing one commit into an empty repository sends
+   * exactly that commit's closure: the commit, its trees and its blobs.
+   */
+  writeSnapshot(
+    req: { readonly canonical: string; readonly store: string; readonly files: readonly SnapshotFile[]; readonly message: string },
+    hooks: IntegrateHooks = {},
+  ): Promise<string> {
+    return this.exclusive(req.canonical, async () => {
+      const dir = await this.repo(req.canonical);
+      const index = `${dir}/snapshot-index-${Math.random().toString(36).slice(2, 10)}`;
+      const env = { GIT_INDEX_FILE: index };
+      try {
+        await this.ok("read-tree", ["-C", dir, "read-tree", "--empty"], env);
+        for (let i = 0; i < req.files.length; i += 200) {
+          // `--cacheinfo mode,sha,path` splits at the first two commas, so a comma in a path is safe.
+          const args = req.files.slice(i, i + 200).flatMap(([path, mode, blob]) => {
+            if (!/^(100644|100755|120000)$/.test(mode)) throw new Error(`mode ${mode} cannot be in a snapshot`);
+            return ["--add", "--cacheinfo", `${mode},${assertSha(blob, "blob")},${path}`];
+          });
+          await this.ok("update-index", ["-C", dir, "update-index", ...args], env);
+        }
+        const tree = assertSha(await this.ok("write-tree", ["-C", dir, "write-tree"], env), "tree");
+        const commit = assertSha(await this.ok("commit-tree", ["-C", dir, "commit-tree", "--no-gpg-sign", tree, "-m", req.message], SNAPSHOT_ENV), "snapshot");
+        const refs = await this.ok("ls-remote", ["ls-remote", req.store]);
+        if (refs !== "") throw new Error("the snapshot repository is not empty; a snapshot is written only into a new, empty repository");
+        await hooks.beforeStore?.(commit);
+        const stored = await this.createRef(dir, req.store, commit, SNAPSHOT_REF);
+        if (stored.kind !== "pinned") throw new Error(`could not store the snapshot at ${SNAPSHOT_REF}`);
+        return commit;
+      } finally {
+        await this.opts.exec(["rm", "-f", index], { env: {} }).catch(() => undefined);
+      }
+    });
   }
 
   /**
