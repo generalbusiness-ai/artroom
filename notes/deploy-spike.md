@@ -168,14 +168,15 @@ fixes" below, and "Founding gaps" in
    recorded before the call, and the token is owed revocation from its
    answer; the genesis is sealed only when no token is active on the
    repository, and the alarm retries the debt until Artifacts confirms it.
-3. **Fixed in the code; the spike stays public-only: a deployment could
-   found publicly or import, not both.** A deployment now takes a second,
-   optional binding, `IMPORT_ARTIFACTS` for `IMPORT_NAMESPACE`, and the Room
-   follows its repository's namespace. A source with no binding is refused
-   at `draft` and before the registry binding, with the reason, so it no
-   longer binds a name that can never complete. The spike may use one
-   namespace, `gitseq-spike`, so it has no import binding: it refuses an
-   import at `draft` and says why. A live import needs a second namespace.
+3. **Fixed: a deployment could found publicly or import, not both.** A
+   deployment now takes a second, optional binding, `IMPORT_ARTIFACTS` for
+   `IMPORT_NAMESPACE`, and the Room follows its repository's namespace. A
+   mode whose binding is absent is refused at `draft` and before the
+   registry binding, with the reason (review a35b4b61), so it no longer
+   binds a name that can never complete. Since revision 2 the spike has
+   both bindings, `gitseq-spike` and `gitseq-spike-import` (approved by
+   hugh), and its live run imports a repository as well as founding a public
+   room.
 4. **No client on main.** Lane E's client, CLI and MCP are not on main, so
    the smoke run is a script over the HTTPS API. `artroom verify` is lane
    L's CLI, which is on main.
@@ -208,6 +209,49 @@ Left behind, as before: the room `deploy-spike-smoke-muqeemmx` in the
 Room's Durable Objects and registry, bound to a deleted repository, and its
 read session, which expires 15 minutes after the run. The import drafts
 created, read and bound nothing.
+
+## Revision 2: a live import (request b6b51de7)
+
+The spike config binds `IMPORT_ARTIFACTS` to `gitseq-spike-import` and sets
+`IMPORT_NAMESPACE`. The smoke script, after the public founding, creates a
+throwaway repository with one commit in `gitseq-spike-import` (with hugh's
+OAuth; its creation token pushes the commit and is then revoked), signs an
+onboarding grant with the spike operator key (the seed is read from the env
+file into the process and never printed), drafts and founds a room on it,
+lands a lane, waits for the log and runs `artroom verify`. Cleanup is the
+deploy lane's `cleanupRun` (review 2485e992), once per namespace.
+
+| Run | Code | Outcome |
+|---|---|---|
+| [03:55:25](../packages/room/measure/results/spike-smoke-2026-10-02T03-55-25-370Z.json) | revision 2, before review a35b4b61 | Public founding passed. The import founded and landed, but its log never published: another actor redeployed `artroom-spike-room` at 03:57:21 from a config without the import binding (version `2092006a`), so the import room lost its namespace. |
+| [04:03:51](../packages/room/measure/results/spike-smoke-2026-10-02T04-03-51-743Z.json) | the same, redeployed | Every step passed. |
+| [04:21:13](../packages/room/measure/results/spike-smoke-2026-10-02T04-21-13-851Z.json) | review a35b4b61 answered, merged with main `b5864882` and `request/deploy-spike` `97f42684`; version `a9f55d45` | Every step and every cleanup duty passed (57 steps). |
+
+The 04:21:13 run, on one deployment:
+
+| Step | Result |
+|---|---|
+| Public founding | main is the Room's first commit, `6ff91167…`; 0 active tokens after founding |
+| Lanes 1 and 2 | both landed; lane 1's released token no longer reads its fork |
+| Import drafts for the public namespace and for `gitseq-spike-other` | 403, each with its reason |
+| Public log | published through entry 14; `artroom verify` exit 0, 4 decisions replayed |
+| Import repository | `gitseq-spike-import/9b1e9f52…`, one commit `76ace7c6…`; its creation token revoked, 0 active |
+| Import draft and found | 200; the genesis carries the grant by operator `key_YPyq…` |
+| Main after founding the import | still `76ace7c6…`: the Room wrote nothing |
+| Lane 3 on the import | landed; main is its integration, on `76ace7c6…` |
+| Import log | published through entry 8; `artroom verify` exit 0, 2 decisions replayed, reports the operator key |
+| Cleanup | both canonical repositories and three forks deleted; every duty done; no repository left |
+
+At cleanup, one active write token was on the public canonical repository:
+60 seconds, created at 04:24:33, two minutes after its first publication.
+It is the Room's own publishing credential for the next log publication (a
+checkpoint entry leaves the log unpublished again), in use or awaiting its
+revocation, not a founding token. Cleanup revoked it, then deleted the
+repository.
+
+Left behind: the rooms of each run in the Room's Durable Objects and
+registry, bound to deleted repositories, and their read sessions, which
+expire 15 minutes after each run.
 
 ## Gates
 
