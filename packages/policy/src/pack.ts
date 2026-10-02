@@ -1,5 +1,5 @@
 /**
- * The default policy pack (lane D). Eleven named rules, each built with the
+ * The default policy pack (lane D). Twelve named rules, each built with the
  * authoring helpers, plus carry settings. `starterPolicy()` assembles them
  * for a repository; `PACK` documents each rule for the guide
  * (docs/policy-pack.md).
@@ -17,6 +17,32 @@ import { OBJECTION_OPEN, carry, owners, policy, requireCheck, requireReview, rul
 import { globCovers } from "./glob.ts";
 
 // ------------------------------------------------------------------ refuse
+
+/**
+ * Refuse a proposal that introduces or changes jj conflict data. jj stores a
+ * conflicted commit, pushed with `--allow-conflicts`, as a Git tree with
+ * `.jjconflict-base-*` and `.jjconflict-side-*` directories at its root.
+ * The rule reads `proposal.changed`: an added or modified path, or a rename
+ * destination, that starts with one of those prefixes. Deletions and rename
+ * sources do not count, so removing conflict data is never refused.
+ *
+ * It does not prove the head is conflict-free: conflict data that the
+ * proposal leaves untouched is not in its changes. That would need a
+ * Room-owned, bounded fact about the head's root entries (docs/policy-pack.md).
+ * For `propose`, refuse rules run before the claim check (R-ADM-1), so the
+ * author sees this cause, not `outside-claim`.
+ */
+export const jjConflicts = (): PolicyPart =>
+  rule({
+    id: "jj-conflicts",
+    kind: "refuse",
+    description: "A proposal must not introduce or change jj conflict data: .jjconflict-base-* or .jjconflict-side-* paths at the tree root.",
+    on: ["propose"],
+    refuse:
+      '$count(proposal.changed[$substring(path, 0, 12) = ".jjconflict-" and $substring(path, 12, 5) in ["base-", "side-"] and status != "deleted"]) > 0',
+    reason: "This proposal introduces or changes jj conflict data: it adds or modifies .jjconflict-base-* or .jjconflict-side-* paths at the root of its tree.",
+    fix: "Resolve the jj conflicts, so the proposal no longer adds or changes .jjconflict-* paths, then propose again.",
+  });
 
 /** Refuse a proposal on a lane nobody has claimed. */
 export const claimBeforePropose = (): PolicyPart =>
@@ -143,6 +169,7 @@ export function starterPolicy(opts: StarterOptions): PolicyDocument {
   const ci = opts.ci ?? "@ci";
   const doc = policy(
     owners(opts.owners),
+    jjConflicts(),
     claimBeforePropose(),
     narrowClaims(),
     ownerReview(),
@@ -198,6 +225,7 @@ export interface PackEntry {
 }
 
 export const PACK: readonly PackEntry[] = [
+  { id: "jj-conflicts", kind: "refuse", replaces: "a pre-push hook or CI step that rejects commits with unresolved conflicts" },
   { id: "claim-before-propose", kind: "refuse", replaces: "a pre-push hook that requires a ticket or branch name" },
   { id: "narrow-claims", kind: "refuse", replaces: "a pre-push hook that rejects repository-wide changes" },
   { id: "owner-review", kind: "require", replaces: "CODEOWNERS with 'require review from code owners'" },
