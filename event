@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d38085af40894acfbcc144d55136b6ba1ad146c5"}
+{"kind":"promise","text":"Review client and deployment hygiene at exact e90cc7c0e8dc0fdb0362fec603de6c8435e72569: all 14 artifacts, strict remote/token grammar and credential read-back, PUBLIC_URL and body caps, runtime edge controls and fresh gates, with Architecture, Security and Simplification conclusions."}
