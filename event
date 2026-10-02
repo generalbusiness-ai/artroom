@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review pi-durable revision 3 exact 8306d426 and all 29 artifacts; verify fresh standalone pinned dependency checks without root node_modules, recovery coverage and retained production gaps; architecture/security/simplification."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c1687b98559d88cb55264b75302d35d4809e48fb"}
