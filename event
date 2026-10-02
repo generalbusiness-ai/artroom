@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c13e86542be69e7a7a4640fa51e4194dbca53a26","text":"Merge retired a covered predecessor; the successor is at packages/room/src/core.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c7c4176b0097ed8fc83191a1a4e2f0a371a86ff2","text":"Merge retired a covered predecessor; the successor is at plans/002-retain-unknown-fork-effects.md."}
