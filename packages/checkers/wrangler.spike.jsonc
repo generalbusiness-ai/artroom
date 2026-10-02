@@ -1,0 +1,44 @@
+// The spike deployment of the checker service (request 9f81f372): the same
+// Worker as wrangler.jsonc, as `artroom-spike-checkers`, serving the spike
+// Room `artroom-spike-room`. The Room binds its entrypoints as
+// CHECKER_TESTS, CHECKER_TYPES and CHECKER_LLM_REVIEW
+// (packages/room/wrangler.spike.jsonc); this Worker binds the Room back as
+// ROOM, to submit each signed check to the job's room.
+//
+// Deploy with packages/room/scripts/deploy-spike.sh, never on its own: the
+// script puts CHECKER_KEY (an Ed25519 private JWK made from
+// ARTROOM_CHECKER_SEED in ~/.config/generalbusiness/artroom-spike.env, on
+// stdin, never in the repo) and deploys the two Workers in the order their
+// mutual bindings need. See notes/deploy-spike.md.
+//
+// CHECKER_KEY's key must be a member's key (role `checker`) in each room
+// whose checks it signs; the smoke runs invite it.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "artroom-spike-checkers",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": {
+    "ARTIFACTS_HOST": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
+    // The spike Room's namespaces: public founding, and imports.
+    "ARTIFACTS_NAMESPACES": "gitseq-spike,gitseq-spike-import",
+    "RUNNER_IMAGE": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lg-runner@sha256:17b7fd60fd812617654c64b95f9b2dde94f103313073b672bc40fdad6dccbaa2",
+    "LLM_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+  },
+  "secrets": { "required": ["CHECKER_KEY"] },
+  "ai": { "binding": "AI" },
+  // The spike Room Worker's ArtroomService (its default entrypoint).
+  "services": [{ "binding": "ROOM", "service": "artroom-spike-room" }],
+  "containers": [
+    {
+      "class_name": "RunnerBox",
+      "scheduling_policy": "durable_object",
+      "images": { "runner": { "image": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lg-runner@sha256:17b7fd60fd812617654c64b95f9b2dde94f103313073b672bc40fdad6dccbaa2" } }
+    }
+  ],
+  "durable_objects": { "bindings": [{ "class_name": "RunnerBox", "name": "RUNNER" }] },
+  "exports": { "RunnerBox": { "type": "durable-object", "storage": "sqlite" } }
+}
