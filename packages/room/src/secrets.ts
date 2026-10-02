@@ -40,7 +40,7 @@ export const DETECTORS: readonly Detector[] = [
 ];
 
 /** Long tokens: runs of base64, base64url or hex characters. */
-const TOKEN = /[A-Za-z0-9+/=_-]{32,}/g;
+export const TOKEN = /[A-Za-z0-9+/=_-]{32,}/g;
 /** Public identifiers that appear in text and are not secrets. */
 const PUBLIC_ID = /^(?:key_[A-Za-z0-9_-]{43}|act_\d+_[0-9a-f]{8}|room_[0-9a-f]{32}|sha256:[0-9a-f]{64}|[0-9a-f]{40}|[0-9a-f]{64})$/;
 

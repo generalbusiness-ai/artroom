@@ -61,10 +61,12 @@ export function toArtroomError(e: unknown): ArtroomError {
 /** A value or a thrown failure, as it crosses the Durable Object boundary. */
 export type Wire<T> = { readonly ok: T } | { readonly error: ArtroomError };
 
-export async function wire<T>(fn: () => Promise<T>): Promise<Wire<T>> {
+/** `unknown` is told of a failure that is not an `ArtroomError`, which the caller sees only as `internal`. */
+export async function wire<T>(fn: () => Promise<T>, unknown?: (e: unknown) => void): Promise<Wire<T>> {
   try {
     return { ok: await fn() };
   } catch (e) {
+    if (!isArtroomError(e)) unknown?.(e);
     return { error: toArtroomError(e) };
   }
 }

@@ -80,9 +80,14 @@ export class Room extends DurableObject<RoomEnv> {
 
   // ------------------------------------------------------------ RPC
 
+  /** `wire`, and a failure that is not an `ArtroomError` is logged under the method's name (request d268d249). */
+  private wire<T>(method: string, fn: () => Promise<T>): Promise<Wire<T>> {
+    return wire(fn, (e) => this.core.diagnose("rpc-failed", method, e));
+  }
+
   /** Found the room from a signed genesis (R-GEN-1). The seed is the room key's, derived by the Worker. */
   found(genesis: Genesis, sig: string, seed: string): Promise<Wire<RoomId>> {
-    return wire(async () => {
+    return this.wire("found", async () => {
       checkGenesis(genesis);
       const raw = unb64url(seed);
       if (!raw || raw.length !== 32) throw artroomError("bad-request", "The room key seed is not 32 bytes.");
@@ -92,35 +97,35 @@ export class Room extends DurableObject<RoomEnv> {
 
   /** `RoomWire.submit` and `POST /acts`: admission path `submitted` (R-ADM-12). */
   submit(act: unknown): Promise<Wire<ActRecord | Refusal>> {
-    return wire(() => submit(this.core, act, "submitted"));
+    return this.wire("submit", () => submit(this.core, act, "submitted"));
   }
 
   request(req: unknown): Promise<Wire<WorkspaceOp | WorkspaceGrant | Session | Refusal>> {
-    return wire(() => request(this.core, req));
+    return this.wire("request", () => request(this.core, req));
   }
 
   /** `address` is the HTTPS client's, or null for a Worker over a service binding (R-CRED-9). */
   redeem(redemption: unknown, address: string | null): Promise<Wire<Joined | Redeemed | Refusal>> {
-    return wire(() => redeem(this.core, redemption, address, this.mcpBase));
+    return this.wire("redeem", () => redeem(this.core, redemption, address, this.mcpBase));
   }
 
   /** An MCP agent's act, signed by the room under the bearer's delegation (R-CRED-3, R-CRED-10). */
   bearerAct(bearer: string, act: unknown): Promise<Wire<ActRecord | Refusal>> {
-    return wire(() => bearerAct(this.core, bearer, act));
+    return this.wire("bearerAct", () => bearerAct(this.core, bearer, act));
   }
 
   /** `workspace` or `workspace-token` for a bearer session (R-CRED-10). */
   bearerRequest(bearer: string, req: unknown): Promise<Wire<WorkspaceOp | WorkspaceGrant | Refusal>> {
-    return wire(() => bearerRequest(this.core, bearer, req));
+    return this.wire("bearerRequest", () => bearerRequest(this.core, bearer, req));
   }
 
   read<Q extends ReadQuery>(token: string, query: Q): Promise<Wire<ReadResults[Q["q"]]>> {
-    return wire(async () => read(this.core, authenticateRead(this.core, token), query));
+    return this.wire("read", async () => read(this.core, authenticateRead(this.core, token), query));
   }
 
   /** The HTTPS long poll: the next update after `cursor`, or an empty one after `waitMs` (R-API-8). */
   poll(token: string, cursor: string | undefined, waitMs: number): Promise<Wire<Update>> {
-    return wire(async () => {
+    return this.wire("poll", async () => {
       const member = authenticateRead(this.core, token);
       const from = cursor ?? liveCursor(this.core);
       const deadline = Date.now() + Math.min(Math.max(waitMs, 0), 60_000);
@@ -166,17 +171,17 @@ export class Room extends DurableObject<RoomEnv> {
 
   /** Publish the log now (R-LOG-8). Also run by the alarm. */
   publishLog(): Promise<Wire<{ readonly through: number; readonly commit: Sha } | null>> {
-    return wire(() => this.core.publish(true));
+    return this.wire("publishLog", () => this.core.publish(true));
   }
 
   /** The open cleanup duties for job tokens, for operators: ended tokens still owed revocation, and mints whose outcome is unknown. */
   jobTokenDuties(): Promise<Wire<ReturnType<typeof jobTokenDuties>>> {
-    return wire(async () => jobTokenDuties(this.core));
+    return this.wire("jobTokenDuties", async () => jobTokenDuties(this.core));
   }
 
   /** Run the alarm's work once, now. For tests and operators; the alarm calls the same code. */
   tick(): Promise<Wire<null>> {
-    return wire(async () => {
+    return this.wire("tick", async () => {
       await this.work();
       await this.core.idle();
       return null;

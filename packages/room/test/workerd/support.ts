@@ -40,6 +40,7 @@ import { buildTree, encodeCommit, gitObject, readLogFiles } from "@generalbusine
 import { b64url, digestBytes, hex, keyPairFromSeed, newKeyPair, randomBytes, randomToken, sign, type KeyPair } from "../../src/crypto.ts";
 import { iso, roomIdOf } from "../../src/ids.ts";
 import { unwire, type Wire } from "../../src/errors.ts";
+import type { Diagnosis } from "../../src/diag.ts";
 
 // ------------------------------------------------------------ the clock
 
@@ -115,8 +116,8 @@ export type PortMethod = keyof ArtifactsPort;
 export interface TestArtifacts extends FakeArtifactsHost {
   /** Calls made, by Artifacts port method: tests check that refused acts did no I/O. */
   readonly calls: Map<PortMethod, number>;
-  /** Make the next `count` calls of a port method fail, as an outage would. */
-  failNext(method: PortMethod, count?: number): void;
+  /** Make the next `count` calls of a port method fail, as an outage would; with `error`, by throwing it. */
+  failNext(method: PortMethod, count?: number, error?: unknown): void;
 }
 
 /** The log ref on the canonical repository, and its transport faults. */
@@ -153,6 +154,8 @@ export interface World {
    * sandbox and log remote follow the repository's namespace.
    */
   imports: FakeArtifactsHost | null;
+  /** What the room logged as diagnoses (`src/diag.ts`), in order (request d268d249). */
+  readonly diagnoses: Diagnosis[];
 }
 
 const worlds = new Map<string, World>();
@@ -162,10 +165,13 @@ function newWorld(): World {
   const host = new FakeArtifactsHost("artroom-public", () => clock.now);
   const calls = new Map<PortMethod, number>();
   const planned = new Map<PortMethod, number>();
+  const errors = new Map<PortMethod, unknown>();
   const artifacts = Object.assign(host, {
     calls,
-    failNext(method: PortMethod, count = 1) {
+    failNext(method: PortMethod, count = 1, error?: unknown) {
       planned.set(method, count);
+      if (error === undefined) errors.delete(method);
+      else errors.set(method, error);
     },
   }) as TestArtifacts;
   const log: LogFacet = {
@@ -191,7 +197,7 @@ function newWorld(): World {
       return host.put(gitObject("commit", encodeCommit({ tree: root, parents: parent ? [parent] : [], author: who, committer: who, message: "not the room\n" })));
     },
   };
-  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, checkers: {}, snapshots: null, logTransfer: null, imports: null };
+  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, checkers: {}, snapshots: null, logTransfer: null, imports: null, diagnoses: [] };
   (world as { instrument?: unknown }).instrument = (a: ArtifactsPort): ArtifactsPort =>
     new Proxy(a, {
       get(target, prop, receiver) {
@@ -203,7 +209,7 @@ function newWorld(): World {
           const n = planned.get(m) ?? 0;
           if (n > 0) {
             planned.set(m, n - 1);
-            return Promise.reject(new Error(`Artifacts is unavailable (${String(m)})`));
+            return Promise.reject(errors.has(m) ? errors.get(m) : new Error(`Artifacts is unavailable (${String(m)})`));
           }
           return (v as (...a: unknown[]) => unknown).apply(target, args);
         };
@@ -231,6 +237,7 @@ setServicesFactory((_env, objectId) => {
     get snapshots() {
       return world.snapshots ?? undefined;
     },
+    diagnose: (d) => world.diagnoses.push(d),
     remotes: {
       artifacts: host.binding,
       get namespace() {
