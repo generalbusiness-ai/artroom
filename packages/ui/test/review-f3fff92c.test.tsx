@@ -91,6 +91,19 @@ describe("an edit moved between places with the same surrounding lines", () => {
       files: [{ path: "auth.ts", meta: null, now: [], before: [], unsure: [{ before: { oldStart: 4, newStart: 4, lines: HUNK }, now: { oldStart: 4, newStart: 4, lines: HUNK } }] }],
     });
   });
+
+  test("ambiguous: a rebase that repeats a line inside the old edit's surroundings is not claimed as a move", async () => {
+    // Main repeats the line "a"; each version changes the same "b" (the one after "c") to "X". The two
+    // parents' diff cannot say which "a" is new, and places the new one inside the old hunk's lines,
+    // so the old place does not map one to one. Found by fuzzing: without that check, this was
+    // reported as a move.
+    const repo = new MemoryRepo();
+    const lines = (s: string) => [...s].join("\n");
+    const p1 = repo.commit(null, { "auth.ts": lines("babcbb") }, "base");
+    const p2 = repo.commit(p1, { "auth.ts": lines("baabcbb") }, "main moved");
+    const d = await compare(repo, [p1, p2], lines("babcXb"), lines("baabcXb"));
+    expect(d.kind === "ok" && d.files.map((f) => [f.now.length, f.before.length, f.unsure.map((u) => [u.before.oldStart, u.now.oldStart])])).toEqual([[0, 0, [[2, 3]]]]);
+  });
 });
 
 describe("on screen", () => {
