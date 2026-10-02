@@ -214,6 +214,8 @@ export class Agent extends DurableObject<AgentEnv> {
   #harness!: Harness;
   #room: Promise<Room> | undefined;
   #prefix!: string;
+  /** The model providers registered from this Worker's bindings, besides the scripted one. */
+  #providers: string[] = [];
 
   constructor(state: DurableObjectState, env: AgentEnv) {
     super(state, env);
@@ -236,7 +238,7 @@ export class Agent extends DurableObject<AgentEnv> {
     const credentials = new InMemoryCredentialStore();
     const models = createModels({ credentials });
     models.setProvider(faux.provider);
-    await addProviders(models, credentials, this.env);
+    this.#providers = await addProviders(models, credentials, this.env);
     const registry = createRegistry();
     registry.install(this.#artroomExtension());
     const storage = await SqliteStorage.open(new DurableObjectSqlite(this.ctx.storage));
@@ -558,6 +560,11 @@ export class Agent extends DurableObject<AgentEnv> {
   async lane(): Promise<LaneState | undefined> {
     const root = await this.#harness.root(ctx0, { agent: { model: this.#model() } });
     return (await this.#harness.snapshot(LaneDoc, root.id, ctx0)) as LaneState | undefined;
+  }
+
+  /** The model providers this Agent registered from its bindings. */
+  async providers(): Promise<string[]> {
+    return this.#providers;
   }
 
   /** Spend, per provider/model, from pi-durable's usage document. */

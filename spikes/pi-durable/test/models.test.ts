@@ -5,10 +5,12 @@
  * binding (src/models.ts). No network.
  */
 
+import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { createModels, InMemoryCredentialStore, Type, type Context } from "@earendil-works/pi-ai";
 import { DEFAULT_LIVE_PROVIDER, liveModel, WORKERS_AI_MODEL } from "../src/live.ts";
 import { addProviders, workersAiFetch, type AiRunner, type ModelEnv } from "../src/models.ts";
+import { stub } from "./support.ts";
 
 describe("liveModel", () => {
   it("is off unless SPIKE_LIVE is set", () => {
@@ -105,6 +107,11 @@ describe("addProviders", () => {
     const { models, added } = await modelsFor({ OPENROUTER_API_KEY: "k" });
     expect(added).toEqual(["openrouter"]);
     expect((await models.getAuth("openrouter"))?.auth).toEqual({ apiKey: "k" });
+  });
+
+  it("is what the Agent uses: with the AI binding (wrangler.jsonc) and no keys, it registers workers-ai only", async () => {
+    expect(typeof (env as unknown as { AI?: AiRunner }).AI?.run).toBe("function");
+    expect(await stub(`agent-${crypto.randomUUID()}`).providers()).toEqual(["workers-ai"]);
   });
 
   it("registers each it is given", async () => {
