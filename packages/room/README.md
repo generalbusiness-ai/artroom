@@ -861,6 +861,27 @@ follow-up revision 3, the merge of main `73af785d`, and amendment
 | `npm run test:workerd` (this package) | 0 | 275 in 18 files |
 | `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles with the Room, Registry and Publisher Durable Objects, the Artifacts binding and the Publisher container |
 
+## Review 2a43661d
+
+The checker's review of revision 8 (`18bd7bc`) accepted lane A's own
+changes. Its one finding was a deadlock in lane B's staging, inherited
+through the merge: finishing a staged object could block. Revision 9 merges
+lane B's revision 4 (`request/laneB-pushlog` at `49c2b2d1`), which fixes
+it. That merge also brings main `4892e114`, with lane L's decoder for
+`check-carried` events. **No lane A source changed.** Lane B reports no
+interface change. Lane A's export of `StagingArea` from `packages/log` is
+kept, because lane B's branch does not have it.
+
+Gates at `2dac0041`, the merge:
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | git 143; log 127 Node and 122 workerd; policy 199 Node and 198 workerd (1 skipped); room 67 Node and 275 workerd; ui 88 |
+| `npm run test:node` (this package) | 0 | 67 |
+| `npm run test:workerd` (this package) | 0 | 275 |
+| `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles |
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
