@@ -138,6 +138,18 @@ export interface Recomputation {
   readonly evaluations: readonly Evaluation[];
 }
 
+/**
+ * The kinds of work the alarm's 5-second loop retries. Each has its own
+ * durable backoff after a failure (request 3da1d82b): an alarm that fires
+ * early for other work skips a kind whose backoff has not ended.
+ */
+export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing"] as const;
+export type LoopKind = (typeof LOOP_KINDS)[number];
+/** Whether a kind of loop work may run now. */
+export type LoopDue = (kind: LoopKind) => boolean;
+/** Loop work that needs the canonical repository. */
+const NEEDS_REPOSITORY: ReadonlySet<LoopKind> = new Set(["pins", "previews", "provision", "landing"]);
+
 let faultHook: ((point: string) => void) | null = null;
 
 /** Tests only: throw at a named point inside a write, as a crash would. */
@@ -1378,7 +1390,7 @@ export class RoomCore {
    * deadline, is never provisioned; its expiry is sealed and its access
    * ended as durable work (R-WS-2, R-WS-3).
    */
-  async resumeWorkspaces(): Promise<void> {
+  async resumeWorkspaces(provision = true): Promise<void> {
     if (!this.founded) return;
     for (const r of this.sql.all("SELECT lane, lease_gen FROM ws_leases WHERE state = 'open' ORDER BY rowid")) {
       const laneId = str(r, "lane") as LaneId;
@@ -1388,7 +1400,7 @@ export class RoomCore {
         this.run("tokens");
         continue;
       }
-      if (this.workspaces.view(laneId)?.state === "pending") await this.workspaces.provision(laneId);
+      if (provision && this.workspaces.view(laneId)?.state === "pending") await this.workspaces.provision(laneId);
       fault("workspace:after-provision");
       // The lease may have ended or run out during provisioning: seal it and end its access now (R-LANE-8, R-WS-3).
       if (!this.leaseCurrent(laneId, leaseGen)) {
@@ -1613,14 +1625,14 @@ export class RoomCore {
       if (!this.pendingPublication() && this.headSeq() <= this.publishedThrough()) return null;
       // The alarm publishes only when due: never inside a failure's backoff, nor for a gone repository (request 3da1d82b).
       if (!force && !this.publicationDue()) return null;
-      // R-PUB-10: publish only for the room the registry binds to this repository.
-      if (!(await this.isBound())) {
-        await this.serial(async () => this.sql.transaction(() => this.publicationFailed("forbidden", false)));
-        throw artroomError("forbidden", "The registry does not bind this repository to this room; nothing is published.");
-      }
       let result: Awaited<ReturnType<PublisherPort["publish"]>>;
       let cohort: PendingPublication;
+      // Every await before and during the push is inside this handler, so any failure, the registry's included,
+      // records the backoff (request 3da1d82b).
+      const unbound = artroomError("forbidden", "The registry does not bind this repository to this room; nothing is published.");
       try {
+        // R-PUB-10: publish only for the room the registry binds to this repository.
+        if (!(await this.isBound())) throw unbound;
         this.publisherCache ??= this.ports.log();
         const publisher = await this.publisherCache;
         // The cohort and its exact commit are fixed and stored before any remote write: the
@@ -1656,12 +1668,13 @@ export class RoomCore {
         // Reopen from the ref next time: the read-back decides what happened.
         this.publisherCache = null;
         const code = (e as { code?: string }).code ?? "transport";
-        this.diagnose("publication-failed", "publish", e);
+        if (e !== unbound) this.diagnose("publication-failed", "publish", e);
         // A NOT_FOUND counts as gone only if the canonical repository itself is not found.
         const gone = code === "NOT_FOUND" && (await this.canonicalMissing());
         await this.serial(async () => this.sql.transaction(() => this.publicationFailed(code, gone)));
         // Wake subscriptions: the admins' item is new even though no entry is.
         this.committed();
+        if (e === unbound) throw unbound;
         throw artroomError("unavailable", `The log could not be published (${code}); the same cohort is retried.`);
       }
       const done = cohort;
@@ -1701,17 +1714,22 @@ export class RoomCore {
   readonly steps = {
     leases: () => this.expireLeases().then(() => undefined),
     notify: () => this.drainNotify(),
-    tokens: () => this.revokeEndedTokens(),
-    // Work that needs the canonical repository waits, kept, while it is gone (request 3da1d82b).
-    pins: async () => {
-      if (!this.canonicalGone()) await this.completePins();
+    tokens: async (due: LoopDue = this.loopAllowed) => {
+      if (due("tokens")) await this.revokeEndedTokens();
     },
-    previews: async () => {
-      if (!this.canonicalGone()) await this.refreshPreviews();
+    pins: async (due: LoopDue = this.loopAllowed) => {
+      if (due("pins")) await this.completePins();
     },
-    workspaces: () => this.resumeWorkspaces(),
-    recompute: () => this.recompute(),
-    landing: () => this.resumeLanding(),
+    previews: async (due: LoopDue = this.loopAllowed) => {
+      if (due("previews")) await this.refreshPreviews();
+    },
+    workspaces: (due: LoopDue = this.loopAllowed) => this.resumeWorkspaces(due("provision")),
+    recompute: async (due: LoopDue = this.loopAllowed) => {
+      if (due("recompute")) await this.recompute();
+    },
+    landing: async (due: LoopDue = this.loopAllowed) => {
+      if (due("landing")) await this.resumeLanding();
+    },
     jobs: () => issueJobs(this),
     snapshots: async () => {
       if (this.founded) await this.snapshotRepos.reconcile();
@@ -1720,31 +1738,52 @@ export class RoomCore {
     publication: () => this.publish().then(() => undefined),
   } as const;
 
-  /** Start one durable step now, in the background. */
+  /** Start one durable step now, in the background. A commit's own work is not held back by an earlier failure's backoff. */
   run(step: keyof RoomCore["steps"]): void {
     this.kick(`step:${step}`, () => this.steps[step]());
   }
 
   /**
-   * Run every durable step once, in order. A step that fails is retried at the next alarm, on its backoff.
-   * A failure that is not an `ArtroomError` is logged under the step's name (requests d268d249, 3da1d82b);
-   * a step that already logged its own failure throws an `ArtroomError`.
+   * Run every durable step once, in order. Loop work whose backoff has not
+   * ended is skipped, while every other due step still runs; afterwards each
+   * kind's backoff is set or cleared (`loopSettled`). A failure that is not
+   * an `ArtroomError` is logged under the step's name (requests d268d249,
+   * 3da1d82b); a step that already logged its own failure throws an
+   * `ArtroomError`.
    */
   async runAll(): Promise<void> {
-    for (const step of Object.keys(this.steps) as (keyof RoomCore["steps"])[])
-      await this.steps[step]().catch((e: unknown) => {
+    const backoff = this.loopBackoff();
+    const now = this.now();
+    const attempted = new Set<LoopKind>();
+    const failed = new Set<LoopKind>();
+    const due: LoopDue = (kind) => {
+      const ok = this.loopAllowed(kind) && (backoff[kind]?.next ?? 0) <= now;
+      if (ok) attempted.add(kind);
+      return ok;
+    };
+    for (const step of Object.keys(this.steps) as (keyof RoomCore["steps"])[]) {
+      const before = new Set(attempted);
+      this.landingReached = false;
+      await this.steps[step](due).catch((e: unknown) => {
         if (!isArtroomError(e)) this.diagnose("step-failed", step, e);
+        // The landing engine times its own retries: only a failure before it ran backs the step off.
+        for (const k of attempted) if (!before.has(k) && !(k === "landing" && this.landingReached)) failed.add(k);
       });
+    }
+    this.loopSettled(attempted, failed);
   }
+
+  /** Set once `resumeLanding` has passed its checks and reached the engine, for `runAll`. */
+  private landingReached = false;
 
   /** Evaluations asked for (after a check, a recomputation), then the engine's own work (R-PUB-7 first). */
   async resumeLanding(): Promise<void> {
     if (!this.founded) return;
-    // Nothing can land in a repository that is gone; its operations and owed revocations are kept (request 3da1d82b).
-    if (this.canonicalGone()) return;
-    // R-PUB-10: canonical write tokens are minted, and main is pushed, only for the bound room.
-    if (!(await this.isBound())) return;
+    // R-PUB-10: canonical write tokens are minted, and main is pushed, only for the bound room. Not bound, or the
+    // registry not answering, is a failure: the step backs off instead of running again at once (request 3da1d82b).
+    if (!(await this.isBound())) throw artroomError("forbidden", "The registry does not bind this repository to this room; nothing lands.");
     await this.canonicalRemoteReady();
+    this.landingReached = true;
     // An abort attempt is carried out at once, even while a push is in flight (R-REV-5): not behind the engine's queue.
     await this.landing.enforceAbort();
     for (const r of this.sql.all("SELECT op FROM land_reeval ORDER BY rowid")) {
@@ -1756,40 +1795,70 @@ export class RoomCore {
   }
 
   /**
-   * Is there work that only the 5-second loop retries? While the canonical
-   * repository is gone, work that needs it (pins, previews, provisioning,
-   * evaluations for landing) is not counted: it cannot succeed, and is kept
-   * for when the repository is back (request 3da1d82b).
+   * May this kind of loop work run at all? Work that needs the canonical
+   * repository (pins, previews, provisioning, landing and its evaluations)
+   * waits, kept, while it is gone: it cannot succeed (request 3da1d82b).
    */
-  loopPending(): boolean {
-    const gone = this.canonicalGone() !== null;
-    let ws = false;
+  readonly loopAllowed: LoopDue = (kind) => !(NEEDS_REPOSITORY.has(kind) && this.canonicalGone() !== null);
+
+  /** Each kind of loop work's backoff: failures in a row, and when it may run again (room clock). */
+  loopBackoff(): Partial<Record<LoopKind, { readonly attempts: number; readonly next: number }>> {
+    const v = getMeta(this.sql, "loop_backoff");
+    let parsed: unknown = null;
     try {
-      ws = this.founded && !!one(this.sql, "SELECT 1 AS x FROM ws_leases w JOIN artroom_ws a ON a.lane = w.lane AND a.lease = w.lease_gen WHERE w.state = 'open' AND a.state = 'pending'");
+      parsed = v === null ? null : JSON.parse(v);
     } catch {
-      ws = false;
+      parsed = null;
     }
-    return (
-      this.endedWorkspaces().length > 0 ||
-      !!one(this.sql, "SELECT 1 AS x FROM generations WHERE recompute IS NOT NULL") ||
-      (!gone &&
-        (!!one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0") ||
-          !!one(this.sql, "SELECT 1 AS x FROM previews WHERE state = 'pending'") ||
-          ws ||
-          !!one(this.sql, "SELECT 1 AS x FROM land_reeval")))
-    );
+    // A single count, from before backoff was kept for each kind, is dropped: every kind is due.
+    return parsed !== null && typeof parsed === "object" ? (parsed as Partial<Record<LoopKind, { attempts: number; next: number }>>) : {};
+  }
+
+  /** The kinds of loop work that are pending now. Landing's own work is timed by the engine (`nextAlarm`). */
+  loopPendingKinds(): Set<LoopKind> {
+    const kinds = new Set<LoopKind>();
+    if (this.endedWorkspaces().length > 0) kinds.add("tokens");
+    if (one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0")) kinds.add("pins");
+    if (one(this.sql, "SELECT 1 AS x FROM previews WHERE state = 'pending'")) kinds.add("previews");
+    if (one(this.sql, "SELECT 1 AS x FROM generations WHERE recompute IS NOT NULL")) kinds.add("recompute");
+    if (one(this.sql, "SELECT 1 AS x FROM land_reeval")) kinds.add("landing");
+    try {
+      if (this.founded && one(this.sql, "SELECT 1 AS x FROM ws_leases w JOIN artroom_ws a ON a.lane = w.lane AND a.lease = w.lease_gen WHERE w.state = 'open' AND a.state = 'pending'"))
+        kinds.add("provision");
+    } catch {
+      // lane B's tables are made with its first use
+    }
+    return kinds;
   }
 
   /**
-   * After an alarm's work: the 5-second loop backs off while its work stays
-   * pending. Each alarm that leaves it pending doubles the wait, up to the
-   * cap (budgets.ts `ALARM`); one that leaves none resets it. Writes nothing
-   * while the loop is idle and was not backing off.
+   * After an alarm's work: each kind it ran that failed, or left its work
+   * pending, waits 5 s, doubling to the cap (budgets.ts `ALARM`); a kind that
+   * succeeded, or has nothing left, is cleared. Writes nothing when no
+   * backoff changes.
    */
-  loopSettled(): void {
-    const attempts = Number(getMeta(this.sql, "loop_backoff") ?? "0");
-    if (this.loopPending()) setMeta(this.sql, "loop_backoff", String(attempts + 1));
-    else if (attempts > 0) this.sql.all("DELETE FROM meta WHERE k = 'loop_backoff'");
+  loopSettled(attempted: ReadonlySet<LoopKind>, failed: ReadonlySet<LoopKind>): void {
+    const backoff = { ...this.loopBackoff() };
+    const pending = this.loopPendingKinds();
+    const now = this.now();
+    // A stored value with no kinds in it (the single count kept before) is removed.
+    let changed = getMeta(this.sql, "loop_backoff") !== null && Object.keys(backoff).length === 0;
+    for (const kind of LOOP_KINDS) {
+      const stalled = attempted.has(kind) && (failed.has(kind) || pending.has(kind));
+      if (stalled) {
+        const attempts = (backoff[kind]?.attempts ?? 0) + 1;
+        backoff[kind] = { attempts, next: now + Math.min(ALARM.pendingIntervalMs * 2 ** (attempts - 1), ALARM.retryBackoffMaxMs) };
+        changed = true;
+      } else if (backoff[kind] && (attempted.has(kind) || (kind !== "landing" && !pending.has(kind)))) {
+        // Run and succeeded, or its work was done meanwhile (a commit's own run). Landing's due time is the engine's,
+        // so its backoff ends only when it runs.
+        delete backoff[kind];
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    if (Object.keys(backoff).length === 0) this.sql.all("DELETE FROM meta WHERE k = 'loop_backoff'");
+    else setMeta(this.sql, "loop_backoff", JSON.stringify(backoff));
   }
 
   /** When the alarm should next run, or null. */
@@ -1802,8 +1871,10 @@ export class RoomCore {
     const notify = this.nextNotifyMs();
     if (notify !== null) times.push(notify);
     // The landing engine needs the canonical repository: while it is gone, its work is kept, not scheduled.
+    // After a failure before the engine ran (the registry, say), not before the step's backoff ends.
+    const backoff = this.loopBackoff();
     const landing = gone ? null : this.landing.nextDue();
-    if (landing !== null) times.push(landing);
+    if (landing !== null) times.push(Math.max(landing, backoff.landing?.next ?? landing));
     // Lane B's workspace duties: cleanup owed, and checks on unanswered remote steps, on their capped backoff.
     let ws: Workspaces | null = null;
     try {
@@ -1827,11 +1898,8 @@ export class RoomCore {
     // Ended job tokens whose revocation Artifacts has not confirmed yet.
     const revoke = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM job_tokens"), "t");
     if (revoke !== null) times.push(revoke);
-    // The 5-second loop, while it makes progress; backing off while its work stays pending (budgets.ts `ALARM`).
-    if (this.loopPending()) {
-      const attempts = Number(getMeta(this.sql, "loop_backoff") ?? "0");
-      times.push(now + Math.min(ALARM.pendingIntervalMs * 2 ** attempts, ALARM.retryBackoffMaxMs));
-    }
+    // The 5-second loop, while its work makes progress; each kind on its own backoff after a failure (budgets.ts `ALARM`).
+    for (const kind of this.loopPendingKinds()) if (this.loopAllowed(kind)) times.push(backoff[kind]?.next ?? now + ALARM.pendingIntervalMs);
     // Log publication: when due, never sooner than the loop's interval from now.
     const publication = this.publicationDueAt();
     if (publication !== null) times.push(Math.max(publication, now + ALARM.pendingIntervalMs));

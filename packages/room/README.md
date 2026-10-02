@@ -1870,7 +1870,7 @@ alarmed every 5.0 seconds, all `ok`, with no fetch or RPC events.
 | An idle room writes no rows | `publicationDueAt` counts only entries that are not `checkpoint` events; an idle room asks for no alarm | "after the last act's publication settles, a founded idle room writes no rows and stores no alarm over 24 simulated hours of alarm ticks" (also 120 forced `alarm()` runs: 0 rows, 0 alarms stored) |
 | A checkpoint-only suffix is never due; a real act after it is published promptly | The same; a due publication is asked for 5 s from now at the soonest | "a checkpoint-only unpublished suffix is never due; a real act after it is due a minute later and is published, and then the room is idle again" |
 | A failing publication backs off, capped, never every 5 s | `publication_retry` in `meta`: 5 s, doubling to 5 minutes (`ALARM` in [src/budgets.ts](src/budgets.ts)); the alarm does not publish inside it. A refusal by the registry (R-PUB-10) backs off the same way | "a failing publication backs off from 5 s, doubling, to a 5-minute cap …": waits of 5, 10, 20, 40, 80, 160, 300, 300 s; 17 runs in the first hour (the first try and its retries), 12 in each later hour; about one row each. "a publication the registry does not allow (R-PUB-10) backs off the same way" |
-| A failing step backs off, capped | The 5-second loop (pins, previews, provisioning, evaluations, recomputation, ended workspaces) doubles its wait each time an alarm leaves its work pending (`loop_backoff`), up to 5 minutes, and resets when none is left | "a failing step on the 5-second loop (a pin) backs off to the cap, and the backoff resets once it succeeds" |
+| A failing step backs off, capped | Each kind of loop work (ended workspaces' tokens, pins, previews, workspace setup, recomputation, and landing with its evaluations) has its own durable backoff in `loop_backoff`: an alarm that ran it and left it failed or pending sets the next try 5 s later, doubling to 5 minutes; one that ran it cleanly clears it. See "Review 5b7aa2ba" below | "a failing step on the 5-second loop (a pin) backs off to the cap, and the backoff resets once it succeeds" |
 | A room whose canonical repository is gone stops, with one admin item, keeping unknown effects and owed cleanup | A publication that fails with `NOT_FOUND` asks Artifacts for the canonical repository itself. If that is `NOT_FOUND` too, `canonical_gone` is stored and admins get one `log-publication-stalled` item with the new reason `repository-gone`. While it is set, publication is due only after a later entry, landing is neither scheduled nor run, and the loop does not count work that needs the repository. Nothing is deleted or settled: the pending cohort, the landing engine's owed revocations and pending pins stay. Lane B's fork, snapshot and job-token duties keep their own capped backoff. A confirmed publication clears it, and the item closes | "stops rescheduling work that cannot succeed …" (the alarm stops within 10 minutes; then 2 hours with no alarm and 0 rows); "a later act tries once more …"; "if the repository comes back …" |
 
 `ALARM` is enforced as written in `src/budgets.ts` (copied unchanged from
@@ -1907,8 +1907,41 @@ logged twice. While the repository is gone, the alarm's pin and preview
 steps do not run, so a stray alarm neither fails nor logs. Each retry logs
 at most one line, so the logs back off with the retries.
 
-**Mutations**, made one at a time on this change; 21 of 21 turned a test
-red (M18 to M21 after the merge):
+**Review 5b7aa2ba (checker, changes requested at `12227d41`).** Two P2s,
+both fixed; the checker's two controls pass.
+
+1. *A registry lookup outside the failure handler.* `publish` awaited
+   `isBound` before its handler, so a registry that threw recorded no
+   backoff, and the alarm came back every 5 seconds. Every await on the
+   publication path, the lookup included, is now inside the one handler,
+   which records the backoff for any failure. A room the registry does not
+   bind still fails closed: nothing is pushed, a forced publication still
+   answers `forbidden`, and that answer is not logged as a failure; a
+   lookup that throws is logged. The parallel place was the landing step:
+   `resumeLanding` returned quietly when the room was not bound, and a
+   throwing lookup or canonical-remote read left the engine's accepted
+   operation due at once. Both now fail the step, which backs off; the
+   engine's own failures stay on the engine's own backoff (`landingReached`).
+2. *Loop work retried before its backoff.* The backoff was one count,
+   applied only to the next alarm time, so an alarm due for other work ran
+   every step. Each kind of loop work now has a durable due time, checked
+   when the alarm runs (`runAll`): a kind whose backoff has not ended is
+   skipped, and every other due step still runs. The next alarm is the
+   earliest due time of all work, each kind's included. A commit's own run
+   of a step (`run`) is not held back by an earlier failure's backoff.
+   While the repository is gone, workspace setup waits too.
+
+| Test | What it pins |
+|---|---|
+| "publication on a cold instance whose registry throws …" and "… answers not bound …" | An evicted instance (no cached binding): waits of 5, 10, 20, 40, 80 s; no push; nothing published; one backoff per run; logged only for the throw; published once the registry answers |
+| "landing on a cold instance whose registry throws …" and "… answers not bound …" | An accepted operation due at once: no alarm closer than 5 s, at most 8 landing tries in 10 minutes, main unmoved, no push; lands once the registry answers |
+| "a failed pin keeps its backoff when a lease expiry fires the alarm 1 s later …" | The checker's case: `pinRef` not called again, the lease expires, the pin's due time unchanged, and the next alarm is the pin's; at that time the pin is tried |
+| "… when a notification retry fires the alarm first", "… when a check job's deadline fires the alarm first" | The notification is tried again and the job sent again; the pin is not |
+| "workspace setup waits, kept, while the canonical repository is gone" | No fork is asked for; only the lease's expiry is scheduled |
+
+**Mutations**, made one at a time on the code at the head that adds this
+review's fixes; 31 of 31 turned a test red. They were run against this
+request's tests and `phase2b.test.ts` (for the engine's own failures):
 
 | Mutant | Red |
 |---|---|
@@ -1920,19 +1953,29 @@ red (M18 to M21 after the merge):
 | a gone repository does not stop publication | gone: stops; gone: a later act |
 | landing is scheduled while gone | all three gone tests |
 | landing runs while gone | gone: stops |
-| the loop counts the repository's work while gone | gone: stops; gone: a later act |
-| the loop backoff does not double | pin step |
-| the loop backoff is never recorded | pin step |
+| the loop schedules the repository's work while gone | all three gone tests; gone: workspace setup |
+| the loop backoff does not double | pin step; both cold landing tests |
+| the loop backoff is never recorded | pin step; both cold landing tests; the three earlier-alarm cases |
 | the loop backoff is never reset | pin step |
 | the `repository-gone` item never closes | gone: comes back |
 | a due publication is asked for at once | checkpoint suffix |
-| a registry refusal records no backoff | registry refusal |
 | an item for every gone failure | gone: a later act |
 | a confirmed publication does not clear gone | gone: comes back |
 | alarm step failures are not logged | pin step |
 | the gone probe is not logged | gone: stops |
 | pins run while gone | gone: stops |
 | previews run while gone | gone: stops |
+| workspace setup runs while gone | gone: workspace setup |
+| the registry lookup is outside the publication handler | registry refusal; both cold publication and both cold landing tests |
+| a not-bound publication returns without a backoff | registry refusal; cold publication and cold landing, not bound |
+| a not-bound answer is logged as a failure | cold publication, not bound |
+| the landing step returns quietly when not bound | cold landing, not bound |
+| a landing failure before the engine is not counted | both cold landing tests |
+| the engine's own failures back the landing step off | `phase2b.test.ts`: the instance stops while the push is in flight |
+| the alarm runs loop work inside its backoff | lease expiry, notification and job deadline cases; cold landing, throws |
+| the next alarm ignores a kind's backoff | pin step; lease expiry and job deadline cases |
+| the next alarm ignores the landing backoff | both cold landing tests |
+| the landing backoff is cleared when it did not run | both cold landing tests |
 
 ## Request d268d249: diagnosable pre-admission failures
 

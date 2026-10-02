@@ -13,12 +13,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
-import type { AttentionItem, Claim, Landing, LogEntry, Note, Sha, WorkspaceOp } from "@generalbusiness/artroom-contract";
+import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
+import type { AttentionItem, CheckerConfig, Claim, Landing, LogEntry, Note, Sha, WorkspaceOp } from "@generalbusiness/artroom-contract";
+import { policy, requireCheck, rule } from "@generalbusiness/artroom-policy/helpers";
 import { forkName } from "@generalbusiness/artroom-git";
 import type { Room } from "../../src/index.ts";
 import { ALARM } from "../../src/budgets.ts";
-import { advance, call, clock, expectOk, failure, hour, makeRoom, pushChange, tick, type TestRoom } from "./support.ts";
+import { advance, call, clock, expectOk, failure, hour, iso, makeRoom, openedWorkspace, pushChange, tick, type TestRoom } from "./support.ts";
 
 const minute = 60_000;
 type Stub = DurableObjectStub<Room>;
@@ -378,5 +379,185 @@ describe("request 3da1d82b: a room whose canonical repository is gone", () => {
     expect(await inDO(room, (r) => r.core.canonicalGone())).toBeNull();
     // The owed revocation is due again (lane B's own backoff), so the alarm is set.
     expect(await inDO(room, (r) => r.core.nextAlarm())).not.toBeNull();
+  });
+});
+
+describe("request 3da1d82b, checker controls (review of 12227d41): every failure before the work backs off, and each step keeps its own backoff", () => {
+  type Answer = "throws" | "false";
+  /**
+   * A cold instance (evicted, so `isBound` has no cached answer) whose
+   * registry lookup throws (an outage) or answers that the repository is not
+   * bound to this room. The lookup itself is replaced, on this object only.
+   */
+  async function coldRegistry(room: TestRoom, answer: Answer): Promise<void> {
+    await evictDurableObject(room.stub);
+    await inDO(room, (r) => {
+      expect((r.core as unknown as { boundCache: boolean }).boundCache).toBe(false);
+      const core = r.core as { bound: (repo: string, id: string, name: string) => Promise<boolean>; realBound?: unknown };
+      core.realBound = core.bound;
+      core.bound = async () => {
+        if (answer === "throws") throw new Error("registry unavailable");
+        return false;
+      };
+    });
+  }
+  const registryBack = (room: TestRoom) =>
+    inDO(room, (r) => {
+      const core = r.core as { bound: unknown; realBound?: unknown };
+      core.bound = core.realBound;
+    });
+
+  for (const answer of ["throws", "false"] as const) {
+    it(`publication on a cold instance whose registry ${answer === "throws" ? "throws" : "answers not bound"}: fails closed, backs off 5, 10, 20, 40, 80 s, ${answer === "throws" ? "and is logged" : "and is not logged"}`, async () => {
+      const room = await makeRoom();
+      const claim = await room.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+      await room.admin.ok("release", { lane: claim.lane }, { lease: 1 });
+      await coldRegistry(room, answer);
+      const pushes = room.world.log.pushes;
+      const start = clock.now;
+      const ran = await alarmsUntil(room, start + 10 * minute);
+      const gaps = ran.slice(1).map((t, i) => t - ran[i]!);
+      expect(gaps.slice(0, 5)).toEqual([5_000, 10_000, 20_000, 40_000, 80_000]);
+      // Fail-closed: nothing was pushed, nothing is published.
+      expect(room.world.log.pushes).toBe(pushes);
+      expect(room.world.log.ref).toBeNull();
+      expect((await room.admin.read({ q: "log" })).publishedThrough).toBe(-1);
+      expect(await inDO(room, (r) => JSON.parse(r.core.sql.all("SELECT v FROM meta WHERE k = 'publication_retry'")[0]!["v"] as string).attempts)).toBe(ran.length);
+      const logged = room.world.diagnoses.filter((d) => d.event === "publication-failed" && d.step === "publish");
+      if (answer === "throws") expect(logged.map((d) => d.message)).toEqual(ran.map(() => "registry unavailable"));
+      else expect(logged).toEqual([]);
+      // A forced publication says why, as before.
+      expect((await failure(room.stub.publishLog())).code).toBe(answer === "throws" ? "unavailable" : "forbidden");
+      // The registry answers again: the next retry publishes.
+      await registryBack(room);
+      await alarmsUntil(room, clock.now + 10 * minute);
+      expect((await room.admin.read({ q: "log" })).publishedThrough).toBeGreaterThanOrEqual(2);
+    });
+
+    it(`landing on a cold instance whose registry ${answer === "throws" ? "throws" : "answers not bound"}: fails closed and backs off, instead of asking for the alarm at once`, async () => {
+      const room = await makeRoom();
+      const claim = await room.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+      const head = pushChange(room, claim.lane, { "src/app.ts": "v2" });
+      await room.admin.ok("propose", { lane: claim.lane }, { lease: 1, expectedGeneration: 0, head, summary: "v2" });
+      await coldRegistry(room, answer);
+      const l = await room.admin.ok<Landing>("land", { lane: claim.lane, generation: 1 }, { lease: 1, head });
+      // The engine has an accepted operation: it is due at once, every time it is asked.
+      expect(await inDO(room, (r) => r.core.landing.nextDue())).toBe(clock.now);
+      const main = room.world.artifacts.main;
+      const start = clock.now;
+      const ran = await alarmsUntil(room, start + 10 * minute);
+      const gaps = ran.slice(1).map((t, i) => t - ran[i]!);
+      expect(Math.min(...gaps)).toBeGreaterThanOrEqual(ALARM.pendingIntervalMs);
+      // The landing and the publication each back off on their own: at most 7 tries each in 10 minutes.
+      expect(ran.length).toBeLessThanOrEqual(16);
+      // Fail-closed: main did not move, nothing was pushed to it.
+      expect(room.world.artifacts.main).toBe(main);
+      expect(room.world.artifacts.remoteCalls.get("push") ?? 0).toBe(0);
+      const logged = room.world.diagnoses.filter((d) => d.event === "step-failed" && d.step === "landing");
+      if (answer === "throws") {
+        expect(logged.length).toBeGreaterThan(0);
+        expect(logged.length).toBeLessThanOrEqual(8);
+        expect(logged.every((d) => d.message === "registry unavailable")).toBe(true);
+      } else expect(logged).toEqual([]);
+      // The registry answers again: the operation lands.
+      await registryBack(room);
+      await alarmsUntil(room, clock.now + 10 * minute);
+      expect(((await room.admin.read({ q: "op", op: l.op.id as never })) as { state: string }).state).toBe("landed");
+    });
+  }
+
+  it("a failed pin keeps its backoff when a lease expiry fires the alarm 1 s later: pinRef is not retried, the lease expires, and the next alarm is the pin's", async () => {
+    const room = await makeRoom();
+    const claim = await room.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    const other = await room.admin.ok<Claim>("claim", null, { goal: "other", scope: ["docs/**"] });
+    const head = pushChange(room, claim.lane, { "src/app.ts": "v2" });
+    room.world.artifacts.failRemote("pinRef", ...Array.from({ length: 200 }, () => new Error("pin outage")));
+    await room.admin.ok("propose", { lane: claim.lane }, { lease: 1, expectedGeneration: 0, head, summary: "v2" });
+    await tick(room);
+    const pinCalls = room.world.artifacts.remoteCalls.get("pinRef") ?? 0;
+    const pinDue = await inDO(room, (r) => r.core.loopBackoff().pins!.next);
+    expect(pinDue).toBe(clock.now + ALARM.pendingIntervalMs);
+    // Another lane's lease runs out 1 s from now, before the pin's backoff ends.
+    await inDO(room, (r) => r.core.sql.all("UPDATE lanes SET expires_ms = ? WHERE id = ?", clock.now + 1_000, other.lane));
+    expect(await inDO(room, (r) => r.core.nextAlarm())).toBe(clock.now + 1_000);
+    advance(1_000);
+    expect(await runDurableObjectAlarm(stubOf(room))).toBe(true);
+    expect(room.world.artifacts.remoteCalls.get("pinRef") ?? 0).toBe(pinCalls);
+    expect((await entries(room)).filter((e) => kindOf(e) === "lease-expired")).toHaveLength(1);
+    // The backoff is unchanged, and the next alarm is the earliest due work: the pin's.
+    expect(await inDO(room, (r) => ({ next: r.core.loopBackoff().pins!.next, alarm: r.core.nextAlarm() }))).toEqual({ next: pinDue, alarm: pinDue });
+    clock.now = pinDue;
+    expect(await runDurableObjectAlarm(stubOf(room))).toBe(true);
+    expect(room.world.artifacts.remoteCalls.get("pinRef") ?? 0).toBeGreaterThan(pinCalls);
+  });
+
+  it("workspace setup waits, kept, while the canonical repository is gone", async () => {
+    const room = await makeRoom();
+    const claim = await room.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    await openedWorkspace(room, claim.lane);
+    await inDO(room, (r) => r.core.sql.all("INSERT INTO meta (k, v) VALUES ('canonical_gone', ?)", JSON.stringify({ since: iso(clock.now), head: r.core.headSeq() })));
+    const forks = room.world.artifacts.remoteCalls.get("fork") ?? 0;
+    // Only the lease's expiry is scheduled, not the 5-second loop for the setup.
+    expect(await inDO(room, (r) => ({ pending: [...r.core.loopPendingKinds()], alarm: r.core.nextAlarm() }))).toEqual({
+      pending: ["provision"],
+      alarm: (await inDO(room, (r) => r.core.sql.all("SELECT expires_ms FROM lanes WHERE id = ?", claim.lane)[0]!["expires_ms"])) as number,
+    });
+    await inDO(room, (r) => r.alarm());
+    expect(room.world.artifacts.remoteCalls.get("fork") ?? 0).toBe(forks);
+    expect(await inDO(room, (r) => r.core.workspaces.view(claim.lane)?.state)).toBe("pending");
+  });
+
+  /**
+   * A failed pin on its backoff, and other work due 1 s later that fires the
+   * alarm first. The other work runs; the pin is not retried; the next alarm is
+   * the earliest due work, the pin's included.
+   */
+  async function earlierAlarm(other: "notification" | "job") {
+    const R = `sha256:${"0".repeat(64)}` as const;
+    const cfg: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: R };
+    const room =
+      other === "notification"
+        ? await makeRoom({ policy: policy(rule({ id: "tell-admins", kind: "notify", on: ["propose"], to: ["role:admin"], why: "A proposal." })) })
+        : await makeRoom({ policy: policy(requireCheck("unit", { paths: "src/**", by: "role:checker", id: "unit-tests" })), files: { ".artroom/checkers/unit.json": JSON.stringify(cfg), "package.json": "{}" } });
+    // The checker service does not answer: the job is owed again, due at its retry time.
+    let jobsSent = 0;
+    room.world.checkers["unit"] = {
+      handle: async () => {
+        jobsSent++;
+        throw new Error("checker service unavailable");
+      },
+    };
+    room.world.policy.failures.notify = 1_000;
+    const claim = await room.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    const head = pushChange(room, claim.lane, { "src/app.ts": "v2" });
+    room.world.artifacts.failRemote("pinRef", ...Array.from({ length: 200 }, () => new Error("pin outage")));
+    await room.admin.ok("propose", { lane: claim.lane }, { lease: 1, expectedGeneration: 0, head, summary: "v2" });
+    await tick(room);
+    const pinCalls = room.world.artifacts.remoteCalls.get("pinRef") ?? 0;
+    const pinDue = await inDO(room, (r) => r.core.loopBackoff().pins!.next);
+    expect(pinDue).toBeGreaterThan(clock.now + 1_000);
+    const table = other === "notification" ? "notify_queue" : "check_jobs";
+    const owed = other === "notification" ? "1 = 1" : "state = 'owed'";
+    expect((await inDO(room, (r) => r.core.sql.all(`SELECT next_ms FROM ${table} WHERE ${owed}`))).length).toBe(1);
+    await inDO(room, (r) => r.core.sql.all(`UPDATE ${table} SET next_ms = ? WHERE ${owed}`, clock.now + 1_000));
+    const before = { notify: room.world.policy.calls.notify, jobs: jobsSent };
+    expect(await inDO(room, (r) => r.core.nextAlarm())).toBe(clock.now + 1_000);
+    advance(1_000);
+    expect(await runDurableObjectAlarm(stubOf(room))).toBe(true);
+    // The pin waited; the other work ran.
+    expect(room.world.artifacts.remoteCalls.get("pinRef") ?? 0).toBe(pinCalls);
+    if (other === "notification") expect(room.world.policy.calls.notify).toBeGreaterThan(before.notify);
+    else expect(jobsSent).toBeGreaterThan(before.jobs);
+    const after = await inDO(room, (r) => ({ pin: r.core.loopBackoff().pins!.next, alarm: r.core.nextAlarm() }));
+    expect(after.pin).toBe(pinDue);
+    expect(after.alarm).toBeLessThanOrEqual(pinDue);
+  }
+
+  it("a failed pin keeps its backoff when a notification retry fires the alarm first", async () => {
+    await earlierAlarm("notification");
+  });
+
+  it("a failed pin keeps its backoff when a check job's deadline fires the alarm first", async () => {
+    await earlierAlarm("job");
   });
 });
