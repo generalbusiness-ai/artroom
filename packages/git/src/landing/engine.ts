@@ -81,7 +81,12 @@ export interface LandingOptions {
   readonly now?: () => number;
   /** Tests only: throw here to stop the driver as a crash would. */
   readonly fault?: (point: FaultPoint, op: OpId) => void;
+  /** How long to wait for Artifacts to answer one revocation of an ended operation's token. Default `REVOKE_TIMEOUT_MS`. */
+  readonly revokeTimeoutMs?: number;
 }
+
+/** An ended operation's token revocation that has not answered by then counts as failed, and is retried with backoff. */
+export const REVOKE_TIMEOUT_MS = 30_000;
 
 /** Thrown by a driver step after `kill()`: this engine instance is gone. */
 export class EngineStopped extends Error {
@@ -100,6 +105,9 @@ export class Landing {
   private readonly fault: (point: FaultPoint, op: OpId) => void;
   private readonly now: () => number;
   private chain: Promise<unknown> = Promise.resolve();
+  /** The cleanup pass in progress, if any. Never on `chain`. */
+  private cleaning: Promise<void> | null = null;
+  private readonly revokeTimeoutMs: number;
   private readonly preparing = new Set<OpId>();
   private stopped = false;
 
@@ -110,6 +118,7 @@ export class Landing {
     this.publisher = opts.publisher;
     this.tokens = opts.tokens;
     this.fault = opts.fault ?? (() => {});
+    this.revokeTimeoutMs = opts.revokeTimeoutMs ?? REVOKE_TIMEOUT_MS;
   }
 
   /** Stop this instance, as an eviction or crash would. Later steps throw. */
@@ -333,22 +342,59 @@ export class Landing {
   }
 
   /**
-   * Revoke the known tokens of ended operations whose revocation failed
-   * (R-PUB-3). Each by its own recorded ID: never a sweep of the canonical
-   * repository's tokens. The answer changes no outcome and no receipt.
+   * Start a pass over the due revocations of ended operations' tokens
+   * (R-PUB-3), unless one is still running. The pass is not on the
+   * publication queue, so an unanswered revocation never holds up a push,
+   * a preparation or the slot.
+   */
+  private startCleanup(): void {
+    if (this.cleaning) return;
+    this.cleaning = this.revokeEnded()
+      .catch(() => undefined) // a stopped instance, or a step to retry: the records still owe it
+      .finally(() => {
+        this.cleaning = null;
+      });
+  }
+
+  /** Resolves when the cleanup pass in progress, if any, has ended. For tests, and for `settle`. */
+  async cleanupDone(): Promise<void> {
+    await this.cleaning;
+  }
+
+  /**
+   * One bounded pass: each due token, by its own recorded ID, never a sweep of
+   * the canonical repository's tokens. An answer that does not arrive in time
+   * counts as a failure; a late answer is dropped, and the token stays owed
+   * until a later attempt is answered. No answer changes an outcome or a
+   * receipt.
    */
   private async revokeEnded(): Promise<void> {
     for (const t of this.core.cleanupDue()) {
+      this.alive();
+      let answered: boolean;
       try {
-        await this.tokens.revoke(t.tokenId);
-        this.alive();
-        this.core.tokenRevoked(t.op, t.n);
-      } catch (e) {
-        if (e instanceof EngineStopped) throw e;
-        this.alive();
-        this.core.cleanupFailed(t.op, t.n);
+        answered = await this.revokeWithin(t.tokenId);
+      } catch {
+        answered = false;
       }
+      this.alive();
+      if (answered) this.core.tokenRevoked(t.op, t.n);
+      else this.core.cleanupFailed(t.op, t.n);
     }
+  }
+
+  /** True if Artifacts answered the revocation within the timeout. Throws if it refused it. */
+  private revokeWithin(tokenId: string): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), this.revokeTimeoutMs);
+      (timer as { unref?: () => void }).unref?.();
+    });
+    const answer = this.tokens.revoke(tokenId).then(() => true);
+    answer.catch(() => undefined); // a late refusal is dropped
+    return Promise.race([answer, late]).finally(() => {
+      if (timer !== undefined) clearTimeout(timer);
+    });
   }
 
   private async readBackAndApply(id: OpId, mode: "after-push" | "probe"): Promise<void> {
@@ -370,7 +416,8 @@ export class Landing {
    * 1. a held slot: revoke tokens a previous instance left live, read main
    *    back, then complete forward;
    * 2. reserve the next ready operation and publish it;
-   * 3. revoke the due tokens of operations that have ended;
+   * 3. start a pass revoking the due tokens of operations that have ended,
+   *    which runs on its own and is not awaited here;
    * 4. start every preparation that is due.
    * Each call does a bounded amount of work; set the alarm to `nextDue()`.
    */
@@ -394,7 +441,7 @@ export class Landing {
         const r = this.core.reserveNext();
         if (r?.kind === "reserved") await this.publishStep();
       }
-      await this.revokeEnded();
+      this.startCleanup();
       const due = this.core.active().filter((o) => o.state === "accepted" || (o.state === "preparing" && o.integration === undefined));
       await Promise.all(due.map((o) => this.prepare(o.id)));
       // A built integration whose readiness answer was lost (a crash, a failed evaluation).
@@ -412,6 +459,7 @@ export class Landing {
     for (let i = 0; i < rounds; i++) {
       const before = this.fingerprint();
       await this.reconcile();
+      await this.cleanupDone();
       if (this.fingerprint() === before) return;
     }
   }
