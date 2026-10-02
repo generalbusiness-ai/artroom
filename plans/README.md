@@ -296,16 +296,16 @@ await mints.idle();        // tests: the revocation pass and late answers have e
 - The answer is classified once, as the note says. Usable: a token ID and text, the scope asked, a readable expiry no later than the answer's arrival plus the lifetime asked and no later than `notAfter`, for a caller still waiting. Usable answers become `held` and are returned. A token ID otherwise becomes `owed`, due at once, with its reported expiry or none. A refusal that changed nothing deletes the record. Anything else is `unknown`. Only the `retriable()` classes are retried, up to 5 attempts from 0.5 s, and each attempt is a new record, sent only after the previous one holds its outcome. A caller waits at most 30 s. After that the record is `unknown`, and the answer, whenever it comes, is applied to its own record with no caller. If recording an answer fails, the record keeps its state, the ID is revoked at once, and the record is deleted only when that revocation is answered.
 - `release()` revokes by ID, waiting at most 30 s. An answer deletes the record. A refusal, a timeout or a completion that does not commit makes it `owed`, due in 1 s. `claim()` is synchronous: it deletes the `held` record inside the owner's transaction, and throws if the ledger no longer holds it.
 - Takeover: the constructor turns every `sent` record into `unknown` and every `held` record into `owed`, due at once, in one indexed update. So a Room builds one ledger per object start.
-- `reconcile()`: with records in flight, the takeover time moves 60 s ahead when less than 30 s away; with none, it is cleared. Then a revocation pass starts, unless one is running, and is not awaited. Then at most one observation runs, if one is due, and is awaited (at most 30 s).
-- Revocation pass: at most 20 owed records with `due <= now`, ordered by due time, then row ID. Records whose readable expiry has passed are settled first, with no revocation call, in their own transaction, before the repository is looked up. Each other record is revoked by its ID, waiting at most 30 s; the repository is looked up when the first one needs it, within the wait, and a failed lookup is a failure for every record left. Those results are written in one transaction at the end of the pass: at most 20 record writes and one summary write. If that transaction fails, every record in the batch takes its backoff, as a failure. Backoff: 1 s doubling to 5 min, never past a readable expiry. When the pass ends, it stores a wake-up for `nextDue()`.
-- Observation: only while a record is `unknown`. One repository lookup and one `listTokens()`, each waited on for at most 30 s; the flag is released when either fails or times out. If the listing has more than 1,000 records, or `completeInventory` refuses it, that is the result and nothing is counted. Otherwise each active, unexpired token is looked up by index and by `known()`. One summary write: the time, the result, the count, and the next due time (a wait doubling from 1 min to 6 h). A new unknown record brings it forward to no sooner than 1 min after the last one.
+- `reconcile()`: with records in flight, the takeover time moves 60 s ahead when less than 30 s away; with none, it is cleared. Then a revocation pass starts, unless one is running, and is not awaited. Then at most one observation runs, if one is due, and is awaited: its repository lookup and its listing share one deadline, 30 s (`waitMs`) from its start, so the whole observation waits at most 30 s. A revocation pass, which the alarm does not await, waits at most 30 s for its lookup and 30 s for each of up to 20 revocations.
+- Revocation pass: at most 20 owed records with `due <= now`, ordered by due time, then row ID. If any of them has a readable expiry that has passed, the pass settles only those, with no revocation call and no wait, in one transaction with one summary write, and ends; `nextDue()` then puts the next pass 1 s later, and that pass revokes the rest. Otherwise the pass looks up the repository, within the wait, and then, immediately before each revocation, checks the record's expiry again: a record whose expiry passed during the lookup or an earlier revocation is settled with no call, on the lookup's failure path too. Each other record is revoked by its ID, waiting at most 30 s, and a failed lookup is a failure for each of them. Those results are written in one transaction at the end of the pass. So every pass makes at most 20 record writes and one summary write. If that transaction fails, every record in the batch takes its backoff, as a failure. Backoff: 1 s doubling to 5 min, never past a readable expiry. When the pass ends, it stores a wake-up for `nextDue()`.
+- Observation: only while a record is `unknown`. One repository lookup and one `listTokens()`, sharing one deadline 30 s from the start: a slow lookup leaves less time for the listing, and a lookup that leaves none means no listing is started. The flag is released when either fails or the deadline passes. If the listing has more than 1,000 records, or `completeInventory` refuses it, that is the result and nothing is counted. Otherwise each active, unexpired token is looked up by index and by `known()`. One summary write: the time, the result, the count, and the next due time (a wait doubling from 1 min to 6 h). A new unknown record brings it forward to no sooner than 1 min after the last one.
 - `nextDue()`: the earliest of the owed records' minimum due time (not before the current attempt's timeout while a pass waits), the observation time (while any record is unknown; not before its timeout while one is running), and the takeover time (while any record is `sent` or `held`). Each time already passed counts as now plus 1 s. A still-future time counts as itself. So the 1 s step applies only when due <= now, and never postpones a still-future takeover or observation time (approval obligation 2). The Room's `wake` keeps an earlier unrelated alarm.
 
 ### Choices where the design left room
 
 These are for the checker to confirm or reject.
 
-1. **The pass writes its results once, at its end** (accepted in review 0ab6dac3; since revised: settlements at a passed expiry are now written first, in their own transaction, so they never wait on a lookup or a revocation. A pass may therefore make two summary writes, one for those settlements and one for its results, and the record writes stay at most 20). The note asks both that "counts change in the same transaction as each record" and that a pass makes "at most 20 record writes and one summary write". One transaction at the end of the pass meets both. The cost: a host that stops during a pass loses the answers it got. Those records stay owed and are revoked again, and a revocation that answers `false` counts as done.
+1. **The pass writes its results once, at its end** (accepted in review 0ab6dac3). Settlement at a passed expiry must not wait on a lookup (that review), and a pass makes one summary write (the note's bound, which the checker's extra controls on `19f6e389` held to). So a pass that finds expired records settles only those and ends, and the next pass, 1 s later, revokes the rest. This is the simplest way to meet both: one more pass, never a second summary write, and no record waits for a lookup to be settled at its expiry. The note asks both that "counts change in the same transaction as each record" and that a pass makes "at most 20 record writes and one summary write". One transaction at the end of the pass meets both. The cost: a host that stops during a pass loses the answers it got. Those records stay owed and are revoked again, and a revocation that answers `false` counts as done.
 2. **A token owed at once is revoked by the next pass, not inside `mint()`.** Its record holds the ID, and `mint()` stores a wake-up for now. Only the failed-handoff case, where no record holds the ID, revokes inline, as the note says.
 3. **Backoff stops at a readable expiry**, so an owed record is settled when its expiry passes, not at its next backoff time after that.
 4. **Wake-ups after a debt is recorded are best effort** (review 0ab6dac3 notes that lane B must compose `nextDue()` into the Room's next alarm and store it): on a release failure, an unusable answer, a late answer, or the end of a pass. The debt is durable, and the takeover wake-up, stored while the record was `sent` or `held`, already covers it. The wake-up before a send is required, and a failure there sends nothing.
@@ -317,7 +317,7 @@ These are for the checker to confirm or reject.
 
 ### Tests: rule map
 
-`packages/git/test/mints.test.ts`, 42 tests, named with the note's lane A numbers, and "(checker 1)" or "(checker 2)" for review 0ab6dac3's two findings. Each test is red under at least one mutant below. Without the ledger the file does not load.
+`packages/git/test/mints.test.ts`, 47 tests, named with the note's lane A numbers, "(checker 1)" or "(checker 2)" for review 0ab6dac3's two findings, "(checker 3)" for review 6a979799's two P2 findings, and "(checker 4)" for its P3. Each test is red under at least one mutant below. Without the ledger the file does not load.
 
 | Note | Rules | Tests |
 |---|---|---|
@@ -333,13 +333,15 @@ These are for the checker to confirm or reject.
 | (10) | R-MINT-5, R-MINT-7 | the scale control below; a listing over 1,000 records counts nothing; the observation doubles from 1 min to 6 h, and new unknowns every second give one inventory a minute |
 | (checker 1) | R-MINT-7 | a lookup that never answers: `mint()` sends nothing and writes no record; the observation records its result and next time; the pass backs each record off, and a later pass revokes. A lookup that answers only after the wait: backoff recorded, the pass and observation flags released (a new pass or observation starts while the old lookup is out), and the late answer starts no revocation or listing and changes no row. A held lookup never delays settlement at a passed expiry |
 | (checker 2) | R-MINT-5 | the checker's control (an accepted token's opaque text echoed in an `Authorization: Bearer` revocation error); every sink (creation, release, the pass, the pass's and the observation's lookups, the listing) with a short opaque text in the message, the name, the code and the status, stores only safe metadata, and neither the rows nor `duties()` contain the text; `errorNote` keeps only allowed names, known codes and bounded integers |
+| (checker 3) | R-MINT-4, R-MINT-7 | a readable expiry that passes while the lookup is held is settled and never revoked, whether the lookup answers or times out; a mixed due batch (two expired, two revocable records) makes one summary write a pass and settles every record within two passes, the second 1 s after the first; a record that expires while an earlier revocation in its pass waits is settled, not revoked, in that pass's one summary write |
+| (checker 4) | R-MINT-7 | an observation's lookup and listing share one deadline: a lookup that takes 200 ms of a 300 ms deadline leaves the listing 100 ms, and the observation ends by the deadline; a lookup that uses the whole deadline means no listing is started |
 | — | | the bounds are the design's (30 s, 60 s and 30 s, 1 s, 20, 1,000, both backoffs) |
 
-**The scale control (10).** The SQL double wraps `node:sqlite`. It counts the rows each statement returns, and the rows written per table (from `RETURNING` or `changes()`). It also runs `EXPLAIN QUERY PLAN` on every read, update and delete, and records any that scans `artroom_mint` rather than searching an index. Setup: 10,000 unknown records, 900 tokens known to other records, and a backlog of 100 owed records, all due, whose tokens make up the other 100 of the 1,000 listed. Then 40 alarm turns, each at `nextDue()` and each after a new unknown record. Each turn: at most one `listTokens()`; at most 20 record writes; at most one summary write each for the takeover time, the observation and the pass; at most 1,040 rows read; at most 1,000 `known()` calls. Turns that only observe write no record. The five backlog passes revoke the next 20 in due order, and after each, `nextDue()` and the stored wake-up are exactly 1 s ahead. Observations are at least 1 min apart, and each counts 0 unaccounted. No statement scans the records. Paging `duties()` 1,000 at a time reaches all 10,040 remaining records once, each page reading at most 1,002 rows. The counts equal `COUNT(*)` per state: all 10,040 are unknown, and none is owed.
+**The scale control (10).** The SQL double wraps `node:sqlite`. It counts the rows each statement returns, and the rows written per table (from `RETURNING` or `changes()`). It also runs `EXPLAIN QUERY PLAN` on every read, update and delete, and records any that scans `artroom_mint` rather than searching an index. Setup: 10,000 unknown records; 890 tokens known to other records; a backlog of 100 owed records, all due; and 10 owed records due earliest whose readable expiry has passed. Those 1,000 tokens are all that is listed. Then 40 alarm turns, each at `nextDue()` and each after a new unknown record. Each turn: at most one `listTokens()`; at most 20 record writes; at most one summary write each for the takeover time, the observation and the pass, and at most one that changes the counts; at most 1,040 rows read; at most 1,000 `known()` calls. Turns that only observe write no record. The first pass settles the 10 expired records with no revocation call, and the next is 1 s later. The five backlog passes after it revoke the next 20 in due order, and after each, `nextDue()` and the stored wake-up are exactly 1 s ahead. Observations are at least 1 min apart, and each counts 0 unaccounted. No statement scans the records. Paging `duties()` 1,000 at a time reaches all 10,040 remaining records once, each page reading at most 1,002 rows. The counts equal `COUNT(*)` per state: all 10,040 are unknown, and none is owed.
 
 ### Mutation table
 
-Each mutant was applied alone to `src/mints.ts` by a script, the mint tests were run, and the file was restored from the commit (`git checkout`). Every mutant turned at least one named test red. T-mutants are the note's mutation targets, O-mutants the approval's two obligations, and G-mutants the other guards. 79 mutants, all red (61 before review 0ab6dac3, and F1 to F18 for its findings). After that review's changes, all 79 were rerun against the final code: the targets of T9a, T9b, G2, G13, G19 and G23 moved and were re-anchored, and T17 and G20 now also break the settlement step before the lookup. The first run left three survivors (T5b, G29, G30). Each was a missing test, not an equivalent mutant, and each now has one: the third (5) test, an assertion in the first (4) test, and one in the scale test. Two tests were then red under no mutant, so G32 and G33 were added to break their guards. G31 was rerun after a fix to the mutant itself, which had broken the syntax.
+Each mutant was applied alone to `src/mints.ts` by a script, the mint tests were run, and the file was restored from the commit (`git checkout`). Every mutant turned at least one named test red. T-mutants are the note's mutation targets, O-mutants the approval's two obligations, and G-mutants the other guards. 85 mutants, all red, and every test is red under at least one: 61 before review 0ab6dac3, F1 to F18 for its findings, H1 to H4 for review 6a979799's P2s, and J1 and J2 for its P3. All 85 were rerun against the final code (the table below is that run). After each review, mutants whose target lines had moved were re-anchored (T9a, T9b, G2, G13, G19, G23, F2, F14), and T17 and G20 also break the settlement of expired records before a pass's lookup. The first run left three survivors (T5b, G29, G30). Each was a missing test, not an equivalent mutant, and each now has one: the third (5) test, an assertion in the first (4) test, and one in the scale test. Two tests were then red under no mutant, so G32 and G33 were added to break their guards. G31 was rerun after a fix to the mutant itself, which had broken the syntax.
 
 | Mutant | Mutation | Red tests (number) |
 |---|---|---|
@@ -356,7 +358,7 @@ Each mutant was applied alone to `src/mints.ts` by a script, the mint tests were
 | T6b | a takeover time not moved ahead by the alarm on the live host | (8) |
 | T7 | an observation written to each record | (10) |
 | T8 | a new unknown that resets the schedule to under 1 min | (10) ×2 |
-| T9a | a revocation batch ordered by newest | (4), (9) ×2, (10) |
+| T9a | a revocation batch ordered by newest | (4), (9) ×2, (10), (checker 3) ×2 |
 | T9b | a revocation batch ordered by row ID only | (9) |
 | T10a | an unconditional update by row ID (move) | (5) ×2, (6) |
 | T10b | an unconditional delete by row ID (drop) | (5) |
@@ -365,15 +367,15 @@ Each mutant was applied alone to `src/mints.ts` by a script, the mint tests were
 | T13 | a claim() in its own transaction (deferred out of the owner's) | (6), (7) |
 | T14 | notAfter checked after the token is returned (not in the classification) | (4) |
 | T15 | ttl computed before the wake-up | (1) ×2 |
-| T16a | an overdue nextDue() returned as is | (8), (10) |
-| T16b | an overdue nextDue() returned as now plus less than 1 s | (8), (10) |
+| T16a | an overdue nextDue() returned as is | (8), (10), (checker 3) |
+| T16b | an overdue nextDue() returned as now plus less than 1 s | (8), (10), (checker 3) |
 | T17 | settlement at an unreadable expiry | (4) |
 | O1 | the pre-send record does not hold the recomputed lifetime (no second conditional update) | (1) ×2 |
 | O2a | the 1 s continuation postpones a still-future time when anything is overdue | (8) |
 | O2b | the 1 s continuation applied to a future time too | (8), (checker 1) |
 | G1 | a failed wake-up leaves its record | (1) |
 | G2 | a refusal leaves the record unknown | (3), (5) |
-| G3 | no text check | (4) ×2, (8), (9) ×5, (10), (checker 1) ×3 |
+| G3 | no text check | (4) ×2, (8), (9) ×5, (10), (checker 1) ×3, (checker 3) ×3 |
 | G4 | no scope check | (4) |
 | G5 | no generic expiry check | (4) |
 | G6 | no readable-expiry check for use | (4) |
@@ -390,26 +392,26 @@ Each mutant was applied alone to `src/mints.ts` by a script, the mint tests were
 | G17 | backoff not capped | (4), (9) |
 | G18 | a revocation timeout counts as answered | (9) |
 | G19 | a completion that cannot commit is not recorded as a failure | (9) |
-| G20 | no settlement at a readable expiry | (4), (checker 1) |
+| G20 | no settlement at a readable expiry | (4), (10), (checker 1), (checker 3) ×3 |
 | G21 | backoff carries the next try past a known expiry | (4) |
 | G22 | no listing size cap | (10) |
 | G23 | an incomplete listing counted | (2) |
 | G24 | the takeover time never moved before a send | (1) |
 | G25 | no wake-up when a pass ends | (10) |
 | G26 | no wake-up for a token owed at once | (4) |
-| G27 | a pass's record writes not batched (summary written per record) | (10) |
+| G27 | a pass's record writes not batched (summary written per record) | (10), (checker 3) ×2 |
 | G28 | no observation backoff doubling | (10) |
-| G29 | observation runs with no unknown records too | (4), (checker 1) |
+| G29 | observation runs with no unknown records too | (4), (checker 1), (checker 3) |
 | G30 | the ledger's own token index not consulted by the observation | (10) |
 | G31 | the takeover time not cleared with nothing in flight | (8) |
-| G32 | every failure that leaves the outcome unknown is retried, not only the retriable() classes | (3), (8), (10) ×2, (checker 1) ×2 |
+| G32 | every failure that leaves the outcome unknown is retried, not only the retriable() classes | (3), (8), (10) ×2, (checker 1) ×2, (checker 4) ×2 |
 | G33 | an answer without a token ID closes the record | (4) |
 | F1 | mint's repository lookup unbounded | (checker 1) |
-| F2 | the pass's repository lookup unbounded | (checker 1) ×2 |
+| F2 | the pass's repository lookup unbounded | (checker 1) ×2, (checker 3) |
 | F3 | the observation's repository lookup unbounded | (checker 1) ×2 |
-| F4 | the lookup's wait not enforced | (checker 1) ×5 |
-| F5 | a lookup that answers late still starts provider work | (checker 1) ×5 |
-| F6 | expired records settled only inside the pass, behind the lookup | (checker 1) |
+| F4 | the lookup's wait not enforced | (checker 1) ×5, (checker 3) |
+| F5 | a lookup that answers late still starts provider work | (checker 1) ×5, (checker 3) |
+| F6 | expired records settled only inside the pass, behind the lookup | (10), (checker 1), (checker 3) |
 | F7 | errorNote keeps the error's message | (checker 2) ×3 |
 | F8 | any error name kept | (checker 2) ×2 |
 | F9 | any code kept | (checker 2) ×2 |
@@ -422,6 +424,12 @@ Each mutant was applied alone to `src/mints.ts` by a script, the mint tests were
 | F16 | the listing failure stores the provider's text | (10), (checker 2) |
 | F17 | a create failure stores the provider's text | (checker 2) |
 | F18 | an unusable answer's reason quotes the provider's scope | (4) |
+| H1 | no expiry recheck immediately before revoking | (checker 3) ×2 |
+| H2 | no expiry recheck on the lookup's failure path | (checker 3) |
+| H3 | expiry judged before the lookup, not after | (checker 3) ×2 |
+| H4 | a pass that settles expired records goes on to revoke the rest (two summary writes) | (10), (checker 3) |
+| J1 | the listing gets a full wait of its own, not what is left of the shared deadline | (checker 4) |
+| J2 | the listing is started with no time left | (checker 4) |
 
 ### Review 0ab6dac3
 
@@ -431,6 +439,16 @@ Report `0ab6dac3` (changes requested) found two P1 defects at `658d10af`, both r
 2. **Availability.** `await repo()` was outside the bounded wait in the observation and the pass (and in `mint()`), so a held lookup held the alarm's observation or the cleanup pass, and its flag, indefinitely. Every lookup is now bounded; a timeout is that attempt's failure with its backoff, the flag is released, and a lookup that answers late is dropped. Records whose readable expiry has passed are settled before any lookup.
 
 The checker's three controls failed at `658d10af` (its log, `/tmp/artroom-checker-mint-a-v1-controls.log`) and pass against this branch's fix (rerun here with only the import paths changed to this worktree). The review accepted choices 1, 2, 3, 6, 7, 8 and 9, and noted 4 and 5, as marked above.
+
+### Review 6a979799
+
+Report `6a979799` on `19f6e389` (changes requested) found two P2 defects and one P3, the first two with the checker's extra controls (`/tmp/artroom-checker-mint-a-v2-extra-controls.ts`).
+
+1. **P2: expiry not rechecked after the lookup.** A record whose readable expiry passed while the pass's repository lookup was held was revoked afterwards, because its expiry was checked before that wait. The pass now looks up the repository first, then checks each record's expiry immediately before both the no-repository result and the revocation call. A record that expired meanwhile is settled with no call.
+2. **P2: two summary writes in a mixed pass.** Settling expired records before the lookup, then writing the revocation results, made two summary writes in one pass, against the note's bound of one. The bound is kept, not amended: a pass that finds expired records settles only those, with one summary write, and ends; the next pass, 1 s later, revokes the rest. This is the simplest way to keep both one summary write a pass and settlement that never waits on a lookup. The scale control now has 10 expired records in its backlog and checks one count write a pass.
+3. **P3: the observation's waits.** The report said 30 s, but the lookup and the listing each had 30 s. They now share one deadline, so the whole observation waits at most 30 s, the bound the note adopted and lane B's alarm composition relies on.
+
+The checker's first extra control passes. Its second asserts that a mixed batch (one expired, one revocable record) is fully settled by a single `reconcile()` with one count write. With the design above, its count assertion holds (one write), but its first assertion, `owed === 0` after that one call, fails by design: the revocable record is revoked by the next pass, 1 s later. Both together are not possible while settlement at expiry must not wait on a lookup. The first write must come before the lookup, and the revocation's count change after it. "(checker 3) a mixed due batch …" is the replacement control: one count write in each pass, and every record settled within two passes.
 
 ### Gates
 
