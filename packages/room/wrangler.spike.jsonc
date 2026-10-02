@@ -13,6 +13,12 @@
 // namespace (R-GEN-12), so imports use a second binding, IMPORT_ARTIFACTS,
 // for gitseq-spike-import (request b6b51de7, revision 2, approved by hugh):
 // one deployment both founds public rooms and imports.
+//
+// The checkers (request 9f81f372) are lane G's service, deployed as
+// `artroom-spike-checkers` (packages/checkers/wrangler.spike.jsonc). The Room
+// issues each check job over the service binding named for its checker,
+// CHECKER_<NAME> (`checkerBinding` in src/config.ts). The two Workers bind
+// each other; deploy-spike.sh deploys them in the order that allows it.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "artroom-spike-room",
@@ -35,6 +41,12 @@
     "OPERATOR_KEYS": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
   },
   "secrets": { "required": ["ROOM_KEY_SECRET"] },
+  // Lane G's checker service, one entrypoint per checker (R-EXEC-8).
+  "services": [
+    { "binding": "CHECKER_TESTS", "service": "artroom-spike-checkers", "entrypoint": "TestsCheckerService" },
+    { "binding": "CHECKER_TYPES", "service": "artroom-spike-checkers", "entrypoint": "TypesCheckerService" },
+    { "binding": "CHECKER_LLM_REVIEW", "service": "artroom-spike-checkers", "entrypoint": "LlmReviewService" }
+  ],
   "artifacts": [
     { "binding": "ARTIFACTS", "namespace": "gitseq-spike", "remote": true },
     { "binding": "IMPORT_ARTIFACTS", "namespace": "gitseq-spike-import", "remote": true }

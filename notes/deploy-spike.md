@@ -35,20 +35,36 @@ only in name, namespace, URL and operator key.
 packages/room/scripts/deploy-spike.sh
 ```
 
+It deploys two Workers that bind each other (request 9f81f372): the Room,
+`artroom-spike-room`, and lane G's checker service, `artroom-spike-checkers`
+(`packages/checkers/wrangler.spike.jsonc`). The Room calls the checkers
+through `CHECKER_TESTS`, `CHECKER_TYPES` and `CHECKER_LLM_REVIEW`. The
+checker service submits checks through `ROOM`.
+
 The script:
 
 1. checks that the env file exists and is mode 600;
-2. reads only `ROOM_KEY_SECRET` from it (the file is not sourced);
+2. reads only `ROOM_KEY_SECRET`, and the checker's key ID from
+   `ARTROOM_CHECKER_SEED` (the file is not sourced);
 3. runs `wrangler whoami` with hugh's OAuth login
    (`env -u CLOUDFLARE_API_TOKEN npx -y wrangler@latest`);
-4. puts the secret with `wrangler secret put ROOM_KEY_SECRET`, on stdin;
-5. deploys `wrangler.spike.jsonc`, retrying once if the deploy fails;
+4. puts `ROOM_KEY_SECRET` on the Room, and `CHECKER_KEY` on the checker
+   service, each with `wrangler secret put` on stdin. `CHECKER_KEY` is the
+   private JWK of `ARTROOM_CHECKER_SEED`, made by
+   `packages/room/scripts/spike-checker-key.mjs jwk`, which writes only to
+   a pipe. `secret put` also creates a Worker that does not exist yet;
+5. deploys the checker service (its `ROOM` target exists), then the Room
+   (its `CHECKER_<NAME>` targets now exist), retrying each once if the
+   deploy fails;
 6. checks that `GET /v1/rooms/deploy-spike-probe` answers 404 from the
    Room's router.
 
 It prints no secret. Use the same `ROOM_KEY_SECRET` on every deploy: it
 derives each room's key and each public repository's identity, so a new
-value would orphan existing rooms.
+value would orphan existing rooms. Keep `ARTROOM_CHECKER_SEED` too: its key
+is a member (role `checker`) of every room it has checked. It is made once,
+with hugh's approval, by `spike-checker-key.mjs create`, which appends it to
+the env file only if it is absent and prints only the key ID.
 
 On the first deploy, `wrangler secret put` created the Worker. `wrangler
 deploy` then uploaded the Worker but stopped while applying the container
@@ -531,3 +547,113 @@ no Artifacts token, bearer or session token. Not ours: `gitseq-spike` holds
   large to publish in one push.
 - **Rooms left behind.** The registry keeps the founded rooms, now bound to
   deleted repositories, by design.
+
+## Review and check, live (request 9f81f372, 2026-10-02)
+
+The spike now runs lane G's checker service. I deployed from
+`request/checker-bindings` after merging main `bd520fb9`, which includes
+lane A's check-job dispatch, and running `packages/room/scripts/deploy-spike.sh`
+with hugh's OAuth. No retry was needed.
+
+| Worker | Version ID | What it has |
+|---|---|---|
+| `artroom-spike-checkers` (new) | `abfe34a8-5fd8-4910-848c-1bfe6dedd1f6` | `ROOM` bound to `artroom-spike-room`; reads `gitseq-spike` and `gitseq-spike-import`; container application `artroom-spike-checkers-runnerbox` (image `artroom-lg-runner@sha256:17b7fd60…`); `AI`; `CHECKER_KEY` |
+| `artroom-spike-room` | `41f61bfe-b980-4988-870b-a56d59b56d4a` | adds `CHECKER_TESTS`, `CHECKER_TYPES` and `CHECKER_LLM_REVIEW`, bound to the checker service's entrypoints |
+
+`CHECKER_KEY` is made from `ARTROOM_CHECKER_SEED`, which was created for
+this run with hugh's approval. Its key is
+`key__5Feafe6dIDQmeA8IHuU-IyPQFWaQ8MnzskJMmfY11Y`. Each checked room invites
+that key as `@checker`, with role `checker`.
+
+**How the room is set up.** It is an import into `gitseq-spike-import`. Its
+first commit holds `.artroom/policy.json` and `.artroom/checkers/tests.json`
+(the whole tree, not volatile, no runner pinned). The policy requires one
+`tests` check by `role:checker` and one review by `role:maintainer`, not
+the author, on `src/**` and `test/**`. The repository is a package with no
+dependencies, so `npm ci` installs nothing, and it has two `node --test`
+tests. The lane adds `src/greet.js` and its test.
+
+| Run | Result | Record |
+|---|---|---|
+| Spike smoke, all phases (public, import, checks) | passed, exit 0; strict cleanup `ok`, 0 unresolved, nothing left | [spike-smoke-2026-10-02T11-42-51-651Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T11-42-51-651Z.json) |
+| MCP stage 0, `--checks` | passed, exit 0; cleanup `ok` (agent sessions ended, repositories gone) | [mcp-stage0-checks-2026-10-02T11-47-36-135Z.json](../packages/room/measure/results/mcp-stage0-checks-2026-10-02T11-47-36-135Z.json) |
+| Spike smoke, checks phase again (`SPIKE_PHASE=checks`), recording the check's runner and detail | passed, exit 0; cleanup `ok` | [spike-smoke-2026-10-02T11-49-37-449Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T11-49-37-449Z.json) |
+
+**The flow, as each run showed it:**
+
+1. **Propose.** The proposal owes `obl_check-tests` and
+   `obl_independent-review`, both open.
+2. **Attention asks.** The reviewer's attention has `review-requested` and
+   the checker's has `check-requested`, both open. In the MCP run, the
+   reviewer is an MCP agent with role `maintainer`, and it saw its request
+   through the `attention` tool.
+3. **Gated landing.** `land` while the review is open is refused with
+   `obligation-open`, over HTTPS and over MCP. The Room records the refusal.
+4. **Dispatch.** The Room issued the job to `artroom-spike-checkers` over
+   `CHECKER_TESTS`, with a read token for the integration. In each run the
+   checker's signed `check` was admitted about 10 seconds after the
+   proposal: `ok: true`, `check: tests`, bound to the integration. The
+   third run recorded what ran:
+
+   > Machine-run check "tests": passed. It ran `npm ci`, then `npm test`,
+   > in an isolated runner. Runner environment: `sha256:31dd5087…` …
+   > `ok 1 - adds` … `ok 2 - greets`
+5. **Check met.** The check obligation is met, and the checker's request
+   is closed in attention.
+6. **Review.** The second member (`@reviewer`, a maintainer; through MCP,
+   `@mcp-reviewer`) approves. The review obligation is met, and the request
+   is closed.
+7. **Land.** The lane lands as a fast-forward, and main is its
+   integration. The author's attention has `land-outcome`, `landed`.
+8. **Verify.** The log publishes, and `artroom verify` passes (through
+   entry 15 over HTTPS and 19 over MCP, 4 decisions replayed, the operator
+   key reported). The verified log holds the `check`, the `review`, the
+   refused and the accepted `land`, and `land-outcome`.
+
+**Cleanup, confirmed separately.** I listed both namespaces completely, by
+each run's repository base: `26cfec8d…` (the public room), `e6f669a5…` and
+`e4c483f9…` (the first run's import and checks), `71223cda…` (the
+checks-only run) and `6d18169b…` (the MCP run). Each listing showed 0
+repositories. Tokens on deleted repositories cannot be listed, but each
+run revoked every listed active token before deleting its repository, and
+every one of those duties is `done`. The result files contain no Artifacts
+token, bearer or session token.
+
+**Also in this lane:**
+
+- `deploy-spike.sh` now deploys both Workers, in the order their mutual
+  bindings need.
+- `measure/checks.mjs` holds the shared fixtures.
+- `spike-smoke.mjs` has the checks phase, and its cleanup covers every
+  imported repository with one combined outcome.
+- `mcp-stage0.mjs` has `--checks`.
+- The room README's "Review 700b74ea" adoption bullet now states the
+  registry-ledger rule.
+
+**Not exercised:**
+
+- **Scoped (filtered) checker inputs.** No snapshot repository was made:
+  the configuration has no `inputs`.
+- **Carry.** No runner is pinned, so no check carried, and only one
+  generation was proposed.
+- **Failing checks.** A failing check, or a refused one (`check-binding`),
+  was not run live.
+- **Other checkers.** `types` and `llm-review` are bound but no policy
+  asked for them, so no Workers AI call was made.
+- **Job failure paths.** Job retries after a lost answer, expired attempts,
+  token-mint failures and the Room's unknown-mint duties.
+- **Advisory checks**, and checks on a landing whose integration differs
+  from the preview's (a merge landing).
+- **Many jobs.** More than one job in flight, and checks under load.
+- **Legacy-base adoption**, as before.
+
+**Gates**, on the code that ran live (after merging main `bd520fb9`):
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | checkers 45; cli 102; client 86 Node and 2 workerd; git 193; log 198 Node and 193 workerd; mcp 73 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 125 Node and 382 workerd; ui 141 |
+| `wrangler deploy --dry-run` of both spike configs | 0 | — |
+
+The room workerd suite printed the "code had hung" message 28 times, with
+every test passing.

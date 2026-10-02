@@ -1625,9 +1625,12 @@ a pending public founding is prepared (`Workspaces.prepareCanonical`, called
 only from `found` for a public room that is not founded), the ledger adopts
 its base name when:
 
-- an older Room may have tried: the registry binding was made before this
-  `found` call (`bind` answers `already-bound`) and this Room has no attempt
-  on record (no `founding_repo`); or
+- an older Room may have tried: the registry binding is a legacy one, made
+  by an older Worker before the registry kept its ledger (`ledger` is NULL;
+  every new binding records 1). This is a durable fact of the binding, read
+  on every attempt; see "Recovery" below. It replaced an earlier rule (the
+  `bind` answer was `already-bound` and this Room had no `founding_repo`),
+  which a lost bind answer or an interrupted `found` could get wrong; or
 - an earlier revision's ledger has a row for the base name; or
 - the base repository exists now (only this founding can have made it,
   R-GEN-12).
