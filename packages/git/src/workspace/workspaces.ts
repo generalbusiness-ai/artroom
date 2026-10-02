@@ -82,6 +82,13 @@ export interface WorkspacesOptions {
   readonly namespace: string;
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
+  /**
+   * Persist a wake-up at or before `at` (ms), for example the Room's alarm,
+   * which then calls `settleCanonical()` before founding. Public founding
+   * awaits it after recording each repository create and before sending it
+   * (plan 004); a rejection sends nothing.
+   */
+  readonly wake?: (at: number) => Promise<void>;
 }
 
 /** How often an unresolved remote step's inventory runs: first after 1 minute, backing off to every 30 minutes. */
@@ -142,6 +149,7 @@ export class Workspaces {
   private readonly namespace: string;
   private readonly now: () => number;
   private readonly sleep: ((ms: number) => Promise<void>) | undefined;
+  private readonly wake: ((at: number) => Promise<void>) | undefined;
   private readonly inFlight = new Map<LaneId, Promise<WorkspaceOp>>();
   private readonly locks = new Map<string, Promise<unknown>>();
 
@@ -152,6 +160,7 @@ export class Workspaces {
     this.namespace = opts.namespace;
     this.now = opts.now ?? Date.now;
     this.sleep = opts.sleep;
+    this.wake = opts.wake;
     this.sql.all(
       "CREATE TABLE IF NOT EXISTS artroom_ws (lane TEXT PRIMARY KEY, lease INTEGER NOT NULL, state TEXT NOT NULL, fork TEXT NOT NULL, " +
         "remote TEXT, lease_expires_at INTEGER NOT NULL, token_id TEXT, token_expires_at INTEGER, error TEXT, updated_at INTEGER NOT NULL)",
@@ -799,9 +808,23 @@ export class Workspaces {
   /** Create a new incarnation of `base`: its name, when its create answered; null when it did not (it is then abandoned). */
   private async createIncarnation(base: string): Promise<string | null> {
     // The step, and so the name, is on record before the create is sent.
-    const step = this.beginStep(base, "repo-create");
-    const name = `${base}-${step}`;
-    this.sql.all("UPDATE artroom_ws_duty SET fork = ? WHERE id = ?", name, step);
+    const { step, name } = this.sql.transaction(() => {
+      const step = this.beginStep(base, "repo-create");
+      const name = `${base}-${step}`;
+      this.sql.all("UPDATE artroom_ws_duty SET fork = ? WHERE id = ?", name, step);
+      return { step, name };
+    });
+    // Then a wake-up is stored for now, when the new step is due (and no earlier than any other founding debt), so a
+    // host that stops while the create is outstanding leaves it scheduled (plan 004). If it cannot be stored, the
+    // create is never sent, and the step says so.
+    if (this.wake) {
+      try {
+        await this.wake(this.now());
+      } catch (e) {
+        this.done([step], "not-sent");
+        throw e;
+      }
+    }
     let made: Awaited<ReturnType<ArtifactsNamespace["create"]>>;
     try {
       made = await this.artifacts.create(name, { description: "Artroom room repository", setDefaultBranch: "main" });

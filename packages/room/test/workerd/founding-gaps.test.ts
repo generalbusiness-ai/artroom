@@ -12,14 +12,14 @@
 
 import { describe, expect, it } from "vitest";
 import { env, exports } from "cloudflare:workers";
-import { evictDurableObject, runInDurableObject } from "cloudflare:test";
+import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Claim, DraftedRoom, Genesis, Landing, LandOp, RoomId } from "@generalbusiness/artroom-contract";
 import { EMPTY_TREE_SHA, firstCommit } from "@generalbusiness/artroom-git";
-import { draftRoom, foundRoom } from "../../src/founding.ts";
+import { draftRoom, foundRoom, roomSeed } from "../../src/founding.ts";
 import { roomIdOf } from "../../src/ids.ts";
 import { hex } from "../../src/crypto.ts";
 import type { RoomEnv } from "../../src/config.ts";
-import { FakeArtifactsHost, artifactsErrors, setFault, type Registry, type Room } from "../../src/index.ts";
+import { FakeArtifactsHost, artifactsErrors, setAlarmDelay, setFault, type Registry, type Room } from "../../src/index.ts";
 import { Client, advance, call, clock, expectOk, failure, grant, logOf, newKeyPair, placeRepo, randomBytes, sign, tick, worldFor, type TestRoom, type World } from "./support.ts";
 
 const worker = exports.default as unknown as {
@@ -571,3 +571,147 @@ describe("review 700b74ea, recovery windows: legacy adoption is read from the re
   });
 });
 
+
+// ------------------------------------------------------------------ plan 004: a wake-up is persisted before the first founding create
+
+describe("plan 004: the founding debt has a persisted alarm before any create is sent, and a fresh object schedules what it finds", () => {
+  /** Hold the next create before it applies; `release` lets it apply, and its answer goes to whoever is still waiting. */
+  function holdCreate(a: World["artifacts"]): { entered: Promise<string>; release: () => void } {
+    const real = a.binding.create;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let enter!: (name: string) => void;
+    const entered = new Promise<string>((r) => (enter = r));
+    a.binding.create = async (name: string, opts?: { readOnly?: boolean; description?: string; setDefaultBranch?: string }) => {
+      a.binding.create = real;
+      enter(name);
+      await gate;
+      return real(name, opts);
+    };
+    return { entered, release };
+  }
+  const alarmOf = (id: string) => runInDurableObject(roomStub(id), (_r: Room, state: DurableObjectState) => state.storage.getAlarm());
+  /** Abort the room's object, as a host that stops; the next stub reaches a fresh one. */
+  const stop = (id: string) => runInDurableObject(roomStub(id), (_r: Room, state: DurableObjectState) => state.abort("host stopped")).catch(() => undefined);
+  const failAt = (point: string, times = 1) => {
+    let left = times;
+    setFault((p) => {
+      if (p !== point || left <= 0) return;
+      if (--left === 0) setFault(null);
+      throw new Error(`interrupted at ${point}`);
+    });
+  };
+
+  it("the alarm is in storage while the first create is outstanding; after the host stops, a fresh object's alarm alone deletes the late repository and its token; the founder never retries", async () => {
+    const f = await draftPublic();
+    const a = f.world.artifacts;
+    const g = f.drafted.genesis;
+    const id = roomIdOf(g);
+    // The create is dispatched and never answers: the host stops while waiting for it. (A plain flag, not a promise
+    // of the test's: resolving one from inside the object keeps the test pool from aborting the object.)
+    const real = a.binding.create;
+    let name: string | null = null;
+    a.binding.create = async (n: string) => {
+      a.binding.create = real;
+      name = n;
+      return new Promise<never>(() => {});
+    };
+    // The Worker's founding steps, then the room's found, started inside the object and sent once: the founder never retries.
+    await call(reg().bind(g.repo, id, g.name));
+    const seed = roomSeed(env as unknown as RoomEnv, f.drafted.draft);
+    await runInDurableObject(roomStub(id), (room: Room) => {
+      void room.core.found(g, f.sig, seed).catch(() => undefined);
+    });
+    while (name === null) await new Promise((r) => setTimeout(r, 2));
+    const created: string = name;
+    // What the object has persisted while the create is outstanding.
+    const seen = await runInDurableObject(roomStub(id), async (room: Room, state: DurableObjectState) => ({ alarm: await state.storage.getAlarm(), duties: room.core.workspaces.duties() }));
+    expect(seen.duties.map((d) => [d.kind, d.state])).toEqual([["repo-create", "in-flight"]]);
+    expect(seen.alarm, "an alarm is persisted before the provider was asked").not.toBeNull();
+    await stop(id);
+    // The create applies late, with its 24-hour token.
+    await real(created);
+    expect(a.repo(created).activeTokens()).toHaveLength(1);
+    // Only the scheduled alarm, on a fresh object.
+    expect(await runDurableObjectAlarm(roomStub(id))).toBe(true);
+    expect(a.repos.has(created)).toBe(false);
+    expect((await duties(id)).filter((d) => d.state !== "done")).toEqual([]);
+    expect(await logOf(id)).toEqual([]);
+    expect(a.remoteCalls.get("create")).toBe(1);
+  });
+
+  it("an alarm that cannot be stored: no create is sent, the recorded debt is kept, the alarm cache claims nothing, and the same found later completes", async () => {
+    const f = await draftPublic();
+    const a = f.world.artifacts;
+    const g = f.drafted.genesis;
+    const id = roomIdOf(g);
+    // An older Worker's binding, so debt (the base name's adoption) is recorded before the first create.
+    await call(reg().bind(g.repo, id, g.name));
+    await markOlderBinding(g.repo);
+    failAt("room:set-alarm", 2); // the wake-up before the create, then the reschedule after the failure
+    await rejects(worker.found(g, f.sig, f.drafted.draft), "unavailable");
+    expect(a.remoteCalls.get("create")).toBeUndefined();
+    expect((await duties(id)).map((d) => [d.kind, d.state, d.doneReason])).toEqual([
+      ["repo-create", "in-flight", null],
+      ["repo-delete", "owed", null],
+      ["repo-create", "done", "not-sent"],
+    ]);
+    expect(await alarmOf(id)).toBeNull();
+    // The next reschedule on the same object stores it: nothing claimed the rejected one.
+    await runInDurableObject(roomStub(id), (room: Room) => (room as unknown as { schedule(): void }).schedule());
+    expect(await alarmOf(id)).not.toBeNull();
+    expect(await worker.found(g, f.sig, f.drafted.draft)).toBe(id);
+    expect(a.remoteCalls.get("create")).toBe(1);
+  });
+
+  it("an earlier alarm already in storage is kept when the founding wake-up asks for a later one", async () => {
+    const f = await draftPublic();
+    const a = f.world.artifacts;
+    const id = roomIdOf(f.drafted.genesis);
+    const earlier = Date.now() + 10 * 60_000; // before the test pool's alarm delay of an hour
+    await runInDurableObject(roomStub(id), (_r: Room, state: DurableObjectState) => state.storage.setAlarm(earlier));
+    const held = holdCreate(a);
+    const founding = worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
+    await held.entered;
+    expect(await alarmOf(id)).toBe(earlier);
+    held.release();
+    expect(await founding).toBe(id);
+    expect(await alarmOf(id)).toBe(earlier);
+  });
+
+  it("wake-ups asked for at once, the earlier first: the earlier alarm stands", async () => {
+    const id = roomIdOf((await draftPublic()).drafted.genesis);
+    const earlier = Date.now() + 3_600_000;
+    const later = earlier + 3_600_000;
+    setAlarmDelay(null); // real alarm times, both far enough ahead not to run during the test
+    try {
+      await runInDurableObject(roomStub(id), async (room: Room) => {
+        const wake = (room as unknown as { wake(at: number): Promise<void> }).wake.bind(room);
+        await Promise.all([wake(earlier), wake(later)]);
+      });
+      expect(await alarmOf(id)).toBe(earlier);
+    } finally {
+      setAlarmDelay(3600_000);
+      await runInDurableObject(roomStub(id), (_r: Room, state: DurableObjectState) => state.storage.deleteAlarm());
+    }
+  });
+
+  it("a fresh object schedules founding debt it finds in an older ledger with no alarm; a fresh unfounded room schedules nothing", async () => {
+    const f = await draftPublic();
+    const a = f.world.artifacts;
+    const id = roomIdOf(f.drafted.genesis);
+    a.failRemote("revokeToken", artifactsErrors.transport());
+    await rejects(worker.found(f.drafted.genesis, f.sig, f.drafted.draft), "unavailable");
+    expect((await duties(id)).some((d) => d.state === "owed")).toBe(true);
+    // As an older Room left it: the debt, and no alarm.
+    await runInDurableObject(roomStub(id), (_r: Room, state: DurableObjectState) => state.storage.deleteAlarm());
+    await stop(id);
+    expect(await alarmOf(id), "the fresh object scheduled the debt").not.toBeNull();
+    expect(await runDurableObjectAlarm(roomStub(id))).toBe(true);
+    expect(a.repo(a.canonical).activeTokens()).toEqual([]);
+    expect((await duties(id)).filter((d) => d.state === "owed")).toEqual([]);
+    // A room that was never founded has nothing to schedule.
+    const quiet = roomIdOf((await draftPublic()).drafted.genesis);
+    expect(await alarmOf(quiet)).toBeNull();
+  });
+});

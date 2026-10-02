@@ -1543,3 +1543,61 @@ test("review 700b74ea: an earlier revision's ledger row for the base name is ado
   assert.equal(legacyOpen(ws), 1);
   assert.equal(ns.repos.has("canon"), false);
 });
+
+// ------------------------------------------------------------------ plan 004: a wake-up is stored before each founding create is sent
+
+/** Public founding with a `wake` that records what was on record when it was called, and rejects the first `fail` calls. */
+function setupWaking(fail = 0) {
+  const base = setupFounding();
+  const wakes: { at: number; createCalls: number; storedBeforeCreate: boolean; open: string[][] }[] = [];
+  let failures = fail;
+  const ws: Workspaces = new Workspaces({
+    sql: base.sql,
+    artifacts: base.ns,
+    canonical: "canon",
+    namespace: "ns",
+    now: base.clock.now,
+    sleep: async () => {},
+    wake: async (at) => {
+      const w = { at, createCalls: base.ns.createCalls, storedBeforeCreate: false, open: open(ws) };
+      wakes.push(w);
+      await new Promise((r) => setTimeout(r, 1)); // storage takes a moment
+      if (failures-- > 0) throw new Error("the alarm could not be stored");
+      w.storedBeforeCreate = base.ns.createCalls === w.createCalls; // nothing was sent while it was being stored
+    },
+  });
+  return { ...base, ws, wakes };
+}
+
+test("plan 004: the founding wake-up is stored after the create step is on record and before the create is sent, for the earliest outstanding work", async () => {
+  const { clock, ns, ws, wakes, firstCommit } = setupWaking();
+  ns.createFailures.push("lost-after-create"); // the first create applies and its answer is lost: a second is made
+  const name = await ws.prepareCanonical("canon", firstCommit);
+  assert.equal(ns.createCalls, 2);
+  assert.equal(wakes.length, 2, "one wake-up before each create");
+  assert.deepEqual(wakes.map((w) => w.createCalls), [0, 1], "each before its create was sent");
+  assert.ok(wakes.every((w) => w.storedBeforeCreate), "and each create waited until its wake-up was stored");
+  assert.deepEqual(wakes[0]!.open, [["repo-create", "in-flight"]], "after the step was recorded");
+  assert.ok(wakes.every((w) => w.at <= clock.t), "at the earliest outstanding work: the new step is due now");
+  ws.sealCanonical(name);
+});
+
+test("plan 004: a wake-up that cannot be stored sends no create; the step is closed as never sent, the debt already recorded is kept, and the next attempt founds", async () => {
+  const { ns, ws, wakes, firstCommit } = setupWaking(1);
+  // An older Room's binding: the base name's adoption is recorded debt before any create.
+  await assert.rejects(ws.prepareCanonical("canon", firstCommit, { legacyBase: true }), /alarm could not be stored/);
+  assert.equal(ns.createCalls, 0, "nothing was sent");
+  assert.equal(wakes.length, 1);
+  assert.deepEqual(
+    ws.duties().map((d) => [d.kind, d.state, d.reason, d.doneReason]),
+    [
+      ["repo-create", "in-flight", "legacy", null],
+      ["repo-delete", "owed", "legacy base name", null],
+      ["repo-create", "done", "repo-create", "not-sent"],
+    ],
+  );
+  assert.ok(ws.canonicalDue() !== null, "the recorded debt stays scheduled for the alarm");
+  const name = await ws.prepareCanonical("canon", firstCommit, { legacyBase: true });
+  assert.equal(ns.createCalls, 1);
+  ws.sealCanonical(name);
+});
