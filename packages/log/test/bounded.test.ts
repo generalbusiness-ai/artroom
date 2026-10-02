@@ -201,7 +201,8 @@ describe("guards", () => {
   test("size mismatch: an entry whose length changes between the size pass and the ID pass is invalid-input; nothing is pushed", async () => {
     const { sim, git, p } = await published();
     const pushes = git.pushes;
-    const { source } = sourceOf(sim.entries, { swap: (seq, e, n) => (seq === 42 && n >= 2 ? longer(e) : e) });
+    // Longer on the second read only: the size pass and the bytes sent see the same entry, the ID pass another.
+    const { source } = sourceOf(sim.entries, { swap: (seq, e, n) => (seq === 42 && n === 2 ? longer(e) : e) });
     await expect(p.publish(source, sim.checkpoint(), [])).rejects.toMatchObject({ code: "invalid-input" });
     expect(git.pushes).toBe(pushes);
   });
@@ -229,7 +230,7 @@ describe("guards", () => {
 
   test("out of order: a source that returns entries out of seq order is invalid-input", async () => {
     const { sim, p } = await published();
-    const { source } = sourceOf(sim.entries, { swap: (seq, e) => (seq === 43 ? sim.entries[44]! : seq === 44 ? sim.entries[43]! : e) });
+    const { source } = sourceOf(sim.entries, { swap: (seq, e) => (seq === 41 ? sim.entries[42]! : seq === 42 ? sim.entries[41]! : e) });
     await expect(p.publish(source, sim.checkpoint(), [])).rejects.toMatchObject({ code: "invalid-input" });
     const short: EntrySource = { through: sim.entries.length - 1, read: (from, limit) => sim.entries.slice(from, from + limit - 1) };
     await expect(p.publish(short, sim.checkpoint(), [])).rejects.toMatchObject({ code: "invalid-input" });
@@ -293,6 +294,19 @@ describe("guards", () => {
       expect(git.objects.get(sha)?.data).toEqual(blob);
     }
   }, 120_000);
+
+  test("would-rewrite: when the parent's last segment is full, the entry its checkpoint names is still checked", async () => {
+    const sim = new RoomSim();
+    const claim = await sim.claim(keys.alice, alice, ["src/**"]);
+    while (sim.entries.length < 1000) note(sim, claim.lane!, 5);
+    const p = new LogPublisher(new MemoryGit());
+    expect((await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), refsOf(sim.retained))).through).toBe(999);
+    note(sim, claim.lane!, 5);
+    // Segment 0 is reused by ID and not read; entry 999, which the parent's checkpoint names, is, by its hash.
+    const changed999 = sourceOf(sim.entries, { swap: (seq, e) => (seq === 999 ? { ...e, hash: `sha256:${"0".repeat(64)}` as never } : e) }).source;
+    await expect(p.publish(changed999, sim.checkpoint(), [])).rejects.toMatchObject({ code: "would-rewrite" });
+    expect((await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), [])).through).toBe(1000);
+  });
 
   test("would-rewrite: a changed published entry in the last segment, a changed entry at the checkpoint, a shorter log", async () => {
     const { sim, p } = await published();
