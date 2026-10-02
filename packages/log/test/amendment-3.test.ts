@@ -160,11 +160,18 @@ describe("edit 2: verify replays each check-carried event and checks the check i
 describe("the outcome agrees with the replayed decisions (R-CARRY-13)", () => {
   const notCarried = (act: ActId) => ({ carried: false as const, notCarried: { act, code: "policy-rejected" as const, text: "not carried" } });
 
-  test("carried with no decisions: carried-outcome-mismatch", async () => {
-    const { sim, lane2, check } = await room();
-    await sim.checkCarried(check, lane2); // 8
-    const r = await expectReason(await publishAs(sim, tamper(sim, 8, (ev) => ({ ...ev, decisions: [] }))), "carried-outcome-mismatch", 8);
-    expect(r.failures[0]!.detail).toMatch(/records no carry rule decision/);
+  test("carried with no decisions, when only platform conditions applied, verifies", async () => {
+    // The demo policy has no carry rule, so the honest event records none (R-CARRY-13).
+    const sim = await base();
+    const lane2 = entryId(2, sim.entries[2]!.hash);
+    const c = sim.accept(sim.envelope(keys.alice, "check", { lane: lane2, generation: 1 }, checkBody()), alice); // 6
+    await sim.checkCarried(entryId(c.seq, c.hash), lane2); // 7
+    const ev = eventOf(sim.entries[7]!);
+    expect(ev.outcome.carried).toBe(true);
+    expect(ev.decisions).toEqual([]);
+    const r = await verifyLog(await publishAs(sim, sim.entries));
+    expect(r.failures).toEqual([]);
+    expect(r).toMatchObject({ ok: true, verifiedThrough: 7 });
   });
 
   test("carried while the decisions refuse: carried-outcome-mismatch", async () => {

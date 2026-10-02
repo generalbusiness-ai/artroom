@@ -146,15 +146,14 @@ export interface VerifyOptions {
  * Why a `check-carried` event's outcome disagrees with its decisions, or
  * null (R-CARRY-13). Verify replays the decisions first, so these are the
  * replayed decisions. Every decision that names evidence names the event's
- * `act`. `carried` needs at least one decision, and every one allows the
- * carry. `notCarried` needs a decision that does not allow it, or none, and
- * names the same `act`.
+ * `act`. `carried` needs every decision to allow the carry; it may have
+ * none, when only platform conditions applied. `notCarried` needs a
+ * decision that does not allow it, or none, and names the same `act`.
  */
 function carryOutcomeProblem(ev: Extract<SystemEvent, { readonly type: "check-carried" }>): string | null {
   const stray = ev.decisions.find((d) => "evidence" in d.outcome && d.outcome.evidence !== ev.act);
   if (stray) return `decision ${stray.rule} names evidence ${String((stray.outcome as { evidence: unknown }).evidence)}`;
   if (ev.outcome.carried) {
-    if (ev.decisions.length === 0) return "the outcome is carried, but it records no carry rule decision";
     const refusing = ev.decisions.find((d) => d.outcome.result !== "carry");
     return refusing ? `the outcome is carried, but ${refusing.rule} decided ${String(refusing.outcome.result)}` : null;
   }

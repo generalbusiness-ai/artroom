@@ -25,8 +25,9 @@ amendment 3, section 29.8 "Lane L" (R-CARRY-13, R-LOG-10).
   5. Its outcome agrees with the replayed decisions. Otherwise
      `carried-outcome-mismatch`:
      - every decision that names evidence names the event's `act`;
-     - `carried` needs at least one decision, and every decision allows
-       the carry (`result: "carry"`);
+     - `carried` needs every decision to allow the carry
+       (`result: "carry"`); it may have none, when only platform
+       conditions applied (R-CARRY-13);
      - `notCarried` needs no decisions, or one that does not allow the
        carry, and `notCarried.act` must equal `act`.
 - `packages/log/test/support/room-sim.ts`: `RoomSim.checkCarried` seals a
@@ -54,7 +55,8 @@ amendment 3, section 29.8 "Lane L" (R-CARRY-13, R-LOG-10).
 - edit 2: the decisions are replayed under the version the event names,
   not the active one
 - edit 1: a check-carried outcome whose carried is not a boolean: malformed
-- outcome: carried with no decisions: carried-outcome-mismatch
+- outcome: carried with no decisions, when only platform conditions
+  applied, verifies
 - outcome: carried while the decisions refuse: carried-outcome-mismatch
 - outcome: not carried while every decision allows the carry:
   carried-outcome-mismatch
@@ -68,7 +70,8 @@ only by grinding about 2^32 hashes. The "later check" test forges entry 9's
 
 ## Gates
 
-At the outcome commit `25a0e4b`, after `npm ci`:
+At the commit that allows a carry with no decisions (the one after
+`adc3da8`), after `npm ci`:
 
 | Gate | Exit |
 |---|---|
@@ -81,7 +84,10 @@ At the outcome commit `25a0e4b`, after `npm ci`:
 ## Mutations
 
 Each guard was broken alone, the new test file run, and the file
-reverted. All were run again at `25a0e4b`; each went red.
+reverted. All were run again at `25a0e4b`; each went red. The
+"`carried` needs a decision" guard was later removed, as R-CARRY-13
+allows a carry with no decisions; putting it back turns "carried with no
+decisions, when only platform conditions applied, verifies" red.
 
 | Mutant | Red test |
 |---|---|
@@ -95,23 +101,13 @@ reverted. All were run again at `25a0e4b`; each went red.
 | `check-carried` removed from the decoder's list | all 16 |
 | Decoder's `outcome.carried` boolean check removed | outcome whose carried is not a boolean |
 | Evidence check removed (c) | a decision whose evidence is another check |
-| `carried` needs a decision: removed (a) | carried with no decisions |
 | `carried` needs every decision to allow: removed (a) | carried while the decisions refuse |
 | `notCarried` needs a decision that does not allow: removed (b) | not carried while every decision allows the carry |
 | `notCarried.act` check removed (b) | notCarried.act differing from act |
-| Outcome check not called | all five outcome tests |
+| Outcome check not called | the four outcome tests that expect a mismatch |
 
 ## Open points in the contract
 
-- **A carry with no decisions.** On the coordinator's instruction, verify
-  refuses a `carried` outcome with no decisions. R-CARRY-13 says
-  "`decisions` is empty when a platform condition failed or no rule
-  applies", and `Carried.rules` is "empty when only platform conditions
-  applied". So when the active policy has no `carry` rule for checks, an
-  honest Room seals a carried event with no decisions, and verify fails it
-  with `carried-outcome-mismatch`. Either the contract should require at
-  least one carry rule decision for a check to carry, or this guard should
-  go. It is one line in `carryOutcomeProblem` (`packages/log/src/verify.ts`).
 - **Which version the event may name.** R-CARRY-13 says "the policy
   version that judged it: the operation's". Verify requires only that an
   earlier `policy-activated` event activated it, not that it is the active
