@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f3798a94187b5532ba52d4d9f1ae00462b334c9d","text":"Merge retired a covered predecessor; the successor is at packages/client/test/redeem.test.ts."}
+{"kind":"promise","text":"Builder takes diagnosable pre-admission failures, now that join hardening (c657d4ba) has landed in admission.ts at 5822204f."}
