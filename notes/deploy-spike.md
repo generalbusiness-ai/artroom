@@ -878,7 +878,8 @@ table, grounded ceilings, and the part 3 budgets) are in
 
 ## Rows per act, ceilings and budgets (request 8bd623cc, 2026-10-02)
 
-Parts 1 and 3 of request 8bd623cc. These measurements were taken on the
+Parts 1 and 3 of request 8bd623cc. Both are partly done: see "not yet
+measured" below. These measurements were taken on the
 redeployed spike: `artroom-spike-room` 75758995 on the folded schema (D5),
 with the read-only analytics token. The driver was the only thing using the
 spike, apart from the older rooms' background.
@@ -915,11 +916,14 @@ file):
 | release | 21–27 |
 | land with 3 open previews | 72–73 |
 | land that activates a policy with 3 open proposals | 113 |
-| policy activation with 3 open (derived) | about 40 |
+| policy activation alone, with 3 open | not yet measured (one subtraction gave about 40) |
 | one publication | 7 |
 
-The check, a single alarm tick and the pin step cannot be isolated, and the
-table says so. Every admitted act writes at least 7 rows:
+Four isolated measurements are **not yet measured**: a check, an idle
+alarm tick, an alarm tick with a pending pin, and policy activation alone.
+Review 28615b74 asked for them, with billing evidence and controls. They
+will be measured after the idle-write fix is deployed. The methods are in
+`packages/room/measure/README.md`, "Not yet measured". Every admitted act writes at least 7 rows:
 
 - `entries` 2 (the rowid and the UNIQUE `id`);
 - `records` 2;

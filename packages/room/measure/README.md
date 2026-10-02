@@ -5,14 +5,21 @@ for the table plus one row for each secondary index the write touches. No
 counter in the application sees that, so the gate asks Cloudflare's billing
 datasets. This follows woo's gate (woo commits 6d2c425a and 50163fc1).
 
-All three parts are done:
+Where each part stands (review 28615b74 asked for changes):
 
-- **Part 2:** the gate, its use in the smoke run, the scheduled check, and
-  the part 1 driver.
-- **Part 1:** the driver ran against the spike on 2026-10-02. The table, the
-  method and the findings are in
-  [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md).
-- **Part 3:** the budgets are in [../src/budgets.ts](../src/budgets.ts).
+- **Part 2 is built.** That is the gate, its use in the smoke run, the
+  scheduled check, and the part 1 driver. Review 28615b74's code findings
+  are fixed.
+- **Part 1 is partly done.** The driver ran against the spike on
+  2026-10-02. The acts measured are in
+  [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md). Four
+  isolated measurements are **not yet measured**: a check, an idle alarm
+  tick, an alarm tick with a pending pin, and policy activation alone. See
+  "Not yet measured".
+- **Part 3 is provisional.** The budgets in
+  [../src/budgets.ts](../src/budgets.ts) come from the acts that were
+  measured. The alarm budget will be checked again once the idle tick is
+  measured after the idle-write fix.
 
 See "What remains".
 
@@ -56,21 +63,47 @@ For one Worker and one window `[from, to)`:
    Paging stops at a short or empty page. It also stops when
    `result_info.total_pages` says so, but only if that field is present:
    the provider marks the pagination metadata as optional (`morePages`).
-2. Run one GraphQL query per namespace, filtered by `namespaceId`. It
-   returns rows written and rows read from the periodic dataset, and
-   requests from the invocations dataset, grouped by `objectId`.
+2. Run two GraphQL queries for each namespace, filtered by `namespaceId`,
+   one for each dataset, and each with its own window:
+   - **Storage** (`durableObjectsPeriodicGroups`: rows written and rows
+     read). Each sample is stamped with the *start* of its interval, so
+     this query starts `SAMPLE_LOOKBACK_MS` (2 minutes) before `from`
+     (`sampleQueryStart`, the helper the per-act driver uses too). It ends
+     before `to`, which is exclusive. A sample stamped before `to` counts
+     in full, even when its interval runs past `to`.
+   - **Invocations** (`durableObjectsInvocationsAdaptiveGroups`:
+     requests). Each invocation is stamped with its own time. On
+     2026-10-02 the values were single seconds (17:36:50, :51, :52 …), not
+     whole minutes. So this query is exactly `[from, to)`. An invocation
+     before `from` is never evidence for the window.
 
-   Cloudflare stamps each periodic sample with the *start* of an interval
-   of up to a minute. So the query starts one minute before `from`
-   (`sampleQueryStart`, the same helper the per-act driver uses). That way
-   a sample stamped just before `from`, whose minute overlaps the window,
-   is counted. It ends before `to` (exclusive). A sample stamped before
-   `to` counts in full even if it runs past `to`. Both edges can count too
-   much, but never too little.
+   Both of these choices can count too much, never too little.
 3. Add the results up by object. Each object keeps its class and its
    `idFromName` name: a room ID for `Room`, `registry` for `Registry`.
 4. Check two budgets: a total for the Worker, and a ceiling for each
    object.
+
+### The sample-interval assumption
+
+This is an **assumption, not a measured guarantee**. Every storage sample
+seen on 2026-10-02 covered at most 60 s. A full interval was 60 s, and an
+eviction can restart one early, which makes a shorter one. Cloudflare does
+not document a maximum.
+
+The gate looks back two minutes, so it counts any sample whose interval
+began up to 120 s before `from`. That covers an interval of up to 120 s
+that overlaps the window. The checker's 63-second case is counted.
+
+A sample whose interval began more than 120 s before `from` and still ran
+into the window would be missed. The gate cannot detect that case. This is
+a known limitation.
+
+The extra lookback costs at most one extra sample per object at the start
+of a window. That counts too much, which is the direction the gate prefers.
+
+The per-act table makes the same assumption: `windowTable` puts a sample in
+the window that holds its start plus 60 s. If intervals were longer, a
+window could take a sample that belongs partly to the next act.
 
 A window is owned. If two runs share the spike at the same time, each
 run's window also counts the other run's rows. That makes a result too
@@ -94,7 +127,10 @@ Each one has a test in `rows.test.ts`.
 | A smoke run with `ARTROOM_ROW_GATE=1` and no token fails before it starts | "runs when the token is present, skips without it, and fails closed when demanded without it" |
 | A billed value (`rowsWritten`, `rowsRead`, `requests`) is missing, null, negative or not a number, or a row names no object (or, in the samples query, no time) | "1. a missing, null, negative or non-numeric billed value is incomplete, never zero" and "1. the samples query fails closed the same way" |
 | A full page of namespaces with no pagination metadata: the next page is read, not skipped | "2. without pagination metadata, pages are read while they come back full" |
-| A sample stamped before `from` whose minute overlaps the window: counted, so a 5,000-row write in it fails the gate | "4. a sample stamped before `from` whose minute overlaps the window is counted; one stamped at `to` is not" |
+| A sample stamped before `from` whose minute overlaps the window: counted, so a 5,000-row write in it fails the gate (including a 63-second interval) | "4. a sample stamped before `from` whose minute overlaps the window is counted; one stamped at `to` is not" |
+| An invocation before `from` is not evidence: an otherwise empty window stays incomplete | "an invocation before `from` cannot make an empty requested window complete" |
+| A namespace the Worker owns with no id or class: the whole result is incomplete, even when the required classes are present | "an owned namespace without an id or class makes the gate incomplete, even with the required classes present" |
+| A credential that crosses the message bound: redacted before the cut, and a token prefix left at the cut is dropped | "a credential crossing the message bound is redacted before the cut, and a partial one at the cut is dropped" |
 
 **Provider errors are reported as metadata only.** A report records a
 failure as the stage, the HTTP status, and the provider's numeric error
@@ -109,8 +145,13 @@ run also adds the analytics token to the values its `redact` removes.
 Test: "3. a provider error that echoes the token reaches neither the report
 nor the webhook: metadata only".
 
-These cases came from the checker's controls on caefe17d. All five controls
-pass, and each new guard was mutated once to show that a test goes red.
+`safeMessage` is local to this plain-Node script. The Room's shared
+redactor, `src/diag.ts`, is TypeScript, and the scheduled check runs
+without a build. Provider text is never kept anyway: only metadata is.
+
+These cases came from the checker's controls: five on caefe17d and four on
+487edd74. All nine controls pass. Each new guard was mutated once to show
+that a test goes red.
 
 The end of a window is read only after the wait for the billing data to
 settle (`windowEndAfterSettle`, 120 s). Cloudflare stamps a periodic sample
@@ -229,16 +270,75 @@ writes `results/row-costs-<run>.md`, and puts the windows, samples and
 table in the run's JSON.
 
 The table and its method are in
-[results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md). Some
-rows cannot be isolated, and the table says so:
+[results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md).
 
-- a single alarm tick;
-- the pin step, which is inside the propose;
-- the check, which is admitted 9 s after its propose;
-- the policy activation, which is derived by subtraction.
+### Not yet measured
+
+Review 28615b74 asked for four isolated measurements, each with billing
+evidence: rows written and read, the windows and namespaces it recorded,
+and controls. None of the four is done yet:
+
+| Measurement | Status | What blocks it |
+|---|---|---|
+| A check | **not yet measured** | The checker service admitted its check 9 s after the propose, inside the same one-minute sample, so its cost could not be separated. |
+| An idle alarm tick (nothing pending) | **not yet measured** | Alarms do not appear in the invocations dataset. Every idle minute holds a checkpoint publication, so no quiet minute exists to compare with. The idle-write fix changes this figure. |
+| An alarm tick with one pending pin | **not yet measured** | The commit that admits a propose runs the pin step itself (`core.run("pins")`). On the deployed code no alarm tick ever finds a pin pending. |
+| Policy activation alone, with N open proposals | **not yet measured** | Activation is sealed in the landing's own transaction. Its only figure so far (about 40 written) is one subtraction across two rooms. It has no repetition and no control. |
+
+All four will be measured on the spike after the idle-write fix is
+deployed. With that fix, a quiet minute should cost nothing, so an act
+stands out against it. The methods proposed:
+
+- **The same for all four:**
+  - Use a dedicated room for each measurement, so no other act's deferred
+    work falls in the window.
+  - Leave at least 5 minutes of quiet before and after, so there are at
+    least four quiet samples on each side for the baseline and its
+    spread.
+  - Repeat three times.
+  - Record rows written and read in each window, the window times, the
+    namespace IDs queried (`Room`, `Registry`, `Publisher`), and the raw
+    samples (`out.rows.samples`).
+  - Keep a control room that runs the same sequence without the act being
+    measured.
+- **A check.** The check must be admitted at least 5 minutes after the
+  propose. Use a room whose policy requires a check that no checker service
+  answers: a check name with no service binding. Then the driver signs the
+  check itself, with its own member key of role `checker`, after the quiet
+  window. Before the run, confirm in the workerd suite whether such a policy
+  still sends a job. If it does, the job's attempts fall in the propose
+  window, and the check's admission still has a window to itself. The
+  control is the same room, with the propose and no check.
+- **An idle alarm tick.** Claim a lane and release it at once. The alarm
+  that was stored for the lease's expiry stays stored, because `schedule`
+  only moves an alarm earlier. When it fires (`LEASE_SECONDS` later, 30
+  minutes on the spike) there is nothing to do. Measure 5 minutes either
+  side of the expected time. Confirm first in the workerd suite that the
+  release leaves the alarm stored. To show that the tick ran, use the
+  room's Workers log (observability is on), because invocations do not
+  show alarms. The control is a room with no lane, which has no alarm.
+- **An alarm tick with one pending pin.** The deployed code never leaves a
+  pin pending for an alarm. This needs a spike-only switch, for example a
+  `PIN_DELAY_MS` variable under which the commit leaves the pin to the
+  alarm, due 3 minutes later. Then the tick that completes the pin has a
+  window of its own. A propose under the switch, without its pin, is the
+  control. This changes the deployed Worker, so it needs hugh's approval
+  before it is built.
+- **Policy activation with N open proposals.** Activation shares its
+  landing's transaction, so it is separated by difference, with controls,
+  in dedicated rooms of the same shape. Use a plain landing and a landing
+  of `.artroom/policy.json`, each with N = 0 and with N = 3 open proposals,
+  three times each. Then:
+  - activation with N open = policy landing(N) − plain landing(N);
+  - the cost per open proposal = (activation(3) − activation(0)) / 3.
+
+  Report the spread with each figure.
 
 ## What remains
 
+- **Measure the four isolated cases** under "Not yet measured", on the
+  spike after the idle-write fix is deployed. Then rerun one clean smoke
+  with `ARTROOM_ROW_GATE=1` at that deploy, and check the ceilings again.
 - **Request 99782949 enforces the budgets.** `src/budgets.ts` states each
   limit and the measurement it comes from. Nothing enforces them yet.
 - **Remove the idle background.** A cohort that holds only checkpoint
