@@ -4,7 +4,7 @@
  * contract's order; the Room seals its own entries the same way.
  */
 
-import type { ActId, Checkpoint, Digest, EntryContent, Genesis, KeyId, LogEntry, RoomId, Seq } from "@generalbusiness/artroom-contract";
+import type { ActId, Checkpoint, Digest, EntryContent, Genesis, KeyId, LogEntry, LogLayout, RoomId, Seq } from "@generalbusiness/artroom-contract";
 import { canonicalize, parseStrict } from "./canonical.ts";
 import { digestJson, sha256Hex, sign } from "./crypto.ts";
 import { utf8 } from "./canonical.ts";
@@ -35,9 +35,9 @@ export function contentOf(entry: LogEntry): EntryContent {
   return content;
 }
 
-/** A checkpoint for entries through `through` (R-LOG-8 step 2). It names no commit. */
-export function makeCheckpoint(room: RoomId, roomKey: KeyId, roomSeed: Uint8Array, through: LogEntry, at: string): Checkpoint {
-  const unsigned = { format: "artroom-log-v1" as const, room, through: through.seq, hash: through.hash, at, roomKey };
+/** A checkpoint for entries through `through` (R-LOG-8 step 2). It names no commit. With `layout`, the commit is layout 2 (R-LOG-16). */
+export function makeCheckpoint(room: RoomId, roomKey: KeyId, roomSeed: Uint8Array, through: Pick<LogEntry, "seq" | "hash">, at: string, layout?: LogLayout): Checkpoint {
+  const unsigned = { format: "artroom-log-v1" as const, room, through: through.seq, hash: through.hash, at, roomKey, ...(layout ? { layout } : {}) };
   return { ...unsigned, sig: sign(roomSeed, "artroom-checkpoint-v1", unsigned) };
 }
 

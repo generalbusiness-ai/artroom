@@ -457,3 +457,77 @@ that adds this section changes only this file.
 
 The room workerd suite printed the "code had hung" message 23 times this
 run (22 before), with every test passing. No room source changed here.
+
+## Redeploy from main c5825470 (2026-10-02)
+
+One coordinated redeploy of the spike from main `c5825470`, which includes
+founding gaps revision 4.2 and MCP stage 0 revision 2. It was built in a
+fresh detached worktree after `npm ci`, and deployed with
+`packages/room/scripts/deploy-spike.sh` using hugh's OAuth. No retry was
+needed.
+
+- **Version ID:** `1a33ec82-ba39-4100-aa2b-90e281c0b2bd`, replacing
+  `a9f55d45-d4db-4852-bbfb-a9c998f5da31`.
+- **Bindings:** `ARTIFACTS` reaches `gitseq-spike` and `IMPORT_ARTIFACTS`
+  reaches `gitseq-spike-import`. The publisher image digest is unchanged.
+- **Probe:** `GET /v1/rooms/deploy-spike-probe` answered 404.
+
+| Check | Result | Record |
+|---|---|---|
+| Spike smoke, public and import (`spike-smoke.mjs`) | passed, exit 0, every step ok; strict cleanup `ok`, 0 unresolved, nothing left in either namespace | [spike-smoke-2026-10-02T06-37-51-694Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T06-37-51-694Z.json) |
+| MCP stage 0 harness with the cold agent (`mcp-stage0.mjs --claude`) | passed, exit 0, every step ok; cleanup `ok`, 0 unresolved, nothing left | [mcp-stage0-2026-10-02T06-40-59-778Z.json](../packages/room/measure/results/mcp-stage0-2026-10-02T06-40-59-778Z.json), transcript [mcp-stage0-claude-2026-10-02T06-40-59-778Z.jsonl](../packages/room/measure/results/mcp-stage0-claude-2026-10-02T06-40-59-778Z.jsonl) |
+| Independent cleanup check | complete listings in both namespaces show no repository for any of the three runs' bases | below |
+
+**What passed, live, for the first time:**
+
+- **Incarnation naming.** Each public room's repository is `<base>-1`, for
+  example `edfa5044…-1`, and its forks are `<base>-1--<lane>`.
+- **Public room's first commit.** Main is the Room's first commit with no
+  files, and no token is left on the new repository. The first lane landed
+  on it: gap 1 is closed live.
+- **Import.** A grant for the public namespace, and one for a namespace
+  with no binding, were each refused with their reason. The import into
+  `gitseq-spike-import` founded; the Room wrote nothing to main; a lane
+  landed; and `artroom verify` passed and reported the operator key.
+- **Log verification.** Both logs verified (public: through entry 14, 4
+  decisions replayed; import: through entry 8, 2 decisions replayed).
+- **Strict cleanup.** Every duty was `done`, with complete inventories
+  before and after, in both namespaces.
+- **MCP stage 0, scripted drive.** This was the first live run of the
+  incarnation-aware harness, against the incarnation `c23e21dc…-1`:
+  - 401 with `WWW-Authenticate`, with no bearer and with an unknown one;
+  - room-custody redemption;
+  - the tool list in legacy mode and in 2026-07-28 mode;
+  - claim, including an idempotent retry; workspace, git push, propose;
+  - a refusal that conforms to the advertised output schema;
+  - land, attention with its cursor, explain and release.
+- **MCP stage 0, cold agent.** Claude Code 2.1.287 (claude-opus-5-5)
+  connected to the endpoint and claimed, pushed, proposed, landed (main
+  `0339e9ff`) and released in 15 turns. Its two tool errors were local
+  permission prompts in its own shell, not Artroom refusals. The harness's
+  `landed` list names only the driver's lane, but main is the agent's
+  commit, as its own report says.
+- **Ending sessions.** Each bearer session was ended by revoking the
+  agent's key, and the bearer was then refused.
+
+**Cleanup, confirmed separately.** Complete listings (`success: true`, every
+record named, under one page) of `gitseq-spike` and `gitseq-spike-import`,
+searched by each run's base (`edfa5044…`, `e6cd66c4…`, `c23e21dc…`), show
+0 repositories. Tokens on deleted repositories cannot be listed. Each run's
+cleanup listed every repository's active tokens and revoked each before
+deleting it (all `done`). The redacted results and the transcript contain
+no Artifacts token, bearer or session token. Not ours: `gitseq-spike` holds
+133 other repositories, from earlier lanes' runs, which were not touched.
+
+**Not exercised:**
+
+- **Legacy-base adoption.** It needs a registry binding left unfounded by
+  an older Worker, and every room here was founded fresh, so the Room's
+  `legacyBinding` was false throughout.
+- **Checkers and reviews.** No policy required them.
+- **Merge landings.** Every landing fast-forwarded main, the cold agent's
+  included: main became its own commit, `0339e9ff`.
+- **Other paths.** Lease expiry, abort and crash recovery, and logs too
+  large to publish in one push.
+- **Rooms left behind.** The registry keeps the founded rooms, now bound to
+  deleted repositories, by design.

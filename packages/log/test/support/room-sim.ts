@@ -17,6 +17,7 @@ import type {
   Genesis,
   KeyId,
   LogEntry,
+  LogLayout,
   MemberId,
   ObligationId,
   PolicyDocument,
@@ -250,8 +251,9 @@ export class RoomSim {
     return this.system({ type: "check-carried", op: `op_land_${this.entries.length}`, lane, generation: 2, integration: "d".repeat(40) as Sha, obligation, act, policy: named, outcome, decisions: this.keep(r.evaluations) });
   }
 
-  checkpoint() {
-    return makeCheckpoint(this.room, keys.room.key, keys.room.seed, this.last, this.at(this.entries.length));
+  /** A checkpoint on the last entry; with `layout`, for a layout 2 commit (R-LOG-16). */
+  checkpoint(layout?: LogLayout) {
+    return makeCheckpoint(this.room, keys.room.key, keys.room.seed, this.last, this.at(this.entries.length), layout);
   }
 
   /** Publish everything so far, then record the `checkpoint` event (R-LOG-8 steps 1 to 5). */

@@ -38,7 +38,7 @@ function world() {
   /** Issue a filtered job for `snap` and check it out in a new runner, as the service does. */
   const run = async (snap: Snap) => {
     const { job, tokenId } = await f.snapshotJob(snap);
-    const bound = checkJob(job, { room: ROOM, checker: job.check, host: HOST, namespace: NS, now: Date.now });
+    const bound = checkJob(job, { room: ROOM, checker: job.check, host: HOST, namespaces: [NS], now: Date.now });
     assert.ok(!isRefusal(bound), JSON.stringify(bound));
     const before = fleet.boxes.length;
     const s = await provider.open(bound);

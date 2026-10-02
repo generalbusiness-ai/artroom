@@ -2,15 +2,19 @@
  * The LLM reviewer: a machine reader of the change, advisory only.
  *
  * - It reads the change inside the runner (`git diff` of the integration
- *   against its first parent) and asks a model, from the checker service,
- *   for findings. The model's key or binding stays in the service.
+ *   against the job's `base`, the main commit the integration was built on,
+ *   R-EXEC-10) and asks a model, from the checker service, for findings. The
+ *   model's key or binding stays in the service. A job whose base the runner
+ *   cannot read (a filtered snapshot cannot reach it) is reviewed against
+ *   nothing and says so.
  * - It records a `check` that always passes (`ok: true`) and lists the
  *   findings, and a `note` anchored to that check. Both say they are
  *   machine-generated and advisory.
  * - It never signs a `review`, so it can never meet a review obligation
  *   (R-OBL-2). Its check is `volatile` (a model is not a pinned tool), so it
- *   never carries (R-CARRY-10). A policy that wants it must use an obligation
- *   that does not block landing.
+ *   never carries (R-CARRY-10). Its configuration (`config/llm-review.json`)
+ *   says `advisory: true`, so its obligation never blocks a landing
+ *   (R-OBL-7).
  * - The diff and the model's answer are data. The answer is parsed only as
  *   a JSON list of findings; nothing in it is followed as an instruction.
  */
@@ -18,6 +22,9 @@
 import type { Check, CheckJob, CheckOutcome } from "@generalbusiness/artroom-contract";
 import { Checker } from "./checker.ts";
 import { git } from "./runner.ts";
+
+/** Git's empty tree: what a change is compared with when its base cannot be read. */
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 export interface Finding {
   readonly path: string;
@@ -77,7 +84,6 @@ export function formatFindings(findings: readonly Finding[]): string {
 export abstract class LlmReviewer<Env = unknown> extends Checker<Env, ReviewOutcome> {
   readonly name: string = "llm-review";
   readonly volatile = true;
-  protected override readonly depth = 2;
   /** The model's name, for the label. */
   protected abstract readonly modelName: string;
   protected abstract model(): Model;
@@ -88,8 +94,12 @@ export abstract class LlmReviewer<Env = unknown> extends Checker<Env, ReviewOutc
 
   async run(job: CheckJob): Promise<ReviewOutcome> {
     const ws = this.workspace(job);
-    const parents = (await git(ws.runner, ws, ["rev-list", "--parents", "-n", "1", "HEAD"])).stdout.trim().split(" ").slice(1);
-    const base = parents[0] ?? "4b825dc642cb6eb9a060e54bf8d69288fbee4904"; // the empty tree for a root commit
+    const session = this.session(job);
+    // R-EXEC-10: the job's base, fetched by its ID from the job's own repository.
+    const fetched =
+      job.base === job.integration ||
+      (await git(ws.runner, ws, ["fetch", "-q", "--no-tags", "--depth", "1", session.remote, job.base], session.gitConfig ?? [])).exitCode === 0;
+    const base = fetched ? job.base : EMPTY_TREE;
     const stat = await git(ws.runner, ws, ["diff", "--stat", base, "HEAD"]);
     const diff = await git(ws.runner, ws, ["diff", "-U3", "--no-color", base, "HEAD"]);
     if (stat.exitCode !== 0 || diff.exitCode !== 0) {
@@ -106,7 +116,7 @@ export abstract class LlmReviewer<Env = unknown> extends Checker<Env, ReviewOutc
     return {
       ok: true,
       findings,
-      detail: [`Change reviewed against ${base.slice(0, 12)}:`, stat.stdout.trim(), "", problem ?? `${findings.length} finding(s):`, formatFindings(findings)].join("\n"),
+      detail: [fetched ? `Change reviewed against the base ${base.slice(0, 12)}:` : "The base could not be read; the whole tree was reviewed:", stat.stdout.trim(), "", problem ?? `${findings.length} finding(s):`, formatFindings(findings)].join("\n"),
     };
   }
 

@@ -14,12 +14,36 @@ import type { CheckJob, GitAuthEnv, Refusal, RoomId } from "@generalbusiness/art
 import { isGlob } from "@generalbusiness/artroom-policy";
 
 export interface JobExpectations {
-  readonly room: RoomId;
+  /**
+   * The one room this service checks for, if it is fixed (the harness, and
+   * tests). Absent in production: the room comes from each job, must be a
+   * room ID (R-ID-3), and is resolved through the `ROOM` service binding
+   * before any sandbox starts (R-EXEC-8).
+   */
+  readonly room?: RoomId;
   readonly checker: string;
   /** The room's Artifacts host, for example `<account>.artifacts.cloudflare.net`. */
   readonly host: string;
-  readonly namespace: string;
+  /** The Artifacts namespaces a job may read from (`ARTIFACTS_NAMESPACES`): the Room's own, and its import namespace if any. */
+  readonly namespaces: readonly string[];
   readonly now: () => number;
+}
+
+const NAMESPACE = /^[A-Za-z0-9._-]{1,100}$/;
+
+/**
+ * The accepted namespaces, from the deploy setting `ARTIFACTS_NAMESPACES`: a
+ * comma-separated list of namespace names. Throws if it is missing, empty,
+ * or holds anything that is not a namespace name, so a misconfigured
+ * service runs nothing.
+ */
+export function parseNamespaces(raw: unknown): readonly string[] {
+  if (typeof raw !== "string") throw new Error("ARTIFACTS_NAMESPACES is not set: list the Artifacts namespaces jobs may read from, comma-separated.");
+  const list = raw.split(",").map((n) => n.trim());
+  if (list.length === 0 || list.some((n) => !NAMESPACE.test(n))) {
+    throw new Error(`ARTIFACTS_NAMESPACES must be a comma-separated list of Artifacts namespace names, not ${JSON.stringify(raw.slice(0, 200))}.`);
+  }
+  return Object.freeze([...new Set(list)]);
 }
 
 /** What the service needs from a valid job. */
@@ -34,6 +58,8 @@ export interface BoundJob {
 }
 
 const SHA = /^[0-9a-f]{40}$/;
+/** R-ID-3: `room_` and 32 hex characters. A room name never has this form (R-GEN-11). */
+const ROOM_ID = /^room_[0-9a-f]{32}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const JOB_ID = /^job_[A-Za-z0-9_-]{1,60}$/;
 const OBLIGATION = /^obl_[a-z][a-z0-9-]{0,63}$/;
@@ -81,11 +107,15 @@ export function ownJob(job: CheckJob): CheckJob | Refusal {
 
 export function checkJob(job: CheckJob, exp: JobExpectations): BoundJob | Refusal {
   if (!JOB_ID.test(job.id)) return refuse("The job ID is malformed.");
-  if (job.room !== exp.room) return refuse("The job is for another room.");
+  if (typeof job.room !== "string" || !ROOM_ID.test(job.room)) return refuse("The job's room is not a room ID.");
+  if (exp.room !== undefined && job.room !== exp.room) return refuse("The job is for another room.");
   if (job.check !== exp.checker) return refuse(`The job is for checker ${job.check}, not ${exp.checker}.`);
   if (!ACT.test(job.lane)) return refuse("The lane ID is malformed.");
   if (!Number.isSafeInteger(job.generation) || job.generation < 1) return refuse("The generation is not a positive integer.");
-  if (!SHA.test(job.head) || !SHA.test(job.integration)) return refuse("The head or integration is not a 40-character SHA-1.");
+  if (!SHA.test(job.head) || !SHA.test(job.integration) || !SHA.test(job.base)) return refuse("The head, integration or base is not a 40-character SHA-1.");
+  // R-EXEC-10: copied from the configuration; a job without them is incomplete.
+  if (typeof job.volatile !== "boolean" || typeof job.advisory !== "boolean") return refuse("The job's volatile or advisory flag is missing.");
+  if (job.runner !== null && !DIGEST.test(job.runner)) return refuse("The job's runner digest is malformed.");
   if (!OBLIGATION.test(job.obligation) || job.obligation === "obl_admin-approval") {
     return refuse("The obligation is not a check obligation.");
   }
@@ -104,13 +134,14 @@ export function checkJob(job: CheckJob, exp: JobExpectations): BoundJob | Refusa
   } catch {
     return refuse("The read URL is malformed.");
   }
-  const prefix = `/git/${exp.namespace}/`;
-  const repo = url.pathname.slice(prefix.length, -".git".length);
+  // `/git/<namespace>/<repo>.git`, in one of the accepted namespaces.
+  const path = /^\/git\/([^/]+)\/([^/]+)\.git$/.exec(url.pathname);
+  const repo = path?.[2] ?? "";
   if (
     url.protocol !== "https:" ||
     url.hostname !== exp.host ||
-    !url.pathname.startsWith(prefix) ||
-    !url.pathname.endsWith(".git") ||
+    !path ||
+    !exp.namespaces.includes(path[1]!) ||
     url.username ||
     url.password ||
     url.search ||

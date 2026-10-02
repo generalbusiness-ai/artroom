@@ -22,7 +22,7 @@ import { Fleet } from "./fake-container.ts";
 // Token-shaped strings are built at run time, never written as literals.
 const tok = (s: string) => ["art", "v1", s].join("_");
 const urlOf = (repo: string) => `https://${HOST}/git/${NS}/${repo}.git` as const;
-const expectations = (checker = "tests") => ({ room: ROOM, checker, host: HOST, namespace: NS, now: Date.now });
+const expectations = (checker = "tests") => ({ room: ROOM, checker, host: HOST, namespaces: [NS], now: Date.now });
 
 class Tests extends TestsChecker<{ s: CheckerServices }> {
   protected services() {
@@ -386,7 +386,7 @@ test("G3: a scoped job's paths and snapshot, and the reviewer's note, come from 
   assert.deepEqual(check.input, original.input);
   // The LLM reviewer's after-hook (its note) uses the same copy.
   const c2 = await f.commit({ "src/add.js": "export function add(a, b) { return a + b; } // TODO\n" }, "llm");
-  const jr = job(c2, { kind: "tree", tree: await f.tree(c2) }, { check: "llm-review", obligation: "obl_llm-review" });
+  const jr = job(c2, { kind: "tree", tree: await f.tree(c2) }, { check: "llm-review", obligation: "obl_llm-review", volatile: true, advisory: true });
   ledger.issue(jr);
   const before = structuredClone(jr);
   const { room, sent } = recording(ledger);

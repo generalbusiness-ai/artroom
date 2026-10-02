@@ -21,16 +21,28 @@ review".
 
 1. **The room sends a job** (`CheckJob`) over a service binding to the
    checker's entrypoint: `TestsCheckerService`, `TypesCheckerService` or
-   `LlmReviewService`, each with `handle(job)`.
+   `LlmReviewService`, each with `handle(job)`. That is the only way in
+   (R-EXEC-8): the production Worker (`src/worker.ts`, `wrangler.jsonc`) has
+   no HTTPS route that accepts or builds a job.
 2. **The service takes its own copy of the job, then checks its binding**
    (`ownJob`, `checkJob`). The copy is deep and frozen, taken before
    anything else happens; checkout, the run, signing and the after-hook read
-   only it, so a caller that changes its job object later changes nothing. The job must be for this
-   room and this checker, name a real check obligation, carry well-formed
-   commits and digests, and point at a repository on the room's own
-   Artifacts host. Its `gitAuthEnv` must be exactly one read-only bearer
-   header for git. Anything else is refused `check-binding` before a sandbox
-   starts.
+   only it, so a caller that changes its job object later changes nothing.
+   The job must name a room by its ID and this checker, name a real check
+   obligation, carry well-formed commits (`base` included) and digests, the
+   configuration's `volatile` and `advisory`, and point at a repository on
+   the Artifacts host, in one of the namespaces the deployment accepts
+   (`ARTIFACTS_NAMESPACES`, comma-separated: the Room's own, and its import
+   namespace if any). An entrypoint will not start if that list is missing,
+   empty or malformed. Its `gitAuthEnv` must be exactly one read-only bearer
+   header for git. A volatile checker refuses a job that says
+   `volatile: false` (R-EXEC-10). Anything else is refused `check-binding`
+   before a sandbox starts.
+   - **The room is the job's own.** No room is configured: the service
+     resolves `job.room` through its `ROOM` binding (the Room Worker's
+     `ArtroomService.room`) before a sandbox starts, and submits the check
+     there. That room admits it only if it binds a job the room recorded
+     (R-OBL-3). Without the binding, nothing runs.
 3. **A new runner sandbox opens, for this job alone.** It is a container
    with Node.js and git, a different class and image from the publisher.
    Every job gets a new one, started from the pinned image, and it is
@@ -46,7 +58,9 @@ review".
 
    The token never enters the container, and nothing in the container holds
    a write token or a signing key. The runner digest is measured in the new
-   container before any of the job's code runs.
+   container before any of the job's code runs. If the job pins a runner
+   (`job.runner`) and the measured digest differs, the service runs nothing,
+   signs nothing, and refuses `check-binding` (R-EXEC-11).
 4. **The exact commit is checked out and confirmed** (R-EXEC-4). The runner
    fetches the integration commit (depth 1, so no history) into a new, empty
    repository, checks out what the remote sent, and confirms that `HEAD` is
@@ -56,11 +70,15 @@ review".
    unchanged, up to 8 MiB; over that the service throws `payload-too-large`
    and records nothing (it never truncates output it verifies, such as the
    snapshot listing). Only the check's detail is cut and redacted.
-6. **The service signs the check**, outside the sandbox, with its
-   delegation key (an Ed25519 key in the secret `CHECKER_KEY`). The check
-   binds the lane, generation, obligation, integration, input, checker
-   configuration digest and runner digest. Detail is cut to 16 KiB and
-   tokens are redacted. The signed envelope goes to the room.
+6. **The service signs the check**, outside the sandbox, with its key (an
+   Ed25519 key in the secret `CHECKER_KEY`), as a member's own key: it names
+   no delegation, so the key must be a member's key in each room whose
+   checks it signs. The check binds the lane, generation, obligation,
+   integration, input, checker configuration digest and runner digest, and
+   states `volatile` as the job does (R-EXEC-10). Its detail shows the
+   measured runner digest (`Runner environment: sha256:…`), so that an admin
+   can pin it (R-EXEC-11). Detail is cut to 16 KiB and tokens are redacted.
+   The signed envelope goes to the job's room.
 
 ## Scoped inputs
 
@@ -121,8 +139,10 @@ the same before it issues filtered jobs (section 29.8, lane A item 4).
 ## The LLM reviewer
 
 - It reads the change inside the runner (`git diff` of the integration
-  against its first parent) and sends it to the model from the checker
-  service. The model is set by the variable `LLM_MODEL` (default
+  against the job's `base`, the main commit it was built on, fetched by its
+  ID; R-EXEC-10) and sends it to the model from the checker service. A job
+  whose base the runner cannot read is reviewed as the whole tree, and says
+  so. The model is set by the variable `LLM_MODEL` (default
   `@cf/meta/llama-3.3-70b-instruct-fp8-fast`). Workers AI needs no external
   key.
 - The diff and the model's answer are data. The answer is parsed only as a
@@ -131,18 +151,31 @@ the same before it issues filtered jobs (section 29.8, lane A item 4).
   pinned tool, so its check never carries), and a note anchored to that
   check.
 - It never signs a `review`, so it can never meet a review obligation.
+- Its configuration, [config/llm-review.json](config/llm-review.json) (for a
+  room's `.artroom/checkers/llm-review.json`), says `advisory: true`, so its
+  obligation never blocks a landing (R-OBL-7), and `volatile: true`. The
+  `tests` and `types` configurations are beside it.
 
 ## Using it from the room
 
-```ts
-// wrangler.jsonc of the room's Worker:
-// "services": [{ "binding": "TESTS", "service": "artroom-lg-checkers", "entrypoint": "TestsCheckerService" }]
-const result = await env.TESTS.handle(job);   // Result<Check>
+The Room Worker binds each checker as `CHECKER_<NAME>` (lane A's
+`checkerBinding`) to this Worker's entrypoint, and this Worker binds the Room
+Worker as `ROOM` (see [wrangler.jsonc](wrangler.jsonc)):
+
+```jsonc
+// The Room Worker's wrangler.jsonc:
+"services": [
+  { "binding": "CHECKER_TESTS", "service": "artroom-checkers", "entrypoint": "TestsCheckerService" },
+  { "binding": "CHECKER_TYPES", "service": "artroom-checkers", "entrypoint": "TypesCheckerService" },
+  { "binding": "CHECKER_LLM_REVIEW", "service": "artroom-checkers", "entrypoint": "LlmReviewService" }
+]
+// This Worker's wrangler.jsonc:
+"services": [{ "binding": "ROOM", "service": "artroom-room" }]
 ```
 
-The entrypoints submit only to the room bound to this Worker as `ROOM` (lane
-A's `RoomWire`). Until one is bound they refuse to run. The harness ledger is
-used only by the `/h/*` routes.
+One deployment serves every room on its `ROOM` binding: each job names its
+room. The harness ledger is used only by the harness Worker's `/h/*`
+routes.
 
 ## Cost of a new container per job
 
@@ -174,6 +207,13 @@ filtered snapshot and attempts to read excluded data, the tests checker
 (pass, fail, a changed test with unchanged source), the room stand-in's
 refusals, and the LLM reviewer with a fake model.
 
+`test/carry.test.ts` covers amendment 3's job rules: a runner pin that
+does not match the measured digest, and a volatile checker given
+`volatile: false`, are refused before anything runs; the check states
+`volatile` as the job does and shows the runner digest; each job's check
+goes to its own room through the `ROOM` binding, which production requires;
+and the production Worker has no route and no harness.
+
 `test/snapshot-isolation.test.ts` runs the publisher's real
 `writeSnapshot`, the git package's `SnapshotRepos` and the real runner over
 a model of Artifacts in which every repository serves any object it holds by
@@ -199,11 +239,13 @@ cd packages/checkers
 env -u CLOUDFLARE_API_TOKEN npx wrangler whoami
 CRANE=/path/to/crane ./container/image.sh   # once: copies node:22-bookworm into the registry
 # secrets: LG_KEY (harness key) and CHECKER_KEY (Ed25519 private JWK), in a JSON secrets file
-env -u CLOUDFLARE_API_TOKEN npx wrangler deploy --secrets-file <file>
+env -u CLOUDFLARE_API_TOKEN npx wrangler deploy -c wrangler.harness.jsonc --secrets-file <file>
 node measure/live.mjs
 ```
 
-The script makes its own repos in the `gitseq-spike` namespace, deletes
+Live runs use the harness Worker, `artroom-lg-checkers` (`src/harness.ts`,
+`wrangler.harness.jsonc`), never the production one. The script makes its
+own repos in the `gitseq-spike` namespace, deletes
 them afterwards, and saves redacted results in `measure/results/`. The
 `/h/*` routes it uses play the room: they build jobs, mint read tokens,
 prepare snapshot repositories (`artroom-lg--snap-<commit>-<attempt>`, deleted when

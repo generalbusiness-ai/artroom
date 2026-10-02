@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { Sha } from "@generalbusiness/artroom-contract";
 import { FakeArtifacts, Fixture } from "./support.ts";
 
-const workerPath = "../src/worker.ts";
+const workerPath = "../src/harness.ts";
 const C1 = "1".repeat(40) as Sha;
 
 afterEach(() => vi.useRealTimers());
