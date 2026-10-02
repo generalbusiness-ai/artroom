@@ -69,3 +69,21 @@ check".
 | `npx playwright test` (packages/ui): 7 tests | 0 |
 | `npm run typecheck` (root) | 0 |
 | `npm test` (root) | 0 |
+
+## Mutation results
+
+Run after the first commit, one mutant at a time with `vitest run` on the
+whole UI suite, each reverted with `git checkout` before the next. Every
+mutant turned at least one test red (vitest exit 1); the tree was clean and
+the suite green afterwards.
+
+| Mutant | Red tests |
+|---|---|
+| M1 Proposal counts advisory obligations as blocking | an advisory obligation is listed apart from what a landing needs, and not counted |
+| M2 Mock landing waits for the advisory check | the landing never waits for the advisory check, and lands while it fails |
+| M3 `isAdvisory` always false | a failing advisory check reads as advisory…; an advisory obligation is listed apart…; the room's lane card counts only what blocks… |
+| M4 Room lane card counts advisory obligations | the room's lane card counts only what blocks… |
+| M5 Carry judgment drops its reason | a carried check shows the reason from its event |
+| M6 Carried evidence shows the evidence record's reason, not the event's | carried check evidence takes its reason from the event, not from the evidence record |
+| M7 Feed sentence drops the carry reason | describes check-carried events…; check-carried events appear in the activity feed |
+| M8 Not-carried judgment drops why | a check judged and not carried is shown with why |
