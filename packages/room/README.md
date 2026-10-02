@@ -656,23 +656,63 @@ always resolved before landing work).
    the contract should say that `CheckJob.integration` for a filtered input
    is this commit, and which lane issues jobs.
 
-## Log publication bound
+## Log publication: staged (lane B follow-up revision 3)
 
-Lane B's follow-up revision 2 bounds one push to `refs/artroom/log` (lane
-L's `LOG_TRANSFER_LIMITS`; lane L sends only the objects the lease lacks).
-When lane L refuses a cohort with `cohort-too-large`, nothing was sent. The
-Room then stores a smaller cohort, half the unpublished entries and at
-least one, with the retained files those entries name, a checkpoint for its
-last entry, and its exact commit (`commitFor`), before any remote write,
-and publishes it. A restart resumes the stored smaller cohort. One entry
-that is still too large is never skipped: publication stops with
-`publication_error` set to `cohort-too-large` and one attention item for
-the admins, and the alarm keeps retrying the same entry.
-[test/workerd/log-transfer.test.ts](test/workerd/log-transfer.test.ts):
-"is shrunk and published; the published log verifies …", "the smaller
-cohort is stored with its exact commit before any remote write, and a
-restart resumes it …", "one entry still too large is a surfaced
-publication error …".
+This revision merges `request/laneB-pushlog` at `f953c04c`. One push to
+`refs/artroom/log` is bounded (lane L's `LOG_TRANSFER_LIMITS`, now 8 MiB
+of decoded bytes, the same as lane B's `LOG_PUSH_LIMITS`). A publication
+larger than that is no longer refused. Lane L stages its objects first, in
+parts of at most one transfer, splitting an object that is larger than one
+transfer, and then pushes the commit with no objects.
+
+What changed in this package:
+
+- **The log remote stages.** [src/logremote.ts](src/logremote.ts)
+  implements lane L's `GitRemote.stage`. It forwards to the sandbox's
+  `stageLog({ canonical: { remote }, cohort, want, parts })`, with each
+  part's data as unpadded base64url, and returns the answer unchanged.
+  It needs no token: the sandbox stages into its own repository, and only
+  `pushLog` writes to the canonical one, under its 60-second write token.
+  The port type `StagingRemote` ([src/ports.ts](src/ports.ts)) makes
+  `stage` required, and [src/config.ts](src/config.ts) forwards
+  `stageLog` to the publisher Durable Object.
+- **The cohort-halving fallback is removed.** Lane L raises
+  `cohort-too-large` only for a publication over one transfer on a remote
+  that cannot stage. The Room's remote always stages, so nothing reaches
+  that error, and the code that stored a smaller cohort, and the admins'
+  attention item for a single entry that was still too large, are gone
+  from [src/core.ts](src/core.ts). A pending cohort stored by revision 7
+  is published as it is. If staging fails or stops making progress, lane L
+  pushes nothing and reports `unresolved`. The Room records that as
+  `publication_error` and retries the same cohort, as for any other
+  publication failure.
+- **The memory fake stages too.** `FakeArtifactsHost.logStub.stageLog`
+  checks the request with lane B's `decodeLogStage` and passes it to lane
+  L's `StagingArea`, one per repository. Completed objects wait in the
+  repository's `staged` set. A push adds them to the repository with its
+  ref. As git's receiving side does, it refuses a commit whose tree,
+  parents or blobs are neither sent, staged nor already held, and the ref
+  does not move.
+- **Lane L exports `StagingArea`** and its `StageWant`, `StagePart` and
+  `StageOutcome` types from `packages/log` (one additive export), so that
+  the fake can use them. Nothing else in `packages/log` changed here.
+
+Tests, in [test/workerd/log-transfer.test.ts](test/workerd/log-transfer.test.ts)
+(they replace the three halving tests):
+
+| Test | What it shows |
+|---|---|
+| "is staged in bounded parts and pushed with no objects; the whole cohort publishes to a verified log head" | With a 16,000-byte bound, the whole log publishes in one cohort. It is staged in more than one call, none over the bound, then pushed once with no objects. `verifyLog` passes through the head |
+| "an object larger than one transfer is staged in chunks of itself, and publishes" | With a 4,000-byte bound, one object is sent in several parts, at offsets after 0, and the log verifies |
+| "the sandbox's push with no objects and nothing staged finds nothing, and the ref does not move" | The fake's push refuses a commit whose objects were never sent or staged |
+
+Mutations, each run against the workerd suite and reverted:
+
+| Mutation | Tests that failed |
+|---|---|
+| The log remote has no `stage` (forwarding dropped) | the first two above (2) |
+| The fake's push ignores staged objects | the first two above (2) |
+| The fake's push skips the completeness check | the third (1) |
 
 ## Review 95323c2b
 
@@ -774,6 +814,51 @@ changes only this file:
 | root `npm test` | 0 | git 132; log 105 Node and 100 workerd; policy 190 Node and 189 workerd (1 skipped); room 67 Node and 272 workerd; ui 88 |
 | `npm run test:node` (this package) | 0 | 67 in 7 files |
 | `npm run test:workerd` (this package) | 0 | 272 in 17 files |
+| `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles with the Room, Registry and Publisher Durable Objects, the Artifacts binding and the Publisher container |
+
+The two merges and amendment 66d6fb14 that follow this fix are gated under
+"Gates for revision 8".
+
+## Amendment 66d6fb14: refuse rules before the claim check
+
+This revision merges main `73af785d`, which adds the default pack's
+`jj-conflicts` rule and amends R-ADM-1 (docs/protocol.md section 28). For
+`propose`, policy `refuse` rules now run inside step 8. They run once the
+head is known in the fork (R-PROP-1) and the changed paths are computed
+(R-PROP-3) and bounded (R-PROP-6). They run before the configuration-recovery
+scope check (R-ADMIN-6), the claim check (R-PROP-4) and configuration
+validity (R-POL-1). `require` rules stay at step 9 and share the act's
+budget meter. On a configuration-recovery lane both are still skipped
+(R-ADMIN-5). The change is in `propose()` in
+[src/admission.ts](src/admission.ts). Other kinds of act are unchanged.
+
+So a proposal that adds `.jjconflict-side-0/` at the root of its tree,
+outside its claim, is refused with `jj-conflicts`, not `outside-claim`.
+
+Tests, in [test/workerd/amendment-66d6fb14.test.ts](test/workerd/amendment-66d6fb14.test.ts),
+under the default pack (`starterPolicy`):
+
+| Test | What it shows |
+|---|---|
+| "a proposal adding .jjconflict-side-0/ outside its claim is refused with jj-conflicts, from the default policy pack, not outside-claim" | The rule's refusal and fix come first |
+| "without the rule, the same proposal is refused by the claim check" | The control: the room's default policy has no such rule |
+| "under the pack, a path outside the claim with no jj conflict data is still outside-claim, and a proposal inside it is admitted" | Moving the rules earlier adds refusals only |
+
+Mutation: putting the `refuse` evaluation back after the claim check made
+the first test fail (1 of 275); reverted.
+
+## Gates for revision 8
+
+Run at `c2ace91`, which holds the review 95323c2b fix, the merge of lane B
+follow-up revision 3, the merge of main `73af785d`, and amendment
+66d6fb14. The commit that adds this text changes only this file.
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | git 137; log 111 Node and 106 workerd; policy 199 Node and 198 workerd (1 skipped); room 67 Node and 275 workerd; ui 88 |
+| `npm run test:node` (this package) | 0 | 67 in 7 files |
+| `npm run test:workerd` (this package) | 0 | 275 in 18 files |
 | `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles with the Room, Registry and Publisher Durable Objects, the Artifacts binding and the Publisher container |
 
 ## Secrets
