@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:aef49c0ba7a1f0bc593587f904ac0b028bf11352","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/git/test/first-commit.test.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:28707d878ec0b2e64c03acbf6841669b73e29f77","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/git/test/ref-fence.test.ts: the pointer is withdrawn with no successor."}
