@@ -69,6 +69,20 @@ interface JobRow {
 
 const isPreview = (owner: string) => owner.startsWith("op_preview_");
 
+/** An error's text without any token in it, short enough to keep. */
+const redact = (s: string) => s.replace(/art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g, "<token>").slice(0, 300);
+
+/**
+ * Artifacts error codes that mean the request was refused and changed
+ * nothing (as lane B's `refusedUnchanged`): a definite answer. Any other
+ * failure, a lost answer included, may have applied.
+ */
+const REFUSED_UNCHANGED = new Set(["ALREADY_EXISTS", "INVALID_INPUT", "INVALID_REPO_NAME", "INVALID_TTL", "NOT_FOUND"]);
+function refusedUnchanged(e: unknown): boolean {
+  const x = e as { code?: unknown; numericCode?: unknown } | null;
+  return typeof x?.code === "string" && REFUSED_UNCHANGED.has(x.code) && typeof x.numericCode === "number";
+}
+
 /** Each room's attempts being waited for, by job ID: calling one stops the wait. Memory only; the row is the state. */
 const waits = new WeakMap<RoomCore, Map<string, () => void>>();
 function waitsOf(core: RoomCore): Map<string, () => void> {
@@ -169,6 +183,13 @@ async function endToken(core: RoomCore, token: string, job: string, expiresAt: n
 async function settleToken(core: RoomCore, token: string): Promise<void> {
   const row = one(core.sql, "SELECT expires_at, attempts FROM job_tokens WHERE token_id = ?", token);
   if (!row) return;
+  // A mint whose answer was lost: no ID to revoke. Settled only once the token it may have made has expired.
+  if (token.startsWith("mint:")) {
+    const until = num(row, "expires_at")!;
+    if (until <= core.now()) core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", token);
+    else core.sql.all("UPDATE job_tokens SET next_ms = ? WHERE token_id = ?", until, token);
+    return;
+  }
   try {
     const repo = await core.artifacts.get(core.location().name);
     await repo.revokeToken(token);
@@ -181,7 +202,7 @@ async function settleToken(core: RoomCore, token: string): Promise<void> {
       "UPDATE job_tokens SET attempts = ?, next_ms = ?, last_error = ? WHERE token_id = ?",
       attempts,
       core.now() + Math.min(5_000 * 2 ** attempts, 300_000),
-      String(e).replace(/art_v\d+_[A-Za-z0-9_]+/g, "<token>").slice(0, 300),
+      redact(String(e)),
       token,
     );
   }
@@ -262,8 +283,28 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       if (!tree) throw new Error("the integration's tree could not be read");
       const readUrl = (await core.canonicalRemoteReady()) as `https://${string}`;
       const repo = await core.artifacts.get(core.location().name);
-      // Asked to expire before the deadline claimed above; what Artifacts returns is checked below (R-EXEC-9).
-      const t = await repo.createToken("read", Math.floor((deadline - core.now()) / 1000) - TOKEN_MARGIN_S);
+      // The mint is recorded before Artifacts is asked (`mint:<job>`): if its answer is lost, a token may exist
+      // that the Room cannot name. The record stays, unresolved and visible, until the token could no longer be
+      // live: the attempt's deadline, which is later than any expiry asked for here.
+      const intent = `mint:${jobId}`;
+      core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, 'minting') ON CONFLICT (token_id) DO NOTHING", intent, deadline, deadline);
+      let t: Awaited<ReturnType<typeof repo.createToken>>;
+      try {
+        // Asked to expire before the deadline claimed above; what Artifacts returns is checked below (R-EXEC-9).
+        t = await repo.createToken("read", Math.floor((deadline - core.now()) / 1000) - TOKEN_MARGIN_S);
+      } catch (e) {
+        // A refusal that changed nothing settles it; any other failure may have minted a token.
+        if (refusedUnchanged(e)) core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
+        else core.sql.all("UPDATE job_tokens SET last_error = ? WHERE token_id = ?", `answer lost: ${redact(String(e))}`, intent);
+        throw e;
+      }
+      // An answer without the token's ID and text cannot be used or revoked: as unknown as a lost one.
+      if (typeof t?.id !== "string" || !t.id || typeof t.plaintext !== "string" || !t.plaintext) {
+        core.sql.all("UPDATE job_tokens SET last_error = 'malformed answer' WHERE token_id = ?", intent);
+        throw new Error("Artifacts answered the mint without a usable token");
+      }
+      // Known now: from here the token is ended by its ID (and the intent is settled in the same step).
+      core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
       tokenId = t.id;
       tokenExpires = Date.parse(t.expiresAt);
       if (!Number.isFinite(tokenExpires)) tokenExpires = null;
