@@ -18,6 +18,7 @@ import type {
   Carried,
   Checkpoint,
   CheckerConfig,
+  CheckerService,
   Decision,
   Digest,
   Glob,
@@ -245,6 +246,8 @@ export interface Remotes {
   readonly firstCommit?: (remote: string, token: string, at: number) => Promise<import("@generalbusiness/artroom-git").FirstCommitOutcome>;
   /** The room's publisher sandbox (lane B's Publisher Durable Object). */
   readonly publisher: import("@generalbusiness/artroom-git").PublisherStub;
+  /** The publisher sandbox's snapshot writer (R-CARRY-15, R-CARRY-16). */
+  readonly writeSnapshot: SnapshotWrite;
   /** Lane L's git remote for `refs/artroom/log` on the room's repository. It must stage. */
   readonly logRemote: (repo: import("./artifacts.ts").RepoLocation) => Promise<StagingRemote>;
   /** The most one log push may carry (lane L's `maxTransfer`); default lane L's `LOG_TRANSFER_LIMITS`. */
@@ -259,17 +262,48 @@ export interface Remotes {
   readonly landingFault?: (point: import("@generalbusiness/artroom-git").FaultPoint, op: OpId) => void;
 }
 
-/** What the Room is given: the policy runtime and the remotes. */
+/**
+ * Snapshot repositories (R-CARRY-16): one new repository per snapshot
+ * commit, one read token per job, and durable retirement. The Room's own is
+ * lane B's `SnapshotRepos` over its SQLite, written by its publisher sandbox
+ * (`core.ts`); tests may give another.
+ */
+export interface SnapshotPort {
+  /**
+   * The repository holding exactly this snapshot commit: reused for the same
+   * commit, otherwise new, with the publisher writing the snapshot into it.
+   * Returns the commit the repository holds; the Room issues the job only if
+   * that is the commit it recorded (R-CARRY-15 step 4).
+   */
+  prepare(snapshot: {
+    readonly commit: Sha;
+    readonly integration: Sha;
+    readonly checker: string;
+    readonly digest: Digest;
+    readonly paths: readonly Glob[];
+  }): Promise<{ readonly commit: Sha; readonly remote: string }>;
+  /** A read token for that repository only, for one job, expiring no later than `deadline` (ms). */
+  mint(commit: Sha, job: string, deadline: number): Promise<{ readonly token: string; readonly expiresAt: number }>;
+  /** The job has ended: revoke its token, and retire the repository once no job is left. */
+  end(commit: Sha, job: string): Promise<unknown>;
+}
+
+/** The publisher sandbox's snapshot writer (lane B's `Publisher.writeSnapshot`): the fixed commit into an empty store, at `refs/artroom/snapshot`. */
+export type SnapshotWrite = (req: {
+  readonly canonical: { readonly remote: string; readonly token: string };
+  readonly store: { readonly remote: string; readonly token: string };
+  readonly files: readonly (readonly [string, string, string])[];
+  readonly message: string;
+}) => Promise<string>;
+
+/** What the Room is given: the policy runtime, the remotes and the checker services. */
 export interface RoomServices {
   readonly policy: PolicyPort;
   readonly remotes: Remotes;
-  /**
-   * The runner environment digest attested now for a checker, or null. A
-   * check carries onto a new integration only if the runner that would run
-   * it now is attested to be the earlier check's (R-CARRY-6). No deployment
-   * attests one yet, so checks do not carry (review a711f7b6; amendment 3).
-   */
-  readonly runnerDigest?: (checker: string) => Digest | null;
+  /** The checker's service binding (R-EXEC-8), or null when the deployment binds none for it. */
+  readonly checkers?: (checker: string) => CheckerService | null;
+  /** Tests only: snapshot repositories other than the Room's own (R-CARRY-16). */
+  readonly snapshots?: SnapshotPort | undefined;
 }
 
 /** The ports the Room's code uses, built by the Room over its services. */

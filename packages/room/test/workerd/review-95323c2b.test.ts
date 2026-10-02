@@ -10,19 +10,20 @@
 
 import { describe, expect, it } from "vitest";
 import { runInDurableObject } from "cloudflare:test";
-import type { Check, CheckerConfig, Claim, Landing, LandOp, Proposal, Sha } from "@generalbusiness/artroom-contract";
+import type { Check, CheckerConfig, Claim, Landing, LandOp, PolicyDocument, Proposal, Sha } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
 import { evidenceByAct } from "../../src/model.ts";
 import { obligationsFor } from "../../src/obligations.ts";
-import { addMember, expectRefusal, makeRoom, pushChange, tick, type Client, type TestRoom } from "./support.ts";
+import { addMember, clock, expectRefusal, iso, makeRoom, pushChange, tick, type Client, type TestRoom } from "./support.ts";
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const op = async (r: TestRoom, id: string) => (await r.admin.read({ q: "op", op: id as never })) as LandOp & { integration?: string; waiting?: string[] };
-const RUNNER = `sha256:${"0".repeat(64)}`;
+const RUNNER = `sha256:${"0".repeat(64)}` as const;
 const volatileCfg: CheckerConfig = { format: "artroom-checker-v1", inputs: ["src/**"], volatile: true, timeoutSeconds: 60 };
-const stableCfg: CheckerConfig = { ...volatileCfg, volatile: false };
+/** Pins the runner every test check states, so its checks can carry (R-CARRY-14). */
+const stableCfg: CheckerConfig = { ...volatileCfg, volatile: false, runner: RUNNER };
 
 type Row = Record<string, unknown>;
 interface Landed {
@@ -32,9 +33,10 @@ interface Landed {
   readonly rec: Row;
 }
 
-async function room(cfg: CheckerConfig) {
+async function room(cfg: CheckerConfig, rules: PolicyDocument["rules"] = []) {
+  const base = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
   const r = await makeRoom({
-    policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })),
+    policy: { ...base, rules: [...base.rules, ...rules] },
     files: { ".artroom/checkers/unit.json": JSON.stringify(cfg), "package.json": "{}" },
   });
   return { r, alice: await addMember(r, "@alice", "member"), bob: await addMember(r, "@bob", "member"), ci: await addMember(r, "@ci", "checker") };
@@ -137,7 +139,7 @@ describe("review 95323c2b P2: a shared snapshot commit is not a reverse key to a
     const { r, ci, first, second } = await twoLandings(volatileCfg);
     // The shared snapshot commit, naming the other landing's operation, from either side.
     const a = expectRefusal(await ci.act("check", { lane: second.lane, generation: 1 }, snapshotCheck(volatileCfg, second.rec, first.opId)), "check-binding");
-    expect(a.reason).toMatch(/not an active landing of this generation/);
+    expect(a.reason).toMatch(/not an active or landed landing of this generation/);
     expectRefusal(await ci.act("check", { lane: first.lane, generation: 1 }, snapshotCheck(volatileCfg, first.rec, second.opId)), "check-binding");
     // An operation that does not exist.
     expectRefusal(await ci.act("check", { lane: second.lane, generation: 1 }, snapshotCheck(volatileCfg, second.rec, "op_9_99999999")), "check-binding");
@@ -154,9 +156,9 @@ describe("review 95323c2b P2: a shared snapshot commit is not a reverse key to a
   });
 
   it("carry: an earlier check on the shared snapshot commit carries to the lane's new integration, whatever order the snapshot rows are stored in", async () => {
-    const t = await room(stableCfg);
+    // A carry rule for checks holds the first judgment back; the activation that removes it judges again.
+    const t = await room(stableCfg, [{ id: "hold", kind: "carry", evidence: "check", allow: "false" }]);
     const { r, ci } = t;
-    r.world.runnerDigest = () => null;
     // Bob's docs landing moves main after Alice's check; Alice's src snapshot is unchanged by it.
     const bobLane = await t.bob.ok<Claim>("claim", null, { goal: "docs", scope: ["docs/**"] });
     const bobHead = pushChange(r, bobLane.lane, { "docs/guide.md": "more" });
@@ -166,7 +168,7 @@ describe("review 95323c2b P2: a shared snapshot commit is not a reverse key to a
     const check = await ci.ok<Check>("check", { lane: mine.lane, generation: 1 }, snapshotCheck(stableCfg, mine.rec, mine.opId));
     expect(await canonicalOf(r, check.id)).toBe(mine.integration);
     await tick(r, 4);
-    // Main moved; with no runner attested nothing carries, and the new integration's snapshot is recorded too.
+    // Main moved; the carry rule stops the carry, and the new integration's snapshot is recorded too.
     const moved = await op(r, mine.opId);
     expect(moved).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
     expect(moved.integration).not.toBe(mine.integration);
@@ -190,9 +192,11 @@ describe("review 95323c2b P2: a shared snapshot commit is not a reverse key to a
       }),
     );
     expect(await inDO(r, (rm) => rm.core.sql.all("SELECT integration FROM check_snapshots WHERE commit_sha = ?", commit)[0]!["integration"])).toBe(moved.integration);
-    // The runner is attested now: the earlier check, bound to the earlier integration, carries by the identical snapshot.
-    r.world.runnerDigest = () => RUNNER;
-    await inDO(r, (rm) => rm.core.requestEvaluation(mine.opId as never));
+    // A policy without the rule: the earlier check, bound to the earlier integration, carries by the identical snapshot.
+    await inDO(r, (rm) => {
+      const old = rm.core.activePolicy();
+      rm.core.sql.transaction(() => rm.core.activate({ ...old.doc, rules: old.doc.rules.filter((x) => x.id !== "hold") }, old.checkers, null, iso(clock.now)));
+    });
     await tick(r, 4);
     expect(await op(r, mine.opId)).toMatchObject({ state: "landed", integration: moved.integration });
   });

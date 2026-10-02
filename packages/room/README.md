@@ -86,6 +86,8 @@ The Room's code talks to other lanes through small interfaces in
 | `LandingPort` and `LandingHost` | The landing operation, and the Room's side of it | Lane B's `Landing` and `LandingRoom`, on the Room's SQLite, with lane B's `ContainerPublisher` and `canonicalTokens`. `readiness` may await; `revalidate` compares the rebuilt reservation input with the bytes the engine retained. |
 | Workspaces | One fork per lane, one token per lease generation | Lane B's `Workspaces`, on the Room's SQLite. The Room records which leases it opened (`ws_leases`), carries renewals to the workspace's deadline, and ends a lease's access when it ends. |
 | `ArtifactsPort` | Repository creation at founding, config reads, heads, pinned refs, diffs, previews, filtered snapshots | [src/artifacts.ts](src/artifacts.ts): the Artifacts binding with lane B's `changedPaths`, `treeDiff`, `previewPlan` and `Pinning`. |
+| Checker services | Every check job, over the checker's service binding (R-EXEC-8) | `RoomServices.checkers`: in a deployment, the binding `CHECKER_<NAME>` ([src/config.ts](src/config.ts)); the job flow is [src/jobs.ts](src/jobs.ts). |
+| `SnapshotPort` | One repository per snapshot commit, and its job tokens (R-CARRY-16) | Lane B's `SnapshotRepos`, on the Room's SQLite, written by the publisher sandbox's `writeSnapshot` (`Remotes.writeSnapshot`). Tests may give another (`RoomServices.snapshots`). |
 | `PublisherPort` | Publishes the log to `refs/artroom/log` (R-LOG-8) | Lane L's `LogPublisher`, opened over a git remote. In a Worker that remote is [src/logremote.ts](src/logremote.ts) over lane B's `LogRemoteStub`: the ref is read by the sandbox's `readLogRef` (the binding's `log({ ref })` returns nothing for `refs/artroom/log`), and an unreadable ref is an error, never an absent one; objects are read through the binding, trying each kind in turn (the binding throws for a commit or tree read of another type), re-encoded and accepted only if they hash to the SHA asked for; pushes go through the sandbox's `pushLog`. Each sandbox call carries a token of at most 60 seconds, revoked afterwards. |
 
 A deployment gives the Room its remotes ([src/config.ts](src/config.ts)):
@@ -272,6 +274,7 @@ Before the first deploy (the file's header says the same):
 | `IMPORT_NAMESPACE` | The namespace `IMPORT_ARTIFACTS` reaches; the only one a grant may name. It must differ from `PUBLIC_NAMESPACE` (R-GEN-12) |
 | `PUBLISHER` (binding) | Lane B's `Publisher` Durable Object class (the git sandbox), one instance per room |
 | `ARTIFACTS_HOST` | The Artifacts host the sandbox's gateway lets the container reach, under `ARTIFACTS_NAMESPACE` and `IMPORT_NAMESPACE` |
+| `CHECKER_<NAME>` (binding) | A checker's service, by its name in capitals with `-` as `_` (`llm-review` is `CHECKER_LLM_REVIEW`). The Room sends that checker's jobs to its `handle(job)` (R-EXEC-8). [wrangler.jsonc](wrangler.jsonc) binds none yet; with none, a check obligation waits for a check signed some other way |
 
 A spike deployment, `artroom-spike-room` on the `gitseq-spike` namespace, is
 configured in [wrangler.spike.jsonc](wrangler.spike.jsonc) and deployed with
@@ -605,7 +608,9 @@ changed:
   volatile, the key is not revoked, and the runner environment attested now
   is the earlier check's. A carry counts only on the integration and under
   the policy version that judged it. No deployment attests a runner yet, so
-  in production checks do not carry (see "Review a711f7b6").
+  in production checks do not carry (see "Review a711f7b6"). Amendment 3
+  replaced the attested runner with the configuration's pin, and seals
+  every judgment (see "Amendment 3").
 - **The alarm** is set from the earliest of the Room's own work, lane B's
   `landing.nextDue()` and `workspaces.nextDue()`, so it follows lane B's
   capped backoff and never spins.
@@ -940,6 +945,387 @@ Gates at `2dac0041`, the merge:
 | `npm run test:workerd` (this package) | 0 | 275 |
 | `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles |
 
+## Amendment 3 (request 23b96a18)
+
+Contract amendment 3 (docs/protocol.md section 29) lists seven edits for
+this package (section 29.8, lane A). This request makes all seven. Edits 1,
+2, 3, 5, 6 and 7 came first; edit 4, one repository per snapshot commit
+(R-CARRY-16), followed once lane G's `SnapshotRepos` landed in
+`packages/git`, together with the fixes of review 0f9739dc (see that
+section). The tests are in
+[test/workerd/amendment3.test.ts](test/workerd/amendment3.test.ts),
+[test/workerd/review-0f9739dc.test.ts](test/workerd/review-0f9739dc.test.ts)
+and [test/workerd/snapshot-repos.test.ts](test/workerd/snapshot-repos.test.ts);
+each test name starts with its rule or finding.
+
+| Edit | What the Room does | Tests (in that file unless named) |
+|---|---|---|
+| 1. Check carry is recorded (R-CARRY-13) | `carryChecks` in [src/core.ts](src/core.ts) judges the earlier passing checks of an open check obligation, newest first, until one carries. Each judgment, carried or not, is sealed as a `check-carried` event in the transaction that stores it, with the operation, lane, generation, new integration, obligation, earlier check, policy version, outcome and the `carry` rule decisions. Lane C's `evaluateCarry` judges the platform conditions first and then the carry rules for checks, with one act meter per judgment; their contexts are retained, so `artroom verify` replays them. A judgment is sealed once per earlier check, integration and policy version (`check_judged`). A stored carry names its event and counts only with it; rows from before this change have none and never count. The rule that carry rules for checks stop all check carrying is gone: their decisions are now in the event. | "R-CARRY-13 check carried …"; "… a carry rule for checks refuses it …"; "… a policy activation after the carry …"; "… fail closed …"; "R-CARRY-13, R-LOG-10: artroom verify accepts a log with carried and not-carried events …"; review-a711f7b6 "a carry rule for reviews only …" |
+| 2. Runner pin (R-CARRY-14) | The current runner is `CheckerConfig.runner` from the active configuration; `RoomServices.runnerDigest` is removed. A check whose `runner` differs from the pin is refused `check-binding`. A checker with no pin never carries: the event says `runner-changed`, "No runner environment is pinned", with no decisions. Its checks still meet obligations on their own integration. | "R-CARRY-14 the configuration pins R …"; "… the pin changes from R to S …"; "… no runner pinned …"; review-a711f7b6 and phase2b carry tests, now with a pinned configuration |
+| 3. Snapshot commit check (R-CARRY-15 step 4) | `snapshotCommit` is kept. Before a filtered job, the Room records the snapshot commit if it has not yet, has the publisher write it into its own repository, and issues the job only if the commit written has the recorded ID. Otherwise it issues nothing and tries again later. Lane B's `SnapshotRepos` makes the same check, and deletes a repository holding anything else. | "R-CARRY-15 the publisher writes the snapshot with another identity …" |
+| 4. Snapshot repositories (R-CARRY-16) | The Room runs lane B's `SnapshotRepos` on its own SQLite (`snapshotRepos` in [src/core.ts](src/core.ts)), with repository names starting with the canonical repository's. For a filtered job it gets the repository for the snapshot commit: a new, empty one, into which its publisher sandbox writes the snapshot at `refs/artroom/snapshot` (lane B's `writeSnapshot`, reading the canonical repository with a 300-second read token), or the same commit's repository while another job still uses it. Each job attempt mints its own read token for that repository only, expiring by the attempt's deadline, and ends it when the attempt answers or expires; with no job left the repository is retired. Unknown creates, deletions and revocations are durable duties; the alarm runs them (`steps.snapshots`) and is set from them (`nextAlarm`). A snapshot never includes a submodule entry. | snapshot-repos: "older snapshot, omitted file …"; "reuse only for the same snapshot commit …"; "retirement after the last job ends …"; "an unknown create …"; "restart …"; "a submodule entry is never part of a snapshot" |
+| 5. Jobs (R-EXEC-8 to R-EXEC-10) | [src/jobs.ts](src/jobs.ts). When a check obligation is open on a clean preview's integration or a landing's, the Room owes one job per owner (that preview or landing operation), integration, obligation and configuration, if the deployment binds a service for that checker (`CHECKER_<NAME>`). The alarm's `jobs` step sends each attempt only to that binding's `handle(job)`, in the background. A whole-tree job reads the canonical repository with a read token minted for the attempt; `gitAuthEnv` is exactly the three variables of `GitAuthEnv`, and `deadline` is the token's expiry. `base` is the landing's `expectedMain`, or the main commit the preview was built on; `volatile`, `advisory` and `runner` come from the configuration whose digest is `config`; a landing's job names it as `landOp`. The job's states and attempts are described under "Review 0f9739dc". | "R-EXEC-8, R-EXEC-9, R-EXEC-10 a whole-tree job carries …"; "R-EXEC-8 no service binding …"; "R-EXEC-8 a job is not issued once its landing has ended"; "… once its obligation is met …"; "… a new job is issued for I2" |
+| 6. Advisory obligations (R-OBL-7) | `withAdvisory` in [src/obligations.ts](src/obligations.ts) sets `CheckObligation.advisory` from the configuration, when a proposal is recorded and when obligations are recomputed at activation. Readiness neither waits for an advisory obligation nor fails on its failing check, and leaves its evidence out of the evidence the landing relies on. Reservation does not require it, and the land rule input leaves it out, so an advisory check that arrives after readiness changes nothing reservation compares. A compromised revocation that reopens only an advisory obligation does not make the landing retryable. The obligation still gets an attention item and a job, and its checks are recorded and shown. | "R-OBL-7 the obligation is advisory …"; "… an advisory checker's check fails …"; "… arrives between readiness and reservation …"; "R-OBL-7, R-REV-3 a landing does not rely on advisory evidence …"; "R-OBL-7, R-POL-9 an activation that makes the checker advisory …" |
+| 7. Volatile flag (R-EXEC-10) | Unchanged: a signed check whose `volatile` differs from its configuration's is `check-binding`, either way. A job's `volatile` is the configuration's. | "R-EXEC-10 the job's volatile is the configuration's (true) / (false) …"; review-a711f7b6 "a check whose volatile flag contradicts the configuration …" |
+
+Migration 8 adds `check_carries.event`, `check_judged` and `check_jobs`.
+
+**Choices the contract leaves open.**
+- A job attempt lives for the checker's `timeoutSeconds` plus 300 seconds;
+  its token expires by then (see "Review 90f30a3b"). A token is ended when
+  the attempt answers or expires; a canonical token's revocation is a
+  durable duty, retried until Artifacts confirms it or the token expires.
+- A job the service refuses is not sent again for that owner and
+  integration. Its outcome is kept in `check_jobs`.
+- A snapshot repository is not kept for reuse after its last job
+  (`SnapshotRepos`' default `retainMs` of 0): reuse is for jobs in flight
+  at the same time on the same snapshot commit.
+- Advisory obligations are left out of the land rule input, so a land rule
+  cannot make one block.
+- With a pinned runner, a change of pin always changes the configuration
+  digest, so the outcome is `config-changed`; `runner-changed` occurs only
+  for an unpinned checker.
+
+**Mutations (revision 1).** Each new guard was broken once, the whole workerd suite run,
+and the change reverted. 27 of 30 mutations were caught, four of them only
+after a test was added or strengthened. Adding the test for advisory
+evidence found a defect: a compromised revocation that reopened only an
+advisory obligation made the landing retryable. It is fixed.
+
+| Mutation | Tests that failed |
+|---|---|
+| Carry stored without sealing its event | the four R-CARRY-13 tests that look for an event, and two R-CARRY-14 tests (6) |
+| A stored carry counts without its event | "R-CARRY-13 fail closed …" (1) |
+| Runner pin ignored at admission | "R-CARRY-14 the configuration pins R …" (1) |
+| A checker with no pin carries | "R-CARRY-14 … no runner pinned …"; phase2b "… no runner pinned …"; review-a711f7b6 "no runner environment pinned …" (3) |
+| Carry rule decisions left out of the event | three R-CARRY-13 tests (3) |
+| Snapshot ID not checked before a filtered job | "R-CARRY-15 …" (1) |
+| Filtered jobs owed without snapshot repositories | "R-CARRY-16 without snapshot repositories …" (1) |
+| Readiness waits for an advisory obligation | all four R-OBL-7 landing tests (4) |
+| A failing advisory check fails the landing | "… an advisory checker's check fails …" (1) |
+| Reservation requires an advisory obligation | three R-OBL-7 tests (3) |
+| Advisory obligations in the land rule input | "… arrives between readiness and reservation …" (1) |
+| Advisory evidence relied on by the landing | "R-OBL-7, R-REV-3 …" (1, after the test was added) |
+| A compromised revocation reopening an advisory obligation stops the landing | "R-OBL-7, R-REV-3 …" (1) |
+| Advisory not set at proposal / at recomputation | three R-OBL-7 tests / "R-OBL-7, R-POL-9 …" (3, 1) |
+| Job `volatile`, `advisory`, `runner` or `base` not from the configuration or landing | the matching R-EXEC-10, R-OBL-7, R-EXEC-8 and R-CARRY-13 job tests (1 to 2 each) |
+| `gitAuthEnv` with a fourth variable; a write token; the token not revoked; a deadline after the token's expiry | "R-EXEC-8, R-EXEC-9, R-EXEC-10 a whole-tree job …" (1 each) |
+| A job issued for a landing that ended / after its obligation is met | "… once its landing has ended" / "… once its obligation is met …" (1 each, after the tests were added) |
+| Jobs owed with no service binding | "R-EXEC-8 no service binding …" (1) |
+| Judgments not deduplicated at all (both checks and the `check_judged` key) | "R-CARRY-14 the pin changes …" (1, after it was strengthened) |
+
+Three are equivalent. The current runner taken from the earlier check
+instead of the pin: the pin is part of the configuration digest and
+admission enforces it, so a changed pin is always `config-changed` first.
+Removing only the check before evaluation, or both checks, for a judgment
+already sealed: the transaction's check, then the `check_judged` primary
+key, still seal it once. One run of the first of these failed a timing test
+in concurrency.test.ts under load; it passed when run again, alone and in
+the suite.
+
+**Gates (revision 1)** at `455491c8`, the last code commit of revision 1:
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | git 143; log 127 Node and 122 workerd; policy 199 Node and 198 workerd (1 skipped); room 67 Node and 295 workerd; ui 88 |
+| `npm run test:node` (this package) | 0 | 67 in 7 files |
+| `npm run test:workerd` (this package) | 0 | 295 in 19 files |
+| `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles with the Room, Registry and Publisher Durable Objects, the Artifacts binding and the Publisher container |
+
+## Review 0f9739dc
+
+The checker's review of `8931f596` accepted the sealed carry, the runner
+pin and the advisory work, and found two P2s in job delivery. Its
+diagnostic asserted both defects; the tests in
+[test/workerd/review-0f9739dc.test.ts](test/workerd/review-0f9739dc.test.ts)
+assert the correct outcomes. This revision also merges main `6f8cacbe`
+(lane F's carry UI and jj history) and `5acf29ad` (lane G, with
+`SnapshotRepos`), and makes amendment 3's edit 4 (see "Amendment 3").
+
+**The fix: one durable state machine per logical job** ([src/jobs.ts](src/jobs.ts)).
+A job belongs to an owner, a clean preview or a landing operation, and is
+one row per owner, integration, obligation and configuration:
+
+- `owed`: due at `next_ms`.
+- `sent`: attempt `attempt` is with the service until `next_ms`, its
+  deadline. Each attempt has its own job ID (`<job>_<attempt>`) and its own
+  token, and the row keeps the token's ID.
+- `done`: answered, or no longer needed, with its outcome.
+
+Every change to a row is made only for the attempt and state it was read
+in, so a late answer, or a second jobs step running at the same time, never
+overwrites a newer attempt. The in-memory "running" flag is gone: the row
+alone decides. A jobs step that finds a sent attempt past its deadline stops
+waiting for its answer, ends its token, and sends a new attempt. Every step
+leaves unfinished jobs due in the future: a failed preparation is due again
+after 30 seconds, and a room the registry does not bind defers its jobs by 5
+minutes. So the alarm is never set in the past.
+
+A job is still needed while its owner is current on that integration (the
+preview's integration now, of a generation not landed; or the landing
+active on it), the generation is the lane's latest, the configuration is
+unchanged and the obligation is open. An advisory job whose landing landed
+before the job was sent is still delivered, and a check that names a landed
+operation of its generation binds that landed integration (R-OBL-3: "a
+landing operation's integration"). A preview job's `base` is the main commit
+the preview was built on; it names no `landOp`.
+
+| Finding | Tests (in that file unless named) |
+|---|---|
+| P2 1. An attempt in flight past its deadline blocked its retry, and left the alarm in the past | "a slow call past its deadline: the next jobs step issues a new attempt with a new token, revokes the expired one, and leaves nothing past due; a late refusal of the first attempt changes nothing"; "the expired attempt's wait is released by the jobs step …"; "two jobs steps at once: one attempt is sent …"; "restart: an attempt in flight when the room stops is issued again at its deadline …"; "a room the registry does not bind issues no job …"; snapshot-repos "an unknown create …" (a failed preparation is due later) |
+| P2 2. Previews got no jobs | "preview before land: the preview's job … meets the obligation, and the landing lands on it without another job" (and a landed generation's refreshed preview gets none); "preview refresh after main moves …"; "an owed preview job whose preview moved to another integration is not issued"; "… whose lane moved to a new generation …"; "… whose checker configuration changed …"; "R-OBL-7 an advisory job still queued when its landing lands is delivered …"; snapshot-repos "older snapshot, omitted file" (filtered preview jobs) |
+
+**Mutations.** Each new guard of this revision, edit 4 included, and the
+job guards of revision 1 again, was broken once, the whole workerd suite
+run, and the change reverted. 30 of 33 mutations were caught, three only
+after a test was added (the expired token ended after a restart; two steps
+at once; the generation fence alone).
+
+| Mutation | Tests that failed |
+|---|---|
+| An expired sent attempt is never sent again | 4 |
+| The expired attempt's wait is not released | "the expired attempt's wait is released …" (1) |
+| The expired attempt's token is not ended by the step | "restart: …" (1, after the assertion was added) |
+| A step that lost the race to send still sends | "two jobs steps at once …" (1, after the test was added) |
+| One job ID for every attempt | 9 |
+| A failed preparation due again at once | snapshot-repos "an unknown create …" (1) |
+| A room the registry does not bind leaves its jobs due now | "a room the registry does not bind …" (1) |
+| Previews owe no jobs | 10 |
+| A preview job's base taken from lane B's preview base | "preview refresh after main moves …" (1) |
+| A landed generation's preview owns jobs | "preview before land …"; "R-OBL-7 an advisory job still queued …" (2) |
+| A preview job issued for an integration the preview no longer has | "an owed preview job whose preview moved …" (1) |
+| A job issued after the lane's generation moved | "… whose lane moved to a new generation …" (1, after the test was split) |
+| A job issued after its configuration changed | "… whose checker configuration changed …" (1) |
+| An advisory job dropped when its landing landed first; a check naming a landed operation refused | "R-OBL-7 an advisory job still queued …" (1 each) |
+| A job issued after its obligation is met | amendment3 "… once its obligation is met …" (1) |
+| The Room does not check the written snapshot commit | amendment3 "R-CARRY-15 …" (1) |
+| A filtered job's token never ended | four snapshot-repos tests (4) |
+| A filtered job reads the canonical repository | 5 |
+| Snapshot duties not run by the alarm; the alarm not set from them | snapshot-repos "retirement …" (1 each) |
+| A submodule entry in a snapshot | snapshot-repos "a submodule entry …" (1) |
+| Job `volatile`, `advisory`, `runner` or `base` not from the configuration or owner | 1, 2, 1 and 4 |
+| `gitAuthEnv` with a fourth variable; a write token; a deadline after the token's expiry | 1, 1 and 4 |
+| Jobs owed with no service binding | 8 |
+
+Three are equivalent. An answer not fenced by its attempt: the jobs step
+releases an expired attempt's wait before it sends the next, so a late
+answer is never delivered. A job issued for a landing that ended: of the
+ended states, only `aborted` keeps an integration, and an aborted landing
+was reserved, which needs every blocking obligation met first. The Room's
+port reporting the recorded commit instead of the one written: lane B's
+`SnapshotRepos.prepare` refuses a repository holding another commit before
+the Room sees it, so the Room's own check (which is tested with another
+port) is a second check.
+
+**Gates** at `f283640e`, the last code commit; the commit that adds this
+text changes only this file:
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | checkers 33; git 162; log 127 Node and 122 workerd; policy 199 Node and 198 workerd (1 skipped); room 67 Node and 311 workerd; ui 141 |
+| `npm run test:node` (this package) | 0 | 67 in 7 files |
+| `npm run test:workerd` (this package) | 0 | 311 in 21 files |
+| `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles with the Room, Registry and Publisher Durable Objects, the Artifacts binding and the Publisher container |
+
+## Review 786e9606
+
+The checker's review of revision 2 (`734767c2`) found two P2s in job
+dispatch ([src/jobs.ts](src/jobs.ts)). This revision fixes both and merges
+main `9bb700b6` (contract amendment 4, bounded-memory log publication, lane
+E, the deploy and pi-durable spikes); the one conflict was in `core.ts`'s
+imports, where main's `RetainedRef` replaces `RetainedFile`.
+
+| Finding | Fix | Tests (in [test/workerd/review-786e9606.test.ts](test/workerd/review-786e9606.test.ts) unless named) |
+|---|---|---|
+| P2 1. Two jobs steps both read one owed row and used one attempt's ID before either claimed it; the step that lost then ended the winner's token and retired its snapshot repository | A step claims the attempt in the job's row (`owed` to `sent`, the next attempt number, its deadline) before it reads a snapshot or a tree or mints a token. A step that loses the claim prepares nothing. Every credential belongs to one attempt, and its ID is written to the row as soon as it exists, so an expiry or a restart still ends it. A canonical token is minted to expire by the deadline claimed with the attempt. | "filtered / whole-tree: two jobs steps at once on two owed jobs send one attempt each, whose tokens and repositories stay usable until they answer"; "whole-tree: a step held past the attempt's deadline, while the next step issues attempt 2, ends its own token and sends nothing"; "filtered: a job token that cannot be minted leaves the job due again later; the retry reuses the repository written for it"; review-0f9739dc "two jobs steps at once …", "restart …" |
+| P2 2. Owner, configuration, generation and obligation were judged only before the asynchronous preparation | After preparation the step checks that the row still holds its attempt, and judges the work again with the same synchronous check it used before (`current`: the owner current on the integration, the lane's latest generation, the same configuration, the obligation open), with no await before the dispatch. Work that changed is marked not needed, and its credentials are ended: the canonical token revoked, or the snapshot job ended, which retires its repository. | eight controls: "whole-tree / filtered preparation, owner / generation / configuration / obligation changed while a read token was being minted" |
+
+The controls run on the real Room Durable Object and SQLite, with lane B's
+real `SnapshotRepos`, over the fake Artifacts and sandbox. To stop a step in
+the middle of its preparation, the fake's `createToken` can be held in
+flight (`FakeArtifactsHost.holdToken`): the controls hold read tokens on
+the canonical repository and on snapshot repositories, and meanwhile move
+the preview to another integration, propose a new generation, activate a
+changed configuration, or meet the obligation with a check signed
+elsewhere.
+
+**Mutations.** Each guard was broken once, the whole workerd suite run, and
+the change reverted. 10 of 12 mutations were caught, one only after its
+control was strengthened.
+
+| Mutation | Tests that failed |
+|---|---|
+| The step that loses the claim goes on preparing | both "two jobs steps at once on two owed jobs …" (2, after they counted each job's preparation; at first the duplicate dispatch was dropped by the in-flight key, so only a stray token showed it) |
+| Dispatch without checking that the row still holds the attempt | "a step held past the attempt's deadline …" (1) |
+| A canonical token's ID not written to the row | review-0f9739dc "restart …" (1) |
+| No judgment after preparation | the eight preparation controls (8) |
+| The credentials of work no longer needed not ended | the eight preparation controls (8) |
+| `current` without the configuration / the generation / the open obligation / the preview's current integration | 3 each: the matching preparation controls (whole-tree and filtered), and the earlier test for that fence |
+| A canonical token that outlives the claimed deadline | amendment3 "R-EXEC-8, R-EXEC-9, R-EXEC-10 a whole-tree job …" (1) |
+
+Two are equivalent. A snapshot token's marker not written to the row: the
+expired attempt's token is then not ended by the step, but `SnapshotRepos`
+already owes the repository's deletion by the token's deadline. A failed
+preparation not ending its credentials: a preparation fails only before its
+token exists (the canonical mint is the last thing that can fail, and
+`SnapshotRepos.end` does nothing for a job with no token); the written
+repository stays for the retry to reuse, as the control shows, and is
+retired when its preparation window closes.
+
+## Review 90f30a3b
+
+The checker's review of revision 3 (`c4ceef41`) credited both races of
+review 786e9606 and found one P2: a whole-tree job's canonical token was
+asked for a lifetime measured from before the asynchronous mint, its
+returned expiry was not checked, and the dispatch boundary did not check
+the attempt's deadline. A slow mint therefore gave a token that outlived
+the job, and with no second jobs step an attempt past its own deadline was
+still sent. This revision fixes it and merges main `1f4f1f0b` (founding:
+incarnation-named public founding, legacy adoption, the import namespace's
+binding). Lane A's jobs and snapshot repositories now reach the canonical
+repository through the Room's namespace-aware binding (`core.artifacts`).
+
+**The fix** ([src/jobs.ts](src/jobs.ts)):
+
+- The claimed deadline is kept, and never extended. The canonical read
+  token is asked to expire 5 seconds before it (`TOKEN_MARGIN_S`, as
+  `SnapshotRepos.mint` asks), and the token Artifacts returns is checked
+  as `SnapshotRepos.mint` checks its own: read-only, a readable expiry, no
+  later than the deadline. A token that fails is refused and ended, nothing
+  is sent, and the job is due again later.
+- The dispatch boundary requires an attempt that is still the row's,
+  before its deadline, and still current (owner, generation, configuration,
+  obligation). An attempt past its deadline is not sent; its credentials
+  are ended and the job is due again later.
+- Ending a canonical token is durable. The token is written to
+  `job_tokens` (migration 8) before Artifacts is asked to revoke it, and
+  stays there, with its attempts and last error, until Artifacts confirms
+  the revocation or the token's known expiry has passed. A token whose
+  expiry is not known stays until it is revoked. The jobs step retries due
+  revocations with backoff (5 seconds, doubling, at most 5 minutes), and the
+  alarm is set from them, so a restart keeps the duty.
+
+Tests, in [test/workerd/review-90f30a3b.test.ts](test/workerd/review-90f30a3b.test.ts),
+on the real Room Durable Object and SQLite with no other jobs step running.
+The fake's `createToken` can hold the request before minting
+(`holdToken`: the expiry then runs from the late mint) or hold the answer
+after minting (`holdTokenReply`: the expiry ran from the request).
+
+| Test | What it shows |
+|---|---|
+| "healthy mint …" | Sent; the token reads the canonical repository, expires before the deadline, and is revoked after the answer |
+| "an answer delayed after the mint, still before the deadline …" | Sent, with a token that expires by the deadline |
+| "a mint delayed by less than the room's margin …" | Sent: the margin absorbs a short delay |
+| "a mint delayed so that the token would outlive the deadline …" | The token is refused and revoked; nothing is sent; the next attempt is sent with a token that expires by its own deadline |
+| "Artifacts answers with a write token" / "… with no readable expiry" | Refused and revoked; nothing is sent |
+| "an answer delayed past the attempt's deadline, with no other jobs step …" | Nothing is sent; the token is ended; the job is due again later |
+| "cleanup fails, and the room restarts …" | The refused token stays recorded, with its error, retried with backoff while it can still read; after a restart the alarm is set for it; when Artifacts recovers it is revoked and the duty settled |
+
+**Mutations.** Each guard was broken once, the whole workerd suite run, and
+the change reverted. All 11 were caught, one after its test was
+strengthened.
+
+| Mutation | Test that failed |
+|---|---|
+| No deadline at the dispatch boundary | "an answer delayed past the attempt's deadline …" |
+| A returned token's scope not checked | "Artifacts answers with a write token" |
+| A returned token's unreadable expiry accepted | "… with no readable expiry" |
+| A returned token that outlives the deadline accepted | "a mint delayed so that the token would outlive the deadline …" |
+| No margin under the deadline | "a mint delayed by less than the room's margin …" |
+| An attempt past its deadline keeps its credentials | "an answer delayed past the attempt's deadline …" |
+| An ended token not recorded before revocation | "cleanup fails, and the room restarts …" |
+| A failed revocation dropped while the token can still read | "cleanup fails …" |
+| Due revocations not retried by the jobs step | "cleanup fails …" |
+| The alarm not set from due revocations | "cleanup fails …" |
+| A failed revocation retried at once | "cleanup fails …" (after it asserted the retry is due later) |
+
+### A token mint whose answer is lost (review 1701f73e)
+
+The checker's review of revision 4 (`277c2375`) found that a whole-tree
+job's canonical `createToken` can apply at Artifacts while its answer is
+lost. What each failure did:
+
+- refused before anything changed (an Artifacts error that says so): no
+  token existed; the job was due again later. Correct.
+- applied, then the answer lost (a transport error), or no answer at all:
+  a live token existed that nothing recorded, revoked or watched. Its
+  expiry ran from when Artifacts applied it, so a mint applied late gave a
+  token that outlived the attempt's deadline (in the checker's control,
+  by 25 seconds). Nothing was sent on it.
+- a malformed answer: with no token ID, the same untracked token; with an
+  ID but no token text, the job could be sent as `Bearer undefined`.
+
+**The fix** ([src/jobs.ts](src/jobs.ts)). The mint is recorded before
+Artifacts is asked (`mint:<job>` in `job_tokens`, with the attempt's
+deadline). A usable answer (ID and text) settles the record in the step
+that records the token by its ID; a definite refusal settles it at once.
+A lost or malformed answer leaves it unresolved, with the error, and
+nothing is ever sent on an unknown mint.
+
+Revision 5 then settled an unresolved mint on a clean inventory of the
+canonical repository's tokens. Review 013dad0c found that unsafe; see
+"Review 013dad0c". The review also accepted the namespace-aware binding:
+an imported room's jobs, tokens and snapshot repositories live in its
+import namespace. The shared test fixture routes the sandbox's
+`writeSnapshot` to the namespace that holds the store, and
+`makeRoom({ importNamespace })` founds a room there. Controls in
+snapshot-repos ("an imported room's jobs stay in its import namespace",
+whole-tree and filtered) fail with the fixture's routing undone, or with
+jobs reading through the public binding.
+
+## Review 013dad0c
+
+The checker's review of revision 5 (`083543b4`) found one P2: an
+unresolved mint was settled when a complete inventory, after the attempt's
+deadline, showed no live token the Room could not account for. That shows
+absence at that moment, not that the mint can never apply. In the
+checker's control, a mint held before Artifacts applied it outlived a
+clean inventory; when it then applied with its answer lost, the live token
+had no duty left, before and after a restart.
+
+**The fix** ([src/jobs.ts](src/jobs.ts)). A mint whose outcome is unknown
+(`mint:<job>` in `job_tokens`) stays an open duty until an answer settles
+it: a refusal that changed nothing, or a usable answer, whose token is then
+recorded by its ID and revoked through the ended-token debt. No inventory
+and no timeout settles it, because nothing bounds when Artifacts applies a
+request, and the token's expiry runs from then. The Room never revokes a
+canonical token it cannot attribute: the inventory names no owner, and the
+repository holds other owners' tokens. What each inventory shows is kept on
+the record as an observation ("outcome unknown; N live token(s) … not
+accounted for at …"); the record is checked again with backoff, doubling
+from 5 seconds to at most every 6 hours, and never stops. A late usable
+answer, after the attempt was superseded, still finds the record: its
+token is ended by its ID, and the record settles. The open duties are
+readable through the Room object's `jobTokenDuties()` operator method (no
+attention item fits: the contract's attention kinds have none for it). In
+practice an unknown mint whose answer never comes stays open indefinitely,
+visible there. Source and test comments no longer say that the attempt's
+deadline bounds an unknown mint's lifetime.
+
+Controls in [test/workerd/job-token-mint.test.ts](test/workerd/job-token-mint.test.ts),
+on the real Room Durable Object and SQLite:
+
+| Test | What it shows |
+|---|---|
+| "applied, then the answer lost …" | Nothing is sent; the next attempt is sent; past the deadline, and after the lost token has expired, the clean inventory is noted and the duty stays open, visible through `jobTokenDuties`, on the alarm |
+| "the checks back off, to at most six hours, and never stop" | Sixteen checks later the record is still there, checked every 6 hours |
+| "review 013dad0c: the mint is held past its deadline, a second jobs step … then the mint applies with a lost answer" | The checker's reproduction: attempt 2 is sent and its inventory is clean; then attempt 1's mint applies with its answer lost. Its token is live past the deadline, the duty is still open, survives a restart with its alarm, and stays open after the token has expired |
+| "… with a usable answer" | The late token outlives the deadline, so it is refused, revoked, and the duty settles |
+| "… with a usable, minted in time answer" | The token was minted in time and only its answer was late: it is never sent, is revoked by its ID because the attempt was superseded, and the duty settles |
+| "the room stops while a mint's answer is outstanding …" | The record survives as an open duty, and the next attempt goes on |
+| "an inventory that is incomplete is noted as such; a live token the Room knows is not counted against the duty" | Observations only |
+| "a malformed answer …", "a refusal that changed nothing settles the mint at once", "an answer still outstanding …" | As before |
+
+**Mutations.** All 8 were caught, one after a test was added: a clean
+inventory settling the mint; settling it by the deadline; no cap on the
+backoff; a late usable answer not finding the record; a late usable
+answer's token not ended (caught after the "minted in time" control was
+added: the first late answer was refused by its expiry instead); a lost
+answer treated as no token; no record before the call; open duties not
+reported.
+
 ## Founding gaps (request b6b51de7)
 
 The first live deploy (`notes/deploy-spike.md`) found three gaps in
@@ -1262,8 +1648,9 @@ is `land-input-changed`. These remain open:
 1. **Unknown note anchors.** A note anchored to an entry that does not
    exist is refused, recorded, with `lane-unknown`; the contract has no
    closer rule (open point 36).
-2. **Check carry decisions, runner environments, snapshot commits.** See
-   "Contract changes needed" under "Review a711f7b6".
+2. **Check carry decisions, runner environments, snapshot commits.**
+   Resolved by contract amendment 3. What is still open is listed under
+   "Amendment 3 (request 23b96a18)".
 
 ## Not done
 

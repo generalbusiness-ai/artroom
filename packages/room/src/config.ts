@@ -10,11 +10,11 @@
  */
 
 import { pushFirstCommit, type PublisherStub } from "@generalbusiness/artroom-git";
-import type { LaneId } from "@generalbusiness/artroom-contract";
+import type { CheckerService, LaneId } from "@generalbusiness/artroom-contract";
 import type { ArtifactsBinding } from "./artifacts.ts";
 import { artifactsLogRemote, type LogRemoteStub } from "./logremote.ts";
 import { lanePolicy } from "./policy.ts";
-import type { RoomServices } from "./ports.ts";
+import type { RoomServices, SnapshotWrite } from "./ports.ts";
 
 export interface RoomEnv {
   readonly ROOMS: DurableObjectNamespace;
@@ -53,7 +53,8 @@ function missing(what: string): never {
 const productionServices: ServicesFactory = (env, roomObject) => {
   const artifacts = (env.ARTIFACTS ?? null) as ArtifactsBinding | null;
   const namespace = env.ARTIFACTS_NAMESPACE ?? env.PUBLIC_NAMESPACE ?? "artroom-public";
-  const publisher = (): PublisherStub & LogRemoteStub => (env.PUBLISHER ? (env.PUBLISHER.get(env.PUBLISHER.idFromName(roomObject)) as unknown as PublisherStub & LogRemoteStub) : missing("PUBLISHER"));
+  type Sandbox = PublisherStub & LogRemoteStub & { writeSnapshot: SnapshotWrite };
+  const publisher = (): Sandbox => (env.PUBLISHER ? (env.PUBLISHER.get(env.PUBLISHER.idFromName(roomObject)) as unknown as Sandbox) : missing("PUBLISHER"));
   const absent = (name: string): ArtifactsBinding => ({ get: async () => missing(name), create: async () => missing(name), delete: async () => missing(name) });
   const binding: ArtifactsBinding = artifacts ?? absent("ARTIFACTS");
   // The import namespace's own binding (R-GEN-12): repositories there are imported, never created.
@@ -81,11 +82,19 @@ const productionServices: ServicesFactory = (env, roomObject) => {
       namespace,
       bindings,
       publisher: stub,
+      writeSnapshot: (r) => publisher().writeSnapshot(r),
       logRemote: async (repo) => artifactsLogRemote(bindingOf(repo.namespace), logStub, repo),
       firstCommit: (remote, token, at) => pushFirstCommit(remote, token, at),
     },
+    // Each checker's service binding, by name (R-EXEC-8).
+    checkers: (name) => ((env as unknown as Record<string, CheckerService | undefined>)[checkerBinding(name)] ?? null),
   };
 };
+
+/** The service binding a deployment gives a checker: `CHECKER_` and its name in capitals, `-` as `_` (`llm-review` is `CHECKER_LLM_REVIEW`). */
+export function checkerBinding(name: string): string {
+  return `CHECKER_${name.toUpperCase().replaceAll("-", "_")}`;
+}
 
 let factory: ServicesFactory = productionServices;
 let clockFn: () => number = () => Date.now();

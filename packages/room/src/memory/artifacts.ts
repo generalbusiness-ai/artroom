@@ -32,6 +32,8 @@ import type { PinResult, PreviewResult, BuildResult, PublisherStub, PushOutcome 
 import { decodeLogPush, decodeLogStage, firstCommit, forkName, integrationMessage, type FirstCommitOutcome, type LogPushOutcome, type LogRemoteStub } from "@generalbusiness/artroom-git";
 import { utf8 } from "../canonical.ts";
 import { randomToken } from "../crypto.ts";
+import type { SnapshotWrite } from "../ports.ts";
+import { snapshotObjects } from "../snapshot.ts";
 
 const decoder = new TextDecoder();
 
@@ -80,6 +82,8 @@ export type RemoteMethod =
   | "preview"
   | "integrate"
   | "push"
+  | "delete"
+  | "writeSnapshot"
   | "firstCommit";
 
 /** One repository: its refs, its objects and its tokens. */
@@ -112,8 +116,13 @@ export class FakeRepo implements GitRemote {
 
   async createToken(scope: "read" | "write" = "write", ttl = 86_400) {
     this.host.enter("createToken");
+    // Held while a test says so. Polled, because a test's promise cannot be resolved inside the Durable Object.
+    const call = ++this.host.tokenCalls;
+    while (this.host.holdToken?.(this.name, scope, ttl, call)) await new Promise((r) => setTimeout(r, 2));
     if (ttl < 60 || ttl > 31_536_000) throw new FakeArtifactsError("INVALID_TTL", 10003);
     const t = this.mint(scope, ttl);
+    // The answer held after the token was minted: its expiry ran from the request, its reply comes late.
+    while (this.host.holdTokenReply?.(this.name, scope, ttl, call)) await new Promise((r) => setTimeout(r, 2));
     this.host.answer("createToken");
     return t;
   }
@@ -378,6 +387,13 @@ export class FakeArtifactsHost {
     if (planned?.length) throw planned.shift()!;
   }
 
+  /** Tests only: hold `createToken` calls in flight while this says so. */
+  holdToken: ((repo: string, scope: "read" | "write", ttl: number, call: number) => boolean) | null = null;
+  /** Tests only: hold `createToken` answers after the token is minted, while this says so. */
+  holdTokenReply: ((repo: string, scope: "read" | "write", ttl: number, call: number) => boolean) | null = null;
+  /** `createToken` calls so far, numbering each for `holdToken` and `holdTokenReply`. */
+  tokenCalls = 0;
+
   /** Clear every planned failure: the remote has recovered. */
   recover(): void {
     this.failures.clear();
@@ -428,7 +444,36 @@ export class FakeArtifactsHost {
       return r;
     },
     // As the binding: delete a repository and its tokens; false when there is none.
-    delete: async (name: string): Promise<boolean> => this.repos.delete(name),
+    delete: async (name: string): Promise<boolean> => {
+      this.enter("delete");
+      const had = this.repos.delete(name);
+      this.answer("delete");
+      return had;
+    },
+  };
+
+  /** Tests only: the identity the sandbox's snapshot writer uses, when not the fixed one (a publisher that gets it wrong). */
+  snapshotIdentity: string | null = null;
+
+  /**
+   * Lane B's `writeSnapshot`: the fixed snapshot commit of `files` into an
+   * empty store, at `refs/artroom/snapshot`, with exactly its closure: the
+   * commit, its trees and its blobs. A store that has any ref is refused.
+   */
+  readonly writeSnapshot: SnapshotWrite = async (req) => {
+    this.enter("writeSnapshot");
+    const canonical = this.authorized(req.canonical, "read");
+    const store = this.authorized(req.store, "write");
+    if (store.refs.size) throw new Error("the snapshot repository is not empty; a snapshot is written only into a new, empty repository");
+    for (const [path, mode, blob] of req.files) {
+      if (!/^(100644|100755|120000)$/.test(mode)) throw new Error(`mode ${mode} cannot be in a snapshot`);
+      if (!canonical.objects.has(blob)) throw new Error(`${path}: blob ${blob} is not in the canonical repository`);
+    }
+    const { commit, objects } = snapshotObjects(req.files, req.message, this.snapshotIdentity ?? undefined);
+    for (const o of objects) store.objects.add(this.put(o));
+    for (const [, , blob] of req.files) store.objects.add(blob);
+    store.refs.set("refs/artroom/snapshot", commit);
+    return commit;
   };
 
   repo(name: string): FakeRepo {

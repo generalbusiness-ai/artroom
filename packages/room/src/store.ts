@@ -211,6 +211,33 @@ export const ROOM_MIGRATIONS: readonly Migration[] = [
       sql.all("CREATE INDEX IF NOT EXISTS check_snapshots_commit ON check_snapshots (commit_sha)");
     },
   },
+  {
+    version: 8,
+    name: "amendment 3: sealed check carry judgments, check jobs",
+    up: (sql) => {
+      // A carry counts only with its sealed `check-carried` event (R-CARRY-13). Earlier rows have none, and never count.
+      if (!columns(sql, "check_carries").has("event")) sql.all("ALTER TABLE check_carries ADD COLUMN event TEXT");
+      // Every check carry judgment, carried or not, by the event that sealed it: one per earlier check, obligation,
+      // integration and policy version.
+      sql.all(`CREATE TABLE IF NOT EXISTS check_judged (lane TEXT NOT NULL, generation INTEGER NOT NULL, integration TEXT NOT NULL, obligation TEXT NOT NULL,
+        act TEXT NOT NULL, policy TEXT NOT NULL, event TEXT NOT NULL, PRIMARY KEY (lane, generation, integration, obligation, act, policy))`);
+      // Check jobs (R-EXEC-8): one logical job per owner (a preview or a landing operation), canonical integration,
+      // obligation and configuration. `owed` is due at next_ms. `sent` is attempt `attempt`, in flight until next_ms,
+      // its deadline, with its token `token`; after that it is due again. `done` keeps its outcome. Every change is
+      // made only for the attempt it read, so a late answer never overwrites a newer attempt.
+      sql.all(`CREATE TABLE IF NOT EXISTS check_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL,
+        obligation TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, integration TEXT NOT NULL, base TEXT NOT NULL,
+        state TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, next_ms INTEGER NOT NULL, token TEXT, outcome TEXT,
+        UNIQUE (owner, integration, obligation, config))`);
+      // Canonical read tokens of job attempts that the Room has ended but Artifacts has not yet confirmed revoked:
+      // retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose expiry
+      // is not known is retried until it is revoked. A row `mint:<job>` is a mint in progress, written before
+      // Artifacts is asked; if the answer is lost it stays until an answer settles it (a refusal that changed
+      // nothing, or a usable answer whose token is then revoked); `expires_at` is only when it is first checked.
+      sql.all(`CREATE TABLE IF NOT EXISTS job_tokens (token_id TEXT PRIMARY KEY, expires_at INTEGER, next_ms INTEGER NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)`);
+    },
+  },
 ];
 
 export function createSchema(sql: Sql): void {

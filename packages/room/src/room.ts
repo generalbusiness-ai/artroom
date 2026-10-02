@@ -28,6 +28,7 @@ import type {
 import { submit } from "./admission.ts";
 import { alarmTime, clock, servicesFor, type RoomEnv } from "./config.ts";
 import { RoomCore } from "./core.ts";
+import { jobTokenDuties } from "./jobs.ts";
 import { checkGenesis } from "./founding.ts";
 import { registry } from "./registry.ts";
 import { unb64url } from "./crypto.ts";
@@ -160,6 +161,11 @@ export class Room extends DurableObject<RoomEnv> {
   /** Publish the log now (R-LOG-8). Also run by the alarm. */
   publishLog(): Promise<Wire<{ readonly through: number; readonly commit: Sha } | null>> {
     return wire(() => this.core.publish(true));
+  }
+
+  /** The open cleanup duties for job tokens, for operators: ended tokens still owed revocation, and mints whose outcome is unknown. */
+  jobTokenDuties(): Promise<Wire<ReturnType<typeof jobTokenDuties>>> {
+    return wire(async () => jobTokenDuties(this.core));
   }
 
   /** Run the alarm's work once, now. For tests and operators; the alarm calls the same code. */
