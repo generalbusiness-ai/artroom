@@ -191,6 +191,8 @@ describe("review 90f30a3b: a whole-tree job's token expires by its deadline, and
     const stub = env.ROOMS.get(env.ROOMS.idFromName(before.id)) as unknown as TestRoom["stub"];
     const r: TestRoom = { ...before, stub, admin: new Client({ id: before.id, stub }, before.admin.keys) };
     const due = (await inDO(r, (room) => room.core.sql.all("SELECT next_ms FROM job_tokens")[0]!["next_ms"])) as number;
+    // Retried later, with backoff, not at once: the alarm never spins on it.
+    expect(due).toBeGreaterThan(clock.now);
     expect(await inDO(r, (room) => room.core.nextAlarm())).toBeLessThanOrEqual(due);
     // Still failing: retried, and kept while the token can still read.
     clock.now = due;
