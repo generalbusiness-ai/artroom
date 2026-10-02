@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e1b22be78f8952681d16b6b784ebb2ed4b1fa0de","text":"Merge retired a covered predecessor; the successor is at packages/checkers/config/llm-review.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ed4e8e10cbce728d5ea5c6fb5bf6d700a6d7b82c","text":"Merge retired a covered predecessor; the successor is at packages/checkers/test/snapshot-isolation.test.ts."}
