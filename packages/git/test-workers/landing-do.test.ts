@@ -149,13 +149,14 @@ describe("landing in a Durable Object", () => {
     };
 
     await revocations(room, true);
+    const before = Date.now();
     expect(await room.publish()).toBe("true");
     expect(await room.view(OP)).toEqual({ state: "landed", slot: "free" });
     expect(await landed(room)).toBe(1);
     expect(await room.liveTokens()).toBe(1);
     let o = await owed(room);
     expect(o.rows.map((r) => [r.op, r.n, r.backoff])).toEqual([[OP, 1, 1000]]);
-    expect(o.rows[0]!.due).toBeGreaterThan(o.now - 1000);
+    expect(o.rows[0]!.due).toBeGreaterThanOrEqual(before + 1000); // not due at once: revocation just failed
 
     // Restart with Artifacts still refusing. The alarm tries once it is due, fails, and schedules the next try.
     room = await restart(room);
