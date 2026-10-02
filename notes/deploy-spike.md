@@ -861,8 +861,9 @@ redeployed at the time.
   token is missing, a namespace is missing, there is no invocation
   evidence, or the result is truncated. It checks a total budget and a
   budget for each object.
-- **The budgets are provisional.** They are woo's 250,000 rows in total and
-  50,000 per object.
+- **The budgets were provisional at first.** They were woo's 250,000 rows
+  in total and 50,000 per object. The next section replaces them with
+  ceilings grounded on the spike.
 - **The smoke run.** `spike-smoke.mjs` gates itself when
   `ARTROOM_CF_ANALYTICS_TOKEN` is set. `ARTROOM_ROW_GATE=1` makes the gate
   required.
@@ -874,3 +875,103 @@ redeployed at the time.
 The method, the token's permissions, and what remains (the part 1 run, the
 table, grounded ceilings, and the part 3 budgets) are in
 [packages/room/measure/README.md](../packages/room/measure/README.md).
+
+## Rows per act, ceilings and budgets (request 8bd623cc, 2026-10-02)
+
+Parts 1 and 3 of request 8bd623cc. These measurements were taken on the
+redeployed spike: `artroom-spike-room` 75758995 on the folded schema (D5),
+with the read-only analytics token. The driver was the only thing using the
+spike, apart from the older rooms' background.
+
+**Runs.** All cleanups reported ok.
+
+- `SPIKE_PHASE=rows` (17-23-45). Its policy landing was refused for
+  `obl_admin-approval`, so the driver now has a second admin approve it.
+- `SPIKE_PHASE=rows ROWS_ONLY=policy` (18-23-46).
+- A full smoke run with `ARTROOM_ROW_GATE=1` (18-47-09). The gate passed,
+  with 2,284 rows written.
+- A first driver run (16-35-35). It failed when its admin session expired.
+  Its two repositories were then deleted by hand, with the same cleanup
+  rules.
+
+**Method.** Cloudflare sends one sample a minute for each object, stamped
+with the start of its interval. Each act gets 150 s of quiet. Each sample
+belongs to the window that holds the end of its interval. An act's rows are
+the window's total minus the quiet-minute baseline.
+
+**Rows written by the Room object for each act** (reads are in the results
+file):
+
+| Act | Rows written |
+|---|---|
+| found | 171 |
+| invite | 9–12 |
+| join | 13 |
+| claim | 9 |
+| propose | 26 |
+| note | 21 |
+| review | 16 |
+| land | 63 |
+| release | 21–27 |
+| land with 3 open previews | 72–73 |
+| land that activates a policy with 3 open proposals | 113 |
+| policy activation with 3 open (derived) | about 40 |
+| one publication | 7 |
+
+The check, a single alarm tick and the pin step cannot be isolated, and the
+table says so. Every admitted act writes at least 7 rows:
+
+- `entries` 2 (the rowid and the UNIQUE `id`);
+- `records` 2;
+- `idem` 2;
+- `explain` 1.
+
+A claim is exactly that plus `lanes` 2. A join is that plus `members` 2,
+`keys` 3 and an `invitations` update 1. `attention` and the registry's
+`bindings` cost 4 rows per insert, which is the largest multiplier. On the
+folded schema, `entries` has one index besides its rowid, not six. The
+full table, the index count for each deployed table, and the method are in
+[packages/room/measure/results/row-costs-2026-10-02.md](../packages/room/measure/results/row-costs-2026-10-02.md).
+
+**Findings.**
+
+- **Idle rooms keep writing.** An idle room publishes its own checkpoint
+  every minute, forever. That costs 7 rows a minute: 10,080 a day for each
+  room. Its reads grow with its log.
+- **Rooms whose repository was deleted keep writing too.** These are the
+  smoke runs' rooms. Their log head stops moving, but each still writes
+  about 12 rows a minute.
+- **This background is most of the spike's writes.** It was 983 of the
+  smoke run's 2,284 rows. In the hour from 17:50 to 18:50, the spike wrote
+  11,285 rows and read 2,249,250.
+- **`attend` scans the whole attention table on every insert.**
+
+**Ceilings** (in `measure/rows.mjs`; each is the measured value times the
+headroom, rounded up to two significant figures):
+
+| Budget | Measured (total / per object) | Headroom | Ceiling (total / per object) |
+|---|---|---|---|
+| `SMOKE_BUDGET` | 2,284 / 508 | 4 | 9,200 / 2,100 |
+| `HOURLY_BUDGET` | 11,285 / 1,034 | 2 | 23,000 / 2,100 |
+
+**Budgets for the cost requests** (`packages/room/src/budgets.ts`):
+
+- **Attention fan-out: 15 per item.** 15 × 4 = 60 rows, which is no more
+  than a landing (63).
+- **Attention FIFO: 2,048 per room.** Each insert scans the whole table. At
+  2,048 rows, that scan reads about as much as a landing with 3 open
+  previews (1,241–1,523).
+- **Idem FIFO: 8,192 per room.** That is one day of claims at the hourly
+  per-object ceiling: 2,100 / 9 = 233 an hour.
+- **Alarms.**
+  - An idle room writes 0 rows an hour.
+  - The 5-second loop runs only while a step is due and making progress.
+  - A failing step retries with backoff up to 5 minutes: at most 12 retries
+    an hour.
+
+The Room enforces none of these yet. Request 99782949 does that.
+
+The last measurement window closed at 18:54 UTC. Since then, nothing has
+used the spike except two read-only log reads, made as the checker. The
+spike is free for the redeploy from main.
+
