@@ -61,16 +61,28 @@ The publisher follows these rules:
 
   When retries run out, the error is `unresolved` and retryable. Calling
   `publish` again with the same input completes forward.
-- **Only what is new is sent.** A push carries the new commit and the trees
-  and blobs its lease does not already hold: the segment the new entries
-  are in, the checkpoint, the trees above them, and new retained files.
-  After `LogPublisher.open`, the head's objects are rebuilt from its files
-  and trusted only if they rebuild exactly the head's tree; otherwise
-  everything is sent. So the transfer bound limits one cohort, never the
-  accumulated log. A cohort over the bound (`maxTransfer`, default
-  `LOG_TRANSFER_LIMITS`: 100,000 objects and 64 MiB, the same as lane B's
-  publisher sandbox) fails with `cohort-too-large` before anything is
-  sent; the Room publishes a smaller cohort. Tests: `test/transfer.test.ts`.
+- **Only what is new is sent, in bounded transfers.** A push carries the
+  new commit and the trees and blobs its lease does not already hold: the
+  segment the new entries are in, the checkpoint, the trees above them,
+  and new retained files. After `LogPublisher.open`, the head's objects are
+  rebuilt from its files and trusted only if they rebuild exactly the
+  head's tree; otherwise everything is sent. The active segment is one
+  blob of up to 1,000 entries, so it alone can exceed one transfer
+  (`maxTransfer`, default `LOG_TRANSFER_LIMITS`: 100,000 objects and
+  8 MiB, the same as lane B's publisher sandbox). A publication over one
+  transfer is staged first (`GitRemote.stage`): the publisher asks which
+  objects are missing, sends the next bytes of each from where its staging
+  stopped, in parts of at most one transfer (an object larger than that
+  goes in chunks), and then pushes the commit with no objects. It asks
+  again before every attempt, so a lost answer, a publisher restart and a
+  lost staging area are all recovered, and the commit is always the one
+  `commitFor` computes. `cohort-too-large` remains only for a remote that
+  cannot stage. `MemoryGit` and `GitCli` stage. Tests:
+  `test/transfer.test.ts`, `test/staging.test.ts`.
+- **Room memory.** The publisher builds the whole tree in memory, the
+  active segment included. A Durable Object has 128 MB; staging bounds
+  what one transfer carries, not what the Room must hold to build the
+  commit.
 - **The commit, in advance.** `commitFor(parent, entries, checkpoint,
   retained)` returns the exact commit `publish` would write for that
   cohort on `parent`, without pushing. Both use the same owned copy and the

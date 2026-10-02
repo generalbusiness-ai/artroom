@@ -94,7 +94,7 @@ describe("review b618eca1: staged publication", () => {
     }
   });
 
-  test("at the default bound: an active segment over 16 MiB keeps taking one-entry cohorts, staged, after a restart too, and verifies", async () => {
+  test("at the default bound: an active segment over 64 MiB (the checker's case) keeps taking one-entry cohorts, staged in default-sized parts, after a restart too, and verifies", async () => {
     const sim = new RoomSim();
     sim.activate(policy(rule({ id: "notify-members", kind: "notify", on: ["note"], to: ["role:member"], why: "A note needs the members." })));
     const git = new Staging();
@@ -118,9 +118,9 @@ describe("review b618eca1: staged publication", () => {
       sim.system({ type: "notified", entry: id, decisions: r.evaluations.map((ev) => ev.decision), to: [...new Set(r.notify.map((n) => n.to as MemberId))] });
     };
     const segment = () => sim.entries.reduce((n, e) => n + Buffer.byteLength(canonicalize(e)) + 1, 0);
-    while (segment() < LOG_TRANSFER_LIMITS.bytes + 1_000_000) {
+    while (segment() < 64 * 1024 * 1024 + 1_000_000) {
       await add();
-      if (sim.entries.length % 20 === 0) await sim.publish(publisher);
+      if (sim.entries.length % 60 === 0) await sim.publish(publisher);
     }
     await sim.publish(publisher);
     // Then one-entry cohorts (each the previous publication's checkpoint event), the second after a restart.
@@ -135,7 +135,7 @@ describe("review b618eca1: staged publication", () => {
       expect(calls.every((c) => c.bytes <= LOG_TRANSFER_LIMITS.bytes)).toBe(true);
       expect(git.pushed.at(-1)).toEqual([]);
     }
-    expect(segment()).toBeGreaterThan(LOG_TRANSFER_LIMITS.bytes);
+    expect(segment()).toBeGreaterThan(64 * 1024 * 1024);
     const report = await verifyLog(git);
     expect(report.failures).toEqual([]);
     expect(report.ok).toBe(true);

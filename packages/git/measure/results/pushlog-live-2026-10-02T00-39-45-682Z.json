@@ -1,0 +1,280 @@
+{
+  "steps": [
+    {
+      "route": "create",
+      "status": 200,
+      "clientMs": 2124,
+      "result": {
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-pushlog-muq8jwpp.git",
+        "ms": 1815
+      }
+    },
+    {
+      "route": "init",
+      "status": 200,
+      "clientMs": 307,
+      "result": {
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/artroom-lb-pushlog-muq8jwpp.git",
+        "main": "bc5a26913470cac379628c612a473edef364744f",
+        "revoked": 1,
+        "ms": 196
+      }
+    },
+    {
+      "route": "logpush",
+      "status": 200,
+      "clientMs": 1334,
+      "result": {
+        "outcome": {
+          "ok": true
+        },
+        "revoked": true,
+        "activeTokens": 0,
+        "binding": {
+          "full": null,
+          "short": null
+        },
+        "ms": {
+          "push": 1245,
+          "total": 1302
+        },
+        "sent": {
+          "objects": 3,
+          "next": "88cd0881a5fed0f13293cb83e8b8040046e4c4e4",
+          "lease": null,
+          "ref": "refs/artroom/log"
+        }
+      },
+      "readBack": "88cd0881a5fed0f13293cb83e8b8040046e4c4e4"
+    },
+    {
+      "route": "logpush",
+      "status": 200,
+      "clientMs": 1188,
+      "result": {
+        "outcome": {
+          "ok": true
+        },
+        "revoked": true,
+        "activeTokens": 0,
+        "binding": {
+          "full": null,
+          "short": null
+        },
+        "ms": {
+          "push": 1069,
+          "total": 1120
+        },
+        "sent": {
+          "objects": 3,
+          "next": "2ada5616ded8f4c25115fc5a0732488d5534738f",
+          "lease": "88cd0881a5fed0f13293cb83e8b8040046e4c4e4",
+          "ref": "refs/artroom/log"
+        }
+      },
+      "readBack": "2ada5616ded8f4c25115fc5a0732488d5534738f"
+    },
+    {
+      "route": "logpush",
+      "status": 200,
+      "clientMs": 793,
+      "result": {
+        "outcome": {
+          "ok": false,
+          "reason": "lease-mismatch",
+          "current": "2ada5616ded8f4c25115fc5a0732488d5534738f"
+        },
+        "revoked": true,
+        "activeTokens": 0,
+        "binding": {
+          "full": null,
+          "short": null
+        },
+        "ms": {
+          "push": 626,
+          "total": 728
+        },
+        "sent": {
+          "objects": 3,
+          "next": "fecfcc50d161b1bacc8e950d6a333aeeb15dd3d6",
+          "lease": "88cd0881a5fed0f13293cb83e8b8040046e4c4e4",
+          "ref": "refs/artroom/log"
+        }
+      },
+      "readBack": "2ada5616ded8f4c25115fc5a0732488d5534738f"
+    },
+    {
+      "route": "logpush",
+      "status": 200,
+      "clientMs": 383,
+      "result": {
+        "outcome": {
+          "ok": false,
+          "reason": "lease-mismatch",
+          "current": "2ada5616ded8f4c25115fc5a0732488d5534738f"
+        },
+        "revoked": true,
+        "activeTokens": 0,
+        "binding": {
+          "full": null,
+          "short": null
+        },
+        "ms": {
+          "push": 257,
+          "total": 300
+        },
+        "sent": {
+          "objects": 3,
+          "next": "4bf96d5acd201aafd109f9718c409dc886b8d28d",
+          "lease": null,
+          "ref": "refs/artroom/log"
+        }
+      },
+      "readBack": "2ada5616ded8f4c25115fc5a0732488d5534738f"
+    },
+    {
+      "route": "logpush",
+      "status": 200,
+      "clientMs": 621,
+      "result": {
+        "outcome": {
+          "ok": false,
+          "reason": "unknown",
+          "detail": "nothing was sent: before the push: 4bf96d5acd201aafd109f9718c409dc886b8d28d does not have exactly the lease as its parent"
+        },
+        "revoked": true,
+        "activeTokens": 0,
+        "binding": {
+          "full": null,
+          "short": null
+        },
+        "ms": {
+          "push": 510,
+          "total": 546
+        },
+        "sent": {
+          "objects": 3,
+          "next": "4bf96d5acd201aafd109f9718c409dc886b8d28d",
+          "lease": "2ada5616ded8f4c25115fc5a0732488d5534738f",
+          "ref": "refs/artroom/log"
+        }
+      },
+      "readBack": "2ada5616ded8f4c25115fc5a0732488d5534738f"
+    },
+    {
+      "route": "logpush",
+      "status": 200,
+      "clientMs": 232,
+      "result": {
+        "outcome": {
+          "ok": false,
+          "reason": "unknown",
+          "detail": "nothing was sent: pushLog writes only refs/artroom/log"
+        },
+        "revoked": true,
+        "activeTokens": 0,
+        "binding": {
+          "full": null,
+          "short": null
+        },
+        "ms": {
+          "push": 118,
+          "total": 152
+        },
+        "sent": {
+          "objects": 3,
+          "next": "8aa782fcd1ab34657b03df9fbf06a163a229f568",
+          "lease": "2ada5616ded8f4c25115fc5a0732488d5534738f",
+          "ref": "refs/heads/main"
+        }
+      },
+      "readBack": "2ada5616ded8f4c25115fc5a0732488d5534738f"
+    },
+    {
+      "route": "logpush",
+      "status": 200,
+      "clientMs": 589,
+      "result": {
+        "outcome": {
+          "ok": false,
+          "reason": "unknown",
+          "detail": "nothing was sent: before the push: 4b825dc642cb6eb9a060e54bf8d69288fbee4904 is not a commit"
+        },
+        "revoked": true,
+        "activeTokens": 0,
+        "binding": {
+          "full": null,
+          "short": null
+        },
+        "ms": {
+          "push": 492,
+          "total": 525
+        },
+        "sent": {
+          "objects": 1,
+          "next": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "lease": "2ada5616ded8f4c25115fc5a0732488d5534738f",
+          "ref": "refs/artroom/log"
+        }
+      },
+      "readBack": "2ada5616ded8f4c25115fc5a0732488d5534738f"
+    },
+    {
+      "route": "logpush",
+      "status": 200,
+      "clientMs": 853,
+      "result": {
+        "outcome": {
+          "ok": true
+        },
+        "revoked": true,
+        "activeTokens": 0,
+        "binding": {
+          "full": null,
+          "short": null
+        },
+        "ms": {
+          "push": 746,
+          "total": 785
+        },
+        "sent": {
+          "objects": 3,
+          "next": "8aa782fcd1ab34657b03df9fbf06a163a229f568",
+          "lease": "2ada5616ded8f4c25115fc5a0732488d5534738f",
+          "ref": "refs/artroom/log"
+        }
+      },
+      "readBack": "8aa782fcd1ab34657b03df9fbf06a163a229f568"
+    },
+    {
+      "route": "reset",
+      "status": 200,
+      "clientMs": 115,
+      "result": {
+        "wasRunning": true
+      }
+    }
+  ],
+  "checks": {
+    "landed": true,
+    "leaseMismatch": true,
+    "notNextSendsNothing": true,
+    "otherRefRefused": true,
+    "treeRefused": true,
+    "everyTokenRevoked": true,
+    "historyExact": true
+  },
+  "history": [
+    "88cd0881a5fed0f13293cb83e8b8040046e4c4e4",
+    "2ada5616ded8f4c25115fc5a0732488d5534738f",
+    "8aa782fcd1ab34657b03df9fbf06a163a229f568"
+  ],
+  "bindingResolvesLogRef": false,
+  "deleted": [
+    {
+      "name": "artroom-lb-pushlog-muq8jwpp",
+      "deleted": true,
+      "tokensRevoked": 0
+    }
+  ]
+}

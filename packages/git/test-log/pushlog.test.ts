@@ -294,7 +294,7 @@ describe("review b618eca1: an object larger than one transfer is staged in parts
     }
   });
 
-  test("at the default bound: an active segment over 16 MiB takes one-entry cohorts, staged through the sandbox, after a restart too, and verifies", async () => {
+  test("at the default bound: an active segment over one default transfer takes one-entry cohorts, staged through the sandbox, after a restart too, and verifies", async () => {
     const { remote, sandbox } = setup();
     let r = new SandboxRemote(remote, sandbox("p"));
     const sim = new RoomSim();

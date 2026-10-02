@@ -66,7 +66,7 @@ export interface LogPushRequest {
  * before pushing (`LOG_TRANSFER_LIMITS`, error `cohort-too-large`), so the
  * bound limits one cohort, never the accumulated log.
  */
-export const LOG_PUSH_LIMITS: { readonly objects: number; readonly bytes: number } = Object.freeze({ objects: 100_000, bytes: 16 * 1024 * 1024 });
+export const LOG_PUSH_LIMITS: { readonly objects: number; readonly bytes: number } = Object.freeze({ objects: 100_000, bytes: 8 * 1024 * 1024 });
 
 /**
  * Check and decode a `pushLog` request before anything touches git. A

@@ -19,7 +19,8 @@ import { homedir, tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Sha } from "@generalbusiness/artroom-contract";
-import { encodeCommit, encodeTree, gitObject, type GitObject, type GitRemote, type ObjectType, type PushOutcome, type TreeEntry } from "../../log/src/git.ts";
+import { encodeCommit, encodeTree, gitObject, type GitObject, type GitRemote, type ObjectType, type PushOutcome, type StageOutcome, type StagePart, type StageWant, type TreeEntry } from "../../log/src/git.ts";
+import { LogPublisher } from "../../log/src/publisher.ts";
 import { LOG_REF } from "../../log/src/entries.ts";
 import { verifyLog } from "../../log/src/verify.ts";
 import { goldenLog } from "../../log/test/support/room-sim.ts";
@@ -34,8 +35,8 @@ const redact = (s: string) => s.replace(TOKEN_RE, "<token>");
 const RUN = Date.now().toString(36);
 const ROOM = `lb-loglive-${RUN}`;
 const REPO = `artroom-lb-loglive-${RUN}`;
-const out: { calls: Record<string, number>; tokens: { revoked: number; notRevoked: number; activeAfter: number[] }; laneAReadFailures: string[]; objectsRead: Record<string, number>; bindingBehaviour: Record<string, number>; [k: string]: unknown } = {
-  calls: {}, tokens: { revoked: 0, notRevoked: 0, activeAfter: [] }, laneAReadFailures: [], objectsRead: {}, bindingBehaviour: {},
+const out: { calls: Record<string, number>; tokens: { revoked: number; notRevoked: number; activeAfter: number[] }; laneAReadFailures: string[]; objectsRead: Record<string, number>; bindingBehaviour: Record<string, number>; staged: number[]; [k: string]: unknown } = {
+  calls: {}, tokens: { revoked: 0, notRevoked: 0, activeAfter: [] }, laneAReadFailures: [], objectsRead: {}, bindingBehaviour: {}, staged: [],
 };
 
 async function h(route: string, body: Record<string, unknown>): Promise<any> {
@@ -116,6 +117,12 @@ class LiveRemote implements GitRemote {
     out.bindingBehaviour[key] = (out.bindingBehaviour[key] ?? 0) + 1;
     return o;
   }
+  async stage(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): Promise<StageOutcome> {
+    out.staged.push(parts.reduce((n, p) => n + p.data.length, 0));
+    const r = await h("logstage", { cohort, want, parts: parts.map((p) => ({ ...p, data: b64url(p.data) })) });
+    if ("threw" in r) throw new Error(`stageLog: ${r.threw}`);
+    return r.result as StageOutcome;
+  }
   async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<PushOutcome> {
     out["pushed"] = [...((out["pushed"] as unknown[]) ?? []), { objects: objects.length, bytes: objects.reduce((n, o) => n + o.data.length, 0) }];
     const r = await h("logpush", { objects: objects.map((o) => ({ type: o.type, data: b64url(o.data) })), ref, next, lease });
@@ -156,7 +163,8 @@ describe.skipIf(!LIVE)("live: lane L's log through artroom-lb-git", () => {
     const remote = new LiveRemote();
     expect(await remote.readRef(LOG_REF)).toBe(null); // absent before the first publication
     const t0 = Date.now();
-    const { c1, c2, c3 } = await goldenLog(remote);
+    const golden = await goldenLog(remote);
+    const { c1, c2, c3 } = golden;
     out["publishMs"] = Date.now() - t0;
     out["commits"] = [c1.commit, c2.commit, c3.commit];
     expect(await remote.readRef(LOG_REF)).toBe(c3.commit);
@@ -166,6 +174,22 @@ describe.skipIf(!LIVE)("live: lane L's log through artroom-lb-git", () => {
     out["verify"] = { ok: report.ok, head: report.head, commits: report.commits, verifiedThrough: report.verifiedThrough, publishedThrough: report.publishedThrough, failures: report.failures };
     expect(report.failures).toEqual([]);
     expect(report).toMatchObject({ ok: true, head: c3.commit, commits: 3 });
+    // A cohort over one transfer (scaled down to 2 KiB): staged in parts through stageLog, then the commit alone.
+    const bounded = await LogPublisher.open(remote, { maxTransfer: { objects: 100_000, bytes: 2048 } });
+    const { sim } = golden;
+    const c4 = await sim.publish(bounded);
+    out["stagedCohort"] = { commit: c4.commit, stageCalls: out.staged.length, maxPartBytes: Math.max(...out.staged), lastPushObjects: (out["pushed"] as { objects: number }[]).at(-1)?.objects };
+    expect(Math.max(...out.staged)).toBeLessThanOrEqual(2048);
+    expect(await remote.readRef(LOG_REF)).toBe(c4.commit);
+    const after = await verifyLog(remote);
+    out["verifyAfterStaging"] = { ok: after.ok, head: after.head, commits: after.commits, failures: after.failures };
+    expect(after).toMatchObject({ ok: true, head: c4.commit, commits: 4 });
+    // At the default bound: an 18 MiB blob staged in 8 MiB parts over the Durable Object RPC, then pushed.
+    const big = await h("logbig", { mib: Number(process.env["LB_BIG_MIB"] ?? 18), chunkMib: Number(process.env["LB_CHUNK_MIB"] ?? 8) });
+    out["bigBlob"] = big;
+    expect(big.outcome).toEqual({ ok: true });
+    expect(big.readBack).toBe(big.commit);
+    expect(big.activeTokens).toBe(0);
     // Refusals: another ref.
     const other = await h("logref", { ref: "refs/heads/main" });
     out["otherRefRead"] = other.threw ? "refused" : other;

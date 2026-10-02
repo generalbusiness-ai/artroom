@@ -70,11 +70,12 @@ export interface PublisherOptions {
 
 /**
  * One transfer's bound: objects and decoded bytes, the same as the
- * publisher sandbox's (lane B, `LOG_PUSH_LIMITS`). 16 MiB is about 21 MiB
- * as base64url, under the Workers RPC message limit (32 MiB) with room for
- * the rest of the request. A publication over it is staged in parts.
+ * publisher sandbox's (lane B, `LOG_PUSH_LIMITS`). A publication over it is
+ * staged in parts. 8 MiB is about 11 MiB as base64url. Measured live
+ * (2026-10-01): parts of 6, 8 and 12 MiB crossed the Durable Object RPC;
+ * 16 MiB parts exhausted a Durable Object's 128 MB memory.
  */
-export const LOG_TRANSFER_LIMITS = { objects: 100_000, bytes: 16 * 1024 * 1024 } as const;
+export const LOG_TRANSFER_LIMITS = { objects: 100_000, bytes: 8 * 1024 * 1024 } as const;
 
 /** Seconds since the epoch for an RFC 3339 time, for the commit's author line. */
 function epoch(at: string): number {
