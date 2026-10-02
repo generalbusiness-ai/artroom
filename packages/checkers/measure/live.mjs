@@ -11,7 +11,11 @@
 // process running, then the same failing commit again; two checks of one
 // checker at once; and a scoped snapshot whose listing is over 64 KiB with
 // a credential-shaped file name. Every job runs in a new container, so every
-// timing is a cold start. Deletes its repos at the end. Prints no token.
+// timing is a cold start. Also (review bdcc7cc9): every snapshot has its own
+// repository, retired when its job ends; a scoped job cannot read an older,
+// wider snapshot of the same commit (which holds the excluded file) by known
+// ID while that snapshot's repository is still in use. Deletes its repos at
+// the end. Prints no token.
 
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
@@ -164,23 +168,31 @@ async function main() {
   const [ca, cb] = await Promise.all([check("concurrent: pass", "tests", c1), check("concurrent: fail", "tests", c2)]);
   out.concurrent = { passStillPasses: ca.ok === true, failStillFails: cb.ok === false };
   log("concurrent:", out.concurrent);
-  // G4: a scoped listing over 64 KiB with a credential-shaped file name.
-  // Declared paths that leave out src/secret.txt: the snapshot store is shared by this checker's snapshots, and the scoped probe below must find no excluded blob in it.
-  const big = await check("scoped: 1,800 files and a credential-shaped name", "tests", c7, { scoped: ["src/add.js", "src/gen/**", odd] });
-  out.bigScoped = { ok: big.ok, files: out.runs.at(-1).snapshot?.files?.length ?? null };
+  // G4: a scoped listing over 64 KiB with a credential-shaped file name. It declares src/**, so this
+  // snapshot holds src/secret.txt; it has its own repository, which the scoped probes below cannot read.
+  const big = await check("scoped: 1,800 files and a credential-shaped name", "tests", c7, { scoped: ["src/**"] });
+  out.bigScoped = { ok: big.ok, files: out.runs.at(-1).snapshot?.files?.length ?? null, holdsSecret: out.runs.at(-1).snapshot?.files?.includes("src/secret.txt") ?? null };
   log("big scoped:", out.bigScoped);
 
   const p1 = await h("probe", { repo: REPO, checker: "tests", commit: c1 });
   out.probeTree = p1;
   log("probe, whole-tree job:");
   for (const r of p1.results) log(`   ${r.argv.slice(0, 80)} -> exit ${r.exit}: ${r.out.split("\n").slice(-1)[0]}`);
-  const p2 = await h("probe", { repo: REPO, checker: "tests", commit: c1, scoped: ["src/add.js"], excludedPath: "src/secret.txt", excludedBlob: secretBlob, other: made.remote });
+  // Review bdcc7cc9: an older, wider snapshot (src/**, with src/secret.txt) is built first and kept in use while
+  // the current src/add.js job runs; the current job tries its commit, tree and the excluded blob by known ID.
+  const p2 = await h("probe", { repo: REPO, checker: "tests", commit: c1, older: ["src/**"], scoped: ["src/add.js"], excludedPath: "src/secret.txt", excludedBlob: secretBlob, other: made.remote });
   out.probeScoped = p2;
-  log(`probe, scoped job (snapshot files: ${p2.snapshot?.files?.join(", ")}):`);
-  for (const r of p2.results) log(`   ${r.argv.slice(0, 80)} -> exit ${r.exit}: ${r.out.split("\n").slice(-1)[0]}`);
+  log(`probe, scoped job (snapshot files: ${p2.snapshot?.files?.join(", ")}; older snapshot ${p2.older?.commit?.slice(0, 8)} with ${p2.older?.files} files, secret included: ${p2.older?.hasSecret}):`);
+  for (const r of p2.results) log(`   ${r.argv.length > 90 ? `${r.argv.slice(0, 40)} … ${r.argv.slice(-46)}` : r.argv} -> exit ${r.exit}: ${r.out.split("\n").slice(-1)[0]}`);
+
+  // Retirement: each snapshot repository is deleted when its job ends; nothing is owed.
+  const duties = await h("snapshots");
+  const left = ((await api("GET", `/repos?limit=200&search=artroom-lg--snap-`)).result ?? []).map((r) => r.name);
+  out.retirement = { pending: duties.pending, duties: duties.duties.length, done: duties.duties.filter((d) => d.state === "done").length, snapshotReposLeft: left };
+  log("snapshot repositories:", out.retirement);
 
   // Cleanup. Runner containers were destroyed at the end of each job.
-  const repos = (await api("GET", `/repos?limit=200&search=${REPO}`)).result ?? [];
+  const repos = [...((await api("GET", `/repos?limit=200&search=${REPO}`)).result ?? []), ...((await api("GET", `/repos?limit=200&search=artroom-lg--snap-`)).result ?? [])];
   for (const r of repos) {
     const toks = (await api("GET", `/repos/${r.name}/tokens?state=active&per_page=100`)).result ?? [];
     for (const t of toks) await api("DELETE", `/tokens/${t.id}`);

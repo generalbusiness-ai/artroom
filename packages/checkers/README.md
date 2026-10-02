@@ -65,23 +65,48 @@ review".
 ## Scoped inputs
 
 A checker whose configuration declares `inputs` sees only those paths plus
-the platform's global inputs (R-CARRY-8):
+the platform's global inputs (R-CARRY-8). What a scoped runner can read is
+set by what its job's repository holds and what its token reaches
+(R-CARRY-16), not by what it checks out:
 
-- The publisher builds a **filtered snapshot**: a commit with no parents
-  whose tree holds exactly those files, in a repository that holds only that
-  checker's snapshots. `Publisher.listTree` and `Publisher.writeSnapshot` in
-  the git package do this.
-- The job's `readUrl` is that snapshot repository, and its read token is for
-  that repository only. The runner never learns the canonical repository's
-  token.
+- **The snapshot commit is fixed** (R-CARRY-15): no parent, a tree with
+  exactly those files, author and committer `Artroom Snapshot
+  <snapshot@artroom.invalid>` at time 0, and the message `Artroom filtered
+  snapshot for <checker>` with its digest. Its ID depends only on the
+  files, the checker and the digest (`snapshotCommitId` computes it without
+  git).
+- **One repository per snapshot commit.** Each snapshot commit gets a new,
+  empty Artifacts repository, named by the commit. The publisher
+  (`Publisher.writeSnapshot` in the git package) writes that commit into it
+  at `refs/artroom/snapshot` and refuses a repository that already has any
+  ref. So the repository holds exactly the commit, its trees and its
+  blobs, and nothing is added to it later. Jobs for the same snapshot
+  commit share its repository. Any other snapshot, including the same
+  checker's after its inputs or the integration changed, gets its own.
+- **One token per job.** A filtered job's read token is for its
+  snapshot's repository only and expires by the job's deadline. The runner
+  never learns the canonical repository's token or another snapshot's.
+- **Retirement.** When a job ends, its token is revoked. When the last job
+  ends, or its deadline passes, the repository is deleted with every token.
+  Both are durable duties, retried until Artifacts confirms; during an
+  outage they stay owed, and the repository is not used again.
 - The runner recomputes the snapshot digest from the files it received and
   refuses a file outside the declared paths.
 - Like every job, a scoped job runs in its own new container, destroyed
   afterwards.
 
-So a test that reads an undeclared file fails: the file is not in the
-working tree, the object store, any history, or any repository the runner
-can reach.
+So a test that reads an undeclared file fails. The file is not in the
+working tree, the object store, any history, or the job's repository, and
+the job's token and gateway reach no other repository. That holds whatever
+the runner asks for, including the known ID of an older snapshot's commit,
+tree or blob: the job's repository does not have them. In the live run of
+2026-10-02, Artifacts served the job's own unreferenced tree and blob by
+ID, and could not serve the older snapshot's objects.
+
+The git package's `SnapshotRepos` does the room's part: it creates and
+names the repositories, mints the job tokens, and keeps the duties. In
+this package only the harness uses it. A production room (lane A) must do
+the same before it issues filtered jobs (section 29.8, lane A item 4).
 
 ## The LLM reviewer
 
@@ -139,6 +164,15 @@ filtered snapshot and attempts to read excluded data, the tests checker
 (pass, fail, a changed test with unchanged source), the room stand-in's
 refusals, and the LLM reviewer with a fake model.
 
+`test/snapshot-isolation.test.ts` runs the publisher's real
+`writeSnapshot`, the git package's `SnapshotRepos` and the real runner over
+a model of Artifacts in which every repository serves any object it holds by
+ID. It covers the acceptance cases of R-CARRY-16: an older, wider snapshot's
+commit, trees and excluded blob cannot be read by known ID or seen
+advertised; the exact current commit fetches; a configuration that narrows
+the inputs gets a new repository; concurrent jobs on different snapshots
+reach only their own; and retirement, including an Artifacts outage.
+
 `test/isolation.test.ts` runs the real runner life cycle (`RunnerHost`,
 `runnerProvider`) over a container modelled on the host
 (`test/fake-container.ts`): a job that replaces a trusted tool and leaves a
@@ -162,7 +196,8 @@ node measure/live.mjs
 The script makes its own repos in the `gitseq-spike` namespace, deletes
 them afterwards, and saves redacted results in `measure/results/`. The
 `/h/*` routes it uses play the room: they build jobs, mint read tokens,
-build snapshots and record checks in `HarnessLedger`. They need the
+prepare snapshot repositories (`artroom-lg--snap-<commit>`, deleted when
+their jobs end) and record checks in `HarnessLedger`. They need the
 `x-lg-key` header.
 
 To remove the Worker: `env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-lg-checkers`.

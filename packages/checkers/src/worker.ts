@@ -375,6 +375,12 @@ async function probe(env: Env, b: Record<string, unknown>) {
       // The older snapshot's own repository.
       results.push(await run(["git", "ls-remote", older.remote]));
     }
+    // Control: objects this job's repository does hold, by ID, though no ref names them. If these fetch, the
+    // server serves objects by ID, and the older snapshot's objects failed only because they are not there.
+    if (ws.files?.length) {
+      results.push(await run(["git", "-c", `http.sslCAInfo=${CA}`, "fetch", "--no-write-fetch-head", job.readUrl, ws.tree]));
+      results.push(await run(["git", "-c", `http.sslCAInfo=${CA}`, "fetch", "--no-write-fetch-head", job.readUrl, ws.files[0]![2]]));
+    }
     // Every ref this job's server advertises.
     results.push(await run(["git", "ls-remote", job.readUrl]));
     // The exact current commit, by ID.
@@ -441,7 +447,7 @@ export default {
           return json({ error: "unknown route" }, 404);
       }
     } catch (e) {
-      return json({ error: redact(e instanceof Error ? e.message : String(e)) }, 500);
+      return json({ error: redact(e instanceof Error ? e.message : typeof e === "object" ? JSON.stringify(e) : String(e)) }, 500);
     }
   },
 };
