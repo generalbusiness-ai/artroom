@@ -18,6 +18,7 @@ import type {
   RoomId,
   Seq,
 } from "@generalbusiness/artroom-contract";
+import type { EntrySource } from "@generalbusiness/artroom-log";
 import { canonicalize } from "./canonical.ts";
 import { digestJson, sign } from "./crypto.ts";
 import { entryId } from "./ids.ts";
@@ -94,6 +95,17 @@ export function entriesAfter(sql: Sql, after: Seq, limit: number): LogEntry[] {
   return sql
     .all("SELECT body FROM entries WHERE seq > ? ORDER BY seq ASC LIMIT ?", after, limit)
     .map((r) => JSON.parse(str(r, "body")!) as LogEntry);
+}
+
+/**
+ * The log from seq 0 through `through`, for publication (lane L's
+ * `EntrySource`): the publisher reads it in batches as it needs them, so
+ * the Room never holds the whole log, or a whole segment, at once
+ * (request 5a7290b9). Sealed entries never change, so every read of a seq
+ * gives the same entry.
+ */
+export function logSource(sql: Sql, through: Seq): EntrySource {
+  return { through, read: (from, limit) => entriesAfter(sql, from - 1, Math.max(0, Math.min(limit, through - from + 1))) };
 }
 
 export function entryCount(sql: Sql): number {

@@ -51,10 +51,10 @@ import { canonicalize, parseStrict } from "./canonical.ts";
 import { b64url, digestJson, keyPairFromSeed, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
-import { checkpoint, entriesAfter, entryAt, idOf, seal } from "./log.ts";
+import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions } from "./obligations.ts";
-import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedFile, RoomServices, Sql } from "./ports.ts";
+import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, Sql } from "./ports.ts";
 import { ContainerPublisher, Landing, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type RepoLocation } from "./artifacts.ts";
@@ -1308,10 +1308,9 @@ export class RoomCore {
     const version: unknown = (stored as { v?: unknown }).v;
     if (version !== undefined) throw Object.assign(new Error(`unknown pending publication version ${String(version)}`), { code: "unknown-version" });
     return this.sql.transaction(() => {
-      const entries = entriesAfter(this.sql, -1, stored.through + 1);
-      const last = entries[entries.length - 1];
-      if (!last || last.seq !== stored.through || last.hash !== stored.hash) throw Object.assign(new Error("the pending cohort does not match the log"), { code: "cohort-mismatch" });
-      const expected = publisher.commitFor(stored.parent, entries, stored.checkpoint, this.retainedFiles(stored.retained));
+      const last = entryAt(this.sql, stored.through);
+      if (!last || last.hash !== stored.hash) throw Object.assign(new Error("the pending cohort does not match the log"), { code: "cohort-mismatch" });
+      const expected = publisher.commitFor(stored.parent, logSource(this.sql, stored.through), stored.checkpoint, this.retainedRefs(stored.retained));
       const p: PendingPublication = { v: 2, parent: stored.parent, expected, through: stored.through, hash: stored.hash, checkpoint: stored.checkpoint, retained: stored.retained };
       setMeta(this.sql, "pending_publication", JSON.stringify(p));
       return p;
@@ -1362,13 +1361,14 @@ export class RoomCore {
             const parent = (getMeta(this.sql, "log_commit") as Sha | null) ?? null;
             const cp = checkpoint(this.roomId, this.genesis.roomKey, this.seed(), through, iso(this.now()));
             const digests = this.sql.all("SELECT digest FROM retained ORDER BY digest").map((r) => str(r, "digest") as Digest);
-            const expected = publisher.commitFor(parent, entriesAfter(this.sql, -1, n + 1), cp, this.retainedFiles(digests));
+            const expected = publisher.commitFor(parent, logSource(this.sql, n), cp, this.retainedRefs(digests));
             const p: PendingPublication = { v: 2, parent, expected, through: n, hash: through.hash, checkpoint: cp, retained: digests };
             setMeta(this.sql, "pending_publication", JSON.stringify(p));
             return p;
           });
-        const entries = entriesAfter(this.sql, -1, cohort.through + 1);
-        const retained = this.retainedFiles(cohort.retained);
+        // Read in batches as the publisher needs them, never the whole log at once (request 5a7290b9).
+        const entries = logSource(this.sql, cohort.through);
+        const retained = this.retainedRefs(cohort.retained);
         // The Room's own fence: the ref holds the parent it confirmed, or exactly the pending
         // commit (a push whose reply was lost). Anything else, even with the same entries, is
         // another writer, and publication stops; it is never built on (R-LOG-8).
@@ -1412,10 +1412,12 @@ export class RoomCore {
     }
   }
 
-  private retainedFiles(digests: readonly Digest[]): RetainedFile[] {
+  /** The retained files by digest; each body is read only if the publisher needs its bytes. */
+  private retainedRefs(digests: readonly Digest[]): RetainedRef[] {
     return digests.map((d) => {
-      const r = one(this.sql, "SELECT kind, body FROM retained WHERE digest = ?", d)!;
-      return { kind: str(r, "kind") === "input" ? ("input" as const) : ("policy" as const), body: str(r, "body")! };
+      const kind = str(one(this.sql, "SELECT kind FROM retained WHERE digest = ?", d)!, "kind");
+      const load = () => str(one(this.sql, "SELECT body FROM retained WHERE digest = ?", d)!, "body")!;
+      return { kind: kind === "input" ? ("input" as const) : ("policy" as const), digest: d, load };
     });
   }
 
