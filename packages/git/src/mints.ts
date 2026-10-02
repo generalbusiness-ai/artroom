@@ -119,27 +119,49 @@ const RETRY = { attempts: 5, firstMs: 500 } as const;
 /** Most records one `duties` page returns. */
 const PAGE_MAX = 1_000;
 
-/** The most error text a record or the observation keeps. */
+/** The most text a record or the observation keeps about an error. */
 const NOTE_MAX = 300;
 
-/** An error as text, with its name: raw, so `note` must redact it before it is stored. */
-const message = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+/** Error names that may be stored. Any other name is not: it is the thrower's text. */
+const SAFE_NAMES: ReadonlySet<string> = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "AggregateError", "AbortError", "TimeoutError"]);
+/** Artifacts codes that may be stored: those `artifacts.ts` classifies (`REFUSED_UNCHANGED`, `retriable`). */
+const SAFE_CODES: ReadonlySet<string> = new Set([
+  "ALREADY_EXISTS",
+  "INVALID_INPUT",
+  "INVALID_REPO_NAME",
+  "INVALID_TTL",
+  "NOT_FOUND",
+  "INTERNAL_ERROR",
+  "UPSTREAM_UNAVAILABLE",
+]);
+
+/** The fixed phrase for where an error happened. */
+export type ErrorStage =
+  | "create failed"
+  | "revocation failed"
+  | "revocation answered, but the completion did not commit"
+  | "repository lookup failed"
+  | "no inventory: repository lookup failed"
+  | "no inventory: the listing failed";
 
 /**
- * Text safe to store or show: every plaintext in `secrets` is removed, then
- * credential patterns (Artifacts tokens, with or without `?expires=`, at any
- * length; `Bearer` and `Basic` values; an `Authorization` header's value),
- * then the text is bounded. The Room's shared redactor can replace this
- * once it lives where the Git package can use it.
+ * All a record or the observation keeps about an error (review 0ab6dac3):
+ * the stage's fixed phrase, the error's name if it is in `SAFE_NAMES`, an
+ * Artifacts code if it is in `SAFE_CODES`, and an integer numeric code or
+ * HTTP status. Never the error's message or any other provider text: no
+ * token format in the contract lets a pattern find every credential. The
+ * Room's shared safe-metadata boundary can replace this once the Git
+ * package can depend on it.
  */
-export function redactNote(text: string, secrets: Iterable<string> = []): string {
-  let out = text;
-  for (const secret of secrets) if (secret.length > 0) out = out.split(secret).join("<token>");
-  out = out
-    .replace(/art_v\d+_[^\s"'<>,;]*/g, "<token>")
-    .replace(/\b(Bearer|Basic)\s+[^\s"'<>,;]+/gi, "$1 <redacted>")
-    .replace(/\b(Authorization)(\s*[:=]\s*)(?!(?:Bearer|Basic)\s)[^\s"'<>,;]+/gi, "$1$2<redacted>");
-  return out.length > NOTE_MAX ? out.slice(0, NOTE_MAX) : out;
+export function errorNote(stage: ErrorStage, e: unknown): string {
+  const x = e as { name?: unknown; code?: unknown; numericCode?: unknown; status?: unknown } | null | undefined;
+  const parts: string[] = [e instanceof Error ? (typeof x?.name === "string" && SAFE_NAMES.has(x.name) ? x.name : "an error of another kind") : "not an error"];
+  if (typeof x?.code === "string" && SAFE_CODES.has(x.code)) parts.push(x.code);
+  const numeric = x?.numericCode;
+  if (typeof numeric === "number" && Number.isInteger(numeric) && numeric >= 0 && numeric <= 99_999) parts.push(`(${numeric})`);
+  const status = x?.status;
+  if (typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599) parts.push(`status ${status}`);
+  return `${stage}: ${parts.join(" ")}`.slice(0, NOTE_MAX);
 }
 
 /** What a create's answer, or its failure, says. */
@@ -151,8 +173,6 @@ type Outcome =
       readonly usable: boolean;
       /** Given to the caller only when usable. */
       readonly plaintext: string;
-      /** Whatever text the answer carried, usable or not: kept in memory only, to redact it from stored errors. */
-      readonly secret: string | null;
       readonly why: string;
     }
   | { readonly kind: "refused"; readonly why: string }
@@ -204,8 +224,6 @@ export class MintLedger {
   private observeUntil = 0;
   /** Late create answers this instance is still waiting for. */
   private readonly late = new Set<Promise<unknown>>();
-  /** Token text this instance has received, by record, until the record ends: never stored, only redacted from notes. */
-  private readonly secrets = new Map<number, string>();
 
   constructor(o: MintLedgerOptions) {
     this.sql = o.sql;
@@ -269,21 +287,17 @@ export class MintLedger {
 
   /** Delete one record in state `from`. True if it was. */
   private drop(id: number, from: MintState): boolean {
-    const gone = this.sql.all("DELETE FROM artroom_mint WHERE id = ? AND state = ? RETURNING id", id, from).length > 0;
-    if (gone) this.secrets.delete(id);
-    return gone;
+    return this.sql.all("DELETE FROM artroom_mint WHERE id = ? AND state = ? RETURNING id", id, from).length > 0;
   }
 
-  /** Every error text a record or the observation keeps goes through here (`redactNote`). */
-  private note(text: string, ...own: string[]): string {
-    return redactNote(text, [...own, ...this.secrets.values()]);
-  }
-
-  /** The repository, looked up within the bounded wait: a lookup that does not answer counts as that attempt's failure. */
-  private async lookup(): Promise<MintRepo> {
+  /**
+   * The repository, looked up within the bounded wait, or null if the
+   * lookup did not answer in time: that attempt's failure. A lookup that
+   * answers later is dropped, so it starts no provider work.
+   */
+  private async lookup(): Promise<MintRepo | null> {
     const repo = await within((async () => this.repo())(), this.waitMs, TIMEOUT);
-    if (repo === TIMEOUT) throw new Error(`the repository was not reached within ${this.waitMs} ms`);
-    return repo;
+    return repo === TIMEOUT ? null : repo;
   }
 
   /** Is any request outstanding, or any token in use, on this host? */
@@ -304,8 +318,8 @@ export class MintLedger {
           "last_error = CASE state WHEN 'sent' THEN ? ELSE ? END " +
           "WHERE state IN ('sent', 'held') RETURNING state",
         this.now(),
-        this.note("taken over: the host stopped before an answer was recorded"),
-        this.note("taken over: the host that held it stopped"),
+        "taken over: the host stopped before an answer was recorded",
+        "taken over: the host that held it stopped",
       );
       const unknown = moved.filter((r) => r["state"] === "unknown").length;
       this.count(moved.length - unknown, unknown);
@@ -324,6 +338,7 @@ export class MintLedger {
    */
   async mint(purpose: string, scope: MintScope, ttl: (sentAt: number) => number, opts: { readonly notAfter?: number } = {}): Promise<LedgerToken> {
     const repo = await this.lookup();
+    if (!repo) throw new Error(`the canonical repository was not reached within ${this.waitMs} ms; nothing was sent`);
     let wait: number = RETRY.firstMs;
     for (let attempt = 1; ; attempt++) {
       const r = await this.once(repo, purpose, scope, ttl, opts.notAfter ?? null);
@@ -408,7 +423,7 @@ export class MintLedger {
       // The caller stops waiting. The answer, whenever it comes, still settles the record (R-MINT-3).
       try {
         this.sql.transaction(() => {
-          if (this.move(id, "sent", "state = 'unknown', last_error = ?", this.note(`no answer within ${this.waitMs} ms`))) this.count(0, 1);
+          if (this.move(id, "sent", "state = 'unknown', last_error = ?", "no answer to the create in time")) this.count(0, 1);
         });
       } catch {
         // Left `sent`: the late answer, or the next host's takeover, settles it.
@@ -458,7 +473,7 @@ export class MintLedger {
       typeof a.plaintext !== "string" || a.plaintext.length === 0
         ? "no token text"
         : a.scope !== scope
-          ? `scope ${String(a.scope)}, not ${scope}`
+          ? "another scope"
           : expiresAt === null
             ? "an unreadable expiry"
             : expiresAt > arrival + ttlS * 1000
@@ -468,12 +483,12 @@ export class MintLedger {
                 : !waiting
                   ? "no caller is waiting"
                   : "";
-    const secret = typeof a.plaintext === "string" && a.plaintext.length > 0 ? a.plaintext : null;
-    return { kind: "token", id: a.id, expiresAt, usable: why === "", plaintext: why === "" ? (a.plaintext as string) : "", secret, why: why || "usable" };
+    return { kind: "token", id: a.id, expiresAt, usable: why === "", plaintext: why === "" ? (a.plaintext as string) : "", why: why || "usable" };
   }
 
   private failure(e: unknown): Outcome {
-    return refusedUnchanged(e) ? { kind: "refused", why: message(e) } : { kind: "unknown", why: message(e) };
+    const why = errorNote("create failed", e);
+    return refusedUnchanged(e) ? { kind: "refused", why } : { kind: "unknown", why };
   }
 
   /**
@@ -484,7 +499,6 @@ export class MintLedger {
    * was deleted, or null if it was in neither state.
    */
   private apply(id: number, o: Outcome): MintState | "closed" | null {
-    if (o.kind === "token" && o.secret !== null) this.secrets.set(id, o.secret);
     return this.sql.transaction(() => {
       for (const from of ["sent", "unknown"] as const) {
         if (o.kind === "token") {
@@ -493,7 +507,7 @@ export class MintLedger {
             continue;
           }
           const why = o.usable ? "no caller is waiting: the record was given up" : o.why;
-          const owed = this.move(id, from, "state = 'owed', token = ?, expires_at = ?, due = ?, backoff = NULL, last_error = ?", o.id, o.expiresAt, this.now(), this.note(why));
+          const owed = this.move(id, from, "state = 'owed', token = ?, expires_at = ?, due = ?, backoff = NULL, last_error = ?", o.id, o.expiresAt, this.now(), why);
           if (owed) {
             this.count(1, from === "unknown" ? -1 : 0);
             return "owed";
@@ -506,7 +520,7 @@ export class MintLedger {
         } else {
           if (from === "unknown") {
             if (this.sql.all("SELECT id FROM artroom_mint WHERE id = ? AND state = 'unknown'", id).length > 0) return "unknown";
-          } else if (this.move(id, from, "state = 'unknown', last_error = ?", this.note(o.why))) {
+          } else if (this.move(id, from, "state = 'unknown', last_error = ?", o.why)) {
             this.count(0, 1);
             return "unknown";
           }
@@ -557,7 +571,7 @@ export class MintLedger {
       plaintext,
       scope,
       expiresAt,
-      release: () => this.release(id, repo, tokenId, plaintext),
+      release: () => this.release(id, repo, tokenId),
       claim: () => {
         // Synchronous, so it commits or rolls back with the owner's transaction.
         if (!this.drop(id, "held")) throw new Error("the ledger no longer holds this token; it cannot be claimed");
@@ -566,25 +580,25 @@ export class MintLedger {
   }
 
   /** Revoke a held token by its ID. An answer deletes the record; a refusal, a timeout or a failed completion makes it owed. */
-  private async release(id: number, repo: MintRepo, tokenId: string, plaintext: string): Promise<void> {
+  private async release(id: number, repo: MintRepo, tokenId: string): Promise<void> {
     // Claimed, released or taken over: no longer this caller's to revoke.
     if (this.sql.all("SELECT id FROM artroom_mint WHERE id = ? AND state = 'held'", id).length === 0) return;
-    let error: unknown = null;
+    let note: string;
     try {
       if (await within(repo.revokeToken(tokenId).then(() => true), this.waitMs, false)) {
         try {
           this.sql.transaction(() => this.drop(id, "held"));
           return;
         } catch (e) {
-          error = e; // the completion did not commit: a failure like any other
+          note = errorNote("revocation answered, but the completion did not commit", e); // a failure like any other
         }
-      } else error = new Error(`no answer within ${this.waitMs} ms`);
+      } else note = "revocation: no answer in time";
     } catch (e) {
-      error = e;
+      note = errorNote("revocation failed", e);
     }
     const due = this.now() + MINT_REVOKE_BACKOFF.firstMs;
     this.sql.transaction(() => {
-      const owed = this.move(id, "held", "state = 'owed', due = ?, backoff = ?, last_error = ?", due, MINT_REVOKE_BACKOFF.firstMs, this.note(`revocation failed: ${message(error)}`, plaintext));
+      const owed = this.move(id, "held", "state = 'owed', due = ?, backoff = ?, last_error = ?", due, MINT_REVOKE_BACKOFF.firstMs, note);
       if (owed) this.count(1, 0);
     });
     await this.wake(due).catch(() => undefined); // the takeover wake-up, stored while it was held, covers it as well
@@ -615,15 +629,36 @@ export class MintLedger {
     while (this.pass || this.late.size > 0) await Promise.all([this.pass, ...this.late]);
   }
 
-  /** Start a pass over at most 20 eligible owed records, earliest due first, unless one is running. */
+  /**
+   * Start a pass over at most 20 eligible owed records, earliest due first,
+   * unless one is running. Those whose readable expiry has passed are
+   * settled first, in their own transaction, with no revocation call, so
+   * they never wait on the repository or on another revocation.
+   */
   private startPass(): void {
     if (this.pass) return;
+    const now = this.now();
     const batch = this.sql
-      .all("SELECT id, token, expires_at, backoff FROM artroom_mint WHERE state = 'owed' AND due <= ? ORDER BY due, id LIMIT ?", this.now(), MINT_REVOKE_BATCH)
+      .all("SELECT id, token, expires_at, backoff FROM artroom_mint WHERE state = 'owed' AND due <= ? ORDER BY due, id LIMIT ?", now, MINT_REVOKE_BATCH)
       .map((r) => ({ id: Number(r["id"]), token: text(r, "token") ?? "", expiresAt: num(r, "expires_at"), backoff: num(r, "backoff") }));
     if (batch.length === 0) return;
-    this.passUntil = this.now() + this.waitMs;
-    const run = this.revoke(batch).catch(() => undefined);
+    const expired = batch.filter((r) => r.expiresAt !== null && r.expiresAt <= now);
+    let rest = batch;
+    if (expired.length > 0) {
+      try {
+        this.sql.transaction(() => {
+          let gone = 0;
+          for (const r of expired) gone += this.drop(r.id, "owed") ? 1 : 0;
+          this.count(-gone, 0);
+        });
+        rest = batch.filter((r) => !expired.includes(r));
+      } catch {
+        // Not settled: they go through the pass, whose completion settles them or gives them their backoff.
+      }
+    }
+    if (rest.length === 0) return;
+    this.passUntil = now + this.waitMs;
+    const run = this.revoke(rest).catch(() => undefined);
     this.pass = run.then(async () => {
       this.pass = null;
       // A backlog continues 1 s after the pass ends.
@@ -634,55 +669,63 @@ export class MintLedger {
 
   /**
    * Revoke each record by its own ID, or settle it once its readable expiry
-   * has passed, with no revocation call. Then one transaction: at most one
-   * write per record and one summary write. A completion that cannot commit
-   * counts as a failure.
+   * has passed, with no revocation call. The repository is looked up when
+   * the first revocation needs it, within the bounded wait; a lookup that
+   * fails or does not answer is a failure for every record left. Then one
+   * transaction: at most one write per record and one summary write. A
+   * completion that cannot commit counts as a failure.
    */
   private async revoke(batch: readonly { id: number; token: string; expiresAt: number | null; backoff: number | null }[]): Promise<void> {
-    const results: { id: number; done: boolean; backoff: number | null; expiresAt: number | null; error: string }[] = [];
-    let repo: MintRepo | null = null;
-    let repoError: unknown = null;
-    try {
-      repo = await this.lookup();
-    } catch (e) {
-      repoError = e;
-    }
+    const results: { id: number; done: boolean; backoff: number | null; expiresAt: number | null; note: string }[] = [];
+    let repo: MintRepo | null | undefined; // undefined: not looked up yet
+    let lookupNote = "";
     for (const r of batch) {
+      const x = { id: r.id, backoff: r.backoff, expiresAt: r.expiresAt };
       if (r.expiresAt !== null && r.expiresAt <= this.now()) {
-        results.push({ id: r.id, done: true, backoff: r.backoff, expiresAt: r.expiresAt, error: "" });
+        results.push({ ...x, done: true, note: "" });
         continue;
       }
+      if (repo === undefined) {
+        this.passUntil = this.now() + this.waitMs;
+        try {
+          repo = await this.lookup();
+          if (!repo) lookupNote = "the repository was not reached in time";
+        } catch (e) {
+          repo = null;
+          lookupNote = errorNote("repository lookup failed", e);
+        }
+      }
       if (!repo) {
-        results.push({ id: r.id, done: false, backoff: r.backoff, expiresAt: r.expiresAt, error: message(repoError) });
+        results.push({ ...x, done: false, note: lookupNote });
         continue;
       }
       this.passUntil = this.now() + this.waitMs;
       try {
         const answered = await within(repo.revokeToken(r.token).then(() => true), this.waitMs, false);
-        results.push({ id: r.id, done: answered, backoff: r.backoff, expiresAt: r.expiresAt, error: answered ? "" : `no answer within ${this.waitMs} ms` });
+        results.push({ ...x, done: answered, note: answered ? "" : "revocation: no answer in time" });
       } catch (e) {
-        results.push({ id: r.id, done: false, backoff: r.backoff, expiresAt: r.expiresAt, error: message(e) });
+        results.push({ ...x, done: false, note: errorNote("revocation failed", e) });
       }
     }
-    const fail = (x: (typeof results)[number], error: string) => {
+    const fail = (x: (typeof results)[number], note: string) => {
       const wait = x.backoff === null ? MINT_REVOKE_BACKOFF.firstMs : Math.min(x.backoff * 2, MINT_REVOKE_BACKOFF.maxMs);
       // Never past a readable expiry: the record is settled when it passes.
       const due = x.expiresAt === null ? this.now() + wait : Math.min(this.now() + wait, x.expiresAt);
-      this.move(x.id, "owed", "due = ?, backoff = ?, last_error = ?", due, wait, this.note(`revocation failed: ${error}`));
+      this.move(x.id, "owed", "due = ?, backoff = ?, last_error = ?", due, wait, note);
     };
     try {
       this.sql.transaction(() => {
         let gone = 0;
         for (const x of results) {
           if (x.done) gone += this.drop(x.id, "owed") ? 1 : 0;
-          else fail(x, x.error);
+          else fail(x, x.note);
         }
         this.count(-gone, 0);
       });
     } catch (e) {
       try {
         this.sql.transaction(() => {
-          for (const x of results) fail(x, x.done ? `the completion did not commit: ${message(e)}` : x.error);
+          for (const x of results) fail(x, x.done ? errorNote("revocation answered, but the completion did not commit", e) : x.note);
         });
       } catch {
         // Storage could not record the retries either: each record keeps its due time.
@@ -702,17 +745,38 @@ export class MintLedger {
     this.observing = true;
     this.observeUntil = this.now() + this.waitMs;
     try {
-      let result: string;
+      let result = "";
       let unaccounted: number | null = null;
+      let repo: MintRepo | null = null;
       try {
-        const repo = await this.lookup();
-        const listing = await within(repo.listTokens(), this.waitMs, TIMEOUT);
-        if (listing === TIMEOUT) throw new Error(`no answer within ${this.waitMs} ms`);
-        const raw = listing as { tokens?: unknown; total?: unknown };
-        const size = Math.max(Array.isArray(raw.tokens) ? raw.tokens.length : 0, typeof raw.total === "number" ? raw.total : 0);
+        repo = await this.lookup();
+        if (!repo) result = "no inventory: the repository was not reached in time";
+      } catch (e) {
+        result = errorNote("no inventory: repository lookup failed", e);
+      }
+      let listing: unknown = null;
+      if (repo) {
+        this.observeUntil = this.now() + this.waitMs;
+        try {
+          listing = await within(repo.listTokens(), this.waitMs, TIMEOUT);
+          if (listing === TIMEOUT) result = "no inventory: the listing did not answer in time";
+        } catch (e) {
+          result = errorNote("no inventory: the listing failed", e);
+        }
+      }
+      if (result === "") {
+        const raw = listing as { tokens?: unknown; total?: unknown } | null;
+        const size = Math.max(Array.isArray(raw?.tokens) ? raw.tokens.length : 0, typeof raw?.total === "number" ? raw.total : 0);
+        let tokens: ReturnType<typeof completeInventory> | null = null;
         if (size > MINT_LISTING_MAX) result = `the listing has ${size} records, over ${MINT_LISTING_MAX}; nothing counted`;
         else {
-          const tokens = completeInventory(listing, "the canonical repository's token inventory");
+          try {
+            tokens = completeInventory(listing);
+          } catch {
+            result = "no inventory: the listing is incomplete or malformed";
+          }
+        }
+        if (tokens) {
           const at = this.now();
           unaccounted = 0;
           for (const t of tokens) {
@@ -722,17 +786,14 @@ export class MintLedger {
           }
           result = `${unaccounted} live token(s) on the canonical repository not accounted for`;
         }
-      } catch (e) {
-        result = `no inventory: ${message(e)}`;
       }
-      const note = this.note(result);
       this.sql.transaction(() => {
         const at = this.now();
         const wait = this.summary().observeWait;
         this.sql.all(
           "UPDATE artroom_mint_summary SET observed_at = ?, observation = ?, unaccounted = ?, observe_due = ?, observe_wait = ? WHERE k = 1",
           at,
-          note,
+          result,
           unaccounted,
           at + wait,
           Math.min(wait * 2, OBSERVE_WAIT.maxMs),

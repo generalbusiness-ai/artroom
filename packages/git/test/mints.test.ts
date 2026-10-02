@@ -13,7 +13,7 @@ import {
   MINT_WAIT_MS,
   MintLedger,
   OBSERVE_WAIT,
-  redactNote,
+  errorNote,
   OVERDUE_STEP_MS,
   TAKEOVER_AHEAD_MS,
   TAKEOVER_MOVE_MS,
@@ -192,6 +192,9 @@ function room(o: { waitMs?: number; sql?: Sql; clock?: Clock } = {}) {
     wakeFails: false,
     /** While set, looking up the repository never answers. */
     lookupHangs: false,
+    /** While set, looking up the repository answers only when this gate opens. */
+    lookupGate: null as ReturnType<typeof deferred<void>> | null,
+    lookups: 0,
     /** Room time one wake takes to store. */
     wakeTakesMs: 0,
     ledger: null as unknown as MintLedger,
@@ -199,7 +202,12 @@ function room(o: { waitMs?: number; sql?: Sql; clock?: Clock } = {}) {
     start(): MintLedger {
       r.ledger = new MintLedger({
         sql,
-        repo: () => (r.lookupHangs ? new Promise<MintRepo>(() => {}) : Promise.resolve(repo)),
+        repo: () => {
+          r.lookups++;
+          if (r.lookupHangs) return new Promise<MintRepo>(() => {});
+          const gate = r.lookupGate;
+          return gate ? gate.promise.then(() => repo) : Promise.resolve(repo);
+        },
         now: clock.now,
         wake: async (at) => {
           if (r.wakeFails) throw new Error("storage refused the alarm");
@@ -472,7 +480,7 @@ test("(4) another scope, a longer expiry, or an expiry after notAfter that passe
     (t) => ({ ...(full(t) as object), scope: "write" }),
     (t) => ({ ...(full(t) as object), expiresAt: iso(t.expiresAt + 1) }),
   ];
-  await assert.rejects(r.ledger.mint("read:a", "read", ttl60), /scope write, not read/);
+  await assert.rejects(r.ledger.mint("read:a", "read", ttl60), /another scope/);
   await assert.rejects(r.ledger.mint("read:b", "read", ttl60), /later than the lifetime asked/);
   // A 60 s token passes the generic check, but outlives the bound.
   const notAfter = r.clock.t + 30_000;
@@ -1107,7 +1115,73 @@ function assertNoSecret(r: ReturnType<typeof room>, secret: string): void {
   assert.equal(stored.includes(secret), false, `stored text contains ${secret}`);
 }
 
-test("(checker 2) an opaque plaintext echoed in an Authorization: Bearer revocation error is neither stored nor shown", async () => {
+/** An error that carries `secret` everywhere a thrower can put text: message, name and code. */
+function leaky(secret: string): Error {
+  return Object.assign(new Error(`Authorization: Bearer ${secret}`), { name: secret, code: secret, status: secret });
+}
+
+test("(checker 1) a repository lookup that answers only after the wait: the pass records its backoff and ends, a new pass can start, and the late lookup does nothing", async () => {
+  const r = room({ waitMs: 30 });
+  r.repo.plans = [(t) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() })];
+  await assert.rejects(r.ledger.mint("a", "write", () => 86_400));
+  const late = deferred<void>();
+  r.lookupGate = late;
+  await alarm(r); // ends within the wait, though the lookup is still out
+  let rec = only(r.sql);
+  assert.deepEqual([rec["state"], rec["backoff"], rec["last_error"]], ["owed", 1_000, "the repository was not reached in time"]);
+  assert.equal(r.ledger.nextDue(), Number(rec["due"]), "its backoff, not the pass's timeout or a continuation");
+  // The pass's flag is released: the next pass starts while the first lookup is still out.
+  const second = deferred<void>();
+  r.lookupGate = second;
+  r.clock.t = Number(rec["due"]);
+  await alarm(r);
+  assert.equal(r.lookups, 3, "the mint's lookup, then one per pass");
+  rec = only(r.sql);
+  assert.equal(rec["backoff"], 2_000);
+  // The late lookups answer: they start no revocation and change nothing.
+  const before = JSON.stringify(rows(r.sql));
+  late.resolve();
+  second.resolve();
+  await new Promise((res) => setTimeout(res, 20));
+  await r.ledger.idle();
+  assert.equal(r.repo.revokes.length, 0);
+  assert.equal(JSON.stringify(rows(r.sql)), before);
+});
+
+test("(checker 1) a held lookup never delays a record whose readable expiry has passed: it is settled before the repository is asked for", async () => {
+  const r = room({ waitMs: 2_000 });
+  const idOnly = (t: Tok) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() });
+  r.repo.plans = [idOnly, idOnly];
+  await assert.rejects(r.ledger.mint("expiring", "write", ttl60));
+  await assert.rejects(r.ledger.mint("lasting", "write", () => 86_400));
+  r.clock.advance(61_000);
+  r.lookupHangs = true;
+  void r.ledger.reconcile();
+  await new Promise((res) => setImmediate(res));
+  assert.deepEqual(rows(r.sql).map((x) => x["purpose"]), ["lasting"], "settled at once, while the lookup is held");
+  assert.equal(r.ledger.duties().owed, 1);
+});
+
+test("(checker 1) an observation lookup that answers only after the wait: the result and next time are recorded, the flag is released, and the late lookup does nothing", async () => {
+  const r = room({ waitMs: 30 });
+  r.repo.plans = ["lose"];
+  await assert.rejects(r.ledger.mint("a", "read", ttl60));
+  const late = deferred<void>();
+  r.lookupGate = late;
+  await alarm(r);
+  const o = r.ledger.duties().observation;
+  assert.deepEqual([o.at, o.result, o.nextAt], [r.clock.t, "no inventory: the repository was not reached in time", r.clock.t + 60_000]);
+  r.clock.t = Number(o.nextAt);
+  r.lookupGate = null;
+  await alarm(r);
+  assert.equal(r.repo.lists, 1, "the next observation runs: the flag was released");
+  late.resolve();
+  await new Promise((res) => setTimeout(res, 20));
+  assert.equal(r.repo.lists, 1, "the late lookup lists nothing");
+  assert.equal(only(r.sql)["state"], "unknown");
+});
+
+test("(checker 2) the checker's control: an accepted token's text echoed in an Authorization: Bearer revocation error is neither stored nor shown", async () => {
   const r = room();
   const secret = "syntheticOpaqueCredentialOnly";
   r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: secret })];
@@ -1116,106 +1190,58 @@ test("(checker 2) an opaque plaintext echoed in an Authorization: Bearer revocat
   r.repo.revokeError = () => new Error(`Authorization: Bearer ${secret}`);
   await t.release();
   assert.equal(only(r.sql)["state"], "owed");
-  assert.match(String(only(r.sql)["last_error"]), /revocation failed/);
-  assertNoSecret(r, secret);
-  // The pass's failures too.
-  r.clock.advance(1_000);
-  await alarm(r);
-  assert.equal(r.repo.revokes.length, 2);
+  assert.equal(only(r.sql)["last_error"], "revocation failed: Error");
   assertNoSecret(r, secret);
 });
 
-test("(checker 2) a short plaintext, and one in the error's name, echoed raw; and an unusable answer's text: none is stored", async () => {
+test("(checker 2) every error sink stores safe metadata only: creation, release, the pass, repository lookups and the listing", async () => {
   const r = room();
-  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: "k9" })];
-  const short = await r.ledger.mint("a", "read", ttl60);
-  r.repo.revokeError = () => new Error("refused for k9");
-  await short.release();
-  assertNoSecret(r, "k9");
-
-  const named = "Zq7opaqueName";
-  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: named })];
-  const n = await r.ledger.mint("b", "read", ttl60);
-  r.repo.revokeError = () => Object.assign(new Error("revocation refused"), { name: named });
-  await n.release();
-  assertNoSecret(r, named);
-
-  // An answer that cannot be used still carried text; it is owed, and its revocation error echoes that text.
-  const unusable = "Wx3unusableText";
-  r.repo.plans = [(t) => ({ ...(full(t) as object), scope: "write", plaintext: unusable })];
-  await assert.rejects(r.ledger.mint("c", "read", ttl60));
-  r.repo.revokeError = () => new Error(`no such token ${unusable}`);
-  r.clock.advance(1_000);
-  await alarm(r);
-  assertNoSecret(r, unusable);
-  assert.equal(rows(r.sql).length, 3);
-});
-
-test("(checker 2) a claim rolled back, then a release whose error echoes the text: the record's own plaintext is still removed", async () => {
-  const r = room();
-  const secret = "Rb5claimedThenReleased";
+  const secret = "k9"; // short, opaque, and in the message, the name, the code and the status
   r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: secret })];
-  const t = await r.ledger.mint("a", "read", ttl60);
-  assert.throws(() =>
-    r.sql.transaction(() => {
-      t.claim();
-      throw new Error("the owner's transaction fails");
-    }),
-  );
-  r.repo.revokeError = () => new Error(`token ${secret} is busy`);
-  await t.release();
-  assert.equal(only(r.sql)["state"], "owed");
-  assertNoSecret(r, secret);
-});
-
-test("(checker 2) with no plaintext in memory (a new host): Artifacts tokens, Bearer, Basic and Authorization values are redacted at any length, and stored text is bounded", async () => {
-  const r = room();
-  const held = await r.ledger.mint("a", "write", () => 86_400);
-  r.start(); // the new host holds no text
-  const art = `art_v12_${"A1".repeat(400)}?expires=1800000060`;
-  r.repo.revokeError = () =>
-    new Error(`denied ${art} Bearer opaqueAfterRestart Basic dXNlcjpwYXNzd29yZA== Authorization: rawHeaderValue ${"x".repeat(5_000)}`);
-  await alarm(r);
-  const note = String(only(r.sql)["last_error"]);
-  for (const secret of [held.plaintext, "A1A1A1", "opaqueAfterRestart", "dXNlcjpwYXNzd29yZA", "rawHeaderValue"]) assertNoSecret(r, secret);
-  assert.ok(note.length <= 300, `bounded, not ${note.length}`);
-  assert.match(note, /<token>.*Bearer <redacted>.*Basic <redacted>.*Authorization: <redacted>/);
-});
-
-test("(checker 2) a create failure's error and an observation's error are redacted too", async () => {
-  const r = room();
-  const secret = "Hd2heldOpaque";
-  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: secret })];
-  const t = await r.ledger.mint("a", "read", ttl60);
+  const held = await r.ledger.mint("held", "read", () => 86_400);
+  // Creation.
   r.repo.createToken = async () => {
-    throw new Error(`upstream said Authorization: Bearer leakedCreate and ${secret}`);
+    throw leaky(secret);
   };
-  await assert.rejects(r.ledger.mint("b", "read", ttl60));
+  await assert.rejects(r.ledger.mint("create", "read", ttl60));
+  assert.equal(r.sql.all("SELECT last_error FROM artroom_mint WHERE purpose = 'create'")[0]!["last_error"], "create failed: an error of another kind");
+  // Release.
+  r.repo.revokeError = () => leaky(secret);
+  await held.release();
+  assert.equal(r.sql.all("SELECT last_error FROM artroom_mint WHERE purpose = 'held'")[0]!["last_error"], "revocation failed: an error of another kind");
+  // The pass's revocation, and the listing, on the same alarm.
   r.repo.listTokens = async () => {
-    throw new Error(`listing failed for ${secret} art_v1_${"z".repeat(30)}`);
+    throw leaky(secret);
   };
+  r.clock.advance(1_000);
   await alarm(r);
-  assert.match(String(r.ledger.duties().observation.result), /no inventory/);
+  assert.equal(r.sql.all("SELECT last_error FROM artroom_mint WHERE purpose = 'held'")[0]!["last_error"], "revocation failed: an error of another kind");
+  assert.equal(r.ledger.duties().observation.result, "no inventory: the listing failed: an error of another kind");
   assertNoSecret(r, secret);
-  assertNoSecret(r, "leakedCreate");
-  assertNoSecret(r, "zzzzzzzzzz");
-  await t.release();
+  // Repository lookups, in the pass and the observation, on a new host.
+  const looked = new MintLedger({
+    sql: r.sql,
+    repo: async () => {
+      throw leaky(secret);
+    },
+    now: r.clock.now,
+    wake: async () => {},
+    known: () => false,
+    waitMs: 2_000,
+  });
+  r.clock.advance(3_600_000);
+  await looked.reconcile();
+  await looked.idle();
+  assert.equal(r.sql.all("SELECT last_error FROM artroom_mint WHERE purpose = 'held'")[0]!["last_error"], "repository lookup failed: an error of another kind");
+  assert.equal(looked.duties().observation.result, "no inventory: repository lookup failed: an error of another kind");
+  assertNoSecret(r, secret);
+  assert.equal(JSON.stringify(looked.duties()).includes(secret), false);
 });
 
-test("(checker 2) a malformed answer whose scope field echoes its text: the owed record's reason does not store it", async () => {
-  const r = room();
-  const secret = "Sc4echoedInScope";
-  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: secret, scope: secret })];
-  await assert.rejects(r.ledger.mint("a", "read", ttl60), /cannot be used/);
-  assert.equal(only(r.sql)["state"], "owed");
-  assert.match(String(only(r.sql)["last_error"]), /scope <token>, not read/);
-  assertNoSecret(r, secret);
-});
-
-test("(checker 2) redactNote: secrets first, then patterns, then the bound", () => {
-  assert.equal(redactNote("a k9 b", ["k9"]), "a <token> b");
-  assert.equal(redactNote(`x art_v1_${"q".repeat(2_000)}?expires=1 y`), "x <token> y");
-  assert.equal(redactNote("Authorization: Basic abc"), "Authorization: Basic <redacted>");
-  assert.equal(redactNote("authorization=opaque"), "authorization=<redacted>");
-  assert.equal(redactNote("y".repeat(1_000)).length, 300);
+test("(checker 2) errorNote keeps only the stage, an allowed name, a known Artifacts code and integer codes", () => {
+  const e = Object.assign(new TypeError("Bearer abc art_v1_xyz"), { code: "INTERNAL_ERROR", numericCode: 10400, status: 503 });
+  assert.equal(errorNote("revocation failed", e), "revocation failed: TypeError INTERNAL_ERROR (10400) status 503");
+  assert.equal(errorNote("create failed", Object.assign(new Error("x"), { code: "SOMETHING_NEW", numericCode: 1.5, status: 9_999 })), "create failed: Error");
+  assert.equal(errorNote("create failed", "a thrown string with a secret"), "create failed: not an error");
+  assert.equal(errorNote("create failed", Object.assign(new Error("x"), { name: "ArtifactsError" })), "create failed: an error of another kind");
 });
