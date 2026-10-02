@@ -119,7 +119,7 @@ interface Site {
   readonly claimed?: boolean;
   /** The lifetime the site asks for, in seconds, unchanged by this design; a check job's ends before its deadline. */
   readonly lifetime: number | "by the deadline";
-  readonly prepare: () => Promise<{ readonly r: TestRoom; readonly run: () => Promise<unknown>; readonly lost?: () => Promise<void> }>;
+  readonly prepare: () => Promise<{ readonly r: TestRoom; readonly run: () => Promise<unknown>; readonly lost?: () => Promise<void>; readonly done?: () => void }>;
 }
 
 const SITES: readonly Site[] = [
@@ -202,7 +202,13 @@ const SITES: readonly Site[] = [
       const r = await makeRoom();
       await quiet(r);
       await r.admin.ok<Claim>("claim", null, { goal: "a lane", scope: ["docs/f/**"] });
-      return { r, run: () => inDO(r, (room) => room.core.publish(true).catch(() => null)) };
+      const before = r.world.artifacts.logRef;
+      return {
+        r,
+        run: () => inDO(r, (room) => room.core.publish(true).catch(() => null)),
+        // The push went through with its write token.
+        done: () => expect(r.world.artifacts.logRef).not.toBe(before),
+      };
     },
   },
   {
@@ -336,11 +342,12 @@ describe("mint lane C (2): a failed revocation at each canonical site is owed, a
   for (const site of SITES)
     it(site.name, () =>
       ahead(async () => {
-        const { r, run } = await site.prepare();
+        const { r, run, done } = await site.prepare();
         const failed = await failRevocation(r, site);
         try {
           await run();
           await settle(r);
+          done?.();
           expect(failed.id, "the site's token was revoked and the revocation failed").not.toBeNull();
           const id = failed.id!;
           expect(token(r, id).revoked).toBe(false);
