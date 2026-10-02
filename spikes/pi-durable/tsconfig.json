@@ -17,5 +17,7 @@
       "@generalbusiness/artroom-policy/helpers": ["./vendor/artroom/packages/policy/src/helpers.ts"]
     }
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  // Fixtures for scripts/check-test.sh, with deliberate errors.
+  "exclude": ["test/check"]
 }

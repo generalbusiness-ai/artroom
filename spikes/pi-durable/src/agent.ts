@@ -12,9 +12,16 @@
  * The Artroom tools follow one rule, the one the spike tests:
  *   an act tool is `replay: "safe"`; its idempotency key is derived from the
  *   pi-durable tool task ID; and the prepared, signed envelope is stored in
- *   the task's memo before it is first sent. A rerun after a crash sends the
- *   stored bytes again, unchanged, and the room returns the original receipt
- *   (R-IDEM-2). Nothing is signed twice, so nothing can be admitted twice.
+ *   the Agent's outbox (its own SQLite table) before it is first sent. The
+ *   tool settles only on a definite outcome: a record, a refusal, or an error
+ *   that says nothing was recorded. While the outcome is unknown (a reply
+ *   lost, a reset), it sends the stored bytes again, unchanged, and the room
+ *   returns the original result (R-IDEM-2). Nothing is signed twice, so
+ *   nothing can be admitted twice.
+ *
+ * The push tool follows the same shape: the commit and the ref it expects to
+ * replace are saved before the first push; a rerun pushes that same commit,
+ * or finds it already pushed.
  */
 
 import { DurableObject } from "cloudflare:workers";
@@ -27,7 +34,7 @@ import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { AssistantEntry, createRegistry, defineDoc, defineExtension, defineTool, Harness, section, type ToolExecutionApi } from "@earendil-works/pi-durable";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
-import { connect, isRefusal, signerFromJwk, type PreparedAct, type ClientActOptions, type PrivateJwk } from "@generalbusiness/artroom-client";
+import { connect, isArtroomError, isRefusal, signerFromJwk, type PreparedAct, type ClientActOptions, type PrivateJwk } from "@generalbusiness/artroom-client";
 import type { ArtroomService, DelegationId, Held, LaneId, OpId, Result, Room, RoomId, Sha } from "@generalbusiness/artroom-contract";
 import { DurableObjectSqlite } from "./do-sqlite.ts";
 
@@ -40,29 +47,49 @@ export interface AgentEnv {
 // ------------------------------------------------------------ test controls (module state, shared with the test isolate)
 
 /** Named crash points. Each fires once: the Durable Object is reset with `ctx.abort()` at that point. */
-export type CrashPoint = `${"claim" | "propose" | "land"}:${"before-send" | "after-send" | "after-receipt"}` | "write:after-push";
+export type CrashPoint = `${"claim" | "propose" | "land"}:${"before-send" | "after-send" | "after-receipt" | "unresolved"}` | `write:${"before-push" | "after-push" | "after-record"}`;
+
+/**
+ * A lane's fork, as the agent's git client sees it. Preparing a commit has no
+ * effect outside; pushing is the one external effect, and it is a
+ * compare-and-swap, as `git push --force-with-lease` is.
+ */
+export interface Workspace {
+  /** Build a commit with these files on the lane's base. Returns it, and the fork head it is to replace (null: no fork yet). */
+  prepare(lane: LaneId, files: Record<string, string>): { commit: Sha; expected: Sha | null };
+  /** The fork's head now (null: no fork yet). */
+  head(lane: LaneId): Sha | null;
+  /** Push `commit` to the fork if its head is still `expected`; throw otherwise. */
+  push(lane: LaneId, commit: Sha, expected: Sha | null): void;
+}
 
 export const controls = {
   crashes: new Set<CrashPoint>(),
-  /** Ablations: what goes wrong without each half of the rule. */
-  memo: true,
+  /** Ablations: what goes wrong without each half of the rule. Store the prepared envelope in the outbox before sending. */
+  outbox: true,
   /** Derive the idempotency key from the tool task ID; false gives a fresh random key per attempt, the client's default. */
   taskKey: true,
   replay: "safe" as "safe" | "unsafe",
-  /** Every time an act tool hands an envelope to the client, by kind: "prepared" (new) or "replayed" (from the memo). */
+  /** Every time an act tool hands an envelope to the client, by kind: "prepared" (new) or "replayed" (from the outbox). */
   sends: new Map<string, string[]>(),
   /** How many times an Agent instance was constructed (a reset makes a new one). */
   opens: 0,
-  /** Pushes a change to a lane's fork and returns the new head. In the spike this is lane A's fake Artifacts. */
-  workspace: null as null | ((lane: LaneId, files: Record<string, string>) => Sha),
+  /** Every push the write tool makes, by commit. */
+  pushes: [] as Sha[],
+  /** Wait between rounds of sends while an act's outcome is unknown. A deployment would set an alarm instead. */
+  retryMs: 1_000,
+  /** The lane's fork. In the spike this is lane A's fake Artifacts. */
+  workspace: null as null | Workspace,
   /** The client's clock. Lane A's test room runs on a fixed clock, so signed requests must use it too. */
   now: undefined as undefined | (() => number),
   reset(): void {
     this.crashes.clear();
-    this.memo = true;
+    this.outbox = true;
     this.taskKey = true;
     this.replay = "safe";
     this.sends.clear();
+    this.pushes = [];
+    this.retryMs = 1_000;
     this.workspace = null;
     this.now = undefined;
     this.opens = 0;
@@ -146,6 +173,26 @@ const ctx0 = BACKGROUND_CONTEXT;
 /** A JSON copy, for memos and documents. */
 const json = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
+const sleep = (ms: number, signal: AbortSignal | undefined) =>
+  new Promise<void>((resolve, reject) => {
+    signal?.throwIfAborted();
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => (clearTimeout(t), reject(signal.reason)), { once: true });
+  });
+
+/**
+ * Whether a failed send leaves the act's outcome known: nothing was recorded.
+ * Over the service binding, an `ArtroomError` the room throws recorded nothing
+ * unless it says `maybeRecorded`; a retryable one may be a lost reply.
+ */
+const definite = (e: unknown): boolean => isArtroomError(e) && !e.retryable && e.maybeRecorded !== true;
+
+/** An injected reset. Nothing catches it: the instance is gone. */
+class Reset extends Error {}
+
+/** An outbox row: the prepared act, and its outcome once known. */
+type Outcome = { result: unknown } | { error: unknown };
+
 export class Agent extends DurableObject<AgentEnv> {
   #harness!: Harness;
   #room: Promise<Room> | undefined;
@@ -156,6 +203,8 @@ export class Agent extends DurableObject<AgentEnv> {
     controls.opens++;
     void state.blockConcurrencyWhile(async () => {
       state.storage.sql.exec("CREATE TABLE IF NOT EXISTS agent_config (k TEXT PRIMARY KEY, v TEXT NOT NULL)");
+      // Prepared acts, by tool task: written before the first send, kept after the tool settles.
+      state.storage.sql.exec("CREATE TABLE IF NOT EXISTS artroom_outbox (task TEXT PRIMARY KEY, kind TEXT NOT NULL, prepared TEXT NOT NULL, outcome TEXT)");
       // A per-storage prefix for idempotency keys: task IDs restart if this storage is ever lost, keys must not.
       const prefix = state.storage.sql.exec<{ v: string }>("SELECT v FROM agent_config WHERE k = 'prefix'").toArray()[0]?.v;
       this.#prefix = prefix ?? crypto.randomUUID().replaceAll("-", "").slice(0, 16);
@@ -193,46 +242,116 @@ export class Agent extends DurableObject<AgentEnv> {
   #maybeCrash(point: CrashPoint): void {
     if (controls.crashes.delete(point)) {
       this.ctx.abort(`injected crash at ${point}`);
-      throw new Error(`injected crash at ${point}`);
+      throw new Reset(`injected crash at ${point}`);
     }
   }
 
   async #roomHandle(): Promise<Room> {
-    this.#room ??= (async () => {
-      const room = this.#config("room") as RoomId;
-      const signer = await signerFromJwk(JSON.parse(this.#config("jwk")!) as PrivateJwk);
-      return connect(this.env.ARTROOM, room, { kind: "delegation", signer, as: this.#config("delegation") as DelegationId }, controls.now ? { now: controls.now } : {});
-    })();
+    if (this.#room === undefined) {
+      const p = (async () => {
+        const room = this.#config("room") as RoomId;
+        const signer = await signerFromJwk(JSON.parse(this.#config("jwk")!) as PrivateJwk);
+        return connect(this.env.ARTROOM, room, { kind: "delegation", signer, as: this.#config("delegation") as DelegationId }, controls.now ? { now: controls.now } : {});
+      })();
+      // A failed connection is not kept: the next call connects again.
+      p.catch(() => {
+        if (this.#room === p) this.#room = undefined;
+      });
+      this.#room = p;
+    }
     return this.#room;
   }
 
+  #outboxRow(task: string): { prepared: PreparedAct; outcome?: Outcome } | undefined {
+    const row = this.ctx.storage.sql.exec<{ prepared: string; outcome: string | null }>("SELECT prepared, outcome FROM artroom_outbox WHERE task = ?", task).toArray()[0];
+    if (row === undefined) return undefined;
+    return { prepared: JSON.parse(row.prepared) as PreparedAct, ...(row.outcome === null ? {} : { outcome: JSON.parse(row.outcome) as Outcome }) };
+  }
+
+  /** The outbox, for the test: each prepared act's kind, and whether its outcome is known. */
+  async outbox(): Promise<{ kind: string; resolved: boolean }[]> {
+    return this.ctx.storage.sql.exec<{ kind: string; outcome: string | null }>("SELECT kind, outcome FROM artroom_outbox ORDER BY rowid").toArray().map((r) => ({ kind: r.kind, resolved: r.outcome !== null }));
+  }
+
   /**
-   * Sends one act exactly once across crashes. The first run prepares and
-   * signs it through the client, stores the prepared act in the tool task's
-   * memo, then sends it. A rerun finds the memo and sends the same bytes.
+   * Sends one act exactly once across crashes and lost replies. The first
+   * run prepares and signs it through the client, stores the prepared act in
+   * the outbox, then sends it. Until the outcome is known, every send is of
+   * those stored bytes, and the tool does not settle: a rerun after a reset
+   * finds the row and sends them again. A known outcome is stored with the
+   * row, so a later rerun sends nothing.
    */
   async #act<T>(api: ToolExecutionApi, cx: Context, kind: "claim" | "propose" | "land", prepare: (room: Room, opts: ClientActOptions) => Promise<Result<T>>): Promise<Result<T>> {
-    const room = await this.#roomHandle();
+    const task = String(api.taskId);
     const count = (how: string) => controls.sends.set(kind, [...(controls.sends.get(kind) ?? []), how]);
-    const saved = controls.memo ? await api.memo<PreparedAct & Record<string, never>>("artroom:prepared", cx) : undefined;
-    let out: Result<T>;
-    if (saved !== undefined) {
-      this.#maybeCrash(`${kind}:before-send`);
-      count("replayed");
-      out = (await (room as unknown as { replay(a: PreparedAct): Promise<Result<T>> }).replay(saved)) as Result<T>;
-    } else {
-      const idempotencyKey = controls.taskKey ? `pd-${this.#prefix}-${String(api.taskId).replace(/[^A-Za-z0-9_-]/g, "_")}`.slice(0, 64) : crypto.randomUUID();
-      out = await prepare(room, {
-        idempotencyKey,
-        onPrepared: async (prepared) => {
-          if (controls.memo) await api.memo("artroom:prepared", json(prepared) as never, cx);
-          this.#maybeCrash(`${kind}:before-send`);
-          count("prepared");
-        },
-      });
+    // Each outbox write is flushed before the next step: the first, before the envelope is first sent.
+    const settle = async (outcome: Outcome): Promise<Result<T>> => {
+      if (controls.outbox) {
+        this.ctx.storage.sql.exec("UPDATE artroom_outbox SET outcome = ? WHERE task = ?", JSON.stringify(outcome), task);
+        await this.ctx.storage.sync();
+      }
+      this.#maybeCrash(`${kind}:after-send`);
+      if ("error" in outcome) throw outcome.error;
+      return outcome.result as Result<T>;
+    };
+    let row = controls.outbox ? this.#outboxRow(task) : undefined;
+    if (row?.outcome !== undefined) {
+      if ("error" in row.outcome) throw row.outcome.error;
+      return row.outcome.result as Result<T>;
     }
-    this.#maybeCrash(`${kind}:after-send`);
-    return out;
+    let round = 0;
+    if (row === undefined) {
+      const idempotencyKey = controls.taskKey ? `pd-${this.#prefix}-${task.replace(/[^A-Za-z0-9_-]/g, "_")}`.slice(0, 64) : crypto.randomUUID();
+      let out: { result: Result<T> } | undefined;
+      try {
+        out = {
+          result: await prepare(await this.#roomHandle(), {
+            idempotencyKey,
+            onPrepared: async (prepared) => {
+              if (controls.outbox) {
+                this.ctx.storage.sql.exec("INSERT INTO artroom_outbox (task, kind, prepared) VALUES (?, ?, ?)", task, kind, JSON.stringify(prepared));
+                await this.ctx.storage.sync();
+              }
+              this.#maybeCrash(`${kind}:before-send`);
+              count("prepared");
+            },
+          }),
+        };
+      } catch (e) {
+        if (e instanceof Reset) throw e;
+        row = controls.outbox ? this.#outboxRow(task) : undefined;
+        // Nothing prepared (a read failed), or the room says nothing was recorded: the outcome is known.
+        if (row === undefined) throw e;
+        if (definite(e)) return settle({ error: e });
+        round = 1; // The client has just tried; wait before the next round.
+      }
+      if (out !== undefined) return settle(out);
+    } else {
+      this.#maybeCrash(`${kind}:before-send`);
+    }
+    // The outcome is unknown, or the stored act was never sent: send the stored bytes until the room answers.
+    const prepared = row!.prepared;
+    for (; ; round++) {
+      if (round > 0) {
+        this.#maybeCrash(`${kind}:unresolved`);
+        await sleep(controls.retryMs, cx.abortSignal);
+      }
+      let room: Room;
+      try {
+        room = await this.#roomHandle();
+      } catch {
+        continue; // Connecting says nothing about the act.
+      }
+      count("replayed");
+      let result: Result<T>;
+      try {
+        result = await (room as unknown as { replay(a: PreparedAct): Promise<Result<T>> }).replay(prepared);
+      } catch (e) {
+        if (definite(e)) return settle({ error: e });
+        continue;
+      }
+      return settle({ result });
+    }
   }
 
   /** Record a receipt in the lane document. Idempotent: an act is recorded once, by ID. */
@@ -279,18 +398,23 @@ export class Agent extends DurableObject<AgentEnv> {
       replay: "safe",
       execute: async (args, api, cx) => {
         const lane = (await this.#lane(api, cx)).lane as LaneId;
-        // The first pushed head wins: a rerun reuses it rather than pushing another commit.
-        let head = await api.memo<string>("artroom:head", cx);
-        if (head === undefined) {
-          const pushed = controls.workspace!(lane, { [args.path]: args.content });
-          head = await api.memo("artroom:head", pushed, cx);
-          this.#maybeCrash("write:after-push");
+        const ws = controls.workspace!;
+        // Prepare, and save the exact commit and the head it replaces, before anything leaves. A rerun reuses them.
+        let push = await api.memo<{ commit: Sha; expected: Sha | null }>("artroom:push", cx);
+        if (push === undefined) push = await api.memo("artroom:push", ws.prepare(lane, { [args.path]: args.content }), cx);
+        this.#maybeCrash("write:before-push");
+        // Publish: unless the fork already has this commit, push it over the saved head, or fail if the fork moved.
+        const { commit, expected } = push;
+        if (ws.head(lane) !== commit) {
+          controls.pushes.push(commit);
+          ws.push(lane, commit, expected);
         }
-        const h = head;
+        this.#maybeCrash("write:after-push");
         await api.commit(async (tx) => {
-          (await tx.doc(LaneDoc, api.conversationId)).head = h;
+          (await tx.doc(LaneDoc, api.conversationId)).head = commit;
         }, cx);
-        return { content: [{ type: "text", text: `Pushed ${args.path}; head ${h}.` }] };
+        this.#maybeCrash("write:after-record");
+        return { content: [{ type: "text", text: `Pushed ${args.path}; head ${commit}.` }] };
       },
     });
 

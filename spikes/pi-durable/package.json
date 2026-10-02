@@ -6,7 +6,8 @@
   "scripts": {
     "setup": "sh scripts/setup.sh",
     "test": "vitest run --config vitest.config.ts",
-    "check": "sh scripts/check.sh"
+    "check": "sh scripts/check.sh",
+    "check:test": "sh scripts/check-test.sh"
   },
   "dependencies": {
     "@earendil-works/chord": "1.0.0",
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.22.0",
+    "typescript": "7.0.2",
     "vitest": "4.1.11",
     "wrangler": "4.146.0"
   }

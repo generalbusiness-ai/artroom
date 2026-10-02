@@ -5,32 +5,28 @@
  *
  * The run is reset once, after the room admitted the `propose` and before
  * the tool's result was committed. It prints one JSON summary line, with no
- * credential in it.
+ * credential in it. The landing's state is read from the room twice: when
+ * the model has answered, and after the room's alarm has run. The model's
+ * answer is not evidence of either.
  */
 
 import { env } from "cloudflare:workers";
 import { expect, it } from "vitest";
-import { generateSigner, type PrivateJwk } from "@generalbusiness/artroom-client";
-import type { DelegationId, LandOp, LogEntry, RosterRecord, RoomId } from "@generalbusiness/artroom-contract";
-import { addMember, clock, day, iso, makeRoom, pushChange, tick } from "../vendor/artroom/packages/room/test/workerd/support.ts";
-import { controls, type Agent } from "../src/agent.ts";
+import type { LandOp } from "@generalbusiness/artroom-contract";
+import { tick } from "../vendor/artroom/packages/room/test/workerd/support.ts";
+import { controls } from "../src/agent.ts";
+import { agentActs, landingNow, logOf, setup, stub as stubOf } from "./support.ts";
 
-const e = env as unknown as { AGENTS: DurableObjectNamespace<Agent>; OPENROUTER_API_KEY?: string; SPIKE_LIVE_MODEL?: string };
+const e = env as unknown as { OPENROUTER_API_KEY?: string; SPIKE_LIVE_MODEL?: string };
 const live = typeof e.OPENROUTER_API_KEY === "string" && e.OPENROUTER_API_KEY.length > 0;
 const MODEL_ID = e.SPIKE_LIVE_MODEL ?? "openai/gpt-4.1-mini";
 
 it.skipIf(!live)(`live: ${MODEL_ID} on OpenRouter claims, proposes and lands through a reset after propose`, { timeout: 300_000 }, async () => {
   controls.reset();
-  const room = await makeRoom();
-  const alice = await addMember(room, "@alice", "member");
-  const { signer, jwk } = await generateSigner({ extractable: true });
-  const grant = await alice.ok<RosterRecord>("roster", null, { op: "delegate", to: signer.key, kinds: ["claim", "propose", "land", "release", "note"], lanes: "*", expiresAt: iso(clock.now + day) });
-  controls.workspace = (lane, files) => pushChange(room, lane, files);
-  controls.now = () => clock.now;
+  const s = await setup({ provider: "openrouter", modelId: MODEL_ID });
+  const room = s.room;
   controls.crashes.add("propose:after-send");
-  const name = `live-${crypto.randomUUID()}`;
-  const stub = () => e.AGENTS.get(e.AGENTS.idFromName(name));
-  await stub().setup(room.id as RoomId, jwk as PrivateJwk, grant.id as DelegationId, { provider: "openrouter", modelId: MODEL_ID });
+  const stub = () => stubOf(s.agentName);
 
   const task = "Add a file docs/pi-durable.md that says, in one sentence, that a pi-durable agent wrote it. Then land it.";
   const crashes: string[] = [];
@@ -44,11 +40,10 @@ it.skipIf(!live)(`live: ${MODEL_ID} on OpenRouter claims, proposes and lands thr
       if (crashes.length > 2) throw err;
     }
   }
-  const log: LogEntry[] = [...(await room.admin.read({ q: "log", req: { limit: 500 } })).acts];
-  const mine = log.flatMap((x) => (x.entry.type !== "system" && x.entry.act.envelope.actor === signer.key ? [x.entry] : []));
-  const acts = mine.flatMap((x) => (x.type === "act" ? [x.act.envelope.kind] : []));
-  const refusals = mine.flatMap((x) => (x.type === "refusal" ? [x.receipt.refusal.rule] : []));
+  const { acts, refusals } = agentActs(await logOf(room), s.agentKey);
   const lane = (await stub().lane())!;
+  // What the room says when the model gives its answer, before the room's alarm has run: the answer is not proof of landing.
+  const landingWhenAnswered = (await landingNow(s)) ?? null;
   await tick(room, 3);
   const op = lane.landOp ? ((await room.admin.read({ q: "op", op: lane.landOp as never })) as LandOp) : undefined;
   const transcript = await stub().transcript();
@@ -60,6 +55,7 @@ it.skipIf(!live)(`live: ${MODEL_ID} on OpenRouter claims, proposes and lands thr
     sends: Object.fromEntries(controls.sends),
     acts,
     refusals,
+    landingWhenAnswered,
     landing: op?.state ?? null,
     mainIsHead: room.world.artifacts.main === lane.head,
     answer: out.answer,

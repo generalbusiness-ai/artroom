@@ -4,78 +4,12 @@
  * under a delegation. Then the same run with the agent's Durable Object
  * reset at each point of each act, and two ablations.
  *
- * The Room is lane A's (request/laneA-room at 4a7c4af6), with lane B's
- * landing engine and lane L's log publisher, over lane A's fake Artifacts
- * remotes. Its test support (vendor/.../test/workerd/support.ts) founds the
- * room, adds members and steers the fakes.
+ * The room and its fakes are in ./support.ts.
  */
 
-import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { generateSigner, type PrivateJwk } from "@generalbusiness/artroom-client";
-import type { DelegationId, LandOp, LogEntry, RosterRecord, RoomId } from "@generalbusiness/artroom-contract";
-import { addMember, clock, day, iso, makeRoom, pushChange, tick, type TestRoom } from "../vendor/artroom/packages/room/test/workerd/support.ts";
-import { controls, type Agent, type CrashPoint } from "../src/agent.ts";
-
-type Agents = DurableObjectNamespace<Agent>;
-const agents = () => (env as unknown as { AGENTS: Agents }).AGENTS;
-
-const TASK = "Add docs/pi-durable.md to the repository, then land it.";
-
-interface Setup {
-  room: TestRoom;
-  agentName: string;
-  agentKey: string;
-}
-
-async function setup(): Promise<Setup> {
-  const room = await makeRoom();
-  const alice = await addMember(room, "@alice", "member");
-  // The agent's own key, as a Worker secret would hold it (R-CRED-4). It never joins.
-  const { signer, jwk } = await generateSigner({ extractable: true });
-  const grant = await alice.ok<RosterRecord>("roster", null, { op: "delegate", to: signer.key, kinds: ["claim", "propose", "land", "release", "note"], lanes: "*", expiresAt: iso(clock.now + day) });
-  controls.workspace = (lane, files) => pushChange(room, lane, files);
-  controls.now = () => clock.now;
-  const agentName = `agent-${crypto.randomUUID()}`;
-  await stub(agentName).setup(room.id as RoomId, jwk as PrivateJwk, grant.id as DelegationId);
-  return { room, agentName, agentKey: signer.key };
-}
-
-/** A fresh stub: after a reset, the old one is broken, as a caller's would be. */
-const stub = (name: string) => agents().get(agents().idFromName(name));
-
-/** Run the task; after a crash, call again with the same request ID, as any client retrying would. */
-async function runThroughCrashes(name: string, requestId: string, maxCrashes = 3): Promise<{ status: string; answer: string; crashes: string[] }> {
-  const crashes: string[] = [];
-  for (;;) {
-    try {
-      const out = await stub(name).run(TASK, requestId);
-      return { ...out, crashes };
-    } catch (e) {
-      crashes.push(String((e as Error).message ?? e));
-      if (crashes.length > maxCrashes) throw e;
-    }
-  }
-}
-
-async function logOf(room: TestRoom): Promise<LogEntry[]> {
-  return [...(await room.admin.read({ q: "log", req: { limit: 500 } })).acts];
-}
-
-/** Acts in the log signed by the agent's key, by kind; and the rules of its recorded refusals. */
-function agentActs(log: LogEntry[], key: string) {
-  const mine = log.flatMap((e) => (e.entry.type !== "system" && e.entry.act.envelope.actor === key ? [e.entry] : []));
-  return {
-    acts: mine.flatMap((e) => (e.type === "act" ? [e.act.envelope.kind] : [])),
-    refusals: mine.flatMap((e) => (e.type === "refusal" ? [e.receipt.refusal.rule] : [])),
-  };
-}
-
-async function landed(s: Setup): Promise<LandOp> {
-  const lane = await stub(s.agentName).lane();
-  await tick(s.room, 3);
-  return (await s.room.admin.read({ q: "op", op: lane!.landOp as never })) as LandOp;
-}
+import { controls, type CrashPoint } from "../src/agent.ts";
+import { agentActs, landed, logOf, runThroughCrashes, setup, stub, TASK } from "./support.ts";
 
 beforeEach(() => controls.reset());
 
@@ -114,7 +48,9 @@ const points: CrashPoint[] = [
   "claim:before-send",
   "claim:after-send",
   "claim:after-receipt",
+  "write:before-push",
   "write:after-push",
+  "write:after-record",
   "propose:before-send",
   "propose:after-send",
   "propose:after-receipt",
@@ -136,9 +72,12 @@ describe("crash and resume across an act: the agent's Durable Object is reset (c
     // One reset: the instance that ran before it, and a new one after.
     expect(controls.opens).toBe(2);
     const [kind, when] = point.split(":");
-    // The rerun found the envelope stored before the first send, and sent those bytes again; the room answered from its idempotency record.
-    const expected = { "before-send": ["replayed"], "after-send": ["prepared", "replayed"], "after-receipt": ["prepared", "replayed"] }[when!];
+    // Before the send, the rerun sent the envelope stored in the outbox; after it, the rerun found the stored outcome and sent nothing.
+    const expected = { "before-send": ["replayed"], "after-send": ["prepared"], "after-receipt": ["prepared"] }[when!];
     if (kind !== "write") expect(controls.sends.get(kind!)).toEqual(expected);
+    // One commit prepared and pushed once, whatever the point.
+    expect(controls.pushes).toHaveLength(1);
+    expect(await stub(s.agentName).outbox()).toEqual(["claim", "propose", "land"].map((k) => ({ kind: k, resolved: true })));
     for (const other of ["claim", "propose", "land"].filter((k) => k !== kind)) expect(controls.sends.get(other)).toEqual(["prepared"]);
     expect((await landed(s)).state).toBe("landed");
     const lane = (await stub(s.agentName).lane())!;
@@ -162,9 +101,9 @@ describe("ablations: each half of the rule is needed", () => {
     expect(lane.acts.map((a) => a.kind)).toEqual(["claim"]);
   });
 
-  it("without the stored envelope: the rerun rebuilds the act from fresh reads, the bytes differ, and the room refuses it as idempotency-mismatch", async () => {
+  it("without the stored envelope (no outbox): the rerun rebuilds the act from fresh reads, the bytes differ, and the room refuses it as idempotency-mismatch", async () => {
     const s = await setup();
-    controls.memo = false;
+    controls.outbox = false;
     controls.crashes.add("propose:after-send");
     const out = await runThroughCrashes(s.agentName, "task-1");
     expect(out.answer).toMatch(/Stopped: artroom_propose failed: Refused: idempotency-mismatch/);
@@ -178,7 +117,7 @@ describe("ablations: each half of the rule is needed", () => {
 describe("ablation: neither half", () => {
   it("without the stored envelope and with a fresh key per attempt: the rerun's propose is a second act, admitted as generation 2", async () => {
     const s = await setup();
-    controls.memo = false;
+    controls.outbox = false;
     controls.taskKey = false;
     controls.crashes.add("propose:after-send");
     await runThroughCrashes(s.agentName, "task-1");
