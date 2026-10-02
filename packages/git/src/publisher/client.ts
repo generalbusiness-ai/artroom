@@ -45,6 +45,8 @@ export interface PublisherStub {
  */
 export interface LogRemoteStub {
   pushLog(req: LogPushRequest & { canonical: RemoteAccess }): Promise<LogPushOutcome>;
+  /** Stage objects for `cohort` in bounded parts (lane L's `GitRemote.stage`); no token. */
+  stageLog(req: LogStageRequest & { canonical: { remote: string } }): Promise<StageResult>;
   /** `refs/artroom/log`'s commit, or null if it does not exist; throws if it cannot be read. */
   readLogRef(req: { canonical: RemoteAccess; ref: string }): Promise<Sha | null>;
 }
@@ -57,7 +59,8 @@ export interface PublisherClientOptions {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
-import type { LogPushOutcome, LogPushRequest } from "./log-push.ts";
+import type { LogPushOutcome, LogPushRequest, LogStageRequest } from "./log-push.ts";
+import type { StageResult } from "./gitops.ts";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 

@@ -18,7 +18,7 @@ import { verifySig } from "./crypto.ts";
 import { parseTime } from "./time.ts";
 import { decodeEntry, segmentLines } from "./decode.ts";
 import { LOG_REF, SEGMENT_SIZE, isRetainedPath, layout, retainedPath, segmentPath, type Retained } from "./entries.ts";
-import { buildTree, encodeCommit, gitObject, parseCommit, parseTree, type GitObject, type GitReader, type GitRemote } from "./git.ts";
+import { buildTree, encodeCommit, gitObject, parseCommit, parseTree, type GitObject, type GitReader, type GitRemote, type StageOutcome, type StagePart, type StageWant } from "./git.ts";
 
 export type PublishErrorCode =
   /** The call would change an entry already published. Nothing was pushed. */
@@ -31,8 +31,9 @@ export type PublishErrorCode =
   | "unresolved"
   /**
    * The objects this publication adds exceed one transfer
-   * (`PublisherOptions.maxTransfer`). Nothing was pushed. Publish a smaller
-   * cohort: fewer new entries, or fewer new retained files.
+   * (`PublisherOptions.maxTransfer`) and the remote cannot stage them
+   * (`GitRemote.stage`). Nothing was pushed. A remote that stages never
+   * gives this error.
    */
   | "cohort-too-large";
 
@@ -67,8 +68,13 @@ export interface PublisherOptions {
   readonly maxTransfer?: { readonly objects: number; readonly bytes: number };
 }
 
-/** One push's bound: objects and decoded bytes. The publisher sandbox refuses more. */
-export const LOG_TRANSFER_LIMITS = { objects: 100_000, bytes: 64 * 1024 * 1024 } as const;
+/**
+ * One transfer's bound: objects and decoded bytes, the same as the
+ * publisher sandbox's (lane B, `LOG_PUSH_LIMITS`). 16 MiB is about 21 MiB
+ * as base64url, under the Workers RPC message limit (32 MiB) with room for
+ * the rest of the request. A publication over it is staged in parts.
+ */
+export const LOG_TRANSFER_LIMITS = { objects: 100_000, bytes: 16 * 1024 * 1024 } as const;
 
 /** Seconds since the epoch for an RFC 3339 time, for the commit's author line. */
 function epoch(at: string): number {
@@ -176,15 +182,20 @@ export class LogPublisher {
     // Send only what the lease does not already hold: the new trees and blobs, and the commit.
     const send = all.filter((o) => o === commit || !this.present.has(o.sha));
     const bytes = send.reduce((n, o) => n + o.data.length, 0);
-    if (send.length > this.maxTransfer.objects || bytes > this.maxTransfer.bytes)
+    // Over one transfer: stage the objects in bounded parts first (chunks of any object larger than
+    // one transfer), then push the commit alone. Only a remote that cannot stage refuses the cohort.
+    const staged = send.length > this.maxTransfer.objects || bytes > this.maxTransfer.bytes;
+    if (staged && !this.remote.stage)
       throw new PublishError(
         "cohort-too-large",
-        `this publication adds ${send.length} objects, ${bytes} bytes; one push carries at most ${this.maxTransfer.objects} objects, ${this.maxTransfer.bytes} bytes. Nothing was pushed; publish a smaller cohort`,
+        `this publication adds ${send.length} objects, ${bytes} bytes; one push carries at most ${this.maxTransfer.objects} objects, ${this.maxTransfer.bytes} bytes, and this remote cannot stage. Nothing was pushed`,
       );
 
     for (let attempt = 1; attempt <= this.attempts; attempt++) {
       if (attempt > 1) await this.sleep(attempt);
-      const outcome = await this.remote.push(send, this.ref, commit.sha, lease);
+      // Staging is asked again before every attempt: a restart may have lost it.
+      if (staged && !(await this.stageAll(commit.sha, send))) continue;
+      const outcome = await this.remote.push(staged ? [] : send, this.ref, commit.sha, lease);
       if (outcome.ok || outcome.reason !== "lease-mismatch") {
         // Read back: the only proof of where the ref is (R-LOG-8 step 5).
         const now = await this.remote.readRef(this.ref);
@@ -196,6 +207,46 @@ export class LogPublisher {
       throw new PublishError("unexpected-writer", `${this.ref} is at ${outcome.current ?? "nothing"}, not the lease ${lease ?? "nothing"}`);
     }
     throw new PublishError("unresolved", `no clear answer after ${this.attempts} attempts; publish again with the same entries`);
+  }
+
+  /**
+   * Stage `objects` for commit `cohort` in parts of at most `maxTransfer`:
+   * ask what is missing, send the next bytes of each missing object from
+   * where its staging stopped, and repeat until nothing is missing. False
+   * when the remote refuses or stops making progress; nothing is pushed then.
+   */
+  private async stageAll(cohort: Sha, objects: readonly GitObject[]): Promise<boolean> {
+    const remote = this.remote;
+    const stage = async (cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): Promise<StageOutcome> => {
+      try {
+        return await remote.stage!(cohort, want, parts);
+      } catch (e) {
+        return { ok: false, detail: e instanceof Error ? e.message : String(e) }; // a lost answer: ask again next attempt
+      }
+    };
+    const bySha = new Map(objects.map((o) => [o.sha, o]));
+    const { objects: maxObjects, bytes: maxBytes } = this.maxTransfer;
+    for (let i = 0; i < objects.length; i += maxObjects) {
+      const want = objects.slice(i, i + maxObjects).map((o) => ({ sha: o.sha, type: o.type, size: o.data.length }));
+      let r = await stage(cohort, want, []);
+      while (r.ok && r.missing.length > 0) {
+        const parts: StagePart[] = [];
+        let room = maxBytes;
+        for (const m of r.missing) {
+          const o = bySha.get(m.sha);
+          if (!o || parts.length >= maxObjects) break;
+          const take = Math.min(o.data.length - m.have, room);
+          if (take <= 0 && o.data.length > 0) break;
+          parts.push({ sha: o.sha, type: o.type, size: o.data.length, offset: m.have, data: o.data.subarray(m.have, m.have + take) });
+          room -= take;
+        }
+        const before = remaining(r.missing, bySha);
+        r = await stage(cohort, want, parts);
+        if (r.ok && r.missing.length > 0 && remaining(r.missing, bySha) >= before) return false; // no progress
+      }
+      if (!r.ok) return false;
+    }
+    return true;
   }
 
   /**
@@ -248,6 +299,11 @@ export class LogPublisher {
     this.present = new Set(all.filter((o) => o !== commit).map((o) => o.sha));
     return { commit: commit.sha, through: cohort.through, hash: cohort.hash, publishedThrough: cohort.through, attempts };
   }
+}
+
+/** Bytes of `missing` objects not yet staged. */
+function remaining(missing: readonly { readonly sha: Sha; readonly have: number }[], bySha: ReadonlyMap<string, GitObject>): number {
+  return missing.reduce((n, m) => n + (bySha.get(m.sha)?.data.length ?? 0) - m.have + 1, 0);
 }
 
 /** The one git serialization of a cohort on `parent`: its tree's objects and its commit. */

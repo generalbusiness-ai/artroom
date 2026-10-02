@@ -160,12 +160,93 @@ export type PushOutcome =
   /** The push failed without a clear answer (network, timeout). The ref may or may not have moved. */
   | { readonly ok: false; readonly reason: "unknown"; readonly detail: string };
 
+/** An object a publication will stage: its ID, type and length in bytes. */
+export interface StageWant {
+  readonly sha: Sha;
+  readonly type: ObjectType;
+  readonly size: number;
+}
+
+/** Bytes `offset` to `offset + data.length` of one object; the whole object when `offset` is 0 and `data.length` is `size`. */
+export interface StagePart extends StageWant {
+  readonly offset: number;
+  readonly data: Uint8Array;
+}
+
+export type StageOutcome =
+  /** Of the objects asked about, those not yet stored, with how many of their bytes are staged. */
+  | { readonly ok: true; readonly missing: readonly { readonly sha: Sha; readonly have: number }[] }
+  | { readonly ok: false; readonly detail: string };
+
 export interface GitRemote extends GitReader {
   /**
    * Send `objects` and move `ref` from `lease` (null: the ref must not
-   * exist) to `next`. Implementations never force past the lease.
+   * exist) to `next`. Implementations never force past the lease. Objects
+   * staged for `next` beforehand need not be sent again.
    */
   push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<PushOutcome>;
+  /**
+   * Optional: store objects for the publication of commit `cohort` ahead of
+   * its push, in bounded parts, so no one transfer carries more than the
+   * bound however large an object is. Idempotent per part: a part already
+   * stored is skipped. Each completed object is checked against its type
+   * and ID. Answers which of `want` are still missing. Staging may be lost
+   * (a restart); the publisher asks again before every push attempt.
+   */
+  stage?(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): Promise<StageOutcome>;
+}
+
+/**
+ * Staging for one cohort, shared by the in-process adapters: parts are
+ * appended in order per object; a completed object is checked against its
+ * type and ID and handed to `store`. `have(sha)` says whether the
+ * repository already holds an object.
+ */
+export class StagingArea {
+  private cohort: string | null = null;
+  private readonly partial = new Map<string, Uint8Array[]>();
+  private readonly has: (sha: Sha) => boolean;
+  private readonly store: (o: GitObject) => void;
+
+  constructor(has: (sha: Sha) => boolean, store: (o: GitObject) => void) {
+    this.has = has;
+    this.store = store;
+  }
+
+  /** Forget what is staged but not stored, as a restart would. */
+  drop(): void {
+    this.partial.clear();
+  }
+
+  private staged(sha: string): number {
+    return (this.partial.get(sha) ?? []).reduce((n, c) => n + c.length, 0);
+  }
+
+  stage(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): StageOutcome {
+    if (this.cohort !== cohort) {
+      this.partial.clear(); // one cohort's staging at a time
+      this.cohort = cohort;
+    }
+    const wanted = new Map(want.map((w) => [w.sha, w]));
+    for (const p of parts) {
+      const w = wanted.get(p.sha);
+      if (!w || w.type !== p.type || w.size !== p.size) return { ok: false, detail: `part of ${p.sha} does not match what is wanted` };
+      if (this.has(p.sha)) continue;
+      const have = this.staged(p.sha);
+      if (p.offset + p.data.length <= have && p.data.length > 0) continue; // already staged
+      if (p.offset !== have || have + p.data.length > p.size) continue; // out of order: the answer says where to resume
+      const chunks = this.partial.get(p.sha) ?? [];
+      chunks.push(p.data.slice());
+      this.partial.set(p.sha, chunks);
+      if (have + p.data.length === p.size) {
+        this.partial.delete(p.sha);
+        const o = gitObject(p.type, concat(chunks));
+        if (o.sha !== p.sha) return { ok: false, detail: `staged ${p.type} hashes to ${o.sha}, not ${p.sha}` };
+        this.store(o);
+      }
+    }
+    return { ok: true, missing: want.filter((w) => !this.has(w.sha)).map((w) => ({ sha: w.sha, have: this.staged(w.sha) })) };
+  }
 }
 
 /** An in-memory repository. `failNext` simulates lost answers for retry tests. */
@@ -175,6 +256,14 @@ export class MemoryGit implements GitRemote {
   /** Pushes to fail with `unknown` before (`"before"`) or after (`"after"`) the ref moves. */
   failNext: ("before" | "after")[] = [];
   pushes = 0;
+  readonly staging = new StagingArea(
+    (sha) => this.objects.has(sha),
+    (o) => this.objects.set(o.sha, { type: o.type, data: o.data }),
+  );
+
+  async stage(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): Promise<StageOutcome> {
+    return this.staging.stage(cohort, want, parts);
+  }
 
   async readObject(sha: Sha) {
     const o = this.objects.get(sha);

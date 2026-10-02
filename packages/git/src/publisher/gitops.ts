@@ -136,6 +136,24 @@ export interface LogObject {
   readonly data: Uint8Array;
 }
 
+/** An object lane L will stage, by ID, type and length. */
+export interface StageWant {
+  readonly sha: string;
+  readonly type: LogObject["type"];
+  readonly size: number;
+}
+
+/** Bytes `offset` to `offset + data.length` of one object. */
+export interface StageChunk extends StageWant {
+  readonly offset: number;
+  readonly data: Uint8Array;
+}
+
+/** Lane L's `StageOutcome`. */
+export type StageResult = { readonly ok: true; readonly missing: { readonly sha: string; readonly have: number }[] } | { readonly ok: false; readonly detail: string };
+
+const isLogType = (t: string): t is LogObject["type"] => t === "blob" || t === "tree" || t === "commit";
+
 /** The ref lane L publishes the log to (R-LOG-8). The only ref `pushLog` writes. */
 export const LOG_REF = "refs/artroom/log";
 
@@ -239,7 +257,6 @@ export class GitOps {
     return r.code === 0 ? { clean: true, tree } : { clean: false, paths: [...new Set(lines.slice(1))].sort() };
   }
 
-  /** Main of a remote, read with ls-remote. Null if it has no main. */
   /**
    * Where lane L's log ref is on `canonical` (R-LOG-8), or null when it does
    * not exist. Read with `git ls-remote`, which sees refs outside
@@ -251,6 +268,7 @@ export class GitOps {
     return this.lsRemote(canonical, LOG_REF);
   }
 
+  /** A ref of a remote, read with ls-remote. Null if it does not exist. */
   async lsRemote(remote: string, ref: string): Promise<string | null> {
     const out = await this.ok("ls-remote", ["ls-remote", remote, assertRef(ref)]);
     const line = out.split("\n").find((l) => l.endsWith(`\t${ref}`));
@@ -433,6 +451,90 @@ export class GitOps {
 
   // ------------------------------------------------------------ the log (lane L)
 
+  /** Run a fixed shell script with arguments (never interpolated into the script). For staging files only. */
+  private sh(script: string, args: readonly string[], stdin?: Uint8Array): Promise<ExecResult> {
+    return this.opts.exec(["sh", "-c", script, "sh", ...args], {
+      env: this.env,
+      timeoutMs: this.opts.timeoutMs ?? 120_000,
+      ...(stdin ? { stdin } : {}),
+    });
+  }
+
+  /**
+   * Stage lane L's log objects for the publication of commit `cohort`, in
+   * bounded parts, ahead of `pushLog` (lane L's `GitRemote.stage`). A whole
+   * object is written into the sandbox's repository after git checks its
+   * type and ID. A part of a larger object is appended, in order, to a
+   * staging file for this cohort; when the file is complete, git writes it
+   * as an object and the ID is checked. Parts already stored are skipped,
+   * so a call is idempotent per part. Staging another cohort discards the
+   * previous cohort's partial files. Answers which of `want` are not yet
+   * stored, with the bytes staged so far. A restart loses partial files and
+   * stored objects alike; the answer then says so, and lane L stages again.
+   */
+  stageLog(canonical: string, cohort: string, want: readonly StageWant[], parts: readonly StageChunk[]): Promise<StageResult> {
+    return this.exclusive(canonical, async () => {
+      try {
+        assertSha(cohort, "cohort");
+        const dir = await this.repo(canonical);
+        const root = `${dir}/artroom-stage`;
+        const area = `${root}/${cohort}`;
+        const r = await this.sh('mkdir -p "$1/$2" && cd "$1" && for d in *; do [ "$d" = "$2" ] || rm -r "$d" || exit 1; done', [root, cohort]);
+        if (r.code !== 0) throw new GitError("stage", r);
+        const wanted = new Map<string, StageWant>();
+        for (const w of want) {
+          assertSha(w.sha, "object");
+          if (!isLogType(w.type) || !Number.isSafeInteger(w.size) || w.size < 0) throw new Error(`${w.sha} is not a git object type and size`);
+          wanted.set(w.sha, w);
+        }
+        for (const p of parts) {
+          const w = wanted.get(p.sha);
+          if (!w || w.type !== p.type || w.size !== p.size) throw new Error(`a part of ${p.sha} does not match what is wanted`);
+          if (!Number.isSafeInteger(p.offset) || p.offset < 0 || p.offset + p.data.length > p.size) throw new Error(`a part of ${p.sha} is outside the object`);
+          if ((await this.git(["-C", dir, "cat-file", "-e", p.sha])).code === 0) continue; // already stored
+          if (p.offset === 0 && p.data.length === p.size) {
+            const got = await this.git(["-C", dir, "hash-object", "-w", "-t", p.type, "--stdin"], {}, p.data);
+            if (got.code !== 0) throw new GitError("hash-object", got);
+            if (got.stdout.trim() !== p.sha) throw new Error(`the ${p.type} sent as ${p.sha} hashes to ${got.stdout.trim()}`);
+            continue;
+          }
+          const file = `${area}/${p.sha}`;
+          const have = (await this.stagedSizes(area)).get(p.sha) ?? 0;
+          if (p.data.length > 0 && p.offset + p.data.length <= have) continue; // already staged
+          if (p.offset !== have) continue; // out of order: the answer says where to resume
+          const a = await this.sh('cat >> "$1"', [file], p.data);
+          if (a.code !== 0) throw new GitError("stage", a);
+          if (have + p.data.length === p.size) {
+            const got = await this.git(["-C", dir, "hash-object", "-w", "-t", p.type, "--", file]);
+            const rm = await this.sh('rm "$1"', [file]);
+            if (got.code !== 0) throw new GitError("hash-object", got);
+            if (rm.code !== 0) throw new GitError("stage", rm);
+            if (got.stdout.trim() !== p.sha) throw new Error(`the staged ${p.type} ${p.sha} hashes to ${got.stdout.trim()}`);
+          }
+        }
+        const check = await this.git(["-C", dir, "cat-file", "--batch-check"], {}, new TextEncoder().encode(want.map((w) => `${w.sha}\n`).join("")));
+        if (check.code !== 0) throw new GitError("cat-file", check);
+        const stored = new Set(check.stdout.split("\n").filter((l) => l && !l.endsWith(" missing")).map((l) => l.slice(0, 40)));
+        const sizes = await this.stagedSizes(area);
+        return { ok: true, missing: want.filter((w) => !stored.has(w.sha)).map((w) => ({ sha: w.sha, have: sizes.get(w.sha) ?? 0 })) };
+      } catch (e) {
+        return { ok: false, detail: (e instanceof Error ? e.message : String(e)).slice(0, 600) };
+      }
+    });
+  }
+
+  /** Bytes staged so far per object in a cohort's staging directory. */
+  private async stagedSizes(area: string): Promise<Map<string, number>> {
+    const r = await this.sh('cd "$1" 2>/dev/null || exit 0; for f in *; do [ -f "$f" ] && printf "%s %s\\n" "$f" "$(wc -c < "$f" | tr -d " ")"; done; exit 0', [area]);
+    if (r.code !== 0) throw new GitError("stage", r);
+    const out = new Map<string, number>();
+    for (const line of r.stdout.split("\n")) {
+      const m = /^([0-9a-f]{40}) (\d+)$/.exec(line.trim());
+      if (m) out.set(m[1]!, Number(m[2]));
+    }
+    return out;
+  }
+
   /**
    * Push lane L's log commit to `refs/artroom/log` under a lease (R-LOG-8):
    * write the given objects, check that `next` is a commit whose only parent
@@ -463,12 +565,13 @@ export class GitOps {
           if (w.code !== 0) throw new GitError("hash-object", w);
         }
         // The exact type first: rev-list accepts a tree or blob with an empty answer, which would pass as "no parent".
+        if ((await this.git(["-C", dir, "cat-file", "-e", next])).code !== 0) throw new Error(`${next} is not here: send or stage it again`);
         const type = await this.git(["-C", dir, "cat-file", "-t", next]);
         if (type.code !== 0 || type.stdout.trim() !== "commit") throw new Error(`${next} is not a commit`);
         const parents = (await this.ok("rev-list", ["-C", dir, "rev-list", "--parents", "-n", "1", next])).split(" ").slice(1);
         if (parents.join(" ") !== (lease ?? "")) throw new Error(`${next} does not have exactly the lease as its parent`);
         const connected = await this.git(["-C", dir, "rev-list", "--objects", next]);
-        if (connected.code !== 0) throw new Error(`objects reachable from ${next} are missing`);
+        if (connected.code !== 0) throw new Error(`objects reachable from ${next} are missing: send or stage them again`);
       } catch (e) {
         return { outcome: { outcome: "error", detail: `before the push: ${e instanceof Error ? e.message : String(e)}`.slice(0, 600) } };
       }

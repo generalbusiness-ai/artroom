@@ -12,9 +12,14 @@ import { LOG_REF } from "../../log/src/entries.ts";
 import { LogPublisher } from "../../log/src/publisher.ts";
 import { verifyLog } from "../../log/src/verify.ts";
 import type { GitObject, GitRemote, PushOutcome } from "../../log/src/git.ts";
-import { goldenLog } from "../../log/test/support/room-sim.ts";
+import { RoomSim, goldenLog, keys, memberAuthority } from "../../log/test/support/room-sim.ts";
+import type { MemberId } from "@generalbusiness/artroom-contract";
+import { evaluateNotify, policy, rule } from "@generalbusiness/artroom-policy";
+import { entryId, retain } from "../../log/src/entries.ts";
+import { canonicalize } from "../../log/src/canonical.ts";
 import { GitOps, type Exec } from "../src/publisher/gitops.ts";
-import { decodeLogPush, LOG_PUSH_LIMITS, toB64url, toLogOutcome } from "../src/publisher/log-push.ts";
+import { decodeLogPush, decodeLogStage, LOG_PUSH_LIMITS, toB64url, toLogOutcome } from "../src/publisher/log-push.ts";
+import type { StageOutcome, StagePart, StageWant } from "../../log/src/git.ts";
 import { LOG_TRANSFER_LIMITS, PublishError } from "../../log/src/publisher.ts";
 
 const exec: Exec = (argv, opts) =>
@@ -38,12 +43,18 @@ class SandboxRemote implements GitRemote {
   readonly reader: GitCli;
   readonly ops: GitOps;
   readonly url: string;
-  readonly limits: { readonly objects: number; readonly bytes: number };
+  limits: { readonly objects: number; readonly bytes: number };
   pushes = 0;
   /** Decoded bytes each push carried. */
   readonly sent: number[] = [];
   /** Pushes to answer `unknown` without sending, as a lost connection would. */
   failNext = 0;
+  /** Decoded part bytes of each stage call. */
+  readonly staged: number[] = [];
+  /** The stage call (by count) whose answer is lost, once. */
+  failStageAt = -1;
+  stageCalls = 0;
+  readonly answers: StageOutcome[] = [];
   constructor(url: string, ops: GitOps, limits = LOG_PUSH_LIMITS) {
     this.url = url;
     this.ops = ops;
@@ -56,6 +67,17 @@ class SandboxRemote implements GitRemote {
   }
   readObject(sha: Sha) {
     return this.reader.readObject(sha);
+  }
+  async stage(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): Promise<StageOutcome> {
+    const lose = this.stageCalls++ === this.failStageAt;
+    // Over the wire as lane A sends it, then the sandbox's own request check and bound.
+    const d = decodeLogStage({ cohort, want, parts: parts.map((p) => ({ ...p, data: toB64url(p.data) })) }, this.limits);
+    if ("refused" in d) return d.refused;
+    this.staged.push(d.parts.reduce((n, p) => n + p.data.length, 0));
+    const r = (await this.ops.stageLog(this.url, d.cohort, d.want, d.parts)) as StageOutcome;
+    if (lose) throw new Error("simulated: the sandbox staged the parts and the answer was lost");
+    this.answers.push(r);
+    return r;
   }
   async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<PushOutcome> {
     this.pushes++;
@@ -197,10 +219,11 @@ describe("review f7d273e1 (2): the bound is on one push, not on the accumulated 
     expect(report).toMatchObject({ ok: true, head: last, commits: 6 });
   });
 
-  test("a cohort whose new objects exceed one push is refused as cohort-too-large, and nothing is sent", async () => {
+  test("a cohort whose new objects exceed one push, to a remote that cannot stage, is refused as cohort-too-large, and nothing is sent", async () => {
     const { remote, sandbox } = setup();
     const r = new SandboxRemote(remote, sandbox("p"));
     const { sim, c3 } = await goldenLog(r);
+    (r as { stage?: unknown }).stage = undefined; // a remote that cannot stage
     const pushes = r.pushes;
     const small = await LogPublisher.open(r, { maxTransfer: { objects: 100_000, bytes: 64 } });
     const err = await small.publish(sim.entries.concat(), sim.checkpoint(), sim.retained).then(() => null, (e: unknown) => e);
@@ -209,4 +232,116 @@ describe("review f7d273e1 (2): the bound is on one push, not on the accumulated 
     expect(r.pushes).toBe(pushes);
     expect(git(remote, "rev-parse", LOG_REF)).toBe(c3.commit);
   });
+});
+
+describe("review b618eca1: an object larger than one transfer is staged in parts through the sandbox", () => {
+  const tiny = { objects: 100_000, bytes: 1024 };
+
+  /** The golden log on `remote`, and the commit an unbounded publisher writes for the next cohort. */
+  async function next(remote: SandboxRemote) {
+    const dry = setup();
+    const ref = await goldenLog(new SandboxRemote(dry.remote, dry.sandbox("dry")));
+    const expected = (await ref.sim.publish(ref.publisher)).commit;
+    const limits = remote.limits;
+    remote.limits = LOG_PUSH_LIMITS; // the golden log itself is published unbounded
+    const g = await goldenLog(remote);
+    remote.limits = limits;
+    return { g, expected };
+  }
+
+  async function independent(remote: string, head: string, commits: number) {
+    git(remote, "fsck", "--strict", "--no-dangling");
+    const reader = GitCli.open(remote);
+    await reader.fetch(LOG_REF);
+    const report = await verifyLog(reader);
+    expect(report.failures).toEqual([]);
+    expect(report).toMatchObject({ ok: true, head, commits });
+  }
+
+  test("scaled down: the segment blob is staged in chunks under the bound, the push carries nothing, the commit is the unbounded one, and it verifies", async () => {
+    const { remote, sandbox } = setup();
+    const r = new SandboxRemote(remote, sandbox("p"), tiny);
+    const { g, expected } = await next(r);
+    const publisher = await LogPublisher.open(r, { maxTransfer: tiny });
+    const pushes = r.sent.length;
+    const stagedBefore = r.staged.length;
+    expect((await g.sim.publish(publisher)).commit).toBe(expected);
+    expect(r.staged.length - stagedBefore).toBeGreaterThan(3);
+    expect(Math.max(...r.staged)).toBeLessThanOrEqual(tiny.bytes);
+    expect(r.sent.slice(pushes)).toEqual([0]); // the push itself carried no objects
+    await independent(remote, expected, 4);
+  });
+
+  test("restart mid-staging: a lost answer stops the publisher; reopened on the same sandbox it resumes, on a restarted sandbox it stages again; the same commit", async () => {
+    for (const restart of [false, true]) {
+      const { remote, sandbox } = setup();
+      const r = new SandboxRemote(remote, sandbox("p"), tiny);
+      const { g, expected } = await next(r);
+      const first = await LogPublisher.open(r, { maxTransfer: tiny, attempts: 1 });
+      r.failStageAt = r.stageCalls + 4;
+      await expect(g.sim.publish(first)).rejects.toMatchObject({ code: "unresolved" });
+      expect(git(remote, "rev-parse", LOG_REF)).toBe(g.c3.commit);
+      const again = restart ? new SandboxRemote(remote, sandbox("restarted"), tiny) : r;
+      const before = again.answers.length;
+      const published = await (await LogPublisher.open(again, { maxTransfer: tiny })).publish(g.sim.entries, g.sim.checkpoint(), g.sim.retained);
+      expect(published.commit).toBe(expected);
+      const probe = again.answers[before]!;
+      expect(probe.ok).toBe(true);
+      const missing = probe.ok ? probe.missing : [];
+      // Resumed: some object was partly staged already. Restarted: nothing was, and everything was staged again.
+      expect(missing.some((m) => m.have > 0)).toBe(!restart);
+      await independent(remote, expected, 4);
+    }
+  });
+
+  test("at the default bound: an active segment over 16 MiB takes one-entry cohorts, staged through the sandbox, after a restart too, and verifies", async () => {
+    const { remote, sandbox } = setup();
+    let r = new SandboxRemote(remote, sandbox("p"));
+    const sim = new RoomSim();
+    sim.activate(policy(rule({ id: "notify-members", kind: "notify", on: ["note"], to: ["role:member"], why: "A note needs the members." })));
+    let publisher = new LogPublisher(r);
+    const authority = memberAuthority("@alice", keys.alice.key);
+    const claim = await sim.claim(keys.alice, authority, ["src/**"]);
+    const recipients = Array.from({ length: 2400 }, (_, i) => `@member${String(i).padStart(5, "0")}${"x".repeat(50)}` as MemberId);
+    const add = async () => {
+      const body = { text: "A note for the room." };
+      const e = sim.accept(sim.envelope(keys.alice, "note", claim.lane!, body), authority);
+      const id = entryId(e.seq, e.hash);
+      const input = {
+        kind: "notify" as const,
+        act: { id, kind: "note" as const, target: claim.lane!, body },
+        actor: { member: "@alice" as MemberId, role: "admin" as const, teams: [], delegated: false },
+        lane: { id: claim.lane!, claimed: true, holder: "@alice" as MemberId, scope: ["src/**"], generation: 1, purpose: "ordinary" as const },
+        proposal: null,
+      };
+      const ev = await evaluateNotify(sim.policy, input, { roles: { member: recipients }, reviewers: [] });
+      for (const x of ev.evaluations) sim.retained.push(retain("input", x.context));
+      sim.system({ type: "notified", entry: id, decisions: ev.evaluations.map((x) => x.decision), to: [...new Set(ev.notify.map((n) => n.to as MemberId))] });
+    };
+    const segment = () => sim.entries.reduce((n, e) => n + Buffer.byteLength(canonicalize(e)) + 1, 0);
+    while (segment() < LOG_PUSH_LIMITS.bytes + 1_000_000) {
+      await add();
+      if (sim.entries.length % 30 === 0) await sim.publish(publisher);
+    }
+    await sim.publish(publisher);
+    for (const restart of [false, true]) {
+      if (restart) {
+        r = new SandboxRemote(remote, sandbox("restarted"));
+        publisher = await LogPublisher.open(r);
+      }
+      const from = publisher.publishedThrough;
+      const before = r.staged.length;
+      const p = await sim.publish(publisher);
+      expect(p.through - from).toBe(1); // a one-entry cohort
+      expect(r.staged.length - before).toBeGreaterThan(2);
+      expect(Math.max(...r.staged.slice(before))).toBeLessThanOrEqual(LOG_PUSH_LIMITS.bytes);
+    }
+    expect(segment()).toBeGreaterThan(LOG_PUSH_LIMITS.bytes);
+    const head = git(remote, "rev-parse", LOG_REF);
+    const reader = GitCli.open(remote);
+    await reader.fetch(LOG_REF);
+    const report = await verifyLog(reader);
+    expect(report.failures).toEqual([]);
+    expect(report).toMatchObject({ ok: true, head });
+  }, 600_000);
 });

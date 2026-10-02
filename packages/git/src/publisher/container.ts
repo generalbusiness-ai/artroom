@@ -19,8 +19,8 @@
  */
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
-import { type BuildResult, type Exec, GitOps, LOG_REF, type PinResult, type PreviewResult, objectsRef } from "./gitops.ts";
-import { decodeLogPush, toLogOutcome, type LogPushOutcome } from "./log-push.ts";
+import { type BuildResult, type Exec, GitOps, LOG_REF, type PinResult, type StageResult, type PreviewResult, objectsRef } from "./gitops.ts";
+import { decodeLogPush, decodeLogStage, toLogOutcome, type LogPushOutcome, type LogStageRequest } from "./log-push.ts";
 import { type AllowedUpdates, FenceError, ZERO, checkUpdates, isReceivePack, readCommands } from "./ref-fence.ts";
 import type { PushOutcome } from "./push-outcome.ts";
 
@@ -244,6 +244,18 @@ export class Publisher extends DurableObject<PublisherEnv> {
     return this.withRoute([[req.canonical, { [LOG_REF]: { old: req.lease ?? ZERO, new: req.next } }]], async () =>
       toLogOutcome(await this.ops.pushLog(req.canonical.remote, objects, req.next, req.lease)),
     );
+  }
+
+  /**
+   * Lane L's staging (`GitRemote.stage`): store a publication's objects in
+   * bounded parts ahead of `pushLog`, chunks of an object larger than one
+   * transfer included. Local to the sandbox: no token, no network. Answers
+   * which wanted objects are still missing (lane L's `StageOutcome`).
+   */
+  stageLog(req: LogStageRequest & { readonly canonical: { readonly remote: string } }): Promise<StageResult> {
+    const d = decodeLogStage(req);
+    if ("refused" in d) return Promise.resolve(d.refused);
+    return this.withRoute([], () => this.ops.stageLog(req.canonical.remote, d.cohort, d.want, d.parts));
   }
 
   /**
