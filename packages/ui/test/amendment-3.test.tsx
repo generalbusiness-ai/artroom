@@ -195,6 +195,8 @@ describe("carried check evidence binds its reason to its destination and policy 
     expect(f.show([earlier, current, later])).toBe("Carried to generation 2 by entry 99: carried to the current integration.");
     // The same integration under another operation is not this destination.
     expect(f.show([f.event(101, "same commit, other operation", { op: OTHER_OP })])).toBe(NONE);
+    // The preview is recomputed under the same operation when main moves: its earlier integration is not this one.
+    expect(f.show([f.event(102, "same preview, earlier integration", { integration: sha("5") })])).toBe(NONE);
     // Every judgment stays in the history list.
     f.show([earlier, current, later]);
     expect(card("tests").querySelectorAll("[data-carry='carried']")).toHaveLength(3);
