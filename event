@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ffc8ba888a095873a8c672b33b3f52a219e8afbb","text":"Merge retired a covered predecessor; the successor is at packages/cli/test/review-80d3710c.test.ts."}
+{"kind":"promise","text":"Builder makes Workers AI the pi-durable default."}
