@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d4475e68f6d97dc4c8725cab0417f3c762c46e00","text":"Merge retired a covered predecessor; the successor is at examples/demo-repo/.artroom/policy.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:db4d3d0e35ae91981d9eca1848e72d4cb2737e11","text":"Merge retired a covered predecessor; the successor is at docs/protocol.md."}
