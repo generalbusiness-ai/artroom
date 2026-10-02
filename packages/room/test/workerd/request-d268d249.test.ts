@@ -460,7 +460,12 @@ describe("request d268d249: credentials known by their syntax are redacted whate
     failing.add("createToken");
     const lost = await jobs();
     const mint = lost.find((x) => String(x["token_id"]).startsWith("mint:"))!;
-    expect(String(mint["last_error"])).toMatch(/^answer lost: /);
+    expect(String(mint["last_error"])).toMatch(/^answer lost: ArtifactsError Bearer <redacted> login password=<redacted> /);
+    const clean = (e: string) => {
+      expect(e).not.toContain("abcd");
+      for (const [, , gone] of SYNTAX_CASES) for (const g of gone) expect(e).not.toContain(g);
+    };
+    clean(String(mint["last_error"]));
     // jobs.ts, the unknown mint's observation and the ended token's revocation: once the mint's deadline has passed,
     // the inventory cannot be read; the next attempt mints a token, the checker refuses, and its revocation fails.
     failing.clear();
@@ -474,9 +479,6 @@ describe("request d268d249: credentials known by their syntax are redacted whate
     const of = (mintRow: boolean) => rows.filter((x) => String(x["token_id"]).startsWith("mint:") === mintRow).map((x) => String(x["last_error"]));
     expect(of(true)).toEqual([expect.stringMatching(/^outcome unknown; the token inventory could not be read: ArtifactsError Bearer <redacted> login password=<redacted> /)]);
     expect(of(false)).toEqual([expect.stringMatching(/^ArtifactsError Bearer <redacted> login password=<redacted> /)]);
-    for (const e of errors) {
-      expect(e).not.toContain("abcd");
-      for (const [, , gone] of SYNTAX_CASES) for (const g of gone) expect(e).not.toContain(g);
-    }
+    for (const e of errors) clean(e);
   });
 });
