@@ -1,10 +1,12 @@
 {
-	"$schema": "../../node_modules/wrangler/config-schema.json",
-	// Lane B's Worker: the publisher sandbox (a container with git only) and a
-	// key-protected harness Room for live tests. The Room of lane A hosts the
-	// same classes from this package.
+	"$schema": "../../../../node_modules/wrangler/config-schema.json",
+	// Lane B's measurement Worker: the publisher sandbox (a container with git
+	// only) and a key-protected harness Room for live measurements. Not
+	// deployed (decision D5); deploy it for a run and delete it after:
+	//   wrangler deploy -c measure/harness/wrangler.jsonc
+	// The Room Worker (packages/room) hosts the Publisher in production.
 	"name": "artroom-lb-git",
-	"main": "src/worker.ts",
+	"main": "worker.ts",
 	"compatibility_date": "2026-10-01",
 	"workers_dev": true,
 	"observability": { "enabled": true },
@@ -20,7 +22,7 @@
 			"class_name": "Publisher",
 			"scheduling_policy": "durable_object",
 			// alpine/git (linux/amd64) copied into Cloudflare's registry with crane;
-			// see container/image.sh. With Docker, use container/Dockerfile instead.
+			// see ../../container/image.sh. With Docker, use ../../container/Dockerfile instead.
 			"images": {
 				"git": {
 					"image": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lb-git@sha256:4a54f21b0d8e4a065ea83a7c51a707682036428f9ddd1362069dcd28d36c0c68"

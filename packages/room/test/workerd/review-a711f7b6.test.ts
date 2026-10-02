@@ -9,13 +9,12 @@ import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import type { CheckBody, CheckerConfig, CheckJob, Claim, Landing, LandOp, PolicyDocument, Proposal, Sha } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import { checkerInputs, filterSnapshot, snapshotDigest, type SnapshotEntry } from "@generalbusiness/artroom-policy";
-import { forkName } from "@generalbusiness/artroom-git";
 import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
 import { obligationsFor } from "../../src/obligations.ts";
 import { snapshotCommit } from "../../src/snapshot.ts";
 import { artifactsErrors } from "../../src/memory/artifacts.ts";
-import { addMember, advance, clock, Client, expectOk, expectRefusal, iso, makeRoom, pushChange, tick, tokenLive, type TestRoom } from "./support.ts";
+import { addMember, clock, Client, expectOk, expectRefusal, iso, makeRoom, pushChange, tick, type TestRoom } from "./support.ts";
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const op = async (r: TestRoom, id: string) => (await r.admin.read({ q: "op", op: id as never })) as LandOp & { integration?: string; waiting?: string[] };
@@ -283,86 +282,6 @@ describe("4d. a scoped check binds the snapshot commit the room recorded for the
     expectRefusal(await ci.act("check", { lane, generation: 1 }, body(scoped, commit, { kind: "filtered", snapshot: `sha256:${"1".repeat(64)}`, paths })), "check-binding");
     expectRefusal(await ci.act("check", { lane, generation: 1 }, body(scoped, commit, { kind: "tree", tree: r.world.artifacts.treeOf(integration as never) })), "check-binding");
     expectRefusal(await ci.act("check", { lane, generation: 1 }, body(scoped, "c".repeat(40), { kind: "filtered", snapshot: rec["digest"], paths })), "check-binding");
-  });
-});
-
-// ------------------------------------------------------------------ 2. P2
-
-describe("2. access opened before lane B's workspaces is cleaned up by lane B when its lease ends", () => {
-  /** A ready workspace of the previous revision, with a live 30-minute token, migrated to version 7. */
-  async function legacy(opts: { recorded?: boolean } = {}) {
-    const r = await makeRoom();
-    const bob = await addMember(r, "@bob", "member");
-    const c = await r.admin.ok<Claim>("claim", null, { goal: "old", scope: ["src/**"] });
-    pushChange(r, c.lane, { "src/app.ts": "v2" });
-    const fork = r.world.artifacts.repo(forkName(r.world.artifacts.canonical, c.lane));
-    const token = fork.mint("write", 1800);
-    await inDO(r, (room) => {
-      const sql = room.core.sql;
-      sql.all("INSERT INTO workspaces (id, lane, lease_gen, state, body, updated_ms) VALUES ('old_ws', ?, 1, 'ready', '{}', ?)", c.lane, clock.now);
-      // Recorded, or minted by a provision whose answer was never recorded (pending).
-      if (opts.recorded !== false) sql.all("INSERT INTO fork_tokens (id, lane, lease_gen, revoked) VALUES (?, ?, 1, 0)", token.id, c.lane);
-      else sql.all("UPDATE workspaces SET state = 'pending' WHERE id = 'old_ws'");
-      sql.all("DROP TABLE ws_leases");
-      sql.all("DROP TABLE check_carries");
-      sql.all("DROP TABLE land_reeval");
-      sql.all("UPDATE schema_version SET v = 5");
-    });
-    await evictDurableObject(r.stub);
-    return { r, c, token, bob };
-  }
-  const pending = (r: TestRoom) => inDO(r, (room) => room.core.workspaces.pendingCleanup());
-
-  it("release without reopening: the old token is revoked through lane B's duties", async () => {
-    const { r, c, token } = await legacy();
-    expect(tokenLive(r, c.lane, token.plaintext)).toBe(true);
-    await r.admin.ok("release", { lane: c.lane }, { lease: 1 });
-    await tick(r, 2);
-    expect(tokenLive(r, c.lane, token.plaintext)).toBe(false);
-    expect(await pending(r)).toBe(0);
-  });
-
-  it("a mint whose answer was never recorded: the inventory lane B is owed revokes the unknown token", async () => {
-    const { r, c, token } = await legacy({ recorded: false });
-    await r.admin.ok("release", { lane: c.lane }, { lease: 1 });
-    await tick(r, 2);
-    expect(tokenLive(r, c.lane, token.plaintext)).toBe(false);
-  });
-
-  it("a recorded token is owed by its ID: revoked even while Artifacts cannot list the fork's tokens", async () => {
-    const { r, c, token } = await legacy();
-    for (let i = 0; i < 40; i++) r.world.artifacts.failRemote("listTokens", artifactsErrors.internal());
-    await r.admin.ok("release", { lane: c.lane }, { lease: 1 });
-    await tick(r, 2);
-    expect(tokenLive(r, c.lane, token.plaintext)).toBe(false);
-    // The inventory is still owed, until Artifacts can list.
-    expect(await pending(r)).toBeGreaterThan(0);
-  });
-
-  it("expiry without reopening: the old token is revoked", async () => {
-    const { r, c, token } = await legacy();
-    advance(1800 * 1000 + 1);
-    await tick(r, 2);
-    expect(tokenLive(r, c.lane, token.plaintext)).toBe(false);
-  });
-
-  it("take-over without reopening: the old token is revoked, and with Artifacts down the cleanup stays owed until it answers", async () => {
-    const { r, c, token, bob } = await legacy();
-    for (let i = 0; i < 20; i++) {
-      r.world.artifacts.failRemote("revokeToken", artifactsErrors.internal());
-      r.world.artifacts.failRemote("listTokens", artifactsErrors.internal());
-    }
-    await r.admin.ok("release", { lane: c.lane }, { lease: 1 });
-    await bob.ok("claim", { lane: c.lane }, { scope: ["src/**"], expectedGeneration: 0 });
-    await tick(r);
-    expect(tokenLive(r, c.lane, token.plaintext)).toBe(true);
-    expect(await pending(r)).toBeGreaterThan(0);
-    r.world.artifacts.recover();
-    const due = await inDO(r, (room) => room.core.workspaces.nextDue());
-    advance(due! - clock.now);
-    await tick(r);
-    expect(tokenLive(r, c.lane, token.plaintext)).toBe(false);
-    expect(await pending(r)).toBe(0);
   });
 });
 

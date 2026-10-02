@@ -20,12 +20,13 @@ It depends on `@generalbusiness/artroom-contract` (lane 0) for its types.
 | Workspaces | `src/workspace/workspaces.ts` | One Artifacts fork per lane; one write token per lease generation, scoped to the fork and expiring with the lease; revoked on release, expiry or take-over |
 | Pinning and previews | `src/publisher/client.ts` | Copies a proposed head into the canonical repo and pins it at `refs/artroom/heads/<lane>/<generation>`; merge previews, with the integration commit the landing would push |
 | Filtered snapshots | `src/publisher/gitops.ts` (`listTree`, `writeSnapshot`), `container.ts` | For scoped checkers (lane G): the fixed snapshot commit of R-CARRY-15 (exactly the chosen files, no parent, author and committer `Artroom Snapshot <snapshot@artroom.invalid>` at time 0), written into its own new, empty repository at `refs/artroom/snapshot` only. A repository that already has any ref is refused, so nothing is ever added to one (R-CARRY-16) |
-| Snapshot repositories | `src/snapshot/repos.ts` | One Artifacts repository per snapshot commit, reused only for it; one read token per job, for that repository only, expiring by the job's deadline (R-CARRY-16). The cleanup ledger follows the workspace one: each create attempt is an in-flight step with its own name, recorded before it is sent and closed only by a definite answer or by seeing (then deleting) its repository; token revocation and repository deletion are owed and retried until Artifacts confirms. A `wake` callback (the Room's alarm) is set before each create. A ledger from revision 3 is upgraded once: each legacy repository name stays watched as an unresolved create, and its repository is deleted whenever it appears. The Artifacts port (`src/artifacts.ts`) has `create` and `delete` for this |
+| Snapshot repositories | `src/snapshot/repos.ts` | One Artifacts repository per snapshot commit, reused only for it; one read token per job, for that repository only, expiring by the job's deadline (R-CARRY-16). The cleanup ledger follows the workspace one: each create attempt is an in-flight step with its own name, recorded before it is sent and closed only by a definite answer or by seeing (then deleting) its repository; token revocation and repository deletion are owed and retried until Artifacts confirms. A `wake` callback (the Room's alarm) is set before each create. The Artifacts port (`src/artifacts.ts`) has `create` and `delete` for this |
 | Path diffs | `src/diff/treediff.ts` | Changed paths through the Artifacts binding: bounded, cached by tree hash, with merge bases, exact renames, and the overlap test that decides whether a preview needs the sandbox |
 | Publisher sandbox | `src/publisher/container.ts`, `gitops.ts` | A Durable Object that owns a container with git only. Every git command is hardened; no repository code runs |
 | Log remote | `src/publisher/container.ts` (`pushLog`, `readLogRef`), `log-push.ts` | Pushes lane L's log commit to `refs/artroom/log` under a lease, answering with lane L's `PushOutcome`; reads the ref back |
 | Gateway and ref fence | `src/publisher/container.ts`, `ref-fence.ts` | The container's only way out. It adds each operation's token and lets a push through only if every ref update is the one that operation allows |
-| Harness Worker | `src/worker.ts`, `wrangler.jsonc` | Worker `artroom-lb-git`: the publisher, plus a key-protected stand-in Room for live tests |
+| Publisher entry | `src/publisher/container.ts`, exported as `@generalbusiness/artroom-git/publisher` | `Publisher` and `ArtifactsGateway`, which the Room Worker hosts |
+| Measurement harness | `measure/harness/` | Worker `artroom-lb-git`: the publisher, plus a key-protected stand-in Room for live measurements. Not deployed, not gated (see "Live runs") |
 | Container image | `container/` | `image.sh` copies `alpine/git` into Cloudflare's registry (no Docker needed); `Dockerfile` for machines with Docker |
 
 ## The landing operation
@@ -196,7 +197,9 @@ the binding, re-encoded and accepted only if they hash to the ID. Live,
 `readCommit` and `readTree` throw (an internal error, not null) for an
 object of another type, and `readBlob` returns null for a non-blob, so a
 reader must treat a throw as "not this type" and try the next. With that,
-lane L's `verifyLog` passes over the binding (`measure/log.live.test.ts`).
+lane L's `verifyLog` passed over the binding (the live test was retired by
+decision D5; the spike deployment's log publication and `artroom verify`
+cover it: [notes/deploy-spike.md](../../notes/deploy-spike.md)).
 
 ## Workspaces
 
@@ -271,26 +274,32 @@ and let the alarm finish the landing.
 
 ## Live runs
 
-These need hugh's wrangler login and the Worker deployed with a key.
+**Status:** measurement only. The harness Worker `artroom-lb-git` was
+retired from `src/` to `measure/harness/` and its deployment deleted
+(decision D5, request 73eccbec, 2026-10-02). The Room's spike deployment
+covers workspaces, pinning, fast-forward landings and log publication
+([notes/deploy-spike.md](../../notes/deploy-spike.md)); `live.mjs` (merge
+landings and a conflict) and `jj-change-id.mjs` cover what it does not.
+The harness is not type-checked or tested by this package's gates.
+
+These need hugh's wrangler login and the harness deployed with a key.
 
 ```sh
 cd packages/git
 env -u CLOUDFLARE_API_TOKEN npx wrangler whoami
 umask 077; openssl rand -hex 24 > ~/.artroom-lb-key
 printf 'LB_KEY=%s\n' "$(cat ~/.artroom-lb-key)" > /tmp/lb-secrets
-env -u CLOUDFLARE_API_TOKEN npx wrangler deploy --secrets-file /tmp/lb-secrets
+env -u CLOUDFLARE_API_TOKEN npx wrangler deploy -c measure/harness/wrangler.jsonc --secrets-file /tmp/lb-secrets
 node measure/live.mjs            # forks, tokens, pinning, diffs, previews, two landings, a conflict, release
-node measure/token-inflight.mjs  # does revoking or expiring a token stop a push in flight?
-node measure/pushlog-live.mjs    # pushLog: two publications, lease mismatches, refusals, read back with git
-npm run test:live                # lane L's publisher and verifyLog through pushLog, readLogRef and the binding
 node measure/jj-change-id.mjs    # does a jj change-id header survive fork, pinning and landing?
+env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-lb-git
+node measure/token-inflight.mjs  # needs no Worker: does revoking or expiring a token stop a push in flight?
 ```
 
 The scripts make their own repos in the `gitseq-spike` namespace, revoke
 every token they mint, and delete their repos. Results are saved, with
-tokens redacted, in `measure/results/`.
-
-To remove the Worker: `env -u CLOUDFLARE_API_TOKEN npx wrangler delete artroom-lb-git`.
+tokens redacted, in `measure/results/`, including those of the retired
+`pushlog-live.mjs` and `log.live.test.ts`.
 
 ## jj change IDs
 
@@ -304,7 +313,7 @@ step, for a commit written by jj and one built with `git hash-object`, with
 both kinds of landing. It uses real git and the real pinning, landing
 engine and publisher code; the fork and canonical repo are local bare repos,
 and the Room and tokens are fakes. `measure/jj-change-id.mjs` runs the same
-check against real Artifacts through the deployed Worker; it held on
+check against real Artifacts through the measurement harness; it held on
 2026-10-01 (`measure/results/jj-change-id-*.json`).
 
 ## Limits and choices

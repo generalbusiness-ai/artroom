@@ -1,9 +1,13 @@
 /**
  * Worker `artroom-lb-git`: the publisher sandbox, and a harness Room for live
- * tests against real Artifacts repos.
+ * measurements against real Artifacts repos (measure/live.mjs,
+ * measure/jj-change-id.mjs). Measurement only, retired from src/ by decision
+ * D5 (request 73eccbec): not type-checked or tested by the package's gates,
+ * and not deployed. Deploy it for a run with `wrangler deploy -c
+ * measure/harness/wrangler.jsonc`, and delete it after.
  *
  * `HarnessRoom` is not the product Room (lane A). It hosts this package's
- * pieces the way the Room will — `Landing`, `Workspaces`, `Pinning`, the
+ * pieces the way the Room does — `Landing`, `Workspaces`, `Pinning`, the
  * bounded diff — with a stand-in for everything else: every lane it is told
  * about is held, there is no policy, and every landing is ready once built.
  * Every route needs the `x-lb-key` header to equal the `LB_KEY` secret.
@@ -15,25 +19,25 @@
 
 import { DurableObject } from "cloudflare:workers";
 import type { ActId, LaneId, OpId, PolicyVersion, Seq, Sha, SystemEvent } from "@generalbusiness/artroom-contract";
-import { durableSql, type Sql, text } from "./sql.ts";
-import { Landing } from "./landing/engine.ts";
-import type { LaneFacts, LandingRoom, LandRecord, Readiness } from "./landing/types.ts";
-import { ContainerPublisher, type LogRemoteStub, Pinning, type PublisherStub } from "./publisher/client.ts";
-import { LOG_REF } from "./publisher/gitops.ts";
-import type { LogPushRequest, LogStageRequest } from "./publisher/log-push.ts";
-import { Workspaces, forkName } from "./workspace/workspaces.ts";
-import { type ArtifactsNamespace, canonicalTokens, withRetry } from "./artifacts.ts";
-import { TreeCache, changedPaths, previewPlan } from "./diff/treediff.ts";
-import { redact } from "./publisher/container.ts";
+import { durableSql, type Sql, text } from "../../src/sql.ts";
+import { Landing } from "../../src/landing/engine.ts";
+import type { LaneFacts, LandingRoom, LandRecord, Readiness } from "../../src/landing/types.ts";
+import { ContainerPublisher, type LogRemoteStub, Pinning, type PublisherStub } from "../../src/publisher/client.ts";
+import { LOG_REF } from "../../src/publisher/gitops.ts";
+import type { LogPushRequest, LogStageRequest } from "../../src/publisher/log-push.ts";
+import { Workspaces, forkName } from "../../src/workspace/workspaces.ts";
+import { type ArtifactsNamespace, canonicalTokens, withRetry } from "../../src/artifacts.ts";
+import { TreeCache, changedPaths, previewPlan } from "../../src/diff/treediff.ts";
+import { redact } from "../../src/publisher/container.ts";
 
-export { Publisher, ArtifactsGateway } from "./publisher/container.ts";
+export { Publisher, ArtifactsGateway } from "../../src/publisher/container.ts";
 
 interface Env {
   readonly ARTIFACTS: Artifacts;
   readonly ARTIFACTS_HOST: string;
   readonly ARTIFACTS_NAMESPACE: string;
   readonly LB_KEY: string;
-  readonly PUBLISHER: DurableObjectNamespace<import("./publisher/container.ts").Publisher>;
+  readonly PUBLISHER: DurableObjectNamespace<import("../../src/publisher/container.ts").Publisher>;
   readonly HARNESS: DurableObjectNamespace<HarnessRoom>;
 }
 

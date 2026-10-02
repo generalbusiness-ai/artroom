@@ -539,7 +539,8 @@ no Artifacts token, bearer or session token. Not ours: `gitseq-spike` holds
 
 - **Legacy-base adoption.** It needs a registry binding left unfounded by
   an older Worker, and every room here was founded fresh, so the Room's
-  `legacyBinding` was false throughout.
+  `legacyBinding` was false throughout. (Retired since, with the spike's
+  state: see "Wipe and retirement (decision D5)".)
 - **Checkers and reviews.** No policy required them.
 - **Merge landings.** Every landing fast-forwarded main, the cold agent's
   included: main became its own commit, `0339e9ff`.
@@ -645,7 +646,7 @@ token, bearer or session token.
 - **Advisory checks**, and checks on a landing whose integration differs
   from the preview's (a merge landing).
 - **Many jobs.** More than one job in flight, and checks under load.
-- **Legacy-base adoption**, as before.
+- **Legacy-base adoption**, as before (retired since: see below).
 
 **Gates**, on the code that ran live (after merging main `bd520fb9`):
 
@@ -657,3 +658,191 @@ token, bearer or session token.
 
 The room workerd suite printed the "code had hung" message 28 times, with
 every test passing.
+
+## Wipe and retirement (decision D5, request 73eccbec, 2026-10-02)
+
+hugh's decision D5 retired the Room's migrations 2 to 8, the legacy lease,
+the registry's legacy flag, lane B's legacy base adoption and the snapshot
+ledger's revision-3 upgrade. Those paths existed only for state the spike
+deployment had. So the spike's Durable Objects were wiped, and the code
+now starts every store at the folded base schema, version 1. The harness
+Workers of lanes B and G were deleted; their code moved to each package's
+`measure/harness/`.
+
+**How the state was wiped: by deleting the Worker.** The first attempt was
+a delete-class migration in `wrangler.spike.jsonc`: `v3` deleting `Room`
+and `Registry`, then `v4` making them again, in one deploy (commit
+`bf2d7d46`). Cloudflare refused it: "Cannot apply --delete-class migration
+to class 'Room' without also removing the binding that references it"
+(code 10061). Nothing changed, except that the deploy script had already
+put both secrets again, with the same values, and redeployed the checker
+service. A delete-class migration therefore needs two deploys, with the
+spike broken in between (no `ROOMS` or `REGISTRY` binding), and would leave
+the spike's migrations different from production's for good. Deleting the
+Worker deletes the storage of all its Durable Objects, which Cloudflare
+documents, and the deploy script then makes it again with production's
+migrations. So the spike config was restored to production's (commit
+`96ed4fc3`), and:
+
+1. `wrangler delete artroom-spike-room`. Wrangler warned that
+   `artroom-spike-checkers` uses it as a service binding; the binding is by
+   name, and works again once the Worker exists.
+2. `packages/room/scripts/deploy-spike.sh` at `96ed4fc3`. It put
+   `ROOM_KEY_SECRET` and `CHECKER_KEY` from the env file, with the same
+   values as before (no secret was created or rotated), and deployed the
+   checker service. The Room's upload succeeded, but its container
+   application did not: twice, wrangler said it "could not finish applying
+   its Durable Object-managed Container application settings". Deleting a
+   Worker does not delete its container application. The old
+   `artroom-spike-room-publisher` application (`18c01d2e…`) was still bound
+   to the deleted Worker's `Publisher` namespace, and a new one could not be
+   made under its name.
+3. `wrangler containers delete 18c01d2e9fa242c1a42846f5a71418dc`, then
+   `wrangler deploy --config wrangler.spike.jsonc` at `96ed4fc3`: deployed,
+   with a new application, `3388b66b…`. The probe answered 404.
+
+| Worker | Version ID | Replacing |
+|---|---|---|
+| `artroom-spike-room` | `0392159a-d0eb-4d86-afe2-030dd29b2c14` | `41f61bfe…` (and `876d6113…`, the secret put by the refused attempt) |
+| `artroom-spike-checkers` | `7d059f37-c974-4272-9516-a3f21f38c27d` | `abfe34a8…` (and `a579ebf0…`, from the refused attempt, the same checker code) |
+
+The publisher image digest and the runner image are unchanged. The
+registry's earlier rooms are gone: `GET /v1/rooms/<name>` answers 404 for
+`deploy-spike-smoke-muqd4vut`, `deploy-spike-smoke-muqeemmx` and
+`deploy-spike-checks-muqwhtip`, which earlier runs left bound.
+
+**Harness Workers deleted.** Before deleting, the account's Workers were
+listed through the API: the `artroom-` ones were `artroom-lb-git`,
+`artroom-lg-checkers`, `artroom-spike-checkers`, `artroom-spike-isogit`,
+`artroom-spike-room` and `artroom-spike-sandbox-git`.
+
+| Deleted | What it was | Last version |
+|---|---|---|
+| Worker `artroom-lb-git` | lane B's harness: `Publisher` and `HarnessRoom` | `7f3cf4f1-0bbd-4611-a2df-5428c6c08c42` |
+| Worker `artroom-lg-checkers` | lane G's harness: `RunnerBox`, `Publisher` and `HarnessLedger` | `1abb65b1-45b7-4cc2-a54e-159c7b7c6514` |
+| Container application `artroom-lb-git-publisher` (`8608a905…`) | left by the Worker's deletion | — |
+| Container applications `artroom-lg-checkers-publisher` (`149e8c52…`) and `artroom-lg-checkers-runnerbox` (`ca74cfd2…`) | the same | — |
+
+Deleting the applications too lets `measure/harness/` be deployed again
+for a run under the same names. The registry images (`artroom-lb-git`,
+`artroom-lg-runner`) are kept: the spike Room and checker service use them.
+Not touched: `artroom-spike-isogit` and `artroom-spike-sandbox-git` (the
+spikes' own Workers), and the container application
+`artroom-lb-logbig-publisher` (`9cf9349e…`), which the deletion of
+`artroom-lb-logbig` left behind and which would block that harness's next
+deploy the same way.
+
+**Live smoke**, `packages/room/measure/spike-smoke.mjs`, all phases:
+
+| Run | Result | Record |
+|---|---|---|
+| 1 | Public and import phases passed (founding, lanes 1 to 3 landed, both logs verified). The checks phase failed at lane 4's `propose`: 503 `unavailable`, "The repository could not be read", after 59 seconds. Cleanup `ok`, 0 unresolved, nothing left. Not reproduced since: see "The 503 at lane 4's propose" below | [spike-smoke-2026-10-02T15-59-44-105Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T15-59-44-105Z.json) |
+| 2 | `SPIKE_PHASE=checks`: passed, exit 0. The job was dispatched, the checker's signed check admitted after 10 seconds, the review given, the lane landed, `artroom verify` exit 0 through entry 15 | [spike-smoke-2026-10-02T16-04-47-640Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-04-47-640Z.json) |
+| 3 | All phases: passed, exit 0, 91 steps ok. Public log verified through entry 14, import through 8, checks through 15; cleanup `ok`, 0 unresolved, nothing left in either namespace | [spike-smoke-2026-10-02T16-06-45-754Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-06-45-754Z.json) |
+
+Every Artifacts token the runs minted was revoked and every repository they
+made was deleted (each run's strict cleanup). The result files contain no
+Artifacts token, bearer or session token.
+
+**Gates** at `bf2d7d46` (the code; `96ed4fc3` changes only the spike config
+and its test back to main's):
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — (again at `96ed4fc3`: 0) |
+| root `npm test` | 0 | checkers 43; cli 102; client 86 Node and 2 workerd; git 212; log 198 Node and 193 workerd; mcp 73 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 125 Node and 379 workerd; ui 141 |
+| git `npm run test:workers`, `npm run test:log` | 0, 0 | 8; 12 |
+| room `npm run test:node` at `96ed4fc3` | 0 | 125 |
+| `wrangler deploy --dry-run` of both spike configs, both production configs and both `measure/harness/` configs | 0 each | — |
+
+### The 503 at lane 4's propose (run 1)
+
+**Not reproduced in 5 runs of the checks phase; cause not found.**
+
+**What produced it.** The message is the Room's pre-admission refusal
+(`preAdmission` in [packages/room/src/admission.ts](../packages/room/src/admission.ts)).
+For a `propose`, the Room makes these calls before deciding:
+
+1. `headInFork`: read the head from the lane's fork through the Artifacts
+   binding.
+2. `pinObjects`: mint a 600-second read token on the fork and a write token
+   on the canonical repository, then call the room's `Publisher` container
+   (start it if it is not running, route its HTTPS through the gateway, and
+   run `git fetch` and `git push`).
+3. `readMain`, `diff`, `readConfig` when `.artroom/` changed, and
+   `changedBetween` for earlier generations.
+
+Any exception from any of these is caught and replaced by this 503. The
+exception itself is discarded (`void e`) and never logged. So run 1's
+result file records only the status, the message and 59,036 ms, and the
+cause was lost. Workers Logs for that minute could not be read: hugh's
+OAuth login has no observability scope (the telemetry API answered 403).
+
+**What can take 59 seconds.** Nothing on this path waits that long by
+design. `withRetry` sleeps for at most 7.5 seconds in all. Each git
+command in the container has a 120-second timeout. The pin tokens last 600
+seconds. Candidate causes, none confirmed:
+
+- The `Publisher` container's cold start (`ensure` runs `start`, then an
+  `exec`) on a host that had not yet pulled the image. Run 1 began 22
+  seconds after the wipe had made a new container application (`3388b66b…`),
+  lane 4's `propose` came about 4 minutes after that, and its room was the
+  third room to start a container. A platform
+  limit near 60 seconds on starting or calling into the container would
+  give this timing.
+- An Artifacts call (a fork or canonical read, a token mint, or the git
+  transfer through the gateway) that hung until a platform limit.
+
+**Whether this change caused it.** Not through its code: nothing on the
+propose path changed. `admission.ts`, `packages/room/src/artifacts.ts` and
+lane B's publisher are unchanged. The `Workspaces` changes affect only public
+founding (`prepareCanonical`, `cleanIncarnation`), and the checks room is an
+import. `adoptLegacyBase` ran only at public founding. `SnapshotRepos` is
+used only for filtered checks, and this configuration checks the whole
+tree. Through the deployment, possibly: the wipe left a brand-new container
+application, which matches the first candidate cause.
+
+**Reruns.** After run 1, the checks phase passed five times out of five.
+Lane 4's `propose` took 2.2 to 7.1 seconds each time.
+
+| Run | Deployed | Lane 4 propose |
+|---|---|---|
+| 2: checks only, 16:04 | `96ed4fc3` | 3.4 s |
+| 3: full, 16:06 | `96ed4fc3` | 3.1 s |
+| 4: full, 16:22 | merge `4a522bd6` | 2.5 s |
+| 5: checks only, 16:27 | merge `4a522bd6` | 7.1 s |
+| 6: checks only, 16:29 | merge `4a522bd6` | 2.2 s |
+
+During runs 4 to 6, `wrangler tail artroom-spike-room` recorded 1,212
+events: 1,203 `ok` and 9 `canceled`, with no exception.
+
+**Pre-existing defect, outside this request:** pre-admission discards the
+error it turns into this 503, so a failure like this one cannot be
+diagnosed afterwards. Logging the error's name and a redacted message, or
+returning a cause code, would have identified the step.
+
+## Redeploy from the merge of main `3ac55e96` (plan 003)
+
+Main's plan 003 changes lane B's landing code, which the Room Worker
+bundles. So the spike was redeployed with `deploy-spike.sh` from the merge
+head `4a522bd6`. No retry was needed, and the probe answered 404.
+
+| Worker | Version ID |
+|---|---|
+| `artroom-spike-room` | `75758995-b37c-459c-89d1-0005f5d0163d` |
+| `artroom-spike-checkers` | `37804f0a-cdd5-4f69-a9fa-27b328596e37` |
+
+| Run | Result | Record |
+|---|---|---|
+| Full smoke | passed, exit 0; cleanup `ok`, 0 unresolved, nothing left | [spike-smoke-2026-10-02T16-22-10-598Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-22-10-598Z.json) |
+| Checks phase | passed, exit 0; cleanup `ok` | [spike-smoke-2026-10-02T16-27-36-022Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-27-36-022Z.json) |
+| Checks phase | passed, exit 0; cleanup `ok` | [spike-smoke-2026-10-02T16-29-50-841Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-29-50-841Z.json) |
+
+**Gates** at `4a522bd6`:
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | checkers 43; cli 102; client 86 Node and 2 workerd; git 225; log 198 Node and 193 workerd; mcp 73 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 125 Node and 380 workerd; ui 141 |
+| git `npm run test:workers` | 0 | 10 |
+

@@ -1,6 +1,6 @@
 /**
  * A stand-in for the Room's admission of checker acts, for tests and the
- * live harness. It is not the Room (lane A). It does what the Room must do
+ * measurement harness (measure/harness/). It is not the Room (lane A). It does what the Room must do
  * for a checker's act, and no more:
  * - verifies the signature against the envelope's `actor` (R-SIG-5);
  * - admits only the checker service's key, and only `check` and `note`;
@@ -12,8 +12,8 @@
 
 import type { ActId, ActRecord, CheckJob, KeyId, MemberId, Refusal, Result, SignedEnvelope } from "@generalbusiness/artroom-contract";
 import { canonicalize, sha256Hex } from "@generalbusiness/artroom-policy";
-import type { RoomPort } from "./checker.ts";
-import { verifyEnvelope } from "./signing.ts";
+import type { RoomPort } from "../src/checker.ts";
+import { verifyEnvelope } from "../src/signing.ts";
 
 export interface LedgerOptions {
   /** The checker service's key. */

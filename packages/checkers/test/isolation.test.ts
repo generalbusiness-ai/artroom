@@ -11,7 +11,7 @@ import type { ArtroomError, Check, CheckJob, Note, Sha, SignedEnvelope } from "@
 import { checkJob, gitAuthEnvFor, isRefusal, type BoundJob } from "../src/job.ts";
 import { checkout } from "../src/runner.ts";
 import { generateKey, importSigner, signEnvelope, verifyEnvelope } from "../src/signing.ts";
-import { Ledger } from "../src/ledger.ts";
+import { Ledger } from "./ledger.ts";
 import { TestsChecker } from "../src/checkers.ts";
 import { LlmReviewer, type Model } from "../src/llm.ts";
 import type { CheckerServices, RoomPort, RunnerProvider } from "../src/checker.ts";

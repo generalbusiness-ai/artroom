@@ -10,7 +10,7 @@ import type { ArtroomError, Check, CheckJob, Digest, Refusal, RoomId } from "@ge
 import type { CheckerServices, RoomPort, RoomResolver } from "../src/checker.ts";
 import { TestsChecker } from "../src/checkers.ts";
 import { LlmReviewer, type Model } from "../src/llm.ts";
-import { Ledger } from "../src/ledger.ts";
+import { Ledger } from "./ledger.ts";
 import { generateKey, importSigner } from "../src/signing.ts";
 import { runnerProvider } from "../src/sandbox.ts";
 import { checkJob, isRefusal, parseNamespaces } from "../src/job.ts";
@@ -190,7 +190,7 @@ test("production: the Worker has no route that accepts or builds a job, and no h
   for (const name of ["HarnessLedger", "Publisher", "ArtifactsGateway"]) assert.equal(name in m, false, `${name} is not part of production`);
   for (const name of ["TestsCheckerService", "TypesCheckerService", "LlmReviewService", "RunnerBox", "RunnerGateway"]) assert.ok(name in m, name);
   const source = readFileSync(new URL("../src/worker.ts", import.meta.url), "utf8");
-  assert.doesNotMatch(source, /from "\.\/harness/);
+  assert.doesNotMatch(source, /from "[^"]*harness/);
   // The production deployment: no harness, no fixed room or delegation, and the Room bound as ROOM.
   interface Config {
     readonly main: string;
@@ -206,7 +206,6 @@ test("production: the Worker has no route that accepts or builds a job, and no h
   assert.deepEqual(prod.secrets.required, ["CHECKER_KEY"]);
   assert.deepEqual(prod.durable_objects.bindings.map((b) => b.name), ["RUNNER"]);
   for (const v of ["ROOM_ID", "CHECKER_DELEGATION", "HARNESS_ROOM_ID", "LG_KEY"]) assert.equal(v in prod.vars, false, v);
-  assert.equal(config("wrangler.harness.jsonc").main, "src/harness.ts");
 });
 
 // ------------------------------------------------------------------ the accepted Artifacts namespaces (ARTIFACTS_NAMESPACES)
@@ -242,6 +241,6 @@ test("production: an entrypoint will not start with a missing, empty or malforme
   }
   const vars = (file: string) => (JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, "")) as { vars: Record<string, string> }).vars;
   assert.deepEqual(parseNamespaces(vars("wrangler.jsonc")["ARTIFACTS_NAMESPACES"]), ["artroom-public"]);
-  assert.deepEqual(parseNamespaces(vars("wrangler.harness.jsonc")["ARTIFACTS_NAMESPACES"]), ["gitseq-spike"]);
+  assert.deepEqual(parseNamespaces(vars("wrangler.spike.jsonc")["ARTIFACTS_NAMESPACES"]), ["gitseq-spike", "gitseq-spike-import"]);
   assert.equal("ARTIFACTS_NAMESPACE" in vars("wrangler.jsonc"), false);
 });

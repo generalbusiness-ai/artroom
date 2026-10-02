@@ -56,7 +56,7 @@ import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, SnapshotPort, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, SnapshotRepos, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
+import { ContainerPublisher, Landing, SnapshotRepos, Workspaces, canonicalTokens } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
@@ -79,8 +79,6 @@ export interface CoreOptions {
   readonly committed: () => void;
   /** Does the registry bind this repository to this room ID and name (R-GEN-13)? */
   readonly bound: (repo: string, room: RoomId, name: string) => Promise<boolean>;
-  /** Was the registry's binding of this repository made by an older Worker (review 700b74ea)? A durable fact of the binding. */
-  readonly legacyBinding?: (repo: string) => Promise<boolean>;
   /**
    * Persist the alarm at or before `at` (room clock), keeping an earlier one; resolves only once it is stored. Public
    * founding awaits it before each repository create (plan 004).
@@ -157,7 +155,6 @@ export class RoomCore {
   readonly defer: (p: Promise<unknown>) => void;
   readonly committed: () => void;
   readonly bound: CoreOptions["bound"];
-  private readonly legacyBinding: NonNullable<CoreOptions["legacyBinding"]>;
   private readonly wake: CoreOptions["wake"];
   readonly remotes: Remotes;
   /** Each checker's service binding, which every job travels over (R-EXEC-8). */
@@ -253,7 +250,6 @@ export class RoomCore {
     this.leaseMs = opts.leaseMs;
     this.defer = opts.defer;
     this.bound = opts.bound;
-    this.legacyBinding = opts.legacyBinding ?? (async () => false);
     this.wake = opts.wake;
     this.committed = () => {
       opts.committed();
@@ -500,13 +496,9 @@ export class RoomCore {
       const push = this.remotes.firstCommit;
       if (!push) throw new Error("this deployment cannot push a first commit");
       const base = locate(genesis.repo, [this.remotes.namespace, ...Object.keys(this.remotes.bindings ?? {})])!.name;
-      // An older Worker's binding: its Room may have created the base name and recorded nothing (review 700b74ea). Read
-      // from the registry, a durable fact, on every attempt, so a retry after any interruption reaches the same answer;
-      // the ledger records the adoption in one transaction, and adoption is idempotent.
-      const legacyBase = await this.legacyBinding(genesis.repo);
       fault("found:before-prepare");
       // A refused push leaves main as it is; the ledger reads it next.
-      const name = await this.workspaces.prepareCanonical(base, (remote, token) => push(remote, token, Date.parse(genesis.createdAt)), { legacyBase });
+      const name = await this.workspaces.prepareCanonical(base, (remote, token) => push(remote, token, Date.parse(genesis.createdAt)));
       // From here the room's repository is this incarnation: reads, forks, landing and the log all reach it.
       if (getMeta(this.sql, "canonical_name") !== name) {
         setMeta(this.sql, "canonical_name", name);
@@ -1361,7 +1353,7 @@ export class RoomCore {
   /** Workspaces whose lease has ended: release, expiry (sealed or only due), take-over or fencing (R-WS-3). */
   endedWorkspaces(): { lane: LaneId; lease: number }[] {
     return this.sql
-      .all("SELECT lane, lease_gen FROM ws_leases WHERE state IN ('open', 'legacy')")
+      .all("SELECT lane, lease_gen FROM ws_leases WHERE state = 'open'")
       .map((r) => ({ lane: str(r, "lane") as LaneId, lease: num(r, "lease_gen")! }))
       .filter((w) => !this.leaseCurrent(w.lane, w.lease));
   }
@@ -1369,34 +1361,12 @@ export class RoomCore {
   /**
    * End the workspace access of every lease that has ended (R-WS-3, R-LANE-8).
    * Lane B revokes the token it minted for the lease and sweeps the fork.
-   * Access opened before lane B's workspaces (`ws_legacy`: recorded token IDs,
-   * and an inventory for any mint whose answer was never recorded) becomes
-   * lane B's durable cleanup duties, in the transaction that marks the lease
-   * ended, so it is owed until Artifacts confirms it (review a711f7b6).
    */
   async revokeEndedTokens(): Promise<void> {
-    let imported = false;
     for (const w of this.endedWorkspaces()) {
       await this.workspaces.revoke(w.lane, w.lease);
-      const fork = forkName(this.location().name, w.lane);
-      this.sql.transaction(() => {
-        for (const r of this.sql.all("SELECT token FROM ws_legacy WHERE lane = ? AND lease_gen = ? ORDER BY token DESC", w.lane, w.lease)) {
-          const token = str(r, "token")!;
-          this.sql.all(
-            "INSERT INTO artroom_ws_duty (fork, kind, token_id, reason, state, started_at, expires_at, next_at) VALUES (?, ?, ?, 'migrated', 'owed', ?, NULL, ?)",
-            fork,
-            token ? "token" : "inventory",
-            token || null,
-            this.now(),
-            this.now(),
-          );
-          imported = true;
-        }
-        this.sql.all("DELETE FROM ws_legacy WHERE lane = ? AND lease_gen = ?", w.lane, w.lease);
-        this.sql.all("UPDATE ws_leases SET state = 'ended' WHERE lane = ? AND lease_gen = ?", w.lane, w.lease);
-      });
+      this.sql.all("UPDATE ws_leases SET state = 'ended' WHERE lane = ? AND lease_gen = ?", w.lane, w.lease);
     }
-    if (imported) await this.workspaces.reconcile();
   }
 
   /**
