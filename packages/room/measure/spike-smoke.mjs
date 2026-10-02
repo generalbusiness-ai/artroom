@@ -26,6 +26,16 @@
 // fails it, and the result lists what is unresolved by repository name and
 // token ID.
 //
+// Then review and check (request 9f81f372): import a repository whose first
+// commit holds a policy that requires one check (`tests`, by role:checker)
+// and one review from a maintainer, invite a reviewer and the spike checker
+// service's key (role checker), and work one lane: propose; the Room
+// dispatches the check job to artroom-spike-checkers over CHECKER_TESTS; the
+// checker's signed check is admitted; landing is refused while the review is
+// open; the reviewer approves; the lane lands; attention shows each step to
+// each member; and `artroom verify` replays the log. SPIKE_PHASE=checks runs
+// only this phase; SPIKE_PHASE=import only the import.
+//
 // Request b6b51de7 changed the first lane from a probe (it could not land:
 // founding left the repository with no main) to a step that must pass, and
 // removed the out-of-band seeding of main.
@@ -40,10 +50,11 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { keyPairFromSeed, newKeyPair, randomToken, sign, unb64url } from "../src/crypto.ts";
+import { b64url, digestBytes, newKeyPair, randomBytes, randomToken, sign } from "../src/crypto.ts";
 import { iso } from "../src/ids.ts";
 import { firstCommit } from "../../git/src/first-commit.ts";
 import { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, readListing, REPO_PAGE, smokeOk } from "./cleanup.mjs";
+import { attentionFor, CHECK, CHECKED_PATHS, checkedChange, checkProject, checksIn, importDraft, loadSpikeKeys, obligationOf, seedImportRepo } from "./checks.mjs";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
 const NS = "gitseq-spike";
@@ -70,7 +81,6 @@ const out = { run: RUN, url: BASE, namespace: NS, importNamespace: IMPORT_NS, st
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, redact(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" ")));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const outer = step;
 function step(name, ok, detail) {
   out.steps.push({ step: name, ok, atMs: Date.now() - t0, detail: clean(detail) });
   log(`${ok ? "ok  " : "FAIL"} ${name}`, detail ?? "");
@@ -98,15 +108,19 @@ async function http(method, path, body, bearer) {
 let room = null;
 let admin = null;
 
-function act(kind, target, body) {
-  const envelope = { v: 1, room, actor: admin.key, kind, target, body, idempotencyKey: randomToken().slice(0, 24) };
-  return http("POST", `/${room}/acts`, { envelope, sig: sign(admin.seed, "artroom-envelope-v1", envelope) });
+/** A signed act by `kp` in the current room. */
+function actAs(kp, kind, target, body) {
+  const envelope = { v: 1, room, actor: kp.key, kind, target, body, idempotencyKey: randomToken().slice(0, 24) };
+  return http("POST", `/${room}/acts`, { envelope, sig: sign(kp.seed, "artroom-envelope-v1", envelope) });
 }
+const act = (kind, target, body) => actAs(admin, kind, target, body);
 
-function request(req) {
-  const r = { v: 1, room, actor: admin.key, request: req, nonce: randomToken().slice(0, 32), notAfter: iso(Date.now() + 60_000) };
-  return http("POST", `/${room}/requests`, { request: r, sig: sign(admin.seed, "artroom-request-v1", r) });
+/** A signed request by `kp` in the current room. */
+function requestAs(kp, req) {
+  const r = { v: 1, room, actor: kp.key, request: req, nonce: randomToken().slice(0, 32), notAfter: iso(Date.now() + 60_000) };
+  return http("POST", `/${room}/requests`, { request: r, sig: sign(kp.seed, "artroom-request-v1", r) });
 }
+const request = (req) => requestAs(admin, req);
 
 let session = null;
 const read = (path) => http("GET", `/${room}${path}`, undefined, session);
@@ -207,11 +221,15 @@ async function canonicalRef(remote, repo, ref, ns = NS) {
 
 // ------------------------------------------------------------ one lane, as an agent works it
 
-async function lane(n, files, opts = {}) {
+async function lane(n, files) {
+  const res = await openLane(n, files);
+  return res.proposal ? landLane(res) : res;
+}
+
+/** Claim, open the workspace, push `files` to the fork, and propose; wait for the preview. */
+async function openLane(n, files, scope = ["docs/**", "README.md"]) {
   const res = { n };
-  // A probe lane's steps are recorded as they happened, but do not fail the run.
-  const step = (name, ok, detail) => outer(name, ok || !!opts.mayFail, opts.mayFail ? { probe: true, passed: ok, ...detail } : detail);
-  const c = await act("claim", null, { goal: `spike smoke lane ${n}`, scope: ["docs/**", "README.md"] });
+  const c = await act("claim", null, { goal: `spike smoke lane ${n}`, scope });
   step(`lane ${n}: claim`, c.status === 200, { status: c.status, ms: c.ms, lane: c.body.lane, seq: c.body.seq, refused: c.body.rule });
   if (c.status !== 200) return res;
   res.lane = c.body.lane;
@@ -245,11 +263,18 @@ async function lane(n, files, opts = {}) {
   const pr = await act("propose", { lane: res.lane }, { lease: 1, expectedGeneration: 0, head: res.head, summary: `spike smoke lane ${n}` });
   step(`lane ${n}: propose`, pr.status === 200, { status: pr.status, ms: pr.ms, generation: pr.body.generation, preview: pr.body.preview, changed: pr.body.changed, obligations: pr.body.obligations, refused: pr.body.rule, reason: pr.body.reason, error: pr.body.code, message: pr.body.message });
   if (pr.status !== 200) return res;
+  res.proposal = pr.body;
   if (pr.body.preview?.id) {
     const pv = await waitOp(pr.body.preview.id, ["clean", "conflict", "failed"], 120_000);
+    res.preview = pv;
     step(`lane ${n}: preview`, pv?.state === "clean", { state: pv?.state, integration: pv?.integration, base: pv?.base, paths: pv?.paths, error: pv?.error });
   }
+  return res;
+}
 
+/** Land the lane's generation 1 and wait for the operation to end. */
+async function landLane(res) {
+  const n = res.n;
   const l = await act("land", { lane: res.lane, generation: 1 }, { lease: 1, head: res.head });
   const landOk = l.status === 200;
   step(`lane ${n}: land accepted`, landOk, { status: l.status, ms: l.ms, op: l.body.op?.id, state: l.body.op?.state, refused: l.body.rule, reason: l.body.reason, error: l.body.code, message: l.body.message });
@@ -264,17 +289,9 @@ async function lane(n, files, opts = {}) {
 // ------------------------------------------------------------ the spike operator key
 
 /** The spike operator's key pair, from the env file. The seed stays in this process; it is never printed. */
-function operatorKey() {
-  const file = process.env.ARTROOM_SPIKE_ENV ?? join(homedir(), ".config/generalbusiness/artroom-spike.env");
-  const text = readFileSync(file, "utf8");
-  const value = (k) => new RegExp(`^${k}=["']?([^"'\n]*)["']?$`, "m").exec(text)?.[1] ?? null;
-  const seed = value("ARTROOM_OPERATOR_SEED");
-  const raw = seed ? unb64url(seed) : null;
-  if (!raw || raw.length !== 32) return null;
-  secrets.add(seed);
-  const kp = keyPairFromSeed(raw);
-  return kp.key === value("OPERATOR_KEYS") ? kp : null;
-}
+const operatorKey = () => loadSpikeKeys(secrets).operator;
+/** The spike checker service's key pair (ARTROOM_CHECKER_SEED): the key CHECKER_KEY holds, which each checked room invites. */
+const checkerKey = () => loadSpikeKeys(secrets).checker;
 
 // ------------------------------------------------------------ the run
 
@@ -288,10 +305,13 @@ const lanes = [];
 async function main() {
   log(`smoke run ${RUN} against ${BASE}`);
   // SPIKE_PHASE=import runs only the import, for a rerun of that part.
-  if (process.env.SPIKE_PHASE === "import") {
+  if (process.env.SPIKE_PHASE === "import" || process.env.SPIKE_PHASE === "checks") {
     const op = operatorKey();
     if (!op) throw new Error("no spike operator key");
-    return importPhase(op);
+    if (process.env.SPIKE_PHASE === "import") return importPhase(op);
+    const ck = checkerKey();
+    if (!ck) throw new Error("no spike checker key (ARTROOM_CHECKER_SEED)");
+    return checksPhase(op, ck);
   }
   admin = newKeyPair();
   const recovery = newKeyPair();
@@ -396,6 +416,11 @@ async function main() {
 
   // 7. An import on the same deployment (request b6b51de7, revision 2).
   if (operator) await importPhase(operator);
+
+  // 8. Review and check (request 9f81f372).
+  const checker = checkerKey();
+  if (operator && checker) await checksPhase(operator, checker);
+  else step("checks: the spike checker key", false, { error: "ARTROOM_CHECKER_SEED is not in the env file" });
 }
 
 /** Wait for the current room's log to publish (R-LOG-8), then run artroom verify (lane L's CLI) against the remote. */
@@ -449,76 +474,169 @@ async function logSummary() {
   );
 }
 
-let importRepo = null;
+/** The run's imported repositories in gitseq-spike-import, each retained before it is created, for cleanup. */
+const importRepos = [];
 
 /**
- * Import a throwaway repository: create it with one commit in the import namespace (hugh's OAuth; the
- * creation token pushes the commit and is then revoked), have the spike operator grant it to a fresh
- * admin key, draft and found a room on it, land a lane, and verify the room's log, which carries the grant.
+ * Create a throwaway repository in the import namespace with one commit of
+ * `files` (hugh's OAuth; the creation token pushes the commit, then every
+ * token on it is revoked before the Room sees it).
  */
-async function importPhase(operator) {
-  const out_ = (out.import = {});
-  importRepo = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const c = await api("POST", "/repos", { name: importRepo }, IMPORT_NS);
-  if (c.result?.token) secrets.add(c.result.token);
-  step("import: throwaway repository created in gitseq-spike-import", c.success === true && !!c.result?.remote, { name: importRepo, remote: c.result?.remote, errors: c.errors });
-  if (!c.success) throw new Error("the import repository could not be created");
-  const remote = c.result.remote;
-  const seed = mkdtempSync(join(tmpdir(), "deploy-spike-import-"));
-  await must(["init", "-q"], { cwd: seed });
-  write(seed, "README.md", "# imported\n\nA throwaway repository for the spike's live import.\n");
-  await must(["add", "-A"], { cwd: seed });
-  await must(["commit", "-q", "-m", "the imported repository's one commit"], { cwd: seed });
-  const seeded = await must(["rev-parse", "HEAD"], { cwd: seed });
-  const p = await git(["push", "-q", remote, "HEAD:refs/heads/main"], { cwd: seed, token: c.result.token });
-  // Every token on it is revoked before the Room sees it: the creation token is spent.
-  let revoked = 0;
-  const before = await activeTokens(importRepo, IMPORT_NS);
-  for (const t of before ?? []) if (await revoke(t.id, IMPORT_NS)) revoked++;
-  const leftover = await activeTokens(importRepo, IMPORT_NS);
-  step("import: one commit pushed; its creation token revoked", p.code === 0 && before !== null && leftover !== null && leftover.length === 0, { main: seeded, code: p.code, stderr: p.stderr || undefined, revoked, active: leftover?.length ?? "unknown" });
-  if (p.code !== 0) throw new Error("the import repository could not be seeded");
+async function seedImport(label, files) {
+  const name = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  importRepos.push(name);
+  const r = await seedImportRepo({ api: (m, p, b) => api(m, p, b, IMPORT_NS), git, dir: mkdtempSync(join(tmpdir(), "deploy-spike-import-")), name, files, onSecret: (t) => secrets.add(t) });
+  step(`${label}: throwaway repository created in gitseq-spike-import`, r.created, { name, remote: r.remote, errors: r.errors });
+  if (!r.created) throw new Error("the import repository could not be created");
+  step(`${label}: one commit pushed; its creation token revoked`, r.pushed === true && r.active === 0, { main: r.seeded, stderr: r.stderr, revoked: r.revoked, active: r.active ?? "unknown" });
+  if (!r.pushed) throw new Error("the import repository could not be seeded");
+  return r;
+}
 
-  // The grant, signed with the operator seed in this process, and the founding.
+/** Have the spike operator grant `repo` to a fresh admin key, draft and found a room on it, and open the admin's session. */
+async function foundImport(label, operator, repo, handle) {
   admin = newKeyPair();
-  const recovery = newKeyPair();
-  const name = `deploy-spike-import-${Date.now().toString(36)}`;
-  const g = { v: 1, repo: `${IMPORT_NS}/${importRepo}`, admin: admin.key, operator: operator.key, notAfter: iso(Date.now() + 15 * 60_000) };
-  const d = await http("POST", "", { name, repo: { kind: "import", grant: { grant: g, sig: sign(operator.seed, "artroom-onboarding-v1", g) } }, admin: { handle: "@importer", key: admin.key }, recovery: recovery.key });
+  const name = `deploy-spike-${label}-${Date.now().toString(36)}`;
+  const body = importDraft({ operator, admin, recovery: newKeyPair(), ns: IMPORT_NS, repo: repo.name, handle, name });
+  const g = body.repo.grant.grant;
+  const d = await http("POST", "", body);
   if (d.body?.draft) secrets.add(d.body.draft);
   const genesis = d.body.genesis;
-  step("import: draft", d.status === 200 && genesis?.repo === g.repo && genesis?.onboarding?.grant?.operator === operator.key, { status: d.status, repo: genesis?.repo, operator: genesis?.onboarding?.grant?.operator, error: d.body.code, message: d.body.message });
-  if (d.status !== 200) throw new Error("import draft failed");
+  step(`${label}: draft`, d.status === 200 && genesis?.repo === g.repo && genesis?.onboarding?.grant?.operator === operator.key, { status: d.status, repo: genesis?.repo, operator: genesis?.onboarding?.grant?.operator, error: d.body.code, message: d.body.message });
+  if (d.status !== 200) throw new Error(`${label} draft failed`);
   const f = await http("POST", "/found", { genesis, sig: sign(admin.seed, "artroom-genesis-v1", genesis), draft: d.body.draft });
-  step("import: found", f.status === 200, { status: f.status, ms: f.ms, room: f.body.room, error: f.body.code, message: f.body.message });
-  if (f.status !== 200) throw new Error("import found failed");
+  step(`${label}: found`, f.status === 200, { status: f.status, ms: f.ms, room: f.body.room, error: f.body.code, message: f.body.message });
+  if (f.status !== 200) throw new Error(`${label} found failed`);
   room = f.body.room;
-  Object.assign(out_, { repo: g.repo, room, name });
-  const main0 = await canonicalRef(remote, importRepo, "refs/heads/main", IMPORT_NS);
-  step("import: main is the imported commit; the Room wrote nothing", main0 === seeded, { main: main0, imported: seeded });
-  const s = await request({ kind: "session", ttlSeconds: 900 });
+  const main0 = await canonicalRef(repo.remote, repo.name, "refs/heads/main", IMPORT_NS);
+  step(`${label}: main is the imported commit; the Room wrote nothing`, main0 === repo.seeded, { main: main0, imported: repo.seeded });
+  const s = await request({ kind: "session", ttlSeconds: 1800 });
   if (s.body?.token) secrets.add(s.body.token);
   session = s.body.token;
-  step("import: session", s.status === 200 && !!session, { status: s.status, member: s.body.member });
+  step(`${label}: session`, s.status === 200 && !!session, { status: s.status, member: s.body.member });
+  return { repo: g.repo, room, name };
+}
+
+/** Import a throwaway repository, found a room on it, land a lane, and verify the room's log, which carries the grant. */
+async function importPhase(operator) {
+  const repo = await seedImport("import", { "README.md": "# imported\n\nA throwaway repository for the spike's live import.\n" });
+  const out_ = (out.import = await foundImport("import", operator, repo, "@importer"));
 
   // A lane, landed on the imported main.
   const l = await lane(3, { "docs/imported.md": `landed by the spike smoke run ${RUN}\n` });
   lanes.push({ ...l, room, admin, ns: IMPORT_NS });
-  const main1 = await canonicalRef(remote, importRepo, "refs/heads/main", IMPORT_NS);
-  step("import: main is the landed integration", !!l.op?.integration && main1 === l.op.integration, { main: main1, integration: l.op?.integration, base: seeded });
+  const main1 = await canonicalRef(repo.remote, repo.name, "refs/heads/main", IMPORT_NS);
+  step("import: main is the landed integration", !!l.op?.integration && main1 === l.op.integration, { main: main1, integration: l.op?.integration, base: repo.seeded });
   if (l.lane) {
     const r = await act("release", { lane: l.lane }, { lease: 1, note: "spike smoke: import lane done" });
     lanes[lanes.length - 1].released = r.status === 200;
   }
-  out_.verify = await publishAndVerify("import", remote, importRepo, IMPORT_NS);
+  out_.verify = await publishAndVerify("import", repo.remote, repo.name, IMPORT_NS);
   step("import: verify reports the operator key", out_.verify.report?.operator === operator.key, { operator: out_.verify.report?.operator });
   out_.log = await logSummary();
+}
+
+// ------------------------------------------------------------ review and check (request 9f81f372)
+
+/** Invite `handle` with `role` (client custody) and have `kp` join; returns the member's own read session. */
+async function joinAs(label, kp, handle, role) {
+  const secret = randomBytes(32);
+  const inv = await act("roster", null, { op: "invite", member: handle, role, custody: "client", expiresAt: iso(Date.now() + 3600_000), secretHash: digestBytes(secret) });
+  const j = inv.status === 200 ? await actAs(kp, "roster", null, { op: "join", invitation: inv.body.id, secret: b64url(secret) }) : inv;
+  const s = j.status === 200 ? await requestAs(kp, { kind: "session", ttlSeconds: 1800 }) : j;
+  if (s.body?.token) secrets.add(s.body.token);
+  step(`${label}: ${handle} joins as ${role}`, inv.status === 200 && j.status === 200 && s.status === 200, { key: kp.key, invite: inv.status, join: j.status, session: s.status, refused: j.body?.rule ?? inv.body?.rule, reason: j.body?.reason ?? inv.body?.reason });
+  return s.body?.token ?? null;
+}
+
+/** One member's attention page in the current room. */
+const attentionOf = async (token) => (await http("GET", `/${room}/attention?limit=100`, undefined, token)).body;
+
+/**
+ * A room under a policy that requires one check and one independent review:
+ * the Room dispatches the check job to the bound checker service, its check
+ * is admitted, a second member reviews, and the lane lands.
+ */
+async function checksPhase(operator, checker) {
+  const L = "checks";
+  const repo = await seedImport(L, checkProject(RUN));
+  const out_ = (out.checks = await foundImport(L, operator, repo, "@author"));
+  const reviewer = newKeyPair();
+  const reviewerSession = await joinAs(L, reviewer, "@reviewer", "maintainer");
+  const checkerSession = await joinAs(L, checker, "@checker", "checker");
+
+  // Propose: the generation owes the check and the review.
+  const l = await openLane(4, checkedChange(RUN), CHECKED_PATHS);
+  lanes.push({ ...l, room, admin, ns: IMPORT_NS });
+  if (!l.proposal) throw new Error("the checked lane was not proposed");
+  const integration = l.preview?.integration ?? null;
+  step(`${L}: the proposal owes one check and one review`, obligationOf(l.proposal, "check")?.state === "open" && obligationOf(l.proposal, "review")?.state === "open", { obligations: l.proposal.obligations });
+  const asked = { review: attentionFor(await attentionOf(reviewerSession), "review-requested", l.lane), check: attentionFor(await attentionOf(checkerSession), "check-requested", l.lane) };
+  step(`${L}: attention asks the reviewer to review and the checker to check`, asked.review?.open === true && asked.check?.open === true, asked);
+
+  // Landing is refused while the review is open (the check is waited for by the landing itself).
+  const early = await act("land", { lane: l.lane, generation: 1 }, { lease: 1, head: l.head });
+  step(`${L}: land before the review is refused (obligation-open)`, early.status === 409 && early.body.rule === "obligation-open", { status: early.status, rule: early.body.rule, reason: early.body.reason });
+
+  // The Room dispatches the job over CHECKER_TESTS; the checker runs it in a runner and submits its signed check.
+  let found = { accepted: [], refused: [] };
+  const t = Date.now();
+  while (Date.now() - t < 15 * 60_000) {
+    found = checksIn((await read("/log?limit=500")).body?.acts, checker.key);
+    if (found.accepted.length || found.refused.length) break;
+    await sleep(10_000);
+  }
+  const check = found.accepted[0] ?? null;
+  step(`${L}: the Room dispatched the job, and the checker's signed check was admitted`, check?.ok === true && check?.check === CHECK && (integration === null || check.integration === integration), { waitedMs: Date.now() - t, check, refused: found.refused, integration });
+  const afterCheck = (await read(`/lanes/${l.lane}/1`)).body;
+  step(`${L}: the check obligation is met`, obligationOf(afterCheck, "check")?.state === "met", { check: obligationOf(afterCheck, "check"), review: obligationOf(afterCheck, "review") });
+  const checkItem = attentionFor(await attentionOf(checkerSession), "check-requested", l.lane);
+  step(`${L}: attention: the checker's request is closed`, checkItem?.open === false, { item: checkItem });
+
+  // A second member, a maintainer, reviews.
+  const rv = await actAs(reviewer, "review", { lane: l.lane, generation: 1 }, { head: l.head, verdict: "approve", scope: CHECKED_PATHS, text: "Reviewed for the spike smoke run: the function and its test are right." });
+  step(`${L}: the reviewer approves`, rv.status === 200, { status: rv.status, fulfils: rv.body.fulfils, refused: rv.body.rule, reason: rv.body.reason });
+  const afterReview = (await read(`/lanes/${l.lane}/1`)).body;
+  step(`${L}: the review obligation is met`, obligationOf(afterReview, "review")?.state === "met", { review: obligationOf(afterReview, "review") });
+  const reviewItem = attentionFor(await attentionOf(reviewerSession), "review-requested", l.lane);
+  step(`${L}: attention: the reviewer's request is closed`, reviewItem?.open === false, { item: reviewItem });
+
+  // Land.
+  const landed = await landLane(l);
+  Object.assign(lanes[lanes.length - 1], { op: landed.op });
+  const main1 = await canonicalRef(repo.remote, repo.name, "refs/heads/main", IMPORT_NS);
+  step(`${L}: main is the landed integration`, !!landed.op?.integration && main1 === landed.op.integration, { main: main1, integration: landed.op?.integration });
+  const outcome = attentionFor(await read("/attention?limit=100").then((r) => r.body), "land-outcome", l.lane);
+  step(`${L}: attention tells the author the landing's outcome`, !!outcome, { item: outcome });
+  if (l.lane) {
+    const r = await act("release", { lane: l.lane }, { lease: 1, note: "spike smoke: checked lane done" });
+    lanes[lanes.length - 1].released = r.status === 200;
+  }
+  out_.verify = await publishAndVerify(L, repo.remote, repo.name, IMPORT_NS);
+  out_.log = await logSummary();
+  const kinds = (out_.log ?? []).map((e) => e.kind);
+  step(`${L}: the verified log holds the check, the review and the landing`, ["check", "review", "land", "land-outcome"].every((k) => kinds.includes(k)), { kinds });
 }
 
 // ------------------------------------------------------------ cleanup (review 1b868265)
 
 // The rules live in cleanup.mjs, shared with mcp-stage0.mjs (review 66fec276).
 export { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, outcomeOf, readListing, smokeOk } from "./cleanup.mjs";
+
+/**
+ * One cleanup outcome from several (each `cleanupRun`'s, with its namespace):
+ * ok only if every part is; the remainder is unknown (null) if any part's is.
+ */
+export function combineCleanups(releases, parts) {
+  const tag = (ns, list) => list.map((d) => ({ namespace: ns, ...d }));
+  return {
+    releases,
+    ok: parts.length > 0 && parts.every(([, c]) => c.ok === true),
+    duties: parts.flatMap(([ns, c]) => tag(ns, c.duties ?? [])),
+    unresolved: parts.flatMap(([ns, c]) => tag(ns, c.unresolved ?? [])),
+    reposLeft: parts.every(([, c]) => Array.isArray(c.reposLeft)) ? parts.flatMap(([ns, c]) => c.reposLeft.map((r) => `${ns}/${r}`)) : null,
+  };
+}
 
 async function cleanup() {
   // Release a lane still held (the landed lane may already be done; a refusal is fine: the token duties below cover access).
@@ -531,20 +649,15 @@ async function cleanup() {
     releases[`lane ${l.n}`] = { status: r.status, rule: r.body?.rule };
   }
   // The deploy lane's cleanup, once per namespace: the public room's repositories, then the import's.
-  const run = async (ns, base, repo, incarnations) => {
-    const forks = lanes.filter((l) => l.fork && l.ns === ns).map((l) => basename(l.fork, ".git"));
+  const run = async (ns, base, repo, incarnations, prefix = null) => {
+    const forks = lanes.filter((l) => l.fork && l.ns === ns && (!prefix || basename(l.fork, ".git").startsWith(`${prefix}--`))).map((l) => basename(l.fork, ".git"));
     return cleanupRun({ api: (m, p, b) => api(m, p, b, ns), canonical: base, expected: base ? [repo ?? base, ...forks] : [], minted: minted[ns], incarnations });
   };
   // The public room: every repository named from its identity's base (incarnations, forks, an adopted base name).
-  const pub = await run(NS, publicBase, canonical, true);
-  const imp = await run(IMPORT_NS, importRepo, importRepo, false);
-  return {
-    releases,
-    ok: pub.ok && imp.ok,
-    duties: [...pub.duties.map((d) => ({ namespace: NS, ...d })), ...imp.duties.map((d) => ({ namespace: IMPORT_NS, ...d }))],
-    unresolved: [...pub.unresolved.map((d) => ({ namespace: NS, ...d })), ...imp.unresolved.map((d) => ({ namespace: IMPORT_NS, ...d }))],
-    reposLeft: pub.reposLeft && imp.reposLeft ? [...pub.reposLeft.map((r) => `${NS}/${r}`), ...imp.reposLeft.map((r) => `${IMPORT_NS}/${r}`)] : null,
-  };
+  const parts = [[NS, await run(NS, publicBase, canonical, true)]];
+  // Each imported repository: its own name and its forks (`<name>--<lane>`).
+  for (const repo of importRepos) parts.push([IMPORT_NS, await run(IMPORT_NS, repo, repo, false, repo)]);
+  return combineCleanups(releases, parts);
 }
 
 const isMain = !!process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);

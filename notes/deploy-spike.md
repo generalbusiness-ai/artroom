@@ -35,20 +35,36 @@ only in name, namespace, URL and operator key.
 packages/room/scripts/deploy-spike.sh
 ```
 
+It deploys two Workers that bind each other (request 9f81f372): the Room,
+`artroom-spike-room`, and lane G's checker service, `artroom-spike-checkers`
+(`packages/checkers/wrangler.spike.jsonc`). The Room calls the checkers
+through `CHECKER_TESTS`, `CHECKER_TYPES` and `CHECKER_LLM_REVIEW`. The
+checker service submits checks through `ROOM`.
+
 The script:
 
 1. checks that the env file exists and is mode 600;
-2. reads only `ROOM_KEY_SECRET` from it (the file is not sourced);
+2. reads only `ROOM_KEY_SECRET`, and the checker's key ID from
+   `ARTROOM_CHECKER_SEED` (the file is not sourced);
 3. runs `wrangler whoami` with hugh's OAuth login
    (`env -u CLOUDFLARE_API_TOKEN npx -y wrangler@latest`);
-4. puts the secret with `wrangler secret put ROOM_KEY_SECRET`, on stdin;
-5. deploys `wrangler.spike.jsonc`, retrying once if the deploy fails;
+4. puts `ROOM_KEY_SECRET` on the Room, and `CHECKER_KEY` on the checker
+   service, each with `wrangler secret put` on stdin. `CHECKER_KEY` is the
+   private JWK of `ARTROOM_CHECKER_SEED`, made by
+   `packages/room/scripts/spike-checker-key.mjs jwk`, which writes only to
+   a pipe. `secret put` also creates a Worker that does not exist yet;
+5. deploys the checker service (its `ROOM` target exists), then the Room
+   (its `CHECKER_<NAME>` targets now exist), retrying each once if the
+   deploy fails;
 6. checks that `GET /v1/rooms/deploy-spike-probe` answers 404 from the
    Room's router.
 
 It prints no secret. Use the same `ROOM_KEY_SECRET` on every deploy: it
 derives each room's key and each public repository's identity, so a new
-value would orphan existing rooms.
+value would orphan existing rooms. Keep `ARTROOM_CHECKER_SEED` too: its key
+is a member (role `checker`) of every room it has checked. It is made once,
+with hugh's approval, by `spike-checker-key.mjs create`, which appends it to
+the env file only if it is absent and prints only the key ID.
 
 On the first deploy, `wrangler secret put` created the Worker. `wrangler
 deploy` then uploaded the Worker but stopped while applying the container

@@ -1,18 +1,28 @@
 #!/usr/bin/env bash
-# Deploy (or redeploy) the spike Room Worker, artroom-spike-room, from
-# wrangler.spike.jsonc with hugh's wrangler OAuth login.
+# Deploy (or redeploy) the spike: the Room Worker, artroom-spike-room
+# (wrangler.spike.jsonc), and lane G's checker service, artroom-spike-checkers
+# (packages/checkers/wrangler.spike.jsonc), with hugh's wrangler OAuth login.
 #
 #   packages/room/scripts/deploy-spike.sh
 #
-# It reads ROOM_KEY_SECRET from ~/.config/generalbusiness/artroom-spike.env
-# (or $ARTROOM_SPIKE_ENV), puts it with `wrangler secret put` on stdin, then
-# deploys. It never prints, logs or writes the secret. The same value on
-# every run keeps existing rooms' keys and repository identities stable.
+# It reads ROOM_KEY_SECRET and ARTROOM_CHECKER_SEED from
+# ~/.config/generalbusiness/artroom-spike.env (or $ARTROOM_SPIKE_ENV) and puts
+# ROOM_KEY_SECRET and CHECKER_KEY (the seed's private JWK, made by
+# spike-checker-key.mjs) with `wrangler secret put` on stdin. It never prints,
+# logs or writes a secret. The same values on every run keep existing rooms'
+# keys, repository identities and checker membership stable.
+#
+# The two Workers bind each other (the Room's CHECKER_<NAME> services, the
+# checker's ROOM service), and a service binding needs its target to exist.
+# So: put both secrets first (`secret put` creates a Worker that does not
+# exist yet), deploy the checker service (its ROOM target exists), then the
+# Room (its CHECKER_<NAME> targets exist, with their entrypoints).
 set -euo pipefail
 
 ENV_FILE=${ARTROOM_SPIKE_ENV:-$HOME/.config/generalbusiness/artroom-spike.env}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 CONFIG=$HERE/wrangler.spike.jsonc
+CHECKERS_CONFIG=$HERE/../checkers/wrangler.spike.jsonc
 URL=https://artroom-spike-room.inguz.workers.dev
 WRANGLER=(env -u CLOUDFLARE_API_TOKEN npx -y wrangler@latest)
 
@@ -23,6 +33,9 @@ mode=$(stat -f %Lp "$ENV_FILE" 2>/dev/null || stat -c %a "$ENV_FILE")
 # The value only; the file is not sourced, so nothing else in it runs or is exported.
 secret=$(sed -nE 's/^ROOM_KEY_SECRET=["'\'']?([^"'\'']*)["'\'']?$/\1/p' "$ENV_FILE")
 [[ -n $secret ]] || { echo "deploy-spike: ROOM_KEY_SECRET is not set in $ENV_FILE" >&2; exit 2; }
+# The checker's key ID (public); fails if ARTROOM_CHECKER_SEED is missing or malformed.
+checker_key=$(ARTROOM_SPIKE_ENV=$ENV_FILE node "$HERE/scripts/spike-checker-key.mjs" id)
+echo "deploy-spike: checker key $checker_key"
 
 cd "$HERE"
 "${WRANGLER[@]}" whoami >/dev/null
@@ -30,6 +43,15 @@ cd "$HERE"
 echo "deploy-spike: putting ROOM_KEY_SECRET (from stdin)"
 printf '%s' "$secret" | "${WRANGLER[@]}" secret put ROOM_KEY_SECRET --config "$CONFIG"
 unset secret
+
+echo "deploy-spike: putting CHECKER_KEY (from stdin)"
+ARTROOM_SPIKE_ENV=$ENV_FILE node "$HERE/scripts/spike-checker-key.mjs" jwk | "${WRANGLER[@]}" secret put CHECKER_KEY --config "$CHECKERS_CONFIG"
+
+echo "deploy-spike: deploying $CHECKERS_CONFIG"
+"${WRANGLER[@]}" deploy --config "$CHECKERS_CONFIG" || {
+	echo "deploy-spike: deploy failed; retrying once"
+	"${WRANGLER[@]}" deploy --config "$CHECKERS_CONFIG"
+}
 
 echo "deploy-spike: deploying $CONFIG"
 # The first deploy (2026-10-02) uploaded the Worker but stopped applying the
