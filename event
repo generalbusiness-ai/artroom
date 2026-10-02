@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a406890836534d8235fc486b5d8e18d2a15988ac","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/logbig/object-limit.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:aedb0e1335d191ee4dcfafd144e1c50d35fbd9be","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/logbig/worker.ts."}
