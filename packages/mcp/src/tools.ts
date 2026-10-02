@@ -75,9 +75,17 @@ const refusal: JsonSchema = {
   required: ["refused", "rule", "reason"],
 };
 
-const record = (what: string, required: readonly string[]): JsonSchema => ({
-  oneOf: [{ type: "object", description: what, required: ["id", "seq", "kind", "by", "at", ...required] }, refusal],
-});
+/**
+ * The advertised output schema of a tool that can refuse: `oneOf` its result
+ * and `Refusal`, so a refusal's structured content conforms too (MCP
+ * 2026-07-28). The root says `type: "object"`, so a 2025-era client gets
+ * the same schema and the same structured content, never wrapped in
+ * `{ result }`.
+ */
+const orRefusal = (result: JsonSchema): JsonSchema => ({ type: "object", oneOf: [result, refusal] });
+
+const record = (what: string, required: readonly string[]): JsonSchema =>
+  orRefusal({ type: "object", description: what, required: ["id", "seq", "kind", "by", "at", ...required] });
 
 // --------------------------------------------------------------- the tools
 
@@ -129,17 +137,12 @@ const workspace = {
     required: ["lane", "lease"],
     additionalProperties: false,
   },
-  outputSchema: {
-    oneOf: [
-      {
-        type: "object",
-        description: "`op` is the public workspace operation. `grant` holds `remote`, `token` and `expiresAt`, or is null until ready.",
-        properties: { op: { type: "object" }, grant: { oneOf: [{ type: "object" }, { type: "null" }] } },
-        required: ["op", "grant"],
-      },
-      refusal,
-    ],
-  },
+  outputSchema: orRefusal({
+    type: "object",
+    description: "`op` is the public workspace operation. `grant` holds `remote`, `token` and `expiresAt`, or is null until ready.",
+    properties: { op: { type: "object" }, grant: { oneOf: [{ type: "object" }, { type: "null" }] } },
+    required: ["op", "grant"],
+  }),
 } as const satisfies McpToolDescriptor<"workspace">;
 
 const renew = {
@@ -286,7 +289,9 @@ const explain = {
     "Use it when a refusal or an outcome surprises you. For an ID the room does not have, it returns `{ act, outcome: \"not-found\" }`: check the ID.",
   ].join(" "),
   inputSchema: { type: "object", properties: { act: id("The act or refusal ID, `act_<seq>_<hash>`.") }, required: ["act"], additionalProperties: false },
+  // A read: it never refuses. The root is an object, so 2025-era clients get it unwrapped.
   outputSchema: {
+    type: "object",
     oneOf: [
       { type: "object", required: ["act", "kind", "outcome", "entry", "decisions", "invariants", "published"] },
       {
@@ -307,10 +312,13 @@ export type Tools = typeof TOOLS;
 /** Exactly one descriptor per contract tool name, and no other (R-API-9). */
 export const TOOL_LIST: readonly McpToolDescriptor[] = Object.values(TOOLS satisfies { readonly [K in McpToolName]: McpToolDescriptor<K> });
 
-/** Instructions an MCP server sends to the agent once, on connection. */
+/**
+ * Instructions an MCP server sends to the agent once. At most 512
+ * characters, and they stand alone: Codex keeps only the first 512.
+ */
 export const INSTRUCTIONS = [
-  "Artroom coordinates changes to one repository. To change code:",
-  "claim the paths, get a workspace, push with git, propose the commit, follow attention, land, then release.",
+  "Artroom coordinates changes to one git repository. Call attention first to see what needs you.",
+  "To change code: claim the paths, get a workspace, push with git, propose the commit, land it, then release.",
   "A refusal is an answer, not a failure: read rule, reason and fix, and do the fix.",
   "After a timeout, repeat the call with the same idempotencyKey. Never print or commit a token.",
 ].join(" ");

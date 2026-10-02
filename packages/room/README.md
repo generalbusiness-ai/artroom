@@ -156,6 +156,17 @@ curl -H "Authorization: Bearer <session>" https://<host>/v1/rooms/<room>/log?aft
 A refusal is status 409 with a `Refusal` body. A failure uses the status
 table of R-API-1. Every JSON response is `Cache-Control: no-store`.
 
+`/v1/rooms/:room/mcp` is the MCP endpoint (R-CRED-10, MCP plan stage 0,
+request 8ae3b2dc). The Worker sends it to lane E's MCP handler
+(`@generalbusiness/artroom-mcp/worker`) before the router. Its `RoomApi`
+for each bearer token ([src/mcp.ts](src/mcp.ts)) is lane E's client
+connected as a bearer session to the Worker's own `RoomWire`: acts go to
+`bearerAct`, workspace requests to `bearerRequest`, and reads and
+`subscribe` carry the token. A missing, unknown, expired or revoked token
+is 401 with `WWW-Authenticate` before any tool runs; an unknown room is a
+404 `ArtroomError`. Tests: `test/workerd/mcp.test.ts`. The deployed run is
+in [notes/mcp-stage0.md](../../notes/mcp-stage0.md).
+
 ### Live updates
 
 - HTTPS: `GET /v1/rooms/:room/subscribe?cursor=…&waitMs=…`, a long poll.
@@ -1259,7 +1270,5 @@ is `land-input-changed`. These remain open:
 - Deployment itself, an operator command to sign onboarding grants, and
   measurements on Cloudflare. The "Deployed" column is pending for every
   case, under its own task.
-- The MCP endpoint's `RoomApi` over `bearerAct` and `bearerRequest` (lane
-  E), and the client package's `connect`, `join` and `redeem`.
 - Attention is a simple projection: review and check requests, objections,
   notes, landing outcomes, lanes left unheld, revert lanes and notify items.

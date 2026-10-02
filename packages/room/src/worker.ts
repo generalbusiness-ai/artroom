@@ -34,6 +34,7 @@ import { unwire, type Wire } from "./errors.ts";
 import { clock, type RoomEnv } from "./config.ts";
 import { draftRoom, foundRoom } from "./founding.ts";
 import { roomStub, route } from "./http.ts";
+import { isMcpRoute, mcpEndpoint } from "./mcp.ts";
 import type { Room } from "./room.ts";
 
 /**
@@ -71,9 +72,14 @@ export class RoomWireTarget extends RpcTarget implements RoomWire {
   [Symbol.dispose](): void {}
 }
 
+/** The MCP endpoint over this Worker's own `RoomWire`: the `RoomApi`-per-bearer adapter (src/mcp.ts). */
+const mcp = mcpEndpoint(async (env, room) => new RoomWireTarget((await roomStub(env, room)) as unknown as DurableObjectStub<Room>));
+
 /** The default export: `fetch` serves HTTPS; RPC methods serve `env.ARTROOM` bindings (`ArtroomService`, `ArtroomFounder`). */
 export default class Artroom extends WorkerEntrypoint<RoomEnv> implements Omit<ArtroomService, "room">, ArtroomFounder {
   override async fetch(req: Request): Promise<Response> {
+    // `POST /v1/rooms/:room/mcp`, the only HTTPS route that accepts a bearer for acts (R-CRED-10).
+    if (isMcpRoute(new URL(req.url))) return mcp(req, this.env);
     return route(req, this.env);
   }
 

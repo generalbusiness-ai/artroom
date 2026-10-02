@@ -99,7 +99,6 @@ export async function route(req: Request, env: RoomEnv): Promise<Response> {
     if (m === "POST" && one === "acts") return respond(unwire(await stub.submit(await body(req))));
     if (m === "POST" && one === "requests") return respond(unwire(await stub.request(await body(req))));
     if (m === "POST" && one === "redeem") return respond(unwire(await stub.redeem(await body(req), req.headers.get("CF-Connecting-IP") ?? "unknown")));
-    if (m === "POST" && one === "mcp") return failure(artroomError("not-found", "The MCP endpoint is served by the MCP package, not this one."));
     if (m === "GET" && one === "ws") {
       if (req.headers.get("Upgrade") !== "websocket") throw artroomError("bad-request", "This route needs a WebSocket upgrade.");
       return stub.fetch(req);
