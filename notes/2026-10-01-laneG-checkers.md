@@ -738,10 +738,16 @@ domain that amends R-EXEC-8. Neither is made here, and
 key. The spike's smoke room can add the checker's key as a member (an
 invitation and a `join`) instead of a delegation.
 
-**Limit.** The service accepts read URLs in one Artifacts namespace,
-`ARTIFACTS_NAMESPACE` (`artroom-public`, the Room's own). A room imported
-into another namespace would have its whole-tree jobs refused
-`check-binding`.
+**Namespaces.** The Artifacts namespaces a job may read from are set at
+deploy time: `ARTIFACTS_NAMESPACES`, comma-separated (production default
+`artroom-public`; the spike sets its own, for example
+`gitseq-spike,gitseq-spike-import`). A read URL outside the list is refused
+`check-binding`. An entrypoint will not start if the list is missing, empty
+or malformed. Tests (`carry.test.ts`): "ARTIFACTS_NAMESPACES: a
+comma-separated list of namespace names; missing, empty or malformed is
+refused"; "a job may read from any accepted namespace, and from no other";
+"production: an entrypoint will not start with a missing, empty or
+malformed ARTIFACTS_NAMESPACES; the shipped configurations parse".
 
 ### Mutation checks
 

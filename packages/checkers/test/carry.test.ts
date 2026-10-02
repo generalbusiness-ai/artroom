@@ -13,7 +13,7 @@ import { LlmReviewer, type Model } from "../src/llm.ts";
 import { Ledger } from "../src/ledger.ts";
 import { generateKey, importSigner } from "../src/signing.ts";
 import { runnerProvider } from "../src/sandbox.ts";
-import { isRefusal } from "../src/job.ts";
+import { checkJob, isRefusal, parseNamespaces } from "../src/job.ts";
 import { Fixture, HOST, NS, ROOM, job } from "./support.ts";
 import { Fleet } from "./fake-container.ts";
 
@@ -49,7 +49,7 @@ async function world() {
   const services = (over: Partial<CheckerServices> = {}): CheckerServices => ({
     signer,
     room: ledger,
-    expectations: { room: ROOM, checker: "tests", host: HOST, namespace: NS, now: Date.now },
+    expectations: { room: ROOM, checker: "tests", host: HOST, namespaces: [NS], now: Date.now },
     runners: provider,
     ...over,
   });
@@ -90,7 +90,7 @@ test("R-EXEC-11: a job that pins another runner digest is refused check-binding;
 
 test("R-EXEC-10: a volatile checker refuses a job that says volatile: false, before any runner starts", async () => {
   const w = await world();
-  const llm = new Llm(ctx, { s: w.services({ expectations: { room: ROOM, checker: "llm-review", host: HOST, namespace: NS, now: Date.now } }), m: async () => '{"findings":[]}' });
+  const llm = new Llm(ctx, { s: w.services({ expectations: { room: ROOM, checker: "llm-review", host: HOST, namespaces: [NS], now: Date.now } }), m: async () => '{"findings":[]}' });
   const j = await w.whole({ check: "llm-review", obligation: "obl_llm-review", volatile: false });
   w.ledger.issue(j);
   const r = (await llm.handle(j)) as Refusal;
@@ -136,7 +136,7 @@ test("one service serves many rooms: each job's check goes to the job's own room
     return l;
   };
   // No fixed room: the production expectations.
-  const s = w.services({ room: rooms, expectations: { checker: "tests", host: HOST, namespace: NS, now: Date.now } });
+  const s = w.services({ room: rooms, expectations: { checker: "tests", host: HOST, namespaces: [NS], now: Date.now } });
   const ja = await w.whole();
   const jb = await w.whole({ room: ROOM_B });
   w.ledger.issue(ja);
@@ -172,7 +172,7 @@ test("production: the ROOM binding is required, and resolves each job's room by 
   const m = (await import(workerPath)) as WorkerModule;
   assert.throws(() => m.productionRoom({}), (e: ArtroomError) => e.code === "unavailable" && /ROOM/.test(e.message));
   const w = await world();
-  await assert.rejects(new m.TestsCheckerService(ctx, {}).handle(await w.whole()), (e: ArtroomError) => e.code === "unavailable");
+  await assert.rejects(new m.TestsCheckerService(ctx, { ARTIFACTS_NAMESPACES: NS }).handle(await w.whole()), (e: ArtroomError) => e.code === "unavailable");
   const submitted: [string, unknown][] = [];
   const service = { room: async (room: string) => ({ submit: async (act: unknown) => (submitted.push([room, act]), { id: "act_1_00000000" }) }) };
   const port: RoomPort = await m.productionRoom({ ROOM: service })(ROOM_B);
@@ -207,4 +207,41 @@ test("production: the Worker has no route that accepts or builds a job, and no h
   assert.deepEqual(prod.durable_objects.bindings.map((b) => b.name), ["RUNNER"]);
   for (const v of ["ROOM_ID", "CHECKER_DELEGATION", "HARNESS_ROOM_ID", "LG_KEY"]) assert.equal(v in prod.vars, false, v);
   assert.equal(config("wrangler.harness.jsonc").main, "src/harness.ts");
+});
+
+// ------------------------------------------------------------------ the accepted Artifacts namespaces (ARTIFACTS_NAMESPACES)
+
+test("ARTIFACTS_NAMESPACES: a comma-separated list of namespace names; missing, empty or malformed is refused", () => {
+  assert.deepEqual(parseNamespaces("gitseq-spike, gitseq-spike-import"), ["gitseq-spike", "gitseq-spike-import"]);
+  assert.deepEqual(parseNamespaces("artroom-public"), ["artroom-public"]);
+  for (const bad of [undefined, "", " ", "a,,b", "a b", "x/y", "gitseq-spike,", ",gitseq-spike", "a\nb", 7]) {
+    assert.throws(() => parseNamespaces(bad), /ARTIFACTS_NAMESPACES/, JSON.stringify(bad));
+  }
+});
+
+test("a job may read from any accepted namespace, and from no other", async () => {
+  const w = await world();
+  const exp = { checker: "tests", host: HOST, namespaces: parseNamespaces("ns, ns-import"), now: Date.now };
+  for (const ns of ["ns", "ns-import"]) {
+    const b = checkJob(await w.whole({ readUrl: `https://${HOST}/git/${ns}/canon.git` }), exp);
+    assert.ok(!isRefusal(b), `${ns}: ${JSON.stringify(b)}`);
+    assert.equal(b.repoPath, `/git/${ns}/canon.git`);
+  }
+  for (const url of [`https://${HOST}/git/gitseq-spike/canon.git`, `https://${HOST}/git/ns-import-2/canon.git`, `https://${HOST}/git/ns/import/canon.git`, `https://${HOST}/git//canon.git`]) {
+    const r = checkJob(await w.whole({ readUrl: url as `https://${string}` }), exp);
+    assert.ok(isRefusal(r) && r.rule === "check-binding", url);
+  }
+});
+
+test("production: an entrypoint will not start with a missing, empty or malformed ARTIFACTS_NAMESPACES; the shipped configurations parse", async () => {
+  const m = (await import(workerPath)) as WorkerModule;
+  for (const Service of ["TestsCheckerService", "TypesCheckerService", "LlmReviewService"] as const) {
+    const C = m[Service] as WorkerModule["TestsCheckerService"];
+    for (const bad of [{}, { ARTIFACTS_NAMESPACES: "" }, { ARTIFACTS_NAMESPACES: "a b" }]) assert.throws(() => new C(ctx, bad), /ARTIFACTS_NAMESPACES/, `${Service} ${JSON.stringify(bad)}`);
+    assert.ok(new C(ctx, { ARTIFACTS_NAMESPACES: "gitseq-spike,gitseq-spike-import" }));
+  }
+  const vars = (file: string) => (JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, "")) as { vars: Record<string, string> }).vars;
+  assert.deepEqual(parseNamespaces(vars("wrangler.jsonc")["ARTIFACTS_NAMESPACES"]), ["artroom-public"]);
+  assert.deepEqual(parseNamespaces(vars("wrangler.harness.jsonc")["ARTIFACTS_NAMESPACES"]), ["gitseq-spike"]);
+  assert.equal("ARTIFACTS_NAMESPACE" in vars("wrangler.jsonc"), false);
 });

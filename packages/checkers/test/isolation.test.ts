@@ -22,7 +22,7 @@ import { Fleet } from "./fake-container.ts";
 // Token-shaped strings are built at run time, never written as literals.
 const tok = (s: string) => ["art", "v1", s].join("_");
 const urlOf = (repo: string) => `https://${HOST}/git/${NS}/${repo}.git` as const;
-const expectations = (checker = "tests") => ({ room: ROOM, checker, host: HOST, namespace: NS, now: Date.now });
+const expectations = (checker = "tests") => ({ room: ROOM, checker, host: HOST, namespaces: [NS], now: Date.now });
 
 class Tests extends TestsChecker<{ s: CheckerServices }> {
   protected services() {

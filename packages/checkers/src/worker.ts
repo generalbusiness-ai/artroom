@@ -26,6 +26,7 @@ import { unavailable, type CheckerServices, type RoomPort, type RoomResolver, ty
 import { TestsChecker, TypesChecker } from "./checkers.ts";
 import { LlmReviewer, type Model } from "./llm.ts";
 import { importSigner } from "./signing.ts";
+import { parseNamespaces } from "./job.ts";
 import type { RunnerBox } from "./container.ts";
 import { runnerProvider, type RunnerStub } from "./sandbox.ts";
 
@@ -33,7 +34,8 @@ export { RunnerBox, RunnerGateway } from "./container.ts";
 
 export interface Env {
   readonly ARTIFACTS_HOST: string;
-  readonly ARTIFACTS_NAMESPACE: string;
+  /** The Artifacts namespaces jobs may read from, comma-separated (`parseNamespaces`). */
+  readonly ARTIFACTS_NAMESPACES: string;
   /** The pinned runner image (container.ts). */
   readonly RUNNER_IMAGE: string;
   readonly LLM_MODEL: string;
@@ -49,13 +51,13 @@ export function runners(env: Pick<Env, "RUNNER">): RunnerProvider {
   return runnerProvider({ fresh: () => env.RUNNER.get(env.RUNNER.newUniqueId()) as unknown as RunnerStub, registry: ["registry.npmjs.org"] });
 }
 
-/** What a checker needs: its key, the job's room, runners, and the host and namespace its jobs may read. */
+/** What a checker needs: its key, the job's room, runners, and the host and namespaces its jobs may read. */
 export async function checkerServices(env: Env, checker: string, room: RoomPort | RoomResolver, fixedRoom?: RoomId): Promise<CheckerServices> {
   return {
     signer: await importSigner(env.CHECKER_KEY),
     room,
     runners: runners(env),
-    expectations: { ...(fixedRoom ? { room: fixedRoom } : {}), checker, host: env.ARTIFACTS_HOST, namespace: env.ARTIFACTS_NAMESPACE, now: Date.now },
+    expectations: { ...(fixedRoom ? { room: fixedRoom } : {}), checker, host: env.ARTIFACTS_HOST, namespaces: parseNamespaces(env.ARTIFACTS_NAMESPACES), now: Date.now },
   };
 }
 
@@ -119,17 +121,25 @@ export class Llm extends LlmReviewer<CheckerEnv> {
 export const CHECKERS = { tests: Tests, types: Types, "llm-review": Llm } as const;
 export type CheckerName = keyof typeof CHECKERS;
 
-export class TestsCheckerService extends WorkerEntrypoint<Env> {
+/** An entrypoint refuses to start with a missing, empty or malformed `ARTIFACTS_NAMESPACES`: nothing it would run could be checked. */
+abstract class CheckerEntrypoint extends WorkerEntrypoint<Env> {
+  constructor(ctx: ExecutionContext, env: Env) {
+    super(ctx, env);
+    parseNamespaces(env.ARTIFACTS_NAMESPACES);
+  }
+}
+
+export class TestsCheckerService extends CheckerEntrypoint {
   async handle(job: CheckJob): Promise<Result<Check>> {
     return new Tests(this.ctx, { env: this.env, room: productionRoom(this.env) }).handle(job);
   }
 }
-export class TypesCheckerService extends WorkerEntrypoint<Env> {
+export class TypesCheckerService extends CheckerEntrypoint {
   async handle(job: CheckJob): Promise<Result<Check>> {
     return new Types(this.ctx, { env: this.env, room: productionRoom(this.env) }).handle(job);
   }
 }
-export class LlmReviewService extends WorkerEntrypoint<Env> {
+export class LlmReviewService extends CheckerEntrypoint {
   async handle(job: CheckJob): Promise<Result<Check>> {
     return new Llm(this.ctx, { env: this.env, room: productionRoom(this.env) }).handle(job);
   }

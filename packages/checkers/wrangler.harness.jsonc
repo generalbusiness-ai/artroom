@@ -12,7 +12,7 @@
 	"observability": { "enabled": true },
 	"vars": {
 		"ARTIFACTS_HOST": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
-		"ARTIFACTS_NAMESPACE": "gitseq-spike",
+		"ARTIFACTS_NAMESPACES": "gitseq-spike",
 		"RUNNER_IMAGE": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lg-runner@sha256:17b7fd60fd812617654c64b95f9b2dde94f103313073b672bc40fdad6dccbaa2",
 		// The model the LLM reviewer uses. Any Workers AI text-generation model.
 		"LLM_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",

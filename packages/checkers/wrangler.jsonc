@@ -14,8 +14,9 @@
 	// Before `wrangler deploy`:
 	// - the Room Worker (ROOM's service) must be deployed;
 	// - the runner image is lane G's (container/image.sh); use the digest it prints;
-	// - ARTIFACTS_HOST and ARTIFACTS_NAMESPACE are the host and namespace the
-	//   Room's jobs read from;
+	// - ARTIFACTS_HOST and ARTIFACTS_NAMESPACES are the host and the namespaces
+	//   the Room's jobs read from (its own, and its import namespace if any); an
+	//   empty or malformed list stops every entrypoint;
 	// - secret: `wrangler secret put CHECKER_KEY` (Ed25519 private JWK). Its key
 	//   must be a member's key in each room whose checks it signs.
 	"name": "artroom-checkers",
@@ -25,7 +26,9 @@
 	"observability": { "enabled": true },
 	"vars": {
 		"ARTIFACTS_HOST": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
-		"ARTIFACTS_NAMESPACE": "artroom-public",
+		// The Artifacts namespaces jobs may read from, comma-separated: the Room's own and its import
+		// namespace if any. A deployment whose Room uses other namespaces sets its own list.
+		"ARTIFACTS_NAMESPACES": "artroom-public",
 		"RUNNER_IMAGE": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lg-runner@sha256:17b7fd60fd812617654c64b95f9b2dde94f103313073b672bc40fdad6dccbaa2",
 		// The model the LLM reviewer uses. Any Workers AI text-generation model.
 		"LLM_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"

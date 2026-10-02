@@ -24,8 +24,26 @@ export interface JobExpectations {
   readonly checker: string;
   /** The room's Artifacts host, for example `<account>.artifacts.cloudflare.net`. */
   readonly host: string;
-  readonly namespace: string;
+  /** The Artifacts namespaces a job may read from (`ARTIFACTS_NAMESPACES`): the Room's own, and its import namespace if any. */
+  readonly namespaces: readonly string[];
   readonly now: () => number;
+}
+
+const NAMESPACE = /^[A-Za-z0-9._-]{1,100}$/;
+
+/**
+ * The accepted namespaces, from the deploy setting `ARTIFACTS_NAMESPACES`: a
+ * comma-separated list of namespace names. Throws if it is missing, empty,
+ * or holds anything that is not a namespace name, so a misconfigured
+ * service runs nothing.
+ */
+export function parseNamespaces(raw: unknown): readonly string[] {
+  if (typeof raw !== "string") throw new Error("ARTIFACTS_NAMESPACES is not set: list the Artifacts namespaces jobs may read from, comma-separated.");
+  const list = raw.split(",").map((n) => n.trim());
+  if (list.length === 0 || list.some((n) => !NAMESPACE.test(n))) {
+    throw new Error(`ARTIFACTS_NAMESPACES must be a comma-separated list of Artifacts namespace names, not ${JSON.stringify(raw.slice(0, 200))}.`);
+  }
+  return Object.freeze([...new Set(list)]);
 }
 
 /** What the service needs from a valid job. */
@@ -116,13 +134,14 @@ export function checkJob(job: CheckJob, exp: JobExpectations): BoundJob | Refusa
   } catch {
     return refuse("The read URL is malformed.");
   }
-  const prefix = `/git/${exp.namespace}/`;
-  const repo = url.pathname.slice(prefix.length, -".git".length);
+  // `/git/<namespace>/<repo>.git`, in one of the accepted namespaces.
+  const path = /^\/git\/([^/]+)\/([^/]+)\.git$/.exec(url.pathname);
+  const repo = path?.[2] ?? "";
   if (
     url.protocol !== "https:" ||
     url.hostname !== exp.host ||
-    !url.pathname.startsWith(prefix) ||
-    !url.pathname.endsWith(".git") ||
+    !path ||
+    !exp.namespaces.includes(path[1]!) ||
     url.username ||
     url.password ||
     url.search ||

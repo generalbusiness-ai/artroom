@@ -31,7 +31,10 @@ review".
    The job must name a room by its ID and this checker, name a real check
    obligation, carry well-formed commits (`base` included) and digests, the
    configuration's `volatile` and `advisory`, and point at a repository on
-   the Artifacts host. Its `gitAuthEnv` must be exactly one read-only bearer
+   the Artifacts host, in one of the namespaces the deployment accepts
+   (`ARTIFACTS_NAMESPACES`, comma-separated: the Room's own, and its import
+   namespace if any). An entrypoint will not start if that list is missing,
+   empty or malformed. Its `gitAuthEnv` must be exactly one read-only bearer
    header for git. A volatile checker refuses a job that says
    `volatile: false` (R-EXEC-10). Anything else is refused `check-binding`
    before a sandbox starts.

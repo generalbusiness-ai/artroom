@@ -15,7 +15,7 @@ import type { CheckerServices } from "../src/checker.ts";
 import { CONFIG, Fixture, HOST, LANE, LocalRunner, NS, PROJECT, ROOM, job, sh } from "./support.ts";
 
 const now = () => Date.now();
-const expect = (checker = "tests") => ({ room: ROOM, checker, host: HOST, namespace: NS, now });
+const expect = (checker = "tests") => ({ room: ROOM, checker, host: HOST, namespaces: [NS], now });
 
 // ------------------------------------------------------------------ binding
 

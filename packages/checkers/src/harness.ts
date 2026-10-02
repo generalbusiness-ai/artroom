@@ -19,7 +19,7 @@ import type { ActRecord, CheckJob, Digest, Result, RoomId, Sha, SignedEnvelope }
 import { checkerInputs, filterSnapshot, snapshotDigest, type SnapshotEntry } from "@generalbusiness/artroom-policy";
 import { type ArtifactsNamespace, SnapshotRepos, durableSql, withRetry } from "@generalbusiness/artroom-git";
 import type { RoomPort } from "./checker.ts";
-import { checkJob, gitAuthEnvFor, isRefusal, ownJob } from "./job.ts";
+import { checkJob, gitAuthEnvFor, isRefusal, ownJob, parseNamespaces } from "./job.ts";
 import { checkout, git } from "./runner.ts";
 import { importSigner } from "./signing.ts";
 import { Ledger } from "./ledger.ts";
@@ -240,7 +240,7 @@ async function probe(env: Env, b: Record<string, unknown>) {
   const { revoke, snapshot } = made;
   const job = ownJob(made.job);
   if (isRefusal(job)) return { refused: job };
-  const bound = checkJob(job, { room: job.room, checker: job.check, host: env.ARTIFACTS_HOST, namespace: env.ARTIFACTS_NAMESPACE, now: Date.now });
+  const bound = checkJob(job, { room: job.room, checker: job.check, host: env.ARTIFACTS_HOST, namespaces: parseNamespaces(env.ARTIFACTS_NAMESPACES), now: Date.now });
   if (isRefusal(bound)) return { refused: bound };
   const session = await runners(env).open(bound);
   try {
