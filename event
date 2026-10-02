@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fca808ab8e0a318a84dcdace9614f9f3449f0f87","text":"Merge retired a covered predecessor; the successor is at packages/client/tsconfig.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fd79214355b7c76048a4411a7914e20e4a73f27c","text":"Merge retired a covered predecessor; the successor is at packages/client/test/support/setup.ts."}
