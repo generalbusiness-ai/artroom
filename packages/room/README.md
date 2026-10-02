@@ -1111,6 +1111,51 @@ text changes only this file:
 | `npm run test:workerd` (this package) | 0 | 311 in 21 files |
 | `npx wrangler deploy --dry-run` with [wrangler.jsonc](wrangler.jsonc) | 0 | bundles with the Room, Registry and Publisher Durable Objects, the Artifacts binding and the Publisher container |
 
+## Review 786e9606
+
+The checker's review of revision 2 (`734767c2`) found two P2s in job
+dispatch ([src/jobs.ts](src/jobs.ts)). This revision fixes both and merges
+main `9bb700b6` (contract amendment 4, bounded-memory log publication, lane
+E, the deploy and pi-durable spikes); the one conflict was in `core.ts`'s
+imports, where main's `RetainedRef` replaces `RetainedFile`.
+
+| Finding | Fix | Tests (in [test/workerd/review-786e9606.test.ts](test/workerd/review-786e9606.test.ts) unless named) |
+|---|---|---|
+| P2 1. Two jobs steps both read one owed row and used one attempt's ID before either claimed it; the step that lost then ended the winner's token and retired its snapshot repository | A step claims the attempt in the job's row (`owed` to `sent`, the next attempt number, its deadline) before it reads a snapshot or a tree or mints a token. A step that loses the claim prepares nothing. Every credential belongs to one attempt, and its ID is written to the row as soon as it exists, so an expiry or a restart still ends it. A canonical token is minted to expire by the deadline claimed with the attempt. | "filtered / whole-tree: two jobs steps at once on two owed jobs send one attempt each, whose tokens and repositories stay usable until they answer"; "whole-tree: a step held past the attempt's deadline, while the next step issues attempt 2, ends its own token and sends nothing"; "filtered: a job token that cannot be minted leaves the job due again later; the retry reuses the repository written for it"; review-0f9739dc "two jobs steps at once …", "restart …" |
+| P2 2. Owner, configuration, generation and obligation were judged only before the asynchronous preparation | After preparation the step checks that the row still holds its attempt, and judges the work again with the same synchronous check it used before (`current`: the owner current on the integration, the lane's latest generation, the same configuration, the obligation open), with no await before the dispatch. Work that changed is marked not needed, and its credentials are ended: the canonical token revoked, or the snapshot job ended, which retires its repository. | eight controls: "whole-tree / filtered preparation, owner / generation / configuration / obligation changed while a read token was being minted" |
+
+The controls run on the real Room Durable Object and SQLite, with lane B's
+real `SnapshotRepos`, over the fake Artifacts and sandbox. To stop a step in
+the middle of its preparation, the fake's `createToken` can be held in
+flight (`FakeArtifactsHost.holdToken`): the controls hold read tokens on
+the canonical repository and on snapshot repositories, and meanwhile move
+the preview to another integration, propose a new generation, activate a
+changed configuration, or meet the obligation with a check signed
+elsewhere.
+
+**Mutations.** Each guard was broken once, the whole workerd suite run, and
+the change reverted. 10 of 12 mutations were caught, one only after its
+control was strengthened.
+
+| Mutation | Tests that failed |
+|---|---|
+| The step that loses the claim goes on preparing | both "two jobs steps at once on two owed jobs …" (2, after they counted each job's preparation; at first the duplicate dispatch was dropped by the in-flight key, so only a stray token showed it) |
+| Dispatch without checking that the row still holds the attempt | "a step held past the attempt's deadline …" (1) |
+| A canonical token's ID not written to the row | review-0f9739dc "restart …" (1) |
+| No judgment after preparation | the eight preparation controls (8) |
+| The credentials of work no longer needed not ended | the eight preparation controls (8) |
+| `current` without the configuration / the generation / the open obligation / the preview's current integration | 3 each: the matching preparation controls (whole-tree and filtered), and the earlier test for that fence |
+| A canonical token that outlives the claimed deadline | amendment3 "R-EXEC-8, R-EXEC-9, R-EXEC-10 a whole-tree job …" (1) |
+
+Two are equivalent. A snapshot token's marker not written to the row: the
+expired attempt's token is then not ended by the step, but `SnapshotRepos`
+already owes the repository's deletion by the token's deadline. A failed
+preparation not ending its credentials: a preparation fails only before its
+token exists (the canonical mint is the last thing that can fail, and
+`SnapshotRepos.end` does nothing for a job with no token); the written
+repository stays for the retry to reuse, as the control shows, and is
+retired when its preparation window closes.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
