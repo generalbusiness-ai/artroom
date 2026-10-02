@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/policy/test/helpers.test.ts","body":{"commit":"fb2bd41321d910f9f0d2218b4f8c2cb9a6bdb054","path":"packages/policy/test/helpers.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:25bb8fd86fd9b977ebaa511d2d937e5c34b3bf46","text":"Merge retired a covered predecessor; the successor is at packages/contract/examples/check-job.ts."}
