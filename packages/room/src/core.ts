@@ -1444,6 +1444,8 @@ export class RoomCore {
       const now = this.pendingPublication();
       if (!now || now.through !== cohort.through || now.expected !== cohort.expected) throw Object.assign(new Error("the pending cohort changed"), { code: "transport" });
       const n = published + Math.ceil((cohort.through - published) / 2);
+      // Always smaller, so shrinking ends: at one entry, or at a cohort that fits.
+      if (n >= cohort.through) return null;
       const through = entryAt(this.sql, n)!;
       const entries = entriesAfter(this.sql, -1, n + 1);
       const cp = checkpoint(this.roomId, this.genesis.roomKey, this.seed(), through, iso(this.now()));

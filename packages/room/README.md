@@ -650,6 +650,24 @@ always resolved before landing work).
    the contract should say that `CheckJob.integration` for a filtered input
    is this commit, and which lane issues jobs.
 
+## Log publication bound
+
+Lane B's follow-up revision 2 bounds one push to `refs/artroom/log` (lane
+L's `LOG_TRANSFER_LIMITS`; lane L sends only the objects the lease lacks).
+When lane L refuses a cohort with `cohort-too-large`, nothing was sent. The
+Room then stores a smaller cohort, half the unpublished entries and at
+least one, with the retained files those entries name, a checkpoint for its
+last entry, and its exact commit (`commitFor`), before any remote write,
+and publishes it. A restart resumes the stored smaller cohort. One entry
+that is still too large is never skipped: publication stops with
+`publication_error` set to `cohort-too-large` and one attention item for
+the admins, and the alarm keeps retrying the same entry.
+[test/workerd/log-transfer.test.ts](test/workerd/log-transfer.test.ts):
+"is shrunk and published; the published log verifies …", "the smaller
+cohort is stored with its exact commit before any remote write, and a
+restart resumes it …", "one entry still too large is a surfaced
+publication error …".
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
