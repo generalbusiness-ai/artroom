@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/git/src/mints.ts at exact 599a55db29c6d23a40a6aa92345a3b8af12550c3 on request/mint-ledger, under promise git:sha1…1dc46a3 on request git:sha1…0e08ce7","body":{"commit":"599a55db29c6d23a40a6aa92345a3b8af12550c3","path":"packages/git/src/mints.ts"}}
+{"kind":"artifact","text":"packages/git/test/mints.test.ts at exact 599a55db29c6d23a40a6aa92345a3b8af12550c3 on request/mint-ledger, under promise git:sha1…1dc46a3 on request git:sha1…0e08ce7","body":{"commit":"599a55db29c6d23a40a6aa92345a3b8af12550c3","path":"packages/git/test/mints.test.ts"}}
