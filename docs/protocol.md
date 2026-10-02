@@ -45,6 +45,7 @@ sections 4 to 11 and 13.
 28. Amendment 66d6fb14: `refuse` rules before the claim check
 29. Contract amendment 3 (bc351fa8): checks, check jobs and snapshots
 30. Contract amendment 4 (1c785ed8): log objects within Artifacts' limit
+31. Contract amendment 5 (10fcfe4e): canonical token mints (R-MINT)
 
 ## 1. Terms
 
@@ -3242,3 +3243,114 @@ order of verifier before writer, and found three P2s.
 | P2 A refused retry does not prove that an earlier attempt will not apply | R-LOG-20 keeps every pushed commit outstanding until the ref is read back at it (confirmed) or at another commit (cannot apply). Refusal, read-back at the parent, expiry and revocation resolve nothing. A new cohort after a refusal leases the same parent, so at most one applies. `from` is fixed by the first confirmed layout 2 commit. Unclear answers attend the admins after an hour (was open point 40) | Late earlier push; late push during the switch; unclear answer; recovery | L 5, 6; A 1 to 3 |
 | P2 Object size became a limit on what a room may record, and trees could still grow past B | The 1 MiB entry bound, the 1 MiB policy and checker configuration bounds, the 256-checker cap and the table of dropped events are removed: entries and files of any size are recorded in full and chunked. R-LOG-19 fans out `segments/`, `entries/`, `inputs/`, `policies/` and chunk directories by name groups, so no directory lists more than 4,096 entries. `log-entry-too-large` is removed, and `log-publication-failed` is renamed `log-publication-stalled` with the reason `unresolved` | Large notification; large revert; large activation; many segments; retained prefix | L 1; A 5; F 1; E 1 |
 | Wording: the UI said every stalled publication is retried | The UI says that publication stops for `unexpected-writer` | — | F 1 |
+
+## 31. Contract amendment 5 (10fcfe4e): canonical token mints
+
+Request 10fcfe4e asked who owns each token the Room creates on the
+canonical repository, from the request to its end. Checker audit handoff
+9f2d8808 found that a lost answer, a hidden retry or a host that stops can
+leave a token outside every record. Artifacts gives no way to name a token
+when it is created, or to learn that a failed create will never apply. So
+these rules keep a durable record before each request, and never revoke a
+token that the Room cannot match to its own record by ID.
+
+The design, the mint sites, what Artifacts is known to offer, and each
+lane's edits and tests are in
+[notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md).
+These rules add obligations to R-PUB-3, R-LOG-8, R-CARRY-15, R-PROP-1,
+R-PROP-2, R-PROP-7 and R-EXEC-9. They change no token lifetime and no
+landing rule.
+
+**R-MINT-1. Scope.** A *canonical mint* is a token that the Room creates
+with Artifacts' token-creation call on its canonical repository: for
+publication (R-PUB-3), staging an integration, pinning and previews, log
+reads and pushes (R-LOG-8), reading the canonical repository to prepare a
+snapshot (R-CARRY-15), and check jobs (R-EXEC-9). These rules apply to
+every canonical mint. Tokens on a lane fork or a snapshot repository, and
+the token that comes with a created repository or fork, are not canonical
+mints (R-CRED-8, R-CARRY-16, R-GEN-12). Development harnesses are not
+covered.
+
+**R-MINT-2. A record before each request.**
+- Before the Room sends a create request, it writes a durable record of
+  it: its owner (the operation, attempt or purpose), its scope and the
+  lifetime asked for. If the record cannot be written, the request is not
+  sent.
+- Each request has its own record. A request is never sent again under
+  the same record. A retry after a transient error is a new request with a
+  new record, sent only after the earlier record holds that request's
+  outcome.
+
+**R-MINT-3. What settles a create.** Only two answers settle it:
+- a usable answer, with the token's ID and text. In one transaction, the
+  record becomes the record of that token, by its ID, with the expiry
+  Artifacts reported. A token with another scope than asked, or with an
+  expiry that is unreadable or later than the asked lifetime allows, is
+  owed revocation at once;
+- an Artifacts error that says the request was refused and changed
+  nothing (`refusedUnchanged`). The record is closed.
+
+Any other result leaves the outcome unknown. That includes a transport
+failure, `INTERNAL_ERROR`, an answer without a token ID and text, and a
+host that stopped before it recorded the answer.
+
+**R-MINT-4. A known token has one owner.**
+- From the moment its ID is recorded, a known token is owned by exactly
+  one durable record. The record ends only when Artifacts answers the
+  token's revocation. It may also end once the token's reported expiry has
+  passed.
+- Ownership moves only in one transaction, which writes the new owner's
+  record and removes the old one.
+- A token that only a host's running code was using, with no durable
+  owner for a later use (as a check job has until its deadline), is owed
+  revocation at once when the Room next starts after that host stops.
+- A known token is revoked by its own ID, never by listing the repository.
+  A revocation that fails or is not answered stays owed, with a durable
+  later due time on a capped backoff. A failure is never discarded.
+- No revocation of an ended or abandoned token runs on, or is awaited by,
+  the publication queue (R-PUB-3, R-PUB-7). A revocation answer or a
+  token's expiry is never evidence about a push (R-PUB-2).
+
+**R-MINT-5. An unknown create is kept, not guessed.**
+- A record whose outcome is unknown stays open. Only a provider completion
+  fence that Artifacts documents can settle it (open point 42). Elapsed
+  time, a token lifetime, an inventory (complete or not) and the end of
+  the record's owner never settle it.
+- The Room never revokes a token that it cannot match by ID to one of its
+  own records. It never revokes by scope, expiry, creation time or absence
+  from its records, and it never sweeps the canonical repository's tokens.
+- The Room may read a complete inventory (`completeInventory`) and keep
+  what it saw on its open records, as an observation. Observations are
+  scheduled on a backoff capped at six hours.
+- Open records are kept for the life of the room, and are shown to admins
+  with the room's other cleanup duties. They never contain a token's text.
+
+**R-MINT-6. The exposure bound.** If a create whose outcome is unknown
+applies, the Room holds no copy of the token's text, and the token lasts
+for its asked lifetime from when Artifacts applied the create (open point
+44). That lifetime is the only bound on its exposure. This amendment
+changes no lifetime: publication, staging, preview and log tokens last
+60 seconds, snapshot preparation reads 300 seconds, pinning tokens 600
+seconds, and check job tokens end by the job's deadline.
+
+**Scheduling.** Each owed revocation and each due observation is
+scheduled: the Room's stored alarm is no later than the earliest. Each
+wake does a bounded amount of this work. A record in use by a live host is
+not due.
+
+### 31.1 Open points
+
+These continue section 22's list.
+
+42. **No completion fence.** Artifacts documents no way to learn that a
+    failed create request will never apply: no bound after which it cannot,
+    and no request ID whose outcome can be asked. Until it does, an unknown
+    record stays open (R-MINT-5).
+43. **No attribution.** The create call takes only a scope and a lifetime,
+    and a listing gives each token's ID, scope, state and expiry. If
+    Artifacts lets a create carry a name, label or idempotency key that a
+    listing returns, the Room could revoke its own unknown token, and only
+    that one. This version does not.
+44. **When a lifetime starts.** R-MINT-6 assumes that a token's lifetime
+    runs from when Artifacts applies the create. If it runs from the
+    request, the bound runs from the time the Room sent it.
