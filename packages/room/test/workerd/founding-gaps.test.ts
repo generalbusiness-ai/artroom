@@ -77,8 +77,7 @@ async function landLane(room: TestRoom, host: FakeArtifactsHost, files: Record<s
 
 /** Make a registry binding look as an older Worker made it: before the ledger column (review 700b74ea). */
 async function markOlderBinding(repo: string): Promise<void> {
-  await runInDurableObject(reg() as never, (r: Registry, state: DurableObjectState) => {
-    void r;
+  await runInDurableObject(reg() as never, (_r: unknown, state: DurableObjectState) => {
     state.storage.sql.exec("UPDATE bindings SET ledger = NULL WHERE repo = ?", repo);
   });
 }
