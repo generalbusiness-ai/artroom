@@ -1680,6 +1680,65 @@ was interrupted after recording its attempt and before adopting, and adopted
 spuriously after a lost bind answer or an interrupted first found; real-DO
 controls interrupt each window.
 
+## Client and deployment hygiene (request 55be0661)
+
+Request 55be0661 carries findings SEC-04, SEC-05 and SEC-11 of
+simplification review 55563589. Each finding was reproduced on main
+a6330262, and each has tests that fail there: 13 of 13 in the Room's node
+file, 4 of 6 in its workerd file, 2 of 4 in the MCP file and 29 of 31 in the
+CLI file. The ones that pass on main pin behaviour that was already right
+and must stay so: the Room's declared-length pre-check, an exact 1 MiB
+body, the MCP route's 401 before reading, and the read-back of every
+admitted character. (The CLI's "refusal does not repeat the token" also
+passes on main, only because `checkGrant` does not exist there.)
+
+| Finding | Fix | Tests |
+|---|---|---|
+| SEC-04: `PUBLIC_URL` fell back to `https://artroom.example.workers.dev` (src/room.ts), and wrangler.jsonc set that placeholder. Redemption names that host in `Redeemed.mcp`, and the CLI prints a `claude mcp add` command that sends the bearer token there. | `publicUrl()` in src/config.ts requires an `https://` origin with nothing after the host, and has no default. The Worker entrypoint (src/worker.ts constructor) and every Room object (src/room.ts constructor) call it first, so neither starts without one, for HTTPS or RPC. wrangler.jsonc no longer sets `PUBLIC_URL`; a deploy passes `--var PUBLIC_URL:https://<host>`. | test/node/hygiene-55be0661.test.ts (the accepted and refused values; wrangler.jsonc has no `PUBLIC_URL` and names no example host; the spike's value is accepted). test/workerd/hygiene-55be0661.test.ts (the Worker and a Room object refuse to start without it, or with a value that is not an origin). |
+| SEC-05: the CLI wrote the room's workspace remote and token verbatim into the git config file the repository includes (packages/cli/src/git.ts). A remote ending `"]`, newline, `[core]`, newline, `sshCommand = ...` set `core.sshCommand`; so did a token with a newline. Both were reproduced on main. | `checkGrant()` in packages/cli/src/git.ts: the remote must be a plain `https://` URL in normal form (no credentials, query, fragment, dot segments or characters outside `A-Za-z0-9._~/-` in the path), and the token may hold only the RFC 6750 token characters and `?` and `=`, up to 4096. `artroom workspace` checks before it touches the destination; `configureWorkspace` checks again at its own boundary. | packages/cli/test/hygiene-55be0661.test.ts: 14 refused remotes and 10 refused tokens, each named; the refusal does not repeat the token; `configureWorkspace` refuses and changes nothing; every admitted character reads back through git as exactly one setting; `artroom workspace` given an injecting remote or token exits 1 with no remote, no credential, no `core.sshCommand` and nothing pending. |
+| SEC-11: the HTTPS routes read a body whole and then compared its length in UTF-16 units with 1 MiB, so a body without `Content-Length` was read entirely first (src/http.ts). The MCP route had no cap (packages/mcp/src/worker.ts). | Both count bytes as the body streams in and stop reading past 1 MiB: 413 `payload-too-large` on the HTTPS routes, a 413 JSON-RPC error on the MCP route. A declared `Content-Length` over 1 MiB is refused before any read. The MCP route reads the body only after the bearer is accepted. | test/workerd/hygiene-55be0661.test.ts: a 16 MiB stream with no length is refused after at most 1 MiB plus two chunks is pulled (main pulled all 16 MiB); 1.5 MiB of two-byte characters is refused; a large declared length is refused with nothing pulled; exactly 1 MiB is read. packages/mcp/test/workerd/body-cap.test.ts: the same three, an unknown bearer refused with nothing pulled, and exactly 1 MiB handed on. |
+
+**Where this departs from the request.** Item 2 asked that the credential
+file be written through `git config` arguments rather than by string
+templating. That would put the token in a command argument, which other
+users on the machine can read in the process list, and the CLI README
+promises the token never is one. The file is still written directly. The
+strict patterns are the fix: neither admits a character that git config
+treats specially (quote, backslash, `#`, `;`, `]`, whitespace, newline), and
+a test writes every admitted character and reads the file back through git
+as exactly one setting.
+
+**Mutants.** Each guard was broken in turn (the script restores the file
+from memory, not from git); every mutant turned at least one of the tests
+above red.
+
+| Mutant | Red |
+|---|---|
+| `publicUrl`: no not-set check | refuses a PUBLIC_URL that is not set |
+| `publicUrl`: any protocol | refuses plain http |
+| `publicUrl`: no origin-equality check | 8 refusals: not a URL, http, trailing slash, path, query, fragment, credentials, upper-case host |
+| Room constructor restores the fallback host | a Room object refuses to start |
+| Worker constructor without the check | the Worker refuses to start |
+| wrangler.jsonc restores the placeholder | wrangler.jsonc has no PUBLIC_URL |
+| HTTPS: no streaming count | the 16 MiB stream; two-byte characters |
+| HTTPS: no `Content-Length` pre-check | a declared length is refused before any read |
+| HTTPS: main's read-then-measure | the 16 MiB stream; two-byte characters; declared length |
+| MCP: no streaming count | the 16 MiB stream |
+| MCP: no `Content-Length` pre-check | a declared length is refused before any read |
+| MCP: the original request handed on, uncapped | the 16 MiB stream; declared length |
+| MCP: body read before authentication | an unknown bearer is 401 before the body is read |
+| CLI: no remote pattern | ext::, plain http, credentials, query, fragment |
+| CLI: no normal-form check | dot segment; an array remote |
+| CLI: no token type check | an array token |
+| CLI: no token pattern | 9 token refusals, the refusal not repeating the token, and both injecting-token tests |
+| CLI: token class widened to any non-space | quote, backslash, `#`, `;` |
+| CLI: no token length bound | more than 4096 characters |
+| CLI: `configureWorkspace` skips `checkGrant` | both boundary tests |
+| CLI: `workspace` skips `checkGrant` before the destination | both end-to-end tests (a pending entry was recorded) |
+
+Not changed, and outside this request: the CLI's `login` prints
+`Redeemed.mcp` from the room into a shell command line without checking it.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it
