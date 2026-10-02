@@ -186,3 +186,208 @@ cache shared between jobs may only be part of the pinned, read-only image.
 
 Not changed: `packages/git` (lane B's package).
 
+
+## Review bdcc7cc9
+
+Revision 3. It merges main `fb2bd41` (contract amendment 3, `docs/protocol.md`
+section 29) and answers the checker's one finding on revision 2.
+
+### The merge
+
+The merge had no conflicts. The amendment's types made lane G's typecheck
+fail, so one commit makes the edits that section 29.8 marks "(type)": lane G
+item 3 (`gitAuthEnvFor` returns `GitAuthEnv`) and item 8 (test fixtures and
+the harness's jobs carry `base`, `volatile`, `advisory` and `runner`). The
+checkers do not act on those fields yet. Items 4 to 7 are left to the later
+request.
+
+### P2: a scoped job could read an older snapshot
+
+**What was wrong.** Every snapshot for a checker went into one repository,
+`<repo>--snap-<checker>`, and each job's token could read all of it. A job
+for the current `src/add.js` snapshot could fetch an older `src/**`
+snapshot's commit by its ID and read `src/secret.txt`. A parentless commit,
+a fresh runner and a careful checkout did not narrow what the token could
+read. The revision 2 live script avoided the case by declaring paths that
+never put the excluded file into the shared repository, so it could not
+support the README's general claim.
+
+**Fix: R-CARRY-16, as ratified.** Isolation now rests on what the job's
+repository holds and what its token reaches:
+
+- **One repository per snapshot commit.** Each snapshot commit gets a new,
+  empty repository, named `<prefix>--snap-<commit>`. The publisher writes
+  the commit into it at `refs/artroom/snapshot` and nothing else. It
+  refuses a repository that already has any ref, so a repository never gets
+  a second snapshot or any later object. Pushing one commit into an empty
+  repository sends exactly that commit, its trees and its blobs.
+- **The fixed commit of R-CARRY-15.** `writeSnapshot` sets author and
+  committer to `Artroom Snapshot <snapshot@artroom.invalid>` at time 0, with
+  the Room's message (29.8 lane G item 1). `snapshotCommitId` computes the
+  same ID without git; the harness uses it, as the Room would, to name the
+  repository first and to check what the publisher wrote.
+- **Reuse only for the same commit**, with a read token per job, for that
+  repository only, expiring by the job's deadline. A token that Artifacts
+  returns with a later expiry is revoked and refused.
+- **Retirement** is durable. The duty to delete the repository is recorded
+  in the transaction that records it, before Artifacts is asked to create
+  it. It is due 24 hours after creation, moved by each job's deadline, and
+  brought forward when the last job ends. Running it revokes every active
+  token and deletes the repository, and only Artifacts' answer to the delete
+  settles it. A job's own token is owed revocation when the job ends. Every
+  duty is retried with backoff; during an outage it stays owed, and the
+  repository is not used for new jobs. A preparation that was interrupted
+  is deleted, never finished.
+- **The harness** drops the per-checker store (29.8 lane G item 2). It
+  prepares, mints and retires through `SnapshotRepos` in `HarnessLedger`,
+  whose alarm runs the duties. Repositories are deleted when their job ends.
+
+None of the excluded repairs was used: no ref is hidden, checkout is
+unchanged, parentlessness is not relied on, the live run now includes the
+wider snapshot, and scoped checks still run.
+
+### The packages/git changes (lane B items 1 to 3, minimal)
+
+Lane B's package is changed here only where this fix needs it. Nothing in
+the landing engine or log publishing is touched.
+
+| File | Change |
+|---|---|
+| `src/artifacts.ts` | `ArtifactsNamespace` gains `create(name, opts)` (a new, empty repository with one write token) and `delete(name)` (true if deleted, false if none). Lane B item 1 |
+| `src/publisher/gitops.ts` | `writeSnapshot`: the fixed identity and time; writes only into an empty repository, at `SNAPSHOT_REF` only (`storeRef` is gone). Lane B item 3 |
+| `src/publisher/container.ts` | `Publisher.writeSnapshot`: the gateway allows only the creation of `refs/artroom/snapshot` at the commit built |
+| `src/snapshot/repos.ts` (new) | `SnapshotRepos`: repositories per snapshot commit, job tokens, and the delete and revoke duties. Lane B item 2 |
+| `src/index.ts` | Exports for the above |
+| `test/gitops.test.ts`, `test/snapshots.test.ts` (new), `test/workspaces.test.ts` | Tests; the workspace fake gains `create` and `delete` that throw |
+| `README.md` | Two rows |
+
+The binding's shapes come from the generated Workers types
+(`worker-runtime.d.ts`, `interface Artifacts`): `create(name, opts)` returns
+`ArtifactsCreateRepoResult` with a plaintext `token`; `delete(name)` returns a
+boolean and "Delete[s] a repository and all associated tokens". A live check
+showed that a new repository advertises no refs. The live run used both
+through the binding.
+
+The duties are kept in their own tables (`artroom_snap*`), apart from the
+workspace duties, so that this change and lane B's other work merge without
+touching `workspaces.ts`.
+
+### Tests
+
+`packages/checkers/test/snapshot-isolation.test.ts` turns the checker's
+diagnostic into a test of the correct outcome. It uses the real
+`GitOps.writeSnapshot`, `SnapshotRepos`, `RunnerHost`, provider, gateway and
+checkout, over a model of Artifacts in which every repository serves any
+object it holds by ID (`uploadpack.allowAnySHA1InWant`), so a fetch fails
+only because the object is not there. In the model a runner's git reaches
+repositories by path, not through the gateway, so which repository a runner
+can reach is tested at the gateway and at Artifacts' token check.
+
+- "older snapshot, omitted file: the current job cannot read the older
+  snapshot's commit, trees or blob by known ID, nor see it advertised (P2,
+  R-CARRY-16)". With a control: the older job reads all of them by ID from
+  its own repository.
+- "exact current commit: the job fetches its own snapshot commit by ID and
+  HEAD is that commit (R-CARRY-16, R-EXEC-4)"
+- "configuration change that narrows the inputs: the new snapshot gets a
+  new repository, and neither job's token reads the other's (R-CARRY-16)"
+- "concurrent jobs, different snapshots: each reads only its own
+  repository, by ID or by ref (R-CARRY-16)"
+- "retirement: when the last job ends the repository and its tokens go; an
+  Artifacts outage leaves both owed and retried (R-CARRY-16)"
+- "the Room's snapshot commit ID equals the commit the publisher writes, for
+  awkward names and modes (R-CARRY-15)"
+
+`packages/git/test/snapshots.test.ts` (fake namespace with outage
+switches): one repository per commit with a token per job; tokens bounded
+by the deadline, an overlong one revoked; retirement when the last job
+ends; retirement during an outage stays owed, blocks reuse and is retried;
+the duty recorded before the repository exists, an interrupted preparation
+deleted, an unused repository deleted after 24 hours; a publisher that
+writes another commit; every token revoked before ready; a job that never
+reports its end. `packages/git/test/gitops.test.ts`: "filtered snapshot:
+the fixed commit of R-CARRY-15, written into an empty repository at
+refs/artroom/snapshot only (R-CARRY-16)", which checks the exact commit
+bytes, the single ref, that the repository holds exactly the closure, and
+that a second write, or a write into a repository with any ref, is refused
+and adds nothing.
+
+`isolation.test.ts` (G3, G4) and the support code now use a repository per
+snapshot.
+
+**Mutation checks.** Each guard was broken, one at a time, after the fix
+was committed, and the git and checkers snapshot tests were run. Every
+mutant made at least one test fail; the tree was clean afterwards.
+
+| Mutant | Failing tests |
+|---|---|
+| Reuse one repository across different snapshots (the name ignores the commit) | 2 git, 3 checkers (older snapshot, configuration change, concurrent) |
+| Write a second commit into an existing snapshot repository (no empty-store check) | the git writer test |
+| The old design: a ref per snapshot in a shared store, no empty-store check | the git writer test; 3 checkers |
+| Skip recording the retirement duty | 6 git, 7 checkers |
+| Mint a token not bounded by the job (24 hours) | 5 git, 7 checkers (the answer check refuses it) |
+| 24-hour token and no check of Artifacts' answer | 2 git (deadline-bound token; job that never reports its end) |
+| No check of Artifacts' answer only | 1 git (overlong token) |
+| Ready without revoking the creation token and others | 1 git |
+| A job's end does not owe its token's revocation | 2 git, 1 checkers |
+| Retirement settles without Artifacts confirming the delete | 1 git, 1 checkers |
+
+### Gates
+
+At `04b5f58c` (this note's commit changes only this file):
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | exit 0 |
+| Root `npm test` | exit 0: checkers 31; git (Node) 127; log 100 Node and 95 workerd; policy 190 Node and 189 workerd (1 skipped); ui 88 |
+| `packages/git` `npm run test:workers` | exit 0, 8 tests |
+| `wrangler deploy --dry-run`, `packages/checkers` | exit 0 |
+| `wrangler deploy --dry-run`, `packages/git` | exit 0 |
+
+### Live run
+
+Worker `artroom-lg-checkers` redeployed; namespace `gitseq-spike`:
+[live-2026-10-02T01-06-30-089Z.json](../packages/checkers/measure/results/live-2026-10-02T01-06-30-089Z.json).
+Every check from revision 2 gave the same result (pass, fail, changed test,
+types, scoped `ENOENT`, LLM review, the poison job and the same runner digest
+after it, two concurrent checks), in 2.6 to 5.9 s.
+
+- The 1,800-file case now declares `src/**`, so its snapshot (1,808 files)
+  holds `src/secret.txt`. It passed.
+- **Older, wider snapshot.** The probe built a `src/**` snapshot of the
+  same commit (7 files, with `src/secret.txt`) and held a job on it, so its
+  repository existed while the `src/add.js` job ran. From inside that job's
+  runner:
+
+| Attempt | Outcome |
+|---|---|
+| Fetch the older snapshot's commit by ID, from the job's repository | Fails (`expected 'packfile'`) |
+| Fetch the older snapshot's root tree by ID | Fails |
+| Fetch the `src/secret.txt` blob by ID | Fails |
+| `git ls-remote` of the older snapshot's repository | 403 at the gateway |
+| `git ls-remote` of the job's repository | One ref: `refs/artroom/snapshot` at the job's commit |
+| Fetch the job's own commit by ID | Succeeds |
+| Control: fetch the job's own root tree and a blob by ID (no ref names them) | Both succeed |
+
+  The control shows that Artifacts serves a repository's objects by ID, so
+  the older snapshot's objects failed because the job's repository does not
+  have them. (`git show <older>:src/secret.txt` says "path does not exist";
+  git says the same in an empty repository.)
+- **Retirement.** After the run the harness owed nothing: 16 duties, all
+  done, and no `artroom-lg--snap-*` repository was left.
+- Push, the canonical repository, the internet and the environment gave the
+  same answers as before.
+
+The first run after the deploy failed at its first, whole-tree check with an
+error object that the harness printed as `[object Object]`. The harness now
+prints such errors in full. The next two runs passed; the failure did not
+recur and its cause is not known. That first run's repository was deleted
+afterwards. All repositories the runs made were deleted, every token with
+them, and the runner containers were destroyed at the end of each job.
+
+### Not done
+
+- The production Room (lane A) must create, name, issue and retire
+  snapshot repositories this way (29.8 lane A item 4). Until it does, only
+  the harness's filtered jobs have this boundary.
+- Lane G items 4 to 8 of 29.8, apart from the type-forced 3 and 8.
