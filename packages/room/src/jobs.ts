@@ -179,17 +179,51 @@ async function endToken(core: RoomCore, token: string, job: string, expiresAt: n
   return settleToken(core, token);
 }
 
+/**
+ * Settle a mint whose answer was lost or malformed. Artifacts' token
+ * inventory names no owner, and the canonical repository holds other
+ * owners' tokens (pinning, the log, landings, other jobs), so the Room can
+ * neither find this mint's token nor revoke unknown tokens safely. It
+ * settles only on a complete, well-formed inventory, taken at or after
+ * `notBefore` (the attempt's deadline), that shows no live token the Room
+ * cannot account for: then no token from this mint can be live. Otherwise
+ * the record stays, with the reason, and is tried again with backoff. A
+ * token that Artifacts minted late is live, and so unaccounted, until it
+ * has really expired.
+ */
+async function settleMint(core: RoomCore, mint: string, notBefore: number, attempts: number): Promise<void> {
+  const retry = (why: string): void =>
+    void core.sql.all("UPDATE job_tokens SET attempts = ?, next_ms = ?, last_error = ? WHERE token_id = ?", attempts + 1, core.now() + Math.min(5_000 * 2 ** (attempts + 1), 300_000), redact(why), mint);
+  if (core.now() < notBefore) return void core.sql.all("UPDATE job_tokens SET next_ms = ? WHERE token_id = ?", notBefore, mint);
+  let unaccounted: number;
+  try {
+    const repo = await core.artifacts.get(core.location().name);
+    const inventory = await repo.listTokens();
+    const tokens = inventory?.tokens;
+    const wellFormed =
+      Array.isArray(tokens) &&
+      tokens.length === inventory.total &&
+      tokens.every((t) => typeof t?.id === "string" && t.id !== "" && ["active", "expired", "revoked"].includes(t.state) && Number.isFinite(Date.parse(t.expiresAt)));
+    if (!wellFormed) return retry("the canonical repository's token inventory is incomplete or malformed");
+    // Accounted for: the tokens of jobs in flight, and ended tokens whose revocation is still owed.
+    const known = new Set([
+      ...core.sql.all("SELECT token FROM check_jobs WHERE state = 'sent' AND token IS NOT NULL AND token NOT LIKE 'snapshot:%'").map((r) => str(r, "token")!),
+      ...core.sql.all("SELECT token_id FROM job_tokens WHERE token_id NOT LIKE 'mint:%'").map((r) => str(r, "token_id")!),
+    ]);
+    unaccounted = tokens.filter((t) => t.state === "active" && Date.parse(t.expiresAt) > core.now() && !known.has(t.id)).length;
+  } catch (e) {
+    return retry(`the token inventory could not be read: ${String(e)}`);
+  }
+  if (unaccounted > 0) return retry(`answer lost; ${unaccounted} live token(s) on the canonical repository are not accounted for`);
+  core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", mint);
+}
+
 /** Try one ended canonical token's revocation. Settled by Artifacts' answer, or by its known expiry passing; otherwise retried. */
 async function settleToken(core: RoomCore, token: string): Promise<void> {
   const row = one(core.sql, "SELECT expires_at, attempts FROM job_tokens WHERE token_id = ?", token);
   if (!row) return;
-  // A mint whose answer was lost: no ID to revoke. Settled only once the token it may have made has expired.
-  if (token.startsWith("mint:")) {
-    const until = num(row, "expires_at")!;
-    if (until <= core.now()) core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", token);
-    else core.sql.all("UPDATE job_tokens SET next_ms = ? WHERE token_id = ?", until, token);
-    return;
-  }
+  // A mint whose answer was lost: no ID to revoke, and its token's expiry ran from whenever Artifacts applied it.
+  if (token.startsWith("mint:")) return settleMint(core, token, num(row, "expires_at")!, num(row, "attempts") ?? 0);
   try {
     const repo = await core.artifacts.get(core.location().name);
     await repo.revokeToken(token);
@@ -284,8 +318,8 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       const readUrl = (await core.canonicalRemoteReady()) as `https://${string}`;
       const repo = await core.artifacts.get(core.location().name);
       // The mint is recorded before Artifacts is asked (`mint:<job>`): if its answer is lost, a token may exist
-      // that the Room cannot name. The record stays, unresolved and visible, until the token could no longer be
-      // live: the attempt's deadline, which is later than any expiry asked for here.
+      // that the Room cannot name. The record stays, unresolved and visible, until an inventory shows that no
+      // token from it can be live (`settleMint`); it is not checked before the attempt's deadline.
       const intent = `mint:${jobId}`;
       core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, 'minting') ON CONFLICT (token_id) DO NOTHING", intent, deadline, deadline);
       let t: Awaited<ReturnType<typeof repo.createToken>>;

@@ -117,6 +117,113 @@ describe("a whole-tree job's token mint whose answer is lost stays recorded, unr
     expect(seen.length).toBeGreaterThan(0);
   });
 
+  it("review 1701f73e: a mint applied 30 seconds late, its answer lost: nothing is sent; the mint stays recorded while its token is live past the attempt's deadline, across a restart, and settles only when an inventory shows it expired", async () => {
+    const { r: before, seen, from } = await owed();
+    const a = before.world.artifacts;
+    const calls = a.remoteCalls.get("createToken") ?? 0;
+    a.holdToken = (repo, scope) => scope === "read" && repo === a.canonical;
+    const running = step(before);
+    await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls);
+    clock.now += 30_000;
+    a.loseReply("createToken");
+    a.holdToken = null;
+    await running;
+    expect(seen).toEqual([]);
+    const [lost] = readTokens(before, from);
+    const [recorded] = await ledger(before);
+    expect(recorded).toMatchObject({ token_id: expect.stringMatching(/^mint:/), last_error: expect.stringMatching(/^answer lost/) });
+    const deadline = recorded!["expires_at"] as number;
+    // Minted late, the token outlives the attempt's deadline.
+    expect(lost!.expiresAt).toBeGreaterThan(deadline);
+    // The room stops; a new object keeps the duty, with its alarm.
+    await runInDurableObject(before.stub as unknown as DurableObjectStub<Room>, (_room, state) => state.abort("restart")).catch(() => undefined);
+    const stub = env.ROOMS.get(env.ROOMS.idFromName(before.id)) as unknown as TestRoom["stub"];
+    const r: TestRoom = { ...before, stub, admin: new Client({ id: before.id, stub }, before.admin.keys) };
+    expect(await ledger(r)).toEqual([recorded]);
+    expect(await inDO(r, (room) => room.core.nextAlarm())).toBeLessThanOrEqual(deadline);
+    // Past the deadline, the token still reads: the inventory shows a live token the Room cannot account for, so
+    // the duty stays, saying so, and is tried again later.
+    clock.now = deadline + 1;
+    await tick(r);
+    expect(a.canonicalRepo().admits(lost!.plaintext, "read")).toBe(true);
+    const kept = (await ledger(r)).find((x) => x["token_id"] === recorded!["token_id"]);
+    expect(kept).toMatchObject({ last_error: expect.stringMatching(/not accounted for/) });
+    expect(kept!["next_ms"] as number).toBeGreaterThan(clock.now);
+    // The job itself went on, with a token the Room knows; that one does not hold the duty open.
+    expect(seen.length).toBeGreaterThan(0);
+    // Once the late token has expired, the next inventory shows nothing unaccounted, and the duty settles.
+    clock.now = lost!.expiresAt;
+    await tick(r);
+    clock.now = ((await ledger(r)).find((x) => x["token_id"] === recorded!["token_id"])?.["next_ms"] as number | undefined) ?? clock.now;
+    await tick(r);
+    expect((await ledger(r)).filter((x) => x["token_id"] === recorded!["token_id"])).toEqual([]);
+    expect(a.canonicalRepo().admits(lost!.plaintext, "read")).toBe(false);
+  });
+
+  it("the room stops while a mint's answer is outstanding: the mint record survives, and an inventory after the deadline reconciles it", async () => {
+    const { r: before, from } = await owed();
+    const a = before.world.artifacts;
+    const calls = a.remoteCalls.get("createToken") ?? 0;
+    a.holdTokenReply = (repo, scope) => scope === "read" && repo === a.canonical;
+    void step(before).catch(() => undefined);
+    await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls);
+    const [recorded] = await ledger(before);
+    expect(recorded).toMatchObject({ token_id: expect.stringMatching(/^mint:/), last_error: "minting" });
+    await runInDurableObject(before.stub as unknown as DurableObjectStub<Room>, (_room, state) => state.abort("restart")).catch(() => undefined);
+    a.holdTokenReply = null;
+    const stub = env.ROOMS.get(env.ROOMS.idFromName(before.id)) as unknown as TestRoom["stub"];
+    const r: TestRoom = { ...before, stub, admin: new Client({ id: before.id, stub }, before.admin.keys) };
+    // The token was minted, and the Room never learned its ID.
+    const [minted] = readTokens(r, from);
+    expect(minted!.revoked).toBe(false);
+    expect(await ledger(r)).toEqual([recorded]);
+    expect(await jobsOf(r)).toMatchObject([{ state: "sent", attempt: 1, token: null }]);
+    clock.now = recorded!["expires_at"] as number;
+    await tick(r);
+    // Its expiry ran from the request, so it has expired by the deadline: the inventory accounts for every live
+    // token, and the duty settles.
+    expect(a.canonicalRepo().admits(minted!.plaintext, "read")).toBe(false);
+    expect((await ledger(r)).filter((x) => x["token_id"] === recorded!["token_id"])).toEqual([]);
+  });
+
+  it("an inventory that is incomplete does not settle the duty; a live token the Room knows does not hold it open", async () => {
+    const { r, seen } = await owed();
+    const a = r.world.artifacts;
+    a.loseReply("createToken");
+    await step(r);
+    const [recorded] = await ledger(r);
+    const deadline = recorded!["expires_at"] as number;
+    // The next attempt is sent, and its call is still with the service: its token is live, and known.
+    let answer: (() => void) | null = null;
+    r.world.checkers["unit"] = {
+      handle(job): Promise<Result<Check>> {
+        seen.push(job);
+        return new Promise((resolve) => (answer = () => resolve(refusal)));
+      },
+    };
+    clock.now = ((await jobsOf(r))[0]!["next_ms"] as number);
+    await inDO(r, (room) => room.core.steps.jobs());
+    await until(async () => seen.length === 1);
+    // An inventory with fewer tokens than its total proves nothing.
+    const repo = a.canonicalRepo();
+    const list = repo.listTokens.bind(repo);
+    (repo as { listTokens: unknown }).listTokens = async () => {
+      const inv = await list();
+      return { ...inv, total: inv.total + 1 };
+    };
+    clock.now = deadline;
+    await inDO(r, (room) => room.core.steps.jobs());
+    expect((await ledger(r)).find((x) => x["token_id"] === recorded!["token_id"])).toMatchObject({ last_error: expect.stringMatching(/incomplete or malformed/) });
+    // A complete one, with only the sent attempt's live token in it, settles the duty.
+    (repo as { listTokens: unknown }).listTokens = list;
+    clock.now = (await ledger(r)).find((x) => x["token_id"] === recorded!["token_id"])!["next_ms"] as number;
+    await inDO(r, (room) => room.core.steps.jobs());
+    expect(repo.admits(/^Authorization: Bearer (.+)$/.exec(seen[0]!.gitAuthEnv.GIT_CONFIG_VALUE_0)![1]!, "read")).toBe(true);
+    expect((await ledger(r)).filter((x) => x["token_id"] === recorded!["token_id"])).toEqual([]);
+    await inDO(r, () => answer!());
+    await inDO(r, (room) => room.core.idle());
+  });
+
   it("a malformed answer (no token text) is as unknown as a lost one: nothing is sent, and the mint stays recorded", async () => {
     const { r, seen } = await owed();
     const repo = r.world.artifacts.canonicalRepo();
