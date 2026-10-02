@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Independently review lane A revision 6 at exact head d0b09ca2; reproduce the prior policy, migration, cleanup and integration findings; record architecture, security and simplification conclusions against all artifacts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5834b4ae2a3a093af52b07c558d500e5dcf3f7d3"}
