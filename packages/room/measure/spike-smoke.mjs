@@ -154,8 +154,13 @@ async function revoke(id, ns = NS) {
 
 /** Token metadata only, never the token. */
 const tokenMeta = (toks) => toks.map((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !/plaintext|token|secret/i.test(k))));
+/**
+ * A repository's active tokens, or null when the listing proves nothing (refused, partial or malformed: the
+ * deploy lane's `readListing`). A step that reads it reports an unknown listing as a failure, never as none.
+ */
 async function activeTokens(repo, ns = NS) {
-  return (await api("GET", `/repos/${repo}/tokens?state=active&per_page=100`, undefined, ns)).result ?? [];
+  const { outcome, items } = readListing(await api("GET", `/repos/${repo}/tokens?state=active&per_page=100`, undefined, ns), 100, isTokenRecord);
+  return outcome === "done" ? items : null;
 }
 
 function git(args, { cwd, token, env = {} } = {}) {
@@ -319,7 +324,7 @@ async function main() {
   // Gap 2: no token is left on the new repository (the create's 24-hour token and the first commit's are revoked).
   // Read before this script mints its own read tokens, and after the one canonicalRef minted is revoked.
   const left = await activeTokens(canonical);
-  step("found: no active token on the new repository", left.length === 0, { active: left.length, tokens: tokenMeta(left) });
+  step("found: no active token on the new repository", left !== null && left.length === 0, { active: left?.length ?? "unknown", tokens: left ? tokenMeta(left) : undefined });
 
   // 2. A read session (R-CRED-5).
   const s = await request({ kind: "session", ttlSeconds: 900 });
@@ -456,9 +461,10 @@ async function importPhase(operator) {
   const p = await git(["push", "-q", remote, "HEAD:refs/heads/main"], { cwd: seed, token: c.result.token });
   // Every token on it is revoked before the Room sees it: the creation token is spent.
   let revoked = 0;
-  for (const t of await activeTokens(importRepo, IMPORT_NS)) if (await revoke(t.id, IMPORT_NS)) revoked++;
+  const before = await activeTokens(importRepo, IMPORT_NS);
+  for (const t of before ?? []) if (await revoke(t.id, IMPORT_NS)) revoked++;
   const leftover = await activeTokens(importRepo, IMPORT_NS);
-  step("import: one commit pushed; its creation token revoked", p.code === 0 && leftover.length === 0, { main: seeded, code: p.code, stderr: p.stderr || undefined, revoked, active: leftover.length });
+  step("import: one commit pushed; its creation token revoked", p.code === 0 && before !== null && leftover !== null && leftover.length === 0, { main: seeded, code: p.code, stderr: p.stderr || undefined, revoked, active: leftover?.length ?? "unknown" });
   if (p.code !== 0) throw new Error("the import repository could not be seeded");
 
   // The grant, signed with the operator seed in this process, and the founding.

@@ -71,7 +71,7 @@ const CHECKER = /^[a-z][a-z0-9-]{0,63}$/;
 export class ArtifactsAdapter implements ArtifactsPort {
   private readonly o: ArtifactsAdapterOptions;
   private readonly cache = new TreeCache();
-  private remoteCache: string | null = null;
+  private remoteCache: { readonly name: string; readonly remote: string } | null = null;
 
   constructor(opts: ArtifactsAdapterOptions) {
     this.o = opts;
@@ -95,11 +95,13 @@ export class ArtifactsAdapter implements ArtifactsPort {
 
   /** The canonical repository's remote, for the publisher sandbox. */
   async canonicalRemote(): Promise<string> {
-    if (this.remoteCache) return this.remoteCache;
+    // Kept per name: before founding, the repository may move to a new incarnation (review 3eb7bc44).
+    if (this.remoteCache?.name === this.name) return this.remoteCache.remote;
+    const name = this.name;
     const info = await (await this.canonical()).info();
     // The repository the room is bound to, and no other (R-GEN-13).
-    if (info.name !== this.name) throw new Error(`the binding answered for ${info.name}, not ${this.name}`);
-    this.remoteCache = info.remote;
+    if (info.name !== name) throw new Error(`the binding answered for ${info.name}, not ${name}`);
+    this.remoteCache = { name, remote: info.remote };
     return info.remote;
   }
 

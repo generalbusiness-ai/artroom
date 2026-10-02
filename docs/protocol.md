@@ -318,8 +318,12 @@ two sources:
   again and refuses, with `forbidden`, a genesis that names any other
   repository or carries `onboarding`. The repository is created at step 6,
   after the registry binding, so an existing repository at that identity
-  can only be this founding's own, from an earlier attempt. At step 6 the
-  deployment also gives `main` one commit with no files, so that the room's
+  can only be this founding's own, from an earlier attempt. The deployment
+  may store it under a name derived from the identity, one per creation
+  attempt and never reused, so that a late request for an abandoned attempt
+  cannot reach the room's repository; the room's repository is the attempt
+  it seals the genesis on. At step 6 the deployment also gives `main` one
+  commit with no files, so that the room's
   first landing has a main to land on (R-LAND-2, R-PUB-4), and revokes every
   credential that creating the repository and that commit produced before it
   seals the genesis.

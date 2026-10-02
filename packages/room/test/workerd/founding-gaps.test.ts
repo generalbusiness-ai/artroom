@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import { env, exports } from "cloudflare:workers";
-import { runInDurableObject } from "cloudflare:test";
+import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import type { Claim, DraftedRoom, Genesis, Landing, LandOp, RoomId } from "@generalbusiness/artroom-contract";
 import { EMPTY_TREE_SHA, firstCommit } from "@generalbusiness/artroom-git";
 import { draftRoom, foundRoom } from "../../src/founding.ts";
@@ -20,7 +20,7 @@ import { roomIdOf } from "../../src/ids.ts";
 import { hex } from "../../src/crypto.ts";
 import type { RoomEnv } from "../../src/config.ts";
 import { FakeArtifactsHost, artifactsErrors, type Registry, type Room } from "../../src/index.ts";
-import { Client, call, clock, expectOk, failure, grant, logOf, newKeyPair, placeRepo, randomBytes, sign, tick, worldFor, type TestRoom, type World } from "./support.ts";
+import { Client, advance, call, clock, expectOk, failure, grant, logOf, newKeyPair, placeRepo, randomBytes, sign, tick, worldFor, type TestRoom, type World } from "./support.ts";
 
 const worker = exports.default as unknown as {
   draft(input: unknown): Promise<DraftedRoom>;
@@ -175,15 +175,16 @@ describe("gap 2: the token Artifacts returns when the Room creates the repositor
     expect(a.remoteCalls.get("createToken")).toBeUndefined();
   });
 
-  it("a create whose answer is lost: the step was recorded before it was sent, so the same found deletes the repository and its 24-hour token nobody saw, and makes it again", async () => {
+  it("a create whose answer is lost: its incarnation is abandoned and deleted with the 24-hour token nobody saw; the room is founded on a new one", async () => {
     const f = await draftPublic();
     const a = f.world.artifacts;
     const id = roomIdOf(f.drafted.genesis);
+    const base = f.drafted.genesis.repo.split("/")[1]!;
     a.loseReply("create");
-    await rejects(worker.found(f.drafted.genesis, f.sig, f.drafted.draft), "unavailable");
-    expect((await duties(id)).map((d) => [d.kind, d.state])).toEqual([["repo-create", "in-flight"]]);
-    expect(a.repo(a.canonical).activeTokens().length).toBe(1);
     expect(await worker.found(f.drafted.genesis, f.sig, f.drafted.draft)).toBe(id);
+    const names = [...a.repos.keys()].filter((n) => n.startsWith(`${base}-`));
+    expect(names).toEqual([a.canonical]);
+    expect(a.remoteCalls.get("create")).toBe(2);
     expect(a.repo(a.canonical).activeTokens()).toEqual([]);
     expect((await duties(id)).every((d) => d.state === "done")).toBe(true);
   });
@@ -311,5 +312,71 @@ describe("review a35b4b61: a mode needs its binding, checked before anything is 
     expect(await reg().byRepo(f.drafted.genesis.repo)).toBeNull();
     expect(await reg().lookup(f.drafted.genesis.name)).toBeNull();
     expect(f.world.artifacts.remoteCalls.size).toBe(0);
+  });
+});
+
+// ------------------------------------------------------------------ review 3eb7bc44: a late delete never reaches the room's repository
+
+describe("review 3eb7bc44: each creation attempt is its own incarnation, and a delete only ever reaches an abandoned one", () => {
+  /** Make the next delete lose its answer before it applies; returns a function that applies it late. */
+  function loseNextDelete(a: World["artifacts"]): () => Promise<boolean> {
+    const real = a.binding.delete;
+    let late: (() => Promise<boolean>) | null = null;
+    a.binding.delete = async (name: string) => {
+      a.binding.delete = real;
+      late = () => real(name);
+      throw artifactsErrors.transport();
+    };
+    return () => late!();
+  }
+
+  it("a late delete after the seal and a normal landing, across a restart: the room's repository, its landed main and its log survive", async () => {
+    const f = await draftPublic();
+    const a = f.world.artifacts;
+    const id = roomIdOf(f.drafted.genesis);
+    // The first incarnation's create applies and its answer is lost; its delete's answer is lost too.
+    a.loseReply("create");
+    const lateDelete = loseNextDelete(a);
+    expect(await worker.found(f.drafted.genesis, f.sig, f.drafted.draft)).toBe(id);
+    const sealed = a.canonical;
+    expect((await duties(id)).some((d) => d.kind === "repo-delete" && d.state !== "done")).toBe(true);
+    // A restart of the room's Durable Object, then ordinary work: a lane lands.
+    await evictDurableObject(roomStub(id));
+    const room = testRoom(f, id);
+    const { head, op } = await landLane(room, a, { "docs/after.md": "landed before the late delete\n" });
+    expect(op).toMatchObject({ state: "landed" });
+    // The lost delete applies now: it reaches only the abandoned incarnation.
+    await lateDelete();
+    expect(a.repos.has(sealed)).toBe(true);
+    expect(a.main).toBe(head);
+    // The alarm, when the debt is due, settles the abandoned incarnation and leaves the room's repository alone.
+    advance(10 * 60_000);
+    await tick(room, 2);
+    expect((await duties(id)).filter((d) => d.state !== "done")).toEqual([]);
+    expect(a.repos.has(sealed)).toBe(true);
+    expect(a.main).toBe(head);
+    await call(room.stub.publishLog());
+    expect(f.world.log.ref).not.toBeNull();
+  });
+
+  it("a lost delete that applied, then NOT_FOUND: settled as gone; the room's repository is untouched", async () => {
+    const f = await draftPublic();
+    const a = f.world.artifacts;
+    const id = roomIdOf(f.drafted.genesis);
+    a.loseReply("create");
+    const real = a.binding.delete;
+    a.binding.delete = async (name: string) => {
+      a.binding.delete = real;
+      await real(name);
+      throw artifactsErrors.transport();
+    };
+    expect(await worker.found(f.drafted.genesis, f.sig, f.drafted.draft)).toBe(id);
+    const base = f.drafted.genesis.repo.split("/")[1]!;
+    expect([...a.repos.keys()].filter((n) => n.startsWith(`${base}-`))).toEqual([a.canonical]);
+    expect((await duties(id)).some((d) => d.kind === "repo-delete" && d.state !== "done")).toBe(true);
+    advance(10 * 60_000);
+    await tick(testRoom(f, id), 2);
+    expect((await duties(id)).filter((d) => d.state !== "done")).toEqual([]);
+    expect(a.main).toBe((await firstCommit(Date.parse(f.drafted.genesis.createdAt))).commit);
   });
 });
