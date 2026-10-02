@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ff98d990d34749f663ac19ec7dd00f4c4baea49c","text":"Merge retired a covered predecessor; the successor is at docs/protocol.md."}
+{"kind":"artifact","text":"packages/git/README.md at exact af89862b1dfbd05b2fc46be8b28628d5fc59c977 on request/mint-publication, under promise git:sha1…b8ff921 on request git:sha1…e4dfee3","body":{"commit":"af89862b1dfbd05b2fc46be8b28628d5fc59c977","path":"packages/git/README.md"}}
