@@ -13,13 +13,15 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { Claim, Landing, OpId } from "@generalbusiness/artroom-contract";
-import type { LandRecord } from "@generalbusiness/artroom-git";
+import { WITHHELD, type LandRecord } from "@generalbusiness/artroom-git";
+import { jobTokenDuties } from "../../src/jobs.ts";
 import type { Room } from "../../src/index.ts";
-import { clock, makeRoom, pushChange, type TestRoom } from "./support.ts";
+import { Client, clock, makeRoom, pushChange, type TestRoom } from "./support.ts";
 
-const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
+const inDO = <T>(r: TestRoom, fn: (room: Room, state: DurableObjectState) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 
 /** Assembled at runtime, so the source holds no credential-shaped literal (push protection scans it). */
 const glue = (...parts: string[]) => parts.join("");
@@ -175,4 +177,122 @@ describe("request d29c09fa: a failed log publication stores and names a known co
       expect(await inDO(r, (room) => room.core.sql.all("SELECT v FROM meta WHERE k = 'publication_error'")[0]?.["v"])).toBe(stored);
       await clean(r, [thrown]);
     });
+});
+
+describe("request d29c09fa: rows stored with provider text before the rule, reopened", () => {
+  it("migration 2 rewrites every legacy error field at rest when the object opens, before any retry, and no projection shows the text; safe values stay", async () => {
+    const { r, op, lane } = await accepted();
+    await ready(r, op);
+    await inDO(r, async (room) => {
+      const pub = (room.core.landing as unknown as { publisher: { readMain: () => Promise<string> } }).publisher;
+      const readMain = pub.readMain;
+      pub.readMain = async () => {
+        throw echoing();
+      };
+      try {
+        await room.core.landing.publish();
+      } finally {
+        pub.readMain = readMain;
+      }
+    });
+    const legacy = (prefix = "") => `${prefix}${echoing().message}`;
+    const later = clock.now + 24 * 3600_000;
+    // Write the legacy rows directly, and put the store back at version 1, as a room stored before the rule.
+    const wsOp = await inDO(r, (room) => {
+      const sql = room.core.sql;
+      const body = JSON.parse(String(sql.all("SELECT body FROM artroom_land_op WHERE id = ?", op)[0]!["body"]));
+      body.lastError = legacy("main could not be read: ");
+      body.pushes[0].detail = legacy();
+      sql.all("UPDATE artroom_land_op SET body = ? WHERE id = ?", JSON.stringify(body), op);
+      void room.core.workspaces; // its tables
+      void (room.core as unknown as { snapshotRepos: unknown }).snapshotRepos;
+      const failed = JSON.stringify({ name: "ArtroomError", code: "internal", message: legacy("Could not provision the workspace: "), retryable: true });
+      const row = sql.all("SELECT lease FROM artroom_ws WHERE lane = ?", lane)[0];
+      const lease = row ? Number(row["lease"]) : 1;
+      if (row) sql.all("UPDATE artroom_ws SET state = 'failed', error = ? WHERE lane = ?", failed, lane);
+      else
+        sql.all(
+          "INSERT INTO artroom_ws (lane, lease, state, fork, lease_expires_at, error, updated_at) VALUES (?, ?, 'failed', ?, ?, ?, ?)",
+          lane,
+          lease,
+          `canon--${lane}`,
+          later,
+          failed,
+          clock.now,
+        );
+      sql.all("INSERT INTO artroom_ws_duty (fork, kind, reason, state, started_at, next_at, last_error, done_at, done_reason) VALUES ('f', 'token', 'legacy', 'done', ?, ?, ?, ?, 'revoked')", clock.now, later, legacy(), clock.now);
+      sql.all("INSERT INTO artroom_snap_duty (snapshot, name, kind, reason, state, next_at, last_error, done_at, done_reason) VALUES ('s', 'n', 'delete', 'legacy', 'done', ?, ?, ?, 'deleted')", later, legacy(), clock.now);
+      const tokens: [string, string][] = [
+        ["mint:job_legacy_1", legacy("answer lost: ")],
+        ["mint:job_legacy_2", legacy("outcome unknown; the token inventory could not be read: ")],
+        ["tid_legacy_revoke", legacy()],
+        ["tid_legacy_held", "held"],
+        ["mint:job_safe_1", "answer lost: create failed: Error INTERNAL_ERROR (10400)"],
+      ];
+      for (const [id, e] of tokens) sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, ?)", id, later, later, e);
+      sql.all("INSERT INTO meta (k, v) VALUES ('publication_error', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", ECHOED[0]!);
+      sql.all("UPDATE schema_version SET v = 1 WHERE id = 1");
+      return `op_ws_${lane}_${lease}`;
+    });
+
+    // Reopen the object: a fresh stub after an abort. Nothing else runs before the reads.
+    await inDO(r, (_room, state: DurableObjectState) => state.abort("restart")).catch(() => undefined);
+    const stub = env.ROOMS.get(env.ROOMS.idFromName(r.id)) as unknown as TestRoom["stub"];
+    const again: TestRoom = { ...r, stub, admin: new Client({ id: r.id, stub }, r.admin.keys) };
+
+    const shown = await inDO(again, (room) => ({ status: room.core.landing.status(), duties: jobTokenDuties(room.core) }));
+    expect(shown.status?.lastError).toBe(`main could not be read: ${WITHHELD}`);
+    const wsView = (await again.admin.read({ q: "op", op: wsOp as never })) as { state: string; error: { message: string } };
+    expect(wsView.error.message).toBe(`could not provision the workspace: ${WITHHELD}`);
+    expect(Object.fromEntries(shown.duties.map((d) => [d.token, d.status]))).toMatchObject({
+      "mint:job_legacy_1": `answer lost: create failed: ${WITHHELD}`,
+      "mint:job_legacy_2": `outcome unknown; the token inventory could not be read: ${WITHHELD}`,
+      tid_legacy_revoke: `revocation failed: ${WITHHELD}`,
+      tid_legacy_held: "held",
+      "mint:job_safe_1": "answer lost: create failed: Error INTERNAL_ERROR (10400)",
+    });
+
+    // The rows themselves are rewritten, and the store is at version 2.
+    const rows = await inDO(again, (room) => {
+      const sql = room.core.sql;
+      const body = JSON.parse(String(sql.all("SELECT body FROM artroom_land_op WHERE id = ?", op)[0]!["body"]));
+      return {
+        v: sql.all("SELECT v FROM schema_version")[0]!["v"],
+        land: [body.lastError, body.pushes[0].detail],
+        ws: JSON.parse(String(sql.all("SELECT error FROM artroom_ws WHERE lane = ?", lane)[0]!["error"])).message,
+        wsDuty: sql.all("SELECT last_error FROM artroom_ws_duty WHERE reason = 'legacy'")[0]!["last_error"],
+        snapDuty: sql.all("SELECT last_error FROM artroom_snap_duty WHERE reason = 'legacy'")[0]!["last_error"],
+        publication: sql.all("SELECT v FROM meta WHERE k = 'publication_error'")[0]!["v"],
+      };
+    });
+    expect(rows).toEqual({
+      v: 2,
+      land: [`main could not be read: ${WITHHELD}`, `landing step failed: ${WITHHELD}`],
+      ws: `could not provision the workspace: ${WITHHELD}`,
+      wsDuty: `workspace step failed: ${WITHHELD}`,
+      snapDuty: `snapshot step failed: ${WITHHELD}`,
+      publication: "transport",
+    });
+    await clean(again, [shown, wsView]);
+  });
+});
+
+describe("request d29c09fa: the operators' job-token view shows safe metadata only, whatever a row holds", () => {
+  it("a row holding provider text after the migration is shown withheld; safe values as they are", async () => {
+    const r = await makeRoom();
+    const later = clock.now + 24 * 3600_000;
+    const duties = await inDO(r, (room) => {
+      const sql = room.core.sql;
+      sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tid_x', ?, ?, ?)", later, later, `${echoing().message}`);
+      sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('mint:job_x_1', ?, ?, ?)", later, later, `answer lost: ${echoing().message}`);
+      sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tid_y', ?, ?, 'held')", later, later);
+      return jobTokenDuties(room.core);
+    });
+    expect(Object.fromEntries(duties.map((d) => [d.token, [d.kind, d.status]]))).toEqual({
+      tid_x: ["revoke", `revocation failed: ${WITHHELD}`],
+      "mint:job_x_1": ["unknown-mint", `answer lost: create failed: ${WITHHELD}`],
+      tid_y: ["held", "held"],
+    });
+    for (const s of ECHOED) expect(JSON.stringify(duties)).not.toContain(s);
+  });
 });

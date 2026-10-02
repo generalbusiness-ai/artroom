@@ -67,6 +67,7 @@ import type {
 import { type Sql, type SqlRow, text } from "../sql.ts";
 import { type ArtifactsNamespace, type RepoHandle, type TokenInfo, artifactsCode, completeInventory, refusedUnchanged, withRetry } from "../artifacts.ts";
 import { errorNote } from "../mints.ts";
+import { safeErrorText } from "../safe-errors.ts";
 
 /** Artifacts' shortest token lifetime. */
 export const MIN_TOKEN_TTL_S = 60;
@@ -313,7 +314,11 @@ export class Workspaces {
     if (r.state === "ready" && r.remote) {
       return { ...base, state: "ready", detail: { remote: r.remote as `https://${string}`, leaseGeneration: r.lease } };
     }
-    if (r.state === "failed") return { ...base, state: "failed", error: JSON.parse(r.error ?? "{}") as ArtroomError };
+    if (r.state === "failed") {
+      const error = JSON.parse(r.error ?? "{}") as ArtroomError;
+      // Only safe metadata is shown, whatever a row written before request d29c09fa holds.
+      return { ...base, state: "failed", error: { ...error, message: safeErrorText(typeof error.message === "string" ? error.message : "", "could not provision the workspace") } };
+    }
     return { ...base, state: "pending" };
   }
 

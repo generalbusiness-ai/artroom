@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { MAX_RETAIN_MS, PREPARE_WINDOW_MS, SnapshotRepos, type SnapshotWriter } from "../src/snapshot/repos.ts";
 import type { ArtifactsNamespace, MintedToken, RepoHandle, TokenInfo } from "../src/artifacts.ts";
 import type { Sql } from "../src/sql.ts";
+import { WITHHELD, scrubLegacyErrors } from "../src/safe-errors.ts";
 import { Clock, echoNote, echoing, everyRow, noEcho, nodeSql } from "./support.ts";
 
 class ArtifactsError extends Error {
@@ -650,4 +651,25 @@ test("d29c09fa: retirement that fails with the provider's text stays owed, and i
   assert.deepEqual(errors.map(([k]) => k).sort(), ["delete", "revoke"]);
   for (const [, e] of errors) assert.equal(e, echoNote("snapshot cleanup failed"));
   noEcho("failed retirement", everyRow(sql), snaps.duties());
+});
+
+test("d29c09fa, reopen: snapshot steps stored with provider text are rewritten once by the scrub; safe ones stay", async () => {
+  const { ns, sql, host } = durable();
+  const snaps = host();
+  ns.create = async () => {
+    throw echoing();
+  };
+  await assert.rejects(snaps.prepare(C1, async () => C1));
+  await assert.rejects(snaps.prepare(C2, async () => C2));
+  // One legacy row; the other keeps its safe metadata.
+  const [first] = sql.all("SELECT id FROM artroom_snap_duty ORDER BY id").map((r) => r["id"] as number);
+  sql.all("UPDATE artroom_snap_duty SET last_error = ? WHERE id = ?", `snapshot create failed: ${echoing().message}`, first!);
+  host(); // reopen
+  assert.equal(scrubLegacyErrors(sql), 1);
+  assert.deepEqual(dutyErrors(sql), [
+    ["create", `snapshot create failed: ${WITHHELD}`],
+    ["create", echoNote("snapshot create failed")],
+  ]);
+  noEcho("the scrubbed rows", everyRow(sql));
+  assert.equal(scrubLegacyErrors(sql), 0);
 });

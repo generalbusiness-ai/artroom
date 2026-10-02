@@ -120,9 +120,9 @@ const RETRY = { attempts: 5, firstMs: 500 } as const;
 const PAGE_MAX = 1_000;
 
 /** Error names that may be stored. Any other name is not: it is the thrower's text. */
-const SAFE_NAMES: ReadonlySet<string> = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "AggregateError", "AbortError", "TimeoutError"]);
+export const SAFE_NAMES: ReadonlySet<string> = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "AggregateError", "AbortError", "TimeoutError"]);
 /** Artifacts codes that may be stored: those `artifacts.ts` classifies (`REFUSED_UNCHANGED`, `retriable`). */
-const SAFE_CODES: ReadonlySet<string> = new Set([
+export const SAFE_CODES: ReadonlySet<string> = new Set([
   "ALREADY_EXISTS",
   "INVALID_INPUT",
   "INVALID_REPO_NAME",
@@ -133,27 +133,31 @@ const SAFE_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /** The fixed phrase for where an error happened. */
-export type ErrorStage =
-  | "create failed"
-  | "revocation failed"
-  | "revocation answered, but the completion did not commit"
-  | "repository lookup failed"
-  | "no inventory: repository lookup failed"
-  | "no inventory: the listing failed"
+export const ERROR_STAGES = [
+  "create failed",
+  "revocation failed",
+  "revocation answered, but the completion did not commit",
+  "repository lookup failed",
+  "no inventory: repository lookup failed",
+  "no inventory: the listing failed",
   // The landing engine and its publishers (request d29c09fa).
-  | "integration failed"
-  | "readiness could not be computed"
-  | "push did not answer"
-  | "main could not be read"
+  "integration failed",
+  "readiness could not be computed",
+  "push did not answer",
+  "main could not be read",
+  "landing step failed",
   // Lane workspaces and snapshot repositories (request d29c09fa).
-  | "could not provision the workspace"
-  | "workspace step failed"
-  | "workspace cleanup failed"
-  | "snapshot create failed"
-  | "snapshot create not yet seen"
-  | "snapshot cleanup failed"
+  "could not provision the workspace",
+  "workspace step failed",
+  "workspace cleanup failed",
+  "snapshot create failed",
+  "snapshot create not yet seen",
+  "snapshot cleanup failed",
+  "snapshot step failed",
   // The Room's job tokens (request d29c09fa).
-  | "the token inventory could not be read";
+  "the token inventory could not be read",
+] as const;
+export type ErrorStage = (typeof ERROR_STAGES)[number];
 
 /**
  * All a record or the observation keeps about an error (review 0ab6dac3):

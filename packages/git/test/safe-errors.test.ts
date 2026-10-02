@@ -13,7 +13,8 @@ import { ContainerPublisher, type PublisherStub } from "../src/publisher/client.
 import { GitError, type GitOps } from "../src/publisher/gitops.ts";
 import { outcomeNote } from "../src/publisher/push-outcome.ts";
 import type { ArtifactsNamespace, RepoHandle } from "../src/artifacts.ts";
-import { Clock, ControlledPublisher, FakeRoom, FakeTokens, Fixture, actId, echoNote, echoing, everyRow, laneId, noEcho, nodeSql, opId } from "./support.ts";
+import { WITHHELD, isSafeErrorText, safeErrorText, scrubLegacyErrors } from "../src/safe-errors.ts";
+import { Clock, ControlledPublisher, ECHOED, FakeRoom, FakeTokens, Fixture, actId, echoNote, echoing, everyRow, laneId, noEcho, nodeSql, opId } from "./support.ts";
 
 async function world() {
   const f = await new Fixture().init();
@@ -150,4 +151,82 @@ test("d29c09fa, main that cannot be read back after the push: the record keeps s
   assert.equal(record(w, w.id).lastError, echoNote("main could not be read"));
   assert.equal(w.engine.status()?.lastError, echoNote("main could not be read"));
   w.clean("a failed read of main");
+});
+
+// ------------------------------------------------------------------ legacy rows: the validator, the read and the scrub
+
+/** What a record stored before the rule may hold: the provider's message, redacted or not. */
+const legacy = (prefix = "") => `${prefix}${echoing().message}`;
+
+test("d29c09fa: the shared validator accepts every form the sinks write, and nothing with provider text", () => {
+  const ok = [
+    echoNote("main could not be read"),
+    "integration failed: Error",
+    "workspace cleanup failed: an error of another kind INVALID_INPUT (10001) status 400",
+    "create failed: not an error",
+    "push answered: landed",
+    "push answered: rejected (remote-rejected) artifacts_git_receive_pack_object_too_large",
+    "token not minted (create failed: Error)",
+    "abort attempt before the push started",
+    "answer lost: create failed: an error of another kind",
+    "outcome unknown; 3 live token(s) on the canonical repository not accounted for at 2026-10-02T12:00:00.000Z",
+    "held",
+    "2 token cleanup step(s) on the fork are still owed; trying again later",
+    "A repository named canon--act_1 exists but is not a fork of ns/canon. It was not used or changed.",
+    `landing step failed: ${WITHHELD}`,
+  ];
+  for (const t of ok) assert.ok(isSafeErrorText(t), t);
+  const bad = [
+    legacy(),
+    legacy("main could not be read: "),
+    legacy("push did not answer: "),
+    `${echoNote("integration failed")} ${ECHOED[0]}`,
+    `push answered: unknown: ${ECHOED[1]}`,
+    `answer lost: ${legacy()}`,
+    "integration failed: ArtifactsError",
+    "integration failed: Error SOMETHING_NEW",
+    "",
+  ];
+  for (const t of bad) assert.ok(!isSafeErrorText(t), t);
+  assert.equal(safeErrorText(legacy("main could not be read: "), "landing step failed"), `main could not be read: ${WITHHELD}`);
+  assert.equal(safeErrorText(legacy(), "landing step failed"), `landing step failed: ${WITHHELD}`);
+  assert.equal(safeErrorText(null, "landing step failed"), null);
+  assert.equal(safeErrorText(echoNote("push did not answer"), "landing step failed"), echoNote("push did not answer"));
+});
+
+test("d29c09fa, reopen: a landing record stored with provider text shows only safe metadata before any retry, and the scrub rewrites it once", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  await reserved(w);
+  w.pub.readMain = async () => {
+    throw echoing();
+  };
+  await w.engine.publish();
+  // Legacy rows: the provider's text in lastError and in the push's detail, as stored before the rule.
+  const body = JSON.parse(String(w.sql.all("SELECT body FROM artroom_land_op WHERE id = ?", w.id)[0]!["body"]));
+  body.lastError = legacy("main could not be read: ");
+  body.pushes[0].detail = legacy("push did not answer: ");
+  w.sql.all("UPDATE artroom_land_op SET body = ? WHERE id = ?", JSON.stringify(body), w.id);
+  w.engine.kill();
+  // Reopen: a new engine on the same storage, before any step runs.
+  const reopened = new Landing({ sql: w.sql, room: w.room, publisher: w.pub, tokens: new FakeTokens(), now: w.clock.now });
+  assert.equal(reopened.status()?.lastError, `main could not be read: ${WITHHELD}`);
+  noEcho("the reopened projections", reopened.status(), reopened.view(w.id), reopened.activeViews(), w.room.log);
+  // The scrub rewrites the rows, and a second run changes nothing.
+  assert.equal(scrubLegacyErrors(w.sql), 1);
+  const rec = reopened.core.get(w.id)!;
+  assert.deepEqual([rec.lastError, rec.pushes![0]!.detail], [`main could not be read: ${WITHHELD}`, `push did not answer: ${WITHHELD}`]);
+  noEcho("the scrubbed rows", everyRow(w.sql));
+  assert.equal(scrubLegacyErrors(w.sql), 0);
+});
+
+test("d29c09fa: the scrub keeps safe values as they are", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  await reserved(w);
+  w.pub.push = () => Promise.reject(echoing());
+  await w.engine.publish();
+  const before = everyRow(w.sql);
+  assert.equal(scrubLegacyErrors(w.sql), 0);
+  assert.equal(everyRow(w.sql), before);
 });

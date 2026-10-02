@@ -4,6 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TOKEN_MARGIN_S, Workspaces, forkName } from "../src/workspace/workspaces.ts";
 import type { ArtifactsNamespace, MintedToken, RepoHandle, TokenInfo } from "../src/artifacts.ts";
+import { WITHHELD, scrubLegacyErrors } from "../src/safe-errors.ts";
 import { Clock, deferred, echoNote, echoing, everyRow, laneId, noEcho, nodeSql } from "./support.ts";
 
 class ArtifactsError extends Error {
@@ -1574,4 +1575,28 @@ test("d29c09fa: cleanup that fails with the provider's text stays owed, and its 
   assert.ok(owed.length > 0);
   for (const [, e] of owed) assert.equal(e, echoNote("workspace cleanup failed"));
   clean("failed cleanup", ws, lane);
+});
+
+test("d29c09fa, reopen: a failed workspace and steps stored with provider text show only safe metadata before any retry, and the scrub rewrites them once", async () => {
+  const { clock, ns, ws, lane } = setup();
+  for (let i = 0; i < 5; i++) ns.forkFailures.push(echoing());
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "failed");
+  // Legacy rows, as stored before the rule: the provider's message, with only the token pattern redacted.
+  const sql = ws["sql"];
+  const legacyText = `Could not provision the workspace: ${echoing().message}`;
+  const error = JSON.parse(String(sql.all("SELECT error FROM artroom_ws WHERE lane = ?", lane)[0]!["error"]));
+  sql.all("UPDATE artroom_ws SET error = ? WHERE lane = ?", JSON.stringify({ ...error, message: legacyText }), lane);
+  sql.all("UPDATE artroom_ws_duty SET last_error = ?", echoing().message);
+  // Reopen: a new instance on the same storage, before any step runs.
+  const reopened = new Workspaces({ sql, artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  const v = reopened.view(lane);
+  assert.ok(v?.state === "failed");
+  assert.equal(v.error.message, `could not provision the workspace: ${WITHHELD}`);
+  noEcho("the reopened view", v, reopened.duties());
+  assert.equal(scrubLegacyErrors(sql), 1 + stepErrors(reopened).length);
+  assert.equal(JSON.parse(String(sql.all("SELECT error FROM artroom_ws WHERE lane = ?", lane)[0]!["error"])).message, `could not provision the workspace: ${WITHHELD}`);
+  for (const [, e] of stepErrors(reopened)) assert.equal(e, `workspace step failed: ${WITHHELD}`);
+  noEcho("the scrubbed rows", everyRow(sql));
+  assert.equal(scrubLegacyErrors(sql), 0);
 });

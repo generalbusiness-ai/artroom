@@ -63,7 +63,7 @@ import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } fr
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
 import { issueJobs, oweJobs } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
-import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
+import { PUBLICATION_CODES, createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
 import { report, toConsole } from "./diag.ts";
 import { matchGlob } from "./glob.ts";
@@ -159,19 +159,6 @@ const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints"]);
 let faultHook: ((point: string) => void) | null = null;
 
 /** Tests only: throw at a named point inside a write, as a crash would. */
-/** Codes a failed publication may store as `publication_error` and name to the caller: lane L's and the Room's own. */
-const PUBLICATION_CODES: ReadonlySet<string> = new Set([
-  "would-rewrite",
-  "invalid-input",
-  "unexpected-writer",
-  "unresolved",
-  "cohort-too-large",
-  "object-too-large",
-  "refused",
-  "unknown-version",
-  "cohort-mismatch",
-]);
-
 /** A failed publication's code: a known one, a known Artifacts code, or `transport`. Never other text (request d29c09fa). */
 function publicationCode(e: unknown): string {
   const code = (e as { code?: unknown } | null | undefined)?.code;

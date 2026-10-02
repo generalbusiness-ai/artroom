@@ -10,6 +10,7 @@
 
 import type { Digest, Seq } from "@generalbusiness/artroom-contract";
 import type { Sql, SqlRow, SqlValue } from "./ports.ts";
+import { isSafeErrorText, knownArtifactsCode, safeErrorText, scrubLegacyErrors } from "@generalbusiness/artroom-git";
 
 /**
  * Version 1: the base schema. The spike deployment's earlier versions (2 to
@@ -141,7 +142,49 @@ export function migrate(sql: Sql, steps: readonly Migration[]): number {
 }
 
 /** The Room's migrations. A new table, column or index is added only here, as a version after the base. */
-export const ROOM_MIGRATIONS: readonly Migration[] = [{ version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) }];
+export const ROOM_MIGRATIONS: readonly Migration[] = [
+  { version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) },
+  { version: 2, name: "safe error metadata at rest (request d29c09fa)", up: scrubErrors },
+];
+
+/** Codes a failed publication may store as `publication_error` and name to the caller: lane L's and the Room's own. */
+export const PUBLICATION_CODES: ReadonlySet<string> = new Set([
+  "would-rewrite",
+  "invalid-input",
+  "unexpected-writer",
+  "unresolved",
+  "cohort-too-large",
+  "object-too-large",
+  "refused",
+  "unknown-version",
+  "cohort-mismatch",
+]);
+
+/** A job token's `last_error` as it may be kept or shown: safe metadata, or a fixed phrase withholding the rest. */
+export function safeJobStatus(text: string | null): string | null {
+  if (text === null || isSafeErrorText(text)) return text;
+  if (text.startsWith("answer lost: ")) return `answer lost: ${safeErrorText(text.slice("answer lost: ".length), "create failed")}`;
+  if (text.startsWith("outcome unknown; ")) return `outcome unknown; ${safeErrorText(text.slice("outcome unknown; ".length), "the token inventory could not be read")}`;
+  return safeErrorText(text, "revocation failed");
+}
+
+/**
+ * Version 2 (request d29c09fa): every error field stored before the
+ * safe-metadata rule is rewritten to safe metadata. Safe values stay; any
+ * other becomes `<stage>: legacy error withheld`. The Git package's tables
+ * (landing records, workspaces, snapshot steps), the job tokens, and the
+ * publication's code (an unknown one becomes `transport`).
+ */
+function scrubErrors(sql: Sql): void {
+  scrubLegacyErrors(sql);
+  for (const r of sql.all("SELECT token_id, last_error FROM job_tokens WHERE last_error IS NOT NULL")) {
+    const was = str(r, "last_error");
+    const now = safeJobStatus(was);
+    if (now !== was) sql.all("UPDATE job_tokens SET last_error = ? WHERE token_id = ?", now, str(r, "token_id"));
+  }
+  const code = getMeta(sql, "publication_error");
+  if (code !== null && code !== "transport" && !PUBLICATION_CODES.has(code) && knownArtifactsCode({ code }) === null) setMeta(sql, "publication_error", "transport");
+}
 
 export function createSchema(sql: Sql): void {
   migrate(sql, ROOM_MIGRATIONS);
