@@ -961,8 +961,9 @@ Migration 8 adds `check_carries.event`, `check_judged` and `check_jobs`.
 
 **Choices the contract leaves open.**
 - A job attempt lives for the checker's `timeoutSeconds` plus 300 seconds;
-  its token expires by then. A token is ended when the attempt answers or
-  expires; if revoking it fails, it expires at the deadline.
+  its token expires by then (see "Review 90f30a3b"). A token is ended when
+  the attempt answers or expires; a canonical token's revocation is a
+  durable duty, retried until Artifacts confirms it or the token expires.
 - A job the service refuses is not sent again for that owner and
   integration. Its outcome is kept in `check_jobs`.
 - A snapshot repository is not kept for reuse after its last job
@@ -1161,6 +1162,73 @@ token exists (the canonical mint is the last thing that can fail, and
 `SnapshotRepos.end` does nothing for a job with no token); the written
 repository stays for the retry to reuse, as the control shows, and is
 retired when its preparation window closes.
+
+## Review 90f30a3b
+
+The checker's review of revision 3 (`c4ceef41`) credited both races of
+review 786e9606 and found one P2: a whole-tree job's canonical token was
+asked for a lifetime measured from before the asynchronous mint, its
+returned expiry was not checked, and the dispatch boundary did not check
+the attempt's deadline. A slow mint therefore gave a token that outlived
+the job, and with no second jobs step an attempt past its own deadline was
+still sent. This revision fixes it and merges main `1f4f1f0b` (founding:
+incarnation-named public founding, legacy adoption, the import namespace's
+binding). Lane A's jobs and snapshot repositories now reach the canonical
+repository through the Room's namespace-aware binding (`core.artifacts`).
+
+**The fix** ([src/jobs.ts](src/jobs.ts)):
+
+- The claimed deadline is kept, and never extended. The canonical read
+  token is asked to expire 5 seconds before it (`TOKEN_MARGIN_S`, as
+  `SnapshotRepos.mint` asks), and the token Artifacts returns is checked
+  as `SnapshotRepos.mint` checks its own: read-only, a readable expiry, no
+  later than the deadline. A token that fails is refused and ended, nothing
+  is sent, and the job is due again later.
+- The dispatch boundary requires an attempt that is still the row's,
+  before its deadline, and still current (owner, generation, configuration,
+  obligation). An attempt past its deadline is not sent; its credentials
+  are ended and the job is due again later.
+- Ending a canonical token is durable. The token is written to
+  `job_tokens` (migration 8) before Artifacts is asked to revoke it, and
+  stays there, with its attempts and last error, until Artifacts confirms
+  the revocation or the token's known expiry has passed. A token whose
+  expiry is not known stays until it is revoked. The jobs step retries due
+  revocations with backoff (5 seconds, doubling, at most 5 minutes), and the
+  alarm is set from them, so a restart keeps the duty.
+
+Tests, in [test/workerd/review-90f30a3b.test.ts](test/workerd/review-90f30a3b.test.ts),
+on the real Room Durable Object and SQLite with no other jobs step running.
+The fake's `createToken` can hold the request before minting
+(`holdToken`: the expiry then runs from the late mint) or hold the answer
+after minting (`holdTokenReply`: the expiry ran from the request).
+
+| Test | What it shows |
+|---|---|
+| "healthy mint …" | Sent; the token reads the canonical repository, expires before the deadline, and is revoked after the answer |
+| "an answer delayed after the mint, still before the deadline …" | Sent, with a token that expires by the deadline |
+| "a mint delayed by less than the room's margin …" | Sent: the margin absorbs a short delay |
+| "a mint delayed so that the token would outlive the deadline …" | The token is refused and revoked; nothing is sent; the next attempt is sent with a token that expires by its own deadline |
+| "Artifacts answers with a write token" / "… with no readable expiry" | Refused and revoked; nothing is sent |
+| "an answer delayed past the attempt's deadline, with no other jobs step …" | Nothing is sent; the token is ended; the job is due again later |
+| "cleanup fails, and the room restarts …" | The refused token stays recorded, with its error, retried with backoff while it can still read; after a restart the alarm is set for it; when Artifacts recovers it is revoked and the duty settled |
+
+**Mutations.** Each guard was broken once, the whole workerd suite run, and
+the change reverted. All 11 were caught, one after its test was
+strengthened.
+
+| Mutation | Test that failed |
+|---|---|
+| No deadline at the dispatch boundary | "an answer delayed past the attempt's deadline …" |
+| A returned token's scope not checked | "Artifacts answers with a write token" |
+| A returned token's unreadable expiry accepted | "… with no readable expiry" |
+| A returned token that outlives the deadline accepted | "a mint delayed so that the token would outlive the deadline …" |
+| No margin under the deadline | "a mint delayed by less than the room's margin …" |
+| An attempt past its deadline keeps its credentials | "an answer delayed past the attempt's deadline …" |
+| An ended token not recorded before revocation | "cleanup fails, and the room restarts …" |
+| A failed revocation dropped while the token can still read | "cleanup fails …" |
+| Due revocations not retried by the jobs step | "cleanup fails …" |
+| The alarm not set from due revocations | "cleanup fails …" |
+| A failed revocation retried at once | "cleanup fails …" (after it asserted the retry is due later) |
 
 ## Founding gaps (request b6b51de7)
 
