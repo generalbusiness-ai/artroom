@@ -118,17 +118,20 @@ describe("a whole-tree job's token mint whose outcome is unknown stays an open d
     expect(gap).toBe(6 * 3600_000);
   });
 
-  for (const late of ["lost", "usable"] as const)
+  for (const late of ["lost", "usable", "usable, minted in time"] as const)
     it(`review 013dad0c: the mint is held past its deadline, a second jobs step sends the next attempt and sees a clean inventory, then the mint applies with a ${late} answer`, async () => {
       const { r: before, seen, from } = await owed();
       const a = before.world.artifacts;
       const calls = a.remoteCalls.get("createToken") ?? 0;
       // Attempt 1's mint (this call alone) is held before Artifacts applies it.
+      // ("minted in time": Artifacts applies it at once, with an expiry within the deadline, and only its answer is held.)
       let heldCall = 0;
-      a.holdToken = (repo, scope, _ttl, n) => {
+      const hold = (repo: string, scope: string, _ttl: number, n: number) => {
         if (scope === "read" && repo === a.canonical && heldCall === 0) heldCall = n;
         return n === heldCall;
       };
+      if (late === "usable, minted in time") a.holdTokenReply = hold;
+      else a.holdToken = hold;
       const held = step(before);
       await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls);
       const [recorded] = await ledger(before);
@@ -145,12 +148,13 @@ describe("a whole-tree job's token mint whose outcome is unknown stays an open d
       // Now Artifacts applies attempt 1's mint.
       if (late === "lost") a.loseReply("createToken");
       a.holdToken = null;
+      a.holdTokenReply = null;
       await held;
       const lateToken = readTokens(before, from).find((t) => t.plaintext !== /^Authorization: Bearer (.+)$/.exec(seen[0]!.gitAuthEnv.GIT_CONFIG_VALUE_0)![1]);
       expect(lateToken).toBeDefined();
       // Never sent.
       expect(seen.map((j) => j.id.slice(-2))).toEqual(["_2"]);
-      if (late === "usable") {
+      if (late !== "lost") {
         // The answer finds the duty: its token is recorded by its ID and revoked, and the duty settles.
         expect(lateToken!.revoked).toBe(true);
         expect((await ledger(before)).filter((x) => x["token_id"] === mint)).toEqual([]);
