@@ -16,6 +16,7 @@ import type { CheckerConfig, Claim, DraftedRoom, Genesis, LogEntry, Proposal, Ro
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import type { Registry, Room, RoomEnv } from "../../src/index.ts";
 import type { Diagnosis } from "../../src/diag.ts";
+import { jobTokenDuties } from "../../src/jobs.ts";
 import { route } from "../../src/http.ts";
 import { mcpEndpoint } from "../../src/mcp.ts";
 import { roomIdOf } from "../../src/ids.ts";
@@ -481,5 +482,12 @@ describe("request d268d249: credentials known by their syntax are redacted whate
     expect(d.observation.result).toBe("no inventory: the listing failed: an error of another kind");
     expect(rows.map((x) => String(x["last_error"]))).toEqual(["revocation failed: an error of another kind"]);
     for (const e of [String(lost!.lastError), String(d.observation.result), ...rows.map((x) => String(x["last_error"])), ...d.records.map((x) => String(x.lastError))]) clean(e);
+    // Every row of every table, the ledger's duties and the operators' view of the job tokens hold none of it either.
+    const everything = await inDO(r, (room) => {
+      const tables = room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").map((x) => String(x["name"]));
+      return JSON.stringify([tables.map((t) => room.core.sql.all(`SELECT * FROM "${t}"`)), room.core.mints.duties({ limit: 1000 }), jobTokenDuties(room.core)]);
+    });
+    // The distinctive parts only: short ones ("cd", "it") occur in any room's rows.
+    for (const g of ["hunter", "horse", "battery", "staple", "q1w2", "e3r4", "Bearer", "password"]) expect(everything).not.toContain(g);
   });
 });

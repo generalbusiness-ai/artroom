@@ -19,6 +19,7 @@ import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Check, CheckerConfig, CheckJob, Claim, Landing, OpId, Proposal, Refusal, Result } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import { setAlarmDelay, type Room } from "../../src/index.ts";
+import { setJobTokenWait } from "../../src/jobs.ts";
 import { artifactsErrors, type FakeRepo } from "../../src/memory/artifacts.ts";
 import { addMember, Client, clock, day, makeRoom, pushChange, type TestRoom } from "./support.ts";
 
@@ -116,7 +117,7 @@ interface Site {
   readonly purpose: RegExp;
   /** Whether the token is claimed into `job_tokens` (a check job), rather than released by the ledger. */
   readonly claimed?: boolean;
-  readonly prepare: () => Promise<{ readonly r: TestRoom; readonly run: () => Promise<unknown> }>;
+  readonly prepare: () => Promise<{ readonly r: TestRoom; readonly run: () => Promise<unknown>; readonly lost?: () => Promise<void> }>;
 }
 
 const SITES: readonly Site[] = [
@@ -128,7 +129,13 @@ const SITES: readonly Site[] = [
       await quiet(r);
       const { lane, head } = await proposed(r, "docs/a/**", { "docs/a/one.md": "one" });
       const l = await r.admin.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
-      return { r, run: () => inDO(r, (room) => room.core.landing.prepare(l.op.id as OpId)) };
+      const op = l.op.id as OpId;
+      return {
+        r,
+        run: () => inDO(r, (room) => room.core.landing.prepare(op)),
+        // The operation keeps only safe metadata about the lost mint, never the provider's text.
+        lost: async () => expect(await inDO(r, (room) => room.core.landing.core.get(op)!.lastError)).toBe("token not minted (create failed: Error)"),
+      };
     },
   },
   {
@@ -272,7 +279,7 @@ describe("mint lane C (1): a lost answer at each canonical site leaves an unknow
   for (const site of SITES)
     it(site.name, () =>
       ahead(async () => {
-        const { r: before, run } = await site.prepare();
+        const { r: before, run, lost: lostCheck } = await site.prepare();
         const asked = revocations(before);
         try {
           const lost = await loseAnswer(before, site.purpose);
@@ -283,6 +290,7 @@ describe("mint lane C (1): a lost answer at each canonical site leaves an unknow
             lost.restore();
           }
           expect(lost.id, "the site's create was sent and its answer lost").not.toBeNull();
+          await lostCheck?.();
           const mine = (await records(before)).records.filter((x) => site.purpose.test(x.purpose));
           expect(mine.map((x) => [x.state, x.tokenId])).toEqual([["unknown", null]]);
           const id = mine[0]!.id;
@@ -622,5 +630,98 @@ describe("mint lane C (5): settlement at a known expiry", () => {
       }
       expect((await records(r)).records).toEqual([expect.objectContaining({ id: owed!.id, state: "owed", expiresAt: null })]);
       expect(token(r, owed!.tokenId!).revoked).toBe(false);
+    }));
+});
+
+describe("mint lane C (5): an ended job token's revocation is bounded, and its expiry is checked again before the send", () => {
+  /** A job sent and refused, so its token is ended, with this object's bounded wait for job tokens set to 200 ms. */
+  async function ended(hold: (id: string) => Promise<boolean> | null) {
+    const { r, seen, jobs } = await jobRoom(whole);
+    const repo = r.world.artifacts.canonicalRepo() as Repo;
+    const real = repo.revokeToken.bind(repo);
+    const asked: string[] = [];
+    repo.revokeToken = (id) => {
+      asked.push(id);
+      return hold(id) ?? real(id);
+    };
+    await inDO(r, (room) => setJobTokenWait(room.core, 200));
+    return { r, seen, jobs, asked, restore: () => void (repo.revokeToken = real) };
+  }
+
+  it("a revocation that never answers ends within the wait; the row keeps its debt with backoff; its late answer changes nothing", () =>
+    ahead(async () => {
+      let answer: (v: boolean) => void = () => undefined;
+      const e = await ended(() => new Promise<boolean>((resolve) => (answer = resolve)));
+      try {
+        const done = await Promise.race([e.jobs().then(() => "ended"), new Promise((resolve) => setTimeout(() => resolve("held"), 3_000))]);
+        expect(done).toBe("ended");
+        expect(e.seen).toHaveLength(1);
+        const [row] = await jobTokens(e.r);
+        expect(row).toMatchObject({ last_error: "revocation: no answer in time" });
+        expect(row!["next_ms"] as number).toBeGreaterThan(clock.now);
+        answer(true);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(await jobTokens(e.r)).toEqual([row]);
+      } finally {
+        e.restore();
+      }
+    }));
+
+  it("a repository lookup still out when the wait ends: nothing is sent, then or when it answers; the debt stays for a later pass", () =>
+    ahead(async () => {
+      const e = await ended(() => null);
+      try {
+        // Every revocation fails once, so the token's row is owed; then the lookup is held past the wait.
+        const repo = e.r.world.artifacts.canonicalRepo() as Repo;
+        e.r.world.artifacts.failRemote("revokeToken", artifactsErrors.internal());
+        await e.jobs();
+        const [row] = await jobTokens(e.r);
+        expect(row).toMatchObject({ last_error: "revocation failed: an error of another kind INTERNAL_ERROR (10400)" });
+        const before = e.asked.length;
+        let release: () => void = () => undefined;
+        await inDO(e.r, (room) => {
+          const binding = room.core.artifacts as unknown as { get: (name: string) => Promise<unknown> };
+          const get = binding.get.bind(binding);
+          binding.get = (name) => {
+            const answer = get(name);
+            return new Promise((resolve) => (release = () => resolve(answer)));
+          };
+        });
+        clock.now = row!["next_ms"] as number;
+        await inDO(e.r, (room) => room.core.steps.jobs());
+        expect(await jobTokens(e.r)).toEqual([expect.objectContaining({ token_id: row!["token_id"], last_error: "the repository was not reached in time" })]);
+        await inDO(e.r, () => release());
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(e.asked.length).toBe(before);
+        expect(repo.tokens.get(row!["token_id"] as string)!.revoked).toBe(false);
+      } finally {
+        e.restore();
+      }
+    }));
+
+  it("an expiry that passes during the lookup: the row is settled, and no revocation is sent", () =>
+    ahead(async () => {
+      const e = await ended(() => null);
+      try {
+        e.r.world.artifacts.failRemote("revokeToken", artifactsErrors.internal());
+        await e.jobs();
+        const [row] = await jobTokens(e.r);
+        const before = e.asked.length;
+        await inDO(e.r, (room) => {
+          const binding = room.core.artifacts as unknown as { get: (name: string) => Promise<unknown> };
+          const get = binding.get.bind(binding);
+          binding.get = async (name) => {
+            clock.now = row!["expires_at"] as number; // the token expires while the lookup is out
+            return get(name);
+          };
+        });
+        clock.now = row!["next_ms"] as number;
+        expect(clock.now).toBeLessThan(row!["expires_at"] as number);
+        await inDO(e.r, (room) => room.core.steps.jobs());
+        expect(await jobTokens(e.r)).toEqual([]);
+        expect(e.asked.length).toBe(before);
+      } finally {
+        e.restore();
+      }
     }));
 });

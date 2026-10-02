@@ -104,6 +104,13 @@ export function moveJobMints(sql: Sql, mints: Pick<MintLedger, "adopt">, now: nu
   });
 }
 
+/** Each room's bounded wait for a job token's revocation, when not the mint ledger's (`MINT_WAIT_MS`). Tests shorten it on one object. */
+const tokenWaits = new WeakMap<RoomCore, number>();
+export function setJobTokenWait(core: RoomCore, ms: number | null): void {
+  if (ms === null) tokenWaits.delete(core);
+  else tokenWaits.set(core, ms);
+}
+
 /** Each room's attempts being waited for, by job ID: calling one stops the wait. Memory only; the row is the state. */
 const waits = new WeakMap<RoomCore, Map<string, () => void>>();
 function waitsOf(core: RoomCore): Map<string, () => void> {
@@ -245,10 +252,11 @@ async function settleToken(core: RoomCore, token: string): Promise<void> {
   const expired = () => expires !== null && expires <= core.now();
   const settle = () => void core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", token);
   if (expired()) return settle();
-  const end = Date.now() + MINT_WAIT_MS;
+  const wait = tokenWaits.get(core) ?? MINT_WAIT_MS;
+  const end = Date.now() + wait;
   let note: string;
   try {
-    const repo = await within((async () => core.artifacts.get(core.location().name))(), MINT_WAIT_MS, null);
+    const repo = await within((async () => core.artifacts.get(core.location().name))(), wait, null);
     if (expired()) return settle();
     if (!repo || Date.now() >= end) note = "the repository was not reached in time";
     else if (await within(repo.revokeToken(token).then(() => true), end - Date.now(), false)) return settle();
