@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Review pi-durable revision 2 exact head 783440ea, all 27 artifacts, unknown-act recovery, prepared push identity and honest compiler gates; give architecture/security/simplification conclusions."}
+{"kind":"artifact","text":"package-lock.json at exact 79fe78cfe2ef709a5352f537f0552f7d38f6d437 on request/laneE-clients, under promise git:sha1…68876e3 on request git:sha1…cf2e531","body":{"commit":"79fe78cfe2ef709a5352f537f0552f7d38f6d437","path":"package-lock.json"}}
