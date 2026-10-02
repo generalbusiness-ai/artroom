@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8e7ce4f30597e5ce476a779eb62018fb391b4aa4","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/room/test/node/deploy.test.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0861a3ced3d7a1b5b99f0bd39ef3ffe2cf333fd7","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa; the successor stands at packages/room/test/tsconfig.json."}
