@@ -1775,6 +1775,96 @@ main.ts). They are hints to read, not commands the CLI runs, but a pasted
 hint from a malicious room could carry shell syntax. Quoting them is a
 separate change.
 
+## Request c657d4ba: joins and redemption
+
+From simplification review 55563589 (SEC-01, SEC-02, SEC-07). Each
+behaviour was wrong on main `a6330262`; the tests in
+`test/workerd/request-c657d4ba.test.ts` fail there (12 of 13; the 13th is
+the control that other refusals are still recorded) and pass here.
+
+| Finding or condition | Fix | Tests |
+|---|---|---|
+| (1) SEC-01: a client-custody redemption minted a read session for whatever admission returned, including the stored result of a join copied from the log | `admission.ts` `admit` says whether its result is a replay (`submit` wraps it). `redeem` issues a session only for a join that call admitted; a replay is refused `invitation-invalid`, and the key that joined can get a session with a signed request (R-CRED-5) | (1): a copied join replayed through `POST /redeem` gets no session; a replay over the Durable Object and over RPC gets none, while the act still replays and the key still gets a session; two identical redemptions at once give one session |
+| (2) SEC-02: a `join` refused at steps 7 to 9 on `POST /acts` or `RoomWire.submit` was sealed with its envelope and `body.secret`, while the invitation stayed usable | `admit` never commits a refused join, on any path; the `recordRefusals` hook is gone | (2): `POST /acts`, refused by a policy rule, records nothing, keeps the secret out of the log and the idempotency table, leaves the invitation unused, and is judged afresh on retry; the same over RPC; control: a refused claim is still recorded |
+| (3) SEC-07: the limit keyed unvalidated input, never evicted, put every service-binding caller under one address, and did not count joins on `/acts` | `src/ratelimit.ts`: an invitation is counted only when the room issued it; windows are per room, dropped when they end, and capped at 10,000 (a full table refuses new windows until one ends); a service-binding caller has no address (`Room.redeem` takes `string \| null`; the Worker passes null); `admit` counts every join against its invitation, so `/acts`, `RoomWire.submit` and both redemptions share one limit | (3): one limit across `/acts` and `/redeem`; `/acts` alone; room-custody redemption after joins on `/acts`; an unissued or malformed invitation opens no counter; 22 RPC redemptions are not limited by address; an HTTPS address is limited to 20; ended windows dropped and the cap holds |
+| docs/protocol.md amended where R-ADM-8 and R-GEN-6 conflict | R-ADM-8 names the `join` exception; R-GEN-6, R-SEC-4 and R-CRED-9 say the same; section 31 lists the change | — |
+| Root gates | See "Gates" below | — |
+
+**Contract.** No types change. A repeated client redemption is now refused
+`invitation-invalid` where it used to return `Joined`. The client's `join()`
+recovers a lost response itself: it resubmits the same signed join, which
+returns the original record (R-IDEM-2), and signs a `session` request with
+the key. Its fake room refuses the repeat as the Room does, and
+`packages/client/test/redeem.test.ts` covers the recovery. `room.ts`
+changed by one line: the type of `redeem`'s `address`.
+
+**Limits are in memory.** A restart of the room's object starts the counts
+again. The protocol allows that; it requires the counters to be bounded.
+
+**Mutations**, made one at a time on the committed head; 13 of 13 turned a
+test red:
+
+| Mutant | Red tests |
+|---|---|
+| `redeem` issues a session on a replay | (1), all three |
+| `admit` never reports a replay | (1), all three |
+| a refused join is recorded | (2), `/acts` and RPC |
+| joins on `/acts` are not counted | (3), the three that mix or use `/acts` |
+| a room-custody redemption is not counted | (3) room-custody; `roster.test.ts` per-invitation limit |
+| any string invitation is keyed | (3) unissued invitation; HTTPS address |
+| a null address is counted | (3) RPC |
+| the Worker passes a shared address | (3) RPC |
+| ended windows are not dropped | (3) bounded; one limit across paths |
+| no cap on windows | (3) bounded |
+| the limit allows one more | (3), four tests |
+| the address limit is removed | (3) unissued invitation; HTTPS address |
+| the client's `join()` does not recover | client: lost join response |
+
+The type check `typeof id !== "string"` in `limitInvitation` is not a
+behaviour guard: a join whose invitation is not a string is refused at step
+4 either way.
+
+**Review of 812fb907 (report b3445eae): the client's clock.** The checker
+found that the client's `join()` recovery signed its `session` request with
+`Date.now`, not `ClientOptions.now`. A room on the supplied clock then
+refused the request's `notAfter`. `recoverJoin` now takes the caller's
+clock and reads it inside each attempt, so every retry of the session
+request is signed afresh at the clock's current time. Recovery still
+resubmits the original join bytes and idempotency key, still proves
+possession of the key with a signed session request, and the Room still
+refuses the replayed redemption.
+
+| Test | What it pins |
+|---|---|
+| `test/workerd/checker-join-recovery.test.ts` (the checker's fixture, unchanged) | Recovery over RPC after an eviction and over HTTPS; "checker: join recovery honors the supplied client clock for its signed session request", which failed at 812fb907 |
+| `request-c657d4ba.test.ts`, "virtual clock: a lost join reply is recovered, and a session request retried after the clock moves is signed again at the moved time" | Against the real Room: the first session request fails retryably after the clock moves ten minutes; the retry's `notAfter` is ten minutes later and is accepted; the log holds one join |
+| `packages/client/test/redeem.test.ts`, the two virtual-clock tests | The same two cases against the fake room |
+
+| Mutant in `connect.ts` | Red |
+|---|---|
+| the session request is signed without the clock (`Date.now`) | the checker's clock test; the client's clock test |
+| `Date.now` passed in place of `options.now` | the same two |
+| the clock read once, before the retries | both "retried after the clock moves" tests |
+
+The other clock reads in `packages/client/src` already use the injected
+clock: `RoomClient` signs requests and judges session expiry with
+`this.now()`, and `HttpWire` times calls with `opts.now`. The one remaining
+`Date.now` is the default of the exported `signRequest`'s `now` argument,
+for callers that have no clock of their own. It stays: every caller in the
+package now passes its clock, and making the argument required would change
+the public API. Envelopes carry no time, and the retry sleeps are delays,
+not clock reads.
+
+The three security repairs are unchanged. Main `7cf6aae0` (plan 003 and the
+client hygiene request 55be0661) is merged into this head. The only
+conflict was this README, resolved by keeping both report sections;
+`room.ts` and `worker.ts` merged without conflict.
+
+**Gates**, at the head of `request/sec-join` that adds this section:
+`npm ci`, the client and Room typechecks and suites, the root
+`npm run typecheck` and the root `npm test` exit 0. The Room's Node suite
+passes 125 tests in 12 files, and its workerd suite 411 tests in 31 files.
+
 ## Secrets
 
 The room scans every string in an act's body before recording it

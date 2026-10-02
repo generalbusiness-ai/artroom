@@ -53,7 +53,8 @@ export class RoomWireTarget extends RpcTarget implements RoomWire {
     return unwire((await this.stub.request(req)) as Wire<WorkspaceOp | WorkspaceGrant | Session | Refusal>);
   }
   async redeem(redemption: Redemption): Promise<Joined | Redeemed | Refusal> {
-    return unwire((await this.stub.redeem(redemption, "service-binding")) as Wire<Joined | Redeemed | Refusal>);
+    // A Worker over a service binding has no client address; the invitation's limit still applies (R-CRED-9).
+    return unwire((await this.stub.redeem(redemption, null)) as Wire<Joined | Redeemed | Refusal>);
   }
   /** R-CRED-10: the room signs under the bearer's session key and delegation. */
   async bearerAct(bearer: string, act: BearerAct): Promise<ActRecord | Refusal> {

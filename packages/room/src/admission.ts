@@ -13,6 +13,9 @@
  * 10. seal and commit, apply effects             one synchronous transaction
  * 11. notify, after the commit (R-LOG-13)        a later `notified` entry
  *
+ * A refused `join` is never recorded, at any step: its body carries the
+ * invitation's secret (R-GEN-6, R-ADM-8).
+ *
  * Steps 3 to 9 read state and may await policy evaluation. Step 10 runs in
  * one synchronous transaction that first checks the log head is unchanged;
  * if it moved, the decision is made again (R-ADM-6). A runtime failure at
@@ -99,6 +102,7 @@ import {
 import type { ArtroomConfig, DiffResult, Evaluation, ObligationSpec } from "./ports.ts";
 import { activeAdmins, activeKeys, delegableBy, delegation, invitation, keyRow, memberRow, recoveryKey, revocationOf, teamsOf } from "./roster.ts";
 import { checkBody, checkEnvelopeSize, checkSignedEnvelope, ShapeError } from "./schema.ts";
+import { limitInvitation } from "./ratelimit.ts";
 import { scanValue } from "./secrets.ts";
 import { one, num, str } from "./store.ts";
 import { isConfigPath, Moved, type ActivePolicyFull, type RoomCore } from "./core.ts";
@@ -122,9 +126,16 @@ export interface Pre {
 /** Something to do inside the commit transaction with the room-held key of a room-custody join (R-CRED-3). */
 export interface AdmitHooks {
   readonly heldKeys?: readonly { readonly key: KeyId; readonly seed: Uint8Array; readonly purpose: string }[];
-  /** False for a redemption: a refused redemption records nothing (R-CRED-9). */
-  readonly recordRefusals?: boolean;
 }
+
+/** What one admission did: its result, and whether it is the stored result of an earlier admission (R-IDEM). */
+export interface Admitted {
+  readonly result: ActRecord | Refusal;
+  readonly replay: boolean;
+}
+
+/** A `join` carries its invitation's secret in the body (R-GEN-6). */
+const isJoinOp = (env: Pick<Envelope, "kind" | "body">): boolean => env.kind === "roster" && (env.body as { op?: unknown }).op === "join";
 
 interface Ctx {
   readonly core: RoomCore;
@@ -179,6 +190,17 @@ const nope = (rule: Refusal["rule"], reason: string, fix?: string, current?: Ref
  * and for runtime failures, which record nothing.
  */
 export async function submit(core: RoomCore, input: unknown, path: AdmissionPath, hooks: AdmitHooks = {}): Promise<ActRecord | Refusal> {
+  return (await admit(core, input, path, hooks)).result;
+}
+
+/**
+ * As `submit`, and says whether the result is a replay: the stored result of
+ * an earlier admission of the same envelope, which this call did not make.
+ * A `join` refused at steps 7 to 9 is not recorded on any path, because its
+ * body carries the invitation's secret (R-GEN-6, R-ADM-8). Every attempt to
+ * join counts against the invitation's rate limit (R-CRED-9).
+ */
+export async function admit(core: RoomCore, input: unknown, path: AdmissionPath, hooks: AdmitHooks = {}): Promise<Admitted> {
   // Step 1: parse, version, room ID, size (R-SIG-4, R-SIG-5, R-SIG-6).
   try {
     checkSignedEnvelope(input);
@@ -189,6 +211,8 @@ export async function submit(core: RoomCore, input: unknown, path: AdmissionPath
   const signed = input as SignedEnvelope;
   const env = signed.envelope;
   if (env.room !== core.roomId) throw artroomError("unauthenticated", "The envelope names a different room.");
+  const join = isJoinOp(env);
+  if (join) limitInvitation(core, (env.body as { invitation?: unknown }).invitation);
   let canonical: string;
   try {
     canonical = canonicalize(env);
@@ -213,9 +237,9 @@ export async function submit(core: RoomCore, input: unknown, path: AdmissionPath
       core.expireDueSync();
       const snap = core.headSeq();
       const plan = await decide(core, signed, path, pre);
-      if (plan.t === "replay") return plan.result;
-      if (plan.t === "unrecorded") return plan.refusal;
-      if (plan.t === "refused" && hooks.recordRefusals === false) return plan.refusal;
+      if (plan.t === "replay") return { result: plan.result, replay: true };
+      if (plan.t === "unrecorded") return { result: plan.refusal, replay: false };
+      if (plan.t === "refused" && join) return { result: plan.refusal, replay: false };
       try {
         const out = core.sql.transaction(() => {
           if (core.headSeq() !== snap) throw new Moved();
@@ -223,10 +247,10 @@ export async function submit(core: RoomCore, input: unknown, path: AdmissionPath
           if (late) return { late };
           return { done: commit(core, plan, hooks) };
         });
-        if ("late" in out) return out.late;
+        if ("late" in out) return { result: out.late, replay: false };
         core.committed();
         if (plan.t === "accept" && plan.afterCommit) plan.afterCommit(out.done.id, out.done.entry);
-        return out.done.result;
+        return { result: out.done.result, replay: false };
       } catch (e) {
         if (e instanceof Moved) continue;
         throw e;

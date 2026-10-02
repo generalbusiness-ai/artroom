@@ -99,7 +99,8 @@ export class Room extends DurableObject<RoomEnv> {
     return wire(() => request(this.core, req));
   }
 
-  redeem(redemption: unknown, address: string): Promise<Wire<Joined | Redeemed | Refusal>> {
+  /** `address` is the HTTPS client's, or null for a Worker over a service binding (R-CRED-9). */
+  redeem(redemption: unknown, address: string | null): Promise<Wire<Joined | Redeemed | Refusal>> {
     return wire(() => redeem(this.core, redemption, address, this.mcpBase));
   }
 
