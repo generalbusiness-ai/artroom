@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b9999d18f321d168609e88f813fe5ca755e793b1","text":"Merge retired a covered predecessor; the successor is at packages/room/README.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cb5727d8ddd8dea1dcb418f7749538852d7fac57","text":"Merge retired a covered predecessor; the successor is at packages/room/src/room.ts."}
