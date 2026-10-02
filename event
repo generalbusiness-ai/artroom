@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/ui/test/review-f3fff92c.test.tsx","body":{"commit":"6f8cacbe4af775a2f065d0fbbb78181f3f60dc65","path":"packages/ui/test/review-f3fff92c.test.tsx"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:02357386393c8b9125b172d2a6055c9d15634e7a","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/room/mock/world.ts."}
