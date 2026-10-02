@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4aecd3ce2dc92b6959f77bd4ca5c8736d73b3364","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa; the successor stands at packages/room/src/mcp.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:65c2ae0a6872d351a932135b3eb61bc6d1ea4612","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/room/src/memory/artifacts.ts: the pointer is withdrawn with no successor."}
