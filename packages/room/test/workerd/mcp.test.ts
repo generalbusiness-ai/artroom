@@ -104,11 +104,14 @@ describe("the route guards", () => {
     expect((await body(byName)).result.tools).toHaveLength(10);
   });
 
-  it("other paths are untouched: /mcp/x and /mcpx are not the MCP route", async () => {
+  it("other paths are untouched: /mcp/x and /mcpx are the router's 404, not the MCP handler's", async () => {
     const r = await makeRoom();
     const b = await bearer(r);
-    expect((await rpc(`${r.id}/mcp/x`, b.bearer, "tools/list")).status).toBe(404);
-    expect((await rpc(`${r.id}/mcpx`, b.bearer, "tools/list")).status).toBe(404);
+    for (const path of [`${r.id}/mcp/x`, `${r.id}/mcpx`]) {
+      const res = await rpc(path, b.bearer, "tools/list");
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({ name: "ArtroomError", code: "not-found", message: "No such route." });
+    }
   });
 
   it("legacy stateless mode: GET has no session stream, 405", async () => {
