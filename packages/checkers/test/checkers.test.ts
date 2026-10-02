@@ -32,6 +32,11 @@ test("every malformed or misdirected job is refused check-binding before any san
   const tree = { kind: "tree" as const, tree: sha };
   const bad: [string, Partial<CheckJob>][] = [
     ["another room", { room: `room_${"b".repeat(32)}` }],
+    ["a room name, not an ID", { room: "my-room" as never }],
+    ["bad base", { base: "xyz" as Sha }],
+    ["no volatile flag", { volatile: undefined as never }],
+    ["no advisory flag", { advisory: "yes" as never }],
+    ["a malformed runner digest", { runner: "sha256:zz" as never }],
     ["another checker", { check: "types" }],
     ["bad integration", { integration: "xyz" as Sha }],
     ["the admin obligation", { obligation: "obl_admin-approval" }],
