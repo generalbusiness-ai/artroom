@@ -292,6 +292,9 @@ describe("R-CARRY-14: the runner environment is the configuration's pin", () => 
     expect(evs[0]).toMatchObject({ integration: ready.integration, act: check.id, outcome: { carried: false, notCarried: { code: "config-changed" } }, decisions: [] });
     expect(evs[0]!.policy).toBe(await inDO(r, (room) => room.core.activePolicy().version));
     expect(await inDO(r, (room) => room.core.sql.all("SELECT 1 FROM check_carries"))).toEqual([]);
+    // Readiness again on the same integration and policy: the judgment stands, and is not sealed twice.
+    await inDO(r, (room) => room.core.landing.evaluate(ready.id as never));
+    expect(await carriedEvents(r)).toHaveLength(1);
   });
 
   it("R-CARRY-14 no runner pinned: the check meets the obligation on its own integration, but never carries (runner-changed)", async () => {
