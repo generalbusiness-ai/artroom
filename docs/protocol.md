@@ -2833,27 +2833,38 @@ Room retries the same cohort for ever while the log silently stops
 publishing. The `inputs/` tree also grows without bound: 97 bytes per
 retained file, so it passes 32 MiB at about 346,000 files.
 
+The answer has four parts, and it adds no limit on what a room may record:
+- a layout named in the signed checkpoint, so old logs verify as before
+  (R-LOG-16);
+- segments that close at a byte bound (R-LOG-17);
+- one chunking rule for any file over the bound, including an entry line,
+  and one fan-out rule for every directory (R-LOG-18, R-LOG-19);
+- publication outcomes that keep every pushed commit until it is resolved,
+  and report a refusal loudly (R-LOG-20).
+
 This section holds every new rule, as section 29 does. Where a rule here
 amends an earlier one, it says so; the earlier rule is read with the
-amendment.
+amendment. Revision 2 answers review 2e38de90 (30.11).
 
 ### 30.1 Two layouts (R-LOG-16)
 
 **R-LOG-16. The checkpoint names the layout.**
 - Layout 1 is R-LOG-9 as first written. Layout 2 is R-LOG-9 with R-LOG-17
-  and R-LOG-19.
+  to R-LOG-19.
 - A layout 2 commit's checkpoint has `layout: { version: 2, from }`
   (`LogLayout`). It is signed with the rest of the checkpoint (R-LOG-8). A
   checkpoint without `layout` is layout 1.
-- `from` is the first seq that the byte rule of R-LOG-17 places. It is 0
-  when the log's first commit is layout 2. When a room switches, it is the
-  `through` of the confirmed parent, the last layout 1 commit, plus one.
-- Once a log commit is layout 2, every later commit is layout 2 with the
-  same `from`.
-- The Room switches at its first publication, after this amendment is
-  deployed, whose parent is confirmed or which has no parent. A pending
-  layout 1 cohort whose outcome is unknown is completed first (R-LOG-8). One
-  that was definitely refused is not (R-LOG-20).
+- `from` is the first seq that the byte rule of R-LOG-17 places: the
+  `through` of the commit's parent plus one, or 0 when it has no parent.
+  The first confirmed layout 2 commit fixes it. Every later commit is
+  layout 2 with the same `from`.
+- Until a layout 2 commit is confirmed, a layout 2 cohort takes `from` from
+  its own parent. So if an outstanding layout 1 commit lands late
+  (R-LOG-20), the next layout 2 cohort builds on it, with `from` one past
+  its `through`.
+- The Room writes layout 2 for every cohort it builds after this amendment
+  is deployed. A layout 1 commit it pushed before stays outstanding until
+  it is resolved (R-LOG-20).
 - Entries do not change. Their format stays `artroom-log-v1`, and the tree
   root stays `artroom-log/v1/`.
 
@@ -2868,9 +2879,10 @@ before this amendment.
 
 **R-LOG-17. In layout 2, a segment closes at 1,000 entries or at the
 object bound.**
-- A segment's bytes are its entries' canonical lines joined by newlines
-  (`0x0A`), with no newline after the last line. That is the blob R-LOG-9
-  already writes.
+- A segment's bytes are its lines joined by newlines (`0x0A`), with no
+  newline after the last. From `from` on, each entry's line is its
+  canonical line, or its `ChunkedLine` when the canonical line is over B
+  (R-LOG-18).
 - Entries are placed in seq order. Entry `n` starts a new segment when the
   current segment holds 1,000 entries, or when `n` is at least `from` and
   the current segment's bytes, plus one, plus the length of `n`'s line,
@@ -2879,7 +2891,7 @@ object bound.**
   layout 1 stay as they are. The segment open at the switch continues under
   the byte rule. If it already holds more than B bytes, it closes at the
   switch, and entry `from` starts a new segment.
-- Since each line is far below B (R-LOG-18), every segment that holds an
+- No line placed from `from` on is over B, so every segment that holds an
   entry from `from` on is at most B bytes.
 - Segment boundaries depend only on the lines' lengths and `from`. Any two
   publishers given the same parent, entries, checkpoint and retained files
@@ -2889,110 +2901,141 @@ object bound.**
   last only grows. This replaces R-LOG-9's last paragraph: in layout 1 the
   segments other than the last are exactly the full ones.
 
-### 30.3 The entry bound (R-LOG-18)
+### 30.3 One chunking rule (R-LOG-18)
 
-**R-LOG-18. An entry sealed after this amendment is deployed has a
-canonical line of at most 1 MiB (1,048,576 bytes).**
-- The Room checks the bound after the receipt is complete and before it
-  commits (R-LOG-2, steps 2 and 6).
-- An act or a recorded refusal whose entry would exceed it is refused with
-  `body-too-large` and not recorded. Amends R-SIG-6, which bounds the
-  envelope (64 KiB) but not the receipt. The refusal is deterministic for
-  the same act and room state.
-- The Room never seals a system event over the bound. It attends its admins
-  with `log-entry-too-large`, which names the event type and its size, and
-  fails closed:
+**R-LOG-18. In layout 2, a file over B is a directory of chunks at the
+same path.**
+- This applies to every file of the log tree: `genesis.json`, every
+  retained replay context, policy document and checker configuration, and
+  the file of an entry over B (below). A segment never needs it: it is at
+  most B by R-LOG-17, or it is a layout 1 segment, which keeps its blob.
+- The chunks are the file's bytes in order: each exactly B bytes, except the
+  last, which has 1 to B bytes. They are named by their index, as 12
+  decimal digits from `000000000000`. The directory is fanned out like any
+  other (R-LOG-19). A reader reassembles the bytes, then checks them as it
+  would the file: a retained file by the digest in its name, an entry by
+  its hash and signature.
+- **An entry over B.** An entry from `from` on whose canonical line is over
+  B is stored as the file `artroom-log/v1/entries/<seq>.jsonl`, which is
+  therefore chunked. `<seq>` is 12 decimal digits. In its segment the entry has a
+  `ChunkedLine` instead: `{"chunked":{"bytes":N,"digest":"sha256:…"},"seq":n}`
+  in canonical form, where N is the line's length and the digest is the
+  SHA-256 of its bytes. It has no key that an entry has, so a reader cannot
+  mistake it for one.
+- The entry's bytes, hash and signature are unchanged: the reassembled line
+  is exactly the line the room sealed. This covers entries of any size,
+  including entries sealed before this amendment and not yet published,
+  and old replay contexts and policy files that were never published.
+- Nothing else changes for a large entry. The Room seals, stores and
+  publishes entries of any size; notifications, revert lanes, recomputed
+  obligations and policy activations are recorded in full, however many
+  members, paths, rules or checkers they name. R-SIG-6's envelope limit
+  is unchanged.
 
-| Event over the bound | What the Room does instead |
-|---|---|
-| `notified`, or a `notify` replay context over B | Ends the queued evaluation: nobody is notified for that entry (R-LOG-13) |
-| `revert-lane` | Opens no lane. The admins' item is the only record; an admin can claim the revert |
-| `check-carried` | The check does not carry (R-CARRY-13) |
-| `land-evaluated` | The operation ends `failed`, with the refusal `body-too-large` |
-| `land-outcome` `failed` with `conflict` | Seals it with an empty `paths` list, which means "too many to list" |
-| `obligations-recomputed` | Refuses `land` on that generation with `body-too-large` until a new generation is admitted |
-| `genesis` | `draft` refuses the room with `bad-request` |
-| Any other | Its size is fixed, or grows only past counts no room reaches: over 40,000 open landing operations (`policy-activated.fenced`) or 35,000 pieces of evidence for one landing (`land-reserved`). If one is ever over the bound, the Room does not do the work that needed it |
+### 30.4 The object bound and directory fan-out (R-LOG-19)
 
-`artroom verify` does not check this bound, because entries sealed before
-this amendment may exceed it. R-LOG-17 bounds what is published.
-
-R-POL-1 is amended so that policy files are bounded too: a policy document
-is at most 1 MiB of canonical bytes, a checker configuration at most
-1 MiB, and a head has at most 256 checker configurations. A head that
-breaks any of these is refused with `policy-invalid`. So no activated
-policy file can exceed B, and `policy-activated.checkers` holds at most
-256 pairs.
-
-### 30.4 Every log object is under the object bound (R-LOG-19)
-
-**R-LOG-19. B is 8 MiB (8,388,608 bytes).**
-- B bounds every git object the log writes in layout 2: blobs, trees and
-  commits. An object's size is the length of its content, without git's
-  `<type> <size>\0` header. Artifacts' limit was measured on that size.
+**R-LOG-19. B is 8 MiB (8,388,608 bytes), and no directory lists more than
+4,096 entries.**
+- B bounds every blob a layout 2 commit writes. An object's size is the
+  length of its content, without git's `<type> <size>\0` header.
+  Artifacts' limit was measured on that size.
 - B is a quarter of Artifacts' limit, 25,165,824 bytes below it. The margin
   is large because:
   - the limit is measured, not documented, and may change;
   - the active segment is a new blob at every publication, so B also
     bounds how much of it one publication sends again. B equals one
     staging part of lane L's publisher (`LOG_TRANSFER_LIMITS`, 8 MiB).
-- In layout 2, retained files are fanned out by the first two hex
-  characters of their digest:
-  `artroom-log/v1/inputs/<hh>/<hex>.json` and
-  `artroom-log/v1/policies/<hh>/<hex>.json`. A file's blob does not change,
-  only its path. At the switch, every file published before moves to its
-  new path. Amends R-LOG-9's table.
+- **Fan-out.** In layout 2 the directories `segments/`, `entries/`,
+  `inputs/` and `policies/`, and every chunk directory, are fanned out by
+  name. Each name has a key: 12 decimal digits for a segment, an entry
+  file or a chunk, and 64 hex characters for a retained file. Keys are cut
+  into groups of three digits or two hex characters.
+  - A directory that would list at most 4,096 names lists them.
+  - Otherwise it lists one subdirectory for each distinct next group of the
+    names' keys, named by that group, and the rule applies again inside
+    each subdirectory.
+  - Names are never removed, so a directory that has split stays split.
+    Where each name goes depends only on the set of names, so the trees are
+    deterministic. `shardsOf` in `examples/log-layout.ts` is the reference.
+  - Every key is unique, so the split always ends: once three decimal
+    groups are used, a directory holds at most 1,000 names, and once 31 hex
+    groups are used, at most 256.
+  - A room with at most 4,096 of each keeps R-LOG-9's paths unchanged.
+- So every tree is small. A directory of names holds at most 4,096 entries
+  of at most 97 bytes, 397,312 bytes in all. A split directory holds at most
+  1,000 subdirectories of 30 bytes. The root and `artroom-log/v1/` trees
+  hold at most six entries. A commit is a few hundred bytes.
+- **The publisher's guard.** In layout 2, every blob is at most B and every
+  tree is small by construction. The publisher still checks every object
+  it would write against B when it plans the commit, before the Room stores
+  the cohort. An object over B means a fault in the publisher. The cohort
+  is not stored and nothing is pushed, so nothing is outstanding. It is a
+  definite failure, `object-too-large` (R-LOG-20). Objects reused from the
+  parent by ID are not written, so they are not checked: a layout 1 segment
+  over B that is already published stays.
+- At the switch, every retained file moves to its layout 2 path, chunked if
+  it is over B. A file at or under B keeps its blob ID. Amends R-LOG-9's
+  table.
 
-Each object in layout 2, and what bounds it:
+### 30.5 Publication outcomes (R-LOG-20)
 
-| Object | Bound |
-|---|---|
-| Segment blob | B, by R-LOG-17 |
-| `segments/` tree | 46 bytes per segment. It reaches B at 182,361 segments: 182 million entries, or over 1 TiB of log |
-| `inputs/` and `policies/` trees | At most 256 entries of 29 bytes |
-| Each `inputs/<hh>/` or `policies/<hh>/` tree | 97 bytes per file. It reaches B at 86,480 files, about 22 million retained files when digests spread evenly |
-| Policy document, checker configuration | 1 MiB (R-POL-1, as amended in 30.3) |
-| Replay context | Its rule input is at most 256 KiB (R-EVAL-2). Only a `notify` context grows with the room: its directory reaches B at over 90,000 members, and R-LOG-18 then applies |
-| `genesis.json`, `checkpoint.json`, the root and `artroom-log/v1/` trees, the commit | A few kilobytes |
+**R-LOG-20. Every pushed log commit is outstanding until it is resolved,
+and a stalled log attends the admins.**
+- **Outstanding commits.** The Room records each log commit, with its
+  parent, `through` and `hash`, durably before its first push. It stays
+  outstanding until it is resolved. Every push of a commit leases its
+  parent (R-LOG-8). The ref only moves forward, and only to commits the
+  Room wrote, so a commit is resolved only when the ref is read back:
+  - at the commit: it is **confirmed**. The Room seals its `checkpoint`
+    event and builds the next cohort on it;
+  - at a commit that is not its parent: it **cannot apply**, because its
+    lease names a value the ref will never hold again.
 
-- **The publisher's guard.** Before it sends anything, the publisher checks
-  every object it would write against B. An object over B is a definite
-  failure, `object-too-large` (R-LOG-20), and nothing is sent. Objects
-  reused from the parent by ID are not written, so they are not checked: a
-  layout 1 segment over B that is already published stays.
-
-### 30.5 A refused push is a definite failure (R-LOG-20)
-
-**R-LOG-20. A refused log push stops publication and attends the
-admins.**
-- A push of a log commit is **refused** when the remote answers that it did
+  A definite refusal of one push, a read-back at the parent, the expiry of
+  a write token, and its revocation each prove only that one attempt did
+  not apply. An earlier attempt whose answer was lost may still apply. None
+  of them resolves a commit.
+- **Reading back.** After every push, and before the Room builds a cohort,
+  it reads the ref. If the ref holds any outstanding commit, the Room
+  confirms that commit, whichever attempt wrote it, and every other
+  outstanding commit on the same parent cannot apply. If the ref holds its
+  last confirmed commit, nothing has changed. Anything else is another
+  writer.
+- **A refused push.** A push is refused when the remote answers that it did
   not apply it. That is a `[rejected]` or `[remote rejected]` status for
   `refs/artroom/log` other than a lease refusal, or an Artifacts error code
   in answer to the pack that Artifacts gives before it updates any ref,
   such as `artifacts_git_receive_pack_object_too_large`. A lease refusal is
-  still a lease mismatch (R-LOG-8). An answer that is not clear is still
-  unknown, and the same commit is pushed again.
-- After a refusal the publisher reads the ref back, as for every push. At
-  the new commit, the publication is confirmed. At the parent, it is a
-  **definite publication failure**. At anything else, it is another writer.
-- A failure of the publisher's guard (R-LOG-19) is also definite.
-- After a definite failure, the Room:
-  1. never pushes that commit again: the cohort is no longer pending, and
-     the next attempt chooses N again (R-LOG-8 step 1). This amends the
-     Room's rule that a pending cohort is published until it is confirmed,
-     which still holds for an unknown outcome;
-  2. attends its admins once with `log-publication-failed`, giving the
-     reason (`refused` or `object-too-large`) and the remote's answer. A
-     repeated failure keeps the same item open; it does not add another;
-  3. tries again no sooner than one hour later, or when it restarts, for
-     example after a deployment;
+  still a lease mismatch, and is resolved by reading back. An answer that
+  is not clear is still unknown.
+- **After a refusal**, the Room:
+  1. keeps the refused commit outstanding, and does not push it again;
+  2. attends its admins once with `log-publication-stalled`, giving the
+     reason (`refused`) and the remote's answer. A repeated refusal keeps
+     the same item open; it does not add another;
+  3. after at least one hour, or when it restarts (for example after a
+     deployment), builds a new cohort on its last confirmed commit and
+     pushes that, with the same lease. Both commits lease the same parent,
+     so at most one can apply, and reading back says which;
   4. keeps admitting acts. `publishedThrough` stays where it was, and the
-     lag shows it (R-LOG-11);
-  5. closes the item when a publication is confirmed.
-- Another writer on `refs/artroom/log` gives the same item with the reason
-  `unexpected-writer`, and publication stops, as it does today. The Room no
-  longer reports it as `publication-unresolved` with the operation
-  `op_log`, which names no operation.
+     lag shows it (R-LOG-11).
+- **During the switch.** A refused layout 1 commit stays outstanding while
+  the Room pushes a layout 2 cohort on the same parent. If the layout 2
+  commit is confirmed, the layout 1 commit cannot apply. If an earlier
+  push of the layout 1 commit lands late instead, the Room confirms it, and
+  its next cohort is layout 2 on it, with `from` one past its `through`
+  (R-LOG-16).
+- **An unclear answer.** The Room pushes the same commit again, with
+  backoff, as before. If a commit has been outstanding for an hour with no
+  confirmed publication, the Room attends its admins with the reason
+  `unresolved`, and keeps trying.
+- **Another writer** gives the item with the reason `unexpected-writer`,
+  and publication stops, as it does today. The Room no longer reports it
+  as `publication-unresolved` with the operation `op_log`, which names no
+  operation.
+- **The guard** (R-LOG-19) gives the item with the reason
+  `object-too-large`. The Room tries again after an hour or a restart.
+- The item closes when a publication is confirmed.
 
 ### 30.6 Verification (amends R-LOG-10)
 
@@ -3003,16 +3046,22 @@ checks:
 - that no layout 1 commit follows a layout 2 commit, that every layout 2
   commit has the same `from`, and that the first one's `from` is its
   parent's `through` plus one, or 0 when it has no parent;
-- that a layout 2 commit's segments start exactly where R-LOG-17 says, and
-  that every segment holding an entry from `from` on is at most B bytes;
+- that a layout 2 commit's segments start exactly where R-LOG-17 says;
+- that every blob in a layout 2 commit is at most B bytes, except segments
+  that hold only entries before `from`, and that every directory follows
+  R-LOG-19's fan-out;
+- that each `ChunkedLine` names an entry file whose reassembled bytes have
+  its length and digest, and whose entry has its seq. The entry is then
+  checked like any other;
 - in both layouts, that every segment except the last is unchanged in each
   later commit, and that the last segment's lines are a prefix of the same
   segment's lines in the next commit;
 - that in layout 2 each retained file is at its fanned-out path, named by
-  its digest. A file at any other path carries no meaning (R-LOG-14).
+  its digest, and reassembled first if it is chunked. A file at any other
+  path carries no meaning (R-LOG-14).
 
-Each needs a named failure reason, such as `layout-changed` and
-`segment-bound`.
+Each needs a named failure reason, such as `layout-changed`,
+`segment-bound` and `chunk-mismatch`.
 
 ### 30.7 Acceptance cases
 
@@ -3023,82 +3072,89 @@ Each is normative.
 | **Byte close.** Layout 2; entries near the 64 KiB envelope bound | After about 128 entries, the next entry starts a new segment, because it would take the first past 8,388,608 bytes. Every segment is at most B; earlier segments never change; verify passes | R-LOG-17 |
 | **Count close.** Layout 2; small entries | Segments close at 1,000 entries, as in layout 1 | R-LOG-17 |
 | **Edge.** An entry that brings the segment to exactly B bytes, newlines included; then one that would bring it to B + 1 | The first is appended; the second starts a new segment | R-LOG-17 |
-| **Determinism.** The same parent, entries, checkpoint and retained files, given to two publishers and to one publisher before and after a restart | The same commit ID each time; its segments start where `segmentStarts` in `examples/log-layout.ts` says | R-LOG-17 |
+| **Determinism.** The same parent, entries, checkpoint and retained files, given to two publishers and to one publisher before and after a restart | The same commit ID each time; its segments, chunks and shard directories are where `examples/log-layout.ts` says | R-LOG-17 to R-LOG-19 |
 | **Old log.** A layout 1 log whose full segments include one of 20 MiB | Verifies as before | R-LOG-16, 30.6 |
-| **Switch, large open segment.** A layout 1 log published through W, whose open segment holds 300 entries and 20 MiB | The next commit has `layout: { version: 2, from: W + 1 }`; that segment is unchanged and closed; entry W + 1 starts a new segment; retained files move to fanned-out paths with the same blob IDs; verify passes across the switch | R-LOG-16, R-LOG-17, R-LOG-19 |
+| **Switch, large open segment.** A layout 1 log confirmed through W, whose open segment holds 300 entries and 20 MiB | The next commit has `layout: { version: 2, from: W + 1 }`; that segment is unchanged and closed; entry W + 1 starts a new segment; verify passes across the switch | R-LOG-16, R-LOG-17 |
 | **Switch, small open segment.** The open segment holds 3 entries at the switch | It continues, and closes at 1,000 entries or at B | R-LOG-17 |
+| **Unpublished old entry over B.** A layout 1 log confirmed through a 10-byte entry 0; entry 1, sealed before the upgrade and never published, has a line of 8,388,609 bytes | The switch commit has `from: 1`. Segment 0 holds entry 0 and the `ChunkedLine` for entry 1; `entries/000000000001.jsonl` holds two chunks of 8,388,608 and 1 bytes. Every blob is at most B; the push is accepted; verify reassembles the line and checks entry 1's hash and signature | R-LOG-18 |
+| **Retained prefix.** 5,000 retained files whose digests share their first two hex characters, and one replay context and one policy document of 20 MiB, never published | `inputs/<hh>/` splits again by the next two characters, so no tree lists more than 4,096 entries; each 20 MiB file is three chunks; verify finds and checks each by its digest | R-LOG-18, R-LOG-19 |
+| **Many segments.** A log of 5 million small entries | `segments/` splits by digit groups; every tree is under 397,312 bytes | R-LOG-19 |
+| **Large notification.** A `notify` rule targets a role with 200,000 members | The `notified` event is sealed with every recipient and decision, published as a chunked entry, and verified; every recipient is notified | R-LOG-18 |
+| **Large revert.** A landing that changed 100,000 paths is reverted after landing | The `revert-lane` event lists every path; the lane opens with that scope; the event is published and verified | R-LOG-18, R-REV-6 |
+| **Large activation.** A landing changes the policy and adds 2,000 checker configurations, with 20 MiB of policy files; obligations are recomputed for 500 open proposals | `policy-activated` names every checker; every `obligations-recomputed` event is sealed; each file over B is chunked; verify replays every decision | R-LOG-18, R-POL-9 |
 | **Layout regression.** A layout 2 commit followed by a layout 1 commit, or by a layout 2 commit with another `from` | Verify fails with `layout-changed` | 30.6 |
 | **Misplaced boundary.** A layout 2 commit whose segment starts differ from R-LOG-17 | Verify fails with `segment-bound` | 30.6 |
-| **Act over the entry bound.** An act whose receipt makes its entry 1,048,577 bytes | Refused `body-too-large`, not recorded; one of exactly 1,048,576 bytes is sealed | R-LOG-18 |
-| **System event over the entry bound.** A landing reverted after it changed enough paths to make `revert-lane` over 1 MiB | No lane opens; admins get `log-entry-too-large` naming `revert-lane`; nothing else changes | R-LOG-18 |
-| **Policy too large.** A proposal whose head has a 1.5 MiB `.artroom/policy.json`, or 257 checker configurations | Refused `policy-invalid` | R-POL-1 as amended |
-| **Fan-out.** 100,000 retained files | Every `inputs/<hh>/` tree is under B; verify finds each file at its fanned-out path | R-LOG-19 |
-| **Guard.** A cohort that would write an object over B | The publisher sends nothing and fails `object-too-large`; the Room attends its admins | R-LOG-19, R-LOG-20 |
-| **Refused push.** Artifacts answers `artifacts_git_receive_pack_object_too_large` (the response recorded on 2026-10-02) | Lane B reports `refused` with the code; the ref reads back at the parent; the Room drops the cohort, attends its admins once with `log-publication-failed`, pushes nothing for an hour, and keeps admitting acts | R-LOG-20 |
+| **Bad chunk.** A chunk of an entry file or retained file is changed | Verify fails with `chunk-mismatch` | 30.6 |
+| **Guard.** A faulty publisher plans an object over B | The cohort is not stored and nothing is pushed; admins get `object-too-large` | R-LOG-19, R-LOG-20 |
+| **Refused push.** Artifacts answers `artifacts_git_receive_pack_object_too_large` (the response recorded on 2026-10-02) | Lane B reports `refused` with the code; the ref reads back at the parent; the commit stays outstanding and is not pushed again; admins get one `log-publication-stalled` item; acts are still admitted | R-LOG-20 |
 | **Refused, by status.** A `[remote rejected]` status for `refs/artroom/log` | As for the refused push | R-LOG-20 |
-| **Unclear answer.** The connection drops after the pack is sent | `unknown`, as before: the same commit is pushed again | R-LOG-20, R-LOG-8 |
-| **Recovery.** A room whose layout 1 cohort was refused, because its open segment is over 32 MiB, is upgraded | Its next publication is layout 2 from the confirmed parent; it is accepted; the admins' item closes | R-LOG-16, R-LOG-20 |
+| **Late earlier push.** Push 1 of commit C on parent P gets no clear answer; push 2 of C is refused; the ref reads back at P. An hour later the Room pushes cohort D on P; then push 1 lands | Either D's push fails its lease and the ref holds C, or the ref holds D. If C: the Room confirms C, seals its checkpoint event, D cannot apply, and the next cohort builds on C. If D: C cannot apply. No `unexpected-writer` either way | R-LOG-20 |
+| **Late push during the switch.** As above, with C a layout 1 commit and D the layout 2 switch commit | If C lands, the next cohort is layout 2 on C with `from` one past C's `through`; if D lands, `from` is one past P's `through`. Verify passes either way | R-LOG-16, R-LOG-20 |
+| **Unclear answer.** The connection drops after the pack is sent | `unknown`: the same commit is pushed again. After an hour with no confirmation, admins get `unresolved` | R-LOG-20 |
+| **Recovery.** A room whose layout 1 commit was refused, because its open segment is over 32 MiB, is upgraded | Its next cohort is layout 2 on the confirmed parent; it is accepted; the refused commit cannot apply; the admins' item closes | R-LOG-16, R-LOG-20 |
 
 ### 30.8 Conditions and changes
 
 | Condition | Rules | Types (`packages/contract`) |
 |---|---|---|
-| (1) A segment closes at a byte bound; every log object under the limit with a margin; oversize entries; other unbounded objects; layout kept otherwise; `commitFor` deterministic | R-LOG-16 to R-LOG-19; amends R-LOG-9, R-LOG-10, R-SIG-6 and R-POL-1 | New `LogLayout`; `Checkpoint.layout?`; comments on `PublishedLayout` |
-| (2) A refused push is a definite failure with an admin item | R-LOG-20; amends R-LOG-8 and the Room's pending-cohort rule | `AttentionWhy` gains `log-publication-failed` and `log-entry-too-large` |
-| (3) Lane edits and acceptance cases | 30.7, 30.9 | `examples/log-layout.ts` compiles the new types and gives `segmentStarts` |
+| (1) A segment closes at a byte bound; every log object under the limit with a margin; entries over the bound; other unbounded objects; layout kept otherwise; `commitFor` deterministic | R-LOG-16 to R-LOG-19; amends R-LOG-9 and R-LOG-10 | New `LogLayout` and `ChunkedLine`; `Checkpoint.layout?`; comments on `PublishedLayout`, which gains `entries/` |
+| (2) A refused push is a definite failure with an admin item | R-LOG-20; amends R-LOG-8 and the Room's pending-cohort rule | `AttentionWhy` gains `log-publication-stalled` |
+| (3) Lane edits and acceptance cases | 30.7, 30.9 | `examples/log-layout.ts` gives `segmentStarts`, `chunks` and `shardsOf` |
 | (4) Amendment and review only | This section | — |
 
 Both type changes are additive. `Checkpoint.layout` is optional, so every
 checkpoint published before this amendment still has the type. The new
-attention items are new cases of a union; a `switch` over `why` that has
-no default must handle them.
+attention item is a new case of a union; a `switch` over `why` must handle
+it.
 
 ### 30.9 Required lane edits
 
 "(type)" marks an edit that a lane's typecheck forces. Packages on main
 (b5864882) typecheck at this amendment's head, because this branch adds
-the two attention cases to lane F's screen and lane E's CLI.
+the new attention case to lane F's screen and lane E's CLI.
 
 **Lane L (`packages/log`, including `artroom verify`)**. The publisher of
 request a6aa60c9 (main b5864882) streams each segment from an
 `EntrySource`, builds every commit in one synchronous `plan`, and keeps
 an `Index` of its last commit. Its edits:
-1. `plan` writes the layout the checkpoint names. For layout 2, the
-   segment starts follow R-LOG-17. The `Index` keeps each segment's
-   `first` and blob ID, not a list by multiples of 1,000. Closed segments
-   are still reused by ID and never read. New boundaries need only the
-   open segment's `first` and the lengths of its lines, which the size
-   pass already records. Retained files go to their fanned-out paths,
-   including in `digestPath`. Layout 1 output does not change, so the
-   comparison with `test/support/publisher-417a1618.ts` still holds for
-   layout 1 checkpoints.
-2. `commitFor` stays synchronous. With the publisher's last commit as the
+1. `plan` writes the layout the checkpoint names. For layout 2: segment
+   starts by R-LOG-17; a `ChunkedLine` and a chunked entry file for a line
+   over B; chunked retained files and `genesis.json` over B; and fanned-out
+   directories by R-LOG-19. The `Index` keeps each segment's `first` and
+   blob ID, and the names in each shard directory, instead of lists by
+   position. Closed segments and existing shards are reused by ID and not
+   read. Layout 1 output does not change, so the comparison with
+   `test/support/publisher-417a1618.ts` still holds for layout 1.
+2. A line over B is hashed and sent in B-byte chunks, read in parts, so the
+   publisher's memory stays bounded as R-LOG-9's segments' does. An
+   `EntrySource` may return a large line in parts.
+3. `commitFor` stays synchronous. With the publisher's last commit as the
    parent, it uses the `Index`. With any other parent, it places every
    segment from `entries` and the checkpoint's `from`, as `segmentStarts`
-   does. Either way it needs nothing beyond its arguments.
-3. The guard (R-LOG-19) goes in `plan`, over every planned object's size,
-   so `commitFor` and `publish` both refuse a cohort with an object over B,
-   with a new `PublishError` code `object-too-large`, not retryable.
-   Nothing is staged or pushed.
-4. `GitRemote.push`'s `PushOutcome` gains
+   does.
+4. The guard (R-LOG-19) goes in `plan`, over every planned object's size,
+   so `commitFor` and `publish` both refuse, with a new `PublishError` code
+   `object-too-large`, not retryable.
+5. `GitRemote.push`'s `PushOutcome` gains
    `{ ok: false, reason: "refused", code, detail }`. After it, read back:
    at the commit, done; at the lease, fail with a new code `refused`, not
-   retryable, without pushing again; anything else, `unexpected-writer`.
-   Today every outcome other than a lease mismatch pushes the same commit
-   again until the attempts run out, then fails `unresolved`.
-5. `readIndex` (used by `open`) reads the layout from the head's checkpoint.
-   It still reads only trees and `checkpoint.json`, so it checks only the
-   shape: for layout 1, as today; for layout 2, segment names that start at
-   0, increase, cover at most 1,000 entries each and end at or before
-   `through`, and retained files at fanned-out paths. Any other head is
-   `unexpected-writer`. The full R-LOG-17 check is verify's.
-6. `decodeCheckpoint` accepts `layout` with `version: 2` and a seq `from`,
-   and refuses any other value.
-7. `artroom verify` makes the checks of 30.6, with named failure reasons,
-   and keeps every layout 1 check as it is.
-8. Tests for the cases of 30.7 that need no Room, including the old log, the
-   two switches, the edges at B and B + 1, and `commitFor` with the last
-   commit and with another parent.
+   retryable, without pushing again; anything else, `unexpected-writer`
+   carrying the ref's value, so the Room can match it against its
+   outstanding commits. Today every outcome other than a lease mismatch
+   pushes the same commit again until the attempts run out.
+6. `open` and `readIndex` accept a head that is any commit the caller
+   names as its own, so the Room can confirm a late commit and build on
+   it. `readIndex` still reads only trees and `checkpoint.json`: it checks
+   the layout 2 shape (segment names start at 0, increase, and cover at most
+   1,000 entries each; directories fanned out), and leaves the byte checks
+   to verify.
+7. `decodeCheckpoint` accepts `layout` with `version: 2` and a seq `from`,
+   and refuses any other value. `decodeEntry`'s callers recognise a
+   `ChunkedLine`.
+8. `artroom verify` and `readLogFiles` make the checks of 30.6, reassemble
+   chunked files and follow shard directories, with named failure reasons.
+   Every layout 1 check stays as it is.
+9. Tests for the cases of 30.7 that need no Room.
 
 **Lane B (`packages/git`)**
 1. `toLogOutcome` maps a `rejected` outcome other than a lease refusal to
@@ -3115,58 +3171,66 @@ an `Index` of its last commit. Its edits:
    (`packages/room/measure/logbig/results/logbig-2026-10-02T02-52-36-597Z.json`).
 
 **Lane A (`packages/room`)**
-1. Choose `from` once (R-LOG-16), store it, and put
-   `layout: { version: 2, from }` in every checkpoint after the switch.
-2. On `refused` or `object-too-large`: drop the pending cohort, attend the
-   admins once with `log-publication-failed`, wait at least an hour or
-   until a restart, and close the item on the next confirmed publication
-   (R-LOG-20). Today the Room records `transport` and retries the same
-   cohort. (type, for the new item)
-3. Another writer gives `log-publication-failed` with `unexpected-writer`,
+1. Write layout 2 for every new cohort, with `from` from the cohort's
+   parent until a layout 2 commit is confirmed, then fixed (R-LOG-16).
+2. Replace the single pending cohort with a durable list of outstanding
+   commits, recorded before each first push, each with its parent,
+   `through` and `hash`. Read the ref before building a cohort and after
+   every push; confirm any outstanding commit found there, and mark the
+   others on its parent as unable to apply (R-LOG-20). A refusal, a
+   read-back at the parent, token expiry or revocation never removes one.
+3. After a refusal: keep the commit, attend the admins once with
+   `log-publication-stalled`, and build a new cohort on the last confirmed
+   commit after an hour or a restart. After an hour outstanding with no
+   confirmation, attend them with `unresolved`. Close the item on the next
+   confirmed publication. Today the Room records `transport` and retries
+   the same cohort silently. (type, for the new item)
+4. Another writer gives `log-publication-stalled` with `unexpected-writer`,
    instead of `publication-unresolved` with the operation `op_log`.
-4. The entry bound (R-LOG-18): refuse an act or refusal over it with
-   `body-too-large`, unrecorded; never seal a system event over it, and do
-   what 30.3's table says, with a `log-entry-too-large` item.
-5. Refuse a head whose policy files break the bounds of 30.3 with
-   `policy-invalid`, through lane D's validator.
-
-**Lane D (`packages/policy`)**
-1. The validator refuses a policy document over 1 MiB of canonical bytes,
-   a checker configuration over 1 MiB, and more than 256 checker
-   configurations, with a test.
+5. Store and read entries and retained files of any size. Durable Object
+   storage limits a row to about 2 MB, so a larger entry or file is stored
+   in parts. Seal every system event in full, whatever its size (R-LOG-18).
 
 **Lane F (`packages/ui`)**
-1. Show the two new items in the attention queue. This branch makes that
-   edit in `NeedsYou.tsx`, so main stays green. (type)
+1. Show the new item in the attention queue, saying that publication has
+   stopped for `unexpected-writer` and is retried for the other reasons.
+   This branch makes that edit in `NeedsYou.tsx`, so main stays green.
+   (type)
 
-**Lane E (`packages/client`, `packages/mcp`, `packages/cli`)**, which
-landed on main (3f44c993) after this amendment's base (472b2380):
+**Lane E (`packages/client`, `packages/mcp`, `packages/cli`)**
 1. CLI `where()` in `src/format.ts` falls through to `item.lane`, which the
-   two new items do not have. They need a case that returns the item's
-   `seq`. (type) This branch makes that edit, so main stays green.
-2. A schema that lists the attention reasons gains the two new ones.
+   new item does not have. It needs a case that returns the item's `seq`.
+   (type) This branch makes that edit, so main stays green.
+2. A schema that lists the attention reasons gains the new one.
 
-**Lane G (`packages/checkers`)**: none.
+**Lane D (`packages/policy`)** and **Lane G (`packages/checkers`)**: none.
 
-**Order.** Lane L's verify and decoder, and lane B's classifier, ship
-before any Room writes layout 2: a verifier from before this amendment
-fails a layout 2 log. Lane D's validator ships with the Room's entry bound.
-Lane L's edits above are written against the bounded-memory publisher
-(request a6aa60c9), which is on main.
+**Order.** Lane L's verify, decoder and `readLogFiles`, and lane B's
+classifier, ship before any Room writes layout 2: a verifier from before
+this amendment fails a layout 2 log. Lane L's edits above are written
+against the bounded-memory publisher (request a6aa60c9), which is on main.
 
 ### 30.10 Open points
 
 These continue section 22's list.
 
-40. **An unclear log push is still silent.** A remote that never answers
-    clearly leaves the Room retrying the same cohort as `unresolved`, with
-    only the publication lag to show it. A later amendment could attend the
-    admins after an hour, as R-PUB-5 does for a landing.
-41. **The object limit is measured, not documented.** If Artifacts lowers
+40. **The object limit is measured, not documented.** If Artifacts lowers
     it below B, the guard does not catch it: each push is refused and
     R-LOG-20 reports it. A smaller B would need a layout 3.
-42. **One fan-out level.** A member who chooses note text to aim replay
-    contexts at one `inputs/<hh>/` directory needs 86,480 acts to fill it.
-    The guard then stops publication and attends the admins (R-LOG-19). A
-    second level of fan-out would remove this, at the cost of one more tree
-    per new file in each publication.
+41. **Reads of a very large entry.** The log is published whatever an
+    entry's size, but the API returns whole entries in a page (R-API-6). An
+    entry larger than a transport's message limit, such as a Workers RPC
+    call's, needs a read in parts. This amendment does not define one.
+
+### 30.11 Review 2e38de90
+
+Checker's review of `993e95d9` kept the signed `Checkpoint.layout` with a
+fixed `from`, the byte-based segment close, the loud refusal item and the
+order of verifier before writer, and found three P2s.
+
+| Finding | Change | Cases (30.7) | Lane edits (30.9) |
+|---|---|---|---|
+| P2 An entry over B sealed before the upgrade and not yet published made the log unpublishable for ever | R-LOG-18 is now one chunking rule: any file over B is a directory of B-byte chunks at its path; an entry over B is the chunked file `entries/<seq>.jsonl`, with a `ChunkedLine` in its segment. Bytes, hash and signature are unchanged. Old replay contexts and policy files are covered by the same rule | Unpublished old entry over B; retained prefix; bad chunk | L 1, 2, 7, 8; A 5 |
+| P2 A refused retry does not prove that an earlier attempt will not apply | R-LOG-20 keeps every pushed commit outstanding until the ref is read back at it (confirmed) or at another commit (cannot apply). Refusal, read-back at the parent, expiry and revocation resolve nothing. A new cohort after a refusal leases the same parent, so at most one applies. `from` is fixed by the first confirmed layout 2 commit. Unclear answers attend the admins after an hour (was open point 40) | Late earlier push; late push during the switch; unclear answer; recovery | L 5, 6; A 1 to 3 |
+| P2 Object size became a limit on what a room may record, and trees could still grow past B | The 1 MiB entry bound, the 1 MiB policy and checker configuration bounds, the 256-checker cap and the table of dropped events are removed: entries and files of any size are recorded in full and chunked. R-LOG-19 fans out `segments/`, `entries/`, `inputs/`, `policies/` and chunk directories by name groups, so no directory lists more than 4,096 entries. `log-entry-too-large` is removed, and `log-publication-failed` is renamed `log-publication-stalled` with the reason `unresolved` | Large notification; large revert; large activation; many segments; retained prefix | L 1; A 5; F 1; E 1 |
+| Wording: the UI said every stalled publication is retried | The UI says that publication stops for `unexpected-writer` | — | F 1 |

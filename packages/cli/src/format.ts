@@ -96,8 +96,7 @@ function where(item: AttentionItem): string {
       return item.note;
     case "policy":
       return item.act;
-    case "log-publication-failed":
-    case "log-entry-too-large":
+    case "log-publication-stalled":
       return `seq ${item.seq}`;
     default:
       return item.lane;

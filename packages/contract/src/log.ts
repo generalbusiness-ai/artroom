@@ -252,27 +252,47 @@ export interface Checkpoint {
 
 /**
  * Layout 2 of a log commit (R-LOG-16 to R-LOG-19): segments close at a byte
- * bound as well as at 1,000 entries, and retained files are fanned out by
- * digest. Named in the signed checkpoint.
+ * bound as well as at 1,000 entries, any file over the bound is chunked,
+ * and every directory is fanned out. Named in the signed checkpoint.
  */
 export interface LogLayout {
   readonly version: 2;
   /**
    * The first seq placed by the byte rule (R-LOG-17): 0 for a log that
-   * began in layout 2, otherwise the `through` of the last layout 1 commit
-   * plus one. It never changes.
+   * began in layout 2, otherwise the `through` of the first layout 2
+   * commit's parent plus one. Fixed by the first layout 2 commit; it never
+   * changes after that.
    */
   readonly from: Seq;
 }
 
-/** The tree layout of each commit on `refs/artroom/log` (R-LOG-9, R-LOG-16). */
+/**
+ * The segment line that stands for an entry whose canonical line is over
+ * the object bound (R-LOG-18). The entry itself is the chunked file
+ * `artroom-log/v1/entries/<seq>.jsonl`; `bytes` and `digest` (SHA-256 of
+ * the line) let a reader check the reassembled bytes before it checks the
+ * entry's own hash and signature.
+ */
+export interface ChunkedLine {
+  readonly chunked: { readonly bytes: number; readonly digest: Digest };
+  readonly seq: Seq;
+}
+
+/**
+ * The tree layout of each commit on `refs/artroom/log` (R-LOG-9, R-LOG-16).
+ * In layout 2 every directory below is fanned out (R-LOG-19), so a path may
+ * have shard directories before the file name, and a file over the object
+ * bound is a directory of chunks at the same path (R-LOG-18).
+ */
 export interface PublishedLayout {
   readonly "artroom-log/v1/genesis.json": Genesis;
-  /** Entries from `first`, as JCS lines joined by newlines. Layout 1: `first`..`first + 999`. Layout 2: closed by R-LOG-17. */
+  /** Entries from `first`, as JCS lines joined by newlines. Layout 1: `first`..`first + 999`. Layout 2: closed by R-LOG-17; a line over the bound is a `ChunkedLine`. */
   readonly [segment: `artroom-log/v1/segments/${string}.jsonl`]: string;
-  /** Retained replay contexts (R-EVAL-8), by digest. Layout 2 adds a directory of the first two hex characters (R-LOG-19). */
+  /** Layout 2 only: the canonical line of each entry over the object bound, by seq (R-LOG-18). */
+  readonly [entry: `artroom-log/v1/entries/${string}.jsonl`]: string;
+  /** Retained replay contexts (R-EVAL-8), by digest. */
   readonly [input: `artroom-log/v1/inputs/${string}.json`]: unknown;
-  /** Every activated policy document and checker configuration, by digest; fanned out in layout 2 as `inputs/` is. */
+  /** Every activated policy document and checker configuration, by digest. */
   readonly [policy: `artroom-log/v1/policies/${string}.json`]: unknown;
   readonly "artroom-log/v1/checkpoint.json": Checkpoint;
 }
