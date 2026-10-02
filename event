@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9e9befebafbbc80aa5f8034439b0512f8b81f1f0","text":"Republished at a964fdf4ba21b334d3370aea34c0f18be40ac9a9, which no longer changes packages/ui/src/room/live/live-room.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ecba4c5a09ea9ddd3bd7ee059fc4f24eaa40abbc","text":"Republished at a964fdf4ba21b334d3370aea34c0f18be40ac9a9; the successor stands at packages/ui/src/room/mock/commits.ts."}
