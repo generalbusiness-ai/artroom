@@ -27,16 +27,14 @@ const inDO = <T>(r: TestRoom, fn: (room: Room, state: State) => T | Promise<T>) 
 const alarm = (r: TestRoom) => runDurableObjectAlarm(r.stub as unknown as DurableObjectStub<Room>);
 const stored = (r: TestRoom) => inDO(r, (_room, state) => state.storage.getAlarm());
 
-/** Run with the room clock a week ahead of real time and no alarm delay; restore both after. */
+/** Run with the room clock a week ahead of real time and no alarm delay; restore the delay after. */
 async function ahead<T>(fn: () => Promise<T>): Promise<T> {
-  const saved = clock.now;
-  clock.now = Date.now() + 7 * day;
+  clock.now = Math.max(clock.now, Date.now() + 7 * day); // never backwards
   setAlarmDelay(null);
   try {
     return await fn();
   } finally {
     setAlarmDelay(3600_000);
-    clock.now = Math.max(saved, clock.now);
   }
 }
 

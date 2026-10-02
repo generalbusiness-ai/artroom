@@ -21,7 +21,7 @@ Parent read every cited production path and test pattern. Read-only synthetic pr
 
 `packages/git/src/artifacts.ts:110,115` and `publisher/client.ts:84` retry non-idempotent canonical token creation after potentially applied internal errors (see artifacts.ts:60–68). `packages/room/src/logremote.ts:45` mints before its finally block. A lost answer can leave an unnamed token outside a cleanup owner's records; a usable publication answer can also be lost between mint and durable pushToken recording at landing/engine.ts:266–267. The ownership loss is evidenced, but a safe complete recovery design needs a contract decision: canonical inventories do not identify an owner and contain concurrent unrelated tokens. Do not turn this into a blanket revoke-all plan. Request explicit ownership of that design and its implementing lanes. Known tokens need durable handoffs; unknown effects need honest observation/retention or a documented provider completion fence. No unauthorized access or credential disclosure is claimed. Measured 60-second publication and longer pin token TTLs remain adopted behavior.
 
-Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A is implemented, pending review: see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lanes B and C are not yet implemented.
+Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A landed at `7be42275` (review `84b71c71`): see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lane B is implemented, pending review: see [Mint lane B](#mint-lane-b-request-78f0971c). Lane C is not yet implemented.
 
 ## Considered and excluded
 
@@ -269,7 +269,7 @@ The earlier Durable Object test's last phase now runs the alarm itself, and chec
 
 ## Mint lane A (request 1eda3c5e)
 
-Status: DONE, pending checker review. Gitseq request `1eda3c5e`, branch `request/mint-ledger`, cut from main `b803d210`. It implements lane A of [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md) ("Lane A: the ledger"), as approved in review `ad6cc052`, under [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). The head for review is the commit that carries this section.
+Status: DONE, landed at `7be42275`, approved in review `84b71c71`. Gitseq request `1eda3c5e`, branch `request/mint-ledger`, cut from main `b803d210`. It implements lane A of [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md) ("Lane A: the ledger"), as approved in review `ad6cc052`, under [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). The head for review is the commit that carries this section.
 
 **Scope.** Code is added only: `packages/git/src/mints.ts` (new), `packages/git/src/index.ts` (exports), and `packages/git/test/mints.test.ts` (new). No caller changes; lanes B and C do that. This section, and the status line above, are the only other edits. Nothing was deployed, no live Cloudflare call was made, and no credential was created.
 
@@ -457,3 +457,127 @@ Run at the exact head that carries this section; the exit codes are in the deliv
 ### Not changed here
 
 Every caller: `canonicalTokens`, the landing engine and core, the publisher client, the log remote, snapshot preparation and check jobs keep their own mints until lanes B and C. The Room does not build a ledger yet, so nothing in production uses it. The package README is unchanged; lane B, which puts the ledger in the Room, can describe it there.
+
+## Mint lane B (request 78f0971c)
+
+Status: DONE, pending checker review. Gitseq request `78f0971c`, branch `request/mint-publication`, cut from main `7be42275` and merged with main `25a7b837` (idle write storms, request `3da1d82b`), so the head for review is the combined one. It implements lane B of [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md) ("Lane B: the publication token, and the ledger in the Room"), as approved in review `ad6cc052`, under [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). The head for review is the commit that carries this section.
+
+**Scope.** The note's lane B paths on main's current layout (post-D5): `packages/git/src/artifacts.ts` (`canonicalTokens` removed), `src/index.ts`, `src/landing/engine.ts`, `src/landing/core.ts`, the Git harness at `packages/git/measure/harness/worker.ts`, `packages/git/test/support.ts`, `test/landing.test.ts`, `test-workers/worker.ts` and `test-workers/landing-do.test.ts`, `packages/room/src/core.ts`, and a new Room workerd file, `packages/room/test/workerd/mint-publication-78f0971c.test.ts`. The two package READMEs name the new API where they named `canonicalTokens`. Nothing was deployed, no live Cloudflare call was made, and no credential was created.
+
+### What was built
+
+```ts
+// Git package
+const tokens = publicationTokens({ mints, repo, waitMs? /* 30 s */, sleep? });   // PublicationTokens
+await tokens.mint(`publish:${op}:${n}`); // the ledger's token: { id, plaintext, expiresAt, claim(), release() }; 60 s write, as before
+await tokens.revoke(tokenId);            // by ID; lookup, revocation and withRetry's retries share one bounded wait
+core.pushToken(op, n, tokenId, claim, expiresAt);  // one transaction: the ID on the attempt, the token's row, claim()
+core.tokenRevoked(op, n);                // also deletes the token's row, by its ID
+core.knownToken(tokenId);                // one point lookup in artroom_land_token; no operation is read
+// FaultPoint "token-answered": after the mint's answer, before pushToken
+
+// Room
+core.mints;                // one MintLedger per object start, built with the core
+core.steps.mints(due?);    // its own loop work kind, "mints"
+core.nextAlarm();          // includes max(mints.nextDue(), the "mints" backoff), unless the canonical repository is gone
+```
+
+- **The publication mint.** `PublicationTokens.mint(owner)` is the ledger's `mint(owner, "write", () => 60)`: a `sent` record and the stored wake-up before the create, the lifetime asked after the wake-up, a 30 s bounded wait, and any retry under a new record (lane A). The engine calls it once per push attempt and never retries it. Its owner is `publish:<op>:<n>`.
+- **The handoff.** `pushToken` takes `claim` and calls it inside its transaction, after recording the ID on the attempt and inserting the token's `artroom_land_token (token PRIMARY KEY, op, n, expires_at)` row with Artifacts' reported expiry. A rollback leaves the ledger owning the token (still `held`) and no row. The engine then releases the token in the background (revoked by its ID; a failure makes it `owed`), never awaited by the publication queue (R-MINT-4), and rethrows. `cleanupDone()` also waits for those releases (tests).
+- **The token rows (R-MINT-7).** `pushToken` writes a row and `tokenRevoked` deletes it, in their own transactions; nothing else does. So a row is kept while a revocation fails, after the operation ends too, until plan 003's cleanup pass or the held operation's own revocation is answered; no row is settled at expiry. A room stored before this change fills the rows once, at its first start, under the meta key `token-index`: one per unrevoked token of an active operation, and one per cleanup record (plan 003's `adoptEndedTokens` runs first, so every ended operation's unrevoked token is there).
+- **The fault point.** `token-answered` sits between the mint's answer and `pushToken`. A host that stops there leaves the token with the ledger, `held`; the next object's ledger takes it over (`owed`, due at once) and its alarm revokes it by its ID, while the engine completes the publication forward with a new attempt.
+- **Revocation of publication tokens.** `canonicalTokens().revoke` is replaced by `publicationTokens().revoke`: the repository lookup and the revocation, with `withRetry`'s retries of a transient error, inside one bounded wait (30 s). A timeout is a failure, as before for the caller; a later answer is dropped, and no retry starts after the wait ends.
+- **Safe metadata.** A mint that fails is recorded on the push attempt as `token not minted (<errorNote("create failed", e)>)`: the stage, a known error name and code and bounded integers, never the provider's text (lane A's `errorNote`).
+- **The Room.** `RoomCore` builds the ledger in its constructor, before the landing engine, with the Room's persisted `wake` (read the stored alarm, store only an earlier one, resolve once stored), the room clock, the canonical repository, and `known(id)`: a primary-key lookup in `job_tokens`, then `landing.core.knownToken(id)`. The landing engine's tokens are `publicationTokens({ mints, repo })`. The `mints` step runs `mints.reconcile()` (takeover time, revocation pass, observation; each checks its own durable due time). `nextAlarm()` includes the ledger's `nextDue()`, so the Room's start-up recovery (`Room.recover`, which stores `nextAlarm()` through `wake`) schedules the ledger's debt with no request, and every alarm stores the earlier of the ledger's time and the Room's other work (`schedule` and `wake` only ever move the stored alarm earlier).
+- **The "mints" loop kind (merged with request `3da1d82b`).** The step is its own kind in `LOOP_KINDS`: a failure of the step itself (storage failing in `reconcile`, say) sets `loop_backoff.mints`, 5 s doubling to 5 min, and an alarm that runs earlier for other work skips the step. It is never pending by rows: the ledger times its own work. Like landing's, its backoff ends only when the step runs (`SELF_TIMED`), and `nextAlarm()` uses the later of the ledger's time and the backoff. It needs the canonical repository: while `canonical_gone` is set, the ledger's records are kept, and it is neither run nor scheduled. The other kinds' fences are unchanged.
+- **The harnesses.** The Git harness (`measure/harness/worker.ts`) builds its own ledger, includes it in its alarm and schedule, and still type-checks (checked with a scratch tsconfig; the package gates do not cover it). The Git Workers test Room mints through a real ledger over a token table that stands in for Artifacts.
+
+### Choices where the design left room
+
+These are for the checker to confirm or reject.
+
+1. **Recovery may need a new object start** (lane A's choice 5, carried as the checker asked). Three cases. (a) A host that stops between the answer and `pushToken` (the `token-answered` point): on a live host nothing uses the token again, but the record stays `held`, its takeover time kept ahead by each alarm (control "several alarms on a live host"), until a new object takes it over and revokes it. (b) `pushToken` rolls back and the background release's revocation fails: the record becomes `owed` and the ledger's pass revokes it, with no new start needed; only if storage also refuses to record that does it stay `held` until the next start. (c) Lane A's failed handoff whose revocation fails stays `sent` until the next start. All three need either a stopped host or storage failing twice.
+2. **A rolled-back `pushToken` releases the token in the background**, not awaited by the publication queue (R-MINT-4), rather than leaving it `held` for a takeover. The note says only that "the token is revoked later"; releasing at once is sooner, and a failed release is still the ledger's debt.
+3. **`publicationTokens().revoke` keeps `withRetry`**, inside one 30 s bound. The held operation's revocations and plan 003's cleanup pass behaved this way with `canonicalTokens`, except that the wait was unbounded. A retry is safe for a revocation by ID. Revocations by the ledger itself (lane A) do not retry.
+4. **The `mints` loop kind** follows the coordinator's direction on the merge with request `3da1d82b`: a fence after a failure of the step itself, never pending by rows (rows that are unknown for the life of the room would otherwise keep the kind backed off), its backoff ending only when it runs, and held while the canonical repository is gone. The cost: after a step failure, every ledger time (takeover move, revocations, observation) waits for the fence, at most 5 minutes. A record's own backoff is unchanged.
+5. **While the canonical repository is gone, the ledger is neither run nor scheduled.** Its revocations and observation cannot succeed, and running them would write a backoff every few minutes forever. Records are kept, never settled.
+6. **The step runs last in `runAll`**, after publication, so the observation's bounded wait (at most 30 s) never delays the log.
+7. **The landing row stores Artifacts' reported expiry** when the mint gives one; the one-time fill stores NULL, as the operation never recorded it. The expiry is shown nowhere and decides nothing: a landing row ends only with `tokenRevoked`.
+8. **A pass's last wake-up stays.** When the last pass of a backlog ends, the alarm already stored for the attempt's timeout (at most 30 s ahead) is kept, because a wake never moves an alarm later; it runs, finds nothing due and writes nothing. The backlog control shows this between the last pass and the lease alarm. Review f060871b accepted the same for the landing's cleanup pass.
+9. **The backlog control's "a publication lands meanwhile".** The publication's own landing work is due at once, so while it runs the Room stores an alarm for now, as it always has. The control checks the bounds (no stored alarm under 1 s ahead, none past the held attempt's timeout) before the publication and again after the landing's alarm has run. All the ledger's own wake-ups stay within those bounds throughout.
+10. **Pre-existing provider text in the landing record is not changed here.** The engine still stores `message(e)` for a failed read of main (`readBackFailed`), a push that did not answer, and a failed integration. Lane B changed only the mint's failure, which it now owns. A separate request should apply the safe-metadata rule there.
+11. **Test hooks.** The Room controls run the room clock a week ahead of real time with no alarm delay, so a stored alarm is the room's own time and never fires by itself; they set hooks on one object only (its `schedule`, `storeAlarm`, the engine's `tokens.revoke`, the ledger's `waitMs` and `reconcile`, and the canonical fake's `revokeToken`), and restore the suite's existing clock and alarm delay. The idle control counts rows written through a spy on that object's `Sql`.
+
+### Tests: rule map
+
+Git package, `packages/git/test/landing.test.ts` ("mint lane B …", 10 tests, with the production `publicationTokens` and a real `MintLedger` over a canonical repository double; a restart is a new engine and a new ledger on the same SQLite), and `packages/git/test-workers/landing-do.test.ts` (1 new test, real Durable Object restarts). Room, `packages/room/test/workerd/mint-publication-78f0971c.test.ts` (10 tests, the production Room with real storage and alarms). The note's (1) and (2) are red at `3ac55e96` by construction: there was no ledger to own the token.
+
+| Note | Rules | Tests |
+|---|---|---|
+| (1) | R-MINT-4, R-MINT-7 | Node: a host stops at `token-answered`; the token is the ledger's alone (`held`, on no attempt, in no row); a restart 10 s later makes it `owed`, due 1 s ahead; the ledger revokes it by its ID once; the publication lands forward with attempt 2, one receipt, no live token, no record, no row. Workers: the same across a real abort, through the alarm alone |
+| (2) | R-MINT-2, R-MINT-5 | Applied, then `INTERNAL_ERROR`: one `unknown` record, the ledger's retry is a new record whose token is pushed, the same outcome, slot and receipts, and the applied token never revoked, past its lifetime and an observation. A lost answer: one create (the engine does not retry), one `unknown` record, the attempt's detail is safe metadata only, and the next attempt lands |
+| (3) | R-MINT-3, R-MINT-4 | A trigger fails `pushToken`'s save: no ID on the attempt, no row, the ledger still owns the token (its release failed, so `owed`), and its pass revokes it by its ID; the publication lands later with a new token. The release is off the publication queue: `publish` ends while it is unanswered |
+| (4) | R-MINT-4, R-MINT-7 | The row: written by `pushToken` with the reported expiry, the ledger's record gone in the same transaction; deleted by the held operation's revocation; kept while revocations fail, after the operation ends and past the token's expiry; deleted by plan 003's cleanup pass. A trigger on the row's insert rolls `pushToken` back (and the ledger's release revokes the token); one on its delete rolls `tokenRevoked` back, and the duty stays until it commits |
+| (5) | R-MINT-7 | A stored room with an active operation's unrevoked token and an ended operation's owed token gains both rows at its first start, and not again |
+| (6) | R-MINT-5, R-MINT-7 | An observation over a listing of exactly those two tokens counts 0 unaccounted; the SQL spy shows two point lookups in `artroom_land_token` and no statement on `artroom_land_op` |
+| (7) | | All earlier landing, plan 003 and review f060871b tests pass unchanged (only `FakeTokens` gained the new interface's fields) |
+| (8) no alarm stored | R-MINT-2, R-MINT-7 | With no alarm stored and the Room's own scheduling off on that object, while the publication's create is held: an alarm no later than the takeover time, stored by the ledger's wake. A wake that takes 20 s of room time comes before the lifetime: the record holds 60 s and the post-wake send time, and the token expires 60 s after it (approval obligation 1) |
+| (8) answer lost | R-MINT-5, R-MINT-7 | Abort while the create is held; it applies late. The fresh object has the record `unknown` and stores an alarm by the observation's time (1 s ahead); one alarm observes once (1 unaccounted: the late token; the publication's own live token is known by its row), keeps the record, and stores the next observation (60 s) on time; after the lifetime and another observation, still `unknown`, the late token never revoked |
+| (8) earlier alarm | R-MINT-4, R-MINT-7 | The token held after `token-answered`; an alarm for other work 20 s later lands the publication and leaves a stored alarm no later than the takeover time; with no alarm stored, the fresh object stores the ledger's (1 s ahead, the only work due), and its alarm takes over and revokes the token by its ID |
+| (8) wake not stored | R-MINT-2 | Storage refuses every alarm: no create while publishing, no record, the attempt's detail is safe metadata only; on a fresh object the publication lands |
+| (8) live host | R-MINT-7 | Four alarms, 35 s apart, with a long-held token: each moves the takeover time to 60 s ahead; every stored alarm is at least 1 s ahead and no later than the takeover time; the live host's token is not revoked |
+| (8) backlog | R-MINT-4, R-MINT-7 | 45 owed records and one unknown; the first revocation held. While held: one call, `nextDue` at the attempt's timeout, the stored alarm between 1 s ahead and that timeout, also after a publication has reserved, pushed and landed and the landing's own alarm has run. The attempt times out with its backoff; the batch's other 19 are revoked; then through alarms alone the next 20, then the last 5 and the held one, earliest due first, each next alarm exactly 1 s after its pass; the lease alarm, earlier than the next observation, is kept; once it has run, the observation's time is stored exactly (approval obligation 2) |
+| (8) expiry | R-MINT-4, R-MINT-7 | A ledger record with a readable expiry whose revocations fail is settled at its expiry: no revocation after it, the token never marked revoked. A landing row for a token whose revocations fail stays past its expiry, with plan 003's record, until `tokenRevoked` |
+| idle | R-MINT-7 (request 3da1d82b) | A write spy on the object's `Sql`: the `mints` step, `nextDue` and `nextAlarm` write 0 rows with no records, and with an unknown record whose next observation is not due. A job token's ID (a `job_tokens` row) is not counted as unaccounted |
+| fence | request 3da1d82b | A failure of the step sets `loop_backoff.mints` (5 s); `nextAlarm` and the stored alarm wait for it though the ledger's time is earlier; an earlier alarm skips the step and keeps the backoff; at its end the step runs, revokes, and clears it |
+| gone | request 3da1d82b | With `canonical_gone` set, the step does not run the ledger, its record is kept, and `nextAlarm` is null |
+
+### Mutation table
+
+Each mutant was applied alone by a script (`/private/tmp/claude-501/mintB/mutants/run.py`) at the merge head `720a7fd4`, the suites named were run, and the file was restored from the commit (`git checkout`). B-mutants are in the Git package and were run against all three suites: `landing.test.ts` (Node), the Git Workers suite, and the Room file; R-mutants are in the Room and were run against the Room file. T marks the note's lane B mutation targets, O the approval's obligations, F the checker's lessons for this lane, and G the other guards. 32 mutants, all red; every new test is red under at least one. No earlier test went red under any mutant.
+
+| Mutant | Kind | Mutation | Red tests |
+|---|---|---|---|
+| B1 | T | no `claim` in `pushToken` | Node (1), (2) applied-then-error, (4) row, (6); Workers (1); Room: no alarm stored, answer lost, earlier alarm, live host, expiry |
+| B2 | T | `claim` outside `pushToken`'s transaction (before it) | Node (3) trigger, (3) off-queue, (4) triggers |
+| B3 | T | the token row written outside `pushToken`'s transaction (after it) | Node (3) off-queue, (4) triggers |
+| B4 | T | the token row not deleted by `tokenRevoked` | Node (1), (4) row, (4) triggers, bounded revocation; Workers (1); Room: expiry |
+| B5 | T | the fill skipped | Node (5) |
+| B6 | T | the fill run at every start | Node (5) |
+| B7 | T | `knownToken` reading operation bodies (active operations and cleanup records) | Node (6) |
+| B8 | T | the engine retrying the mint itself | Node (2) lost answer |
+| B9 | G | the `token-answered` point after `pushToken`, not before | Node (1); Workers (1); Room: earlier alarm, live host |
+| B10 | G | no release when `pushToken` does not commit | Node (3) trigger, (3) off-queue, (4) triggers |
+| B11 | F | the release awaited on the publication queue | Node (3) off-queue |
+| B12 | F | the publication token's revocation unbounded | Node bounded revocation |
+| B13 | F | retries of that revocation going on after the bound | Node bounded revocation |
+| B14 | F | a failed mint's detail keeping the provider's text | Node (2) lost answer; Room: wake not stored |
+| B15 | G | the fill leaving out the cleanup records | Node (5) |
+| B16 | G | the token row without the reported expiry | Node (4) row |
+| B17 | G | the publication lifetime changed (120 s) | Room: no alarm stored (60 s held, expiry 60 s after the post-wake send) |
+| R1 | T | the alarm never runs the ledger (no `mints` step) | Room: backlog, answer lost, expiry, earlier alarm, idle, live host, fence |
+| R2 | T | `nextAlarm()` leaving out the ledger | Room: backlog, earlier alarm, live host, fence |
+| R3 | T | start-up recovery leaving out the ledger | Room: earlier alarm |
+| R4 | G | the ledger's wake not persisted (the commit hook instead of the stored alarm) | Room: no alarm stored, wake not stored |
+| R5 | G | a failed wake swallowed | Room: wake not stored |
+| R6 | G | `known` leaving out the landing's token rows | Room: answer lost |
+| R7 | G | `known` leaving out job tokens | Room: idle |
+| R8 | G | a ledger built per alarm (a takeover at every alarm) | Room: earlier alarm, live host |
+| R9 | O | the ledger's time replacing an earlier unrelated one | Room: backlog |
+| R10 | G | `mints` not self-timed (an early alarm clears its backoff) | Room: fence |
+| R11 | G | the `mints` step ignoring its fence | Room: fence, gone |
+| R12 | G | `nextAlarm()` ignoring the `mints` fence | Room: fence |
+| R13 | G | the ledger run while the repository is gone | Room: gone |
+| R14 | G | the ledger scheduled while the repository is gone | Room: gone |
+| R15 | G | `mints` pending by rows (the 5-second loop fences it) | Room: backlog, fence |
+
+Lane A's mutants (T1 to T17, O1, O2, G1 to G33, F1 to F18, H1 to H4, J1, J2) guard `mints.ts`, which this lane does not change; its 47 tests pass unchanged in the Node gate.
+
+
+### Gates
+
+Run at the exact head that carries this section, serially, with logs in `/private/tmp/claude-501/mintB/`; the exit codes are in the delivery report. In this order: `npm run typecheck -w @generalbusiness/artroom-git`, `npm test -w @generalbusiness/artroom-git` (Node) and `npm run test:workers -w @generalbusiness/artroom-git`; `npm run typecheck -w @generalbusiness/artroom-room`, `npm run test:node -w @generalbusiness/artroom-room` and `npm run test:workerd -w @generalbusiness/artroom-room`; then from the root `npm ci`, `npm run typecheck` and `npm test`; then `npm exec -w @generalbusiness/artroom-room -- wrangler deploy --dry-run` (bundles only; no credentials, nothing is uploaded). The Git harness is type-checked separately with a scratch tsconfig, as the package gates do not cover `measure/`.
+
+### Not changed here
+
+Lane C's sites keep their own mints: the publisher client's `withToken` (integrate, pinning, previews), the log remote, snapshot preparation's canonical read token and check jobs (`watchMint` and its `mint:` rows). The Room's `known` already includes `job_tokens`, so lane C's claim into that table needs no change here. `mints.ts` is unchanged. Showing the ledger's records to admins stays with the cleanup projection request (`8d249233`).
