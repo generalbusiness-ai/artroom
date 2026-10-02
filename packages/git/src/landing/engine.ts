@@ -92,8 +92,11 @@ export const PUBLICATION_TTL_S = 60;
  * wake-up before each create request, any retry a new record, and a 30 s
  * bounded wait. The engine never retries a mint itself. A revocation is by
  * the token's ID: the repository lookup and the revocation, with
- * `withRetry`'s retries of a transient error, share one bounded wait; a
- * later answer is dropped, and no retry starts after it.
+ * `withRetry`'s retries of a transient error, share one bounded wait. Once
+ * it has run out, nothing more is sent: the wait's end is checked when each
+ * attempt starts (after a retry's sleep) and again after each lookup,
+ * immediately before the revocation is sent (review d4a4c681). A later
+ * answer is dropped, and the caller's record keeps the debt.
  */
 export function publicationTokens(o: {
   readonly mints: MintLedger;
@@ -106,10 +109,13 @@ export function publicationTokens(o: {
     mint: (owner) => o.mints.mint(owner, "write", () => PUBLICATION_TTL_S),
     revoke: async (id) => {
       let over = false;
+      const gaveUp = () => new Error("the revocation was given up when its bounded wait ran out");
       const answer = withRetry(
         async () => {
-          if (over) throw new Error("the revocation was given up");
-          return (await o.repo()).revokeToken(id);
+          if (over) throw gaveUp(); // after a retry's sleep
+          const repo = await o.repo();
+          if (over) throw gaveUp(); // after the lookup, immediately before the send
+          return repo.revokeToken(id);
         },
         o.sleep ? { sleep: o.sleep } : {},
       );

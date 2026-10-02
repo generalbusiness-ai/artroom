@@ -1725,3 +1725,70 @@ test("mint lane B, R-MINT-4: a publication token's revocation is bounded: unansw
   assert.equal(w.host.repo.live("tok_c1"), false);
   assert.deepEqual(w.rows(), []);
 });
+
+/** Publish with a 200 ms revocation wait while the revocation path is held as `hold` says; the landing ends with its token's revocation owed. */
+async function revocationHeldPastTheWait(t: { after: (fn: () => unknown) => void }, hold: (w: Awaited<ReturnType<typeof ledgerWorld>>) => void) {
+  const w = await ledgerWorld({ waitMs: 200 });
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await w.ready(id);
+  hold(w);
+  await within(w.engine.publish(), "publish, while its token's revocation is held", 5_000);
+  assert.equal(w.engine.view(id)?.state, "landed");
+  return { w, id };
+}
+
+/** The debt is kept for a later bounded pass, which revokes the token by its ID. */
+async function debtKeptThenRevoked(w: Awaited<ReturnType<typeof ledgerWorld>>, id: OpId, sentBefore: number) {
+  assert.deepEqual(w.engine.core.tokenCleanup().map((c) => [c.op, c.n]), [[id, 1]]);
+  assert.deepEqual(w.rows().map((r) => r.token), ["tok_c1"]);
+  assert.equal(w.host.repo.live("tok_c1"), true);
+  w.host.holdLookup = null;
+  w.host.holdSleep = false;
+  w.host.repo.revokeDown = false;
+  w.clock.advance(2_000);
+  await w.engine.reconcile();
+  await w.engine.cleanupDone();
+  assert.equal(w.host.repo.revokes.length, sentBefore + 1);
+  assert.equal(w.host.repo.live("tok_c1"), false);
+  assert.deepEqual(w.rows(), []);
+}
+
+test("review d4a4c681: a revocation whose repository lookup is still out when the bounded wait ends sends nothing when the lookup answers; the debt stays for a later pass", async (t) => {
+  const { w, id } = await revocationHeldPastTheWait(t, (w) => {
+    w.host.holdLookup = (n) => n === 1;
+  });
+  assert.equal(w.host.heldLookups.length, 1);
+  w.host.heldLookups[0]!();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(w.host.repo.revokes, [], "no provider call after the wait ended");
+  await debtKeptThenRevoked(w, id, 0);
+});
+
+test("review d4a4c681: a retry whose repository lookup is still out when the bounded wait ends sends nothing when the lookup answers: one provider call, not two", async (t) => {
+  const { w, id } = await revocationHeldPastTheWait(t, (w) => {
+    w.host.repo.revokeDown = true; // the first attempt fails with a transient error, and is retried
+    w.host.holdLookup = (n) => n === 2;
+  });
+  assert.equal(w.host.heldLookups.length, 1);
+  w.host.repo.revokeDown = false;
+  w.host.heldLookups[0]!();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(w.host.repo.revokes, ["tok_c1"], "only the first attempt was sent");
+  await debtKeptThenRevoked(w, id, 1);
+});
+
+test("review d4a4c681: a retry whose sleep outlasts the bounded wait starts no lookup and sends nothing", async (t) => {
+  const { w, id } = await revocationHeldPastTheWait(t, (w) => {
+    w.host.repo.revokeDown = true;
+    w.host.holdSleep = true;
+  });
+  assert.equal(w.host.heldSleeps.length, 1);
+  const lookups = w.host.lookups;
+  w.host.repo.revokeDown = false;
+  w.host.heldSleeps[0]!();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(w.host.lookups, lookups, "no lookup after the wait ended");
+  assert.deepEqual(w.host.repo.revokes, ["tok_c1"]);
+  await debtKeptThenRevoked(w, id, 1);
+});

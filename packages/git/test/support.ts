@@ -493,6 +493,13 @@ export class LedgerHost {
   tokens!: PublicationTokens;
   alarm: number | null = null;
   readonly wakes: number[] = [];
+  /** Repository lookups on the publication tokens' revocation path, numbered from 1; `holdLookup` holds chosen ones until the test answers them. */
+  lookups = 0;
+  holdLookup: ((n: number) => boolean) | null = null;
+  readonly heldLookups: (() => void)[] = [];
+  /** The publication tokens' sleep between retries; `holdSleep` holds each until the test ends it. */
+  holdSleep = false;
+  readonly heldSleeps: (() => void)[] = [];
   wakeFails = false;
   known: (tokenId: string) => boolean = () => false;
   private readonly waitMs: number;
@@ -518,7 +525,25 @@ export class LedgerHost {
       waitMs: this.waitMs,
       sleep: async () => {},
     });
-    this.tokens = publicationTokens({ mints: this.mints, repo: async () => this.repo, waitMs: this.waitMs, sleep: async () => {} });
+    this.tokens = publicationTokens({
+      mints: this.mints,
+      repo: async () => {
+        const n = ++this.lookups;
+        if (this.holdLookup?.(n)) {
+          const gate = deferred<void>();
+          this.heldLookups.push(() => gate.resolve());
+          await gate.promise;
+        }
+        return this.repo;
+      },
+      waitMs: this.waitMs,
+      sleep: async () => {
+        if (!this.holdSleep) return;
+        const gate = deferred<void>();
+        this.heldSleeps.push(() => gate.resolve());
+        await gate.promise;
+      },
+    });
   }
   /** The alarm's ledger work, waited on to the end of its revocation pass. */
   async reconcile(): Promise<void> {
