@@ -1931,6 +1931,13 @@ both fixed; the checker's two controls pass.
    of a step (`run`) is not held back by an earlier failure's backoff.
    While the repository is gone, workspace setup waits too.
 
+One existing test changed with the second fix:
+`review-a711f7b6.test.ts`, "Artifacts is down: … the next alarm completes
+it", ticked again at the same instant after the failed read of the
+canonical remote. That read now backs the landing step off for 5 s, so the
+test moves the clock to the next alarm the room asks for, and the
+operation lands there, as the test's name says.
+
 | Test | What it pins |
 |---|---|
 | "publication on a cold instance whose registry throws …" and "… answers not bound …" | An evicted instance (no cached binding): waits of 5, 10, 20, 40, 80 s; no push; nothing published; one backoff per run; logged only for the throw; published once the registry answers |
