@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/log/tsconfig.test.json","body":{"commit":"fecd69eba214ba58c63c6a5529410b68649aa1be","path":"packages/log/tsconfig.test.json"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:023a269b798adc0467183a840b252de5c765efcc","text":"Merge retired a covered predecessor; the successor is at packages/git/README.md."}
