@@ -736,7 +736,7 @@ deploy the same way.
 
 | Run | Result | Record |
 |---|---|---|
-| 1 | Public and import phases passed (founding, lanes 1 to 3 landed, both logs verified). The checks phase failed at lane 4's `propose`: 503 `unavailable`, "The repository could not be read", after 59 seconds. Cleanup `ok`, 0 unresolved, nothing left. Not diagnosed; it did not recur in the next two runs | [spike-smoke-2026-10-02T15-59-44-105Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T15-59-44-105Z.json) |
+| 1 | Public and import phases passed (founding, lanes 1 to 3 landed, both logs verified). The checks phase failed at lane 4's `propose`: 503 `unavailable`, "The repository could not be read", after 59 seconds. Cleanup `ok`, 0 unresolved, nothing left. Not reproduced since: see "The 503 at lane 4's propose" below | [spike-smoke-2026-10-02T15-59-44-105Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T15-59-44-105Z.json) |
 | 2 | `SPIKE_PHASE=checks`: passed, exit 0. The job was dispatched, the checker's signed check admitted after 10 seconds, the review given, the lane landed, `artroom verify` exit 0 through entry 15 | [spike-smoke-2026-10-02T16-04-47-640Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-04-47-640Z.json) |
 | 3 | All phases: passed, exit 0, 91 steps ok. Public log verified through entry 14, import through 8, checks through 15; cleanup `ok`, 0 unresolved, nothing left in either namespace | [spike-smoke-2026-10-02T16-06-45-754Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-06-45-754Z.json) |
 
@@ -754,4 +754,95 @@ and its test back to main's):
 | git `npm run test:workers`, `npm run test:log` | 0, 0 | 8; 12 |
 | room `npm run test:node` at `96ed4fc3` | 0 | 125 |
 | `wrangler deploy --dry-run` of both spike configs, both production configs and both `measure/harness/` configs | 0 each | — |
+
+### The 503 at lane 4's propose (run 1)
+
+**Not reproduced in 5 runs of the checks phase; cause not found.**
+
+**What produced it.** The message is the Room's pre-admission refusal
+(`preAdmission` in [packages/room/src/admission.ts](../packages/room/src/admission.ts)).
+For a `propose`, the Room makes these calls before deciding:
+
+1. `headInFork`: read the head from the lane's fork through the Artifacts
+   binding.
+2. `pinObjects`: mint a 600-second read token on the fork and a write token
+   on the canonical repository, then call the room's `Publisher` container
+   (start it if it is not running, route its HTTPS through the gateway, and
+   run `git fetch` and `git push`).
+3. `readMain`, `diff`, `readConfig` when `.artroom/` changed, and
+   `changedBetween` for earlier generations.
+
+Any exception from any of these is caught and replaced by this 503. The
+exception itself is discarded (`void e`) and never logged. So run 1's
+result file records only the status, the message and 59,036 ms, and the
+cause was lost. Workers Logs for that minute could not be read: hugh's
+OAuth login has no observability scope (the telemetry API answered 403).
+
+**What can take 59 seconds.** Nothing on this path waits that long by
+design. `withRetry` sleeps for at most 7.5 seconds in all. Each git
+command in the container has a 120-second timeout. The pin tokens last 600
+seconds. Candidate causes, none confirmed:
+
+- The `Publisher` container's cold start (`ensure` runs `start`, then an
+  `exec`) on a host that had not yet pulled the image. Run 1 began 22
+  seconds after the wipe had made a new container application (`3388b66b…`),
+  lane 4's `propose` came about 4 minutes after that, and its room was the
+  third room to start a container. A platform
+  limit near 60 seconds on starting or calling into the container would
+  give this timing.
+- An Artifacts call (a fork or canonical read, a token mint, or the git
+  transfer through the gateway) that hung until a platform limit.
+
+**Whether this change caused it.** Not through its code: nothing on the
+propose path changed. `admission.ts`, `packages/room/src/artifacts.ts` and
+lane B's publisher are unchanged. The `Workspaces` changes affect only public
+founding (`prepareCanonical`, `cleanIncarnation`), and the checks room is an
+import. `adoptLegacyBase` ran only at public founding. `SnapshotRepos` is
+used only for filtered checks, and this configuration checks the whole
+tree. Through the deployment, possibly: the wipe left a brand-new container
+application, which matches the first candidate cause.
+
+**Reruns.** After run 1, the checks phase passed five times out of five.
+Lane 4's `propose` took 2.2 to 7.1 seconds each time.
+
+| Run | Deployed | Lane 4 propose |
+|---|---|---|
+| 2: checks only, 16:04 | `96ed4fc3` | 3.4 s |
+| 3: full, 16:06 | `96ed4fc3` | 3.1 s |
+| 4: full, 16:22 | merge `4a522bd6` | 2.5 s |
+| 5: checks only, 16:27 | merge `4a522bd6` | 7.1 s |
+| 6: checks only, 16:29 | merge `4a522bd6` | 2.2 s |
+
+During runs 4 to 6, `wrangler tail artroom-spike-room` recorded 1,212
+events: 1,203 `ok` and 9 `canceled`, with no exception.
+
+**Pre-existing defect, outside this request:** pre-admission discards the
+error it turns into this 503, so a failure like this one cannot be
+diagnosed afterwards. Logging the error's name and a redacted message, or
+returning a cause code, would have identified the step.
+
+## Redeploy from the merge of main `3ac55e96` (plan 003)
+
+Main's plan 003 changes lane B's landing code, which the Room Worker
+bundles. So the spike was redeployed with `deploy-spike.sh` from the merge
+head `4a522bd6`. No retry was needed, and the probe answered 404.
+
+| Worker | Version ID |
+|---|---|
+| `artroom-spike-room` | `75758995-b37c-459c-89d1-0005f5d0163d` |
+| `artroom-spike-checkers` | `37804f0a-cdd5-4f69-a9fa-27b328596e37` |
+
+| Run | Result | Record |
+|---|---|---|
+| Full smoke | passed, exit 0; cleanup `ok`, 0 unresolved, nothing left | [spike-smoke-2026-10-02T16-22-10-598Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-22-10-598Z.json) |
+| Checks phase | passed, exit 0; cleanup `ok` | [spike-smoke-2026-10-02T16-27-36-022Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-27-36-022Z.json) |
+| Checks phase | passed, exit 0; cleanup `ok` | [spike-smoke-2026-10-02T16-29-50-841Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T16-29-50-841Z.json) |
+
+**Gates** at `4a522bd6`:
+
+| Gate | Exit | Tests |
+|---|---|---|
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | checkers 43; cli 102; client 86 Node and 2 workerd; git 225; log 198 Node and 193 workerd; mcp 73 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 125 Node and 380 workerd; ui 141 |
+| git `npm run test:workers` | 0 | 10 |
 
