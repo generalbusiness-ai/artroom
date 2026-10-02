@@ -394,11 +394,16 @@ names enforced by a regex over source text. [Reported] Request
 
 ## 7. Decisions for Hugh
 
-Recorded as assert `82c29bcd`.
+Recorded as assert `82c29bcd`. Hugh's answers of 2026-10-02 are recorded
+as assert `1c62cbf1`: D1 is deferred until the control-Rooms picture is
+complete (`notes/2026-10-02-collections-of-rooms.md` and request
+`d50ce26d`), because the controls are expected to live there; D5 is yes,
+retire now, request `73eccbec`; D6 is any time. D2, D3 and D4 are open.
 
 - **D1. Public founding.** Operator-signed grant per founding; a
   per-address quota with a Rate Limiting binding; proof of work; or open
   for the contest period only. Request `d226be30` waits on this.
+  **Deferred** to the control-Rooms design.
 - **D2. What a check attests.** Pin the command in checker configuration
   under `.artroom`; require admin approval when `package.json` or the
   lockfile change; or accept that review of the diff is the barrier and
@@ -439,7 +444,42 @@ can follow the jam's move; `249d113d` should.
   duplicates of them.
 - Stale request `c0f0592f` (duties read): revived inside `d2cb872f`.
 
-## 10. Requests filed
+## 10. What woo's Durable Object write storms teach
+
+Hugh asked for caution from the woo project's history, where Durable
+Object re-write storms were costly. Sources: woo commits `6d2c425a` and
+`50163fc1` (2026-08-02, the billing gate), `3f6e5a29` and `f4b5dbaf`
+(2026-07-28), `spec/operations/net-cutover.md` and `observability.md`.
+
+**What happened there.** Rows were written by fan-out across objects,
+by retries and concurrent reads each minting a durable row, by caches
+whose eviction window never closed, by startup migration and save on
+cold init, and by a hot object's roster growing without bound. The
+fixes were receipts that advance no head, FIFO quotas with insert and
+prune in one transaction, dedup of no-op writes, per-turn budgets refused
+by name, and a load gate of 250,000 total physical rows and 50,000 per
+object, measured from the billing API because application counters
+cannot see base-table plus secondary-index writes.
+
+**Artroom's matching shapes** [Verified]:
+
+| woo shape | Artroom site | Status |
+|---|---|---|
+| a row per alarm, alarms on every commit | `setAlarm` is one row written; `nextAlarm` runs at eight `committed()` sites and on the five-second loop | `99782949` |
+| index multiplier | six secondary indexes on the Room's tables in `store.ts`, so one act is several physical rows | measured by `8bd623cc` |
+| fan-out per principal | `attention` inserts one row per principal per item (`core.ts:859`), uncapped, never pruned | `99782949` gains caps |
+| retry mints a row | `idem` written for every act (`admission.ts:1493, 1510`), never pruned | `99782949` gains a quota |
+| fan-out on a trigger | policy activation recomputes every open proposal; every landing resets every open preview | D3 |
+| startup amplification | `createSchema` and eight migrations on every new object | `73eccbec` |
+
+**Applied.** Request `99782949` gains FIFO caps on attention and idem
+with insert-and-prune in one transaction and a per-item fan-out cap.
+Request `d2cb872f` gains a fail-closed rows-written gate from the
+billing API. A new request measures physical rows per act, per alarm
+tick and per publication on the spike before the durable deployment,
+and ports woo's gate scripts; see the table below.
+
+## 11. Requests filed
 
 | Request | Scope | Priority |
 |---|---|---|
@@ -458,7 +498,9 @@ can follow the jam's move; `249d113d` should.
 | `e7abe9c8` | one fake Artifacts, SQLite adapter, measure library (DUP-05, 09, 10; ARCH-10) | after the jam's move |
 | `249d113d` | structural refactors (ARCH-03, 04, 07, 09, 11, 12; LAYER-06, 08, 12) | after the move, D6 |
 | `61bdd92b` | documentation and repository hygiene (CRUFT-03, 05, 08, 09, 10, 11; LAYER-09) | any time |
-| `82c29bcd` | decisions D1 to D6 (assert) | Hugh |
+| `82c29bcd` | decisions D1 to D6 (assert); answers in `1c62cbf1` | Hugh |
+| `73eccbec` | retire the legacy migrations and harness Workers (D5) | now |
+| `8bd623cc` | row-write accounting from the billing API and a fail-closed gate (woo lessons, assert `53fbb7e3`) | before J2 |
 
 No files were written under `plans/`; the requests above carry the
 handoff, as this project's practice is, and `plans/README.md` is left as
