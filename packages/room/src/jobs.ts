@@ -168,46 +168,85 @@ function ownerNow(core: RoomCore, j: JobRow, advisory: boolean): { readonly land
   return op.state === "landed" && advisory ? { landOp: op.id } : null;
 }
 
-async function issue(core: RoomCore, j: JobRow): Promise<void> {
-  const notNeeded = () => void move(core, j, "state = 'done', outcome = 'not-needed', token = NULL");
+/**
+ * The work this job does now, or null if it no longer belongs to its owner:
+ * the configuration is unchanged, the generation is the lane's latest, the
+ * obligation is open on the integration, and the owner is current on it.
+ * Synchronous, so a decision and the write that follows it see one state.
+ */
+function current(core: RoomCore, j: JobRow) {
   const policy = core.activePolicy();
   const cfg = policy.checkers[j.checker];
   const lane = laneRow(core.sql, j.lane);
   const gen = generationRow(core.sql, j.lane, j.generation);
-  if (!cfg || cfg.digest !== j.config || !lane || !gen || lane.generation !== j.generation) return notNeeded();
+  if (!cfg || cfg.digest !== j.config || !lane || !gen || lane.generation !== j.generation) return null;
   const status = obligationsFor(core.sql, j.lane, j.generation, { doc: policy.doc, checkers: policy.checkers, integration: j.integration }).find((o) => o.id === j.obligation);
-  if (!status || status.kind !== "check" || status.state === "met") return notNeeded();
+  if (!status || status.kind !== "check" || status.state === "met") return null;
   const owner = ownerNow(core, j, status.advisory === true);
-  if (!owner) return notNeeded();
+  return owner ? { policy, cfg, gen, owner } : null;
+}
+
+async function issue(core: RoomCore, j: JobRow): Promise<void> {
+  const now = current(core, j);
+  if (!now) return void move(core, j, "state = 'done', outcome = 'not-needed', token = NULL");
+  const { policy, cfg, gen, owner } = now;
   const service = core.checkers(j.checker);
   if (!service) return void move(core, j, "state = 'done', outcome = 'unbound', token = NULL");
   const ttl = cfg.config.timeoutSeconds + JOB_MARGIN_S;
-  let target: { integration: Sha; input: CheckInput; readUrl: `https://${string}`; token: string; tokenId: string; expiresAt: number };
-  const inputs = checkerInputs(cfg.config.inputs, policy.doc.carry);
+  const deadline = core.now() + ttl * 1000;
   const attempt = j.attempt + 1;
   const jobId: CheckJob["id"] = `${j.id}_${attempt}`;
-  if (inputs) {
-    // R-CARRY-15 step 3: the snapshot commit is recorded before a filtered job is issued.
-    const recorded = () => one(core.sql, "SELECT * FROM check_snapshots WHERE integration = ? AND checker = ? AND config = ?", j.integration, j.checker, j.config);
-    if (!recorded()) await core.recordSnapshots(j.lane, j.generation, j.integration, policy);
-    const rec = recorded();
-    if (!rec) throw new Error("the snapshot could not be recorded");
-    const commit = str(rec, "commit_sha") as Sha;
-    const digest = str(rec, "digest") as Digest;
-    const paths = JSON.parse(str(rec, "paths")!) as Glob[];
-    const wrote = await core.snapshots.prepare({ commit, integration: j.integration, checker: j.checker, digest, paths });
-    // R-CARRY-15 step 4: the publisher must have written exactly the commit the Room recorded.
-    if (wrote.commit !== commit) throw new Error("the publisher wrote another snapshot commit");
-    const deadline = core.now() + ttl * 1000;
-    const t = await core.snapshots.mint(commit, jobId, deadline);
-    target = { integration: commit, input: { kind: "filtered", snapshot: digest, paths }, readUrl: wrote.remote as `https://${string}`, token: t.token, tokenId: `snapshot:${commit}`, expiresAt: deadline };
-  } else {
-    const tree = await core.ports.artifacts.treeOf(j.integration);
-    if (!tree) throw new Error("the integration's tree could not be read");
-    const readUrl = (await core.canonicalRemoteReady()) as `https://${string}`;
-    const repo = await core.remotes.artifacts.get(core.location().name);
-    const t = await repo.createToken("read", ttl);
-    target = { integration: j.integration, input: { kind: "tree", tree }, readUrl, token: t.plaintext, tokenId: t.id, expiresAt: Date.parse(t.expiresAt) };
+  // The attempt is claimed before any credential is prepared: a step that loses the claim prepares nothing, and
+  // every credential belongs to exactly one attempt. A host that stops from here on leaves the attempt due at its
+  // deadline, when it is issued again and its recorded token ended.
+  if (!move(core, j, "state = 'sent', attempt = ?, next_ms = ?, token = NULL", attempt, deadline)) return;
+  const mine: JobRow = { ...j, state: "sent", attempt, token: null };
+  let tokenId: string | null = null;
+  let target: { integration: Sha; input: CheckInput; readUrl: `https://${string}`; token: string };
+  const end = () => (tokenId ? endToken(core, tokenId, jobId).catch(() => undefined) : Promise.resolve());
+  try {
+    const inputs = checkerInputs(cfg.config.inputs, policy.doc.carry);
+    if (inputs) {
+      // R-CARRY-15 step 3: the snapshot commit is recorded before a filtered job is issued.
+      const recorded = () => one(core.sql, "SELECT * FROM check_snapshots WHERE integration = ? AND checker = ? AND config = ?", j.integration, j.checker, j.config);
+      if (!recorded()) await core.recordSnapshots(j.lane, j.generation, j.integration, policy);
+      const rec = recorded();
+      if (!rec) throw new Error("the snapshot could not be recorded");
+      const commit = str(rec, "commit_sha") as Sha;
+      const digest = str(rec, "digest") as Digest;
+      const paths = JSON.parse(str(rec, "paths")!) as Glob[];
+      const wrote = await core.snapshots.prepare({ commit, integration: j.integration, checker: j.checker, digest, paths });
+      // R-CARRY-15 step 4: the publisher must have written exactly the commit the Room recorded.
+      if (wrote.commit !== commit) throw new Error("the publisher wrote another snapshot commit");
+      tokenId = `snapshot:${commit}`;
+      move(core, mine, "token = ?", tokenId);
+      const t = await core.snapshots.mint(commit, jobId, deadline);
+      target = { integration: commit, input: { kind: "filtered", snapshot: digest, paths }, readUrl: wrote.remote as `https://${string}`, token: t.token };
+    } else {
+      const tree = await core.ports.artifacts.treeOf(j.integration);
+      if (!tree) throw new Error("the integration's tree could not be read");
+      const readUrl = (await core.canonicalRemoteReady()) as `https://${string}`;
+      const repo = await core.remotes.artifacts.get(core.location().name);
+      // Expiring no later than the deadline claimed above (R-EXEC-9).
+      const t = await repo.createToken("read", Math.floor((deadline - core.now()) / 1000));
+      tokenId = t.id;
+      move(core, mine, "token = ?", tokenId);
+      target = { integration: j.integration, input: { kind: "tree", tree }, readUrl, token: t.plaintext };
+    }
+  } catch {
+    // Not prepared: this attempt's credentials are ended, and the job is due again later.
+    await end();
+    move(core, mine, "state = 'owed', next_ms = ?, token = NULL", core.now() + JOB_RETRY_MS);
+    return;
+  }
+  // Preparation awaited: the attempt must still be the row's, and the owner, generation, configuration and
+  // obligation are judged again, with no await before the dispatch. Work that no longer belongs to its owner is
+  // retired with its credentials.
+  if (!move(core, mine, "next_ms = next_ms")) return void (await end());
+  if (!current(core, mine)) {
+    move(core, mine, "state = 'done', outcome = 'not-needed', token = NULL");
+    await end();
+    return;
   }
   const job: CheckJob = {
     // Each attempt is its own run (R-EXEC-8): it names its own sandbox.
@@ -231,14 +270,9 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
     runner: cfg.config.runner ?? null,
     ...(owner.landOp ? { landOp: owner.landOp } : {}),
     // The token expires no later than the job's deadline (R-EXEC-9).
-    deadline: iso(target.expiresAt),
+    deadline: iso(deadline),
   };
-  // The attempt is recorded before it is sent. Another step that got here first wins; this one sends nothing.
-  if (!move(core, j, "state = 'sent', attempt = ?, next_ms = ?, token = ?", attempt, target.expiresAt, target.tokenId)) {
-    await endToken(core, target.tokenId, jobId).catch(() => undefined);
-    return;
-  }
-  const sent: JobRow = { ...j, state: "sent", attempt, token: target.tokenId };
+  const sent: JobRow = { ...mine, token: tokenId };
   core.kick(`job:${job.id}`, async () => {
     // The wait ends with the answer, or when a jobs step finds the attempt past its deadline.
     const expired = new Promise<null>((resolve) => waitsOf(core).set(job.id, () => resolve(null)));
@@ -250,7 +284,7 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       move(core, sent, "state = 'owed', next_ms = ?", core.now() + JOB_RETRY_MS);
     } finally {
       waitsOf(core).delete(job.id);
-      await endToken(core, target.tokenId, job.id).catch(() => undefined);
+      await end();
     }
   });
 }

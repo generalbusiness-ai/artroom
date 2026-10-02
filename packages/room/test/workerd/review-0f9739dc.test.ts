@@ -148,7 +148,7 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
     await answer(r, late, 0, "refuse");
   });
 
-  it("two jobs steps at once: one attempt is sent; the step that lost the race sends nothing and revokes the token it minted", async () => {
+  it("two jobs steps at once: one attempt is sent; the step that lost the claim prepares nothing (review 786e9606)", async () => {
     const { r, alice, ci } = await checkRoom();
     await hold(r, ["jobs"]);
     const { seen } = service(r, ci, ["refuse"]);
@@ -162,8 +162,9 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
     expect(seen).toHaveLength(1);
     expect(await jobsOf(r)).toMatchObject([{ state: "done", attempt: 1, outcome: "refused: check-binding" }]);
     const minted = [...r.world.artifacts.canonicalRepo().tokens.values()].slice(before).filter((t) => t.scope === "read");
-    expect(minted).toHaveLength(2);
-    expect(minted.every((t) => t.revoked)).toBe(true);
+    expect(minted).toHaveLength(1);
+    expect(minted[0]!.plaintext).toBe(tokenOf(seen[0]!));
+    expect(minted[0]!.revoked).toBe(true);
   });
 
   it("restart: an attempt in flight when the room stops is issued again at its deadline, and its check lands the change", async () => {

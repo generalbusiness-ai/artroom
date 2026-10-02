@@ -115,6 +115,8 @@ export class FakeRepo implements GitRemote {
 
   async createToken(scope: "read" | "write" = "write", ttl = 86_400) {
     this.host.enter("createToken");
+    // Held while a test says so. Polled, because a test's promise cannot be resolved inside the Durable Object.
+    while (this.host.holdToken?.(this.name, scope, ttl)) await new Promise((r) => setTimeout(r, 2));
     if (ttl < 60 || ttl > 31_536_000) throw new FakeArtifactsError("INVALID_TTL", 10003);
     const t = this.mint(scope, ttl);
     this.host.answer("createToken");
@@ -380,6 +382,9 @@ export class FakeArtifactsHost {
     const planned = this.failures.get(method);
     if (planned?.length) throw planned.shift()!;
   }
+
+  /** Tests only: hold `createToken` calls in flight while this says so. */
+  holdToken: ((repo: string, scope: "read" | "write", ttl: number) => boolean) | null = null;
 
   /** Clear every planned failure: the remote has recovered. */
   recover(): void {
