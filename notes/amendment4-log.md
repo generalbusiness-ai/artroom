@@ -258,6 +258,38 @@ Run one suite at a time at `f545b5d4`, the last code commit; later commits chang
 | git, workerd (`npm run test:workers`) | 8 passed, exit 0 |
 | git, `npm run test:log` | 12 passed, exit 0 |
 
+## Review of 04797d8c: lengths past 32 bits
+
+A preliminary finding from the checker. The publisher kept each segment's
+line lengths in a `Uint32Array`.
+- **What broke.** A line given in parts (`EntryLine`) of 2^32 bytes or
+  more wrapped to its length modulo 2^32. R-LOG-18 allows such a line, as
+  513 or more chunks. The next comparison with the real length then
+  refused the cohort as `invalid-input`, wrongly saying "the source
+  changed while it was read". Nothing was written, so verify had nothing
+  to catch. No placement or chunking decision was made on a wrapped value.
+- **A worse, related defect.** A `RetainedRef` given in parts with a size
+  of NaN or -1 was hashed as a blob with no bytes, and `commitFor`
+  returned a commit for it. That commit could never be pushed, since its
+  objects do not hash to their IDs. A size of `Infinity` looped in
+  `chunks()`.
+- **The fix** (commit `9fb941ad`):
+  - lengths are a `Float64Array`, exact for every safe integer;
+  - a segment whose lengths sum past a safe integer is `invalid-input`
+    before any byte is read;
+  - a `RetainedRef` with `read` or `bytes` must have both, with `bytes` a
+    safe integer of at least 0, or it is `invalid-input`;
+  - `eachChunk` refuses a size that is not a length, and the publisher
+    plans a chunked file chunk by chunk.
+- **Tests.** In `test/amendment-4.test.ts`, "lengths past 32 bits and
+  sizes that are not lengths". They fake the lengths, so nothing large is
+  allocated. All five fail on the previous code.
+- **Mutants.** Each was killed:
+  - N1: lengths back in a `Uint32Array`;
+  - N2: a retained size left unchecked;
+  - N3: a segment sum past a safe integer left unchecked;
+  - N4: `eachChunk` with its check removed.
+
 ## Follow-ups and open questions
 
 1. **A live check (not run here: another agent owns the spike
