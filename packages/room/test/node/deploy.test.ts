@@ -48,12 +48,7 @@ describe("wrangler.jsonc (deploy)", () => {
     expect(spike.vars["ROOM_KEY_SECRET"]).toBeUndefined();
     expect(spike.vars["ARTIFACTS_HOST"]).toBe(prod.vars["ARTIFACTS_HOST"]);
     expect(spike.durable_objects).toEqual(prod.durable_objects);
-    // Production's migrations, then the spike's wipe of its Room and Registry objects (decision D5).
-    expect(spike.migrations).toEqual([
-      ...prod.migrations,
-      { tag: "v3", deleted_classes: ["Room", "Registry"] },
-      { tag: "v4", new_sqlite_classes: ["Room", "Registry"] },
-    ]);
+    expect(spike.migrations).toEqual(prod.migrations);
     // The same image by digest; wrangler names each container application after its Worker.
     const unnamed = (cs: readonly unknown[]) => cs.map((c) => ({ ...(c as object), name: undefined }));
     expect(unnamed(spike.containers)).toEqual(unnamed(prod.containers));
