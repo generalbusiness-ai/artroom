@@ -274,6 +274,15 @@ interface ActSpec<T> {
   intent?(room: RoomConfig, act: PreparedAct, id: RoomId): LocalIntent;
 }
 
+/**
+ * True when the installation `install` provably no longer has a credential
+ * in the file whose mark is `now`: the file is gone, or it names another
+ * installation. An unreadable mark (null) proves nothing.
+ */
+function credentialSettled(now: ReturnType<typeof credentialOwner>, install: string): boolean {
+  return now === undefined || (now !== null && now.install !== install);
+}
+
 /** Changes the selected lane; every change, even back to an earlier lane, gets a new revision (R: review 80d3710c). */
 function setLane(r: RoomConfig, lane: LaneId | undefined, by: string): void {
   if (lane === undefined) delete r.lane;
@@ -329,30 +338,32 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
     case "release-lane": {
       // At each repository: remove exactly a credential whose file names one of this lane's own installations,
       // recorded before the release was sent. Newer installations, any Room's, are left; so is a newer reservation.
-      const removed = new Set<string>();
       for (const d of local.dirs) {
         const file = credentialFileIn(d.dir);
         withDestination(d.dir, (o) => {
           const marker = credentialOwner(file);
           if (marker && local.installs.includes(marker.install)) {
             rmSync(file);
-            removed.add(marker.install);
             lines.push(`Removed the workspace credential for lane ${local.lane}, lease ${marker.lease}, from ${file}.`);
           } else if (marker && d.held) {
             lines.push(`Left the workspace credential at ${file}: a newer workspace installed it.`);
           } else if (marker === null && d.held) {
             lines.push(`Manual local step: ${file} has no installation mark artroom can read. If it still holds lane ${local.lane}'s credential, remove it by hand.`);
           }
-          const ours = (p: Party | undefined) => p !== undefined && local.installs.includes(p.install);
+          // One evidence rule, the same as for the Room's mapping: an owned installation is settled only when its
+          // credential was removed now, the file is gone, or the file provably belongs to another installation.
+          // An unreadable file proves nothing, so the evidence (the cleanup duty) stays.
+          const now = credentialOwner(file);
+          const settle = (p: Party | undefined) => p !== undefined && local.installs.includes(p.install) && credentialSettled(now, p.install);
           const cancel = o.reservation !== undefined && local.reservations.includes(o.reservation.install);
           const pending = o.pending ?? [];
-          if (!ours(o.installed) && !pending.some(ours) && !cancel) return undefined;
+          if (!settle(o.installed) && !pending.some(settle) && !cancel) return undefined;
           const { installed, pending: _settled, reservation, ...rest } = o;
-          const unsettled = pending.filter((p) => !ours(p));
+          const unsettled = pending.filter((p) => !settle(p));
           return {
             ...rest,
             rev: o.rev + 1,
-            ...(installed && !ours(installed) ? { installed } : {}),
+            ...(installed && !settle(installed) ? { installed } : {}),
             ...(unsettled.length > 0 ? { pending: unsettled } : {}),
             ...(reservation && !cancel ? { reservation } : {}),
           };
@@ -364,8 +375,7 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
         // The mapping is this Room's evidence of what it installed. Forget it only when that duty is done:
         // its credential was removed now, or the file there is provably another installation's (or gone).
         if (mapped !== undefined && mapped.install !== "" && local.installs.includes(mapped.install)) {
-          const there = credentialOwner(mapped.file);
-          if (removed.has(mapped.install) || there === undefined || (there !== null && there.install !== mapped.install)) delete r.workspaces![local.lane];
+          if (credentialSettled(credentialOwner(mapped.file), mapped.install)) delete r.workspaces![local.lane];
         }
         if (mapped !== undefined && mapped.install === "") {
           // A mapping from an older artroom names no installation: nothing proves the file is this lease's.
