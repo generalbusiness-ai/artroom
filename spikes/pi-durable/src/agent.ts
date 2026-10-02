@@ -5,7 +5,9 @@
  * (protocol R-CRED-4, case (b) of R-ADM-3).
  *
  * The model is scripted (pi-ai's faux provider, with a response factory
- * that reads the transcript), because no model API key is configured here.
+ * that reads the transcript), except in the live run, which uses a real one:
+ * Workers AI through the Worker's `AI` binding by default (src/models.ts,
+ * src/live.ts).
  * Everything else is the real code: pi-durable 1.0.0's Harness, tool tasks,
  * memos and documents; lane E's client; lane A's Room.
  *
@@ -30,18 +32,21 @@ import type { Context } from "@earendil-works/chord";
 import { Type, type AssistantMessage, type Message } from "@earendil-works/pi-ai";
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
-import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { AssistantEntry, createRegistry, defineDoc, defineExtension, defineTool, Harness, section, type ToolExecutionApi } from "@earendil-works/pi-durable";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
 import { connect, isArtroomError, isRefusal, signerFromJwk, type PreparedAct, type ClientActOptions, type PrivateJwk } from "@generalbusiness/artroom-client";
 import type { ArtroomService, DelegationId, Held, LaneId, OpId, Result, Room, RoomId, Sha } from "@generalbusiness/artroom-contract";
 import { DurableObjectSqlite } from "./do-sqlite.ts";
+import { addProviders, type ModelEnv } from "./models.ts";
 
-export interface AgentEnv {
+/**
+ * The Agent's bindings. `AI` (wrangler.jsonc) is the Workers AI binding; the
+ * keys are set only for a live run on another provider (test/live.test.ts),
+ * and would be Worker secrets in a deployment.
+ */
+export interface AgentEnv extends ModelEnv {
   readonly ARTROOM: ArtroomService;
-  /** Set only for the live run (test/live.test.ts). A Worker secret in a deployment. */
-  readonly OPENROUTER_API_KEY?: string;
 }
 
 // ------------------------------------------------------------ test controls (module state, shared with the test isolate)
@@ -228,13 +233,10 @@ export class Agent extends DurableObject<AgentEnv> {
   async #open(): Promise<Harness> {
     const faux = fauxProvider();
     faux.setResponses(Array.from({ length: 200 }, () => (context: { messages: Message[] }) => scriptedTurn(context.messages)));
-    // The key reaches pi-ai through its credential store, never through process.env or a log line.
     const credentials = new InMemoryCredentialStore();
-    const key = this.env.OPENROUTER_API_KEY;
-    if (key) await credentials.modify("openrouter", async () => ({ type: "api_key", key }));
     const models = createModels({ credentials });
     models.setProvider(faux.provider);
-    if (key) models.setProvider(openrouterProvider());
+    await addProviders(models, credentials, this.env);
     const registry = createRegistry();
     registry.install(this.#artroomExtension());
     const storage = await SqliteStorage.open(new DurableObjectSqlite(this.ctx.storage));
