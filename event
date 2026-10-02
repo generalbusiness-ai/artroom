@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f96042f752bd5572056f1ba31253e784e5817185","text":"Merge retired a covered predecessor; the successor is at packages/git/src/index.ts."}
+{"kind":"promise","text":"Builder takes mint lane B now that lane A has landed (main 7be42275); lane C follows B, serialised at core.ts."}
