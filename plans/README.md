@@ -21,7 +21,7 @@ Parent read every cited production path and test pattern. Read-only synthetic pr
 
 `packages/git/src/artifacts.ts:110,115` and `publisher/client.ts:84` retry non-idempotent canonical token creation after potentially applied internal errors (see artifacts.ts:60–68). `packages/room/src/logremote.ts:45` mints before its finally block. A lost answer can leave an unnamed token outside a cleanup owner's records; a usable publication answer can also be lost between mint and durable pushToken recording at landing/engine.ts:266–267. The ownership loss is evidenced, but a safe complete recovery design needs a contract decision: canonical inventories do not identify an owner and contain concurrent unrelated tokens. Do not turn this into a blanket revoke-all plan. Request explicit ownership of that design and its implementing lanes. Known tokens need durable handoffs; unknown effects need honest observation/retention or a documented provider completion fence. No unauthorized access or credential disclosure is claimed. Measured 60-second publication and longer pin token TTLs remain adopted behavior.
 
-Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Not yet approved or implemented.
+Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A is implemented, pending review: see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lanes B and C are not yet implemented.
 
 ## Considered and excluded
 
@@ -266,3 +266,119 @@ The earlier Durable Object test's last phase now runs the alarm itself, and chec
 | M1–M20, M7b and N1–N5, re-anchored to the new loop | each red, 1 to 13 tests |
 
 **Scope.** The Room control is a new test file outside plan 003's four paths. Review f060871b asked for a production Room alarm control, and the coordinator asked for it explicitly. No Room source changed.
+
+## Mint lane A (request 1eda3c5e)
+
+Status: DONE, pending checker review. Gitseq request `1eda3c5e`, branch `request/mint-ledger`, cut from main `b803d210`. It implements lane A of [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md) ("Lane A: the ledger"), as approved in review `ad6cc052`, under [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). The head for review is the commit that carries this section.
+
+**Scope.** Code is added only: `packages/git/src/mints.ts` (new), `packages/git/src/index.ts` (exports), and `packages/git/test/mints.test.ts` (new). No caller changes; lanes B and C do that. This section, and the status line above, are the only other edits. Nothing was deployed, no live Cloudflare call was made, and no credential was created.
+
+### What was built
+
+`MintLedger`, on the Room's SQLite through the package's `Sql` interface (a Durable Object's storage or `node:sqlite`). It creates its own tables, as the other Git package classes do: `artroom_mint` (the records) and `artroom_mint_summary` (one row).
+
+```ts
+const mints = new MintLedger({ sql, repo, now, wake, known, waitMs? /* default 30 s */, sleep? /* tests */ });
+const t = await mints.mint(purpose, "read" | "write", (sentAt) => ttlSeconds, { notAfter? });
+//   t: { id, plaintext, scope, expiresAt, release(), claim() }
+await mints.withToken(purpose, scope, ttl, async (t) => …);   // mint, run, release
+await mints.reconcile();   // the alarm: keep or clear the takeover time, start a revocation pass, observe if due
+mints.nextDue();           // when the alarm should next run, or null
+mints.duties({ after, limit });   // one page of records by row ID, with the counts and the observation
+await mints.idle();        // tests: the revocation pass and late answers have ended
+```
+
+- `repo` is a function that returns the canonical repository (`createToken`, `revokeToken`, `listTokens`), as `canonicalTokens` takes it. It is fetched before the record is written, so nothing slow sits between the lifetime and the send.
+- `known(tokenId)` is the Room's point lookups in its other records (`job_tokens` and, from lane B, `artroom_land_token`). The ledger checks its own records through an index on token ID.
+- Records: `sent`, `held`, `owed` or `unknown`, as in the note's table. A record is deleted when it ends. Row IDs come from `AUTOINCREMENT`, so they are never reused. Every change is `UPDATE … WHERE id = ? AND state = ? RETURNING id` (or the same `DELETE`), and the counts in the summary row change in the same transaction, from the rows that actually changed.
+- Before the request: one transaction writes the `sent` record, and moves the takeover time to 60 s ahead if it is less than 30 s away. Then `wake(takeover)` is awaited. Then `ttl(sentAt)` is called, and a second conditional update stores that lifetime and send time on the record (approval obligation 1). Only then is `createToken` called. If any of these fails, the record is deleted and nothing is sent.
+- The answer is classified once, as the note says. Usable: a token ID and text, the scope asked, a readable expiry no later than the answer's arrival plus the lifetime asked and no later than `notAfter`, for a caller still waiting. Usable answers become `held` and are returned. A token ID otherwise becomes `owed`, due at once, with its reported expiry or none. A refusal that changed nothing deletes the record. Anything else is `unknown`. Only the `retriable()` classes are retried, up to 5 attempts from 0.5 s, and each attempt is a new record, sent only after the previous one holds its outcome. A caller waits at most 30 s. After that the record is `unknown`, and the answer, whenever it comes, is applied to its own record with no caller. If recording an answer fails, the record keeps its state, the ID is revoked at once, and the record is deleted only when that revocation is answered.
+- `release()` revokes by ID, waiting at most 30 s. An answer deletes the record. A refusal, a timeout or a completion that does not commit makes it `owed`, due in 1 s. `claim()` is synchronous: it deletes the `held` record inside the owner's transaction, and throws if the ledger no longer holds it.
+- Takeover: the constructor turns every `sent` record into `unknown` and every `held` record into `owed`, due at once, in one indexed update. So a Room builds one ledger per object start.
+- `reconcile()`: with records in flight, the takeover time moves 60 s ahead when less than 30 s away; with none, it is cleared. Then a revocation pass starts, unless one is running, and is not awaited. Then at most one observation runs, if one is due, and is awaited (at most 30 s).
+- Revocation pass: at most 20 owed records with `due <= now`, ordered by due time, then row ID. A record whose readable expiry has passed is settled with no revocation call; any other is revoked by its ID, waiting at most 30 s. All results are written in one transaction at the end of the pass: at most 20 record writes and one summary write. If that transaction fails, every record in the batch takes its backoff, as a failure. Backoff: 1 s doubling to 5 min, never past a readable expiry. When the pass ends, it stores a wake-up for `nextDue()`.
+- Observation: only while a record is `unknown`. One `listTokens()`, waited on for at most 30 s. If the listing has more than 1,000 records, or `completeInventory` refuses it, that is the result and nothing is counted. Otherwise each active, unexpired token is looked up by index and by `known()`. One summary write: the time, the result, the count, and the next due time (a wait doubling from 1 min to 6 h). A new unknown record brings it forward to no sooner than 1 min after the last one.
+- `nextDue()`: the earliest of the owed records' minimum due time (not before the current attempt's timeout while a pass waits), the observation time (while any record is unknown; not before its timeout while one is running), and the takeover time (while any record is `sent` or `held`). Each time already passed counts as now plus 1 s. A still-future time counts as itself. So the 1 s step applies only when due <= now, and never postpones a still-future takeover or observation time (approval obligation 2). The Room's `wake` keeps an earlier unrelated alarm.
+
+### Choices where the design left room
+
+These are for the checker to confirm or reject.
+
+1. **The pass writes its results once, at its end.** The note asks both that "counts change in the same transaction as each record" and that a pass makes "at most 20 record writes and one summary write". One transaction at the end of the pass meets both. The cost: a host that stops during a pass loses the answers it got. Those records stay owed and are revoked again, and a revocation that answers `false` counts as done.
+2. **A token owed at once is revoked by the next pass, not inside `mint()`.** Its record holds the ID, and `mint()` stores a wake-up for now. Only the failed-handoff case, where no record holds the ID, revokes inline, as the note says.
+3. **Backoff stops at a readable expiry**, so an owed record is settled when its expiry passes, not at its next backoff time after that.
+4. **Wake-ups after a debt is recorded are best effort**: on a release failure, an unusable answer, a late answer, or the end of a pass. The debt is durable, and the takeover wake-up, stored while the record was `sent` or `held`, already covers it. The wake-up before a send is required, and a failure there sends nothing.
+5. **A failed handoff whose revocation also fails** leaves the record `sent`, as the note says ("keeps its earlier state"). On a live host it then stays in flight: the alarm keeps moving the takeover time until the next object start makes it `unknown`. The same holds for a `release()` that cannot record its debt. That throws, and the record stays `held` until the next start makes it `owed`. Both need storage to fail twice in a row.
+6. **A new unknown brings the observation forward but does not reset the doubling.** The note says only "brings it forward". Either way there is at most one inventory a minute.
+7. **`nextDue()` reads one indexed minimum, one indexed existence check and the summary row**, where the note says "three indexed minimums". The bound is the same.
+8. **Additions to the note's API:** `sleep` (tests only, as `SnapshotRepos` and `canonicalTokens` have), `idle()` (as the landing engine's `cleanupDone()`), and the exported constants. `duties()` includes the token ID, never its text, and caps `limit` at 1,000. `withToken` takes no `notAfter`, because only check jobs need one, and they claim the token.
+9. **The bounded wait timing out is not retried,** and neither is a transport failure: only `retriable()` classes are, as `withRetry` does today.
+
+### Tests: rule map
+
+`packages/git/test/mints.test.ts`, 33 tests, named with the note's lane A numbers. Each test is red under at least one mutant below. Without the ledger the file does not load.
+
+| Note | Rules | Tests |
+|---|---|---|
+| (1) | R-MINT-2 | the record and the stored wake-up in place when `createToken` is called; the lifetime computed after a 20 s wake-up and held on the pre-send record; a failed record write, and a failed wake-up, send nothing and leave no record; the takeover time moves only when under 30 s away |
+| (2) | R-MINT-2, R-MINT-5 | applied then `INTERNAL_ERROR`: unknown, and the retry is a new record; the record survives 100 lifetimes, a complete inventory with nothing unaccounted, an incomplete one and a takeover; nothing outside the ledger's records is revoked |
+| (3) | R-MINT-3 | a refusal deletes the record, with no retry; a transport failure is unknown, with no retry |
+| (4) | R-MINT-3, R-MINT-4 | ID without text owed and revoked by ID; unreadable expiry owed until a revocation is answered; another scope, a longer expiry, or after `notAfter` owed and never returned (an expiry equal to `notAfter` accepted); no ID is unknown; settlement at a readable expiry with no revocation call |
+| (5) | R-MINT-3 | an answer held past the wait: error, unknown, then the late ID owed and revoked; a late refusal deletes; a late lost answer stays unknown; a late answer to a record whose unknown state could not be stored is owed, never held |
+| (6) | R-MINT-3, R-MINT-4 | failed handoff: record kept, ID revoked at once, record deleted only after the answer; two mints in flight with a claimed row; a stale caller after a takeover gets nothing, and counts stay exact; `claim()` rolls back with its owner |
+| (7) | R-MINT-4, R-MINT-7 | takeover: `sent` to unknown, `held` to owed and revoked by ID; the old host's `release` and `claim` do nothing |
+| (8) | R-MINT-7 | the takeover time in `nextDue()`, moved on the live host, cleared with nothing in flight; overdue work at now plus 1 s; a still-future takeover, observation or revocation time on time |
+| (9) | R-MINT-4, R-MINT-7 | backoff 1 s to 5 min across a takeover; a timeout is a failure and its late answer is dropped; a completion that cannot commit is a failure; a failed or timed-out release is owed; 20 a pass, earliest due first; one pass at a time, not eligible before the attempt's timeout |
+| (10) | R-MINT-5, R-MINT-7 | the scale control below; a listing over 1,000 records counts nothing; the observation doubles from 1 min to 6 h, and new unknowns every second give one inventory a minute |
+| — | | the bounds are the design's (30 s, 60 s and 30 s, 1 s, 20, 1,000, both backoffs) |
+
+**The scale control (10).** The SQL double wraps `node:sqlite`. It counts the rows each statement returns, and the rows written per table (from `RETURNING` or `changes()`). It also runs `EXPLAIN QUERY PLAN` on every read, update and delete, and records any that scans `artroom_mint` rather than searching an index. Setup: 10,000 unknown records, 900 tokens known to other records, and a backlog of 100 owed records, all due, whose tokens make up the other 100 of the 1,000 listed. Then 40 alarm turns, each at `nextDue()` and each after a new unknown record. Each turn: at most one `listTokens()`; at most 20 record writes; at most one summary write each for the takeover time, the observation and the pass; at most 1,040 rows read; at most 1,000 `known()` calls. Turns that only observe write no record. The five backlog passes revoke the next 20 in due order, and after each, `nextDue()` and the stored wake-up are exactly 1 s ahead. Observations are at least 1 min apart, and each counts 0 unaccounted. No statement scans the records. Paging `duties()` 1,000 at a time reaches all 10,040 remaining records once, each page reading at most 1,002 rows. The counts equal `COUNT(*)` per state: all 10,040 are unknown, and none is owed.
+
+### Mutation table
+
+Each mutant was applied alone to `src/mints.ts` by a script, the mint tests were run, and the file was restored from the commit (`git checkout`). Every mutant turned at least one named test red. T-mutants are the note's mutation targets, O-mutants the approval's two obligations, and G-mutants the other guards. 61 mutants, all red. The first run left three survivors (T5b, G29, G30). Each was a missing test, not an equivalent mutant, and each now has one: the third (5) test, an assertion in the first (4) test, and one in the scale test. Two tests were then red under no mutant, so G32 and G33 were added to break their guards. G31 was rerun after a fix to the mutant itself, which had broken the syntax.
+
+| Mutant | Red tests (number) |
+|---|---|
+| T1a wake-up after the send / T1b record after the send | (1) ×3 / (1) ×4, (2) |
+| T2 a failed wake-up still sends | (1) |
+| T3a settle unknown by inventory / T3b by lifetime / T3c by the owner's end (takeover deletes `sent`) | (2), (7), (10) / (2), (10) ×2 / (6) ×2, (7) |
+| T4 a late ID left unknown | (5) ×2, (6) |
+| T5a a late answer given to the caller (no bounded wait) / T5b late answer classified as for a waiting caller | (5) ×3, (6) ×2 / (5) |
+| T6a takeover time left out of `nextDue()` / T6b not moved ahead | (8) ×2 / (8) |
+| T7 an observation written to each record | (10) scale |
+| T8 a new unknown resets the schedule to now | (10) ×2 |
+| T9a batch by newest / T9b batch by row ID only | (4), (9) ×2, (10) / (9) |
+| T10a unconditional `UPDATE` by row ID / T10b unconditional `DELETE` | (5) ×2, (6) / (5) |
+| T11 a retry under one record (`withRetry` around the create) | (2) |
+| T12 a swallowed release failure | (8), (9) |
+| T13 `claim()` deferred out of the owner's transaction | (6), (7) |
+| T14 `notAfter` not checked before the token is returned | (4) |
+| T15 `ttl` computed before the wake-up | (1) ×2 |
+| T16a overdue `nextDue()` returned as is / T16b as now plus 10 ms | (8), (10) / (8), (10) |
+| T17 settlement at an unreadable expiry | (4) |
+| O1 no second conditional update: the pre-send record lacks the lifetime | (1) ×2 |
+| O2a 1 s step whenever anything is overdue, postponing a future time / O2b 1 s floor on future times | (8) / (8) |
+| G1 a failed wake-up leaves its record; G2 a refusal left unknown | (1); (3), (5) |
+| G3 no text check; G4 no scope check; G5 no generic expiry check; G6 an unreadable expiry usable | 9 tests; (4); (4); (4) |
+| G7 no takeover at start; G8 a taken-over `held` owed an hour later | (6) ×2, (7); (7) |
+| G9 a late answer leaves the unknown count | (5), (6) |
+| G10 failed handoff deletes before the answer; G11 no inline revocation | (6); (6) |
+| G12 `release` revokes a claimed token | (6), (7) |
+| G13 no single pass; G14 owed eligible during a pass; G15 a batch of 40 | (9); (9); (9), (10), bounds |
+| G16 no doubling; G17 no cap; G18 a timeout counted as answered; G19 a failed completion not recorded | (4), (9); (4), (9); (9); (9) |
+| G20 no settlement at a readable expiry; G21 backoff past the expiry | (4); (4) |
+| G22 no listing cap; G23 an incomplete listing counted | (10); (2) |
+| G24 the takeover time never moved before a send; G31 not cleared with nothing in flight | (1); (8) |
+| G25 no wake-up when a pass ends; G26 none for a token owed at once | (10); (4) |
+| G27 the pass writes the summary per record | (10) scale |
+| G28 no observation doubling; G29 observation with no unknown record; G30 observation skips the ledger's own token index | (10); (4); (10) scale |
+| G32 every unknown failure retried, not only `retriable()` classes; G33 an answer without a token ID closes the record | (3), (8), (10) ×2; (4) |
+
+### Gates
+
+Run at the exact head that carries this section; the exit codes are in the delivery report. In this order: `npm run typecheck -w @generalbusiness/artroom-git` and `npm test -w @generalbusiness/artroom-git` (Node); then from the root `npm ci`, `npm run typecheck` and `npm test`; then the note's lane gates: `npm run test:workers -w @generalbusiness/artroom-git`, `npm run test:node -w @generalbusiness/artroom-room`, `npm run test:workerd -w @generalbusiness/artroom-room`, and `npm exec -w @generalbusiness/artroom-room -- wrangler deploy --dry-run` (bundles only; nothing is uploaded).
+
+### Not changed here
+
+Every caller: `canonicalTokens`, the landing engine and core, the publisher client, the log remote, snapshot preparation and check jobs keep their own mints until lanes B and C. The Room does not build a ledger yet, so nothing in production uses it. The package README is unchanged; lane B, which puts the ledger in the Room, can describe it there.
