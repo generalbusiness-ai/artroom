@@ -1,0 +1,121 @@
+{
+  "source": "wrangler tail artroom-lb-logbig --format json, during every run in this directory (tail may sample events)",
+  "from": "2026-10-02T02:47:47.840000+00:00",
+  "to": "2026-10-02T03:16:53.144000+00:00",
+  "events": 2695,
+  "outcomes": {
+    "ok": 2692,
+    "canceled": 2,
+    "aborted": 1
+  },
+  "notOk": [
+    {
+      "outcome": "canceled",
+      "entrypoint": "Publisher",
+      "method": "pushLog",
+      "cpuMs": 3,
+      "wallMs": 1565,
+      "exceptions": []
+    },
+    {
+      "outcome": "canceled",
+      "entrypoint": "Publisher",
+      "method": "stageLog",
+      "cpuMs": 1165,
+      "wallMs": 2900,
+      "exceptions": []
+    },
+    {
+      "outcome": "aborted",
+      "entrypoint": "Room",
+      "method": "",
+      "cpuMs": 0,
+      "wallMs": 0,
+      "exceptions": [
+        "lb: restart mid-staging"
+      ]
+    }
+  ],
+  "byEntrypoint": {
+    "ArtifactsGateway": {
+      "events": 492,
+      "maxCpuMs": 13,
+      "maxWallMs": 855
+    },
+    "Publisher.pushLog": {
+      "events": 112,
+      "maxCpuMs": 787,
+      "maxWallMs": 2026
+    },
+    "Publisher.readLogRef": {
+      "events": 91,
+      "maxCpuMs": 4,
+      "maxWallMs": 733
+    },
+    "Publisher.stageLog": {
+      "events": 187,
+      "maxCpuMs": 1563,
+      "maxWallMs": 3660
+    },
+    "Registry.bind": {
+      "events": 9,
+      "maxCpuMs": 1,
+      "maxWallMs": 156
+    },
+    "Registry.byRepo": {
+      "events": 18,
+      "maxCpuMs": 1,
+      "maxWallMs": 54
+    },
+    "Room": {
+      "events": 1,
+      "maxCpuMs": 0,
+      "maxWallMs": 0
+    },
+    "Room.found": {
+      "events": 4,
+      "maxCpuMs": 73,
+      "maxWallMs": 2001
+    },
+    "Room.lbAbortAfter": {
+      "events": 2,
+      "maxCpuMs": 642,
+      "maxWallMs": 2270
+    },
+    "Room.lbAbortAfterStages": {
+      "events": 1,
+      "maxCpuMs": 0,
+      "maxWallMs": 45
+    },
+    "Room.lbNotified": {
+      "events": 3,
+      "maxCpuMs": 121,
+      "maxWallMs": 213
+    },
+    "Room.lbPublishStart": {
+      "events": 20,
+      "maxCpuMs": 11379,
+      "maxWallMs": 13202
+    },
+    "Room.lbPushProbe": {
+      "events": 4,
+      "maxCpuMs": 5,
+      "maxWallMs": 537794
+    },
+    "Room.lbStatus": {
+      "events": 255,
+      "maxCpuMs": 6053,
+      "maxWallMs": 433026
+    },
+    "Room.submit": {
+      "events": 544,
+      "maxCpuMs": 190,
+      "maxWallMs": 383
+    },
+    "fetch": {
+      "events": 952,
+      "maxCpuMs": 219,
+      "maxWallMs": 11246
+    }
+  }
+}

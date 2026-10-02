@@ -17,12 +17,16 @@
  *   parts, through the sandbox (`stageLog`, no token: the sandbox stages
  *   locally), and then pushed with no objects. The answer is lane L's
  *   `StageOutcome`, returned as the sandbox gives it.
+ * - Object bytes cross the Durable Object RPC as unpadded base64url, built
+ *   in one buffer (`partB64url`). Building the string by concatenation, as
+ *   `crypto.ts`'s `b64url` does, makes a rope: measured in Node, 8 MiB of
+ *   part data held 153 MiB of heap until the string was flattened, more
+ *   than a Durable Object's 128 MB (request 5a7290b9).
  */
 
 import type { Sha } from "@generalbusiness/artroom-contract";
 import type { LogRemoteStub } from "@generalbusiness/artroom-git";
 import { encodeCommit, encodeTree, gitObject, type GitObject, type ObjectType, type PushOutcome, type StageOutcome, type StagePart, type StageWant, type TreeEntry } from "@generalbusiness/artroom-log";
-import { b64url } from "./crypto.ts";
 import type { ArtifactsBinding, RepoLocation } from "./artifacts.ts";
 import type { StagingRemote } from "./ports.ts";
 
@@ -81,7 +85,7 @@ export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStu
     },
     async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<PushOutcome> {
       return withToken("write", (canonical) =>
-        stub.pushLog({ canonical, objects: objects.map((o) => ({ type: o.type, data: b64url(o.data) })), ref, next, lease }) as Promise<PushOutcome>,
+        stub.pushLog({ canonical, objects: objects.map((o) => ({ type: o.type, data: partB64url(o.data) })), ref, next, lease }) as Promise<PushOutcome>,
       );
     },
     async stage(cohort: Sha, want: readonly StageWant[], parts: readonly StagePart[]): Promise<StageOutcome> {
@@ -90,8 +94,42 @@ export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStu
         canonical: { remote },
         cohort,
         want,
-        parts: parts.map((p) => ({ sha: p.sha, type: p.type, size: p.size, offset: p.offset, data: b64url(p.data) })),
+        parts: parts.map((p) => ({ sha: p.sha, type: p.type, size: p.size, offset: p.offset, data: partB64url(p.data) })),
       }) as Promise<StageOutcome>;
     },
   };
+}
+
+const ALPHABET = new TextEncoder().encode("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
+const ascii = new TextDecoder();
+
+/**
+ * Unpadded base64url (RFC 4648 section 5), the same text as `crypto.ts`'s
+ * `b64url`, written into one byte buffer and decoded once: about 4/3 of
+ * the input in memory, never a rope of small strings.
+ */
+export function partB64url(bytes: Uint8Array): string {
+  const n = bytes.length;
+  const full = n - (n % 3);
+  const out = new Uint8Array(Math.ceil((n * 4) / 3));
+  let o = 0;
+  let i = 0;
+  for (; i < full; i += 3) {
+    const v = (bytes[i]! << 16) | (bytes[i + 1]! << 8) | bytes[i + 2]!;
+    out[o++] = ALPHABET[(v >> 18) & 63]!;
+    out[o++] = ALPHABET[(v >> 12) & 63]!;
+    out[o++] = ALPHABET[(v >> 6) & 63]!;
+    out[o++] = ALPHABET[v & 63]!;
+  }
+  if (n - i === 1) {
+    const v = bytes[i]! << 16;
+    out[o++] = ALPHABET[(v >> 18) & 63]!;
+    out[o++] = ALPHABET[(v >> 12) & 63]!;
+  } else if (n - i === 2) {
+    const v = (bytes[i]! << 16) | (bytes[i + 1]! << 8);
+    out[o++] = ALPHABET[(v >> 18) & 63]!;
+    out[o++] = ALPHABET[(v >> 12) & 63]!;
+    out[o++] = ALPHABET[(v >> 6) & 63]!;
+  }
+  return ascii.decode(out.subarray(0, o));
 }

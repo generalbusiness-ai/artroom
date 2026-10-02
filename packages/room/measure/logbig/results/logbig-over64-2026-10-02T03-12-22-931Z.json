@@ -1,0 +1,246 @@
+{
+  "date": "2026-10-02T03:12:22.931Z",
+  "mode": "over64",
+  "targetMiB": 64.5,
+  "worker": "artroom-lb-logbig",
+  "namespace": "gitseq-spike",
+  "steps": [
+    {
+      "step": "notified",
+      "at": 300,
+      "seqs": [
+        302
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 600,
+      "seqs": [
+        603
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "notified",
+      "at": 850,
+      "seqs": [
+        854
+      ],
+      "bytes": [
+        2013297
+      ]
+    },
+    {
+      "step": "load",
+      "claims": 960,
+      "ms": 67522,
+      "head": 964,
+      "activeSegment": {
+        "first": 0,
+        "entries": 965,
+        "bytes": 67741449,
+        "largestEntry": 2013297
+      }
+    },
+    {
+      "step": "reset",
+      "abortStages": 2,
+      "reset": false
+    }
+  ],
+  "publications": [
+    {
+      "label": "load through 101",
+      "reset": true,
+      "before": {
+        "head": 101,
+        "publishedThrough": -1
+      },
+      "after": {
+        "publishedThrough": -1,
+        "pending": {
+          "v": 2,
+          "parent": null,
+          "expected": "1b6b1e56759cd5fe011a7a1b72e5dddb91f27c23",
+          "through": 101,
+          "hash": "sha256:9d91cf0dcc4b9c0c1ba16fe2f7475a45409233613ab1092c6a4120a0ec9358f0",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_baf374b61de4e05a3f1b49a740e82c5d",
+            "through": 101,
+            "hash": "sha256:9d91cf0dcc4b9c0c1ba16fe2f7475a45409233613ab1092c6a4120a0ec9358f0",
+            "at": "2026-10-02T03:12:32.575Z",
+            "roomKey": "key_LHdVeGxXErC5f7SSqeljbvoEAHZt-8k5l1p3jPTJKA0",
+            "sig": "YVAcfZ-X289uuaUnVoXF0XLC0laTuzallMYKegaxv3r2vcjAa09gwp4l-LRQVichKP1WNx11gDNNVUEijSGRDQ"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        },
+        "publicationError": null,
+        "heap": {
+          "rss": 0,
+          "heapTotal": 0,
+          "heapUsed": 0,
+          "external": 0,
+          "arrayBuffers": 0
+        }
+      },
+      "ms": 2614
+    },
+    {
+      "label": "64.6 MiB active segment, reset mid-publication",
+      "before": {
+        "head": 964,
+        "publishedThrough": -1,
+        "activeSegment": {
+          "first": 0,
+          "entries": 965,
+          "bytes": 67741449,
+          "largestEntry": 2013297
+        },
+        "pending": {
+          "v": 2,
+          "parent": null,
+          "expected": "1b6b1e56759cd5fe011a7a1b72e5dddb91f27c23",
+          "through": 101,
+          "hash": "sha256:9d91cf0dcc4b9c0c1ba16fe2f7475a45409233613ab1092c6a4120a0ec9358f0",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_baf374b61de4e05a3f1b49a740e82c5d",
+            "through": 101,
+            "hash": "sha256:9d91cf0dcc4b9c0c1ba16fe2f7475a45409233613ab1092c6a4120a0ec9358f0",
+            "at": "2026-10-02T03:12:32.575Z",
+            "roomKey": "key_LHdVeGxXErC5f7SSqeljbvoEAHZt-8k5l1p3jPTJKA0",
+            "sig": "YVAcfZ-X289uuaUnVoXF0XLC0laTuzallMYKegaxv3r2vcjAa09gwp4l-LRQVichKP1WNx11gDNNVUEijSGRDQ"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        }
+      },
+      "result": {
+        "through": 101,
+        "commit": "1b6b1e56759cd5fe011a7a1b72e5dddb91f27c23"
+      },
+      "error": null,
+      "ms": 4251,
+      "after": {
+        "publishedThrough": 101,
+        "logCommit": "1b6b1e56759cd5fe011a7a1b72e5dddb91f27c23",
+        "activeSegment": {
+          "first": 0,
+          "entries": 966,
+          "bytes": 67741983,
+          "largestEntry": 2013297
+        },
+        "publicationError": null
+      },
+      "publisher": {
+        "stats": {
+          "peakBatchBytes": 1028876,
+          "peakSendBytes": 6427021,
+          "peakObjectBytes": 564,
+          "largestSegment": 6425055,
+          "hashedBytes": 6425055,
+          "sentSegmentBytes": 6425055
+        },
+        "head": "1b6b1e56759cd5fe011a7a1b72e5dddb91f27c23",
+        "publishedThrough": 101
+      },
+      "heap": {
+        "rss": 0,
+        "heapTotal": 0,
+        "heapUsed": 0,
+        "external": 0,
+        "arrayBuffers": 0
+      }
+    },
+    {
+      "label": "64.6 MiB active segment, after the reset",
+      "reset": true,
+      "before": {
+        "head": 965,
+        "publishedThrough": 101
+      },
+      "after": {
+        "publishedThrough": 101,
+        "pending": {
+          "v": 2,
+          "parent": "1b6b1e56759cd5fe011a7a1b72e5dddb91f27c23",
+          "expected": "25236e03a0dfe15244cf719ded84b0a9b0ee22c2",
+          "through": 965,
+          "hash": "sha256:3b32ebff376bd520843e9c0f8c9c771ca27105367cc7b05879fe5f2f2cc0ee5a",
+          "checkpoint": {
+            "format": "artroom-log-v1",
+            "room": "room_baf374b61de4e05a3f1b49a740e82c5d",
+            "through": 965,
+            "hash": "sha256:3b32ebff376bd520843e9c0f8c9c771ca27105367cc7b05879fe5f2f2cc0ee5a",
+            "at": "2026-10-02T03:13:37.296Z",
+            "roomKey": "key_LHdVeGxXErC5f7SSqeljbvoEAHZt-8k5l1p3jPTJKA0",
+            "sig": "R4VYiTOI06lN9a8UHhwKeVoDArXcFTTbsgkemig6IpnWiFm7y0pHmbzMchzyen2LUUjPspdStKWVbYEJWQWCBw"
+          },
+          "retained": [
+            "sha256:6d96de3d8133bbf753e23e353bffb217698eb67233b02007407044910beec0dc"
+          ]
+        },
+        "publicationError": null,
+        "heap": {
+          "rss": 0,
+          "heapTotal": 0,
+          "heapUsed": 0,
+          "external": 0,
+          "arrayBuffers": 0
+        }
+      },
+      "ms": 12648,
+      "probe": {
+        "expected": "25236e03a0dfe15244cf719ded84b0a9b0ee22c2",
+        "lease": "1b6b1e56759cd5fe011a7a1b72e5dddb91f27c23",
+        "outcome": {
+          "ok": false,
+          "reason": "unknown",
+          "detail": "nothing was sent: before the push: 25236e03a0dfe15244cf719ded84b0a9b0ee22c2 is not here: send or stage it again"
+        }
+      }
+    }
+  ],
+  "room": "room_baf374b61de4e05a3f1b49a740e82c5d",
+  "repo": "gitseq-spike/66b0d40da25102d5d6f71caeec73ffed",
+  "checks": {
+    "resetHappened": false,
+    "pendingStoredBeforeReset": false,
+    "sameCohortAfterReset": null,
+    "resumedSameCommit": null,
+    "resumedThrough": null,
+    "resumedError": null,
+    "segmentBytes": null,
+    "sentAfterReset": null,
+    "resumedFromStaged": null,
+    "activeSegmentMiB": 64.60378932952881,
+    "largestEntry": 2013297
+  },
+  "verify": {
+    "ref": "1b6b1e56759cd5fe011a7a1b72e5dddb91f27c23",
+    "refIsLast": true,
+    "exit": 0,
+    "ms": 1732,
+    "ok": true,
+    "verifiedThrough": 101,
+    "publishedThrough": 101,
+    "commits": 1,
+    "failures": [],
+    "stderr": ""
+  },
+  "cleanup": {
+    "activeTokensFound": 1,
+    "revoked": 1,
+    "repoDeleted": true
+  },
+  "totalMs": 92327
+}

@@ -725,6 +725,42 @@ Mutations, each run against the workerd suite and reverted:
 | The fake's push ignores staged objects | the first two above (2) |
 | The fake's push skips the completeness check | the third (1) |
 
+## Log publication: bounded memory (request 5a7290b9)
+
+The Room no longer loads its log to publish it. Before, `publish` and
+`commitFor` were given `entriesAfter(sql, -1, n + 1)`, every entry as an
+object, and every retained file's body. With an active segment over
+64 MiB, that is several times the Durable Object's 128 MB.
+
+- **Entries** come from `logSource(sql, through)` ([src/log.ts](src/log.ts)),
+  lane L's `EntrySource`. The publisher reads them in batches as it needs
+  them. A full segment it has published is reused by ID and never read.
+- **Retained files** are `RetainedRef`s (`retainedRefs` in
+  [src/core.ts](src/core.ts)): kind and digest, and a `load` that reads
+  the body only if the parent commit does not hold it.
+- **The log remote** ([src/logremote.ts](src/logremote.ts)) encodes each
+  part as base64url in one buffer (`partB64url`). `crypto.ts`'s `b64url`
+  builds its string by concatenation; in Node an 8 MiB part held 153 MiB
+  of heap that way.
+- Nothing else changed: the pending cohort, its stored commit and the
+  fence are as before. `PublisherPort` now takes an `EntrySource` and
+  `RetainedRef`s ([src/ports.ts](src/ports.ts)).
+
+Tests: [test/workerd/log-bounded.test.ts](test/workerd/log-bounded.test.ts)
+(reads of at most `READ_LIMITS.entries`, none of a published full segment,
+retained bodies only when new, and a verified log) and
+[test/node/logremote.test.ts](test/node/logremote.test.ts). The live
+matrix and memory figures are in `notes/log-bounded.md`; the harness is in
+[measure/logbig/](measure/logbig/).
+
+**A limit found live.** Artifacts refuses a push that carries a git object
+larger than 32 MiB (`artifacts_git_receive_pack_object_too_large`;
+[measure/logbig/object-limit.mjs](measure/logbig/object-limit.mjs)). Under
+R-LOG-9 the active segment is one blob, so a segment over 32 MiB cannot be
+published to Artifacts at all. The Room stages it and then retries the same
+cohort with `unresolved` without end. The layout, or a rule that bounds a
+segment's bytes, is a contract question, not changed here.
+
 ## Review 95323c2b
 
 The checker's review of revision 6 (`d0b09ca2`) found one P2, and
