@@ -235,10 +235,10 @@ const AUTHZ_SESSION_G2 = `
 +export const currentUser = (req: Request) => requireSession(req);
 `;
 
-const SESSION_LIB = `
+const SESSION_LIB_DEBUG = `
 --- /dev/null
 +++ b/src/lib/authz/session.ts
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,12 @@
 +import type { Request } from "../../http";
 +import { readCookie, verifySessionCookie } from "../cookies";
 +
@@ -247,9 +247,40 @@ const SESSION_LIB = `
 +/** The signed-in user, or null. Every session check goes through here. */
 +export function requireSession(req: Request) {
 +  const cookie = readCookie(req, SESSION_COOKIE);
++  console.log("session cookie", cookie);
 +  if (!cookie) return null;
 +  return verifySessionCookie(cookie);
 +}
+`;
+
+const SESSION_LIB_2 = `
+--- /dev/null
++++ b/src/lib/authz/session.ts
+@@ -0,0 +1,12 @@
++import type { Request } from "../../http";
++import { isExpired, readCookie, verifySessionCookie } from "../cookies";
++
++const SESSION_COOKIE = "sid";
++
++/** The signed-in user, or null. Every session check goes through here. */
++export function requireSession(req: Request) {
++  const cookie = readCookie(req, SESSION_COOKIE);
++  if (!cookie) return null;
++  if (isExpired(cookie)) return null;
++  return verifySessionCookie(cookie);
++}
+`;
+
+const SESSION_TEST = `
+--- /dev/null
++++ b/src/lib/authz/session.test.ts
+@@ -0,0 +1,6 @@
++import { expect, test } from "vitest";
++import { requireSession } from "./session";
++
++test("no cookie, no session", () => {
++  expect(requireSession(new Request("https://acme.test/"))).toBeNull();
++});
 `;
 
 const API_SESSION = `
@@ -274,6 +305,6 @@ export const DIFFS: Readonly<Record<string, string>> = {
   "L1/1": LOGIN + BUCKET + BUCKET_TEST,
   "L1/2": LOGIN + BUCKET + BUCKET_TEST + AUTHZ_RATEKEY,
   "L3/1": LOGGER + MIDDLEWARE,
-  "L2/1": AUTHZ_SESSION_G1 + SESSION_LIB + API_SESSION,
-  "L2/2": AUTHZ_SESSION_G2 + SESSION_LIB + API_SESSION,
+  "L2/1": AUTHZ_SESSION_G1 + SESSION_LIB_DEBUG + API_SESSION,
+  "L2/2": AUTHZ_SESSION_G2 + SESSION_TEST + SESSION_LIB_2 + API_SESSION,
 };
