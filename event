@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/README.md","body":{"commit":"a6330262b1a609843308d9a493dbd6132d428499","path":"plans/README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:158609572e131d85e25875956f58596b5772021a","text":"Merge retired a covered predecessor; the successor is at packages/room/src/jobs.ts."}
