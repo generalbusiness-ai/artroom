@@ -14,7 +14,13 @@ import type { CheckJob, GitAuthEnv, Refusal, RoomId } from "@generalbusiness/art
 import { isGlob } from "@generalbusiness/artroom-policy";
 
 export interface JobExpectations {
-  readonly room: RoomId;
+  /**
+   * The one room this service checks for, if it is fixed (the harness, and
+   * tests). Absent in production: the room comes from each job, must be a
+   * room ID (R-ID-3), and is resolved through the `ROOM` service binding
+   * before any sandbox starts (R-EXEC-8).
+   */
+  readonly room?: RoomId;
   readonly checker: string;
   /** The room's Artifacts host, for example `<account>.artifacts.cloudflare.net`. */
   readonly host: string;
@@ -34,6 +40,8 @@ export interface BoundJob {
 }
 
 const SHA = /^[0-9a-f]{40}$/;
+/** R-ID-3: `room_` and 32 hex characters. A room name never has this form (R-GEN-11). */
+const ROOM_ID = /^room_[0-9a-f]{32}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const JOB_ID = /^job_[A-Za-z0-9_-]{1,60}$/;
 const OBLIGATION = /^obl_[a-z][a-z0-9-]{0,63}$/;
@@ -81,11 +89,15 @@ export function ownJob(job: CheckJob): CheckJob | Refusal {
 
 export function checkJob(job: CheckJob, exp: JobExpectations): BoundJob | Refusal {
   if (!JOB_ID.test(job.id)) return refuse("The job ID is malformed.");
-  if (job.room !== exp.room) return refuse("The job is for another room.");
+  if (typeof job.room !== "string" || !ROOM_ID.test(job.room)) return refuse("The job's room is not a room ID.");
+  if (exp.room !== undefined && job.room !== exp.room) return refuse("The job is for another room.");
   if (job.check !== exp.checker) return refuse(`The job is for checker ${job.check}, not ${exp.checker}.`);
   if (!ACT.test(job.lane)) return refuse("The lane ID is malformed.");
   if (!Number.isSafeInteger(job.generation) || job.generation < 1) return refuse("The generation is not a positive integer.");
-  if (!SHA.test(job.head) || !SHA.test(job.integration)) return refuse("The head or integration is not a 40-character SHA-1.");
+  if (!SHA.test(job.head) || !SHA.test(job.integration) || !SHA.test(job.base)) return refuse("The head, integration or base is not a 40-character SHA-1.");
+  // R-EXEC-10: copied from the configuration; a job without them is incomplete.
+  if (typeof job.volatile !== "boolean" || typeof job.advisory !== "boolean") return refuse("The job's volatile or advisory flag is missing.");
+  if (job.runner !== null && !DIGEST.test(job.runner)) return refuse("The job's runner digest is malformed.");
   if (!OBLIGATION.test(job.obligation) || job.obligation === "obl_admin-approval") {
     return refuse("The obligation is not a check obligation.");
   }

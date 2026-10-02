@@ -1,0 +1,50 @@
+{
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	// Lane G's harness Worker, for live runs only: the checker entrypoints and
+	// runner sandboxes, a publisher for filtered snapshots, and key-protected
+	// /h/* routes that play one room. Never a production deployment: that is
+	// wrangler.jsonc, whose Worker has no routes (R-EXEC-8).
+	//   wrangler deploy -c wrangler.harness.jsonc
+	"name": "artroom-lg-checkers",
+	"main": "src/harness.ts",
+	"compatibility_date": "2026-10-01",
+	"workers_dev": true,
+	"observability": { "enabled": true },
+	"vars": {
+		"ARTIFACTS_HOST": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
+		"ARTIFACTS_NAMESPACE": "gitseq-spike",
+		"RUNNER_IMAGE": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lg-runner@sha256:17b7fd60fd812617654c64b95f9b2dde94f103313073b672bc40fdad6dccbaa2",
+		// The model the LLM reviewer uses. Any Workers AI text-generation model.
+		"LLM_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+		// The one room the harness plays.
+		"HARNESS_ROOM_ID": "room_6c670000000000000000000000000000"
+	},
+	// CHECKER_KEY: the service's signing key (Ed25519 JWK). LG_KEY: the harness key.
+	"secrets": { "required": ["CHECKER_KEY", "LG_KEY"] },
+	"ai": { "binding": "AI" },
+	"artifacts": [{ "binding": "ARTIFACTS", "namespace": "gitseq-spike", "remote": true }],
+	"containers": [
+		{
+			"class_name": "RunnerBox",
+			"scheduling_policy": "durable_object",
+			"images": { "runner": { "image": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lg-runner@sha256:17b7fd60fd812617654c64b95f9b2dde94f103313073b672bc40fdad6dccbaa2" } }
+		},
+		{
+			"class_name": "Publisher",
+			"scheduling_policy": "durable_object",
+			"images": { "git": { "image": "registry.cloudflare.com/6e953d231f1c9aadffbf59537a82e13a/artroom-lb-git@sha256:4a54f21b0d8e4a065ea83a7c51a707682036428f9ddd1362069dcd28d36c0c68" } }
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{ "class_name": "RunnerBox", "name": "RUNNER" },
+			{ "class_name": "Publisher", "name": "PUBLISHER" },
+			{ "class_name": "HarnessLedger", "name": "LEDGER" }
+		]
+	},
+	"exports": {
+		"RunnerBox": { "type": "durable-object", "storage": "sqlite" },
+		"Publisher": { "type": "durable-object", "storage": "sqlite" },
+		"HarnessLedger": { "type": "durable-object", "storage": "sqlite" }
+	}
+}

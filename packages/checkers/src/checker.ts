@@ -5,16 +5,20 @@
  * `handle(job)`:
  * 1. takes its own deep, frozen copy of the job before anything else, so
  *    nothing the caller changes later reaches the check (`ownJob`);
- * 2. checks that copy's binding before anything starts (`checkJob`);
- * 3. opens a new runner sandbox for this job alone, checks out the exact
- *    integration and confirms `HEAD`, the tree or the snapshot digest
- *    (`checkout`);
+ * 2. checks that copy's binding before anything starts (`checkJob`),
+ *    refuses a job that says `volatile: false` to a volatile checker, and
+ *    resolves the job's room through the room binding (R-EXEC-8, R-EXEC-10);
+ * 3. opens a new runner sandbox for this job alone, refuses the job if the
+ *    runner digest it measured is not the one the job pins (R-EXEC-11), then
+ *    checks out the exact integration and confirms `HEAD`, the tree or the
+ *    snapshot digest (`checkout`);
  * 4. calls the subclass's `run(job)` with the copy, which runs untrusted code
  *    only inside the sandbox;
  * 5. closes the sandbox, then, outside it, builds the `check` body from the
- *    copy (generation, integration, input, configuration digest) and the
- *    runner digest, labels it machine-run, signs it with the service's
- *    delegation key, and submits it to the room.
+ *    copy (generation, integration, input, configuration digest, `volatile`
+ *    as the job states it) and the runner digest, labels it machine-run and
+ *    shows the digest, signs it with the service's key, and submits it to
+ *    the job's room.
  *
  * A subclass writes `run()` (and, for the LLM reviewer, `after()`). Each
  * `handle` call owns its job copy, session and workspace; they are found by
@@ -32,6 +36,7 @@ import type {
   CheckerContext,
   DelegationId,
   Note,
+  RoomId,
   NoteAnchor,
   Refusal,
   Result,
@@ -48,6 +53,9 @@ export interface RoomPort {
   submit(act: SignedEnvelope): Promise<Result<ActRecord>>;
 }
 
+/** The room of each job, by its ID: in production, `ArtroomService.room` over the `ROOM` service binding. */
+export type RoomResolver = (room: RoomId) => Promise<RoomPort>;
+
 /** A runner sandbox opened for one job. `close` ends it. */
 export interface RunnerSession extends Omit<CheckoutOptions, "depth"> {
   readonly runner: Runner;
@@ -60,9 +68,10 @@ export interface RunnerProvider {
 
 export interface CheckerServices {
   readonly signer: Signer;
-  /** The delegation the signing key acts under (R-ADM-3, case b). */
+  /** The delegation the signing key acts under (R-ADM-3, case b). Absent: the key signs as a member's own key (case a). */
   readonly delegation?: DelegationId;
-  readonly room: RoomPort;
+  /** One fixed room (the harness, tests), or each job's room by its ID (production). */
+  readonly room: RoomPort | RoomResolver;
   readonly runners: RunnerProvider;
   readonly expectations: JobExpectations;
 }
@@ -119,6 +128,16 @@ export abstract class Checker<Env = unknown, Outcome extends CheckOutcome = Chec
   /** The check itself, given the job copy `handle` owns. Untrusted code runs only through `this.workspace(job).runner`. */
   abstract run(job: CheckJob): Promise<Outcome>;
 
+  /** The job's room. A resolver that fails is an infrastructure failure: nothing ran. */
+  private async roomOf(s: CheckerServices, job: CheckJob): Promise<RoomPort> {
+    if (typeof s.room !== "function") return s.room;
+    try {
+      return await s.room(job.room);
+    } catch (e) {
+      throw unavailable(`could not reach the job's room ${job.room}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   /** Called after the check is recorded, with the same job copy, when `run()` ran. The LLM reviewer posts its note here. */
   protected after(_job: CheckJob, _check: Check, _outcome: Outcome): Promise<void> {
     return Promise.resolve();
@@ -147,11 +166,27 @@ export abstract class Checker<Env = unknown, Outcome extends CheckOutcome = Chec
     const s = await this.services();
     const bound = checkJob(job, s.expectations);
     if (isRefusal(bound)) return bound;
+    // R-EXEC-10: a checker whose inputs are volatile never signs a false flag.
+    if (this.volatile && !job.volatile) {
+      return { refused: true, rule: "check-binding", reason: `The checker ${this.name} is volatile, and the job says volatile: false.`, fix: "Mark the checker's configuration volatile." };
+    }
+    const room = await this.roomOf(s, job);
     let session: RunnerSession;
     try {
       session = await s.runners.open(bound);
     } catch (e) {
       throw unavailable(`could not start a runner: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    // R-EXEC-11: measured in the new container before any job code; a pinned job runs only in that environment.
+    const digest = session.runner.digest;
+    if (job.runner !== null && job.runner !== digest) {
+      await session.close().catch(() => undefined);
+      return {
+        refused: true,
+        rule: "check-binding",
+        reason: `The job pins the runner environment ${job.runner}; this service measured ${digest}.`,
+        fix: "Pin the measured digest in the checker's configuration, or run the pinned environment.",
+      };
     }
     let outcome: CheckOutcome;
     // What run() returned, when the checkout was confirmed and it ran.
@@ -178,10 +213,12 @@ export abstract class Checker<Env = unknown, Outcome extends CheckOutcome = Chec
       integration: job.integration,
       input: job.input,
       config: job.config,
-      runner: session.runner.digest,
-      volatile: this.volatile,
+      runner: digest,
+      // R-EXEC-10: as the job states it (a volatile checker has refused a job that says false).
+      volatile: job.volatile,
       ok: outcome.ok,
-      detail: clip(`Machine-run check "${this.name}": ${outcome.ok ? "passed" : "failed"}. ${this.label}\n\n${outcome.detail}`),
+      // R-EXEC-11: the measured digest is shown, so that an admin can pin it.
+      detail: clip(`Machine-run check "${this.name}": ${outcome.ok ? "passed" : "failed"}. ${this.label}\nRunner environment: ${digest}\n\n${outcome.detail}`),
       ...(job.landOp ? { landOp: job.landOp } : {}),
     };
     const signed = await signEnvelope(s.signer, {
@@ -194,7 +231,7 @@ export abstract class Checker<Env = unknown, Outcome extends CheckOutcome = Chec
       idempotencyKey: `chk-${job.id}`.slice(0, 64),
       ...(s.delegation ? { delegation: s.delegation } : {}),
     });
-    const recorded = await s.room.submit(signed);
+    const recorded = await room.submit(signed);
     if (isRefusal(recorded)) return recorded as Refusal;
     const check = recorded as Check;
     if (produced) await this.after(job, check, produced);
@@ -214,7 +251,7 @@ export abstract class Checker<Env = unknown, Outcome extends CheckOutcome = Chec
       idempotencyKey: `${key}-${job.id}`.slice(0, 64),
       ...(s.delegation ? { delegation: s.delegation } : {}),
     });
-    return (await s.room.submit(signed)) as Result<Note>;
+    return (await (await this.roomOf(s, job)).submit(signed)) as Result<Note>;
   }
 }
 
