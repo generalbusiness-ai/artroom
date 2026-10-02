@@ -304,6 +304,8 @@ export interface RoomServices {
   readonly checkers?: (checker: string) => CheckerService | null;
   /** Tests only: snapshot repositories other than the Room's own (R-CARRY-16). */
   readonly snapshots?: SnapshotPort | undefined;
+  /** Where the Room's diagnoses go (`diag.ts`): the Worker's log when not given. Tests capture them. */
+  readonly diagnose?: import("./diag.ts").DiagnosisSink | undefined;
 }
 
 /** The ports the Room's code uses, built by the Room over its services. */

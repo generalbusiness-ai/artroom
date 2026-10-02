@@ -50,6 +50,7 @@ import type {
 import { checkerInputs, ownersFor } from "@generalbusiness/artroom-policy";
 import { canonicalize, parseStrict, utf8 } from "./canonical.ts";
 import { b64url, digestJson, keyPairFromSeed, sha256Hex, unb64url, verify } from "./crypto.ts";
+import { isArtroomError } from "@generalbusiness/artroom-contract";
 import { artroomError } from "./errors.ts";
 import { iso, roomIdOf } from "./ids.ts";
 import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
@@ -64,6 +65,7 @@ import { issueJobs, oweJobs } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
+import { report, toConsole } from "./diag.ts";
 import { matchGlob } from "./glob.ts";
 import { ALARM } from "./budgets.ts";
 
@@ -387,6 +389,15 @@ export class RoomCore {
     return this.clock();
   }
 
+  /**
+   * Log a failure the client sees only as a fixed message: the step and the
+   * error's name, with its message redacted and bounded (request d268d249).
+   * Never throws.
+   */
+  diagnose(event: string, step: string, e: unknown): void {
+    report(this.services.diagnose ?? toConsole, event, step, e);
+  }
+
   // ------------------------------------------------------------ founding (R-GEN)
 
   /**
@@ -412,18 +423,23 @@ export class RoomCore {
     let main: Sha | null = null;
     let remote: string;
     setMeta(this.sql, "founding_repo", genesis.repo);
+    let step = "newRepository";
     try {
       if (!genesis.onboarding) await this.newRepository(genesis);
+      step = "readMain";
       main = await this.ports.artifacts.readMain();
       if (main === null && !genesis.onboarding) throw new Error("main has no first commit");
+      step = "canonicalRemote";
       remote = await this.ports.artifacts.canonicalRemote();
-    } catch {
+    } catch (e) {
+      this.diagnose("found-failed", step, e);
       // Wake the alarm: it settles whatever the new repository still owes (request b6b51de7).
       this.committed();
       throw artroomError("unavailable", "The canonical repository could not be created or read. Retry the same found.");
     }
     if (main !== null) {
-      const cfg = await this.ports.artifacts.readConfig(main).catch(() => {
+      const cfg = await this.ports.artifacts.readConfig(main).catch((e: unknown) => {
+        this.diagnose("found-failed", "readConfig", e);
         throw artroomError("unavailable", "The canonical repository could not be read. Try again.");
       });
       const parsed = this.parseConfig(cfg.policy, cfg.checkers);
@@ -439,7 +455,8 @@ export class RoomCore {
       if (!genesis.onboarding) {
         try {
           this.workspaces.sealCanonical(getMeta(this.sql, "canonical_name") ?? "");
-        } catch {
+        } catch (e) {
+          this.diagnose("found-failed", "sealCanonical", e);
           throw artroomError("unavailable", "The canonical repository still owes cleanup. Retry the same found.");
         }
       }
@@ -1284,7 +1301,8 @@ export class RoomCore {
           p.kind === "clean"
             ? { state: "clean", base: p.base, integration: p.integration }
             : { state: "conflict", base: p.base, paths: p.paths };
-      } catch {
+      } catch (e) {
+        this.diagnose("preview-failed", "preview", e);
         body = { state: "failed", error: artroomError("unavailable", "The preview could not be computed.") };
       }
       const prev = json<Record<string, unknown>>(one(this.sql, "SELECT body FROM previews WHERE id = ?", id), "body")!;
@@ -1576,6 +1594,7 @@ export class RoomCore {
       await this.artifacts.get(this.location().name);
       return false;
     } catch (e) {
+      this.diagnose("publication-failed", "canonicalProbe", e);
       return (e as { code?: unknown } | null)?.code === "NOT_FOUND";
     }
   }
@@ -1637,6 +1656,7 @@ export class RoomCore {
         // Reopen from the ref next time: the read-back decides what happened.
         this.publisherCache = null;
         const code = (e as { code?: string }).code ?? "transport";
+        this.diagnose("publication-failed", "publish", e);
         // A NOT_FOUND counts as gone only if the canonical repository itself is not found.
         const gone = code === "NOT_FOUND" && (await this.canonicalMissing());
         await this.serial(async () => this.sql.transaction(() => this.publicationFailed(code, gone)));
@@ -1682,8 +1702,13 @@ export class RoomCore {
     leases: () => this.expireLeases().then(() => undefined),
     notify: () => this.drainNotify(),
     tokens: () => this.revokeEndedTokens(),
-    pins: () => this.completePins(),
-    previews: () => this.refreshPreviews(),
+    // Work that needs the canonical repository waits, kept, while it is gone (request 3da1d82b).
+    pins: async () => {
+      if (!this.canonicalGone()) await this.completePins();
+    },
+    previews: async () => {
+      if (!this.canonicalGone()) await this.refreshPreviews();
+    },
     workspaces: () => this.resumeWorkspaces(),
     recompute: () => this.recompute(),
     landing: () => this.resumeLanding(),
@@ -1700,9 +1725,16 @@ export class RoomCore {
     this.kick(`step:${step}`, () => this.steps[step]());
   }
 
-  /** Run every durable step once, in order. A step that fails is retried at the next alarm. */
+  /**
+   * Run every durable step once, in order. A step that fails is retried at the next alarm, on its backoff.
+   * A failure that is not an `ArtroomError` is logged under the step's name (requests d268d249, 3da1d82b);
+   * a step that already logged its own failure throws an `ArtroomError`.
+   */
   async runAll(): Promise<void> {
-    for (const step of Object.keys(this.steps) as (keyof RoomCore["steps"])[]) await this.steps[step]().catch(() => undefined);
+    for (const step of Object.keys(this.steps) as (keyof RoomCore["steps"])[])
+      await this.steps[step]().catch((e: unknown) => {
+        if (!isArtroomError(e)) this.diagnose("step-failed", step, e);
+      });
   }
 
   /** Evaluations asked for (after a check, a recomputation), then the engine's own work (R-PUB-7 first). */

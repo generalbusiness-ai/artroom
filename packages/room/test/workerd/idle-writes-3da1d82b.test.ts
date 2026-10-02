@@ -229,6 +229,11 @@ describe("request 3da1d82b: failing work backs off", () => {
     expect(gaps.filter((g) => g === ALARM.pendingIntervalMs).length).toBeLessThanOrEqual(2);
     expect(ran.length).toBeLessThanOrEqual(20);
     expect(await inDO(room, (r) => r.core.sql.all("SELECT done FROM pins"))).toEqual([{ done: 0 }]);
+    // Each failed retry is logged through the shared diagnosis (request d268d249), so no more often than it runs.
+    const pinLogs = room.world.diagnoses.filter((d) => d.event === "step-failed" && d.step === "pins");
+    expect(pinLogs.length).toBeGreaterThan(0);
+    expect(pinLogs.length).toBeLessThanOrEqual(ran.length + 1);
+    expect(pinLogs[0]).toMatchObject({ name: "Error", message: "Artifacts is unavailable (pinRef)" });
 
     // The outage ends: the next retry completes the pin, and the backoff is reset.
     expect(await inDO(room, (r) => r.core.sql.all("SELECT 1 FROM meta WHERE k = 'loop_backoff'").length)).toBe(1);
@@ -306,6 +311,12 @@ describe("request 3da1d82b: a room whose canonical repository is gone", () => {
     expect(ran.every((t) => t - start <= 10 * minute)).toBe(true);
     expect(await inDO(room, (r) => r.core.nextAlarm())).toBeNull();
 
+    // The failure and the probe that found the repository gone are both logged (request d268d249).
+    const logs = room.world.diagnoses.filter((d) => d.event === "publication-failed");
+    expect(logs.map((d) => d.step)).toEqual(expect.arrayContaining(["publish", "canonicalProbe"]));
+    expect(logs.find((d) => d.step === "canonicalProbe")!.message).toContain("NOT_FOUND");
+    const logged = room.world.diagnoses.length;
+
     // Exactly one admin item, open, naming the repository.
     const items = await stalled(room);
     expect(items).toHaveLength(1);
@@ -320,6 +331,9 @@ describe("request 3da1d82b: a room whose canonical repository is gone", () => {
     }));
     expect(now).toEqual(kept);
 
+    // A preview left pending also waits while the repository is gone.
+    await inDO(room, (r) => r.core.sql.all("UPDATE previews SET state = 'pending'"));
+    expect(await inDO(room, (r) => r.core.nextAlarm())).toBeNull();
     // Two more idle hours: nothing written, no alarm.
     const rows = w.rows;
     const alarms = w.alarms;
@@ -329,6 +343,8 @@ describe("request 3da1d82b: a room whose canonical repository is gone", () => {
       await inDO(room, (r) => r.alarm());
     }
     expect({ rows: w.rows - rows, alarms: w.alarms - alarms }).toEqual({ rows: 0, alarms: 0 });
+    // Stopped work logs nothing more either.
+    expect(room.world.diagnoses.length).toBe(logged);
   });
 
   it("a later act tries once more, still with one admin item; a forced publication also tries; neither reschedules", async () => {
