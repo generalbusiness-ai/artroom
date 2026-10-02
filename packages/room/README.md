@@ -1264,55 +1264,67 @@ that records the token by its ID; a definite refusal settles it at once.
 A lost or malformed answer leaves it unresolved, with the error, and
 nothing is ever sent on an unknown mint.
 
-An unresolved mint is not settled by time: a token applied late can
-outlive the deadline. Artifacts' token inventory gives each token's ID,
-scope, state and expiry but no owner, and the canonical repository holds
-other owners' tokens (pinning, the log, landings, other jobs), so the Room
-can neither pick out this mint's token nor revoke unknown tokens safely.
-It settles the record only on a complete, well-formed inventory (as many
-tokens as its total, each with an ID, a known state and a readable
-expiry), taken at or after the attempt's deadline, that shows no live
-token the Room cannot account for. The accounted tokens are those of jobs
-in flight and ended tokens whose revocation is still owed. Otherwise the
-record stays, saying why, retried with backoff and set on the alarm, so a
-restart keeps it; a late token keeps it open until it has really expired.
-The residual: a request that Artifacts applies only after such an
-inventory, taken after the deadline, would not be seen.
+Revision 5 then settled an unresolved mint on a clean inventory of the
+canonical repository's tokens. Review 013dad0c found that unsafe; see
+"Review 013dad0c". The review also accepted the namespace-aware binding:
+an imported room's jobs, tokens and snapshot repositories live in its
+import namespace. The shared test fixture routes the sandbox's
+`writeSnapshot` to the namespace that holds the store, and
+`makeRoom({ importNamespace })` founds a room there. Controls in
+snapshot-repos ("an imported room's jobs stay in its import namespace",
+whole-tree and filtered) fail with the fixture's routing undone, or with
+jobs reading through the public binding.
+
+## Review 013dad0c
+
+The checker's review of revision 5 (`083543b4`) found one P2: an
+unresolved mint was settled when a complete inventory, after the attempt's
+deadline, showed no live token the Room could not account for. That shows
+absence at that moment, not that the mint can never apply. In the
+checker's control, a mint held before Artifacts applied it outlived a
+clean inventory; when it then applied with its answer lost, the live token
+had no duty left, before and after a restart.
+
+**The fix** ([src/jobs.ts](src/jobs.ts)). A mint whose outcome is unknown
+(`mint:<job>` in `job_tokens`) stays an open duty until an answer settles
+it: a refusal that changed nothing, or a usable answer, whose token is then
+recorded by its ID and revoked through the ended-token debt. No inventory
+and no timeout settles it, because nothing bounds when Artifacts applies a
+request, and the token's expiry runs from then. The Room never revokes a
+canonical token it cannot attribute: the inventory names no owner, and the
+repository holds other owners' tokens. What each inventory shows is kept on
+the record as an observation ("outcome unknown; N live token(s) … not
+accounted for at …"); the record is checked again with backoff, doubling
+from 5 seconds to at most every 6 hours, and never stops. A late usable
+answer, after the attempt was superseded, still finds the record: its
+token is ended by its ID, and the record settles. The open duties are
+readable through the Room object's `jobTokenDuties()` operator method (no
+attention item fits: the contract's attention kinds have none for it). In
+practice an unknown mint whose answer never comes stays open indefinitely,
+visible there. Source and test comments no longer say that the attempt's
+deadline bounds an unknown mint's lifetime.
 
 Controls in [test/workerd/job-token-mint.test.ts](test/workerd/job-token-mint.test.ts),
 on the real Room Durable Object and SQLite:
 
 | Test | What it shows |
 |---|---|
-| "applied, then the answer lost …" | Nothing is sent; the mint stays recorded until the deadline; the next attempt is sent with its own token; then the inventory settles it |
-| "applied, the answer lost, and the room restarts …" | The record survives an abort and a fresh stub, with its alarm, and settles after the deadline |
-| "review 1701f73e: a mint applied 30 seconds late, its answer lost …" | The checker's reproduction: nothing is sent; past the deadline the late token still reads, so the duty stays (across a restart), saying a live token is unaccounted for; it settles only once the token has expired |
-| "the room stops while a mint's answer is outstanding …" | The record made before the call survives; an inventory after the deadline reconciles it |
-| "an inventory that is incomplete does not settle the duty; a live token the Room knows does not hold it open" | An inventory with fewer tokens than its total proves nothing; the sent attempt's live, known token does not block settlement |
-| "a malformed answer (no token text) …" | As unknown as a lost one: nothing is sent, the mint stays recorded |
-| "a refusal that changed nothing settles the mint at once" | No record is left |
-| "an answer still outstanding …" | The record exists while the call is out; a late answer's token is ended and the record settled |
+| "applied, then the answer lost …" | Nothing is sent; the next attempt is sent; past the deadline, and after the lost token has expired, the clean inventory is noted and the duty stays open, visible through `jobTokenDuties`, on the alarm |
+| "the checks back off, to at most six hours, and never stop" | Sixteen checks later the record is still there, checked every 6 hours |
+| "review 013dad0c: the mint is held past its deadline, a second jobs step … then the mint applies with a lost answer" | The checker's reproduction: attempt 2 is sent and its inventory is clean; then attempt 1's mint applies with its answer lost. Its token is live past the deadline, the duty is still open, survives a restart with its alarm, and stays open after the token has expired |
+| "… with a usable answer" | The late token outlives the deadline, so it is refused, revoked, and the duty settles |
+| "… with a usable, minted in time answer" | The token was minted in time and only its answer was late: it is never sent, is revoked by its ID because the attempt was superseded, and the duty settles |
+| "the room stops while a mint's answer is outstanding …" | The record survives as an open duty, and the next attempt goes on |
+| "an inventory that is incomplete is noted as such; a live token the Room knows is not counted against the duty" | Observations only |
+| "a malformed answer …", "a refusal that changed nothing settles the mint at once", "an answer still outstanding …" | As before |
 
-The review also accepted the namespace-aware binding: an imported room's
-jobs, tokens and snapshot repositories live in its import namespace. The
-shared test fixture now routes the sandbox's `writeSnapshot` to the
-namespace that holds the store, and `makeRoom({ importNamespace })` founds
-a room there. Controls in snapshot-repos ("an imported room's jobs stay in
-its import namespace", whole-tree and filtered): the job reads the import
-namespace, a filtered job's repository there lacks a file outside its
-inputs and its token cannot read the canonical repository, its credentials
-end with the job, and the public namespace has no repository and no call.
-With the fixture's routing undone, the filtered control fails; with jobs
-reading through the public binding, the whole-tree control fails.
-
-**Mutations.** 11 of 12 were caught: no record before the call; a lost
-answer treated as no token; a refusal kept unresolved; a malformed answer
-accepted; a usable answer leaving the record; settling by the deadline
-alone; an incomplete inventory accepted; in-flight tokens not accounted
-for; expired or revoked tokens counted as live; an unaccounted live token
-ignored; no backoff. The equivalent one checks a record before its
-deadline: a record is only reached once it is due, and it is due at its
-deadline.
+**Mutations.** All 8 were caught, one after a test was added: a clean
+inventory settling the mint; settling it by the deadline; no cap on the
+backoff; a late usable answer not finding the record; a late usable
+answer's token not ended (caught after the "minted in time" control was
+added: the first late answer was refused by its expiry instead); a lost
+answer treated as no token; no record before the call; open duties not
+reported.
 
 ## Founding gaps (request b6b51de7)
 
