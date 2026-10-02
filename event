@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7eea570b85a73a3e8a60f282e8201960c1f56b8d","text":"Merge retired a covered predecessor; the successor is at spikes/pi-durable/src/agent.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8bc68c7098fbca5a9ee7f07106c17695321ecacc","text":"Merge retired a covered predecessor; the successor is at spikes/pi-durable/scripts/check.sh."}
