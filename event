@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0cdf9172efce2e302de416ed38358ad2e1cdd40c"}
+{"kind":"promise","text":"Take D5 landing-head review at b78f8b33. Preserve the completed e80c2c39 review, inspect the main hygiene merge and conflict resolution, verify the exact artifact set and fresh integration gates. Finish the queued mint design verdict while those gates run, then file the D5 combined-head verdict."}
