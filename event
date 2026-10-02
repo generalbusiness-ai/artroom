@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c844f27cf1f113729e39bf893243a7076b385de8","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/room/src/admission.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a8bd068f5781d2e1329f896d908cab0bb4e5513e","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/room/src/artifacts.ts: the pointer is withdrawn with no successor."}
