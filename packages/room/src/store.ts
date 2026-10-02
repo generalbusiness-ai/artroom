@@ -232,8 +232,8 @@ export const ROOM_MIGRATIONS: readonly Migration[] = [
       // Canonical read tokens of job attempts that the Room has ended but Artifacts has not yet confirmed revoked:
       // retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose expiry
       // is not known is retried until it is revoked. A row `mint:<job>` is a mint in progress, written before
-      // Artifacts is asked; if the answer is lost it stays until an inventory taken at or after `expires_at` (the
-      // attempt's deadline) shows no live token the Room cannot account for.
+      // Artifacts is asked; if the answer is lost it stays until an answer settles it (a refusal that changed
+      // nothing, or a usable answer whose token is then revoked); `expires_at` is only when it is first checked.
       sql.all(`CREATE TABLE IF NOT EXISTS job_tokens (token_id TEXT PRIMARY KEY, expires_at INTEGER, next_ms INTEGER NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)`);
     },
