@@ -299,6 +299,7 @@ describe("acceptance cases (30.7): verify's layout checks", () => {
       files.delete(s1);
     });
     expect((await verifyLog(gap)).failures.map((f) => f.reason)).toContain("segment-bound");
+    await expect(LogPublisher.open(gap)).rejects.toMatchObject({ code: "unexpected-writer" }); // segment 1001 is 1,001 entries after 0
 
     const shard = new MemoryGit();
     for (const [k, v] of git.objects) shard.objects.set(k, v);

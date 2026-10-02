@@ -138,7 +138,8 @@ and `GitReader.readRef`, as lane A's log remote calls them
 
 ```ts
 pushLog({ canonical: { remote, token }, objects: [{ type, data /* unpadded base64url */ }], ref: "refs/artroom/log", next, lease })
-  → { ok: true } | { ok: false, reason: "lease-mismatch", current } | { ok: false, reason: "unknown", detail }
+  → { ok: true } | { ok: false, reason: "lease-mismatch", current } | { ok: false, reason: "refused", code, detail }
+  | { ok: false, reason: "unknown", detail }
 readLogRef({ canonical: { remote, token }, ref: "refs/artroom/log" })
   → the commit ID, or null when the ref does not exist; throws when it cannot be read
 stageLog({ canonical: { remote }, cohort: next, want: [{ sha, type, size }], parts: [{ sha, type, size, offset, data /* base64url */ }] })
@@ -172,11 +173,20 @@ and stages a publication over one call first (below). It then pushes
 through the
 same lease push as `main`, and the gateway lets through only
 `refs/artroom/log: lease → next`. The answer maps the publisher's push
-outcome conservatively: only a confirmed push is `ok`; a lease refusal
-whose current value was read back is `lease-mismatch`; everything else,
-including a request refused before git, is `unknown`, so lane L reads the
-ref back. Revocation or elapsed time never proves an unresolved push did
-not land.
+outcome conservatively:
+- only a confirmed push is `ok`;
+- a lease refusal whose current value was read back is `lease-mismatch`;
+- any other refusal is `refused` (contract amendment 4, R-LOG-20): a
+  `[rejected]` or `[remote rejected]` status, or an Artifacts code that
+  Artifacts answers before it updates any ref (below). `code` is the
+  Artifacts code, or the kind of status (`remote-rejected`,
+  `non-fast-forward`);
+- everything else, including a request refused before git, is `unknown`.
+
+Lane L reads the ref back after every answer but `lease-mismatch`.
+`refused` proves only that this attempt did not apply: an earlier attempt
+whose answer was lost may still land. Revocation or elapsed time never
+proves an unresolved push did not land.
 
 Reading back: live, the Artifacts binding's `log({ ref: "refs/artroom/log" })`
 returns nothing even when the ref is there (it resolves branches, tags
@@ -319,6 +329,44 @@ check against real Artifacts through the deployed Worker; it held on
 - **Pinning tokens live 10 minutes**, because a lane's objects can be large
   and an expired token refuses an upload in progress. Publication and
   staging tokens live 60 seconds; their pushes carry almost nothing.
+
+## Contract amendment 4
+
+The lane B edits of `docs/protocol.md` section 30.9.
+
+1. **`refused`.** `LogPushOutcome` gains
+   `{ ok: false, reason: "refused", code, detail }`, and `toLogOutcome`
+   maps every `rejected` outcome other than a lease refusal to it. The test
+   that it is the same type as lane L's `PushOutcome`, both ways, still
+   holds.
+2. **Artifacts' refusal of the pack.** Artifacts refuses a pack holding an
+   object over 33,554,432 bytes with `remote: artifacts_git_receive_pack_object_too_large`
+   before it updates any ref; git then reports only that the remote hung
+   up, which alone is `unknown`. `classifyGitPush` now reports a push whose
+   output has a known Artifacts refusal code on a line of its own, with a
+   nonzero exit and no status line for the ref, as `rejected`
+   (`remote-rejected`). The known codes are `ARTIFACTS_REFUSALS`; only
+   codes Artifacts answers before any ref update belong there, so an answer
+   is still never `rejected` when the ref might have changed.
+
+Tests:
+- `test/push-outcome.test.ts`: "Artifacts' recorded refusal of an object
+  over its limit is rejected (remote-rejected), not unknown", over every
+  refusal recorded by the live probes of 2026-10-02
+  (`packages/room/measure/logbig/results/logbig-2026-10-02T02-52-36-597Z.json`
+  and `object-limit-2026-10-02T02-55-14-470Z.json`); "only a known
+  Artifacts code before any ref update is a refusal: a status line for the
+  ref, an unknown code, and a zero exit still decide as before".
+- `test/gitops.test.ts`: "only a landed push is ok, only a read-back lease
+  refusal is lease-mismatch, any other rejection is refused; everything
+  else is unknown, with the token redacted".
+- `test-log/pushlog.test.ts`: "a remote that refuses the pack with
+  Artifacts' code: pushLog reports rejected, lane L sees refused with the
+  code, reads the ref back at the parent, and does not push again" (a
+  pre-receive hook gives the code, so git reports `[remote rejected]`).
+
+Each change was broken on purpose and a named test failed
+(`notes/amendment4-log.md`).
 
 ## Contract gaps
 
