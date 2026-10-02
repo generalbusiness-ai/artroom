@@ -19,7 +19,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { FakeRoom } from "../../client/test/support/fake-room.ts";
-import { lockWait, readOwner, withDestination } from "../src/git.ts";
+import { readOwner } from "../src/git.ts";
 import { invitationLink } from "../src/link.ts";
 import { EXIT } from "../src/main.ts";
 import { useHarness } from "./harness.ts";
@@ -145,19 +145,23 @@ describe("P2: waiting for the destination lock is bounded on every path", () => 
     return { pid: p.pid!, exited: new Promise((r) => p.on("exit", r)) };
   }
 
+  /**
+   * Tries to take the lock from a separate process, killed after five seconds,
+   * so that a regression that spins forever fails the test instead of hanging it.
+   * Returns "ACQUIRED", the error message, or "HUNG".
+   */
   async function bounded(dir: string, waitMs = 200): Promise<string> {
-    const saved = lockWait.ms;
-    lockWait.ms = waitMs;
-    const started = Date.now();
-    try {
-      withDestination(dir, (o) => ({ ...o, rev: o.rev + 1 }));
-      return "ACQUIRED";
-    } catch (e) {
-      expect(Date.now() - started).toBeLessThan(5_000);
-      return (e as Error).message;
-    } finally {
-      lockWait.ms = saved;
-    }
+    const gitTs = new URL("../src/git.ts", import.meta.url).href;
+    const code = `import { withDestination, lockWait } from ${JSON.stringify(gitTs)}; lockWait.ms = ${waitMs};
+      try { withDestination(${JSON.stringify(dir)}, (o) => ({ ...o, rev: o.rev + 1 })); console.log("ACQUIRED"); }
+      catch (e) { console.log(e.message); }`;
+    const p = spawn(process.execPath, ["--input-type=module", "-e", code], { stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    p.stdout.on("data", (c: Buffer) => (out += c.toString()));
+    const killer = setTimeout(() => p.kill("SIGKILL"), 5_000);
+    const exit = await new Promise<number | null>((r) => p.on("exit", r));
+    clearTimeout(killer);
+    return exit === null ? "HUNG" : out.trim();
   }
 
   test("a recovery file held by a live recoverer is waited on, then named, and nothing is removed", async () => {
