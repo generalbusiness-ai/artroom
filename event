@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e5fe3a4cd27e8c038b96610bb7a68144b7540db5","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa; the successor stands at packages/room/tsconfig.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3f0148c78a0b312e928b51e1e98604ed2615dd12","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/room/wrangler.jsonc: the pointer is withdrawn with no successor."}
