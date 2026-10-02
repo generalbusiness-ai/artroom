@@ -44,11 +44,42 @@ export async function roomStub(env: RoomEnv, room: string): Promise<RoomStub> {
   return env.ROOMS.get(env.ROOMS.idFromName(id)) as unknown as RoomStub;
 }
 
+/** The largest request body any route reads. */
+const MAX_BODY = 1024 * 1024;
+
+/**
+ * The body's bytes, counted as they stream in: past `MAX_BODY` the read
+ * stops and the request is refused, whatever `Content-Length` said or
+ * whether it was sent at all (request 55be0661).
+ */
+async function bodyText(req: Request): Promise<string> {
+  const tooLarge = () => artroomError("payload-too-large", "The request body is larger than 1 MiB.");
+  if (Number(req.headers.get("Content-Length") ?? "0") > MAX_BODY) throw tooLarge();
+  if (req.body === null) return "";
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY) {
+      await reader.cancel().catch(() => undefined);
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 async function body(req: Request): Promise<unknown> {
-  const len = Number(req.headers.get("Content-Length") ?? "0");
-  if (len > 1024 * 1024) throw artroomError("payload-too-large", "The request body is larger than 1 MiB.");
-  const text = await req.text();
-  if (text.length > 1024 * 1024) throw artroomError("payload-too-large", "The request body is larger than 1 MiB.");
+  const text = await bodyText(req);
   try {
     return parseStrict(text);
   } catch (e) {

@@ -27,7 +27,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
-import { commit, decide, earlySteps, finalBoundary, refuseApplies, refuseInput, submit, type DecideOptions } from "./admission.ts";
+import { admit, commit, decide, earlySteps, finalBoundary, refuseApplies, refuseInput, submit, type DecideOptions } from "./admission.ts";
 import { judge, refusal } from "./authority.ts";
 import { utf8 } from "./canonical.ts";
 import { fault, Moved, type RoomCore } from "./core.ts";
@@ -35,6 +35,7 @@ import { digestBytes, digestJson, newKeyPair, randomToken, sha256Hex, sign, unb6
 import { artroomError } from "./errors.ts";
 import { iso, parseTime, RE } from "./ids.ts";
 import { laneRow } from "./model.ts";
+import { limitAddress, limitInvitation } from "./ratelimit.ts";
 import { delegation, invitation, keyRow, memberRow, revocationOf } from "./roster.ts";
 import { checkRedemption, checkSignedRequest, isPlainObject, ShapeError } from "./schema.ts";
 import { num, one, str } from "./store.ts";
@@ -172,41 +173,35 @@ export function authenticateHash(core: RoomCore, h: string): MemberId {
 
 // ------------------------------------------------------------ redemption (R-CRED-9)
 
-const limits = new Map<string, { n: number; since: number }>();
-
-function rateLimit(key: string, max: number, now: number): void {
-  const w = limits.get(key);
-  if (!w || now - w.since > 60_000) {
-    limits.set(key, { n: 1, since: now });
-    return;
-  }
-  w.n++;
-  if (w.n > max) throw artroomError("rate-limited", "Too many redemption attempts. Wait a minute and try again.", { retryAfterMs: 60_000 - (now - w.since) });
-}
-
-export async function redeem(core: RoomCore, input: unknown, address: string, mcpBase: string): Promise<Joined | Redeemed | Refusal> {
+/**
+ * `redeem`. `address` is the client's address over HTTPS, or null for a
+ * Worker calling over a service binding, which has none (src/ratelimit.ts).
+ */
+export async function redeem(core: RoomCore, input: unknown, address: string | null, mcpBase: string): Promise<Joined | Redeemed | Refusal> {
   try {
     checkRedemption(input);
   } catch (e) {
     throw artroomError("bad-request", e instanceof ShapeError ? e.message : "The redemption is not valid.");
   }
   const r = input as { custody: "client"; join: SignedEnvelope } | { custody: "room"; invitation: InvitationId; secret: string };
-  const now = core.now();
-  const invitationId = r.custody === "client" ? (r.join.envelope.body as { invitation?: string }).invitation ?? "none" : r.invitation;
-  rateLimit(`addr:${core.roomId}:${address}`, 20, now);
-  rateLimit(`inv:${core.roomId}:${invitationId}`, 10, now);
+  limitAddress(core, address);
 
   if (r.custody === "client") {
     const body = r.join.envelope.body as { op?: string };
     if (r.join.envelope.kind !== "roster" || body.op !== "join" || r.join.envelope.delegation !== undefined)
       throw artroomError("bad-request", "A client-custody redemption carries a signed join.");
-    // The same admission as any act, on the `submitted` path (R-ADM-12). A refusal records nothing (R-CRED-9).
-    const out = await submit(core, r.join, "submitted", { recordRefusals: false });
-    if (isRefusal(out)) return out;
-    const record = out as RosterRecord;
+    // The same admission as any act, on the `submitted` path (R-ADM-12), which counts the attempt against the
+    // invitation's limit. A refused join records nothing (R-CRED-9, R-GEN-6).
+    const out = await admit(core, r.join, "submitted");
+    if (isRefusal(out.result)) return out.result;
+    // A session only for a join this call admitted: the stored result of an earlier one is public in the log.
+    if (out.replay)
+      return refusal("invitation-invalid", `This join was already admitted, as ${out.result.id}, so its invitation is used.`, "Sign a session request with the key that joined.");
+    const record = out.result as RosterRecord;
     const by = record.by as Extract<RosterRecord["by"], { via: "join" }>;
     return { custody: "client", member: by.member, role: by.role, key: by.key, record, session: newSession(core, by.member, by.key, null, 3600) };
   }
+  limitInvitation(core, r.invitation);
   return redeemRoom(core, r.invitation, r.secret, mcpBase);
 }
 

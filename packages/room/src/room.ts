@@ -26,7 +26,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { submit } from "./admission.ts";
-import { alarmTime, clock, servicesFor, type RoomEnv } from "./config.ts";
+import { alarmTime, clock, publicUrl, servicesFor, type RoomEnv } from "./config.ts";
 import { RoomCore, fault } from "./core.ts";
 import { jobTokenDuties } from "./jobs.ts";
 import { checkGenesis } from "./founding.ts";
@@ -46,6 +46,8 @@ interface SocketState {
 
 export class Room extends DurableObject<RoomEnv> {
   readonly core: RoomCore;
+  /** `PUBLIC_URL`, the base of `Redeemed.mcp`. Required: the object refuses to start without it. */
+  private readonly mcpBase: string;
   /** An alarm is stored at or before this time (room clock), or null when that is not known. Set only once storage has it. */
   private scheduled: number | null = null;
   /** `wake` calls, one at a time: each reads the stored alarm and only ever moves it earlier. */
@@ -53,6 +55,7 @@ export class Room extends DurableObject<RoomEnv> {
 
   constructor(ctx: DurableObjectState, env: RoomEnv) {
     super(ctx, env);
+    this.mcpBase = publicUrl(env);
     const sql: Sql = {
       all: (q, ...b) => ctx.storage.sql.exec(q, ...b).toArray() as ReturnType<Sql["all"]>,
       transaction: (fn) => ctx.storage.transactionSync(fn),
@@ -73,10 +76,6 @@ export class Room extends DurableObject<RoomEnv> {
     });
     // A fresh object schedules the founding debt it finds, with no new found request (plan 004).
     void ctx.blockConcurrencyWhile(() => this.recover().catch(() => undefined));
-  }
-
-  private get mcpBase(): string {
-    return this.env.PUBLIC_URL ?? "https://artroom.example.workers.dev";
   }
 
   // ------------------------------------------------------------ RPC
@@ -100,7 +99,8 @@ export class Room extends DurableObject<RoomEnv> {
     return wire(() => request(this.core, req));
   }
 
-  redeem(redemption: unknown, address: string): Promise<Wire<Joined | Redeemed | Refusal>> {
+  /** `address` is the HTTPS client's, or null for a Worker over a service binding (R-CRED-9). */
+  redeem(redemption: unknown, address: string | null): Promise<Wire<Joined | Redeemed | Refusal>> {
     return wire(() => redeem(this.core, redemption, address, this.mcpBase));
   }
 

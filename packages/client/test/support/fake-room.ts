@@ -749,8 +749,11 @@ export class FakeRoom {
     if (r.custody === "client") {
       const env = r.join?.envelope;
       if (!env || env.kind !== "roster" || (env.body as Obj)["op"] !== "join") throw artroomError("bad-request", "A client redemption carries a signed join.");
+      // As the Room: a session only for a join this call admits; a replay of an earlier one gets none (R-CRED-9).
+      const earlier = this.#idem.get(`${env.actor}|${env.idempotencyKey}`);
       const out = await this.admit(r.join, "submitted");
       if (isRefusal(out)) return out;
+      if (earlier) return refusal("invitation-invalid", `This join was already admitted, as ${out.id}, so its invitation is used.`, "Sign a session request with the key that joined.");
       const member = this.members.get((out.by as { member: MemberId }).member)!;
       const token = `ses_${randomToken(24)}`;
       const expiresAt = this.now() + 3600_000;

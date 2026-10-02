@@ -14,7 +14,7 @@ This is a design for review. It changes no source code. Approving it
 authorizes no live operation and no implementation: lanes A, B and C below
 each get their own gitseq request after approval, with their own decision
 provenance. The normative text is [docs/protocol.md](../docs/protocol.md)
-section 31 (R-MINT-1 to R-MINT-7).
+section 32 (R-MINT-1 to R-MINT-7).
 
 ## Summary
 

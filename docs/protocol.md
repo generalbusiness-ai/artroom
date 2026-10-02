@@ -45,7 +45,8 @@ sections 4 to 11 and 13.
 28. Amendment 66d6fb14: `refuse` rules before the claim check
 29. Contract amendment 3 (bc351fa8): checks, check jobs and snapshots
 30. Contract amendment 4 (1c785ed8): log objects within Artifacts' limit
-31. Contract amendment 5 (10fcfe4e): canonical token mints (R-MINT)
+31. Request c657d4ba: joins and redemption
+32. Contract amendment 5 (10fcfe4e): canonical token mints (R-MINT)
 
 ## 1. Terms
 
@@ -235,8 +236,9 @@ may review or check a particular proposal is decided by its obligations
   only if the secret's hash matches and the invitation is unexpired and
   unused at admission. The same entry consumes it. For a room-custody
   invitation the room makes the key and signs the `join` (R-CRED-3).
-- A refused `join` is not recorded, so a secret that fails is never
-  published.
+- A refused `join` is never recorded, at any step of admission and on any
+  path (R-ADM-8). Its body carries the secret, and a refused join leaves the
+  invitation unused, so recording it would publish a live credential.
 
 **R-GEN-7.** The `team` op sets a team's members. Teams are principals for
 owners, review obligations and notifications.
@@ -471,6 +473,12 @@ full signed envelope and the decisions that led to them. The returned
 never recorded. So only an authenticated, authorized, well-formed and
 secret-free envelope ever reaches the log.
 
+The one exception is `join`. Its `secret` is exempt from the secret scan
+(R-SEC-4) because an admitted join consumes the invitation in the same
+entry. A refused join consumes nothing, so a `join` refused at steps 7 to 9
+is not recorded either: it is returned without `act`, leaves no
+idempotency record, and a retry is judged afresh (R-IDEM-4, R-GEN-6).
+
 **R-ADM-9.** A runtime failure during admission records nothing. Examples
 are a Worker CPU limit, running out of memory, a storage error or an engine
 fault. The caller receives a retryable `ArtroomError`. The one exception is
@@ -598,7 +606,11 @@ credential. It is `RoomWire.redeem` over RPC and `POST
 /v1/rooms/:room/redeem` over HTTPS.
 - `custody: "client"`: the body is a signed `join` envelope. The room
   admits it like any act, by case (c) of R-ADM-3, on the `submitted` path.
-  It returns `Joined`, with a read session.
+  It returns `Joined`, with a read session, only when this call admitted
+  the join. A join admitted earlier is public in the log, so a redemption
+  that repeats it is refused `invitation-invalid` and issues no session.
+  The key that joined gets its record again by resubmitting the same bytes
+  (R-IDEM-2), and a session with a signed `session` request (R-CRED-5).
 - `custody: "room"`: the body is the invitation ID and secret. The room
   makes the member key, and admits the `join` it signs with that key on the
   `room-redemption` path. It then makes a session key, records the
@@ -606,7 +618,15 @@ credential. It is `RoomWire.redeem` over RPC and `POST
 - The body's `custody` only selects the branch. The join admission checks
   the invitation's recorded custody against the path (R-ADM-12).
 - A refused redemption records nothing and does not consume the invitation.
-- Redemption is rate-limited per client address and per invitation.
+- Redemption is rate-limited per client address and per invitation. The
+  invitation's limit counts every attempt to join with it, through
+  `redeem` and as a `join` on `POST /acts` or `RoomWire.submit`. It keys
+  only an entry ID that names an invitation the room issued. A Worker
+  calling over a service binding has no client address, so only the
+  invitation's limit applies to it; a binding that fronts the public
+  limits its own callers. The counters may be held in memory, but must be
+  bounded, and an exceeded limit throws `rate-limited` and records
+  nothing.
 
 **R-CRED-10. Bearer sessions.** A bearer token is the credential of one
 bearer session: a room-held session key and the delegation the room
@@ -1585,7 +1605,8 @@ never repeats the secret.
 **R-SEC-4.** Fields with a fixed, validated format skip the entropy check
 only. These are `Sha`, `Digest`, key IDs, entry IDs, signatures,
 idempotency keys and nonces. They still get the format detectors. A `join`
-act's `secret` is exempt: it is consumed in the same entry (R-GEN-6).
+act's `secret` is exempt: it is consumed in the same entry, and a refused
+join is never recorded (R-GEN-6, R-ADM-8).
 
 **R-SEC-5.** These are never recorded or published: workspace tokens,
 publication tokens, bearer tokens, session tokens, `gitAuthEnv`, and
@@ -3244,7 +3265,18 @@ order of verifier before writer, and found three P2s.
 | P2 Object size became a limit on what a room may record, and trees could still grow past B | The 1 MiB entry bound, the 1 MiB policy and checker configuration bounds, the 256-checker cap and the table of dropped events are removed: entries and files of any size are recorded in full and chunked. R-LOG-19 fans out `segments/`, `entries/`, `inputs/`, `policies/` and chunk directories by name groups, so no directory lists more than 4,096 entries. `log-entry-too-large` is removed, and `log-publication-failed` is renamed `log-publication-stalled` with the reason `unresolved` | Large notification; large revert; large activation; many segments; retained prefix | L 1; A 5; F 1; E 1 |
 | Wording: the UI said every stalled publication is retried | The UI says that publication stops for `unexpected-writer` | — | F 1 |
 
-## 31. Contract amendment 5 (10fcfe4e): canonical token mints
+## 31. Request c657d4ba: joins and redemption
+
+Simplification review 55563589 found three defects in joins and
+redemption (SEC-01, SEC-02 and SEC-07). No type changes.
+
+| Finding | Change | Rules | Who adapts |
+|---|---|---|---|
+| SEC-01 A client redemption issued a session for whatever admission returned, including the stored result of a join copied from the log, so anyone who could read one join got a renewable read session as that member | A session only for a join the call admitted; a repeat is refused `invitation-invalid` | R-CRED-9 | Room; the client's `join` recovers a lost response by resubmitting and signing a `session` request |
+| SEC-02 A `join` refused at steps 7 to 9 on `POST /acts` or `RoomWire.submit` was recorded with its envelope, publishing a secret whose invitation stayed usable. R-ADM-8 required it; R-GEN-6 forbade it | A refused join is never recorded, on any path; R-ADM-8 names the exception | R-ADM-8, R-GEN-6, R-SEC-4 | Room |
+| SEC-07 The redemption limit keyed unvalidated input, never dropped a counter, put every service-binding caller under one address, and did not count joins on `/acts` | Validated invitation IDs only; bounded counters; no address for service bindings; joins on every path count against the invitation | R-CRED-9 | Room |
+
+## 32. Contract amendment 5 (10fcfe4e): canonical token mints
 
 Request 10fcfe4e asked who owns each token the Room creates on the
 canonical repository, from the request to its end. Checker audit handoff
@@ -3391,7 +3423,7 @@ unknown otherwise.
   batches. New mints never delay revocations or observations that were due
   earlier.
 
-### 31.1 Open points
+### 32.1 Open points
 
 These continue section 22's list.
 
