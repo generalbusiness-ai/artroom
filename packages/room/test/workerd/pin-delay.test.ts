@@ -72,6 +72,47 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     expect(await inDO(r, (room) => room.core.nextPinDue())).toBeNull();
   });
 
+  it("set: a pin not yet due is not loop work (no backoff written), and when due it obeys the pins loop's backoff (request 3da1d82b)", async () => {
+    setPinDelay(DELAY);
+    const r = await makeRoom();
+    const { p, head } = await proposed(r);
+    const due = clock.now + DELAY;
+    await inDO(r, (room) => room.core.idle());
+    await tick(r, 3);
+    expect(await inDO(r, (room) => [...room.core.loopPendingKinds()])).not.toContain("pins");
+    expect(await inDO(r, (room) => room.core.loopBackoff().pins)).toBeUndefined();
+    // A pins backoff that ends after the due time holds the pin back, and moves the wake with it.
+    await inDO(r, (room) => room.core.sql.all("INSERT INTO meta (k, v) VALUES ('loop_backoff', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", JSON.stringify({ pins: { attempts: 1, next: due + 10_000 } })));
+    expect(await inDO(r, (room) => room.core.nextAlarm())).toBe(due + 10_000);
+    clock.now = due;
+    await tick(r);
+    expect(await pinDone(r, p.pinnedRef)).toBe(0);
+    clock.now = due + 10_000;
+    await tick(r);
+    expect(r.world.artifacts.refs.get(p.pinnedRef)).toBe(head);
+    expect(await inDO(r, (room) => room.core.loopBackoff().pins)).toBeUndefined();
+    expect(await dueRows(r)).toEqual([]);
+  });
+
+  it("set: while the canonical repository is gone, a delayed pin is neither woken for nor written (the pins loop's fence)", async () => {
+    setPinDelay(DELAY);
+    const r = await makeRoom();
+    const { p, head } = await proposed(r);
+    const due = clock.now + DELAY;
+    await inDO(r, (room) => room.core.idle());
+    await tick(r, 2);
+    await inDO(r, (room) => room.core.sql.all("INSERT INTO meta (k, v) VALUES ('canonical_gone', ?)", JSON.stringify({ since: new Date(clock.now).toISOString(), head: room.core.headSeq() })));
+    expect(await inDO(r, (room) => room.core.nextAlarm())).not.toBe(due);
+    clock.now = due;
+    await tick(r);
+    expect(await pinDone(r, p.pinnedRef)).toBe(0);
+    expect(await inDO(r, (room) => [...room.core.loopPendingKinds()].filter((k) => room.core.loopAllowed(k)))).not.toContain("pins");
+    // The repository back: the pin is written.
+    await inDO(r, (room) => room.core.sql.all("DELETE FROM meta WHERE k = 'canonical_gone'"));
+    await tick(r);
+    expect(r.world.artifacts.refs.get(p.pinnedRef)).toBe(head);
+  });
+
   it("set: a read of the proposal still finds its pinned ref (R-PROP-1)", async () => {
     setPinDelay(DELAY);
     const r = await makeRoom();

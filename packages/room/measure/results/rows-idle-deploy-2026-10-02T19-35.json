@@ -1,0 +1,205 @@
+{
+  "worker": "artroom-spike-room",
+  "from": "2026-10-02T19:35:00Z",
+  "to": "2026-10-02T19:39:30Z",
+  "sampledFrom": "2026-10-02T19:33:00.000Z",
+  "totalRowsWritten": 554,
+  "totalRowsRead": 116599,
+  "totalRequests": 181,
+  "namespaces": [
+    {
+      "id": "3388b66bd8f345438705519a063d6bd7",
+      "name": "artroom-spike-room_Publisher",
+      "className": "Publisher"
+    },
+    {
+      "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+      "name": "artroom-spike-room_Registry",
+      "className": "Registry"
+    },
+    {
+      "id": "fd8efe823eb6430bb910ee34d469681b",
+      "name": "artroom-spike-room_Room",
+      "className": "Room"
+    }
+  ],
+  "objects": [
+    {
+      "className": "Registry",
+      "object": "registry",
+      "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+      "rowsWritten": 0,
+      "rowsRead": 43,
+      "requests": 36,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_d7c53f0d9af0702547d51928a8f04cdc",
+      "objectId": "2942a720f8603aa8f33c56f123a092e085d8e4dcec941f7a7797d524bd1fdf5d",
+      "rowsWritten": 39,
+      "rowsRead": 5533,
+      "requests": 9,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_a81dc2db9888ec46487f56097aa249f2",
+      "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+      "rowsWritten": 38,
+      "rowsRead": 8647,
+      "requests": 8,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_2b316cee6a211797e897d7c91b15a410",
+      "objectId": "9ffc1b57d15655c6948b08d1a42185947e6acb9b7949f845d203379a818a9974",
+      "rowsWritten": 38,
+      "rowsRead": 8647,
+      "requests": 9,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+      "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+      "rowsWritten": 34,
+      "rowsRead": 7551,
+      "requests": 8,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_1741490181aa074e9337b16af80dbe9d",
+      "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+      "rowsWritten": 33,
+      "rowsRead": 7076,
+      "requests": 10,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+      "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+      "rowsWritten": 33,
+      "rowsRead": 14767,
+      "requests": 8,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_3a6011559c193fd7f90b8d2392516840",
+      "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+      "rowsWritten": 31,
+      "rowsRead": 4173,
+      "requests": 9,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_e59975fd2dbeeae4eca7aad1cc8a4a01",
+      "objectId": "8977051d20636636f80ed0b430378df8a3c0495f3ca9861b69a155f4610504c2",
+      "rowsWritten": 31,
+      "rowsRead": 4861,
+      "requests": 8,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_a490b23ca538a208de5528469b2a9689",
+      "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+      "rowsWritten": 31,
+      "rowsRead": 4711,
+      "requests": 9,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_872e0b20159fb850fc36fd1deb49b3fc",
+      "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+      "rowsWritten": 31,
+      "rowsRead": 18437,
+      "requests": 8,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+      "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+      "rowsWritten": 30,
+      "rowsRead": 6455,
+      "requests": 9,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_fe9913737e6a034530cc430b92b2ff83",
+      "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+      "rowsWritten": 30,
+      "rowsRead": 4003,
+      "requests": 7,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_5c1bb798d5da946c048160c51b321bfc",
+      "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+      "rowsWritten": 30,
+      "rowsRead": 4519,
+      "requests": 8,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+      "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+      "rowsWritten": 29,
+      "rowsRead": 3833,
+      "requests": 8,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+      "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+      "rowsWritten": 29,
+      "rowsRead": 4327,
+      "requests": 8,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+      "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+      "rowsWritten": 29,
+      "rowsRead": 4327,
+      "requests": 9,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+      "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+      "rowsWritten": 28,
+      "rowsRead": 4135,
+      "requests": 9,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_c79f08919e5fb4263c76265750ae1f99",
+      "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+      "rowsWritten": 10,
+      "rowsRead": 554,
+      "requests": 1,
+      "periodicSamples": 1
+    }
+  ],
+  "budget": {
+    "maxRowsWritten": 23000,
+    "maxRowsWrittenPerObject": 2100
+  },
+  "state": "pass",
+  "failures": []
+}

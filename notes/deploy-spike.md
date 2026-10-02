@@ -985,3 +985,89 @@ The last measurement window closed at 18:54 UTC. Since then, nothing has
 used the spike except two read-only log reads, made as the checker. The
 spike is free for the redeploy from main.
 
+## Idle write storms fixed (request 3da1d82b, 2026-10-02)
+
+The Room change is described in
+[packages/room/README.md](../packages/room/README.md), "Request 3da1d82b:
+idle write storms". Rows were measured with `rows.mjs` from request
+8bd623cc's branch (`request/row-writes`), run read-only from that
+worktree with the analytics token. The reports are in
+`packages/room/measure/results/rows-idle-*.json`.
+
+**Before the fix**, on `artroom-spike-room` `75758995`:
+
+- `wrangler tail` at 19:06 UTC: only `Room` alarm events. 17 objects,
+  each alarmed every 5.0 seconds, every one `ok`, with no fetch or RPC
+  events. These alarms are the "12 requests a minute".
+- 19:00 to 19:30 UTC, no client: **6,289 rows written** (about 12,600 an
+  hour), 1,661,040 read and 6,380 requests. 18 rooms wrote 355 to 377 rows
+  each (12 a minute). The earlier hour, 17:50 to 18:50 with measured runs
+  active, wrote 11,285.
+
+**Deploy** of `request/idle-writes` `d8d0daa5` with
+`packages/room/scripts/deploy-spike.sh` at about 19:35 UTC. No retry was
+needed, and the probe answered 404. The same `ROOM_KEY_SECRET` and
+`CHECKER_KEY` values were put again; no credential was created or rotated.
+
+| Worker | Version ID | Replacing |
+|---|---|---|
+| `artroom-spike-room` | `065d3189-c6c6-46d6-b9bb-fdda44bfc6f7` | `75758995…` |
+| `artroom-spike-checkers` | `d3677515-097e-40a8-83f2-10f4a9681372` | `37804f0a…` |
+
+**The 18 older rooms were left as they were.** Every one is bound to a
+repository that an earlier smoke run deleted. No Durable Object was
+deleted: the fix does not need it, and their logs stay readable. On the new
+code each one ran its alarm once or twice. The pending checkpoint cohort
+failed with `NOT_FOUND`, the Room found the canonical repository gone,
+recorded it, and attended its admins once. From 19:35 to 19:39:30 they
+wrote 28 to 39 rows each, with 7 to 10 requests. That window includes
+about 30 seconds of the old code's 5-second loop before the new version
+took over. After 19:40 none of them appears in the billing data again.
+
+**Live smoke**, all phases, `node packages/room/measure/spike-smoke.mjs`,
+19:39:57 to 19:43:53 UTC: passed, exit 0, 91 of 91 steps ok. The public,
+import and checks logs were published and verified (through entries 14, 8
+and 15). Cleanup was `ok`, with 0 unresolved and no repository left.
+Every token the run minted was revoked. Record:
+[spike-smoke-2026-10-02T19-39-56-933Z.json](../packages/room/measure/results/spike-smoke-2026-10-02T19-39-56-933Z.json).
+The run made three rooms (`2ade20c5…`, `836fd4cb…` and `48d4bf60…`, by
+object). After the cleanup deleted their repositories, the public room
+wrote its last 12 rows, with 1 request, in the sample from 19:43:57. That
+was the publication of the cleanup's release, which found the repository
+gone. All three rooms wrote 0 in every sample after that.
+
+**After the fix**, the idle hours (the probe requests are two
+`GET /v1/rooms/deploy-spike-probe` that I sent at 19:49 to check the tail):
+
+| Window (UTC) | Rows written | Rows read | Requests | Notes |
+|---|---|---|---|---|
+| 19:44 to 20:44 | 493 | 4,755 | 3 | All 493 are in samples stamped 19:42 to 19:43: the smoke's checks room (443) and its public and import rooms (38 and 8). Cloudflare stamps a sample with the start of its interval, and `rows.mjs` reads from one minute before the window, so the smoke's last minute is counted |
+| 19:47 to 20:47 | **0** | 2 | 2 | The two probes, in the Registry. No `Room` object wrote a row |
+
+`rows.mjs` passed both windows against `HOURLY_BUDGET` (23,000 rows, and
+2,100 for each object).
+
+**Why the old rooms stopped.** On the old code a pending checkpoint cohort
+was retried on the 5-second loop forever. On the new code a failing
+publication backs off, and a `NOT_FOUND` for the canonical repository
+stops publication and landing until a new entry is sealed. The rooms keep
+their pending cohort, their owed cleanup and one open admin item
+(`log-publication-stalled`, reason `repository-gone`).
+
+**Alarm wall time.** Before the fix, each alarm of a room with a deleted
+repository ran for about 5 seconds of wall time with a few milliseconds of
+CPU. The two old rooms' alarms seen just after the deploy did the same
+(5.1 and 5.3 s). The wait is outside the Room's code: the most likely
+cause is the Artifacts binding's answer for a deleted repository. Workers
+Logs could not be read to confirm it.
+
+**Gates** at `d8d0daa5`, logs in `/private/tmp/claude-501/idle/`:
+
+| Gate | Exit | Tests |
+|---|---|---|
+| room `npm run typecheck` | 0 | — |
+| room `npm run test:node` | 0 | 138 |
+| room `npm run test:workerd` | 0 | 411, of which 8 are this request's |
+| root `npm ci` | 0 | — |
+| root `npm run typecheck` | 0 | — |
+| root `npm test` | 0 | checkers 43; cli 162; client 88 Node and 2 workerd; git 225; log 198 Node and 193 workerd; mcp 73 Node and 5 workerd; policy 199 Node and 198 workerd (1 skipped); room 138 Node and 411 workerd; ui 141 |

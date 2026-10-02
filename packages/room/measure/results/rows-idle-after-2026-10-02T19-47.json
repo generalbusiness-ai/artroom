@@ -1,0 +1,70 @@
+{
+  "worker": "artroom-spike-room",
+  "from": "2026-10-02T19:47:00Z",
+  "to": "2026-10-02T20:47:00Z",
+  "sampledFrom": "2026-10-02T19:45:00.000Z",
+  "totalRowsWritten": 0,
+  "totalRowsRead": 2,
+  "totalRequests": 2,
+  "namespaces": [
+    {
+      "id": "3388b66bd8f345438705519a063d6bd7",
+      "name": "artroom-spike-room_Publisher",
+      "className": "Publisher"
+    },
+    {
+      "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+      "name": "artroom-spike-room_Registry",
+      "className": "Registry"
+    },
+    {
+      "id": "fd8efe823eb6430bb910ee34d469681b",
+      "name": "artroom-spike-room_Room",
+      "className": "Room"
+    }
+  ],
+  "objects": [
+    {
+      "className": "Registry",
+      "object": "registry",
+      "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+      "rowsWritten": 0,
+      "rowsRead": 2,
+      "requests": 2,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_e7dca7e8da56a779fe2236341b009cbd",
+      "objectId": "2ade20c519c4787507022ec62eb746d13ca6c84bb7d3f97f5ad0a7033981bc23",
+      "rowsWritten": 0,
+      "rowsRead": 0,
+      "requests": 0,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_80be25cf1ac970a6a8bd65a6fbb8d156",
+      "objectId": "48d4bf60d12daa85c01734117d1e7e575f788bc961a56b2585539d9faf08b42d",
+      "rowsWritten": 0,
+      "rowsRead": 0,
+      "requests": 0,
+      "periodicSamples": 1
+    },
+    {
+      "className": "Room",
+      "object": "room_498314731b721f6dad0e77958a841571",
+      "objectId": "836fd4cb80888ab2cbc1b26545db8495ddc4bbcb84660c3a1abbe92958b81b97",
+      "rowsWritten": 0,
+      "rowsRead": 0,
+      "requests": 0,
+      "periodicSamples": 1
+    }
+  ],
+  "budget": {
+    "maxRowsWritten": 23000,
+    "maxRowsWrittenPerObject": 2100
+  },
+  "state": "pass",
+  "failures": []
+}
