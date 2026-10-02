@@ -138,7 +138,7 @@ export interface RoomSnapshot {
   readonly source: { readonly kind: "mock" | "live"; readonly status: "live" | "connecting" | "offline"; readonly note?: string };
 }
 
-export type { ChangeEntry, ChangeHistory, FileInterdiff, Interdiff } from "./changes.ts";
+export type { ChangeEntry, ChangeHistory, FileInterdiff, FileMeta, Hunk, Interdiff } from "./changes.ts";
 
 // ------------------------------------------------------------------ diffs
 

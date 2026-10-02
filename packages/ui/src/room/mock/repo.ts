@@ -10,19 +10,19 @@ import type { CommitStore } from "../changes.ts";
 import type { Sha } from "../contract.ts";
 import { fakeSha } from "./ids.ts";
 
-type Files = Readonly<Record<string, string>>;
+type Files = Readonly<Record<string, { readonly text: string; readonly mode: string }>>;
 
 export class MemoryRepo implements CommitStore {
   private readonly blobs = new Map<string, string>();
   private readonly trees = new Map<string, readonly TreeEntry[]>();
   private readonly commits = new Map<string, { treeHash: string; parents: string[]; committedAt: number; files: Files }>();
 
-  /** Make a commit from its parent's files with `edits` applied (null deletes a path). */
-  commit(parent: Sha | null, edits: Readonly<Record<string, string | null>>, salt: string): Sha {
-    const files: Record<string, string> = { ...(parent ? this.commits.get(parent)!.files : {}) };
+  /** Make a commit from its parent's files with `edits` applied: text (mode 100644), text and mode, or null to delete. */
+  commit(parent: Sha | null, edits: Readonly<Record<string, string | { text: string; mode: string } | null>>, salt: string): Sha {
+    const files: Record<string, { text: string; mode: string }> = { ...(parent ? this.commits.get(parent)!.files : {}) };
     for (const [path, content] of Object.entries(edits)) {
       if (content === null) delete files[path];
-      else files[path] = content;
+      else files[path] = typeof content === "string" ? { text: content, mode: "100644" } : content;
     }
     const treeHash = this.tree(files, "");
     const id = fakeSha(`commit:${treeHash}:${parent ?? ""}:${salt}`);
@@ -39,9 +39,10 @@ export class MemoryRepo implements CommitStore {
       const slash = rest.indexOf("/");
       if (slash >= 0) dirs.add(rest.slice(0, slash));
       else {
-        const hash = fakeSha(`blob:${files[path]}`);
-        this.blobs.set(hash, files[path]!);
-        here.set(rest, { name: rest, mode: "100644", hash, type: "blob" });
+        const { text, mode } = files[path]!;
+        const hash = fakeSha(`blob:${text}`);
+        this.blobs.set(hash, text);
+        here.set(rest, { name: rest, mode, hash, type: mode === "100755" ? "exec" : "blob" });
       }
     }
     for (const d of dirs) here.set(d, { name: d, mode: "040000", hash: this.tree(files, `${prefix}${d}/`), type: "tree" });

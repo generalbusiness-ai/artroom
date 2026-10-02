@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "preact/hooks";
-import type { ChangeEntry, ChangeHistory, Interdiff } from "../room/adapter.ts";
+import type { ChangeEntry, ChangeHistory, FileMeta, Hunk, Interdiff } from "../room/adapter.ts";
 import type { Proposal } from "../room/contract.ts";
 import { Badge, Sha, type Tone } from "./bits.tsx";
 import { useApp } from "./context.ts";
@@ -22,49 +22,75 @@ const KIND: Record<ChangeEntry["kind"], { label: string; tone: Tone }> = {
   divergent: { label: "Divergent", tone: "warn" },
 };
 
-const BOUND: Record<Extract<Interdiff, { kind: "too-large" }>["bound"], string> = {
-  depth: "directory levels",
-  entries: "tree entries",
-  commits: "commits",
-  lines: "lines in one file",
+/** Each bound, and whether it is lane B's (shared with every proposal's diff) or this view's own. */
+const BOUND: Record<Extract<Interdiff, { kind: "too-large" }>["bound"], { what: string; shared: boolean }> = {
+  depth: { what: "directory levels", shared: true },
+  entries: { what: "tree entries", shared: true },
+  commits: { what: "commits", shared: true },
+  lines: { what: "lines in one version of a file", shared: false },
+  "line-bytes": { what: "bytes in one line", shared: false },
+  work: { what: "units of work for this generation's comparison", shared: false },
 };
 
-function PatchLines({ lines, label }: { lines: readonly string[]; label: string }) {
+/** What one version of the change did to a path, in words. */
+function describe(m: FileMeta | null): string {
+  if (!m) return "leaves it alone";
+  const mode = m.oldMode && m.newMode && m.oldMode !== m.newMode ? `, mode ${m.oldMode} to ${m.newMode}` : "";
+  if (m.status === "added") return `adds it, mode ${m.newMode}`;
+  if (m.status === "deleted") return "deletes it";
+  if (m.status === "renamed") return `renames it from ${m.from}${mode}`;
+  return `edits it${mode}`;
+}
+
+function Hunks({ hunks, label }: { hunks: readonly Hunk[]; label: string }) {
   return (
     <div class="stack-sm">
       <p class="small muted">{label}</p>
       <pre class="patch" aria-label={label}>
-        {lines.map((l, i) => (
-          <span key={i} class={l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : ""}>
-            {l}
-            {"\n"}
-          </span>
-        ))}
+        {hunks.map((h, k) => [
+          <span key={`h${k}`} class="hunk">
+            @@ -{h.oldStart} +{h.newStart} @@{"\n"}
+          </span>,
+          ...h.lines.map((l, i) => (
+            <span key={`${k}.${i}`} class={l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : ""}>
+              {l}
+              {"\n"}
+            </span>
+          )),
+        ])}
       </pre>
     </div>
   );
 }
 
-function InterdiffView({ d, from, to }: { d: Interdiff; from: number; to: number }) {
-  if (d.kind === "too-large")
+export function InterdiffView({ d, from, to }: { d: Interdiff; from: number; to: number }) {
+  if (d.kind === "too-large") {
+    const b = BOUND[d.bound];
     return (
       <p class="small muted" data-interdiff="too-large">
-        Too large to compare here: more than {d.limit.toLocaleString("en")} {BOUND[d.bound]}. The same bound applies to every proposal's diff.
+        Too large to compare here: more than {d.limit.toLocaleString("en")} {b.what}.{" "}
+        {b.shared ? "Every proposal's diff has the same bound." : "This bound is this view's own; it does not limit the proposal's diff."}
       </p>
     );
+  }
   if (!d.files.length)
     return (
       <p class="small muted" data-interdiff="same">
-        The same edits as in generation {from}: only rebased or reworded.
+        The same edits as in generation {from}, to the same files with the same modes and surrounding lines: only rebased or reworded.
       </p>
     );
   return (
     <div class="stack" data-interdiff="changed">
       {d.files.map((f) => (
-        <div key={f.path} class="stack-sm">
+        <div key={f.path} class="stack-sm" data-interdiff-file={f.path}>
           <p class="file-path small">{f.path}</p>
-          {f.now.length > 0 && <PatchLines lines={f.now} label={`Edits only in generation ${to}'s version`} />}
-          {f.before.length > 0 && <PatchLines lines={f.before} label={`Edits only in generation ${from}'s version`} />}
+          {f.meta && (
+            <p class="small" data-interdiff-meta>
+              Generation {to}'s version {describe(f.meta.now)}; generation {from}'s {describe(f.meta.before)}.
+            </p>
+          )}
+          {f.now.length > 0 && <Hunks hunks={f.now} label={`Edits only in generation ${to}'s version`} />}
+          {f.before.length > 0 && <Hunks hunks={f.before} label={`Edits only in generation ${from}'s version`} />}
         </div>
       ))}
     </div>

@@ -8,7 +8,8 @@
  *   tkxlpsuy  Use requireSession() in whoami
  *   ommqkrtv  Log the session cookie while debugging
  * Generation 2 (@cedar's recut on main after the rate limit landed):
- *   zvqmnwro  rewritten: it now also refuses expired cookies
+ *   zvqmnwro  rewritten: it now also refuses expired cookies (and one check.ts
+ *             hunk shows again: rateKey(), next to it, changed underneath)
  *   tkxlpsuy  rewritten by the rebase only: the same edits
  *   (ommqkrtv dropped: it logged a cookie)
  *   yrwpvlqs  added: Test requireSession()

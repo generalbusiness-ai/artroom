@@ -6,7 +6,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import { App } from "../src/app.tsx";
-import { changeHistory, LINE_LIMIT, type ChangeHistory, type CommitInfo } from "../src/room/changes.ts";
+import { changeHistory, LINE_BOUNDS, type ChangeHistory, type CommitInfo } from "../src/room/changes.ts";
 import { SCENARIO_COMMITS } from "../src/room/mock/commits.ts";
 import { MockRoom } from "../src/room/mock/mock-room.ts";
 import { MemoryRepo } from "../src/room/mock/repo.ts";
@@ -53,10 +53,19 @@ describe("change history from change-id headers", () => {
   test("a rewritten change's interdiff shows only how its own edits differ", async () => {
     const [moved, whoami] = (await scenario()).entries;
     if (moved?.kind !== "rewritten" || moved.interdiff.kind !== "ok") throw new Error("not rewritten");
-    // check.ts was rebased onto the new rateKey(): its own edits are the same, so it is not listed.
-    expect(moved.interdiff.files.map((f) => f.path)).toEqual(["src/lib/authz/session.ts"]);
-    expect(moved.interdiff.files[0]!.now).toEqual(['+import { isExpired, readCookie, verifySessionCookie } from "../cookies";', "+  if (isExpired(cookie)) return null;"]);
-    expect(moved.interdiff.files[0]!.before).toEqual(['+import { readCookie, verifySessionCookie } from "../cookies";']);
+    expect(moved.interdiff.files.map((f) => f.path)).toEqual(["src/lib/authz/check.ts", "src/lib/authz/session.ts"]);
+    const [check, session] = moved.interdiff.files;
+    // check.ts was rebased onto the new rateKey(). Its import edit is the same and is not listed. Its
+    // currentUser edit is the same too, but rateKey()'s body, two lines above it, changed underneath, so
+    // that hunk's context differs and it is shown from both versions, at their own line numbers.
+    expect(check!.meta).toBeNull();
+    expect(check!.now.map((h) => [h.oldStart, h.newStart, h.lines[0]])).toEqual([[17, 15, "   return `${req.ip}:${account.toLowerCase()}`;"]]);
+    expect(check!.before.map((h) => [h.oldStart, h.newStart, h.lines[0]])).toEqual([[13, 11, "   return req.ip;"]]);
+    expect(check!.now[0]!.lines.slice(1)).toEqual(check!.before[0]!.lines.slice(1));
+    // session.ts is new in both versions: one hunk each, and generation 2's refuses expired cookies.
+    expect(session!.meta).toBeNull();
+    expect(session!.now.flatMap((h) => h.lines)).toContain("+  if (isExpired(cookie)) return null;");
+    expect(session!.before.flatMap((h) => h.lines)).not.toContain("+  if (isExpired(cookie)) return null;");
     // Rebased only: the same edits.
     expect(whoami?.kind === "rewritten" && whoami.interdiff).toEqual({ kind: "ok", files: [] });
   });
@@ -93,9 +102,9 @@ describe("change history from change-id headers", () => {
     const c = await changeHistory(t.repo, { generation: 1, commits: t.before }, { generation: 2, commits: t.after }, { maxCommits: 0 });
     expect(c).toMatchObject({ kind: "too-large", bound: "commits", limit: 0 });
     // Lines per file version.
-    const big = tiny({ before: { "a.txt": "1\n" }, after: { "a.txt": "x\n".repeat(LINE_LIMIT + 1) } }, { before: ["kkkkkkkk"], after: ["kkkkkkkk"] });
+    const big = tiny({ before: { "a.txt": "1\n" }, after: { "a.txt": "x\n".repeat(LINE_BOUNDS.maxLines + 1) } }, { before: ["kkkkkkkk"], after: ["kkkkkkkk"] });
     const l = await changeHistory(big.repo, { generation: 1, commits: big.before }, { generation: 2, commits: big.after });
-    expect(l?.kind === "ok" && l.entries[0]?.kind === "rewritten" && l.entries[0].interdiff).toEqual({ kind: "too-large", bound: "lines", limit: LINE_LIMIT });
+    expect(l?.kind === "ok" && l.entries[0]?.kind === "rewritten" && l.entries[0].interdiff).toEqual({ kind: "too-large", bound: "lines", limit: LINE_BOUNDS.maxLines });
   });
 });
 

@@ -409,6 +409,7 @@ a.lane-goal:hover { text-decoration: underline; }
 .patch > span { display: block; padding: 0 10px; }
 .patch > span.add { background: var(--diff-add); }
 .patch > span.del { background: var(--diff-del); }
+.patch > span.hunk { color: var(--muted); }
 #changes-h + .badge, .section-head > .badge { align-self: center; }
 
 /* ------------------------------------------------------------ policy */

@@ -6,8 +6,16 @@
  * added or dropped compared with the previous generation, and for each
  * rewritten change an interdiff: how the change's own edits differ, ignoring
  * what changed underneath it. This is `jj evolog` and `jj interdiff` in
- * spirit, computed the way `git range-diff` does: the two versions' patches
- * are compared line by line.
+ * spirit, computed the way `git range-diff` does: each version of the change
+ * becomes a patch against its own parent, and the two patches are compared.
+ *
+ * A patch keeps, for each path, what the commit did to it (added, modified,
+ * deleted or renamed, the rename source, and the file modes) and its hunks
+ * with `CONTEXT` lines of context on each side. Two versions are the same
+ * edit to a path only when that metadata is equal and every hunk, context
+ * included, is in the other version too. Hunks are compared without their
+ * line numbers, so a rebase that moves an edit up or down does not show; one
+ * that changes a line within `CONTEXT` lines of an edit does.
  *
  * A header is author-supplied and proves nothing. Nothing here feeds
  * obligations, evidence or the carry rule, which stay path-based.
@@ -16,11 +24,13 @@
  * (`treeDiff` with `DEFAULT_BOUNDS`, R-PROP-6), so it is refused as too large
  * exactly as a proposal's diff would be. A generation longer than
  * `DEFAULT_BOUNDS.maxCommits` commits is not compared. Lane B bounds paths,
- * not file contents, so the line comparison has one further bound of its own,
- * `LINE_LIMIT` lines per file version.
+ * not file contents, so this comparison has bounds of its own
+ * (`LINE_BOUNDS`): lines per file version, bytes per line, and the work of
+ * the whole comparison of two generations. Over any bound, the result says
+ * "too large" and names the bound; it is never silently empty.
  */
 
-import { DEFAULT_BOUNDS, treeDiff, type DiffBounds, type TreeReader } from "@generalbusiness/artroom-git";
+import { DEFAULT_BOUNDS, treeDiff, type DiffBounds, type TreeEntry, type TreeReader } from "@generalbusiness/artroom-git";
 import type { Generation, PathChange, RepoPath, Sha } from "./contract.ts";
 
 /** One commit of a generation, oldest first, with its jj header if it has one. */
@@ -43,16 +53,38 @@ export interface ChangeCommit {
   readonly subject: string;
 }
 
-/** For one path: the change's patch lines that only the new version has, and those only the old one had. */
-export interface FileInterdiff {
-  readonly path: RepoPath;
-  readonly now: readonly string[];
-  readonly before: readonly string[];
+/** What one commit did to one path. */
+export interface FileMeta {
+  readonly status: PathChange["status"];
+  /** The rename source; null unless renamed. */
+  readonly from: RepoPath | null;
+  /** The git file mode before and after (`100644`, `100755`, `120000`, ...); null where the path is absent. */
+  readonly oldMode: string | null;
+  readonly newMode: string | null;
 }
 
-export type Interdiff =
-  | { readonly kind: "ok"; readonly files: readonly FileInterdiff[] }
-  | { readonly kind: "too-large"; readonly bound: "depth" | "entries" | "commits" | "lines"; readonly limit: number };
+/** A run of a commit's edits to one file, with up to `CONTEXT` unchanged lines on each side. */
+export interface Hunk {
+  /** Where the hunk starts in the file before and after the commit, counting from 1. */
+  readonly oldStart: number;
+  readonly newStart: number;
+  /** Each line starts with " " (context), "-" (removed) or "+" (added). */
+  readonly lines: readonly string[];
+}
+
+/** How the two versions of a change treat one path differently. */
+export interface FileInterdiff {
+  readonly path: RepoPath;
+  /** What each version did to the path, when that differs; null when it is the same. A null side leaves the path alone. */
+  readonly meta: { readonly before: FileMeta | null; readonly now: FileMeta | null } | null;
+  /** Hunks only the new version has, and those only the old one had. */
+  readonly now: readonly Hunk[];
+  readonly before: readonly Hunk[];
+}
+
+type Bound = "depth" | "entries" | "commits" | "lines" | "line-bytes" | "work";
+
+export type Interdiff = { readonly kind: "ok"; readonly files: readonly FileInterdiff[] } | { readonly kind: "too-large"; readonly bound: Bound; readonly limit: number };
 
 export type ChangeEntry =
   | { readonly kind: "rewritten"; readonly changeId: string; readonly before: ChangeCommit; readonly after: ChangeCommit; readonly interdiff: Interdiff }
@@ -73,8 +105,26 @@ export type ChangeHistory =
     }
   | { readonly kind: "too-large"; readonly from: Generation; readonly to: Generation; readonly bound: "commits"; readonly limit: number };
 
-/** Most lines in one version of one file that the line comparison reads. */
-export const LINE_LIMIT = 2_000;
+/** Unchanged lines kept on each side of an edit. */
+export const CONTEXT = 3;
+
+/** This comparison's own bounds, beyond lane B's. */
+export interface LineBounds {
+  /** Most lines in one version of one file. */
+  readonly maxLines: number;
+  /** Most bytes (UTF-8) in one line. */
+  readonly maxLineBytes: number;
+  /**
+   * Most work for one comparison of two generations, all files of all
+   * commits together: one unit per character of file read, plus one per
+   * pair of lines the line comparison examines.
+   */
+  readonly maxWork: number;
+}
+
+export const LINE_BOUNDS: LineBounds = { maxLines: 2_000, maxLineBytes: 10_000, maxWork: 20_000_000 };
+
+type Bounds = DiffBounds & LineBounds;
 
 const brief = (c: CommitInfo): ChangeCommit => ({ commit: c.commit, subject: c.subject });
 
@@ -86,9 +136,9 @@ export async function changeHistory(
   store: CommitStore,
   before: { readonly generation: Generation; readonly commits: readonly CommitInfo[] },
   after: { readonly generation: Generation; readonly commits: readonly CommitInfo[] },
-  bounds: Partial<DiffBounds> = {},
+  bounds: Partial<Bounds> = {},
 ): Promise<ChangeHistory | null> {
-  const b = { ...DEFAULT_BOUNDS, ...bounds };
+  const b: Bounds = { ...DEFAULT_BOUNDS, ...LINE_BOUNDS, ...bounds };
   if (![...before.commits, ...after.commits].some((c) => c.changeId)) return null;
   const range = { from: before.generation, to: after.generation };
   if (before.commits.length > b.maxCommits || after.commits.length > b.maxCommits) return { kind: "too-large", ...range, bound: "commits", limit: b.maxCommits };
@@ -104,6 +154,9 @@ export async function changeHistory(
   const ids = [...new Set([...after.commits.flatMap((c) => (c.changeId ? [c.changeId] : [])), ...before.commits.flatMap((c) => (c.changeId ? [c.changeId] : []))])];
 
   const entries: ChangeEntry[] = [];
+  // Shared by every rewritten change: once spent, the rest are too large.
+  let left = b.maxWork;
+  const spend = (n: number) => (left -= n) >= 0;
   for (const id of ids) {
     const o = old.get(id) ?? [];
     const n = now.get(id) ?? [];
@@ -111,7 +164,7 @@ export async function changeHistory(
     else if (!o.length) entries.push({ kind: "added", changeId: id, after: brief(n[0]!) });
     else if (!n.length) entries.push({ kind: "dropped", changeId: id, before: brief(o[0]!) });
     else if (o[0]!.commit === n[0]!.commit) entries.push({ kind: "unchanged", changeId: id, commit: brief(n[0]!) });
-    else entries.push({ kind: "rewritten", changeId: id, before: brief(o[0]!), after: brief(n[0]!), interdiff: await interdiff(store, o[0]!, n[0]!, b) });
+    else entries.push({ kind: "rewritten", changeId: id, before: brief(o[0]!), after: brief(n[0]!), interdiff: await interdiff(store, o[0]!, n[0]!, b, spend) });
   }
   return {
     kind: "ok",
@@ -121,87 +174,157 @@ export async function changeHistory(
   };
 }
 
-type Patch = { readonly kind: "ok"; readonly files: Map<RepoPath, string[]> } | { readonly kind: "too-large"; readonly bound: Extract<Interdiff, { kind: "too-large" }>["bound"]; readonly limit: number };
+type TooLarge = Extract<Interdiff, { kind: "too-large" }>;
+interface FilePatch {
+  readonly meta: FileMeta;
+  readonly hunks: readonly Hunk[];
+}
+type Patch = { readonly kind: "ok"; readonly files: Map<RepoPath, FilePatch> } | TooLarge;
+type Spend = (work: number) => boolean;
 
 /** How two versions of one change differ in their own edits. */
-async function interdiff(store: CommitStore, a: CommitInfo, b: CommitInfo, bounds: DiffBounds): Promise<Interdiff> {
-  const [pa, pb] = [await patch(store, a, bounds), await patch(store, b, bounds)];
+async function interdiff(store: CommitStore, a: CommitInfo, b: CommitInfo, bounds: Bounds, spend: Spend): Promise<Interdiff> {
+  if (!spend(0)) return { kind: "too-large", bound: "work", limit: bounds.maxWork };
+  const pa = await patch(store, a, bounds, spend);
   if (pa.kind === "too-large") return pa;
+  const pb = await patch(store, b, bounds, spend);
   if (pb.kind === "too-large") return pb;
   const files: FileInterdiff[] = [];
   for (const path of [...new Set([...pa.files.keys(), ...pb.files.keys()])].sort()) {
-    const x = pa.files.get(path) ?? [];
-    const y = pb.files.get(path) ?? [];
-    if (x.length > LINE_LIMIT || y.length > LINE_LIMIT) return { kind: "too-large", bound: "lines", limit: LINE_LIMIT };
-    const ops = lineDiff(x, y);
-    const nowOnly = ops.filter((o) => o.op === "add").map((o) => o.text);
-    const beforeOnly = ops.filter((o) => o.op === "del").map((o) => o.text);
-    if (nowOnly.length || beforeOnly.length) files.push({ path, now: nowOnly, before: beforeOnly });
+    const x = pa.files.get(path);
+    const y = pb.files.get(path);
+    const meta = sameMeta(x?.meta, y?.meta) ? null : { before: x?.meta ?? null, now: y?.meta ?? null };
+    const now = minus(y?.hunks ?? [], x?.hunks ?? []);
+    const before = minus(x?.hunks ?? [], y?.hunks ?? []);
+    if (meta || now.length || before.length) files.push({ path, meta, now, before });
   }
   return { kind: "ok", files };
 }
 
-/** One commit's own edits: for each path it changes, its `+` and `-` lines. */
-async function patch(store: CommitStore, c: CommitInfo, bounds: DiffBounds): Promise<Patch> {
+const sameMeta = (x: FileMeta | undefined, y: FileMeta | undefined) =>
+  x === y || (!!x && !!y && x.status === y.status && x.from === y.from && x.oldMode === y.oldMode && x.newMode === y.newMode);
+
+/** The hunks of `a` that `b` does not have, each hunk of `b` matching at most once. Line numbers are not compared. */
+function minus(a: readonly Hunk[], b: readonly Hunk[]): Hunk[] {
+  const key = (h: Hunk) => h.lines.join("\n");
+  const count = new Map<string, number>();
+  for (const h of b) count.set(key(h), (count.get(key(h)) ?? 0) + 1);
+  return a.filter((h) => {
+    const n = count.get(key(h)) ?? 0;
+    count.set(key(h), n - 1);
+    return n <= 0;
+  });
+}
+
+/** One commit's own edits: for each path it changes, what it did and its hunks. */
+async function patch(store: CommitStore, c: CommitInfo, bounds: Bounds, spend: Spend): Promise<Patch> {
   const [self, parent] = [await store.readCommit(c.commit), await store.readCommit(c.parent)];
   if (!self || !parent) throw new Error(`commit ${self ? c.parent : c.commit} not found`);
   const d = await treeDiff(store, parent.treeHash, self.treeHash, { bounds });
   if (d.kind === "too-large") return { kind: "too-large", bound: d.bound, limit: d.limit };
-  const files = new Map<RepoPath, string[]>();
+  const files = new Map<RepoPath, FilePatch>();
   for (const change of d.changes) {
-    const [from, to] = await Promise.all([text(store, parent.treeHash, oldPath(change)), text(store, self.treeHash, change.status === "deleted" ? null : change.path)]);
-    const x = from === null ? [] : from.split("\n");
-    const y = to === null ? [] : to.split("\n");
-    if (x.length > LINE_LIMIT || y.length > LINE_LIMIT) return { kind: "too-large", bound: "lines", limit: LINE_LIMIT };
-    files.set(change.path, lineDiff(x, y).flatMap((o) => (o.op === "add" ? [`+${o.text}`] : o.op === "del" ? [`-${o.text}`] : [])));
+    const [from, to] = await Promise.all([entryAt(store, parent.treeHash, oldPath(change)), entryAt(store, self.treeHash, change.status === "deleted" ? null : change.path)]);
+    const meta: FileMeta = { status: change.status, from: change.status === "renamed" ? change.from : null, oldMode: from?.mode ?? null, newMode: to?.mode ?? null };
+    // The same blob on both sides (a pure rename or mode change): no hunks, nothing to read.
+    if (from && to && from.hash === to.hash) {
+      files.set(change.path, { meta, hunks: [] });
+      continue;
+    }
+    const [x, y] = [await lines(store, from), await lines(store, to)];
+    for (const v of [x, y]) {
+      if (v.length > bounds.maxLines) return { kind: "too-large", bound: "lines", limit: bounds.maxLines };
+      if (v.some((l) => l.length > bounds.maxLineBytes || (l.length * 3 > bounds.maxLineBytes && utf8.encode(l).length > bounds.maxLineBytes)))
+        return { kind: "too-large", bound: "line-bytes", limit: bounds.maxLineBytes };
+      if (!spend(v.reduce((n, l) => n + l.length + 1, 0))) return { kind: "too-large", bound: "work", limit: bounds.maxWork };
+    }
+    const ops = lineDiff(x, y, spend);
+    if (!ops) return { kind: "too-large", bound: "work", limit: bounds.maxWork };
+    files.set(change.path, { meta, hunks: toHunks(ops, CONTEXT) });
   }
   return { kind: "ok", files };
 }
 
+const utf8 = new TextEncoder();
+
 const oldPath = (c: PathChange): RepoPath | null => (c.status === "added" ? null : c.status === "renamed" ? c.from : c.path);
 
-/** A blob's text at a path in a tree, or null when the path is absent. */
-async function text(store: CommitStore, tree: string, path: RepoPath | null): Promise<string | null> {
+/** The tree entry at a path, or null when the path is absent. */
+async function entryAt(store: CommitStore, tree: string, path: RepoPath | null): Promise<TreeEntry | null> {
   if (path === null) return null;
+  let e: TreeEntry | undefined;
   let hash = tree;
-  const parts = path.split("/");
-  for (let i = 0; i < parts.length; i++) {
-    const entries = await store.readTree(hash);
-    const e = entries?.find((x) => x.name === parts[i]);
+  for (const part of path.split("/")) {
+    e = (await store.readTree(hash))?.find((x) => x.name === part);
     if (!e) return null;
     hash = e.hash;
   }
-  return store.readBlob(hash);
+  return e ?? null;
+}
+
+/** An entry's lines: a blob's text, or a submodule's commit as git shows it. */
+async function lines(store: CommitStore, e: TreeEntry | null): Promise<string[]> {
+  if (!e) return [];
+  const text = e.mode === "160000" ? `Subproject commit ${e.hash}` : await store.readBlob(e.hash);
+  return text === null ? [] : text.split("\n");
+}
+
+type Op = { op: "same" | "add" | "del"; text: string };
+
+/** Group a line diff into hunks with up to `context` unchanged lines on each side; nearby edits share a hunk. */
+export function toHunks(ops: readonly Op[], context: number): Hunk[] {
+  const at: { old: number; new: number }[] = [];
+  let o = 1;
+  let n = 1;
+  for (const x of ops) {
+    at.push({ old: o, new: n });
+    if (x.op !== "add") o++;
+    if (x.op !== "del") n++;
+  }
+  const changed = ops.flatMap((x, i) => (x.op === "same" ? [] : [i]));
+  const out: Hunk[] = [];
+  for (let k = 0; k < changed.length; k++) {
+    const start = Math.max(0, changed[k]! - context);
+    while (k + 1 < changed.length && changed[k + 1]! - changed[k]! <= 2 * context + 1) k++;
+    const end = Math.min(ops.length, changed[k]! + context + 1);
+    out.push({ oldStart: at[start]!.old, newStart: at[start]!.new, lines: ops.slice(start, end).map((x) => (x.op === "same" ? " " : x.op === "add" ? "+" : "-") + x.text) });
+  }
+  return out;
 }
 
 /**
  * A line diff by longest common subsequence, after trimming the common
- * prefix and suffix. Inputs are bounded by LINE_LIMIT.
+ * prefix and suffix. Lines are numbered first, so each comparison is of two
+ * integers whatever the line's length. `spend` is charged one unit per pair
+ * of lines compared, before the work is done; null when it refuses.
  */
-export function lineDiff(a: readonly string[], b: readonly string[]): { op: "same" | "add" | "del"; text: string }[] {
+export function lineDiff(a: readonly string[], b: readonly string[], spend: Spend = () => true): Op[] | null {
   let p = 0;
   while (p < a.length && p < b.length && a[p] === b[p]) p++;
   let s = 0;
   while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
-  const x = a.slice(p, a.length - s);
-  const y = b.slice(p, b.length - s);
+  const ids = new Map<string, number>();
+  const id = (l: string) => ids.get(l) ?? (ids.set(l, ids.size), ids.size - 1);
+  const x = a.slice(p, a.length - s).map(id);
+  const y = b.slice(p, b.length - s).map(id);
   const n = x.length;
   const m = y.length;
+  if (!spend(n * m)) return null;
   const lcs: Uint32Array[] = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) lcs[i]![j] = x[i] === y[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
-  const out: { op: "same" | "add" | "del"; text: string }[] = a.slice(0, p).map((text) => ({ op: "same" as const, text }));
+  const out: Op[] = a.slice(0, p).map((text) => ({ op: "same" as const, text }));
   let i = 0;
   let j = 0;
   while (i < n && j < m) {
     if (x[i] === y[j]) {
-      out.push({ op: "same", text: x[i]! });
+      out.push({ op: "same", text: a[p + i]! });
       i++;
       j++;
-    } else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) out.push({ op: "del", text: x[i++]! });
-    else out.push({ op: "add", text: y[j++]! });
+    } else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) out.push({ op: "del", text: a[p + i++]! });
+    else out.push({ op: "add", text: b[p + j++]! });
   }
-  while (i < n) out.push({ op: "del", text: x[i++]! });
-  while (j < m) out.push({ op: "add", text: y[j++]! });
+  while (i < n) out.push({ op: "del", text: a[p + i++]! });
+  while (j < m) out.push({ op: "add", text: b[p + j++]! });
   for (const text of a.slice(a.length - s)) out.push({ op: "same", text });
   return out;
 }
