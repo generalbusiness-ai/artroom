@@ -6,7 +6,7 @@ The web interface for Artroom: four screens over one data adapter.
 |---|---|
 | **Needs you** | The viewer's attention queue. Each item says what to do, why it is theirs, and offers one action. |
 | **Room** | Claims and their overlaps (before any code exists), lanes and leases, the landing operations, the publication slot, and how far the log is published. Live. |
-| **Proposal** | One generation: the diff, notes anchored to path, line and head, the obligations as a checklist, each piece of evidence marked *reviewed here*, *carried* (with the reason) or *stale* (with the reason), each check carry judgment from its `check-carried` event, advisory checks listed apart as never blocking, and "why" links. |
+| **Proposal** | One generation: the diff, notes anchored to path, line and head, the obligations as a checklist, each piece of evidence marked *reviewed here*, *carried* (with the reason) or *stale* (with the reason), each check carry judgment from its `check-carried` event, advisory checks listed apart as never blocking, and "why" links. When commits carry jj `change-id` headers, also which changes the generation rewrote, added or dropped, with an interdiff for each rewritten one. |
 | **Policy** | The rules in plain English, recent outcomes, and a dry run of a draft rule against the room's history. |
 
 It is built with Preact and Vite, with hand-written CSS. It has no component
@@ -19,7 +19,8 @@ approved lane 0 contract (`940e2dca`) with the policy-runtime amendment
 check carry facts), and contract amendment 3 (`bc351fa8`, on `main` at
 `fb2bd41`): advisory obligations and `check-carried` events. It also uses the policy runtime
 (`@generalbusiness/artroom-policy`) for glob matching, carry decisions and
-the policy dry run.
+the policy dry run, and lane B's git engine (`@generalbusiness/artroom-git`)
+for the bounded tree diff behind the per-change history.
 
 ## Run it
 
@@ -67,6 +68,7 @@ asked for `ui/screenshots`; they are in `packages/ui/screenshots`:
 - `proposal-light.png`, `proposal-dark.png`, `proposal-phone.png`
 - `proposal-carry-light.png`: step 28, a carried and a not-carried check, and the advisory check
 - `policy-light.png`, `policy-dark.png`
+- `proposal-changes-light.png`, `proposal-changes-dark.png`: the per-change history of the session lane's recut
 
 Laptop screenshots are 1280 pixels wide; phone screenshots are 390. The clock
 is UTC and motion is reduced, so the screenshots are reproducible.
@@ -91,6 +93,9 @@ src/room/refuse-claim.ts the refuse-claim draft compiled to a profile expression
 src/room/mock/           MockRoom: a small deterministic room model and the scripted scenario
 src/room/live/           LiveRoom: a stub over the contract's HttpRoom and its WebSocket watch
 src/room/dryrun.ts       the policy dry run, through the policy runtime
+src/room/changes.ts      per-change history and interdiffs from jj change-id headers
+src/room/mock/repo.ts    an in-memory git object store, read through lane B's TreeReader
+src/ui/ChangeHistory.tsx the per-change view on the Proposal screen
 src/screens/             the four screens
 src/ui/landing.tsx       what each landing state means, from its recorded facts
 src/ui/                  shell pieces: icons, badges, router, the "why" dialog, the demo bar
@@ -99,7 +104,7 @@ src/ui/                  shell pieces: icons, badges, router, the "why" dialog, 
 Screens read a `RoomSnapshot` and call the adapter. They never touch a
 transport. Contract records (`Lane`, `Proposal`, `LandOp`, `AttentionItem`,
 `Refusal`, `Evidence`) pass through unchanged, so a change in the contract
-(lane 0, `845c7fd7`, still under review) is absorbed in `src/room`.
+(lane 0) is absorbed in `src/room`.
 
 **The scenario.** Three agents (@ash, @birch, @cedar), two people (@maya,
 security; @sam, platform and admin) and a checker (@ci) work in `acme/web`
@@ -122,7 +127,9 @@ for 44 minutes, in 37 steps:
    failed check is never carried: a required one keeps the landing waiting,
    and an advisory one does not.
 6. @birch's lease expires with no handover note. Its proposal now conflicts
-   with main. @cedar takes the lane over and recuts it.
+   with main. @cedar takes the lane over and recuts it. @birch worked in jj,
+   so the recut's page shows the per-change history: one change rewritten
+   with a real edit, one only rebased, one added and one dropped.
 
 The mock applies the platform's rules to the viewer's actions too: approve or
 object from the Proposal screen, reply to notes, or run a dry run. A review
@@ -138,6 +145,72 @@ link, visible focus rings, focus moved to the page on navigation, and
 `prefers-reduced-motion`. Status colours always come with words. The colour
 pairs used for text meet WCAG AA contrast (checked by calculation for the
 main token pairs in both themes; no automated audit has been run).
+
+## Per-change history (request d0cbb26d)
+
+When a generation's commits carry jj `change-id` headers, the Proposal
+screen lists, by change ID, which changes the generation rewrote, added or
+dropped compared with the previous generation. Each rewritten change has an
+interdiff: each version of the change is a patch against its own parent, and
+the two patches are compared, so changes underneath it (main moving) mostly
+do not show. A patch keeps, for each path, what the commit did (added,
+modified, deleted or renamed, the rename source, the file modes) and its
+hunks with three lines of context. The interdiff lists a path when that
+metadata differs, said in words, or when a hunk, context included, is in only
+one version, or is in both but at different places; each such hunk is shown
+with its line numbers. A hunk's place is where it starts in the file it was
+made against (its parent). When the two versions' parents differ at that
+path, the old hunk's parent lines are mapped into the new parent by a line
+diff of the two parents. So a rebase that only moves an edit up or down does
+not show, and one that changes a line within three lines of an edit shows
+that hunk from both versions. When the old hunk's lines do not map one to
+one (the parent changed inside them) and the new version has the same hunk,
+the screen says it **could not tell whether the edit moved**, rather than
+calling it the same. A change only rebased or reworded says so. When no commit in either generation has a header, the
+screen shows nothing extra. Commits without a header beside ones with a
+header are counted, not followed. The same change ID twice in a generation
+is shown as divergent and not matched.
+
+The view is labelled **author-supplied**. A header proves nothing, so it is
+never an input to obligations, evidence or the carry rule, which stay
+path-based. A test checks that no change ID reaches those records.
+
+**Bounds.** Each commit's own diff runs through lane B's bounded tree diff
+(`treeDiff` with `DEFAULT_BOUNDS`: depth 64, 100,000 entries), and a
+generation of more than 2,000 commits (`maxCommits`) is not compared. A
+proposal's diff has the same bounds. Lane B bounds paths, not file contents,
+so this view adds bounds of its own (`LINE_BOUNDS` in `src/room/changes.ts`),
+which do not apply to the proposal's diff:
+
+| Bound | Limit |
+|---|---|
+| Lines in one version of a file | 2,000 |
+| UTF-8 bytes in one line | 10,000 |
+| Work for one comparison of two generations, all its changes together: one unit per character read, plus one per pair of lines compared | 20,000,000 |
+
+Over any bound, the interdiff says "too large to compare here" and names the
+bound; once the work is spent, every later rewritten change says so too.
+Lines are numbered before the comparison, so comparing two lines costs the
+same whatever their length. The line comparison is synchronous, but no single
+file can cost more than 2,000 × 2,000 pairs, and the reads between files give
+the page back to the browser. A blob is read whole before its lines are
+counted: the `TreeReader` gives no size, so a live Room should refuse an
+oversized blob when it serves it.
+
+**What the live Room must expose.** The contract has no read for a
+generation's commits (contract gap 10), so `LiveRoom` has no
+`changeHistory` (the adapter method is optional) and the live
+screen shows nothing extra. To support it, the Room would need to serve, per
+proposal generation:
+1. the commits from the generation's base to its head, oldest first, each
+   with its ID, parent and message subject, and its raw `change-id` header
+   when present;
+2. read access to those commits' trees and blobs in the canonical repository
+   (the pinned heads' objects), as lane B's `TreeReader` plus a blob read, or
+   the per-change interdiffs computed server-side under the same bounds.
+
+`src/room/changes.ts` takes exactly these (`CommitInfo[]` and a
+`CommitStore`), so either form plugs into the existing adapter.
 
 ## Contract gaps
 
@@ -271,3 +344,156 @@ Lane F's edits for amendment 3 (`docs/protocol.md` section 29.8). Tests are in
    and shows no reason.
 3. **No per-change history in a live room (open point 39).** See contract
    gap 10.
+
+## Review 125ee638
+
+Checker reviewed head `048b2d51` (the per-change history) and asked for two
+changes, a security bound and two simplifications. Main at `fb2bd41` (contract
+amendment 3) is merged first. Tests are in `test/review-125ee638.test.tsx`;
+the checker's three diagnostics are among them, now asserting the correct
+outcome.
+
+1. **P2: tree-change metadata was lost.** A patch now keeps, for each path,
+   its status, rename source and old and new modes (`FileMeta`). A path whose
+   metadata differs between the versions is listed, and the screen says what
+   each version did ("renames it from y.txt; generation 1's renames it from
+   x.txt", "edits it, mode 100644 to 100755; generation 1's leaves it
+   alone"). Tests: "a different rename destination is a difference", "a
+   different rename source is a difference", "setting the executable bit in
+   one version only is a difference", "the same text edit, with the executable
+   bit set only in the new version, is a difference", and the control "the
+   same rename and the same mode change, rebased, are not a difference".
+2. **P2: edits at different places looked the same.** Hunks keep three lines
+   of context and their line numbers (`Hunk`). Two versions match on a hunk
+   only when its lines, context included, are equal; line numbers are not
+   compared. Tests: "denying in first() and denying in second() are different
+   edits" (each version's hunk names its function) and the control "the same
+   edit, moved down by a rebase that changed lines far from it, is not a
+   difference". The existing rebase-only control (whoami, `tkxlpsuy`) still
+   says "the same edits". In the scenario, `check.ts` now shows once more in
+   the first change: `rateKey()`'s body, two lines above the `currentUser`
+   edit, changed underneath it, so that hunk's context differs. The test "a
+   rewritten change's interdiff shows only how its own edits differ" asserts
+   this, and that the import edit, whose context did not change, is not
+   listed.
+3. **Security: bytes per line and total work were not bounded.** See
+   **Bounds** above: 10,000 UTF-8 bytes per line, and 20,000,000 units of work
+   per comparison, shared by all its changes. Tests: "a line over the byte
+   bound is too large, counted in UTF-8 bytes", "one file's line comparison
+   over the work bound is too large", "reading counts as work, even when the
+   line comparison is trivial", "the work bound covers all the changes of a
+   comparison together", and "once the work is spent, a later change that
+   needs no reading is still too large". The 2,000-line bound keeps its test
+   in `test/change-history.test.tsx`.
+4. **Simplification: structure.** The interdiff is per path: `meta` (or null)
+   and the hunks only in each version, each with `oldStart`, `newStart` and
+   its lines. No more unlocated `+`/`-` strings. Test: "each hunk shows where
+   it is, with its context".
+5. **Simplification: the "too large" copy.** It no longer says this view's
+   bounds apply to every proposal's diff. For lane B's bounds (depth,
+   entries, commits) it says every proposal's diff has the same bound; for
+   this view's own (lines, bytes per line, work) it says the bound does not
+   limit the proposal's diff. Test: "too large: this view's own bounds are not
+   said to bound the proposal's diff". The identical-edit case still reads
+   "The same edits as in generation 1 ... only rebased or reworded".
+
+**Mutations.** Each was applied to the committed fix, run against
+`test/review-125ee638.test.tsx` and `test/change-history.test.tsx`, then
+reverted. Each turned at least one test red:
+
+| Mutation | Tests that went red |
+|---|---|
+| Drop the metadata comparison | the four metadata tests |
+| Drop the context (0 lines) | first()/second(); the scenario interdiff |
+| Compare line numbers too | the moved-by-a-rebase control |
+| Remove the lines-per-file bound | lane B's bounds test (lines) |
+| Remove the bytes-per-line bound | the byte bound test |
+| Count characters, not bytes | the byte bound test |
+| Remove the work bound | the three LCS work tests |
+| Do not charge the line comparison | the three LCS work tests |
+| Do not charge reading | reading counts as work |
+| Give each change its own budget | all changes together; spent budget |
+| Do not check a spent budget first | spent budget |
+| Say the line bound is shared | the "too large" copy test |
+
+The screenshots `proposal-changes-light.png` and `proposal-changes-dark.png`
+are regenerated.
+
+**Gates**, all exit 0: root `npm run typecheck`; root `npm test` (git 118,
+log 100 and 95 in workerd, policy 190 and 189 with 1 skipped in workerd, UI
+114); `npm run build` in `packages/ui`; `npm run e2e` (Playwright, 7 tests).
+
+## Review f3fff92c
+
+Checker reviewed head `69a8931` and credited the metadata fix, the bounds
+and the copy. One P2 remained. Main at `ad19956b` (lane F's carry UI,
+`3203660e`) is merged first, keeping both sides: the README rows and
+scenario, the e2e carry screenshot, and lane F's test that a live room has
+no per-change history. For that test, `RoomAdapter.changeHistory` is now
+optional and `LiveRoom` does not have it. Tests are in
+`test/review-f3fff92c.test.tsx`; the checker's diagnostic is the first one,
+now asserting the correct outcome.
+
+**P2: repeated context still hid an edit moved between functions.** Hunks
+were matched by their lines alone, so with two functions whose bodies are
+identical for more than three lines, denying in `first()` and denying in
+`second()` matched. Now a pair of hunks is the same edit only when its lines
+are equal and the old hunk's place, mapped into the new version's parent, is
+the new hunk's place (`matchHunks` and `placeIn` in `src/room/changes.ts`):
+
+- **Same parent blob at that path:** places are compared as they are.
+- **Different parents:** a line diff of the two parents maps each old
+  parent line to the new one. The old hunk's place maps only if every one of
+  its parent lines maps, one to one and in order. That diff is charged to
+  the work bound.
+- **No map, but the same hunk in the new version:** reported explicitly in
+  `FileInterdiff.unsure`. The screen says "Could not tell whether this edit
+  moved" and shows the hunk once, with where generation 1 made it. It is never
+  counted as the same edit.
+
+Tests:
+- "same parent: denying in first() and denying in second() are different
+  edits, at their own places" (the diagnostic: five identical lines on each
+  side);
+- "different parents: the move is still found, through the rebase";
+- the controls "the same edit, rebased onto lines added above it, is the
+  same edit" and "the same edit, rebased onto an unrelated change in the
+  other function, is the same edit". Review 125ee638's unrelated-rebase
+  control and the scenario's rebase-only change (whoami) still pass;
+- "ambiguous: when the old edit's place is gone from the new parent, it says
+  it could not tell" (main deleted `first()`);
+- "ambiguous: a rebase that repeats a line inside the old edit's
+  surroundings is not claimed as a move". A fuzz of 6,000 small rebases found
+  this case: without the one-to-one check it was reported as a move;
+- "diffing the two parents counts as work";
+- "an unsure match says it could not tell whether the edit moved, and shows
+  the hunk".
+
+**Mutations.** Each was applied to the committed fix, run against the
+three per-change test files, then reverted:
+
+| Mutation | Tests that went red |
+|---|---|
+| Ignore the place (lines only) | the diagnostic, the rebased move, both ambiguous tests |
+| Same place even when the parents differ | both rebase controls, both ambiguous tests |
+| No "unsure": an unmapped hunk is "only in" one version | both ambiguous tests |
+| An unmapped equal hunk counts as the same edit | both ambiguous tests |
+| Drop the one-to-one check | the repeated-line ambiguous test |
+| Do not charge the parents' diff | diffing the two parents counts as work |
+| Do not render "unsure" | the on-screen test |
+| Let a region whose first parent line is gone still map | none (below) |
+
+No test separates that last check (`first < 0`) from the one-to-one check,
+which almost always rejects the same regions. The same fuzz, run 40,000
+times over two-letter files (the most repetitive), gave identical results
+with and without it. It is kept as the plain statement that a line main
+deleted has no place, but it is not counted as tested.
+
+The screenshots `proposal-changes-light.png` and `proposal-changes-dark.png`
+are regenerated: the identical-edit sentence now says "at the same places".
+
+**Gates**, all exit 0, after `npm ci` (main added `packages/room`): root
+`npm run typecheck`; root `npm test` (git 143; log 127, and 122 in workerd;
+policy 199, and 198 with 1 skipped in workerd; room 67, and 275 in workerd;
+UI 141); `npm run build` in `packages/ui`; `npm run e2e` (Playwright, 8
+tests, including lane F's carry screenshot).

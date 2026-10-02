@@ -424,6 +424,8 @@ export class FakeArtifactsHost {
       if (!r) throw artifactsErrors.notFound();
       return r;
     },
+    // As the binding: delete a repository and its tokens; false when there is none.
+    delete: async (name: string): Promise<boolean> => this.repos.delete(name),
   };
 
   repo(name: string): FakeRepo {
