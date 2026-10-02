@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/tsconfig.json","body":{"commit":"c58254708c5e83c3657b2518e0e545719c821e04","path":"packages/room/tsconfig.json"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0402a314a6a2812188a3dbb48f1a2c274054e3f8","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/spike-smoke.mjs."}
