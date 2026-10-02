@@ -13,6 +13,7 @@ import {
   claimBeforePropose,
   deployConfigReview,
   freshApproval,
+  jjConflicts,
   narrowClaims,
   notifyHolder,
   notifyOwners,
@@ -30,6 +31,7 @@ export default policy(
     "docs/**": "@docs",
   }),
   // Before an act is recorded
+  jjConflicts(),
   claimBeforePropose(),
   narrowClaims(),
   // What a proposal needs
