@@ -6,6 +6,7 @@
 
 ## Status
 
+- Status: DONE, pending review. Implemented under gitseq request `b2509b23` on branch `request/cc-workspace`; see the implementation report in [README.md](README.md).
 - Priority: P2
 - Effort: M; estimates do not reduce scope.
 - Risk: LOW — retain debt while leaving the unrelated repository untouched.

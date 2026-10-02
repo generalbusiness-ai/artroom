@@ -6,6 +6,7 @@
 
 ## Status
 
+- Status: DONE, pending review. Implemented under gitseq request `b2509b23` on branch `request/cc-workspace`; see the implementation report in [README.md](README.md).
 - Priority: P2
 - Effort: M; no functionality is cut to fit this estimate.
 - Risk: MED — preserve the Room's shared alarm ordering and recovery behavior.
