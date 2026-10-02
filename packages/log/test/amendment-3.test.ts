@@ -6,12 +6,13 @@
  */
 
 import { describe, expect, test } from "vitest";
-import type { ActId, LogEntry } from "@generalbusiness/artroom-contract";
+import type { ActId, LogEntry, Sha } from "@generalbusiness/artroom-contract";
 import { carry, policy, rule } from "@generalbusiness/artroom-policy";
 import { canonicalize } from "../src/canonical.ts";
 import { entryId } from "../src/entries.ts";
+import { digestJson } from "../src/crypto.ts";
 import { verifyLog } from "../src/verify.ts";
-import { DEMO_CHECKERS, DEMO_POLICY, checkBody, keys } from "./support/room-sim.ts";
+import { DEMO_CHECKERS, DEMO_POLICY, RoomSim, checkBody, keys } from "./support/room-sim.ts";
 import { alice, base, expectReason, lines, publishAs, publishLines, reseal } from "./support/logs.ts";
 
 /** The demo policy with one `carry` rule for checks. */
@@ -35,6 +36,15 @@ function eventOf(e: LogEntry) {
   return e.entry.event;
 }
 
+type CheckCarried = ReturnType<typeof eventOf>;
+
+/** Change the check-carried event at `seq`, and reseal from there. */
+function tamper(sim: RoomSim, seq: number, change: (ev: CheckCarried) => CheckCarried): LogEntry[] {
+  const entries = [...sim.entries];
+  entries[seq] = { ...entries[seq]!, entry: { type: "system", event: change(eventOf(entries[seq]!)) } };
+  return reseal(entries, seq);
+}
+
 describe("edit 1: the decoder reads check-carried events", () => {
   test("a check-carried event with decisions verifies, and its decisions are replayed", async () => {
     const { sim, lane2, check } = await room();
@@ -56,6 +66,16 @@ describe("edit 1: the decoder reads check-carried events", () => {
     l[8] = canonicalize({ ...sim.entries[8]!, entry: { type: "system", event: rest } });
     const r = await expectReason(await publishLines(sim, l), "malformed", 8);
     expect(r.failures[0]!.detail).toMatch(/decisions is not an array/);
+  });
+
+  test("a check-carried outcome whose carried is not a boolean: malformed", async () => {
+    const { sim, lane2, check } = await room();
+    await sim.checkCarried(check, lane2); // 8
+    const l = lines(sim.entries);
+    const ev = eventOf(sim.entries[8]!);
+    l[8] = canonicalize({ ...sim.entries[8]!, entry: { type: "system", event: { ...ev, outcome: { ...ev.outcome, carried: "yes" } } } });
+    const r = await expectReason(await publishLines(sim, l), "malformed", 8);
+    expect(r.failures[0]!.detail).toMatch(/outcome.carried is not a boolean/);
   });
 });
 
@@ -134,5 +154,46 @@ describe("edit 2: verify replays each check-carried event and checks the check i
     const r = await verifyLog(await publishAs(sim, sim.entries));
     expect(r.failures).toEqual([]);
     expect(r).toMatchObject({ ok: true, verifiedThrough: 9 });
+  });
+});
+
+describe("the outcome agrees with the replayed decisions (R-CARRY-13)", () => {
+  const notCarried = (act: ActId) => ({ carried: false as const, notCarried: { act, code: "policy-rejected" as const, text: "not carried" } });
+
+  test("carried with no decisions: carried-outcome-mismatch", async () => {
+    const { sim, lane2, check } = await room();
+    await sim.checkCarried(check, lane2); // 8
+    const r = await expectReason(await publishAs(sim, tamper(sim, 8, (ev) => ({ ...ev, decisions: [] }))), "carried-outcome-mismatch", 8);
+    expect(r.failures[0]!.detail).toMatch(/records no carry rule decision/);
+  });
+
+  test("carried while the decisions refuse: carried-outcome-mismatch", async () => {
+    const { sim, lane2, check } = await room({ allow: "false" });
+    await sim.checkCarried(check, lane2); // 8
+    const reason = { code: "tree-identical" as const, tree: "b".repeat(40) as Sha, config: digestJson(DEMO_CHECKERS["test"]), runner: `sha256:${"c".repeat(64)}` as const, text: "carried" };
+    const r = await expectReason(await publishAs(sim, tamper(sim, 8, (ev) => ({ ...ev, outcome: { carried: true, reason } }))), "carried-outcome-mismatch", 8);
+    expect(r.failures[0]!.detail).toMatch(/checks-carry decided no-carry/);
+  });
+
+  test("not carried while every decision allows the carry: carried-outcome-mismatch", async () => {
+    const { sim, lane2, check } = await room();
+    await sim.checkCarried(check, lane2); // 8
+    const r = await expectReason(await publishAs(sim, tamper(sim, 8, (ev) => ({ ...ev, outcome: notCarried(check) }))), "carried-outcome-mismatch", 8);
+    expect(r.failures[0]!.detail).toMatch(/every carry rule decision allows it/);
+  });
+
+  test("notCarried.act differing from act: carried-outcome-mismatch", async () => {
+    const { sim, lane2, check } = await room({ allow: "false" });
+    await sim.checkCarried(check, lane2); // 8
+    const r = await expectReason(await publishAs(sim, tamper(sim, 8, (ev) => ({ ...ev, outcome: notCarried(lane2) }))), "carried-outcome-mismatch", 8);
+    expect(r.failures[0]!.detail).toContain(`notCarried names ${lane2}`);
+  });
+
+  test("a decision whose evidence is another check: carried-outcome-mismatch", async () => {
+    const { sim, lane2, check } = await room();
+    const other = sim.accept(sim.envelope(keys.alice, "check", { lane: lane2, generation: 1 }, checkBody()), alice); // 8: the same lane and obligation
+    await sim.checkCarried(check, lane2); // 9: judged for the check at 7
+    const r = await expectReason(await publishAs(sim, tamper(sim, 9, (ev) => ({ ...ev, act: entryId(other.seq, other.hash) }))), "carried-outcome-mismatch", 9);
+    expect(r.failures[0]!.detail).toContain(`names evidence ${check}`);
   });
 });

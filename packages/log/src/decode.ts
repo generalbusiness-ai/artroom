@@ -70,7 +70,7 @@ type Field =
   // amendment 2: checker configurations, checks and onboarding grants
   | "createdAt" | "checkers" | "name" | "config" | "check" | "onboarding" | "grant" | "repo" | "operator" | "notAfter"
   // amendment 3: check carry
-  | "lane" | "obligation";
+  | "lane" | "obligation" | "carried" | "notCarried";
 type Obj = { readonly [K in Field]?: unknown } & Readonly<Record<string, unknown>>;
 
 const bad = (path: string, what: string): never => {
@@ -177,6 +177,11 @@ function systemEvent(v: unknown, path: string): void {
       break;
     case "check-carried":
       for (const k of ["lane", "obligation", "act", "policy"] as const) str(ev[k], `${path}.${k}`);
+      {
+        const o = obj(ev.outcome, `${path}.outcome`);
+        if (typeof o.carried !== "boolean") bad(`${path}.outcome.carried`, "is not a boolean");
+        if (o.carried === false) str(obj(o.notCarried, `${path}.outcome.notCarried`).act, `${path}.outcome.notCarried.act`);
+      }
       decisions(ev.decisions, `${path}.decisions`);
       break;
     case "land-evaluated":
