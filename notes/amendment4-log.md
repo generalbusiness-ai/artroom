@@ -258,37 +258,78 @@ Run one suite at a time at `f545b5d4`, the last code commit; later commits chang
 | git, workerd (`npm run test:workers`) | 8 passed, exit 0 |
 | git, `npm run test:log` | 12 passed, exit 0 |
 
-## Review of 04797d8c: lengths past 32 bits
+## Review 74f29c21
 
-A preliminary finding from the checker. The publisher kept each segment's
-line lengths in a `Uint32Array`.
-- **What broke.** A line given in parts (`EntryLine`) of 2^32 bytes or
-  more wrapped to its length modulo 2^32. R-LOG-18 allows such a line, as
-  513 or more chunks. The next comparison with the real length then
-  refused the cohort as `invalid-input`, wrongly saying "the source
-  changed while it was read". Nothing was written, so verify had nothing
-  to catch. No placement or chunking decision was made on a wrapped value.
-- **A worse, related defect.** A `RetainedRef` given in parts with a size
-  of NaN or -1 was hashed as a blob with no bytes, and `commitFor`
-  returned a commit for it. That commit could never be pushed, since its
-  objects do not hash to their IDs. A size of `Infinity` looped in
-  `chunks()`.
-- **The fix** (commit `9fb941ad`):
-  - lengths are a `Float64Array`, exact for every safe integer;
-  - a segment whose lengths sum past a safe integer is `invalid-input`
-    before any byte is read;
-  - a `RetainedRef` with `read` or `bytes` must have both, with `bytes` a
-    safe integer of at least 0, or it is `invalid-input`;
-  - `eachChunk` refuses a size that is not a length, and the publisher
-    plans a chunked file chunk by chunk.
-- **Tests.** In `test/amendment-4.test.ts`, "lengths past 32 bits and
-  sizes that are not lengths". They fake the lengths, so nothing large is
-  allocated. All five fail on the previous code.
+Changes requested at `04797d8c`, with one P2 finding: logical line
+lengths were narrowed to 32 bits.
+
+- **What broke.**
+  - `plan` measured each line's length exactly, but `close` stored a
+    segment's lengths with `Uint32Array.from(lens)`. That array was also
+    used by `Body`, `batchSize` and `batch`.
+  - So a line given in parts (`EntryLine`) of 2^32 bytes became 0, and
+    one of 2^32 + 1 became 1. `segment` compared the unchanged
+    `EntryLine.bytes` with the wrapped value, and refused the cohort as
+    `invalid-input`, falsely saying "the source changed while it was
+    read".
+  - The line never reached chunking. Nothing wrong was published, so
+    verify had nothing to catch. No placement or chunking decision was
+    made on a wrapped value, because `Placement` saw the exact length.
+  - R-LOG-18 sets no size limit, so such a line must be published as
+    513 chunks.
+- **A related defect found while fixing it.** A `RetainedRef` given in
+  parts with a size of NaN or -1 was hashed as a blob with no bytes, and
+  `commitFor` returned a commit for it, which could never be pushed. A
+  size of `Infinity` looped in `chunks()`.
+- **The fix** (commit `9fb941ad`). No limit on entry size was added, and
+  every byte of content is still required.
+  - Lengths are a `Float64Array`, exact for every safe integer, through
+    measuring, placing, hashing and sending. `EntryLine.bytes` was
+    already required to be a safe integer.
+  - A source whose length really changes is still refused: between
+    measuring and hashing (in `segment`), and between hashing and sending
+    (in `lineRange`).
+  - A `RetainedRef` with `read` or `bytes` must have both, with `bytes` a
+    safe integer of at least 0. This is the length contract, not a limit.
+  - `eachChunk` (`layout.ts`) yields chunks one at a time and refuses a
+    size that is not a length. The publisher plans a chunked file chunk by
+    chunk, so its list of chunks grows only as bytes are read. `chunks` is
+    `eachChunk` as a list, so the rule is still in one place.
+  - A segment whose lengths sum past 2^53 - 1 is `invalid-input` before
+    any byte is read, because its git header could not be written exactly.
+    Only a segment of whole lines is affected: layout 1, or entries before
+    `from`. In layout 2 a chunked line counts as its stub, so a segment is
+    at most B whatever its entries' sizes.
+- **Boundary controls** (commit `56365259`, `test/amendment-4.test.ts`).
+  - Through the real `commitFor`, an `EntryLine` of 2^32 - 1, 2^32 or
+    2^32 + 1 bytes is the last entry. Its canonical tail comes from a real
+    sealed entry, so the checkpoint and the tail check pass.
+  - In both layouts, each case reaches the hashing of the body from byte
+    0, and the control stops at the second body read. Nothing large is
+    allocated or hashed.
+  - On `04797d8c` the 2^32 and 2^32 + 1 cases fail; 2^32 - 1 passes.
+  - Also: "a line that is 2^32 bytes when measured and 2^32 + 1 when
+    hashed is still refused as changed", "a segment whose lengths sum
+    past a safe integer ...", and "a retained file given in parts must
+    have a length that is a safe integer ...".
+  - The five tests of `9fb941ad` fail on the previous code.
+- **Actual chunk publication** is covered by `amendment-4-large.test.ts`,
+  where each case is pushed and verified:
+  - "Unpublished old entry over B": B + 1 bytes, read whole and in parts;
+  - "Large notification" and "Large revert": entries over B, given in
+    parts;
+  - "Retained prefix": two 20 MiB files in parts;
+  - "a line or file of exactly B is not chunked; one byte more is";
+  - "a chunked line whose length changes between hashing and sending is
+    refused as changed, and nothing is pushed".
 - **Mutants.** Each was killed:
-  - N1: lengths back in a `Uint32Array`;
+  - N1: lengths back in a `Uint32Array` (killed by the boundary controls
+    and by the 2^32 + 9 tests);
   - N2: a retained size left unchecked;
   - N3: a segment sum past a safe integer left unchecked;
-  - N4: `eachChunk` with its check removed.
+  - N4: `eachChunk` with its check removed;
+  - N5: the changed-length refusal in `segment` removed;
+  - N6: the changed-length refusal in `lineRange` removed.
 
 ## Follow-ups and open questions
 
