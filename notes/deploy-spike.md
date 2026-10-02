@@ -197,3 +197,64 @@ unchanged; the new Node test is the spike config check):
 The room workerd suite prints "The Workers runtime canceled this request
 because it detected that your Worker's code had hung" 22 times as uncaught
 exceptions, but every test passes.
+
+## Review 1b868265
+
+The checker's review of `34d4ba9d` accepted the config, the deploy script
+and the smoke evidence, and found one P2: a failed cleanup did not fail the
+smoke run. Refused revocations, a refused deletion and repositories left
+over were recorded but did not change `ok` or the exit status. A cleanup
+exception was caught and ignored. A refused inventory was read as an empty
+list (`result ?? []`), so it looked like proof that nothing was left.
+
+**The fix** is in [packages/room/measure/spike-smoke.mjs](../packages/room/measure/spike-smoke.mjs).
+The result has one cleanup outcome, `cleanup`, from `cleanupRun`:
+
+- Every piece of cleanup is a duty: revoke each token the run minted and
+  did not see revoked; inventory the run's repositories (the canonical one
+  and its `<canonical>--<lane>` forks); for each, list its active tokens,
+  revoke each one and delete the repository; inventory again.
+- Each duty ends `done` (the API answered `success: true`), `refused`
+  (`success: false`) or `unknown` (an exception, or an answer without
+  `success`).
+- A listing counts only if it succeeded, holds an array, fills less than
+  one page and reports no larger `total_count`. Otherwise it proves
+  nothing, and the remainder (`reposLeft`) is `null`, not empty.
+- When the inventory fails, the run still cleans the repositories it knows
+  it made: the canonical repository and the forks of its ready workspaces.
+- `cleanup.ok` is true only when every duty is done and the final inventory
+  proves that no repository of the run is left. `cleanupRun` catches its own
+  exceptions, so a throw becomes an unknown duty or `cleanup.error`, never
+  a silent success.
+- The run's `ok` (`smokeOk`) needs main to finish, every step to pass and
+  `cleanup.ok`. The exit status is 0 only then.
+- `cleanup.unresolved` lists every duty that is not done, with the
+  repository name and the token ID. Neither is a secret, and no token value
+  is kept. An operator finishes the cleanup with the Artifacts REST API:
+  `DELETE /tokens/<id>` and `DELETE /repos/<name>` under
+  `accounts/6e953d23…/artifacts/namespaces/gitseq-spike`.
+
+The two earlier result files were recorded before this change. They show
+all tokens revoked and no repositories left, but in the old shape.
+
+**Tests**, in [packages/room/test/node/spike-smoke.test.ts](../packages/room/test/node/spike-smoke.test.ts),
+run `cleanupRun` against a fake Artifacts REST API and make no live calls.
+The first five are the checker's diagnostics, now asserting the correct
+outcome:
+
+| Test | What it shows |
+|---|---|
+| clean | every duty done, nothing left: `ok`; another run's repository is untouched; no token value is kept |
+| delete refused | not `ok`; the refusal names the repository; `reposLeft` lists it; `smokeOk` is false |
+| revoke refused | not `ok`, though the repository was then deleted; the token ID is kept |
+| inventory refused | not `ok`; `reposLeft` is `null`; the known repositories are still cleaned |
+| cleanup throws | not `ok`; every duty `unknown` with the cause; `cleanupRun` does not throw |
+| a full page, or a larger `total_count` | an incomplete listing proves nothing: not `ok` |
+| a token listing refused, or without `success` | not `ok`; the repository is still deleted |
+| a deletion answered as success but still listed | not `ok`; `reposLeft` names it |
+| a minted token not seen revoked | revoked again; if refused, unresolved by ID |
+| no canonical repository | nothing to clean: `ok`, no calls |
+| `smokeOk` | false for a failed cleanup, no cleanup, a failed main, a failed step, or no steps |
+| `outcomeOf`, `completeListing` | strict classification |
+
+No redeploy or live run was needed for this change; the Worker is unchanged.

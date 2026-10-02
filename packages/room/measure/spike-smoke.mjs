@@ -12,7 +12,10 @@
 // propose, land) that must land; check main; wait for the log to publish;
 // run `artroom verify` against the published log. Then clean up: release
 // the lanes, revoke every active token on the test repositories and delete
-// them.
+// them. The run succeeds only if every step and every cleanup duty
+// succeeded (review 1b868265): an unconfirmed revocation or deletion, an
+// unreadable or incomplete inventory, or a repository left over fails it,
+// and the result lists what is unresolved by repository name and token ID.
 //
 // It needs hugh's wrangler OAuth login (Artifacts REST: repository tokens,
 // listing and deletion). It prints no token and saves a redacted result in
@@ -22,7 +25,7 @@
 import { execFile } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { newKeyPair, randomToken, sign } from "../src/crypto.ts";
 import { iso } from "../src/ids.ts";
@@ -46,7 +49,7 @@ const clean = (v) => JSON.parse(redact(JSON.stringify(v ?? null)));
 
 const t0 = Date.now();
 const RUN = new Date(t0).toISOString().replace(/[:.]/g, "-");
-const out = { run: RUN, url: BASE, namespace: NS, steps: [], gaps: [], cleanup: {} };
+const out = { run: RUN, url: BASE, namespace: NS, steps: [], gaps: [], cleanup: null };
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, redact(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" ")));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -118,14 +121,19 @@ async function api(method, path, body) {
   });
   return r.json().catch(() => ({}));
 }
+/** Tokens this run minted and has not seen revoked, by ID (not a secret), with their repository. */
+const minted = new Map();
 async function mint(repo, scope, ttl) {
   const r = await api("POST", "/tokens", { repo, scope, ttl });
   if (!r.result?.plaintext) throw new Error(`token for ${repo}: ${redact(JSON.stringify(r.errors ?? r))}`);
   secrets.add(r.result.plaintext);
+  minted.set(r.result.id, repo);
   return r.result;
 }
 async function revoke(id) {
-  return (await api("DELETE", `/tokens/${id}`)).success === true;
+  const ok = (await api("DELETE", `/tokens/${id}`)).success === true;
+  if (ok) minted.delete(id);
+  return ok;
 }
 
 function git(args, { cwd, token, env = {} } = {}) {
@@ -364,50 +372,147 @@ async function main() {
   );
 }
 
+// ------------------------------------------------------------ cleanup (review 1b868265)
+
+const REPO_PAGE = 200;
+const TOKEN_PAGE = 100;
+
+/** A remote answer settles a duty only on `success: true`; `success: false` is a refusal; anything else is unknown. */
+export function outcomeOf(answer) {
+  if (answer?.success === true) return "done";
+  if (answer?.success === false) return "refused";
+  return "unknown";
+}
+
+/**
+ * The items of a listing, only if it proves the whole set: it succeeded, has
+ * an array, fills less than a page, and reports no larger total. Otherwise
+ * null: a refused, malformed or partial listing proves nothing is absent.
+ */
+export function completeListing(answer, page) {
+  if (answer?.success !== true || !Array.isArray(answer.result)) return null;
+  const total = answer.result_info?.total_count;
+  if (answer.result.length >= page || (typeof total === "number" && total > answer.result.length)) return null;
+  return answer.result;
+}
+
+function why(answer) {
+  if (answer === undefined || answer === null) return "no answer";
+  const errors = Array.isArray(answer.errors) ? answer.errors.map((e) => `${e.code ?? ""} ${e.message ?? ""}`.trim()).join("; ") : "";
+  if (errors) return errors;
+  if (answer.success === true) return "incomplete listing";
+  return "no success field in the answer";
+}
+
+/**
+ * Clean up one run's Artifacts state and say whether it is all done. Duties:
+ * revoke every token the run minted and did not see revoked; inventory the
+ * run's repositories (the canonical one and `<canonical>--<lane>` forks);
+ * for each, list its active tokens, revoke each, delete the repository; then
+ * inventory again. Each duty ends `done`, `refused` or `unknown`. `ok` is
+ * true only when every duty is done and the final inventory proves no
+ * repository is left. Repository names and token IDs are kept, so an
+ * operator can finish what is unresolved; no token is ever kept.
+ */
+export async function cleanupRun({ api, canonical, expected = [], minted = new Map() }) {
+  const duties = [];
+  let reposLeft = null;
+  let error;
+  const record = (duty, outcome, detail) => {
+    const d = { ...duty, outcome, ...(outcome !== "done" && detail ? { detail } : {}) };
+    duties.push(d);
+    return d;
+  };
+  const settle = async (duty, call) => {
+    try {
+      const answer = await call();
+      return record(duty, outcomeOf(answer), why(answer)).outcome;
+    } catch (e) {
+      return record(duty, "unknown", e.message).outcome;
+    }
+  };
+  const listing = async (duty, path, page) => {
+    try {
+      const answer = await api("GET", path);
+      const items = completeListing(answer, page);
+      record(duty, items ? "done" : answer?.success === false ? "refused" : "unknown", why(answer));
+      return items;
+    } catch (e) {
+      record(duty, "unknown", e.message);
+      return null;
+    }
+  };
+  try {
+    for (const [id, repo] of [...minted]) {
+      if ((await settle({ duty: "revoke-minted-token", repo, token: id }, () => api("DELETE", `/tokens/${id}`))) === "done") minted.delete(id);
+    }
+    if (canonical) {
+      const mine = (r) => typeof r?.name === "string" && (r.name === canonical || r.name.startsWith(`${canonical}--`));
+      const inventory = (duty) => listing({ duty, repos: expected }, `/repos?limit=${REPO_PAGE}&search=${canonical}`, REPO_PAGE);
+      const found = await inventory("inventory");
+      // Without a complete inventory, still clean what the run knows it made; the run fails on the inventory duty.
+      const names = found ? found.filter(mine).map((r) => r.name) : [...new Set(expected)];
+      for (const name of names) {
+        const tokens = await listing({ duty: "list-tokens", repo: name }, `/repos/${name}/tokens?state=active&per_page=${TOKEN_PAGE}`, TOKEN_PAGE);
+        for (const t of tokens ?? []) {
+          // Token metadata only: the ID, scope and times, never the token.
+          const meta = Object.fromEntries(Object.entries(t ?? {}).filter(([k]) => !/plaintext|token|secret/i.test(k)));
+          await settle({ duty: "revoke-token", repo: name, token: t?.id, meta }, () => api("DELETE", `/tokens/${t?.id}`));
+        }
+        await settle({ duty: "delete-repo", repo: name }, () => api("DELETE", `/repos/${name}`));
+      }
+      const left = await inventory("final-inventory");
+      reposLeft = left ? left.filter(mine).map((r) => r.name) : null;
+    } else reposLeft = [];
+  } catch (e) {
+    error = e.message;
+  }
+  const unresolved = duties.filter((d) => d.outcome !== "done");
+  const ok = error === undefined && unresolved.length === 0 && Array.isArray(reposLeft) && reposLeft.length === 0;
+  return { ok, duties, unresolved, reposLeft, ...(error !== undefined ? { error } : {}) };
+}
+
+/** The run succeeds only if main finished, every step passed, and cleanup is all done. */
+export function smokeOk(result, failed) {
+  return !failed && result.steps.length > 0 && result.steps.every((s) => s.ok) && result.cleanup?.ok === true;
+}
+
 async function cleanup() {
-  // Release a lane still held (the landed lane may already be done; a refusal is fine).
+  // Release a lane still held (the landed lane may already be done; a refusal is fine: the token duties below cover access).
+  const releases = {};
   for (const l of lanes) {
     if (!l.lane || !room || l.released) continue;
     const r = await act("release", { lane: l.lane }, { lease: 1, note: "spike smoke cleanup" }).catch((e) => ({ status: 0, body: { message: e.message } }));
-    out.cleanup[`release lane ${l.n}`] = { status: r.status, rule: r.body?.rule };
+    releases[`lane ${l.n}`] = { status: r.status, rule: r.body?.rule };
   }
-  if (!canonical) return;
-  // Every repository of this run: the canonical one and its lane forks (`<canonical>--<lane>`).
-  const repos = ((await api("GET", `/repos?limit=200&search=${canonical}`)).result ?? []).filter((r) => r.name === canonical || r.name.startsWith(`${canonical}--`));
-  out.cleanup.repos = [];
-  for (const r of repos) {
-    const toks = (await api("GET", `/repos/${r.name}/tokens?state=active&per_page=100`)).result ?? [];
-    let revoked = 0;
-    for (const t of toks) if (await revoke(t.id)) revoked++;
-    const d = await api("DELETE", `/repos/${r.name}`);
-    // Token metadata only (never the token): which tokens were still live at cleanup, and from when.
-    const meta = toks.map((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !/plaintext|token|secret/i.test(k))));
-    out.cleanup.repos.push({ repo: r.name, activeTokens: toks.length, tokens: meta, revoked, deleted: d.success === true });
-    log(`cleanup ${r.name}: ${toks.length} active tokens, ${revoked} revoked, deleted ${d.success === true}`);
-  }
-  const left = ((await api("GET", `/repos?limit=200&search=${canonical}`)).result ?? []).filter((r) => r.name === canonical || r.name.startsWith(`${canonical}--`));
-  out.cleanup.reposLeft = left.map((r) => r.name);
+  const expected = canonical ? [canonical, ...lanes.filter((l) => l.fork).map((l) => basename(l.fork, ".git"))] : [];
+  return { releases, ...(await cleanupRun({ api, canonical, expected, minted })) };
 }
 
-let failed = false;
-try {
-  await main();
-} catch (e) {
-  failed = true;
-  out.error = redact(e.stack ?? e.message);
-  log("error:", e.message);
-} finally {
+const isMain = !!process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  let failed = false;
   try {
-    await cleanup();
+    await main();
   } catch (e) {
-    out.cleanup.error = redact(e.message);
+    failed = true;
+    out.error = redact(e.stack ?? e.message);
+    log("error:", e.message);
+  } finally {
+    try {
+      out.cleanup = await cleanup();
+    } catch (e) {
+      out.cleanup = { ok: false, error: redact(e.message), unresolved: [], reposLeft: null };
+    }
+    for (const d of out.cleanup.duties ?? []) log(`cleanup ${d.duty}${d.repo ? ` ${d.repo}` : ""}${d.token ? ` token ${d.token}` : ""}: ${d.outcome}${d.detail ? ` (${d.detail})` : ""}`);
+    log(`cleanup ok ${out.cleanup.ok}; repositories left ${JSON.stringify(out.cleanup.reposLeft)}; unresolved ${out.cleanup.unresolved?.length ?? "?"}`);
+    out.ok = smokeOk(out, failed);
+    out.ms = Date.now() - t0;
+    const dir = join(HERE, "results");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `spike-smoke-${RUN}.json`);
+    writeFileSync(file, redact(JSON.stringify(out, null, 2)) + "\n");
+    log(`ok ${out.ok}; result ${file}`);
+    process.exit(out.ok ? 0 : 1);
   }
-  out.ok = !failed && out.steps.every((s) => s.ok);
-  out.ms = Date.now() - t0;
-  const dir = join(HERE, "results");
-  mkdirSync(dir, { recursive: true });
-  const file = join(dir, `spike-smoke-${RUN}.json`);
-  writeFileSync(file, redact(JSON.stringify(out, null, 2)) + "\n");
-  log(`ok ${out.ok}; result ${file}`);
-  process.exit(out.ok ? 0 : 1);
 }
