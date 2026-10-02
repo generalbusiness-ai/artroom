@@ -73,7 +73,7 @@ async function restarted(before: TestRoom): Promise<TestRoom> {
   return { ...before, stub, admin: new Client({ id: before.id, stub }, before.admin.keys) };
 }
 
-const duties = (r: TestRoom) => call<{ token: string; kind: string; status: string | null; nextAt: number }[]>(r.stub.jobTokenDuties());
+const duties = (r: TestRoom) => call<{ token: string; kind: string; expiresAt: number | null; nextCheckAt: number; status: string | null }[]>(r.stub.jobTokenDuties());
 
 describe("a whole-tree job's token mint whose outcome is unknown stays an open duty until an answer settles it", () => {
   it("applied, then the answer lost: nothing is sent; the next attempt is sent; the duty stays open, visible, past the deadline and after the token has expired, with what each inventory saw", async () => {
@@ -87,7 +87,8 @@ describe("a whole-tree job's token mint whose outcome is unknown stays an open d
     expect(row).toMatchObject({ state: "owed", attempt: 1, token: null });
     const [recorded] = await ledger(r);
     expect(recorded).toMatchObject({ token_id: expect.stringMatching(/^mint:job_[0-9a-f]+_1$/), last_error: expect.stringMatching(/^answer lost/) });
-    expect(await duties(r)).toEqual([expect.objectContaining({ token: recorded!["token_id"], kind: "unknown-mint" })]);
+    // An unknown mint has no known expiry; only when it is next checked.
+    expect(await duties(r)).toEqual([expect.objectContaining({ token: recorded!["token_id"], kind: "unknown-mint", expiresAt: null, nextCheckAt: recorded!["next_ms"] })]);
     // The next attempt is sent, with a token the Room knows.
     clock.now = row!["next_ms"] as number;
     await step(r);

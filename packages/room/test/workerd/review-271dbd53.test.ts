@@ -16,7 +16,7 @@ import type { Check, CheckerConfig, CheckJob, Claim, Proposal, Refusal, Result }
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import type { Room } from "../../src/index.ts";
 import { artifactsErrors } from "../../src/memory/artifacts.ts";
-import { addMember, Client, clock, makeRoom, pushChange, tick, until, type TestRoom } from "./support.ts";
+import { addMember, call, Client, clock, makeRoom, pushChange, tick, until, type TestRoom } from "./support.ts";
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const R = `sha256:${"0".repeat(64)}` as const;
@@ -112,8 +112,10 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     expect(seen).toEqual([]);
     const [token] = readTokens(before, from);
     expect(token!.revoked).toBe(false);
-    // Its record exists, due now: the refused token is owned, though ending it failed.
-    expect(await ledger(before)).toEqual([{ token_id: token!.id, next_ms: expect.any(Number), last_error: "refused" }]);
+    // Its record exists, due at once: the refused token is owned, though ending it failed.
+    const [owned] = await ledger(before);
+    expect(owned).toEqual({ token_id: token!.id, next_ms: expect.any(Number), last_error: "refused" });
+    expect(owned!["next_ms"] as number).toBeLessThanOrEqual(clock.now);
     const r = await restarted(before);
     await settle(r);
     expect(token!.revoked).toBe(true);
@@ -131,7 +133,8 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     expect(token!.revoked).toBe(false);
     expect(await ledger(before)).toEqual([{ token_id: token!.id, next_ms: token!.expiresAt, last_error: "held" }]);
     const r = await restarted(before);
-    expect((await ledger(r)).map((x) => x["token_id"])).toEqual([token!.id]);
+    // The operators' view: a held token, with its real expiry.
+    expect(await call(r.stub.jobTokenDuties())).toEqual([expect.objectContaining({ token: token!.id, kind: "held", expiresAt: token!.expiresAt, nextCheckAt: token!.expiresAt })]);
     expect(await inDO(r, (room) => room.core.nextAlarm())).toBeLessThanOrEqual(token!.expiresAt);
     await settle(r);
     expect(token!.revoked).toBe(true);

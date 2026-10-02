@@ -218,11 +218,8 @@ async function watchMint(core: RoomCore, mint: string, notBefore: number, attemp
       tokens.length === inventory.total &&
       tokens.every((t) => typeof t?.id === "string" && t.id !== "" && ["active", "expired", "revoked"].includes(t.state) && Number.isFinite(Date.parse(t.expiresAt)));
     if (!wellFormed) return note("the canonical repository's token inventory is incomplete or malformed");
-    // Accounted for: the tokens of jobs in flight, and ended tokens whose revocation is still owed.
-    const known = new Set([
-      ...core.sql.all("SELECT token FROM check_jobs WHERE state = 'sent' AND token IS NOT NULL AND token NOT LIKE 'snapshot:%'").map((r) => str(r, "token")!),
-      ...core.sql.all("SELECT token_id FROM job_tokens WHERE token_id NOT LIKE 'mint:%'").map((r) => str(r, "token_id")!),
-    ]);
+    // Accounted for: every token the Room knows by its ID, each owned by its row here (held by a job, or ended).
+    const known = new Set(core.sql.all("SELECT token_id FROM job_tokens WHERE token_id NOT LIKE 'mint:%'").map((r) => str(r, "token_id")!));
     const unaccounted = tokens.filter((t) => t.state === "active" && Date.parse(t.expiresAt) > core.now() && !known.has(t.id)).length;
     // An observation only: a clean inventory shows absence now, not that the mint can never apply.
     note(`${unaccounted} live token(s) on the canonical repository not accounted for at ${iso(core.now())}`);
@@ -234,15 +231,16 @@ async function watchMint(core: RoomCore, mint: string, notBefore: number, attemp
 /**
  * The Room's records of job tokens, for operators: tokens held by a job
  * (owned here until revoked or expired), ended tokens still owed
- * revocation, and mints whose outcome is unknown. An unknown mint has no
- * known expiry: `checkFrom` is only when it was first checked.
+ * revocation, and mints whose outcome is unknown. `expiresAt` is a known
+ * token's real expiry; an unknown mint's is unknown (null). `nextCheckAt`
+ * is when the record is next due: a revocation attempt, or another
+ * observation of an unknown mint.
  */
 export function jobTokenDuties(core: RoomCore): {
   readonly token: string;
   readonly kind: "held" | "revoke" | "unknown-mint";
   readonly expiresAt: number | null;
-  readonly checkFrom: number | null;
-  readonly nextAt: number;
+  readonly nextCheckAt: number;
   readonly attempts: number;
   readonly status: string | null;
 }[] {
@@ -253,8 +251,7 @@ export function jobTokenDuties(core: RoomCore): {
       token,
       kind,
       expiresAt: kind === "unknown-mint" ? null : num(r, "expires_at"),
-      checkFrom: kind === "unknown-mint" ? num(r, "expires_at") : null,
-      nextAt: num(r, "next_ms")!,
+      nextCheckAt: num(r, "next_ms")!,
       attempts: num(r, "attempts") ?? 0,
       status: str(r, "last_error"),
     };
