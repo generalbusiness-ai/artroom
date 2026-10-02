@@ -224,7 +224,7 @@ named test fail. Examples:
 ## The default policy pack
 
 `src/pack.ts` (exported as `@generalbusiness/artroom-policy/pack`) holds
-eleven named rules built with the helpers, and `starterPolicy()`. The demo
+twelve named rules built with the helpers, and `starterPolicy()`. The demo
 repository's policy is `examples/demo-repo/.artroom/policy.ts`. Compile it
 from the repository root with:
 

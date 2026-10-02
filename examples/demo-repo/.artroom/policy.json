@@ -32,6 +32,17 @@
   "retiredEvidence": "counts",
   "rules": [
     {
+      "id": "jj-conflicts",
+      "kind": "refuse",
+      "description": "A proposal must not introduce or change jj conflict data: .jjconflict-base-* or .jjconflict-side-* paths at the tree root.",
+      "on": [
+        "propose"
+      ],
+      "refuse": "$count(proposal.changed[$substring(path, 0, 12) = \".jjconflict-\" and $substring(path, 12, 5) in [\"base-\", \"side-\"] and status != \"deleted\"]) > 0",
+      "reason": "This proposal introduces or changes jj conflict data: it adds or modifies .jjconflict-base-* or .jjconflict-side-* paths at the root of its tree.",
+      "fix": "Resolve the jj conflicts, so the proposal no longer adds or changes .jjconflict-* paths, then propose again."
+    },
+    {
       "id": "claim-before-propose",
       "kind": "refuse",
       "description": "Work is proposed only on a claimed lane, so everyone can see who is changing what.",

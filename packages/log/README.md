@@ -61,6 +61,28 @@ The publisher follows these rules:
 
   When retries run out, the error is `unresolved` and retryable. Calling
   `publish` again with the same input completes forward.
+- **Only what is new is sent, in bounded transfers.** A push carries the
+  new commit and the trees and blobs its lease does not already hold: the
+  segment the new entries are in, the checkpoint, the trees above them,
+  and new retained files. After `LogPublisher.open`, the head's objects are
+  rebuilt from its files and trusted only if they rebuild exactly the
+  head's tree; otherwise everything is sent. The active segment is one
+  blob of up to 1,000 entries, so it alone can exceed one transfer
+  (`maxTransfer`, default `LOG_TRANSFER_LIMITS`: 100,000 objects and
+  8 MiB, the same as lane B's publisher sandbox). A publication over one
+  transfer is staged first (`GitRemote.stage`): the publisher asks which
+  objects are missing, sends the next bytes of each from where its staging
+  stopped, in parts of at most one transfer (an object larger than that
+  goes in chunks), and then pushes the commit with no objects. It asks
+  again before every attempt, so a lost answer, a publisher restart and a
+  lost staging area are all recovered, and the commit is always the one
+  `commitFor` computes. `cohort-too-large` remains only for a remote that
+  cannot stage. `MemoryGit` and `GitCli` stage. Tests:
+  `test/transfer.test.ts`, `test/staging.test.ts`.
+- **Room memory.** The publisher builds the whole tree in memory, the
+  active segment included. A Durable Object has 128 MB; staging bounds
+  what one transfer carries, not what the Room must hold to build the
+  commit.
 - **The commit, in advance.** `commitFor(parent, entries, checkpoint,
   retained)` returns the exact commit `publish` would write for that
   cohort on `parent`, without pushing. Both use the same owned copy and the
@@ -140,6 +162,8 @@ time can never pass an expiry check.
   - the recovery-key flag and idempotency;
   - that no effect or event names its own lane (R-LOG-12);
 - that `notified` events name an earlier accepted act, and no act twice;
+- that each `check-carried` event names in `act` an earlier accepted
+  `check` of the same lane and obligation (R-CARRY-13);
 - that `checkpoint` events name an earlier log commit with the same
   `through` and `hash`.
 
@@ -154,7 +178,9 @@ exactly one policy version, chosen by event kind:
   later activations do not change it (R-LOG-13);
 - an `obligations-recomputed` event: the version it names, which must be
   the active one (R-POL-9);
-- a `land-evaluated` event: the active policy (R-LAND-4).
+- a `land-evaluated` event: the active policy (R-LAND-4);
+- a `check-carried` event: the version it names, which an earlier
+  `policy-activated` event must have activated (R-CARRY-13).
 
 **The report** gives:
 - the verified prefix: the last good entry and its ID;
@@ -210,6 +236,8 @@ entries of the last consistent commit.
   (see below).
 - `test/amendment-2.test.ts` covers the lane L edits of contract
   amendment 2 (see below).
+- `test/amendment-3.test.ts` covers the lane L edits of contract
+  amendment 3: `check-carried` events (protocol section 29.8).
 - `test/review-07d3150e.test.ts` covers the findings of review 07d3150e
   (see below).
 - `test/review-a454cbaf.test.ts` covers review a454cbaf and `commitFor`
