@@ -19,7 +19,7 @@
  */
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
-import { type BuildResult, type Exec, GitOps, LOG_REF, type PinResult, type StageResult, type PreviewResult, objectsRef } from "./gitops.ts";
+import { type BuildResult, type Exec, GitOps, LOG_REF, type PinResult, type StageResult, type PreviewResult, SNAPSHOT_REF, type SnapshotFile, objectsRef } from "./gitops.ts";
 import { decodeLogPush, decodeLogStage, toLogOutcome, type LogPushOutcome, type LogStageRequest } from "./log-push.ts";
 import { type AllowedUpdates, FenceError, ZERO, checkUpdates, isReceivePack, readCommands } from "./ref-fence.ts";
 import type { PushOutcome } from "./push-outcome.ts";
@@ -205,6 +205,41 @@ export class Publisher extends DurableObject<PublisherEnv> {
   pinRef(req: { readonly canonical: RemoteAccess; readonly ref: string; readonly head: string }): Promise<PinResult> {
     return this.withRoute([[req.canonical, { [req.ref]: { old: ZERO, new: req.head } }]], () =>
       this.ops.pinRef(req.canonical.remote, req.ref, req.head),
+    );
+  }
+
+  /** The files of a commit, for building a filtered snapshot. Read only. */
+  listTree(req: { readonly canonical: RemoteAccess; readonly commit: string }): Promise<SnapshotFile[]> {
+    return this.withRoute([[req.canonical, null]], () => this.ops.listTree(req.canonical.remote, req.commit));
+  }
+
+  /**
+   * Write a filtered snapshot into its own new, empty repository
+   * (R-CARRY-15, R-CARRY-16). The canonical repo is read only; the store's
+   * token may only create `SNAPSHOT_REF`, at the commit just built.
+   */
+  writeSnapshot(req: {
+    readonly canonical: RemoteAccess;
+    readonly store: RemoteAccess;
+    readonly files: readonly SnapshotFile[];
+    readonly message: string;
+  }): Promise<string> {
+    return this.withRoute(
+      [
+        [req.canonical, null],
+        [req.store, null],
+      ],
+      () =>
+        this.ops.writeSnapshot(
+          { canonical: req.canonical.remote, store: req.store.remote, files: req.files, message: req.message },
+          {
+            beforeStore: (sha) =>
+              this.route([
+                [req.canonical, null],
+                [req.store, { [SNAPSHOT_REF]: { old: ZERO, new: sha } }],
+              ]),
+          },
+        ),
     );
   }
 

@@ -27,6 +27,8 @@ export type {
 } from "./landing/types.ts";
 export { Workspaces, forkName, MIN_TOKEN_TTL_S } from "./workspace/workspaces.ts";
 export type { WorkspacesOptions } from "./workspace/workspaces.ts";
+export { MAX_RETAIN_MS, PREPARE_WINDOW_MS, SnapshotRepos } from "./snapshot/repos.ts";
+export type { SnapshotRepo, SnapshotReposOptions, SnapshotToken, SnapshotWriter } from "./snapshot/repos.ts";
 export {
   DEFAULT_BOUNDS,
   EMPTY_TREE,
@@ -41,15 +43,15 @@ export {
 export type { DiffBounds, DiffResult, DiffStats, TreeEntry, TreeReader } from "./diff/treediff.ts";
 export { ContainerPublisher, Pinning } from "./publisher/client.ts";
 export type { LogRemoteStub, PublisherClientOptions, PublisherStub } from "./publisher/client.ts";
-export { GitOps, HARDENING, LOG_REF, integrationMessage, integrationRef, objectsRef, pinnedRef } from "./publisher/gitops.ts";
+export { GitOps, HARDENING, LOG_REF, SNAPSHOT_AUTHOR, SNAPSHOT_REF, integrationMessage, integrationRef, objectsRef, pinnedRef } from "./publisher/gitops.ts";
 export { decodeLogPush, decodeLogStage, fromB64url, toB64url, toLogOutcome, LOG_PUSH_LIMITS } from "./publisher/log-push.ts";
 export type { LogPushOutcome, LogPushRequest, LogStageRequest } from "./publisher/log-push.ts";
-export type { Exec, ExecResult, BuildResult, LogObject, PinResult, PreviewResult, StageChunk, StageResult, StageWant } from "./publisher/gitops.ts";
+export type { Exec, ExecResult, BuildResult, LogObject, PinResult, PreviewResult, SnapshotFile, StageChunk, StageResult, StageWant } from "./publisher/gitops.ts";
 export { GitPublisher, landMessage } from "./publisher/git-publisher.ts";
 export { classifyGitPush, definitelyNotApplied } from "./publisher/push-outcome.ts";
 export type { PushOutcome } from "./publisher/push-outcome.ts";
 export { checkUpdates, readCommands, FenceError } from "./publisher/ref-fence.ts";
 export { canonicalTokens, readMainVia, withRetry } from "./artifacts.ts";
-export type { ArtifactsNamespace, RepoHandle } from "./artifacts.ts";
+export type { ArtifactsNamespace, CreatedRepo, RepoHandle } from "./artifacts.ts";
 export { durableSql } from "./sql.ts";
 export type { Sql, SqlRow, SqlValue } from "./sql.ts";

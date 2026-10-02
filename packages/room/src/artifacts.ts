@@ -35,10 +35,9 @@ export interface ArtifactsRepoLike extends RepoHandle {
   readBlob(hash: string): Promise<Blob | null>;
 }
 
-/** The Artifacts binding: lane B's namespace surface, plus repository creation. */
+/** The Artifacts binding: lane B's namespace surface (with repository creation and deletion), plus blob reads. */
 export interface ArtifactsBinding extends ArtifactsNamespace {
   get(name: string): Promise<ArtifactsRepoLike>;
-  create(name: string, opts?: { description?: string }): Promise<{ readonly name: string; readonly remote: string }>;
 }
 
 /** Where a repository identity lives: the binding's namespace and the repository's name in it. */

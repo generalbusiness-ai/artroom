@@ -194,6 +194,51 @@ test("preview: clean with a tree, or the conflicting paths", async (t) => {
   assert.equal(ok.kind, "clean");
 });
 
+test("filtered snapshot: the fixed commit of R-CARRY-15, written into an empty repository at refs/artroom/snapshot only (R-CARRY-16)", async (t) => {
+  const f = await new Fixture().init({ "src/a.ts": "a\n", "src/secret.ts": "s\n", "package.json": "{}\n", "tests/a.test.ts": "t\n" });
+  t.after(() => f.dispose());
+  const files = await f.ops.listTree(f.canonical, f.main);
+  assert.deepEqual(files.map((x) => x[0]).sort(), ["package.json", "src/a.ts", "src/secret.ts", "tests/a.test.ts"]);
+  const chosen = files.filter(([p]) => p !== "src/secret.ts");
+  const secretBlob = files.find(([p]) => p === "src/secret.ts")![2];
+  const store = async (name: string) => {
+    const dir = join(f.root, `${name}.git`);
+    await sh(f.root, "init", "-q", "--bare", dir);
+    return dir;
+  };
+  const git = (dir: string, ...args: string[]) => sh(f.root, "--git-dir", dir, ...args);
+  const message = `Artroom filtered snapshot for tests\n\nDigest: sha256:${"d".repeat(64)}\n`;
+  const s1 = await store("s1");
+  const commit = await f.ops.writeSnapshot({ canonical: f.canonical, store: s1, files: chosen, message });
+  // Exactly this commit object: no parent, the fixed identity at time 0, the Room's message.
+  const tree = await git(s1, "rev-parse", `${commit}^{tree}`);
+  const raw = (await localExec(["git", "--git-dir", s1, "cat-file", "commit", commit], { env: {} })).stdout;
+  assert.equal(
+    raw,
+    `tree ${tree}\nauthor Artroom Snapshot <snapshot@artroom.invalid> 0 +0000\ncommitter Artroom Snapshot <snapshot@artroom.invalid> 0 +0000\n\n${message}`,
+  );
+  // One ref, and nothing but the commit's closure.
+  assert.equal(await git(s1, "for-each-ref", "--format=%(refname) %(objectname)"), `refs/artroom/snapshot ${commit}`);
+  const reachable = (await git(s1, "rev-list", "--objects", "--all")).split("\n").map((l) => l.slice(0, 40)).sort();
+  const stored = (await git(s1, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)")).split("\n").sort();
+  assert.deepEqual(stored, reachable, "the repository holds exactly the snapshot's commit, trees and blobs");
+  assert.deepEqual((await git(s1, "ls-tree", "-r", "--name-only", commit)).split("\n").sort(), ["package.json", "src/a.ts", "tests/a.test.ts"]);
+  assert.notEqual((await localExec(["git", "--git-dir", s1, "cat-file", "-e", secretBlob], { env: {} })).code, 0);
+  // Anyone computes the same commit from the same files, in any order.
+  const again = await f.ops.writeSnapshot({ canonical: f.canonical, store: await store("s2"), files: [...chosen].reverse(), message });
+  assert.equal(again, commit);
+  // A repository is never given a second snapshot: not the same one, not a wider one.
+  const before = await git(s1, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)");
+  await assert.rejects(f.ops.writeSnapshot({ canonical: f.canonical, store: s1, files: chosen, message }), /not empty/);
+  await assert.rejects(f.ops.writeSnapshot({ canonical: f.canonical, store: s1, files, message }), /not empty/);
+  assert.equal(await git(s1, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)"), before, "nothing was added");
+  // Nor anything else: a store with any ref at all, even with no snapshot ref, is refused and nothing is pushed.
+  const s3 = await store("s3");
+  await sh(f.root, "--git-dir", f.canonical, "push", "-q", s3, `${f.main}:refs/heads/main`);
+  await assert.rejects(f.ops.writeSnapshot({ canonical: f.canonical, store: s3, files: chosen, message }), /not empty/);
+  assert.equal(await git(s3, "for-each-ref", "--format=%(refname)"), "refs/heads/main");
+});
+
 // ------------------------------------------------------------------ request 090a0eca: the preview's integration
 
 test("a clean preview carries its integration commit: the merge commit the landing builds on the same main, stored in the canonical repo", async (t) => {

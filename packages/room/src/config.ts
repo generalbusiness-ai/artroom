@@ -47,6 +47,7 @@ const productionServices: ServicesFactory = (env, roomObject) => {
   const binding: ArtifactsBinding = artifacts ?? {
     get: async () => missing("ARTIFACTS"),
     create: async () => missing("ARTIFACTS"),
+    delete: async () => missing("ARTIFACTS"),
   };
   // The stub is resolved per call, so a deployment without the sandbox still founds rooms and admits acts that need no repository work.
   const stub: PublisherStub = {

@@ -1,0 +1,27 @@
+{
+  "name": "@generalbusiness/artroom-checkers",
+  "version": "0.0.0",
+  "description": "Artroom's checkers: the Checker base class, an isolated runner sandbox, and three checkers (tests, types, an advisory LLM reviewer).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/worker.ts"
+  },
+  "scripts": {
+    "types": "wrangler types --include-env=false src/worker-runtime.d.ts >/dev/null",
+    "typecheck": "npm run types && tsc -p tsconfig.json && tsc -p test/tsconfig.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-contract": "*",
+    "@generalbusiness/artroom-git": "*",
+    "@generalbusiness/artroom-policy": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "wrangler": "^4.146.0",
+    "vitest": "^4.1.0"
+  }
+}
