@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/wrangler.test.jsonc","body":{"commit":"1f4f1f0b38cbb862cd45a4903a61bf82b1f32e5a","path":"packages/room/wrangler.test.jsonc"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0227afc47cb95342a044cd36c1da697c5599370a","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/founding.test.ts."}
