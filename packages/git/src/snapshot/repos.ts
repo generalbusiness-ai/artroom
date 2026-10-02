@@ -8,7 +8,8 @@
  *   `write` (the publisher's `writeSnapshot`) puts exactly that commit's
  *   closure into it at `refs/artroom/snapshot`, the commit written must be
  *   `commit`, and every token on the repository is revoked before it is
- *   ready. A repository whose preparation did not finish is deleted, never
+ *   ready, as a complete inventory shows (`completeInventory`; an incomplete
+ *   one issues nothing). A repository whose preparation did not finish is deleted, never
  *   finished or reused.
  * - `mint(commit, job, deadline)` mints a read token for that repository
  *   only, expiring no later than the job's deadline. Every job has its own.
@@ -47,7 +48,7 @@
  */
 
 import { type Sql, text } from "../sql.ts";
-import { type ArtifactsNamespace, type RepoHandle, artifactsCode, refusedUnchanged, withRetry } from "../artifacts.ts";
+import { type ArtifactsNamespace, type RepoHandle, artifactsCode, completeInventory, refusedUnchanged, withRetry } from "../artifacts.ts";
 import { MIN_TOKEN_TTL_S, RECHECK_MS, TOKEN_MARGIN_S } from "../workspace/workspaces.ts";
 
 /** The longest a snapshot repository is kept for reuse after its last job. */
@@ -340,8 +341,10 @@ export class SnapshotRepos {
         throw new Error(`the publisher wrote snapshot ${wrote}, not the recorded ${commit}; nothing is issued`);
       }
       const repo = await withRetry(() => this.artifacts.get(name), this.retry);
-      // Ready only once no token is active: nothing can write to it again.
-      for (const t of (await withRetry(() => repo.listTokens(), this.retry)).tokens) {
+      // Ready only once no token is active: nothing can write to it again. Only a complete inventory shows that (plan 001);
+      // an incomplete or malformed one throws, nothing is issued, and the repository's deletion stays owed.
+      const inventory = completeInventory(await withRetry(() => repo.listTokens(), this.retry), `the token inventory of ${name}`);
+      for (const t of inventory) {
         if (t.state === "active") await withRetry(() => repo.revokeToken(t.id), this.retry);
       }
       // Fenced by name: only this attempt's own row becomes ready.

@@ -51,6 +51,34 @@ export interface CreatedRepo {
   readonly token: string;
 }
 
+/**
+ * Every token of a complete, well-formed listing: as many records as its
+ * total, each with an ID, a known scope and state, and a readable expiry.
+ * Anything else throws: an incomplete or malformed listing proves nothing is
+ * absent, so no caller may treat it as an inventory. The caller applies its
+ * own active and expiry filter to what this returns.
+ */
+export function completeInventory(listing: unknown, what = "the token inventory"): readonly TokenInfo[] {
+  const r = listing as { tokens?: unknown; total?: unknown } | null;
+  const tokens = r?.tokens;
+  const wellFormed = (t: unknown): t is TokenInfo => {
+    const x = t as Partial<TokenInfo> | null;
+    return (
+      !!x &&
+      typeof x.id === "string" &&
+      x.id.length > 0 &&
+      (x.scope === "read" || x.scope === "write") &&
+      (x.state === "active" || x.state === "expired" || x.state === "revoked") &&
+      typeof x.expiresAt === "string" &&
+      Number.isFinite(Date.parse(x.expiresAt))
+    );
+  };
+  if (!Array.isArray(tokens) || r?.total !== tokens.length || !tokens.every(wellFormed)) {
+    throw new Error(`${what} is incomplete or malformed`);
+  }
+  return tokens;
+}
+
 /** An Artifacts error, as thrown by the binding. */
 export function artifactsCode(e: unknown): string | null {
   const code = (e as { code?: unknown } | null)?.code;

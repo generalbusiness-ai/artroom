@@ -27,7 +27,9 @@
  * - `done`: settled, with the reason.
  *
  * An inventory run lists the fork's tokens and revokes every active one that
- * no ready or installing lease has recorded. When it succeeds, it settles
+ * no ready or installing lease has recorded. Only a complete, well-formed
+ * listing counts (`completeInventory`); any other leaves every duty owed and
+ * scheduled. When it succeeds, it settles
  * every `owed` inventory and every step answered before it started. A step
  * still `in-flight` is never settled, by any snapshot or by elapsed time:
  * it keeps an inventory on a capped backoff (every minute at first, then
@@ -61,7 +63,7 @@ import type {
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { type Sql, type SqlRow, text } from "../sql.ts";
-import { type ArtifactsNamespace, type RepoHandle, type TokenInfo, artifactsCode, refusedUnchanged, withRetry } from "../artifacts.ts";
+import { type ArtifactsNamespace, type RepoHandle, type TokenInfo, artifactsCode, completeInventory, refusedUnchanged, withRetry } from "../artifacts.ts";
 
 /** The reason of the step that stands for an old Room's unrecorded creates of a public founding's base name (review 700b74ea). */
 const LEGACY = "legacy";
@@ -589,7 +591,8 @@ export class Workspaces {
     const sweep = duties.filter((x) => x.kind !== "token");
     if (sweep.length > 0) {
       try {
-        const { tokens } = await withRetry(() => fork.listTokens(), this.retryOpts());
+        // Only a complete inventory settles anything (plan 001): an incomplete or malformed one throws, and the debt stays scheduled.
+        const tokens = completeInventory(await withRetry(() => fork.listTokens(), this.retryOpts()), `the token inventory of ${name}`);
         // Keep only tokens a ready or installing lease has recorded on this fork.
         const keep = new Set(
           this.sql
@@ -854,23 +857,7 @@ export class Workspaces {
    */
   private async inventoryOf(name: string): Promise<readonly TokenInfo[]> {
     const repo = await withRetry(() => this.artifacts.get(name), this.retryOpts());
-    const r = (await withRetry(() => repo.listTokens(), this.retryOpts())) as { tokens?: unknown; total?: unknown } | null;
-    const tokens = r?.tokens;
-    const wellFormed = (t: unknown): t is TokenInfo => {
-      const x = t as Partial<TokenInfo> | null;
-      return (
-        !!x &&
-        typeof x.id === "string" &&
-        x.id.length > 0 &&
-        (x.scope === "read" || x.scope === "write") &&
-        (x.state === "active" || x.state === "expired" || x.state === "revoked") &&
-        typeof x.expiresAt === "string" &&
-        Number.isFinite(Date.parse(x.expiresAt))
-      );
-    };
-    if (!Array.isArray(tokens) || typeof r?.total !== "number" || r.total !== tokens.length || !tokens.every(wellFormed)) {
-      throw new Error("the canonical repository's token inventory is incomplete or malformed");
-    }
+    const tokens = completeInventory(await withRetry(() => repo.listTokens(), this.retryOpts()), "the canonical repository's token inventory");
     return tokens.filter((t) => t.state === "active" && Date.parse(t.expiresAt) > this.now());
   }
 

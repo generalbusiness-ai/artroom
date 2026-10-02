@@ -62,6 +62,7 @@ class FakeRepo implements RepoHandle {
       state: t.state === "active" && t.expiresAt <= this.ns.clock.t ? ("expired" as const) : t.state,
       expiresAt: new Date(t.expiresAt).toISOString(),
     }));
+    if (this.ns.listingFault) return this.ns.listingFault(tokens) as never;
     return { tokens, total: tokens.length };
   }
   async info() {
@@ -117,6 +118,8 @@ class FakeNamespace implements ArtifactsNamespace {
   failRevoke = false;
   /** Revocation fails, listing works. */
   failRevokeOnly = false;
+  /** While set, every listing answers this instead of the complete one (plan 001: an incomplete or malformed inventory). */
+  listingFault: ((tokens: TokenInfo[]) => unknown) | null = null;
   constructor(clock: Clock) {
     this.clock = clock;
     this.repos.set("canon", new FakeRepo(this, "canon", null));
@@ -925,6 +928,92 @@ test("no open duty is left due after a run, whichever way the run ends", async (
   clock.t = ws.nextDue()!;
   await ws.reconcile();
   assert.ok(ws.nextDue()! > clock.t);
+});
+
+// ------------------------------------------------------------------ plan 001: a fork inventory counts only when complete and well formed
+
+const FAR = new Date(2e12).toISOString();
+/** Listings that do not account for every token: each proves nothing is absent. */
+const INCOMPLETE: readonly (readonly [string, (tokens: TokenInfo[]) => unknown])[] = [
+  ["an empty page and a positive total", (t) => ({ tokens: [], total: Math.max(t.length, 1) })],
+  ["no total", (t) => ({ tokens: t })],
+  ["no list of records", (t) => ({ total: t.length })],
+  ["a record with no ID", (t) => ({ tokens: [...t, { scope: "write", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record with an empty ID", (t) => ({ tokens: [...t, { id: "", scope: "write", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record of an unknown scope", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "admin", state: "active", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record of an unknown state", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "live", expiresAt: FAR }], total: t.length + 1 })],
+  ["a record with no readable expiry", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "active", expiresAt: "soon" }], total: t.length + 1 })],
+  ["a record whose expiry is not a timestamp string", (t) => ({ tokens: [...t, { id: "tid_odd", scope: "write", state: "active", expiresAt: 2026 }], total: t.length + 1 })],
+];
+
+for (const [label, listing] of INCOMPLETE) {
+  test(`plan 001: a fork inventory with ${label} proves nothing: the workspace is not ready and gets no grant; across a restart a complete one ends the creation token and keeps the lease's`, async () => {
+    const { clock, ns, ws, lane, fork } = setup();
+    const canon = ns.repos.get("canon")!.mintRaw("write", 3600); // the canonical repository's own token, unrelated
+    ns.listingFault = listing;
+    ws.open(lane, 1, clock.t + LEASE_MS);
+    const v = await ws.provision(lane);
+    assert.notEqual(v.state, "ready");
+    assert.ok("refused" in ws.grant(lane, 1), "no grant");
+    assert.equal(fork().live().length, 1, "the fork's 24-hour creation token is still live: nothing proved it gone");
+    assert.ok(ws.pendingCleanup() > 0 && ws.nextDue() !== null, "the cleanup stays owed and scheduled");
+    // A restart over the same storage: the incomplete observation still settles nothing, however often it is seen.
+    const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+    for (let i = 0; i < 3; i++) {
+      clock.t = Math.max(clock.t, restarted.nextDue()!);
+      assert.ok((await restarted.reconcile()) > 0);
+    }
+    assert.ok(restarted.nextDue()! > clock.t, "the next check is in the future");
+    restarted.open(lane, 1, clock.t + LEASE_MS);
+    assert.notEqual((await restarted.provision(lane)).state, "ready");
+    assert.ok("refused" in restarted.grant(lane, 1));
+    // A complete listing: the creation token is ended, the lease's recorded token is kept, and the grant is given.
+    ns.listingFault = null;
+    restarted.open(lane, 1, clock.t + LEASE_MS);
+    assert.equal((await restarted.provision(lane)).state, "ready");
+    const g = restarted.grant(lane, 1);
+    assert.ok(!("refused" in g));
+    assert.deepEqual(fork().live(), [g.token.match(/art_v1_(tid_\d+)/)![1]], "exactly one live token: the lease's");
+    assert.equal(restarted.pendingCleanup(), 0);
+    assert.deepEqual(ns.repos.get("canon")!.live(), [canon.id], "the canonical repository is never swept");
+  });
+}
+
+test("plan 001: an incomplete inventory after the lease token is minted: not ready, no grant; a complete one makes it ready with only the lease's token", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  // Complete until the lease's token exists, then an empty page that claims a token.
+  ns.listingFault = (t) => (ns.minted.length >= 2 ? { tokens: [], total: t.length } : { tokens: t, total: t.length });
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.notEqual((await ws.provision(lane)).state, "ready");
+  assert.ok("refused" in ws.grant(lane, 1));
+  ns.listingFault = null;
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "ready");
+  assert.equal(fork().live().length, 1);
+  assert.ok(!("refused" in ws.grant(lane, 1)));
+});
+
+test("plan 001: an unrecorded token on a released fork, while inventories are incomplete: the cleanup stays owed across a restart until a complete one revokes it; the canonical token is untouched", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const canon = ns.repos.get("canon")!.mintRaw("write", 3600);
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "ready");
+  const orphan = fork().mintRaw("write", 3600); // minted, its answer lost: nobody recorded it
+  ns.listingFault = (t) => ({ tokens: t.filter((x) => x.id !== orphan.id), total: t.length });
+  assert.ok((await ws.revoke(lane, 1)) > 0, "the inventory owed on release is not settled");
+  const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  for (let i = 0; i < 4; i++) {
+    clock.t = Math.max(clock.t, restarted.nextDue()!);
+    assert.ok((await restarted.reconcile()) > 0);
+    assert.ok(restarted.nextDue()! > clock.t);
+  }
+  assert.equal(fork().tokens.get(orphan.id)?.state, "active");
+  ns.listingFault = null;
+  clock.t = Math.max(clock.t, restarted.nextDue()!);
+  assert.equal(await restarted.reconcile(), 0);
+  assert.deepEqual(fork().live(), []);
+  assert.equal(restarted.nextDue(), null);
+  assert.deepEqual(ns.repos.get("canon")!.live(), [canon.id]);
 });
 
 // ------------------------------------------------------------------ request b6b51de7, reviews a35b4b61 and 3eb7bc44: the canonical repository at public founding
