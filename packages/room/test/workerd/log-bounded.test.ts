@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { runInDurableObject } from "cloudflare:test";
 import { policy, rule } from "@generalbusiness/artroom-policy";
 import type { Claim } from "@generalbusiness/artroom-contract";
-import { READ_BATCH, verifyLog } from "@generalbusiness/artroom-log";
+import { READ_LIMITS, verifyLog } from "@generalbusiness/artroom-log";
 import type { Room } from "../../src/index.ts";
 import { call, makeRoom, type TestRoom } from "./support.ts";
 
@@ -32,7 +32,7 @@ async function spy(r: TestRoom) {
 }
 
 describe("request 5a7290b9: publication reads the log in batches", () => {
-  it("never more than READ_BATCH entries per read; after the first publication only the last segment is read; a retained file is read only when new", async () => {
+  it("never more than READ_LIMITS.entries entries per read; after the first publication only the last segment is read; a retained file is read only when new", async () => {
     // Every note's refuse decision retains a replay context (R-LOG-7), so retained files grow with the log.
     const r = await makeRoom({ policy: policy(rule({ id: "never", on: "note", refuse: "false", reason: "never", fix: "none" })) });
     const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
@@ -41,7 +41,7 @@ describe("request 5a7290b9: publication reads the log in batches", () => {
     const p1 = await call<{ through: number; commit: string }>(r.stub.publishLog());
     expect(p1.through).toBeGreaterThan(1000);
     expect(seen.reads.length).toBeGreaterThan(0);
-    expect(Math.max(...seen.reads.map((x) => x.limit))).toBeLessThanOrEqual(READ_BATCH);
+    expect(Math.max(...seen.reads.map((x) => x.limit))).toBeLessThanOrEqual(READ_LIMITS.entries);
     const firstBodies = new Set(seen.bodies);
     expect(firstBodies.size).toBeGreaterThan(1000);
 
@@ -50,7 +50,7 @@ describe("request 5a7290b9: publication reads the log in batches", () => {
     seen.bodies.length = 0;
     const p2 = await call<{ through: number; commit: string }>(r.stub.publishLog());
     expect(p2.through).toBe(p1.through + 6); // the checkpoint event and five notes
-    expect(Math.max(...seen.reads.map((x) => x.limit))).toBeLessThanOrEqual(READ_BATCH);
+    expect(Math.max(...seen.reads.map((x) => x.limit))).toBeLessThanOrEqual(READ_LIMITS.entries);
     // Segment 0 is full and published: none of its entries is read again.
     expect(Math.min(...seen.reads.map((x) => x.from))).toBeGreaterThanOrEqual(1000);
     // Only the new notes' replay contexts are read: to hash them, and to send them.

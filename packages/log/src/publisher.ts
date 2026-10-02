@@ -12,7 +12,7 @@
  *   confirms, retries the same commit, or stops on an unexpected writer.
  *
  * Memory is bounded (request 5a7290b9). The entries come from an
- * `EntrySource` in batches of `readBatch`; a segment blob is never held
+ * `EntrySource` in batches (`READ_LIMITS`); a segment blob is never held
  * whole. Its size is counted first, then its ID is hashed, then its bytes
  * are read again for each staged part. Full segments of the parent are
  * reused by ID and not read at all. Retained files are read one at a time,
@@ -75,8 +75,8 @@ export interface PublisherOptions {
   readonly sleep?: (attempt: number) => Promise<void>;
   /** The most one push may send. Default `LOG_TRANSFER_LIMITS`, the publisher sandbox's bound (lane B, `LOG_PUSH_LIMITS`). */
   readonly maxTransfer?: { readonly objects: number; readonly bytes: number };
-  /** Entries read from an `EntrySource` at a time. Default `READ_BATCH`. */
-  readonly readBatch?: number;
+  /** How much is read from an `EntrySource` at a time. Default `READ_LIMITS`. */
+  readonly read?: { readonly entries: number; readonly bytes: number };
 }
 
 /**
@@ -88,8 +88,15 @@ export interface PublisherOptions {
  */
 export const LOG_TRANSFER_LIMITS = { objects: 100_000, bytes: 8 * 1024 * 1024 } as const;
 
-/** Entries read from an `EntrySource` at a time. A signed envelope is at most 64 KiB (R-SIG-6). */
-export const READ_BATCH = 16;
+/**
+ * How much the publisher reads from an `EntrySource` at once. The first
+ * read of a segment, which measures each line, takes one entry at a time.
+ * Later reads take at most `entries` entries and at most `bytes` of them,
+ * by the measured lengths, and always at least one entry. One entry is
+ * bounded only by where the Room stores it: a row of Durable Object SQLite
+ * is at most 2 MB.
+ */
+export const READ_LIMITS = { entries: 64, bytes: 1024 * 1024 } as const;
 
 /**
  * A log's entries, read in batches (the Room reads them from its SQLite).
@@ -224,7 +231,7 @@ export class LogPublisher {
   private readonly attempts: number;
   private readonly sleep: (attempt: number) => Promise<void>;
   private readonly maxTransfer: { readonly objects: number; readonly bytes: number };
-  private readonly readBatch: number;
+  private readonly readLimits: { readonly entries: number; readonly bytes: number };
   private lastCommit: Sha | null = null;
   /** `lastCommit`'s index; `EMPTY` before the first publication. */
   private index: Index = EMPTY;
@@ -236,7 +243,8 @@ export class LogPublisher {
     this.attempts = opts.attempts ?? 5;
     this.sleep = opts.sleep ?? (async () => {});
     this.maxTransfer = opts.maxTransfer ?? LOG_TRANSFER_LIMITS;
-    this.readBatch = Math.max(1, opts.readBatch ?? READ_BATCH);
+    const read = opts.read ?? READ_LIMITS;
+    this.readLimits = { entries: Math.max(1, read.entries), bytes: Math.max(1, read.bytes) };
   }
 
   /**
@@ -494,14 +502,31 @@ export class LogPublisher {
     return add({ sha: gitObject("blob", data).sha, type: "blob", size: data.length, body: { kind: "retained", load } });
   }
 
+  /**
+   * How many lines to read from line `i` of `count`: one when their lengths
+   * are not yet measured; otherwise as many as fit the read limits by their
+   * measured lengths, and at least one.
+   */
+  private batchSize(i: number, count: number, lens?: Uint32Array): number {
+    if (!lens) return 1;
+    const { entries, bytes } = this.readLimits;
+    const most = Math.min(entries, count - i);
+    let n = 1;
+    for (let sum = lens[i]!; n < most && sum + lens[i + n]! <= bytes; n++) sum += lens[i + n]!;
+    return n;
+  }
+
+  /** Read one batch of lines from line `i` of a run that starts at seq `first`, as UTF-8 bytes. */
+  private batch(lines: Lines, first: Seq, i: number, count: number, lens?: Uint32Array): Uint8Array[] {
+    const batch = lines.read(first + i, this.batchSize(i, count, lens)).map(utf8);
+    if (batch.length === 0) throw new PublishError("invalid-input", `the entries ended at ${first + i - 1}`);
+    this.counters.peakBatchBytes = Math.max(this.counters.peakBatchBytes, batch.reduce((n, b) => n + b.length, 0));
+    return batch;
+  }
+
   /** Each line of `count` from `first`, as UTF-8 bytes, read in batches. */
-  private eachLine(lines: Lines, first: Seq, count: number, f: (i: number, bytes: Uint8Array) => void): void {
-    for (let i = 0; i < count; ) {
-      const batch = lines.read(first + i, Math.min(this.readBatch, count - i)).map(utf8);
-      if (batch.length === 0) throw new PublishError("invalid-input", `the entries ended at ${first + i - 1}`);
-      this.counters.peakBatchBytes = Math.max(this.counters.peakBatchBytes, batch.reduce((n, b) => n + b.length, 0));
-      for (const b of batch) f(i++, b);
-    }
+  private eachLine(lines: Lines, first: Seq, count: number, f: (i: number, bytes: Uint8Array) => void, lens?: Uint32Array): void {
+    for (let i = 0; i < count; ) for (const b of this.batch(lines, first, i, count, lens)) f(i++, b);
   }
 
   /**
@@ -536,7 +561,7 @@ export class LogPublisher {
       h.update(b);
       if (inPrefix) prefix!.update(b);
       hashed += b.length + (i > 0 ? 1 : 0);
-    });
+    }, lens);
     if (hashed !== size) throw new PublishError("invalid-input", `segment ${first} hashed ${hashed} bytes, not ${size}`);
     if (prefix && hex(prefix.digest()) !== published!.sha)
       throw new PublishError("would-rewrite", `an entry from ${first} to ${first + published!.count - 1} differs from the published entry; published history is never rewritten`);
@@ -569,10 +594,7 @@ export class LogPublisher {
       }
     };
     while (filled < length && i < body.count) {
-      const batch = lines.read(body.first + i, Math.min(this.readBatch, body.count - i)).map(utf8);
-      if (batch.length === 0) throw new PublishError("invalid-input", `the entries ended at ${body.first + i - 1}`);
-      this.counters.peakBatchBytes = Math.max(this.counters.peakBatchBytes, batch.reduce((n, b) => n + b.length, 0));
-      for (const b of batch) {
+      for (const b of this.batch(lines, body.first, i, body.count, body.lens)) {
         if (b.length !== body.lens[i]) throw new PublishError("invalid-input", `entry ${body.first + i} was ${body.lens[i]} bytes and is now ${b.length}; the source changed while it was read`);
         put(b, at);
         at += b.length;

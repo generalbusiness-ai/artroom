@@ -32,7 +32,7 @@ export {
 export {
   LOG_TRANSFER_LIMITS,
   LogPublisher,
-  READ_BATCH,
+  READ_LIMITS,
   PublishError,
   publicationDue,
   readLogFiles,
