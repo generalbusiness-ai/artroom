@@ -1,0 +1,1757 @@
+{
+  "run": "2026-10-02T18-23-46-213Z",
+  "url": "https://artroom-spike-room.inguz.workers.dev",
+  "namespace": "gitseq-spike",
+  "importNamespace": "gitseq-spike-import",
+  "steps": [
+    {
+      "step": "rows: throwaway repository created in gitseq-spike-import",
+      "ok": true,
+      "atMs": 4162,
+      "detail": {
+        "name": "f281fe1b462636424629ba94f0109a40",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40.git"
+      }
+    },
+    {
+      "step": "rows: one commit pushed; its creation token revoked",
+      "ok": true,
+      "atMs": 4162,
+      "detail": {
+        "main": "ff5f9ab845482a06859d9a02b307f2c626978e1d",
+        "revoked": 1,
+        "active": 0
+      }
+    },
+    {
+      "step": "rows: draft",
+      "ok": true,
+      "atMs": 4600,
+      "detail": {
+        "status": 200,
+        "repo": "gitseq-spike-import/f281fe1b462636424629ba94f0109a40",
+        "operator": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
+      }
+    },
+    {
+      "step": "rows: found",
+      "ok": true,
+      "atMs": 6074,
+      "detail": {
+        "status": 200,
+        "ms": 1473,
+        "room": "room_b2198a2189e1771ac0bafa88d7c78bbc"
+      }
+    },
+    {
+      "step": "rows: main is the imported commit; the Room wrote nothing",
+      "ok": true,
+      "atMs": 7769,
+      "detail": {
+        "main": "ff5f9ab845482a06859d9a02b307f2c626978e1d",
+        "imported": "ff5f9ab845482a06859d9a02b307f2c626978e1d"
+      }
+    },
+    {
+      "step": "rows: session",
+      "ok": true,
+      "atMs": 7882,
+      "detail": {
+        "status": 200,
+        "member": "@author"
+      }
+    },
+    {
+      "step": "rows: @admin2 joins as admin",
+      "ok": true,
+      "atMs": 158500,
+      "detail": {
+        "key": "key_dwkJqGjEUrwEA31I_ha3_x-mLAbcxelsZCRQcFPmJqI",
+        "invite": 200,
+        "join": 200,
+        "session": 200
+      }
+    },
+    {
+      "step": "lane 11: claim",
+      "ok": true,
+      "atMs": 249241,
+      "detail": {
+        "status": 200,
+        "ms": 738,
+        "lane": "act_7_c72cd4ec",
+        "seq": 7
+      }
+    },
+    {
+      "step": "lane 11: workspace requested",
+      "ok": true,
+      "atMs": 249380,
+      "detail": {
+        "status": 200,
+        "ms": 138,
+        "op": "op_ws_act_7_c72cd4ec_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 11: workspace ready",
+      "ok": true,
+      "atMs": 252031,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_7_c72cd4ec.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 11: workspace token",
+      "ok": true,
+      "atMs": 252142,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_7_c72cd4ec.git",
+        "expiresAt": "2026-10-02T18:57:50.040Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 11: clone fork",
+      "ok": true,
+      "atMs": 253729,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 11: push to fork",
+      "ok": true,
+      "atMs": 254167,
+      "detail": {
+        "head": "ae98c8238b02d7bb13ee2eadfb87b2cdfff8dc86",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 11: propose",
+      "ok": true,
+      "atMs": 256547,
+      "detail": {
+        "status": 200,
+        "ms": 2379,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_8",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T18:28:02.555Z",
+          "lane": "act_7_c72cd4ec",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d1/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 11: preview",
+      "ok": true,
+      "atMs": 256773,
+      "detail": {
+        "state": "clean",
+        "integration": "ae98c8238b02d7bb13ee2eadfb87b2cdfff8dc86",
+        "base": "ff5f9ab845482a06859d9a02b307f2c626978e1d"
+      }
+    },
+    {
+      "step": "lane 12: claim",
+      "ok": true,
+      "atMs": 256888,
+      "detail": {
+        "status": 200,
+        "ms": 114,
+        "lane": "act_9_678be675",
+        "seq": 9
+      }
+    },
+    {
+      "step": "lane 12: workspace requested",
+      "ok": true,
+      "atMs": 257004,
+      "detail": {
+        "status": 200,
+        "ms": 116,
+        "op": "op_ws_act_9_678be675_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 12: workspace ready",
+      "ok": true,
+      "atMs": 259987,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_9_678be675.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 12: workspace token",
+      "ok": true,
+      "atMs": 260100,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_9_678be675.git",
+        "expiresAt": "2026-10-02T18:57:58.017Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 12: clone fork",
+      "ok": true,
+      "atMs": 261144,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 12: push to fork",
+      "ok": true,
+      "atMs": 261856,
+      "detail": {
+        "head": "7857af0c2d69674978e44d2fa6821dce030e247f",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 12: propose",
+      "ok": true,
+      "atMs": 263296,
+      "detail": {
+        "status": 200,
+        "ms": 1439,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_11",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T18:28:09.290Z",
+          "lane": "act_9_678be675",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d2/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 12: preview",
+      "ok": true,
+      "atMs": 263538,
+      "detail": {
+        "state": "clean",
+        "integration": "7857af0c2d69674978e44d2fa6821dce030e247f",
+        "base": "ff5f9ab845482a06859d9a02b307f2c626978e1d"
+      }
+    },
+    {
+      "step": "lane 13: claim",
+      "ok": true,
+      "atMs": 263653,
+      "detail": {
+        "status": 200,
+        "ms": 115,
+        "lane": "act_12_6df2aced",
+        "seq": 12
+      }
+    },
+    {
+      "step": "lane 13: workspace requested",
+      "ok": true,
+      "atMs": 263768,
+      "detail": {
+        "status": 200,
+        "ms": 114,
+        "op": "op_ws_act_12_6df2aced_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 13: workspace ready",
+      "ok": true,
+      "atMs": 266602,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_12_6df2aced.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 13: workspace token",
+      "ok": true,
+      "atMs": 266709,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_12_6df2aced.git",
+        "expiresAt": "2026-10-02T18:58:04.649Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 13: clone fork",
+      "ok": true,
+      "atMs": 267382,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 13: push to fork",
+      "ok": true,
+      "atMs": 268099,
+      "detail": {
+        "head": "6ea0a661a200fab3fc852d9e6ae8103dbf8a0534",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 13: propose",
+      "ok": true,
+      "atMs": 269574,
+      "detail": {
+        "status": 200,
+        "ms": 1474,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_13",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T18:28:15.581Z",
+          "lane": "act_12_6df2aced",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d3/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 13: preview",
+      "ok": true,
+      "atMs": 269759,
+      "detail": {
+        "state": "clean",
+        "integration": "6ea0a661a200fab3fc852d9e6ae8103dbf8a0534",
+        "base": "ff5f9ab845482a06859d9a02b307f2c626978e1d"
+      }
+    },
+    {
+      "step": "lane 14: claim",
+      "ok": true,
+      "atMs": 269874,
+      "detail": {
+        "status": 200,
+        "ms": 114,
+        "lane": "act_14_356dbf23",
+        "seq": 14
+      }
+    },
+    {
+      "step": "lane 14: workspace requested",
+      "ok": true,
+      "atMs": 269996,
+      "detail": {
+        "status": 200,
+        "ms": 121,
+        "op": "op_ws_act_14_356dbf23_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 14: workspace ready",
+      "ok": true,
+      "atMs": 273030,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_14_356dbf23.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 14: workspace token",
+      "ok": true,
+      "atMs": 273151,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_14_356dbf23.git",
+        "expiresAt": "2026-10-02T18:58:10.039Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 14: clone fork",
+      "ok": true,
+      "atMs": 274268,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 14: push to fork",
+      "ok": true,
+      "atMs": 275033,
+      "detail": {
+        "head": "1e31d5e44d12df99489a2d9e894ec7a729342740",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 14: propose",
+      "ok": true,
+      "atMs": 276500,
+      "detail": {
+        "status": 200,
+        "ms": 1466,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_15",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T18:28:22.511Z",
+          "lane": "act_14_356dbf23",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d4/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 14: preview",
+      "ok": true,
+      "atMs": 276767,
+      "detail": {
+        "state": "clean",
+        "integration": "1e31d5e44d12df99489a2d9e894ec7a729342740",
+        "base": "ff5f9ab845482a06859d9a02b307f2c626978e1d"
+      }
+    },
+    {
+      "step": "lane 11: land accepted",
+      "ok": true,
+      "atMs": 367582,
+      "detail": {
+        "status": 200,
+        "ms": 813,
+        "op": "op_land_17",
+        "state": "accepted"
+      }
+    },
+    {
+      "step": "lane 11: landed",
+      "ok": true,
+      "atMs": 369807,
+      "detail": {
+        "op": "op_land_17",
+        "state": "landed",
+        "integration": "ae98c8238b02d7bb13ee2eadfb87b2cdfff8dc86"
+      }
+    },
+    {
+      "step": "lane 30: claim",
+      "ok": true,
+      "atMs": 610496,
+      "detail": {
+        "status": 200,
+        "ms": 146,
+        "lane": "act_25_6b4e427f",
+        "seq": 25
+      }
+    },
+    {
+      "step": "lane 30: workspace requested",
+      "ok": true,
+      "atMs": 610604,
+      "detail": {
+        "status": 200,
+        "ms": 107,
+        "op": "op_ws_act_25_6b4e427f_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 30: workspace ready",
+      "ok": true,
+      "atMs": 613120,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_25_6b4e427f.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 30: workspace token",
+      "ok": true,
+      "atMs": 613189,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/f281fe1b462636424629ba94f0109a40--act_25_6b4e427f.git",
+        "expiresAt": "2026-10-02T19:03:51.103Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 30: clone fork",
+      "ok": true,
+      "atMs": 614198,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 30: push to fork",
+      "ok": true,
+      "atMs": 614851,
+      "detail": {
+        "head": "b12150c29559ae3d8c96868428235fbc290c9b07",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 30: propose",
+      "ok": true,
+      "atMs": 616771,
+      "detail": {
+        "status": 200,
+        "ms": 1919,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_26",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T18:34:02.798Z",
+          "lane": "act_25_6b4e427f",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "modified",
+            "path": ".artroom/policy.json"
+          }
+        ],
+        "obligations": [
+          {
+            "id": "obl_admin-approval",
+            "rule": "admin-approval",
+            "policy": "act_1_e031d296",
+            "paths": [
+              ".artroom/policy.json"
+            ],
+            "kind": "review",
+            "from": [
+              "role:admin"
+            ],
+            "count": 1,
+            "allowSelf": false,
+            "state": "open",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "step": "lane 30: preview",
+      "ok": true,
+      "atMs": 617037,
+      "detail": {
+        "state": "clean",
+        "integration": "b12150c29559ae3d8c96868428235fbc290c9b07",
+        "base": "ae98c8238b02d7bb13ee2eadfb87b2cdfff8dc86"
+      }
+    },
+    {
+      "step": "rows: the second admin approves the policy lane",
+      "ok": true,
+      "atMs": 617112,
+      "detail": {
+        "status": 200,
+        "fulfils": [
+          {
+            "obligation": "obl_admin-approval",
+            "evidence": {
+              "basis": "here",
+              "act": "act_27_aba3fda3",
+              "kind": "review",
+              "generation": 1,
+              "head": "b12150c29559ae3d8c96868428235fbc290c9b07"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "lane 30: land accepted",
+      "ok": true,
+      "atMs": 707635,
+      "detail": {
+        "status": 200,
+        "ms": 522,
+        "op": "op_land_29",
+        "state": "accepted"
+      }
+    },
+    {
+      "step": "lane 30: landed",
+      "ok": true,
+      "atMs": 709750,
+      "detail": {
+        "op": "op_land_29",
+        "state": "landed",
+        "integration": "b12150c29559ae3d8c96868428235fbc290c9b07"
+      }
+    },
+    {
+      "step": "rows: admin read session renewed",
+      "ok": true,
+      "atMs": 1250437,
+      "detail": {
+        "status": 200
+      }
+    }
+  ],
+  "gaps": [],
+  "cleanup": {
+    "releases": {},
+    "ok": true,
+    "duties": [
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "inventory",
+        "repos": [
+          "f281fe1b462636424629ba94f0109a40",
+          "f281fe1b462636424629ba94f0109a40--act_7_c72cd4ec",
+          "f281fe1b462636424629ba94f0109a40--act_9_678be675",
+          "f281fe1b462636424629ba94f0109a40--act_12_6df2aced",
+          "f281fe1b462636424629ba94f0109a40--act_14_356dbf23",
+          "f281fe1b462636424629ba94f0109a40--act_25_6b4e427f"
+        ],
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_25_6b4e427f",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_25_6b4e427f",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_14_356dbf23",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_14_356dbf23",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_12_6df2aced",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_12_6df2aced",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_9_678be675",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_9_678be675",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_7_c72cd4ec",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "f281fe1b462636424629ba94f0109a40--act_7_c72cd4ec",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "f281fe1b462636424629ba94f0109a40",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "f281fe1b462636424629ba94f0109a40",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "final-inventory",
+        "repos": [
+          "f281fe1b462636424629ba94f0109a40",
+          "f281fe1b462636424629ba94f0109a40--act_7_c72cd4ec",
+          "f281fe1b462636424629ba94f0109a40--act_9_678be675",
+          "f281fe1b462636424629ba94f0109a40--act_12_6df2aced",
+          "f281fe1b462636424629ba94f0109a40--act_14_356dbf23",
+          "f281fe1b462636424629ba94f0109a40--act_25_6b4e427f"
+        ],
+        "outcome": "done"
+      }
+    ],
+    "unresolved": [],
+    "reposLeft": []
+  },
+  "rows": {
+    "room": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+    "open": 3,
+    "windows": [
+      {
+        "name": "found one room (draft, found, first session)",
+        "kind": "act",
+        "from": "2026-10-02T18:23:50.375Z",
+        "to": "2026-10-02T18:26:24.098Z"
+      },
+      {
+        "name": "setup: a second admin joins",
+        "kind": "setup",
+        "from": "2026-10-02T18:26:24.099Z",
+        "to": "2026-10-02T18:27:54.715Z"
+      },
+      {
+        "name": "setup: 4 lanes claimed, pushed and proposed",
+        "kind": "setup",
+        "from": "2026-10-02T18:27:54.715Z",
+        "to": "2026-10-02T18:29:52.981Z"
+      },
+      {
+        "name": "land with 3 open previews",
+        "kind": "act",
+        "from": "2026-10-02T18:29:52.982Z",
+        "to": "2026-10-02T18:32:26.023Z"
+      },
+      {
+        "name": "setup: release the landed lane",
+        "kind": "setup",
+        "from": "2026-10-02T18:32:26.023Z",
+        "to": "2026-10-02T18:33:56.562Z"
+      },
+      {
+        "name": "setup: a policy lane claimed, pushed, proposed and approved by the second admin",
+        "kind": "setup",
+        "from": "2026-10-02T18:33:56.562Z",
+        "to": "2026-10-02T18:35:33.325Z"
+      },
+      {
+        "name": "land that activates a policy, with 3 open proposals",
+        "kind": "act",
+        "from": "2026-10-02T18:35:33.325Z",
+        "to": "2026-10-02T18:38:05.965Z"
+      },
+      {
+        "name": "setup: release the policy lane",
+        "kind": "setup",
+        "from": "2026-10-02T18:38:05.965Z",
+        "to": "2026-10-02T18:39:36.347Z"
+      },
+      {
+        "name": "idle: lanes held, nothing pending",
+        "kind": "idle",
+        "from": "2026-10-02T18:39:36.347Z",
+        "to": "2026-10-02T18:44:36.350Z"
+      },
+      {
+        "name": "setup: release every lane",
+        "kind": "setup",
+        "from": "2026-10-02T18:44:36.350Z",
+        "to": "2026-10-02T18:44:36.936Z"
+      }
+    ],
+    "table": [
+      {
+        "window": "found one room (draft, found, first session)",
+        "kind": "act",
+        "from": "2026-10-02T18:23:50.375Z",
+        "to": "2026-10-02T18:26:24.098Z",
+        "samples": 2,
+        "roomWritten": 187,
+        "roomRead": 267,
+        "baselineWritten": 8,
+        "baselineRead": 120,
+        "actWritten": 171,
+        "actRead": 27,
+        "roomInvocationsPerMinute": 3,
+        "registryWritten": 4,
+        "registryRead": 7,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 366
+      },
+      {
+        "window": "setup: a second admin joins",
+        "kind": "setup",
+        "from": "2026-10-02T18:26:24.099Z",
+        "to": "2026-10-02T18:27:54.715Z",
+        "samples": 2,
+        "roomWritten": 41,
+        "roomRead": 402,
+        "baselineWritten": 7,
+        "baselineRead": 161,
+        "actWritten": 27,
+        "actRead": 80,
+        "roomInvocationsPerMinute": 2,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 260
+      },
+      {
+        "window": "setup: 4 lanes claimed, pushed and proposed",
+        "kind": "setup",
+        "from": "2026-10-02T18:27:54.715Z",
+        "to": "2026-10-02T18:29:52.981Z",
+        "samples": 2,
+        "roomWritten": 267,
+        "roomRead": 5290,
+        "baselineWritten": 7,
+        "baselineRead": 494,
+        "actWritten": 253,
+        "actRead": 4302,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 10,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 286
+      },
+      {
+        "window": "land with 3 open previews",
+        "kind": "act",
+        "from": "2026-10-02T18:29:52.982Z",
+        "to": "2026-10-02T18:32:26.023Z",
+        "samples": 2,
+        "roomWritten": 86,
+        "roomRead": 2333,
+        "baselineWritten": 7,
+        "baselineRead": 546,
+        "actWritten": 72,
+        "actRead": 1241,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 393
+      },
+      {
+        "window": "setup: release the landed lane",
+        "kind": "setup",
+        "from": "2026-10-02T18:32:26.023Z",
+        "to": "2026-10-02T18:33:56.562Z",
+        "samples": 2,
+        "roomWritten": 35,
+        "roomRead": 1719,
+        "baselineWritten": 7,
+        "baselineRead": 569,
+        "actWritten": 21,
+        "actRead": 581,
+        "roomInvocationsPerMinute": 2,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 248
+      },
+      {
+        "window": "setup: a policy lane claimed, pushed, proposed and approved by the second admin",
+        "kind": "setup",
+        "from": "2026-10-02T18:33:56.562Z",
+        "to": "2026-10-02T18:35:33.325Z",
+        "samples": 1,
+        "roomWritten": 85,
+        "roomRead": 2515,
+        "baselineWritten": 85,
+        "baselineRead": 2515,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 215,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "window": "land that activates a policy, with 3 open proposals",
+        "kind": "act",
+        "from": "2026-10-02T18:35:33.325Z",
+        "to": "2026-10-02T18:38:05.965Z",
+        "samples": 3,
+        "roomWritten": 134,
+        "roomRead": 4711,
+        "baselineWritten": 7,
+        "baselineRead": 752,
+        "actWritten": 113,
+        "actRead": 2455,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 434
+      },
+      {
+        "window": "setup: release the policy lane",
+        "kind": "setup",
+        "from": "2026-10-02T18:38:05.965Z",
+        "to": "2026-10-02T18:39:36.347Z",
+        "samples": 1,
+        "roomWritten": 21,
+        "roomRead": 759,
+        "baselineWritten": 21,
+        "baselineRead": 759,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 193,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "window": "idle: lanes held, nothing pending",
+        "kind": "idle",
+        "from": "2026-10-02T18:39:36.347Z",
+        "to": "2026-10-02T18:44:36.350Z",
+        "samples": 5,
+        "roomWritten": 35,
+        "roomRead": 3930,
+        "baselineWritten": 7,
+        "baselineRead": 776,
+        "actWritten": 0,
+        "actRead": 50,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 10,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 777
+      },
+      {
+        "window": "setup: release every lane",
+        "kind": "setup",
+        "from": "2026-10-02T18:44:36.350Z",
+        "to": "2026-10-02T18:44:36.936Z",
+        "samples": 0,
+        "roomWritten": 0,
+        "roomRead": 0,
+        "baselineWritten": null,
+        "baselineRead": null,
+        "actWritten": null,
+        "actRead": null,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      }
+    ],
+    "samples": [
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:24:52Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:25:55Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:26:58Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:28:00Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:29:23Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:29:54Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:30:59Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:32:02Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:33:31Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:34:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:35:04Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:35:34Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:36:40Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:37:43Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:39:11Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:40:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:41:16Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:42:19Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:43:21Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "name": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "t": "2026-10-02T18:44:24Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:23:24Z",
+        "rowsWritten": 0,
+        "rowsRead": 3
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:23:51Z",
+        "rowsWritten": 4,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:24:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:25:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:26:02Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:26:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:26:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:27:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:28:00Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:28:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:28:39Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:29:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:30:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:31:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:32:06Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:32:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:33:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:34:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:35:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:36:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:36:51Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:37:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:38:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:39:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:40:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:41:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:42:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:43:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:44:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:23:51Z",
+        "rowsWritten": 179,
+        "rowsRead": 120
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:24:51Z",
+        "rowsWritten": 8,
+        "rowsRead": 147
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:25:51Z",
+        "rowsWritten": 34,
+        "rowsRead": 241
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:26:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 161
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:27:51Z",
+        "rowsWritten": 260,
+        "rowsRead": 4796
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:28:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 494
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:29:51Z",
+        "rowsWritten": 79,
+        "rowsRead": 1787
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:30:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 546
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:31:51Z",
+        "rowsWritten": 28,
+        "rowsRead": 1150
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:32:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 569
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:33:51Z",
+        "rowsWritten": 85,
+        "rowsRead": 2515
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:34:51Z",
+        "rowsWritten": 120,
+        "rowsRead": 3194
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:35:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 765
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:36:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 752
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:37:51Z",
+        "rowsWritten": 21,
+        "rowsRead": 759
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:38:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 776
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:39:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 781
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:40:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 786
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:41:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 791
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:42:51Z",
+        "rowsWritten": 7,
+        "rowsRead": 796
+      },
+      {
+        "className": "Room",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "name": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "t": "2026-10-02T18:43:51Z",
+        "rowsWritten": 77,
+        "rowsRead": 2693
+      }
+    ]
+  },
+  "rowGate": {
+    "worker": "artroom-spike-room",
+    "from": "2026-10-02T18:23:46.214Z",
+    "to": "2026-10-02T18:46:47.263Z",
+    "totalRowsWritten": 4309,
+    "totalRowsRead": 875375,
+    "totalRequests": 3612,
+    "namespaces": [
+      {
+        "id": "3388b66bd8f345438705519a063d6bd7",
+        "name": "artroom-spike-room_Publisher",
+        "className": "Publisher"
+      },
+      {
+        "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+        "name": "artroom-spike-room_Registry",
+        "className": "Registry"
+      },
+      {
+        "id": "fd8efe823eb6430bb910ee34d469681b",
+        "name": "artroom-spike-room_Room",
+        "className": "Room"
+      }
+    ],
+    "objects": [
+      {
+        "className": "Publisher",
+        "object": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "objectId": "bf05357387d20efb3fde0ad651b89e190160c4a68153b4a65dd0037f7c45e60c",
+        "rowsWritten": 0,
+        "rowsRead": 0,
+        "requests": 68,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Registry",
+        "object": "registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "rowsWritten": 4,
+        "rowsRead": 58,
+        "requests": 30,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_b2198a2189e1771ac0bafa88d7c78bbc",
+        "objectId": "5e889516701ff06ad70387145d6b0b9863867c8f27a24817d970ee8f1d9ca56b",
+        "rowsWritten": 974,
+        "rowsRead": 26592,
+        "requests": 35,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_a81dc2db9888ec46487f56097aa249f2",
+        "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+        "rowsWritten": 263,
+        "rowsRead": 72062,
+        "requests": 267,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_fe9913737e6a034530cc430b92b2ff83",
+        "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+        "rowsWritten": 263,
+        "rowsRead": 44710,
+        "requests": 272,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_5c1bb798d5da946c048160c51b321bfc",
+        "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+        "rowsWritten": 263,
+        "rowsRead": 50496,
+        "requests": 270,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+        "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+        "rowsWritten": 263,
+        "rowsRead": 50496,
+        "requests": 270,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+        "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+        "rowsWritten": 261,
+        "rowsRead": 44316,
+        "requests": 268,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "rowsWritten": 257,
+        "rowsRead": 193940,
+        "requests": 262,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+        "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+        "rowsWritten": 252,
+        "rowsRead": 69116,
+        "requests": 267,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_a490b23ca538a208de5528469b2a9689",
+        "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+        "rowsWritten": 251,
+        "rowsRead": 48192,
+        "requests": 272,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_3a6011559c193fd7f90b8d2392516840",
+        "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+        "rowsWritten": 250,
+        "rowsRead": 42500,
+        "requests": 266,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+        "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+        "rowsWritten": 249,
+        "rowsRead": 68226,
+        "requests": 269,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_1741490181aa074e9337b16af80dbe9d",
+        "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+        "rowsWritten": 248,
+        "rowsRead": 66277,
+        "requests": 264,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+        "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+        "rowsWritten": 246,
+        "rowsRead": 47428,
+        "requests": 258,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+        "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+        "rowsWritten": 243,
+        "rowsRead": 46962,
+        "requests": 252,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_c79f08919e5fb4263c76265750ae1f99",
+        "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+        "rowsWritten": 22,
+        "rowsRead": 4004,
+        "requests": 22,
+        "periodicSamples": 1
+      }
+    ],
+    "budget": {
+      "maxRowsWritten": 250000,
+      "maxRowsWrittenPerObject": 50000
+    },
+    "provisional": true,
+    "state": "pass",
+    "failures": []
+  },
+  "ok": true,
+  "ms": 1383606
+}

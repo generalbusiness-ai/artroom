@@ -66,7 +66,7 @@ import { iso } from "../src/ids.ts";
 import { firstCommit } from "../../git/src/first-commit.ts";
 import { cleanupRun, incarnationOf, isRepoRecord, isTokenRecord, readListing, REPO_PAGE, smokeOk } from "./cleanup.mjs";
 import { attentionFor, CHECK, CHECKED_PATHS, checkedChange, checkProject, checksIn, checksPolicy, importDraft, loadSpikeKeys, obligationOf, REVIEW_RULE, seedImportRepo } from "./checks.mjs";
-import { gateOk, gateOptions, PROVISIONAL_BUDGET, rowGate, rowTable, rowTableMarkdown, SETTLE_MS, SPIKE_WORKER, windowEndAfterSettle } from "./rows.mjs";
+import { gateOk, gateOptions, querySamples, rowGate, SETTLE_MS, SMOKE_BUDGET, SPIKE_WORKER, windowEndAfterSettle, windowTable, windowTableMarkdown } from "./rows.mjs";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
 const NS = "gitseq-spike";
@@ -661,165 +661,180 @@ async function checksPhase(operator, checker) {
 
 // ------------------------------------------------------------ rows per act (request 8bd623cc, part 1)
 
-/** After an act, wait this long before closing its window: its own durable steps (5-second loop) finish in it. */
-const ACT_SETTLE_MS = 15_000;
-/** The Room publishes a minute after the oldest unpublished entry (`publicationDue`); its window waits for that, then this long. */
-const PUBLICATION_SETTLE_MS = 15_000;
-/** How long the idle window lasts: lanes held, nothing pending, so no alarm is due. */
-const IDLE_MS = 120_000;
+/**
+ * After an act, the window stays open this long with nothing sent: the act's
+ * own deferred work finishes, and at least one quiet per-minute sample of the
+ * room falls in the window (rows.mjs `windowTable`). Setup windows use a
+ * shorter tail; they need only to keep their work out of the next act's.
+ */
+const ACT_TAIL_MS = 150_000;
+const SETUP_TAIL_MS = 90_000;
+/** How long the idle window lasts: lanes held, nothing pending. */
+const IDLE_MS = 300_000;
+/** A read session is renewed when older than this (sessions last 30 minutes). */
+const SESSION_RENEW_MS = 20 * 60_000;
 
 /** The billing windows of SPIKE_PHASE=rows, in order. They are contiguous: every request of the phase falls in one. */
 const windows = [];
+let sessionAt = 0;
 
-/** The log's head and published-through, by the current session. */
-async function logMark() {
-  const r = await read("/log?limit=1");
-  return { head: r.body?.head ?? null, published: r.body?.publishedThrough ?? -1 };
+/** A fresh admin read session when the current one is near its end; inside the window that is open. */
+async function freshSession() {
+  if (Date.now() - sessionAt < SESSION_RENEW_MS) return;
+  const s = await request({ kind: "session", ttlSeconds: 1800 });
+  if (s.body?.token) {
+    secrets.add(s.body.token);
+    session = s.body.token;
+    sessionAt = Date.now();
+  }
+  step("rows: admin read session renewed", s.status === 200 && !!s.body?.token, { status: s.status });
 }
 
-/**
- * Run `fn` in its own billing window, wait ACT_SETTLE_MS, and close it. Then,
- * unless `publication` is false, a second window holds the log publication
- * the act caused: it ends PUBLICATION_SETTLE_MS after the log is published
- * through the head. A window in which the log was already published says so.
- */
-async function measured(name, fn, { kind = "act", publication = true } = {}) {
-  const before = session ? await logMark() : null;
+/** Run `fn` in its own billing window, then keep the window open for its quiet tail. */
+async function measured(name, fn, { kind = "act", tail = kind === "act" ? ACT_TAIL_MS : SETUP_TAIL_MS } = {}) {
   const from = new Date().toISOString();
+  if (session) await freshSession();
   const r = await fn();
-  await sleep(ACT_SETTLE_MS);
+  await sleep(tail);
   const to = new Date().toISOString();
-  const after = session ? await logMark() : null;
-  const note = before && after && after.published > before.published ? "the log was published inside this window" : undefined;
-  windows.push({ name, kind, from, to, ...(note ? { note } : {}) });
-  log(`window ${kind} ${name}: ${from} .. ${to}${note ? ` (${note})` : ""}`);
-  if (publication && session) {
-    const end = Date.now() + 3 * 60_000;
-    let m = after;
-    while (Date.now() < end && !(m.head !== null && m.published >= m.head)) {
-      await sleep(5_000);
-      m = await logMark();
-    }
-    await sleep(PUBLICATION_SETTLE_MS);
-    const pto = new Date().toISOString();
-    const done = m.head !== null && m.published >= m.head;
-    windows.push({ name: `${name}: its publication`, kind: "publication", from: to, to: pto, ...(done ? {} : { note: "the log was not published within 3 minutes" }) });
-  }
+  windows.push({ name, kind, from, to });
+  log(`window ${kind} ${name}: ${from} .. ${to}`);
   return r;
 }
 
 /**
  * Each act once, in one imported room under the checks policy, each in its
  * own billing window; then the rows written and read in each window, from
- * the billing datasets, as a table (measure/README.md). ROWS_OPEN (default 3)
- * is N, the open proposals at a landing and at a policy activation.
+ * the billing datasets' per-minute samples, as a table (measure/README.md).
+ * ROWS_OPEN (default 3) is N, the open proposals at a landing and at a
+ * policy activation. ROWS_ONLY=policy measures only the policy activation
+ * (founding, then the N lanes and the policy landing).
  */
 async function rowsPhase(operator, checker) {
   const L = "rows";
   const N = Number(process.env.ROWS_OPEN ?? 3);
   if (!Number.isSafeInteger(N) || N < 1) throw new Error("ROWS_OPEN must be a positive integer");
   const repo = await seedImport(L, checkProject(RUN));
-  const founded = await measured("found one room (draft, found, first session)", () => foundImport(L, operator, repo, "@author"));
+  const founded = await measured("found one room (draft, found, first session)", async () => {
+    const f = await foundImport(L, operator, repo, "@author");
+    sessionAt = Date.now();
+    return f;
+  });
   const measuredRoom = founded.room;
   out.rows = { room: measuredRoom, open: N, windows };
-
-  // Join: the invitation and the join are two acts, each in its own window.
+  const onlyPolicy = process.env.ROWS_ONLY === "policy";
+  // A change to .artroom/ owes an approval from an admin other than its author (obl_admin-approval).
+  const admin2 = newKeyPair();
   const reviewer = newKeyPair();
   const secret = randomBytes(32);
-  const inv = await measured("invite", () => act("roster", null, { op: "invite", member: "@reviewer", role: "maintainer", custody: "client", expiresAt: iso(Date.now() + 3600_000), secretHash: digestBytes(secret) }));
-  step(`${L}: invite`, inv.status === 200, { status: inv.status, refused: inv.body.rule });
-  const j = await measured("join", () => actAs(reviewer, "roster", null, { op: "join", invitation: inv.body.id, secret: b64url(secret) }));
-  step(`${L}: join`, j.status === 200, { status: j.status, refused: j.body.rule, reason: j.body.reason });
-  await measured("setup: the reviewer's session; the checker joins", async () => {
-    const s = await requestAs(reviewer, { kind: "session", ttlSeconds: 3600 });
-    if (s.body?.token) secrets.add(s.body.token);
-    await joinAs(L, checker, "@checker", "checker");
-  }, { kind: "setup" });
-
-  // One lane outside the checked paths: claim, propose, note, land, release.
-  // A lane is listed for cleanup as soon as it is claimed: the same object, so its fork is known when pushed.
   const listed = (res) => (lanes.push(Object.assign(res, { room, admin, ns: IMPORT_NS })), res);
-  const d = listed(await measured("claim", () => claimLane(10, ["docs/d0/**"])));
-  if (!d.lane) throw new Error("the measured claim was refused");
-  await measured("setup: workspace, workspace token, push", () => pushLane(d, { "docs/d0/a.md": `rows ${RUN}\n` }), { kind: "setup" });
-  await measured("propose (with its pin and preview)", () => proposeLane(d));
-  const note = await measured("note", () => act("note", { act: d.lane }, { text: "a note, measured" }));
-  step(`${L}: note`, note.status === 200, { status: note.status, refused: note.body.rule, reason: note.body.reason });
-  await measured("land (no other open preview)", () => landLane(d));
-  const rel = await measured("release", () => act("release", { lane: d.lane }, { lease: 1, note: "measured" }));
-  d.released = rel.status === 200;
+  if (!onlyPolicy) await openActs();
+  else await measured("setup: a second admin joins", () => joinAs(L, admin2, "@admin2", "admin"), { kind: "setup" });
+  await policyActivation();
+  if (!onlyPolicy) await checkedActs();
 
-  // N open proposals, and one more lane to land among them.
-  const open = [];
-  let lander = null;
-  await measured(`setup: ${N + 1} lanes claimed, pushed and proposed`, async () => {
-    for (let i = 1; i <= N + 1; i++) {
-      const res = listed(await openLane(10 + i, { [`docs/d${i}/a.md`]: `rows ${RUN} ${i}\n` }, [`docs/d${i}/**`]));
-      if (!res.proposal) throw new Error(`lane ${10 + i} was not proposed`);
-      if (i === 1) lander = res;
-      else open.push(res);
-    }
-  }, { kind: "setup" });
-  await measured(`land with ${N} open previews`, () => landLane(lander));
-  await measured("setup: release the landed lane", async () => {
-    const r = await act("release", { lane: lander.lane }, { lease: 1, note: "measured" });
-    lander.released = r.status === 200;
-  }, { kind: "setup" });
-
-  // A landing that changes the policy: activation recomputes the N open proposals and resets their previews.
-  const changed = { ...checksPolicy(), rules: checksPolicy().rules.map((r) => (r.id === REVIEW_RULE ? { ...r, id: `${REVIEW_RULE}-2` } : r)) };
-  let pol = null;
-  await measured("setup: a policy lane claimed, pushed and proposed", async () => {
-    pol = listed(await openLane(30, { ".artroom/policy.json": JSON.stringify(changed, null, 2) + "\n" }, [".artroom/**"]));
-    if (!pol.proposal) throw new Error("the policy lane was not proposed");
-  }, { kind: "setup" });
-  await measured(`land that activates a policy, with ${N} open proposals`, () => landLane(pol));
-  await measured("setup: release the policy lane", async () => {
-    const r = await act("release", { lane: pol.lane }, { lease: 1, note: "measured" });
-    pol.released = r.status === 200;
-  }, { kind: "setup" });
-
-  // A checked lane: propose owes the check and the review; the checker service's check; the review.
-  let c = null;
-  await measured("setup: a checked lane claimed and pushed", async () => {
-    c = listed(await claimLane(40, CHECKED_PATHS));
-    if (!c.lane || !(await pushLane(c, checkedChange(RUN)))) throw new Error("the checked lane was not pushed");
-  }, { kind: "setup" });
-  await measured("propose (owes a check and a review; the check job is dispatched)", () => proposeLane(c));
-  const check = await measured("check (the checker service's signed check, admitted)", async () => {
-    const t = Date.now();
-    while (Date.now() - t < 15 * 60_000) {
-      const found = checksIn((await read("/log?limit=500")).body?.acts, checker.key);
-      if (found.accepted.length || found.refused.length) return found;
-      await sleep(10_000);
-    }
-    return { accepted: [], refused: [] };
-  });
-  step(`${L}: the check was admitted`, check.accepted[0]?.ok === true, { check: check.accepted[0] ?? null, refused: check.refused });
-  const rv = await measured("review", () => actAs(reviewer, "review", { lane: c.lane, generation: 1 }, { head: c.head, verdict: "approve", scope: CHECKED_PATHS, text: "Measured review." }));
-  step(`${L}: review`, rv.status === 200, { status: rv.status, refused: rv.body.rule, reason: rv.body.reason });
-
-  // Idle: N + 1 lanes held, the log published, nothing pending: no alarm is due before the leases expire.
-  await measured("idle: lanes held, nothing pending", () => sleep(IDLE_MS), { kind: "idle", publication: false });
+  // Idle: lanes held, nothing pending: the room's background alone.
+  await measured("idle: lanes held, nothing pending", () => sleep(IDLE_MS), { kind: "idle", tail: 0 });
   await measured("setup: release every lane", async () => {
     for (const l of lanes) {
       if (!l.lane || l.released || l.room !== measuredRoom) continue;
       const r = await act("release", { lane: l.lane }, { lease: 1, note: "measured" });
       l.released = r.status === 200;
     }
-  }, { kind: "setup", publication: false });
+  }, { kind: "setup", tail: 0 });
+
+  async function openActs() {
+    // Join: the invitation and the join are two acts, each in its own window.
+    const inv = await measured("invite", () => act("roster", null, { op: "invite", member: "@reviewer", role: "maintainer", custody: "client", expiresAt: iso(Date.now() + 3 * 3600_000), secretHash: digestBytes(secret) }));
+    step(`${L}: invite`, inv.status === 200, { status: inv.status, refused: inv.body.rule });
+    const j = await measured("join", () => actAs(reviewer, "roster", null, { op: "join", invitation: inv.body.id, secret: b64url(secret) }));
+    step(`${L}: join`, j.status === 200, { status: j.status, refused: j.body.rule, reason: j.body.reason });
+    await measured("setup: the checker and a second admin join", async () => {
+      await joinAs(L, checker, "@checker", "checker");
+      await joinAs(L, admin2, "@admin2", "admin");
+    }, { kind: "setup" });
+
+    // One lane outside the checked paths: claim, propose, note, land, release.
+    const d = listed(await measured("claim", () => claimLane(10, ["docs/d0/**"])));
+    if (!d.lane) throw new Error("the measured claim was refused");
+    await measured("setup: workspace, workspace token, push", () => pushLane(d, { "docs/d0/a.md": `rows ${RUN}\n` }), { kind: "setup" });
+    await measured("propose (with its pin and preview)", () => proposeLane(d));
+    const note = await measured("note", () => act("note", { act: d.lane }, { text: "a note, measured" }));
+    step(`${L}: note`, note.status === 200, { status: note.status, refused: note.body.rule, reason: note.body.reason });
+    await measured("land (no other open preview)", () => landLane(d));
+    const rel = await measured("release", () => act("release", { lane: d.lane }, { lease: 1, note: "measured" }));
+    d.released = rel.status === 200;
+  }
+
+  async function policyActivation() {
+    // N open proposals, and one more lane to land among them.
+    const open = [];
+    let lander = null;
+    await measured(`setup: ${N + 1} lanes claimed, pushed and proposed`, async () => {
+      for (let i = 1; i <= N + 1; i++) {
+        const res = listed(await openLane(10 + i, { [`docs/d${i}/a.md`]: `rows ${RUN} ${i}\n` }, [`docs/d${i}/**`]));
+        if (!res.proposal) throw new Error(`lane ${10 + i} was not proposed`);
+        if (i === 1) lander = res;
+        else open.push(res);
+      }
+    }, { kind: "setup" });
+    await measured(`land with ${N} open previews`, () => landLane(lander));
+    await measured("setup: release the landed lane", async () => {
+      const r = await act("release", { lane: lander.lane }, { lease: 1, note: "measured" });
+      lander.released = r.status === 200;
+    }, { kind: "setup" });
+
+    // A landing that changes the policy: activation recomputes the N open proposals and resets their previews.
+    const changed = { ...checksPolicy(), rules: checksPolicy().rules.map((r) => (r.id === REVIEW_RULE ? { ...r, id: `${REVIEW_RULE}-2` } : r)) };
+    let pol = null;
+    await measured("setup: a policy lane claimed, pushed, proposed and approved by the second admin", async () => {
+      pol = listed(await openLane(30, { ".artroom/policy.json": JSON.stringify(changed, null, 2) + "\n" }, [".artroom/**"]));
+      if (!pol.proposal) throw new Error("the policy lane was not proposed");
+      const a = await actAs(admin2, "review", { lane: pol.lane, generation: 1 }, { head: pol.head, verdict: "approve", scope: [".artroom/**"], text: "Approved for the measurement." });
+      step(`${L}: the second admin approves the policy lane`, a.status === 200, { status: a.status, fulfils: a.body.fulfils, refused: a.body.rule, reason: a.body.reason });
+    }, { kind: "setup" });
+    await measured(`land that activates a policy, with ${N} open proposals`, () => landLane(pol));
+    await measured("setup: release the policy lane", async () => {
+      const r = await act("release", { lane: pol.lane }, { lease: 1, note: "measured" });
+      pol.released = r.status === 200;
+    }, { kind: "setup" });
+  }
+
+  async function checkedActs() {
+
+    // A checked lane: propose owes the check and the review; the checker service's check; the review.
+    let c = null;
+    await measured("setup: a checked lane claimed and pushed", async () => {
+      c = listed(await claimLane(40, CHECKED_PATHS));
+      if (!c.lane || !(await pushLane(c, checkedChange(RUN)))) throw new Error("the checked lane was not pushed");
+    }, { kind: "setup" });
+    await measured("propose (owes a check and a review; the check job is dispatched)", () => proposeLane(c));
+    const check = await measured("check (the checker service's signed check, admitted)", async () => {
+      const t = Date.now();
+      while (Date.now() - t < 15 * 60_000) {
+        const found = checksIn((await read("/log?limit=500")).body?.acts, checker.key);
+        if (found.accepted.length || found.refused.length) return found;
+        await sleep(10_000);
+      }
+      return { accepted: [], refused: [] };
+    });
+    step(`${L}: the check was admitted`, check.accepted[0]?.ok === true, { check: check.accepted[0] ?? null, refused: check.refused });
+    const rv = await measured("review", () => actAs(reviewer, "review", { lane: c.lane, generation: 1 }, { head: c.head, verdict: "approve", scope: CHECKED_PATHS, text: "Measured review." }));
+    step(`${L}: review`, rv.status === 200, { status: rv.status, refused: rv.body.rule, reason: rv.body.reason });
+  }
 }
 
-/** Each window's rows, from the billing datasets, and the table; saved beside the run's result. */
+/** The samples of the phase, from the billing datasets, and the table; saved beside the run's result. */
 async function rowsReport() {
-  const reports = [];
-  for (const w of windows) reports.push(await rowGate({ accountId: rowsGate.accountId, token: rowsGate.token, worker: SPIKE_WORKER, from: w.from, to: w.to }));
-  const table = rowTable(windows, reports, out.rows.room);
+  // Samples are stamped with their interval's start: begin a minute early, so the first window's first sample is in.
+  const from = new Date(Date.parse(windows[0].from) - 60_000).toISOString();
+  const samples = await querySamples({ accountId: rowsGate.accountId, token: rowsGate.token, worker: SPIKE_WORKER, from, to: windows.at(-1).to });
+  const table = windowTable(windows, samples, out.rows.room);
   out.rows.table = table;
-  out.rows.reports = reports;
+  out.rows.samples = samples.samples.filter((s) => s.name === out.rows.room || s.className !== "Room");
   const file = join(HERE, "results", `row-costs-${RUN}.md`);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, `# Rows per act, ${RUN}\n\nRoom \`${out.rows.room}\`; N = ${out.rows.open}. From Cloudflare's durableObjectsPeriodicGroups (rowsWritten, rowsRead), per window (measure/README.md).\n\n${rowTableMarkdown(table)}`);
+  writeFileSync(file, `# Rows per act, ${RUN}\n\nRoom \`${out.rows.room}\`; N = ${out.rows.open}. From Cloudflare's per-minute durableObjectsPeriodicGroups samples (rowsWritten, rowsRead), by window (measure/README.md).\n\n${windowTableMarkdown(table)}`);
   log(`rows table ${file}`);
 }
 
@@ -843,7 +858,18 @@ export function combineCleanups(releases, parts) {
   };
 }
 
+/** Have wrangler refresh hugh's OAuth token (it lasts an hour), as deploy-spike.sh's `whoami` does. Never prints it. */
+function refreshOauth() {
+  return new Promise((done) => {
+    const env = { ...process.env };
+    delete env.CLOUDFLARE_API_TOKEN;
+    execFile("npx", ["-y", "wrangler@latest", "whoami"], { env, maxBuffer: 1 << 22 }, (err) => done(!err));
+  });
+}
+
 async function cleanup() {
+  // A long run (SPIKE_PHASE=rows) outlives the OAuth token it started with.
+  if (Date.now() - t0 > 45 * 60_000) log(`cleanup: OAuth refreshed ${await refreshOauth()}`);
   // Release a lane still held (the landed lane may already be done; a refusal is fine: the token duties below cover access).
   const releases = {};
   for (const l of lanes) {
@@ -887,7 +913,7 @@ if (isMain) {
       log(`row gate: waiting ${SETTLE_MS} ms for the billing datasets`);
       const to = await windowEndAfterSettle(SETTLE_MS);
       if (out.rows) await rowsReport().catch((e) => void (out.rows.error = redact(e.message)));
-      out.rowGate = await rowGate({ accountId: rowsGate.accountId, token: rowsGate.token, worker: SPIKE_WORKER, from: rowsFrom, to, budget: PROVISIONAL_BUDGET });
+      out.rowGate = await rowGate({ accountId: rowsGate.accountId, token: rowsGate.token, worker: SPIKE_WORKER, from: rowsFrom, to, budget: SMOKE_BUDGET });
     } else out.rowGate = rowsGate ? { state: "skipped", reason: rowsGate.reason } : { state: "incomplete", failures: ["the row gate did not start (see error)"] };
     log(`row gate ${out.rowGate.state}${out.rowGate.totalRowsWritten !== undefined ? `: ${out.rowGate.totalRowsWritten} rows written` : ""}`, out.rowGate.failures ?? out.rowGate.reason ?? "");
     out.ok = smokeOk(out, failed) && gateOk(out.rowGate);

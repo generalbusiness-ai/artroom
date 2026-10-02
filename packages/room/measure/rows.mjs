@@ -48,11 +48,29 @@ export const REQUIRED_CLASSES = {
 };
 
 /**
- * PROVISIONAL ceilings: woo's load-gate values, not yet grounded for
- * Artroom. Part 1 of request 8bd623cc replaces them with ceilings from a
- * clean measured run (measure/README.md, "What remains").
+ * Ceilings grounded on the spike, 2026-10-02 (measure/README.md, "Ceilings").
+ * Each is the measured value times a headroom factor, rounded up to two
+ * significant figures.
+ *
+ * SMOKE_BUDGET is for one full smoke run, from its start to two minutes
+ * after its cleanup. The clean run spike-smoke-2026-10-02T18-47-09-470Z
+ * wrote 2,284 rows in total (1,301 by its three rooms, 983 by 15 older idle
+ * rooms) and at most 508 in one object. Headroom 4: 9,136 -> 9,200 and
+ * 2,032 -> 2,100.
+ *
+ * HOURLY_BUDGET is for the scheduled check's hour. The hour 17:50-18:50
+ * wrote 11,285 rows in total, 1,034 at most in one object, while measured
+ * runs were active and 17 rooms existed. Headroom 2: 22,570 -> 23,000 and
+ * 2,068 -> 2,100.
+ *
+ * Both totals include the idle rooms' background (about 720 rows an hour
+ * each; see the README), which grows with every room made. Until that
+ * background is removed, the totals are exceeded once enough rooms exist:
+ * that is the alert working, not a ceiling to raise.
  */
-export const PROVISIONAL_BUDGET = Object.freeze({ maxRowsWritten: 250_000, maxRowsWrittenPerObject: 50_000 });
+export const HEADROOM = Object.freeze({ smoke: 4, hourly: 2 });
+export const SMOKE_BUDGET = Object.freeze({ maxRowsWritten: 9_200, maxRowsWrittenPerObject: 2_100 });
+export const HOURLY_BUDGET = Object.freeze({ maxRowsWritten: 23_000, maxRowsWrittenPerObject: 2_100 });
 /** Wait this long after the last act before closing a billing window: samples are stamped when emitted, after the writes. */
 export const SETTLE_MS = 120_000;
 /** GraphQL's per-query row limit; a result this long may be truncated. */
@@ -197,11 +215,11 @@ export function reportForOutput(report) {
 }
 
 /** Query and judge one window. Never throws: a query failure is an incomplete gate, with its reason. */
-export async function rowGate({ accountId, token, worker, from, to, budget = PROVISIONAL_BUDGET, fetchImpl = fetch }) {
+export async function rowGate({ accountId, token, worker, from, to, budget = SMOKE_BUDGET, fetchImpl = fetch }) {
   try {
     const report = await queryWorkerRows({ accountId, token, worker, from, to, fetchImpl });
     const decision = evaluateRows(report, budget);
-    return { ...reportForOutput(report), budget, provisional: budget === PROVISIONAL_BUDGET, ...decision };
+    return { ...reportForOutput(report), budget, ...decision };
   } catch (e) {
     return { worker, from, to, budget, state: "incomplete", failures: [String(e?.message ?? e).slice(0, 1_000)] };
   }
@@ -236,43 +254,139 @@ export async function windowEndAfterSettle(ms, wait = (t) => new Promise((r) => 
 // ------------------------------------------------------------ the per-act table (part 1)
 
 /**
- * The table of the measured windows: for each, the rows of this room's own
- * Room object, of the registry, of Publisher objects, and of any other
- * object (another run's traffic in the same window: a sign the window is
- * not clean). `reports` holds one rowGate result per window, by index.
+ * Cloudflare emits one periodic sample per active object per minute,
+ * stamped with the START of its interval (measured 2026-10-02: an act at
+ * 16:39:15 is in the sample stamped 16:38:39, not 16:39:39). An eviction
+ * restarts the cadence, so a short interval can occur. Acts are therefore
+ * attributed by sample, not by the sum over a window: see `windowTable`.
  */
-export function rowTable(windows, reports, room) {
-  return windows.map((w, i) => {
-    const r = reports[i] ?? {};
-    const objects = Array.isArray(r.objects) ? r.objects : [];
-    const sum = (pred, k) => objects.filter(pred).reduce((s, o) => s + o[k], 0);
-    const own = (o) => o.className === "Room" && o.object === room;
-    const registry = (o) => o.className === "Registry";
-    const publisher = (o) => o.className === "Publisher";
-    const other = (o) => !own(o) && !registry(o) && !publisher(o);
+export const SAMPLES_QUERY = `
+query DurableObjectSamples($accountTag: String!, $start: Time!, $end: Time!, $namespaceId: String!) {
+  viewer {
+    accounts(filter: { accountTag: $accountTag }) {
+      durableObjectsPeriodicGroups(limit: ${ROW_LIMIT}, filter: { datetime_geq: $start, datetime_lt: $end, namespaceId: $namespaceId }, orderBy: [datetime_ASC]) {
+        dimensions { datetime objectId name }
+        sum { rowsWritten rowsRead }
+      }
+      durableObjectsInvocationsAdaptiveGroups(limit: ${ROW_LIMIT}, filter: { datetime_geq: $start, datetime_lt: $end, namespaceId: $namespaceId }, orderBy: [datetimeMinute_ASC]) {
+        dimensions { datetimeMinute objectId }
+        sum { requests }
+      }
+    }
+  }
+}`;
+
+/**
+ * Every periodic sample of `worker`'s objects whose interval starts in
+ * [from, to), and invocations by minute, with the same fail-closed rules as
+ * `queryWorkerRows`.
+ */
+export async function querySamples({ accountId, token, worker, from, to, required = REQUIRED_CLASSES[worker] ?? [], fetchImpl = fetch }) {
+  if (!token) throw new Error("ARTROOM_CF_ANALYTICS_TOKEN is not set");
+  const namespaces = await workerNamespaces({ accountId, token, worker, fetchImpl });
+  const missing = required.filter((c) => !namespaces.some((n) => n.className === c));
+  if (namespaces.length === 0 || missing.length) throw new Error(`worker ${worker} is missing Durable Object namespaces: ${missing.join(", ") || "all"}`);
+  const samples = [];
+  const invocations = [];
+  for (const ns of namespaces) {
+    const label = `Durable Object samples query for ${ns.name}`;
+    const body = await json(
+      await fetchImpl(`${API}/graphql`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ query: SAMPLES_QUERY, variables: { accountTag: accountId, start: from, end: to, namespaceId: ns.id } }),
+      }),
+      label,
+    );
+    if (body.errors?.length) throw new Error(`${label}: GraphQL errors ${JSON.stringify(body.errors).slice(0, 500)}`);
+    const account = body.data?.viewer?.accounts?.[0];
+    const periodic = account?.durableObjectsPeriodicGroups;
+    const inv = account?.durableObjectsInvocationsAdaptiveGroups;
+    if (!Array.isArray(periodic) || !Array.isArray(inv)) throw new Error(`${label} omitted a required dataset`);
+    if (periodic.length >= ROW_LIMIT || inv.length >= ROW_LIMIT) throw new Error(`${label} reached its ${ROW_LIMIT}-row limit (truncated)`);
+    for (const g of periodic) {
+      const d = g?.dimensions ?? {};
+      if (d.objectId && d.datetime) samples.push({ className: ns.className, objectId: d.objectId, name: d.name ?? "", t: d.datetime, rowsWritten: nonNegative(g.sum?.rowsWritten), rowsRead: nonNegative(g.sum?.rowsRead) });
+    }
+    for (const g of inv) {
+      const d = g?.dimensions ?? {};
+      if (d.objectId && d.datetimeMinute) invocations.push({ className: ns.className, objectId: d.objectId, minute: d.datetimeMinute, requests: nonNegative(g.sum?.requests) });
+    }
+  }
+  return { worker, from, to, samples, invocations };
+}
+
+const median = (xs) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor((s.length - 1) / 2)];
+};
+
+/**
+ * The table of measured windows, from samples. A sample belongs to the
+ * window that holds its interval's end (start + 60 s), so an act at the
+ * start of a window, and its deferred work within the window, is in that
+ * window's samples. The driver leaves a quiet tail after each act so every
+ * window holds at least one quiet sample.
+ *
+ * For the measured room's own object: `samples` is the number of samples;
+ * `baseline` the smallest non-empty sample in the window (a minute with
+ * nothing but the room's background: its once-a-minute checkpoint
+ * publication); `act` is the window's total minus (non-empty samples x
+ * baseline). Reads use the same rule.
+ * The registry, publishers and other objects are shown as window totals.
+ * `invocations` is the room object's requests per minute, the median over
+ * the window's minutes (the alarm rate when idle).
+ */
+export function windowTable(windows, { samples, invocations }, room) {
+  const own = samples.filter((s) => s.className === "Room" && s.name === room);
+  const roomIds = new Set(own.map((s) => s.objectId));
+  const endIn = (w) => (s) => {
+    const end = Date.parse(s.t) + 60_000;
+    return end > Date.parse(w.from) && end <= Date.parse(w.to);
+  };
+  const sum = (xs, k) => xs.reduce((a, x) => a + x[k], 0);
+  return windows.map((w) => {
+    const inW = endIn(w);
+    const mine = own.filter(inW);
+    const all = samples.filter(inW);
+    // An empty interval (an eviction restarted the cadence) is not a quiet minute.
+    const quiet = mine.filter((s) => s.rowsWritten > 0 || s.rowsRead > 0);
+    const bw = quiet.length ? Math.min(...quiet.map((s) => s.rowsWritten)) : null;
+    const br = quiet.length ? Math.min(...quiet.map((s) => s.rowsRead)) : null;
+    const perMinute = invocations.filter((i) => roomIds.has(i.objectId) && Date.parse(i.minute) >= Date.parse(w.from) && Date.parse(i.minute) < Date.parse(w.to)).map((i) => i.requests);
+    const other = all.filter((s) => !(s.className === "Room" && s.name === room) && s.className !== "Registry" && s.className !== "Publisher");
     return {
       window: w.name,
       kind: w.kind,
       from: w.from,
       to: w.to,
-      state: r.state ?? "missing",
-      roomWritten: sum(own, "rowsWritten"),
-      roomRead: sum(own, "rowsRead"),
-      registryWritten: sum(registry, "rowsWritten"),
-      registryRead: sum(registry, "rowsRead"),
-      publisherWritten: sum(publisher, "rowsWritten"),
-      publisherRead: sum(publisher, "rowsRead"),
+      samples: mine.length,
+      roomWritten: sum(mine, "rowsWritten"),
+      roomRead: sum(mine, "rowsRead"),
+      baselineWritten: bw,
+      baselineRead: br,
+      actWritten: bw === null ? null : sum(mine, "rowsWritten") - quiet.length * bw,
+      actRead: br === null ? null : sum(mine, "rowsRead") - quiet.length * br,
+      roomInvocationsPerMinute: median(perMinute),
+      registryWritten: sum(all.filter((s) => s.className === "Registry"), "rowsWritten"),
+      registryRead: sum(all.filter((s) => s.className === "Registry"), "rowsRead"),
+      publisherWritten: sum(all.filter((s) => s.className === "Publisher"), "rowsWritten"),
+      publisherRead: sum(all.filter((s) => s.className === "Publisher"), "rowsRead"),
       otherWritten: sum(other, "rowsWritten"),
       ...(w.note ? { note: w.note } : {}),
-      ...(r.failures?.length ? { failures: r.failures } : {}),
+      ...(quiet.length < 2 ? { caution: "fewer than two non-empty samples of the room: no quiet baseline in the window" } : {}),
     };
   });
 }
 
-/** The table as Markdown, for notes/deploy-spike.md. */
-export function rowTableMarkdown(rows) {
-  const head = "| Window | Kind | Room written | Room read | Registry written | Registry read | Publisher written | Publisher read | Other written | State |\n|---|---|---|---|---|---|---|---|---|---|";
-  const line = (r) => `| ${r.window} | ${r.kind} | ${r.roomWritten} | ${r.roomRead} | ${r.registryWritten} | ${r.registryRead} | ${r.publisherWritten} | ${r.publisherRead} | ${r.otherWritten} | ${r.state} |`;
+/** The table as Markdown. */
+export function windowTableMarkdown(rows) {
+  const v = (x) => (x === null || x === undefined ? "n/a" : String(x));
+  const head =
+    "| Window | Kind | Samples | Room written (act) | Room read (act) | Room written (window) | Baseline written/min | Baseline read/min | Room invocations/min | Registry written | Registry read | Publisher written | Publisher read | Other written |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|";
+  const line = (r) =>
+    `| ${r.window}${r.caution ? " (caution)" : ""} | ${r.kind} | ${r.samples} | ${v(r.actWritten)} | ${v(r.actRead)} | ${r.roomWritten} | ${v(r.baselineWritten)} | ${v(r.baselineRead)} | ${v(r.roomInvocationsPerMinute)} | ${r.registryWritten} | ${r.registryRead} | ${r.publisherWritten} | ${r.publisherRead} | ${r.otherWritten} |`;
   return [head, ...rows.map(line)].join("\n") + "\n";
 }
 
@@ -290,15 +404,14 @@ function count(raw, name, fallback) {
   return n;
 }
 
-/** The scheduled check's options from its arguments: the hour ending ten minutes ago, the provisional budget. */
+/** The scheduled check's options from its arguments: the hour ending ten minutes ago, the hourly budget. */
 export function checkOptions(args, now = Date.now()) {
   const to = flag(args, "--to") ?? new Date(now - 10 * 60_000).toISOString();
   const from = flag(args, "--from") ?? new Date(Date.parse(to) - 60 * 60_000).toISOString();
   if (!Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) || Date.parse(from) >= Date.parse(to)) throw new Error("--from and --to must be ISO times, from before to");
-  const maxRowsWritten = count(flag(args, "--max-rows-written"), "--max-rows-written", PROVISIONAL_BUDGET.maxRowsWritten);
-  const maxRowsWrittenPerObject = count(flag(args, "--max-rows-written-per-object"), "--max-rows-written-per-object", PROVISIONAL_BUDGET.maxRowsWrittenPerObject);
-  const same = maxRowsWritten === PROVISIONAL_BUDGET.maxRowsWritten && maxRowsWrittenPerObject === PROVISIONAL_BUDGET.maxRowsWrittenPerObject;
-  return { worker: flag(args, "--worker") ?? SPIKE_WORKER, from, to, budget: same ? PROVISIONAL_BUDGET : { maxRowsWritten, maxRowsWrittenPerObject } };
+  const maxRowsWritten = count(flag(args, "--max-rows-written"), "--max-rows-written", HOURLY_BUDGET.maxRowsWritten);
+  const maxRowsWrittenPerObject = count(flag(args, "--max-rows-written-per-object"), "--max-rows-written-per-object", HOURLY_BUDGET.maxRowsWrittenPerObject);
+  return { worker: flag(args, "--worker") ?? SPIKE_WORKER, from, to, budget: { maxRowsWritten, maxRowsWrittenPerObject } };
 }
 
 /** Post the report to the alert webhook. */

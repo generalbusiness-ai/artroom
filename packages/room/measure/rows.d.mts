@@ -57,7 +57,6 @@ export interface GateResult extends Decision {
   readonly from: string;
   readonly to: string;
   readonly budget: Budget;
-  readonly provisional?: boolean;
   readonly totalRowsWritten?: number;
   readonly totalRowsRead?: number;
   readonly totalRequests?: number;
@@ -67,10 +66,35 @@ export interface GateResult extends Decision {
 
 export interface Window {
   readonly name: string;
-  readonly kind: "act" | "publication" | "setup" | "idle";
+  readonly kind: "act" | "setup" | "idle";
   readonly from: string;
   readonly to: string;
   readonly note?: string;
+}
+
+export interface Sample {
+  readonly className: string;
+  readonly objectId: string;
+  readonly name: string;
+  /** The start of the sample's interval. */
+  readonly t: string;
+  readonly rowsWritten: number;
+  readonly rowsRead: number;
+}
+
+export interface MinuteInvocations {
+  readonly className: string;
+  readonly objectId: string;
+  readonly minute: string;
+  readonly requests: number;
+}
+
+export interface Samples {
+  readonly worker: string;
+  readonly from: string;
+  readonly to: string;
+  readonly samples: readonly Sample[];
+  readonly invocations: readonly MinuteInvocations[];
 }
 
 export interface TableRow {
@@ -78,16 +102,21 @@ export interface TableRow {
   readonly kind: string;
   readonly from: string;
   readonly to: string;
-  readonly state: string;
+  readonly samples: number;
   readonly roomWritten: number;
   readonly roomRead: number;
+  readonly baselineWritten: number | null;
+  readonly baselineRead: number | null;
+  readonly actWritten: number | null;
+  readonly actRead: number | null;
+  readonly roomInvocationsPerMinute: number | null;
   readonly registryWritten: number;
   readonly registryRead: number;
   readonly publisherWritten: number;
   readonly publisherRead: number;
   readonly otherWritten: number;
   readonly note?: string;
-  readonly failures?: readonly string[];
+  readonly caution?: string;
 }
 
 type Fetch = typeof fetch;
@@ -95,7 +124,9 @@ type Fetch = typeof fetch;
 export declare const SPIKE_ACCOUNT: string;
 export declare const SPIKE_WORKER: string;
 export declare const REQUIRED_CLASSES: Readonly<Record<string, readonly string[]>>;
-export declare const PROVISIONAL_BUDGET: Budget;
+export declare const HEADROOM: { readonly smoke: number; readonly hourly: number };
+export declare const SMOKE_BUDGET: Budget;
+export declare const HOURLY_BUDGET: Budget;
 export declare const SETTLE_MS: number;
 export declare const ROW_LIMIT: number;
 export declare const STORAGE_QUERY: string;
@@ -116,8 +147,10 @@ export function rowGate(input: { accountId: string; token: string | null; worker
 export function gateOk(gate: { readonly state?: string | undefined } | null | undefined): boolean;
 export function gateOptions(env?: Record<string, string | undefined>): { run: false; reason: string } | { run: true; token: string; accountId: string };
 export function windowEndAfterSettle(ms: number, wait?: (ms: number) => Promise<void>, now?: () => Date): Promise<string>;
-export function rowTable(windows: readonly Window[], reports: readonly Partial<GateResult>[], room: string): TableRow[];
-export function rowTableMarkdown(rows: readonly TableRow[]): string;
+export declare const SAMPLES_QUERY: string;
+export function querySamples(input: { accountId: string; token: string | null; worker: string; from: string; to: string; required?: readonly string[]; fetchImpl?: Fetch }): Promise<Samples>;
+export function windowTable(windows: readonly Window[], samples: Pick<Samples, "samples" | "invocations">, room: string): TableRow[];
+export function windowTableMarkdown(rows: readonly TableRow[]): string;
 export function checkOptions(args: readonly string[], now?: number): { worker: string; from: string; to: string; budget: Budget };
 export function sendAlert(webhook: string, payload: unknown, fetchImpl?: Fetch): Promise<void>;
 export function check(args: readonly string[], env?: Record<string, string | undefined>, fetchImpl?: Fetch): Promise<number>;

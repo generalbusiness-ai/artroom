@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  PROVISIONAL_BUDGET,
+  HOURLY_BUDGET,
+  SMOKE_BUDGET,
   ROW_LIMIT,
   check,
   checkOptions,
@@ -9,9 +10,10 @@ import {
   gateOptions,
   queryWorkerRows,
   rowGate,
-  rowTable,
-  rowTableMarkdown,
+  querySamples,
   windowEndAfterSettle,
+  windowTable,
+  windowTableMarkdown,
   workerNamespaces,
   type WorkerRows,
 } from "../../measure/rows.mjs";
@@ -136,13 +138,73 @@ describe("row gate: attribution", () => {
     }
   });
 
-  it("tables a measured window by this room, the registry, publishers and anything else", async () => {
-    const result = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fakeCloudflare().fetchImpl });
-    const rows = rowTable([{ name: "claim", kind: "act", ...WINDOW }, { name: "land", kind: "act", ...WINDOW }], [result], "room_aaaa");
-    expect(rows[0]).toMatchObject({ window: "claim", state: "pass", roomWritten: 100, roomRead: 500, registryWritten: 4, registryRead: 9, publisherWritten: 2, publisherRead: 1, otherWritten: 7 });
-    // A window with no report is shown as missing, never as zero rows that passed.
-    expect(rows[1]).toMatchObject({ window: "land", state: "missing" });
-    expect(rowTableMarkdown(rows)).toContain("| claim | act | 100 | 500 | 4 | 9 | 2 | 1 | 7 | pass |");
+});
+
+describe("rows per act: per-minute samples", () => {
+  // The shape of the samples query: periodic groups by datetime and object, invocations by minute and object.
+  const SAMPLES: Record<string, unknown> = {
+    "ns-room": {
+      durableObjectsPeriodicGroups: [
+        // The act at 12:00:10 is in the sample whose interval starts at 11:59:39.
+        { dimensions: { datetime: "2026-10-02T11:59:39Z", objectId: "o-room", name: "room_aaaa" }, sum: { rowsWritten: 16, rowsRead: 250 } },
+        { dimensions: { datetime: "2026-10-02T12:00:39Z", objectId: "o-room", name: "room_aaaa" }, sum: { rowsWritten: 7, rowsRead: 240 } },
+        // An empty interval after an eviction is not a quiet minute.
+        { dimensions: { datetime: "2026-10-02T12:01:30Z", objectId: "o-room", name: "room_aaaa" }, sum: { rowsWritten: 0, rowsRead: 0 } },
+        // The next act's window.
+        { dimensions: { datetime: "2026-10-02T12:02:39Z", objectId: "o-room", name: "room_aaaa" }, sum: { rowsWritten: 40, rowsRead: 900 } },
+        { dimensions: { datetime: "2026-10-02T12:03:39Z", objectId: "o-room", name: "room_aaaa" }, sum: { rowsWritten: 8, rowsRead: 260 } },
+        // Another room's background in the same minutes.
+        { dimensions: { datetime: "2026-10-02T12:00:05Z", objectId: "o-other", name: "room_bbbb" }, sum: { rowsWritten: 7, rowsRead: 100 } },
+      ],
+      durableObjectsInvocationsAdaptiveGroups: [
+        { dimensions: { datetimeMinute: "2026-10-02T12:00:00Z", objectId: "o-room" }, sum: { requests: 14 } },
+        { dimensions: { datetimeMinute: "2026-10-02T12:01:00Z", objectId: "o-room" }, sum: { requests: 12 } },
+        { dimensions: { datetimeMinute: "2026-10-02T12:01:00Z", objectId: "o-other" }, sum: { requests: 12 } },
+      ],
+    },
+    "ns-registry": {
+      durableObjectsPeriodicGroups: [{ dimensions: { datetime: "2026-10-02T11:59:50Z", objectId: "o-reg", name: "registry" }, sum: { rowsWritten: 4, rowsRead: 9 } }],
+      durableObjectsInvocationsAdaptiveGroups: [],
+    },
+    "ns-publisher": { durableObjectsPeriodicGroups: [], durableObjectsInvocationsAdaptiveGroups: [] },
+  };
+  const samplesFake = () => fakeCloudflare({ graphql: (ns) => json({ data: { viewer: { accounts: [SAMPLES[ns] ?? {}] } }, errors: null }) });
+  const W = [
+    { name: "claim", kind: "act" as const, from: "2026-10-02T12:00:00.000Z", to: "2026-10-02T12:02:30.000Z" },
+    { name: "propose", kind: "act" as const, from: "2026-10-02T12:02:30.000Z", to: "2026-10-02T12:05:00.000Z" },
+    { name: "note", kind: "act" as const, from: "2026-10-02T12:05:00.000Z", to: "2026-10-02T12:07:30.000Z" },
+  ];
+
+  it("asks for samples by interval start and invocations by minute, failing closed like the gate", async () => {
+    const fake = samplesFake();
+    const r = await querySamples({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl });
+    expect(r.samples).toHaveLength(7);
+    expect(r.invocations).toHaveLength(3);
+    for (const c of fake.calls.filter((x) => x.url.endsWith("/graphql"))) {
+      expect(c.body?.query).toMatch(/dimensions \{ datetime objectId name \}/);
+      expect(c.body?.query).toMatch(/dimensions \{ datetimeMinute objectId \}/);
+    }
+    await expect(querySamples({ accountId: "acct", token: null, worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl })).rejects.toThrow("ARTROOM_CF_ANALYTICS_TOKEN is not set");
+    const bad = fakeCloudflare({ graphql: () => json({ data: { viewer: { accounts: [{ durableObjectsPeriodicGroups: [] }] } }, errors: null }) });
+    await expect(querySamples({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: bad.fetchImpl })).rejects.toThrow("omitted a required dataset");
+    const none = fakeCloudflare({ namespaces: NAMESPACES.filter((n) => n.class !== "Room") });
+    await expect(querySamples({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: none.fetchImpl })).rejects.toThrow("missing Durable Object namespaces: Room");
+  });
+
+  it("attributes each sample to the window holding its interval's end, and subtracts the quiet baseline", async () => {
+    const r = await querySamples({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: samplesFake().fetchImpl });
+    const [claim, propose, note] = windowTable(W, r, "room_aaaa");
+    // claim: samples ending 12:00:39 (16) and 12:01:39 (7); the empty 12:01:30 sample ends 12:02:30, in claim too.
+    expect(claim).toMatchObject({ samples: 3, roomWritten: 23, baselineWritten: 7, actWritten: 9, roomRead: 490, baselineRead: 240, actRead: 10, roomInvocationsPerMinute: 12, registryWritten: 4, otherWritten: 7 });
+    expect(claim!.caution).toBeUndefined();
+    // propose: 40 and 8, so the act is 40 - 8.
+    expect(propose).toMatchObject({ samples: 2, roomWritten: 48, baselineWritten: 8, actWritten: 32, actRead: 640 });
+    // A window with no sample of the room has no baseline and says so; never zero rows.
+    expect(note).toMatchObject({ samples: 0, actWritten: null, baselineWritten: null, roomInvocationsPerMinute: null });
+    expect(note!.caution).toContain("no quiet baseline");
+    const md = windowTableMarkdown([claim!, note!]);
+    expect(md).toContain("| claim | act | 3 | 9 | 10 | 23 | 7 | 240 | 12 | 4 | 9 | 0 | 0 | 7 |");
+    expect(md).toContain("| note (caution) | act | 0 | n/a | n/a | 0 | n/a | n/a | n/a |");
   });
 });
 
@@ -191,9 +253,9 @@ describe("row gate: fails closed", () => {
   it("no invocation evidence, or invocations with no periodic sample, is incomplete, not zero rows", async () => {
     const empty = { durableObjectsPeriodicGroups: [], durableObjectsInvocationsAdaptiveGroups: [] };
     const quiet = await query(fakeCloudflare({ rows: { "ns-room": empty, "ns-registry": empty, "ns-publisher": empty } }));
-    expect(evaluateRows(quiet, PROVISIONAL_BUDGET)).toEqual({ state: "incomplete", failures: ["no Durable Object invocations were visible in the window"] });
+    expect(evaluateRows(quiet, SMOKE_BUDGET)).toEqual({ state: "incomplete", failures: ["no Durable Object invocations were visible in the window"] });
     const lagging = await query(fakeCloudflare({ rows: { ...ROWS, "ns-registry": { ...ROWS["ns-registry"], durableObjectsPeriodicGroups: [] } } }));
-    expect(evaluateRows(lagging, PROVISIONAL_BUDGET)).toEqual({ state: "incomplete", failures: ["artroom-spike-room_Registry/o-reg had invocations but no periodic storage sample"] });
+    expect(evaluateRows(lagging, SMOKE_BUDGET)).toEqual({ state: "incomplete", failures: ["artroom-spike-room_Registry/o-reg had invocations but no periodic storage sample"] });
   });
 });
 
@@ -216,10 +278,17 @@ describe("row gate: budgets", () => {
     expect(evaluateRows(report, { maxRowsWritten: 120, maxRowsWrittenPerObject: 90 })).toEqual({ state: "pass", failures: [] });
   });
 
-  it("the provisional ceilings are woo's 250,000 total and 50,000 per object, and say so", async () => {
-    expect(PROVISIONAL_BUDGET).toEqual({ maxRowsWritten: 250_000, maxRowsWrittenPerObject: 50_000 });
+  it("the ceilings are the measured runs times their headroom, rounded up to two significant figures", async () => {
+    const up2 = (n: number) => {
+      const p = 10 ** (Math.floor(Math.log10(n)) - 1);
+      return Math.ceil(n / p) * p;
+    };
+    // spike-smoke-2026-10-02T18-47-09-470Z: 2,284 in total, 508 in one object; headroom 4.
+    expect(SMOKE_BUDGET).toEqual({ maxRowsWritten: up2(2_284 * 4), maxRowsWrittenPerObject: up2(508 * 4) });
+    // The hour 17:50-18:50: 11,285 in total, 1,034 in one object; headroom 2.
+    expect(HOURLY_BUDGET).toEqual({ maxRowsWritten: up2(11_285 * 2), maxRowsWrittenPerObject: up2(1_034 * 2) });
     const g = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fakeCloudflare().fetchImpl });
-    expect(g).toMatchObject({ state: "pass", provisional: true, totalRowsWritten: 113 });
+    expect(g).toMatchObject({ state: "pass", budget: SMOKE_BUDGET, totalRowsWritten: 113 });
   });
 });
 
@@ -254,9 +323,9 @@ describe("row gate: the smoke run's switch", () => {
 describe("row gate: the scheduled check", () => {
   const HOOK = "https://alerts.example.invalid/hook";
 
-  it("defaults to the hour ending ten minutes ago, the spike Room Worker and the provisional budget", () => {
+  it("defaults to the hour ending ten minutes ago, the spike Room Worker and the hourly budget", () => {
     const o = checkOptions([], Date.parse("2026-10-02T13:10:00.000Z"));
-    expect(o).toEqual({ worker: "artroom-spike-room", from: "2026-10-02T12:00:00.000Z", to: "2026-10-02T13:00:00.000Z", budget: PROVISIONAL_BUDGET });
+    expect(o).toEqual({ worker: "artroom-spike-room", from: "2026-10-02T12:00:00.000Z", to: "2026-10-02T13:00:00.000Z", budget: HOURLY_BUDGET });
     expect(checkOptions(["--max-rows-written", "10", "--max-rows-written-per-object", "5", "--worker", "artroom-spike-checkers"]).budget).toEqual({ maxRowsWritten: 10, maxRowsWrittenPerObject: 5 });
     expect(() => checkOptions(["--max-rows-written", "NaN"])).toThrow("non-negative integer");
     expect(() => checkOptions(["--from", "2026-10-02T13:00:00Z", "--to", "2026-10-02T12:00:00Z"])).toThrow("from before to");
