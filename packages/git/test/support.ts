@@ -411,6 +411,9 @@ export class FakeCanonical implements MintRepo {
   readonly revokes: string[] = [];
   /** While set, every revocation fails. */
   revokeDown = false;
+  /** While set, revocations wait for the test: `heldRevokes` answers or fails each. */
+  holdRevokes = false;
+  readonly heldRevokes: { id: string; answer: () => void; fail: (e: Error) => void }[] = [];
   /** Provider text a failure carries: it must never be stored. */
   failureText = "Artifacts: internal error";
   constructor(clock: Clock) {
@@ -441,6 +444,11 @@ export class FakeCanonical implements MintRepo {
   }
   async revokeToken(id: string): Promise<boolean> {
     this.revokes.push(id);
+    if (this.holdRevokes) {
+      const gate = deferred<void>();
+      this.heldRevokes.push({ id, answer: () => gate.resolve(), fail: (e) => gate.reject(e) });
+      await gate.promise;
+    }
     if (this.revokeDown) throw new ArtifactsError("INTERNAL_ERROR", 10400, this.failureText);
     const t = this.tokens.find((x) => x.id === id);
     if (!t || t.state !== "active") return false;

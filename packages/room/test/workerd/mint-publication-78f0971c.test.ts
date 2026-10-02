@@ -102,22 +102,33 @@ function stopAtTokenAnswered(r: TestRoom) {
 const token = (r: TestRoom, id: string) => r.world.artifacts.canonicalRepo().tokens.get(id)!;
 
 describe("mint lane B: the publication token through the canonical mint ledger, in the Room", () => {
-  it("no alarm stored beforehand: while the publication token's create is held, storage has an alarm no later than the takeover time, stored by the ledger's wake before the create was sent", () =>
+  it("no alarm stored beforehand: while the publication token's create is held, storage has an alarm no later than the takeover time, stored by the ledger's wake before the create was sent; a wake that takes 20 s of room time comes before the lifetime, which the record holds", () =>
     ahead(async () => {
       const r = await makeRoom();
       const { lane, head } = await proposed(r, "docs/a/**", { "docs/a/one.md": "one" });
       const held = await holdLedgerCreate(r);
+      const asked: number[] = [];
       // Nothing stored, and the Room's own scheduling switched off on this object: only a wake can store an alarm now.
+      // Storing it takes 20 s of room time.
       await inDO(r, async (room, state) => {
         await state.storage.deleteAlarm();
-        (room as unknown as { schedule: () => void }).schedule = () => {};
+        const o = room as unknown as { schedule: () => void; storeAlarm: (when: number) => Promise<void> };
+        o.schedule = () => {};
+        const store = o.storeAlarm.bind(room);
+        o.storeAlarm = async (when) => {
+          if (asked.length === 0) clock.now += 20_000;
+          asked.push(when);
+          return store(when);
+        };
       });
       expect(await stored(r)).toBeNull();
+      const t1 = clock.now;
       const op = await startLanding(r, lane, head);
       await until(async () => held.call > 0);
       const seen = await inDO(r, async (room, state) => ({ alarm: await state.storage.getAlarm(), d: room.core.mints.duties(), now: clock.now }));
-      expect(seen.d.records.map((x) => [x.purpose, x.state])).toEqual([[`publish:${op}:1`, "sent"]]);
-      expect(seen.d.takeoverAt).toBe(seen.now + 60_000);
+      expect(seen.d.records.map((x) => [x.purpose, x.state, x.ttlSeconds, x.sentAt])).toEqual([[`publish:${op}:1`, "sent", 60, t1 + 20_000]]);
+      expect(seen.d.takeoverAt).toBe(t1 + 60_000);
+      expect(asked).toEqual([t1 + 60_000]);
       expect(seen.alarm).not.toBeNull();
       expect(seen.alarm!).toBeLessThanOrEqual(seen.d.takeoverAt!);
       // The create answers: the token is claimed by pushToken, pushed and revoked, and the record is gone.
@@ -126,6 +137,54 @@ describe("mint lane B: the publication token through the canonical mint ledger, 
       await inDO(r, (room) => room.core.idle());
       expect((await records(r)).records).toEqual([]);
       expect(r.world.artifacts.canonicalRepo().activeTokens()).toEqual([]);
+      // The token's expiry ran from the send, after the wake: 60 s from t1 + 20 s.
+      const pushed = await inDO(r, (room) => room.core.landing.core.get(op)!.pushes![0]!.tokenId!);
+      expect(token(r, pushed).expiresAt).toBe(t1 + 80_000);
+    }));
+
+  it("idle: the mints step and the ledger's next due time write nothing, with no records, and with an unknown record whose observation is not yet due (a write spy on this object's SQL)", () =>
+    ahead(async () => {
+      const r = await makeRoom();
+      const spy = (room: Room, state: State) => {
+        const sql = room.core.sql as { all: (q: string, ...b: unknown[]) => unknown[] };
+        const real = sql.all;
+        const seen = { written: 0, restore: () => void (sql.all = real) };
+        sql.all = (q: string, ...b: unknown[]) => {
+          const c = state.storage.sql.exec(q, ...(b as never[]));
+          const rows = c.toArray();
+          seen.written += c.rowsWritten;
+          return rows;
+        };
+        return seen;
+      };
+      const idleRun = () =>
+        inDO(r, async (room, state) => {
+          const w = spy(room, state);
+          try {
+            await room.core.steps.mints();
+            room.core.mints.nextDue();
+            room.core.nextAlarm();
+            await room.core.mints.idle();
+            return w.written;
+          } finally {
+            w.restore();
+          }
+        });
+      expect(await idleRun()).toBe(0);
+      // An unknown record: its first observation writes the summary once; until the next is due, nothing.
+      // A check job's token (a job_tokens row) is known to the Room: the observation does not count it.
+      const job = r.world.artifacts.canonicalRepo().mint("read", 300);
+      await inDO(r, (room) => room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, 'held')", job.id, clock.now + 300_000, clock.now + 300_000));
+      r.world.artifacts.loseReply("createToken");
+      await inDO(r, (room) => room.core.mints.mint("test:lost", "read", () => 60).catch(() => undefined));
+      await inDO(r, (room) => room.core.steps.mints());
+      expect((await records(r)).observation.unaccounted).toBe(1); // the lost create's token only
+      const next = (await records(r)).observation.nextAt!;
+      expect(next).toBe(clock.now + 60_000);
+      clock.now += 30_000;
+      expect(await idleRun()).toBe(0);
+      expect(await idleRun()).toBe(0);
+      expect((await records(r)).observation.nextAt).toBe(next);
     }));
 
   it("a crash with the answer lost: the object is aborted while the create is held and the create applies late; through the alarm alone, the fresh object records it as unknown, stores a bounded alarm for the observation, observes once, and keeps the record", () =>
@@ -198,8 +257,13 @@ describe("mint lane B: the publication token through the canonical mint ledger, 
       expect(afterAlarm.alarm).not.toBeNull();
       expect(afterAlarm.alarm!).toBeLessThanOrEqual(takeover);
       expect(token(before, tokenId).revoked).toBe(false);
-      // The host stops. The next alarm, with no request, takes over and revokes the token by its ID.
+      // The host stops, with no alarm stored. The fresh object stores one for the owed token at start, with no request;
+      // the landing has nothing left to do, so only the ledger's debt is due within the minute.
+      await inDO(before, (_room, state) => state.storage.deleteAlarm());
       const r = await restarted(before);
+      const recovered = await inDO(r, async (room, state) => ({ alarm: await state.storage.getAlarm(), due: room.core.mints.nextDue(), now: clock.now }));
+      expect(recovered.due).toBe(recovered.now + 1_000);
+      expect(recovered.alarm).toBe(recovered.due);
       expect((await records(r)).records.map((x) => [x.state, x.tokenId])).toEqual([["owed", tokenId]]);
       expect(await alarm(r)).toBe(true);
       await inDO(r, (room) => room.core.mints.idle());

@@ -1379,12 +1379,12 @@ function spySql(inner: Sql) {
   return s;
 }
 
-async function ledgerWorld() {
+async function ledgerWorld(o: { waitMs?: number } = {}) {
   const f = await new Fixture().init();
   const room = new FakeRoom();
   const clock = new Clock();
   const sql = spySql(nodeSql());
-  const host = new LedgerHost(sql, clock);
+  const host = new LedgerHost(sql, clock, o.waitMs);
   const pub = new ControlledPublisher(new GitPublisher(f.ops, f.canonical));
   // The remote takes a push only with a live token, so the pushed token is the one the room holds.
   pub.authAtRemote = host;
@@ -1686,4 +1686,42 @@ test("mint lane B (6), R-MINT-5, R-MINT-7: an observation over a listing that ho
   assert.deepEqual(w.sql.queries.filter((q) => q.includes("artroom_land_op")), [], "no operation is read");
   assert.equal(w.sql.queries.filter((q) => q.includes("artroom_land_token WHERE token")).length, 2, "one point lookup per listed token");
   w.pub.paused[0]!.abandon();
+});
+
+test("mint lane B (3), R-MINT-4: the revocation of a token that pushToken did not take runs off the publication queue: publish ends while it is unanswered, and the ledger closes the record when it answers", async (t) => {
+  const w = await ledgerWorld();
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await w.ready(id);
+  w.sql.all("CREATE TRIGGER row_insert_down BEFORE INSERT ON artroom_land_token BEGIN SELECT RAISE(ABORT, 'row insert down'); END");
+  w.host.repo.holdRevokes = true;
+  await assert.rejects(within(w.engine.publish(), "publish, while the release is unanswered", 2_000), /row insert down/);
+  assert.deepEqual(w.host.repo.heldRevokes.map((h) => h.id), ["tok_c1"]);
+  assert.deepEqual(w.records().map((r) => [r.state, r.tokenId]), [["held", "tok_c1"]]);
+  w.host.repo.heldRevokes[0]!.answer();
+  await w.engine.cleanupDone();
+  assert.deepEqual(w.records(), []);
+  assert.equal(w.host.repo.live("tok_c1"), false);
+});
+
+test("mint lane B, R-MINT-4: a publication token's revocation is bounded: unanswered, it ends with the wait, the landing goes on, no retry is sent after it, and plan 003's record revokes it later", async (t) => {
+  const w = await ledgerWorld({ waitMs: 200 });
+  t.after(w.dispose);
+  const { id } = await w.land(1, { "src/c.txt": "c\n" });
+  await w.ready(id);
+  w.host.repo.holdRevokes = true;
+  await within(w.engine.publish(), "publish, while its token's revocation is unanswered", 5_000);
+  assert.equal(w.engine.view(id)?.state, "landed");
+  assert.deepEqual(w.engine.core.tokenCleanup().map((c) => [c.op, c.n]), [[id, 1]]);
+  // The late answer is a transient error: no retry follows it.
+  w.host.repo.holdRevokes = false;
+  w.host.repo.heldRevokes[0]!.fail(new Error("10400 internal error"));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(w.host.repo.revokes, ["tok_c1"]);
+  w.clock.advance(2_000);
+  await w.engine.reconcile();
+  await w.engine.cleanupDone();
+  assert.deepEqual(w.host.repo.revokes, ["tok_c1", "tok_c1"]);
+  assert.equal(w.host.repo.live("tok_c1"), false);
+  assert.deepEqual(w.rows(), []);
 });
