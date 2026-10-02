@@ -148,6 +148,24 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
     await answer(r, late, 0, "refuse");
   });
 
+  it("two jobs steps at once: one attempt is sent; the step that lost the race sends nothing and revokes the token it minted", async () => {
+    const { r, alice, ci } = await checkRoom();
+    await hold(r, ["jobs"]);
+    const { seen } = service(r, ci, ["refuse"]);
+    await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    await settled(r);
+    const before = r.world.artifacts.canonicalRepo().tokens.size;
+    await inDO(r, async (room) => {
+      await Promise.all([room.core.steps.jobs(), room.core.steps.jobs()]);
+      await room.core.idle();
+    });
+    expect(seen).toHaveLength(1);
+    expect(await jobsOf(r)).toMatchObject([{ state: "done", attempt: 1, outcome: "refused: check-binding" }]);
+    const minted = [...r.world.artifacts.canonicalRepo().tokens.values()].slice(before).filter((t) => t.scope === "read");
+    expect(minted).toHaveLength(2);
+    expect(minted.every((t) => t.revoked)).toBe(true);
+  });
+
   it("restart: an attempt in flight when the room stops is issued again at its deadline, and its check lands the change", async () => {
     const { r: before, land, deadline, seen, late } = await sentAndHanging(["hang", "sign"]);
     // The object stops with the call in flight; a new stub reaches a new object with nothing in memory.
@@ -161,6 +179,9 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
     expect(seen).toHaveLength(2);
     expect(await jobsOf(r)).toMatchObject([{ state: "done", attempt: 2, outcome: expect.stringMatching(/^act_/) }]);
     expect(await op(r, land.op.id)).toMatchObject({ state: "landed" });
+    // Nothing in memory ended the first attempt: the step that found it expired revoked its token.
+    const firstToken = [...r.world.artifacts.canonicalRepo().tokens.values()].find((t) => t.plaintext === tokenOf(seen[0]!))!;
+    expect(firstToken.revoked).toBe(true);
     void late; // The first attempt's call belonged to the stopped object.
   });
 });
@@ -244,16 +265,33 @@ describe("review 0f9739dc P2 2: a preview's integration gets jobs (R-EXEC-8)", (
     expect(seen[1]!.base).not.toBe(seen[0]!.base);
   });
 
-  it("an owed preview job whose generation moved, or whose configuration changed, is not issued", async () => {
+  it("an owed preview job whose lane moved to a new generation is not issued; the new generation's job is", async () => {
     const { r, alice, ci } = await checkRoom();
     await hold(r, ["jobs"]);
-    const { seen } = service(r, ci);
+    const { seen } = service(r, ci, ["refuse"]);
     const g1 = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
     await settled(r);
     await proposed(r, alice, [g1.lane], { "src/app.ts": "v3" }, 1);
     await settled(r);
-    const owed = await jobsOf(r);
-    expect(owed.map((j) => j["state"])).toEqual(["owed", "owed"]);
+    expect((await jobsOf(r)).map((j) => j["state"])).toEqual(["owed", "owed"]);
+    await inDO(r, async (room) => {
+      await room.core.steps.jobs();
+      await room.core.idle();
+    });
+    expect((await jobsOf(r)).map((j) => [j["state"], j["outcome"]])).toEqual([
+      ["done", "not-needed"],
+      ["done", "refused: check-binding"],
+    ]);
+    expect(seen.map((j) => j.generation)).toEqual([2]);
+  });
+
+  it("an owed preview job whose checker configuration changed is not issued", async () => {
+    const { r, alice, ci } = await checkRoom();
+    await hold(r, ["jobs"]);
+    const { seen } = service(r, ci);
+    await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    await settled(r);
+    expect(await jobsOf(r)).toMatchObject([{ state: "owed" }]);
     const changed = { ...whole, timeoutSeconds: 61 };
     await inDO(r, (room) => {
       const old = room.core.activePolicy();
@@ -262,13 +300,9 @@ describe("review 0f9739dc P2 2: a preview's integration gets jobs (R-EXEC-8)", (
     const after = await inDO(r, async (room) => {
       await room.core.steps.jobs();
       await room.core.idle();
-      return room.core.sql.all("SELECT state, outcome FROM check_jobs ORDER BY rowid LIMIT 2");
+      return room.core.sql.all("SELECT state, outcome FROM check_jobs ORDER BY rowid LIMIT 1");
     });
-    // Generation 1's job: the lane moved to generation 2. Generation 2's job: the configuration changed.
-    expect(after).toEqual([
-      { state: "done", outcome: "not-needed" },
-      { state: "done", outcome: "not-needed" },
-    ]);
+    expect(after).toEqual([{ state: "done", outcome: "not-needed" }]);
     expect(seen).toEqual([]);
   });
 
