@@ -1016,6 +1016,145 @@ test("plan 001: an unrecorded token on a released fork, while inventories are in
   assert.deepEqual(ns.repos.get("canon")!.live(), [canon.id]);
 });
 
+// ------------------------------------------------------------------ plan 002: a foreign occupant is an observation, not an unknown step's answer
+
+/** A repository not of this canonical repo, recording every call made on it. Only `info` (the provenance check) may be. */
+function foreign(ns: FakeNamespace, name: string): { repo: FakeRepo; calls: string[]; theirs: string } {
+  const repo = new FakeRepo(ns, name, "artifacts:ns/other-canon");
+  const theirs = repo.mintRaw("write", 7 * 24 * 3600).id;
+  const calls: string[] = [];
+  const methods = repo as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+  for (const m of ["createToken", "revokeToken", "listTokens", "info", "fork", "log", "readTree", "readCommit"]) {
+    const real = methods[m]!.bind(repo);
+    methods[m] = async (...a: unknown[]) => {
+      calls.push(m);
+      return real(...a);
+    };
+  }
+  return { repo, calls, theirs };
+}
+
+/** A fork creation sent by a host that then stops: no answer ever arrives. Returns a function that applies it late. */
+function lostForkCreate(ns: FakeNamespace): { sent: Promise<void>; apply: () => Promise<void> } {
+  const canon = ns.repos.get("canon")!;
+  const realFork = canon.fork.bind(canon);
+  const sent = deferred();
+  let name = "";
+  canon.fork = async (n: string) => {
+    name = n;
+    canon.fork = realFork;
+    sent.resolve();
+    return await new Promise<never>(() => {});
+  };
+  return {
+    sent: sent.promise,
+    apply: async () => {
+      await realFork(name);
+    },
+  };
+}
+
+const restartOf = (ws: Workspaces, ns: FakeNamespace, clock: Clock) =>
+  new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+const forkCreates = (ws: Workspaces) => ws.duties().filter((d) => d.kind === "fork-create").map((d) => d.state);
+
+test("plan 002: a fork creation whose answer is lost, a foreign repository at the name, swept and removed, then the old create applies: the step stays in flight and a restarted host revokes the late creation token", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const name = forkName("canon", lane);
+  const late = lostForkCreate(ns);
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  void ws.provision(lane);
+  await late.sent;
+  const host = restartOf(ws, ns, clock);
+  const other = foreign(ns, name);
+  ns.repos.set(name, other.repo);
+  assert.equal(await host.sweep(), 1, "the unknown create is still open");
+  assert.deepEqual(forkCreates(host), ["in-flight"]);
+  assert.ok(host.nextDue() !== null && host.nextDue()! > clock.t, "and scheduled in the future");
+  assert.ok(other.calls.every((c) => c === "info"), `only provenance was read: ${other.calls.join(", ")}`);
+  assert.deepEqual(other.repo.live(), [other.theirs], "the foreign repository is unchanged");
+  assert.equal(ns.deleteCalls, 0);
+  // The foreign repository goes away, and the old request applies: a fork of ours, with its 24-hour token.
+  ns.repos.delete(name);
+  await late.apply();
+  assert.equal(fork().live().length, 1);
+  const again = restartOf(ws, ns, clock);
+  clock.t = Math.max(clock.t, again.nextDue()!);
+  await again.reconcile();
+  assert.deepEqual(fork().live(), [], "the late creation token is revoked");
+  assert.deepEqual(forkCreates(again), ["in-flight"], "still never settled: it was never answered");
+  assert.ok(again.nextDue()! > clock.t);
+});
+
+test("plan 002: foreign, absent, foreign and ours again, each seen by a restarted host: the unknown create stays in flight on a growing, capped backoff, and the foreign repository is never touched", async () => {
+  const { clock, ns, ws, lane, fork } = setup();
+  const name = forkName("canon", lane);
+  const late = lostForkCreate(ns);
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  void ws.provision(lane);
+  await late.sent;
+  const other = foreign(ns, name);
+  const gaps: number[] = [];
+  const observe = async (occupant: "foreign" | "absent" | "ours") => {
+    if (occupant === "foreign") ns.repos.set(name, other.repo);
+    else if (occupant === "absent") ns.repos.delete(name);
+    const host = restartOf(ws, ns, clock);
+    clock.t = Math.max(clock.t, host.nextDue()!);
+    await host.reconcile();
+    assert.deepEqual(forkCreates(host), ["in-flight"], occupant);
+    const due = host.nextDue()!;
+    assert.ok(due > clock.t, `${occupant}: the next check is in the future`);
+    gaps.push(due - clock.t);
+  };
+  for (const o of ["foreign", "foreign", "absent", "foreign", "foreign", "absent", "foreign", "foreign"] as const) await observe(o);
+  assert.ok(gaps[gaps.length - 1]! > gaps[0]!, "the backoff grows");
+  assert.ok(Math.max(...gaps) <= 30 * 60_000, "and is capped at 30 minutes");
+  assert.ok(other.calls.every((c) => c === "info"), other.calls.join(", "));
+  assert.deepEqual(other.repo.live(), [other.theirs]);
+  // The name frees and the late create applies: ours, and its token is revoked when next checked.
+  ns.repos.delete(name);
+  await late.apply();
+  await observe("ours");
+  assert.deepEqual(fork().live(), []);
+  assert.equal(ns.deleteCalls, 0);
+});
+
+test("plan 002: a fork creation refused unchanged, then a foreign occupant: the definite answer settles the step, and nothing is owed or touched", async () => {
+  const { clock, ns, ws, lane } = setup();
+  const name = forkName("canon", lane);
+  const canon = ns.repos.get("canon")!;
+  const other = foreign(ns, name);
+  canon.fork = async () => {
+    ns.repos.set(name, other.repo); // another creator took the name first
+    throw new ArtifactsError("ALREADY_EXISTS", 10409);
+  };
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  const v = await ws.provision(lane);
+  assert.ok(v.state === "failed" && v.error.code === "forbidden");
+  assert.equal(await ws.sweep(), 0);
+  assert.deepEqual(forkCreates(ws), ["done"]);
+  assert.equal(ws.nextDue(), null);
+  assert.ok(other.calls.every((c) => c === "info"));
+  assert.deepEqual(other.repo.live(), [other.theirs]);
+});
+
+test("plan 002: an ordinary fork creation that answered, not yet swept, then a foreign occupant: the answered step settles; only in-flight steps are kept", async () => {
+  const { clock, ns, ws, lane } = setup();
+  const name = forkName("canon", lane);
+  ns.failRevoke = true; // the sweep after the create cannot run, so the answered step stays open
+  ws.open(lane, 1, clock.t + LEASE_MS);
+  assert.equal((await ws.provision(lane)).state, "failed");
+  assert.deepEqual(forkCreates(ws), ["answered"]);
+  ns.failRevoke = false;
+  const other = foreign(ns, name);
+  ns.repos.set(name, other.repo); // our fork, and every token on it, is gone; another repository holds the name
+  assert.equal(await ws.sweep(), 0);
+  assert.deepEqual(forkCreates(ws), ["done"]);
+  assert.equal(ws.nextDue(), null);
+  assert.ok(other.calls.every((c) => c === "info"));
+  assert.deepEqual(other.repo.live(), [other.theirs]);
+});
+
 // ------------------------------------------------------------------ request b6b51de7, reviews a35b4b61 and 3eb7bc44: the canonical repository at public founding
 
 const FIRST = "f".repeat(40);

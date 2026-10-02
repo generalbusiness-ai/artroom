@@ -44,7 +44,9 @@
  * fork lock coordinates one live host only; it is never restart evidence.
  * The Room's alarm calls `reconcile()` and sets its next alarm from
  * `nextDue()`. Cleanup checks provenance first, and never touches a
- * repository that is not this canonical repo's fork.
+ * repository that is not this canonical repo's fork. Such a repository at the
+ * fork's name settles answered and owed duties (our fork is gone, with its
+ * tokens), never a step in flight: occupancy is not that step's answer.
  *
  * The same ledger covers the canonical repository at public founding
  * (`prepareCanonical`, `sealCanonical`, `settleCanonical`; request b6b51de7,
@@ -561,8 +563,11 @@ export class Workspaces {
       state = await this.forkState(name);
     } catch (e) {
       if (e instanceof NotOurFork) {
-        // Not ours: never touched, and nothing of ours can be live in it.
-        this.done(duties.map((d) => d.id), "not-our-repository");
+        // Not ours: never touched. Our fork no longer holds the name, so no token of ours is live there, and every
+        // answered or owed duty is settled. A step still in flight is not (plan 002): another repository at the name
+        // is an observation, not that request's answer, and if the name frees the request may still apply. It keeps its
+        // inventory on the capped backoff (`cleanFork`'s finally), and does not block.
+        this.done(duties.filter((d) => d.state !== "in-flight").map((d) => d.id), "not-our-repository");
         return 0;
       }
       this.defer(duties.map((d) => d.id), String(e));
