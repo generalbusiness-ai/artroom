@@ -8,10 +8,24 @@
 
 export { CanonicalError, canonicalBytes, canonicalize, parseStrict } from "./canonical.ts";
 export { b64url, digestJson, keyIdOf, keyPairFromSeed, publicKeyOf, sign, verifySig, type KeyPair } from "./crypto.ts";
-export { Malformed, decodeCheckpoint, decodeEntry, decodeRetained } from "./decode.ts";
+export { Malformed, decodeCheckpoint, decodeChunkedLine, decodeEntry, decodeLayout, decodeRetained } from "./decode.ts";
 export { LOG_REF, contentOf, entryId, logFiles, makeCheckpoint, retain, retainedPath, roomIdOf, seal, segmentPath, type Retained } from "./entries.ts";
 export {
+  ARTIFACTS_OBJECT_LIMIT,
+  DIRECTORY_ENTRIES,
+  OBJECT_BOUND,
+  SEGMENT_ENTRIES,
+  Placement,
+  chunkedLine,
+  chunks,
+  placedBytes,
+  segmentStarts,
+  shardsOf,
+} from "./layout.ts";
+export { entryPath, readLogCommit, type LogCommit } from "./tree.ts";
+export {
   MemoryGit,
+  OBJECT_TOO_LARGE,
   buildTree,
   encodeCommit,
   encodeTree,
@@ -38,6 +52,7 @@ export {
   readLogFiles,
   readPublishedEntries,
   type BatchPolicy,
+  type EntryLine,
   type EntrySource,
   type PublicationStats,
   type PublishErrorCode,

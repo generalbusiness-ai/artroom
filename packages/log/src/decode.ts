@@ -13,9 +13,9 @@
  * check signatures or digests: verify does that on the decoded value.
  */
 
-import type { CheckerConfig, Checkpoint, LogEntry, PolicyDocument, ReplayContext } from "@generalbusiness/artroom-contract";
+import type { CheckerConfig, Checkpoint, ChunkedLine, LogEntry, LogLayout, PolicyDocument, ReplayContext } from "@generalbusiness/artroom-contract";
 import { validateCheckerConfig, validatePolicy } from "@generalbusiness/artroom-policy";
-import { fromUtf8, parseStrict } from "./canonical.ts";
+import { canonicalize, fromUtf8, parseStrict } from "./canonical.ts";
 import { hex } from "./crypto.ts";
 import { parseTime } from "./time.ts";
 
@@ -322,8 +322,46 @@ export function decodeCheckpoint(bytes: Uint8Array): Checkpoint {
   str(c.hash, "checkpoint.hash");
   time(c.at, "checkpoint.at");
   str(c.roomKey, "checkpoint.roomKey");
+  if ("layout" in c) decodeLayout(c["layout"], "checkpoint.layout");
   str(c.sig, "checkpoint.sig");
   return v as Checkpoint;
+}
+
+/**
+ * A checkpoint's `layout` (R-LOG-16): exactly `{ version: 2, from }` with a
+ * seq `from`. Any other value is malformed; an absent one is layout 1.
+ */
+export function decodeLayout(v: unknown, path = "layout"): LogLayout {
+  const l = obj(v, path);
+  if (Object.keys(l).length !== 2) bad(path, "is not { version, from }");
+  if (l["version"] !== 2) bad(`${path}.version`, "is not 2");
+  seqOf(l["from"], `${path}.from`);
+  return l as unknown as LogLayout;
+}
+
+/** The start of every `ChunkedLine`, and of no entry: an entry's first key is `at`. */
+const CHUNKED_PREFIX = '{"chunked":';
+
+/**
+ * A segment line that stands for a chunked entry file (R-LOG-18), or null
+ * when the line is not one. A line that starts as one must be exactly a
+ * canonical `ChunkedLine`, or it is malformed.
+ */
+export function decodeChunkedLine(line: string): ChunkedLine | null {
+  if (!line.startsWith(CHUNKED_PREFIX)) return null;
+  let v: unknown;
+  try {
+    v = parseStrict(line);
+  } catch (e) {
+    throw new Malformed(`the chunked line is not strict JSON: ${(e as Error).message}`);
+  }
+  const c = obj(v, "chunked line");
+  const inner = obj(c["chunked"], "chunked");
+  if (!Number.isSafeInteger(inner["bytes"]) || (inner["bytes"] as number) < 0) bad("chunked.bytes", "is not a length");
+  if (!/^sha256:[0-9a-f]{64}$/.test(str(inner["digest"], "chunked.digest"))) bad("chunked.digest", "is not a SHA-256 digest");
+  seqOf(c.seq, "seq");
+  if (canonicalize(v) !== line || Object.keys(c).length !== 2 || Object.keys(inner).length !== 2) bad("chunked line", "is not exactly a canonical ChunkedLine");
+  return v as ChunkedLine;
 }
 
 export function decodeRetained(kind: "json", bytes: Uint8Array): unknown;
