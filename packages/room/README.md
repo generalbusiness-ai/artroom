@@ -1728,16 +1728,27 @@ The type check `typeof id !== "string"` in `limitInvitation` is not a
 behaviour guard: a join whose invitation is not a string is refused at step
 4 either way.
 
-**Review of 812fb907: the client's clock.** The checker found that the
-client's `join()` recovery signed its `session` request with `Date.now`, not
-`ClientOptions.now`. A room on the supplied clock then refused the
-request's `notAfter`. `recoverJoin` now takes the caller's clock. The
-checker's fixture is `test/workerd/checker-join-recovery.test.ts`: recovery
-over RPC after an eviction, over HTTPS, and with a room clock a day behind.
-The third test failed at 812fb907. `packages/client/test/redeem.test.ts`
-adds the same clock case against the fake room. Both mutants turn both
-tests red: signing without the clock, and passing `Date.now` in place of
-`options.now`.
+**Review of 812fb907 (report b3445eae): the client's clock.** The checker
+found that the client's `join()` recovery signed its `session` request with
+`Date.now`, not `ClientOptions.now`. A room on the supplied clock then
+refused the request's `notAfter`. `recoverJoin` now takes the caller's
+clock and reads it inside each attempt, so every retry of the session
+request is signed afresh at the clock's current time. Recovery still
+resubmits the original join bytes and idempotency key, still proves
+possession of the key with a signed session request, and the Room still
+refuses the replayed redemption.
+
+| Test | What it pins |
+|---|---|
+| `test/workerd/checker-join-recovery.test.ts` (the checker's fixture, unchanged) | Recovery over RPC after an eviction and over HTTPS; "checker: join recovery honors the supplied client clock for its signed session request", which failed at 812fb907 |
+| `request-c657d4ba.test.ts`, "virtual clock: a lost join reply is recovered, and a session request retried after the clock moves is signed again at the moved time" | Against the real Room: the first session request fails retryably after the clock moves ten minutes; the retry's `notAfter` is ten minutes later and is accepted; the log holds one join |
+| `packages/client/test/redeem.test.ts`, the two virtual-clock tests | The same two cases against the fake room |
+
+| Mutant in `connect.ts` | Red |
+|---|---|
+| the session request is signed without the clock (`Date.now`) | the checker's clock test; the client's clock test |
+| `Date.now` passed in place of `options.now` | the same two |
+| the clock read once, before the retries | both "retried after the clock moves" tests |
 
 The other clock reads in `packages/client/src` already use the injected
 clock: `RoomClient` signs requests and judges session expiry with
@@ -1754,7 +1765,7 @@ head without conflict (`git merge-tree`), so it is not merged here.
 **Gates**, at the head of `request/sec-join` that adds this section:
 `npm ci`, the client and Room typechecks and suites, the root
 `npm run typecheck` and the root `npm test` exit 0. The Room's Node suite
-passes 125 tests in 12 files, and its workerd suite 410 tests in 31 files.
+passes 125 tests in 12 files, and its workerd suite 411 tests in 31 files.
 
 ## Secrets
 
