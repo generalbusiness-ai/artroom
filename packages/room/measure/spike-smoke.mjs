@@ -5,14 +5,20 @@
 //
 //   node packages/room/measure/spike-smoke.mjs
 //
-// Steps: found a room (public founding), read it back, open a session; a
-// first lane on the fresh, empty repository (claim, workspace, push,
-// propose, land) to see how far it gets; seed main if the room cannot land
-// on an empty repository; a second lane (claim, workspace, token, push,
-// propose, land) that must land; check main; wait for the log to publish;
-// run `artroom verify` against the published log. Then clean up: release
-// the lanes, revoke every active token on the test repositories and delete
-// them.
+// Steps: found a room (public founding), read it back, check that the new
+// repository's main is the Room's first commit (no files) and that no token
+// is left on it, open a session; a first lane on the fresh repository
+// (claim, workspace, push, propose, land) that must land; release it and
+// check its token no longer works; a second lane (claim, workspace, token,
+// push, propose, land) that must land; check main; two import drafts,
+// signed by the spike operator key, that this public-only deployment must
+// refuse with a clear reason; wait for the log to publish; run `artroom
+// verify` against the published log. Then clean up: release the lanes,
+// revoke every active token on the test repositories and delete them.
+//
+// Request b6b51de7 changed the first lane from a probe (it could not land:
+// founding left the repository with no main) to a step that must pass, and
+// removed the out-of-band seeding of main.
 //
 // It needs hugh's wrangler OAuth login (Artifacts REST: repository tokens,
 // listing and deletion). It prints no token and saves a redacted result in
@@ -24,8 +30,9 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { newKeyPair, randomToken, sign } from "../src/crypto.ts";
+import { keyPairFromSeed, newKeyPair, randomToken, sign, unb64url } from "../src/crypto.ts";
 import { iso } from "../src/ids.ts";
+import { firstCommit } from "../../git/src/first-commit.ts";
 
 const ACCT = "6e953d231f1c9aadffbf59537a82e13a";
 const NS = "gitseq-spike";
@@ -225,6 +232,21 @@ async function lane(n, files, opts = {}) {
   return res;
 }
 
+// ------------------------------------------------------------ the spike operator key
+
+/** The spike operator's key pair, from the env file. The seed stays in this process; it is never printed. */
+function operatorKey() {
+  const file = process.env.ARTROOM_SPIKE_ENV ?? join(homedir(), ".config/generalbusiness/artroom-spike.env");
+  const text = readFileSync(file, "utf8");
+  const value = (k) => new RegExp(`^${k}=["']?([^"'\n]*)["']?$`, "m").exec(text)?.[1] ?? null;
+  const seed = value("ARTROOM_OPERATOR_SEED");
+  const raw = seed ? unb64url(seed) : null;
+  if (!raw || raw.length !== 32) return null;
+  secrets.add(seed);
+  const kp = keyPairFromSeed(raw);
+  return kp.key === value("OPERATOR_KEYS") ? kp : null;
+}
+
 // ------------------------------------------------------------ the run
 
 let canonical = null;
@@ -261,6 +283,16 @@ async function main() {
   canonicalRemote = info.result?.remote ?? null;
   step("found: repository created in gitseq-spike", !!canonicalRemote, { name: info.result?.name, remote: canonicalRemote, source: info.result?.source ?? null });
 
+  // Request b6b51de7, gap 1: main is the Room's first commit, with no files, fixed by the genesis's time.
+  const expectedFirst = (await firstCommit(Date.parse(genesis.createdAt))).commit;
+  const mainAtFounding = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
+  step("found: main is the Room's first commit (no files)", mainAtFounding === expectedFirst, { main: mainAtFounding, expected: expectedFirst });
+  // Gap 2: no token is left on the new repository (the create's 24-hour token and the first commit's are revoked).
+  // Read before this script mints its own read tokens, and after the one canonicalRef minted is revoked.
+  const left = (await api("GET", `/repos/${canonical}/tokens?state=active&per_page=100`)).result ?? [];
+  const meta = left.map((t) => Object.fromEntries(Object.entries(t).filter(([k]) => !/plaintext|token|secret/i.test(k))));
+  step("found: no active token on the new repository", left.length === 0, { active: left.length, tokens: meta });
+
   // 2. A read session (R-CRED-5).
   const s = await request({ kind: "session", ttlSeconds: 900 });
   if (s.body?.token) secrets.add(s.body.token);
@@ -269,41 +301,25 @@ async function main() {
   const lg = await read("/log?limit=10");
   step("read: log after founding", lg.status === 200, { status: lg.status, head: lg.body.head, kinds: lg.body.acts?.map((e) => (e.entry.type === "system" ? e.entry.event.type : e.entry.act?.envelope?.kind)) });
 
-  // 3. A first lane on the fresh, empty repository.
-  const first = await lane(1, { "README.md": "# spike smoke\n", "docs/first.md": "first lane, empty repository\n" }, { mayFail: true });
+  // 3. A first lane on the fresh repository: it must land (request b6b51de7, gap 1).
+  const first = await lane(1, { "README.md": "# spike smoke\n", "docs/first.md": "first lane, fresh repository\n" });
   lanes.push(first);
   const mainAfterFirst = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
-  out.firstLaneOnEmptyRepo = { landed: first.op?.state === "landed", landResponse: clean(first.landResponse ?? null), main: mainAfterFirst };
-  if (first.op?.state !== "landed") {
-    out.gaps.push(
-      `A room founded with { kind: "new" } has an empty repository, and its first lane cannot land: ${redact(JSON.stringify(first.landResponse?.body ?? first.op ?? "no land response")).slice(0, 400)}`,
-    );
-    // Release the first lane (R-WS-3: its workspace token is revoked).
-    if (first.lane) {
-      const r = await act("release", { lane: first.lane }, { lease: 1, note: "spike smoke: the empty-repository lane is abandoned" });
-      first.released = r.status === 200;
-      step("lane 1: release", r.status === 200, { status: r.status, refused: r.body.rule, reason: r.body.reason });
-      // R-WS-3: release ends the lease's access. The token may take a moment to be revoked by the room's durable step.
-      if (first.token && first.fork) {
-        let code = 0;
-        for (let i = 0; i < 10 && code === 0; i++) {
-          code = (await git(["ls-remote", first.fork], { token: first.token })).code;
-          if (code === 0) await sleep(2_000);
-        }
-        step("lane 1: the released lane's workspace token no longer reads the fork", code !== 0, { lsRemoteExit: code });
+  out.firstLaneOnFreshRepo = { landed: first.op?.state === "landed", main: mainAfterFirst, integration: first.op?.integration ?? null };
+  step("lane 1: main is lane 1's integration, on the first commit", !!first.op?.integration && mainAfterFirst === first.op.integration, { main: mainAfterFirst, integration: first.op?.integration });
+  // Release the first lane (R-WS-3: its workspace token is revoked).
+  if (first.lane) {
+    const r = await act("release", { lane: first.lane }, { lease: 1, note: "spike smoke: lane 1 is done" });
+    first.released = r.status === 200;
+    step("lane 1: release", r.status === 200, { status: r.status, refused: r.body.rule, reason: r.body.reason });
+    // R-WS-3: release ends the lease's access. The token may take a moment to be revoked by the room's durable step.
+    if (first.token && first.fork) {
+      let code = 0;
+      for (let i = 0; i < 10 && code === 0; i++) {
+        code = (await git(["ls-remote", first.fork], { token: first.token })).code;
+        if (code === 0) await sleep(2_000);
       }
-    }
-    // Seed main out of band, as an operator would, with a 60-second write token revoked after.
-    if (!/^[0-9a-f]{40}$/.test(mainAfterFirst ?? "")) {
-      const seed = mkdtempSync(join(tmpdir(), "deploy-spike-seed-"));
-      await must(["init", "-q"], { cwd: seed });
-      write(seed, "README.md", "# spike smoke\n\nSeeded out of band: a fresh public room cannot land its first commit.\n");
-      await must(["add", "-A"], { cwd: seed });
-      await must(["commit", "-q", "-m", "seed"], { cwd: seed });
-      const t = await mint(canonical, "write", 60);
-      const p = await git(["push", "-q", canonicalRemote, "HEAD:refs/heads/main"], { cwd: seed, token: t.plaintext });
-      const revoked = await revoke(t.id);
-      step("seed main out of band (write token, revoked after)", p.code === 0, { code: p.code, stderr: p.stderr || undefined, main: await must(["rev-parse", "HEAD"], { cwd: seed }), tokenRevoked: revoked });
+      step("lane 1: the released lane's workspace token no longer reads the fork", code !== 0, { lsRemoteExit: code });
     }
   }
 
@@ -312,6 +328,21 @@ async function main() {
   lanes.push(second);
   const main2 = await canonicalRef(canonicalRemote, canonical, "refs/heads/main");
   step("main is the landed integration", !!second.op?.integration && main2 === second.op.integration, { main: main2, integration: second.op?.integration, head: second.head });
+
+  // Gap 3: this deployment founds public rooms only (one Artifacts namespace). Imports signed by the
+  // spike operator key are refused at draft, with the reason; nothing is created, read or bound.
+  const operator = operatorKey();
+  if (operator) {
+    for (const [label, repo, want] of [
+      ["a grant for the public namespace", `${NS}/${"0".repeat(32)}`, /public founding namespace/],
+      ["a grant for another namespace", `gitseq-spike-import/${"0".repeat(32)}`, /does not import repositories/],
+    ]) {
+      const importer = newKeyPair();
+      const g = { v: 1, repo, admin: importer.key, operator: operator.key, notAfter: iso(Date.now() + 10 * 60_000) };
+      const r = await http("POST", "", { name: `deploy-spike-import-${Date.now().toString(36)}`, repo: { kind: "import", grant: { grant: g, sig: sign(operator.seed, "artroom-onboarding-v1", g) } }, admin: { handle: "@importer", key: importer.key }, recovery: newKeyPair().key });
+      step(`import: ${label} is refused with its reason`, r.status === 403 && want.test(r.body.message ?? ""), { status: r.status, code: r.body.code, message: r.body.message });
+    }
+  } else step("import: the spike operator key", false, { error: "ARTROOM_OPERATOR_SEED is not in the env file, or does not match OPERATOR_KEYS" });
 
   // 5. The log publishes (R-LOG-8): a minute after the oldest unpublished entry, by the alarm.
   const head = (await read("/log?limit=1")).body.head;

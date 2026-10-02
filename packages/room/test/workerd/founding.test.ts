@@ -107,7 +107,7 @@ describe("R-GEN-12: imports need an operator's grant", () => {
     const world = prepareWorld(drafted.genesis);
     const room = await worker.found(drafted.genesis, sig, drafted.draft);
     expect(world.artifacts.calls.get("readMain")).toBeGreaterThan(0);
-    expect(world.artifacts.calls.get("createRepo")).toBeUndefined();
+    expect(world.artifacts.remoteCalls.get("create")).toBeUndefined();
     expect((await reg().byRepo(repo))?.room).toBe(room);
   });
 

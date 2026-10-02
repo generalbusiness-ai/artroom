@@ -129,8 +129,26 @@ class FakeNamespace implements ArtifactsNamespace {
     if (this.createGate) await this.createGate;
     return r;
   }
-  async create(): Promise<never> {
-    throw new Error("workspaces never create a repository");
+  /** Public founding only (`createCanonical`): off unless a test turns it on. */
+  allowCreate = false;
+  /** Planned outcomes of the next creates: an error, or "lost-after-create" (applies, then the answer is lost). */
+  readonly createFailures: (Error | "lost-after-create")[] = [];
+  createCalls = 0;
+  /** Run when a create is sent, before it applies. */
+  readonly createHooks: (() => void)[] = [];
+  async create(name: string) {
+    if (!this.allowCreate) throw new Error("workspaces never create a repository");
+    this.createCalls++;
+    this.createHooks.shift()?.();
+    const failure = this.createFailures.shift();
+    if (failure && failure !== "lost-after-create") throw failure;
+    if (this.repos.has(name)) throw new ArtifactsError("ALREADY_EXISTS", 10409);
+    const repo = new FakeRepo(this, name, null);
+    this.repos.set(name, repo);
+    // As Artifacts' create: the answer carries a 24-hour write token.
+    const t = repo.mintRaw("write", 86400);
+    if (failure === "lost-after-create") throw new ArtifactsError("INTERNAL_ERROR", 10400);
+    return { name, remote: (await repo.info()).remote, token: t.plaintext };
   }
   async delete(): Promise<never> {
     throw new Error("workspaces never delete a repository");
@@ -896,4 +914,97 @@ test("no open duty is left due after a run, whichever way the run ends", async (
   clock.t = ws.nextDue()!;
   await ws.reconcile();
   assert.ok(ws.nextDue()! > clock.t);
+});
+
+// ------------------------------------------------------------------ request b6b51de7: the canonical repository at public founding
+
+function setupFounding() {
+  const clock = new Clock();
+  const ns = new FakeNamespace(clock);
+  ns.repos.delete("canon");
+  ns.allowCreate = true;
+  const sql = nodeSql();
+  const ws = new Workspaces({ sql, artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  return { clock, ns, sql, ws, canon: () => ns.repos.get("canon")! };
+}
+
+test("public founding: the create is recorded before it is sent, its 24-hour token is owed from its answer, and settling revokes it", async () => {
+  const { ns, ws, canon } = setupFounding();
+  ns.createHooks.push(() => {
+    // The step is on record before Artifacts sees the call.
+    assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"]]);
+  });
+  await ws.createCanonical();
+  assert.equal(ns.createCalls, 1);
+  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "answered"], ["inventory", "owed"]]);
+  assert.equal(canon().live().length, 1, "the create's own token is live until settled");
+  assert.ok(canon().tokens.get(canon().live()[0]!)!.ttl === 86400);
+  assert.equal(await ws.settleCanonical(), 0);
+  assert.deepEqual(canon().live(), [], "no token is left on the canonical repository");
+  assert.equal(ws.pendingCleanup(), 0);
+});
+
+test("public founding: the first commit's token lasts 60 seconds, is owed by ID before it is used, and is revoked after", async () => {
+  const { ws, canon } = setupFounding();
+  await ws.createCanonical();
+  let during: { kind: string; state: string }[] = [];
+  const out = await ws.withCanonicalToken(async (token) => {
+    during = ws.duties().map((d) => ({ kind: d.kind, state: d.state }));
+    const live = canon().live().map((id) => canon().tokens.get(id)!);
+    assert.ok(live.some((t) => t.plaintext === token && t.ttl === 60 && t.scope === "write"));
+    return "pushed";
+  });
+  assert.equal(out, "pushed");
+  assert.deepEqual(during.filter((d) => d.kind === "token"), [{ kind: "token", state: "owed" }], "owed while it is used");
+  assert.deepEqual(during.filter((d) => d.kind === "mint"), [{ kind: "mint", state: "answered" }]);
+  assert.ok(canon().live().every((id) => canon().tokens.get(id)!.ttl !== 60), "revoked after use");
+  // A failure inside still revokes it.
+  await assert.rejects(ws.withCanonicalToken(async () => {
+    throw new Error("push failed");
+  }), /push failed/);
+  assert.ok(canon().live().every((id) => canon().tokens.get(id)!.ttl !== 60));
+  assert.equal(await ws.settleCanonical(), 0);
+  assert.deepEqual(canon().live(), []);
+});
+
+test("public founding: when settling fails the debt stays owed and blocks; a later run, by the alarm's reconcile, revokes the token", async () => {
+  const { clock, ns, ws, canon } = setupFounding();
+  await ws.createCanonical();
+  ns.failRevoke = true;
+  assert.ok((await ws.settleCanonical()) > 0, "open: the founding must not seal");
+  assert.equal(canon().live().length, 1);
+  const due = ws.nextDue()!;
+  assert.ok(due > clock.t, "the retry is scheduled");
+  // A restart, then the alarm: the canonical repository's duties are its own, not a fork's.
+  ns.failRevoke = false;
+  const restarted = new Workspaces({ sql: ws["sql"], artifacts: ns, canonical: "canon", namespace: "ns", now: clock.now, sleep: async () => {} });
+  clock.t = due;
+  assert.equal(await restarted.reconcile(), 0);
+  assert.deepEqual(canon().live(), []);
+  assert.deepEqual(restarted.duties().map((d) => d.doneReason), ["inventory", "inventory"]);
+  assert.equal(restarted.nextDue(), null);
+});
+
+test("public founding: a create whose answer was lost stays in flight until the repository is seen and swept; a retry's ALREADY_EXISTS is not an error", async () => {
+  const { ns, ws, canon } = setupFounding();
+  ns.createFailures.push("lost-after-create");
+  await assert.rejects(ws.createCanonical(), /INTERNAL_ERROR/);
+  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"]]);
+  assert.equal(canon().live().length, 1, "the lost answer's token exists");
+  // The retried founding: the repository is there already.
+  await ws.createCanonical();
+  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"], ["repo-create", "answered"]]);
+  assert.equal(await ws.settleCanonical(), 0);
+  assert.deepEqual(canon().live(), [], "the token whose answer was lost is revoked too");
+});
+
+test("public founding: absence never settles a create in flight; a refused create closes its step", async () => {
+  const { ns, ws } = setupFounding();
+  ns.createFailures.push(new TypeError("connection lost"));
+  await assert.rejects(ws.createCanonical(), /connection lost/);
+  assert.equal(await ws.settleCanonical(), 1, "no repository yet, and the create may still apply");
+  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"]]);
+  ns.createFailures.push(new ArtifactsError("INVALID_REPO_NAME", 10002));
+  await assert.rejects(ws.createCanonical(), /INVALID_REPO_NAME/);
+  assert.deepEqual(ws.duties().map((d) => [d.kind, d.state]), [["repo-create", "in-flight"], ["repo-create", "answered"]]);
 });

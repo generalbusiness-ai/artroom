@@ -178,15 +178,17 @@ export class Room extends DurableObject<RoomEnv> {
     this.schedule();
   }
 
-  /** The alarm's work: every durable step once (R-LANE-8, R-LOG-13, R-PUB-7, R-LOG-8). */
+  /**
+   * The alarm's work: every durable step once (R-LANE-8, R-LOG-13, R-PUB-7, R-LOG-8).
+   * Before founding, only the cleanup a new repository still owes (request b6b51de7).
+   */
   private async work(): Promise<void> {
-    if (!this.core.founded) return;
+    if (!this.core.founded) return this.core.settleFounding();
     await this.core.runAll();
   }
 
   private schedule(): void {
-    if (!this.core.founded) return;
-    const next = this.core.nextAlarm();
+    const next = this.core.founded ? this.core.nextAlarm() : this.core.foundingDue();
     if (next === null) return;
     if (this.scheduled !== null && this.scheduled <= next) return;
     this.scheduled = next;

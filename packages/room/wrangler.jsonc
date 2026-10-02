@@ -10,6 +10,13 @@
 //   alpine/git into the account's registry); use the digest it prints;
 // - secrets: `wrangler secret put ROOM_KEY_SECRET`;
 // - OPERATOR_KEYS lists the operator key IDs that sign onboarding grants.
+//
+// To import repositories as well as found public rooms, add a second
+// Artifacts binding for another namespace (an import's repository must be
+// outside PUBLIC_NAMESPACE, R-GEN-12): an `artifacts` entry
+// { "binding": "IMPORT_ARTIFACTS", "namespace": "<ns>", "remote": true } and
+// the var "IMPORT_NAMESPACE": "<ns>". Without them, imports are refused at
+// draft, with that reason.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "artroom-room",

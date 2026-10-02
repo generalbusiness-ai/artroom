@@ -57,7 +57,7 @@ import { adminObligation, invalidity, latestReviews, obligationsFor, qualificati
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedFile, RoomServices, Sql } from "./ports.ts";
 import { ContainerPublisher, Landing, Workspaces, canonicalTokens, forkName } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
-import { ArtifactsAdapter, locate, type RepoLocation } from "./artifacts.ts";
+import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit } from "./snapshot.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
@@ -153,8 +153,8 @@ export class RoomCore {
   /** Lane B's landing engine, on this room's SQLite. */
   readonly landing: Landing;
   private wsCache: Workspaces | null = null;
-  /** The repository identity while `found` runs, before the genesis is stored. */
-  private foundingRepo: string | null = null;
+  /** The Artifacts binding for the room's repository namespace (`binding()`), resolved per call. */
+  private readonly artifacts: ArtifactsBinding;
   private chain: Promise<unknown> = Promise.resolve();
   private seedCache: Uint8Array | null = null;
   /** Deferred work already started, so a kick is not repeated. */
@@ -190,7 +190,13 @@ export class RoomCore {
     createSchema(this.sql);
     const r = this.remotes;
     const sleep = r.sleep ? { sleep: r.sleep } : {};
-    const adapter = new ArtifactsAdapter({ binding: r.artifacts, stub: r.publisher, location: () => this.location(), ...(r.bounds ? { bounds: r.bounds } : {}), ...sleep });
+    // The public namespace's binding, or the import namespace's (R-GEN-12): whichever holds the room's repository.
+    this.artifacts = {
+      get: (name) => this.binding().get(name),
+      create: (name, o) => this.binding().create(name, o),
+      delete: (name) => this.binding().delete(name),
+    };
+    const adapter = new ArtifactsAdapter({ binding: this.artifacts, stub: r.publisher, location: () => this.location(), ...(r.bounds ? { bounds: r.bounds } : {}), ...sleep });
     this.ports = {
       policy: opts.services.policy,
       artifacts: r.wrapArtifacts ? r.wrapArtifacts(adapter) : adapter,
@@ -212,19 +218,27 @@ export class RoomCore {
     this.landing = new Landing({
       sql: this.sql,
       room: this.host(),
-      publisher: new ContainerPublisher({ stub: r.publisher, artifacts: r.artifacts, canonical, ...sleep }),
-      tokens: canonicalTokens(() => r.artifacts.get(this.location().name), sleep),
+      publisher: new ContainerPublisher({ stub: r.publisher, artifacts: this.artifacts, canonical, ...sleep }),
+      tokens: canonicalTokens(() => this.artifacts.get(this.location().name), sleep),
       now: () => this.now(),
       ...(r.landingFault ? { fault: r.landingFault } : {}),
     });
   }
 
-  /** The room's repository in this deployment's Artifacts namespace (R-GEN-12). */
+  /**
+   * The room's repository in one of this deployment's Artifacts namespaces
+   * (R-GEN-12): the genesis's, or while `found` runs, the one it is founding.
+   */
   location(): RepoLocation {
-    const identity = this.foundingRepo ?? (this.founded ? this.genesis.repo : null);
-    const loc = identity ? locate(identity, this.remotes.namespace) : null;
+    const identity = this.founded ? this.genesis.repo : getMeta(this.sql, "founding_repo");
+    const loc = identity ? locate(identity, [this.remotes.namespace, ...Object.keys(this.remotes.bindings ?? {})]) : null;
     if (!loc) throw artroomError("unavailable", identity ? "This deployment has no Artifacts binding for the room's repository namespace." : "This room has not been founded.");
     return loc;
+  }
+
+  private binding(): ArtifactsBinding {
+    const ns = this.location().namespace;
+    return ns === this.remotes.namespace ? this.remotes.artifacts : this.remotes.bindings![ns]!;
   }
 
   /**
@@ -247,7 +261,7 @@ export class RoomCore {
       const loc = this.location();
       this.wsCache = new Workspaces({
         sql: this.sql,
-        artifacts: this.remotes.artifacts,
+        artifacts: this.artifacts,
         canonical: loc.name,
         namespace: loc.namespace,
         now: () => this.now(),
@@ -326,23 +340,23 @@ export class RoomCore {
     let checkers: ActivePolicyFull["checkers"] = {};
     let main: Sha | null = null;
     let remote: string;
-    this.foundingRepo = genesis.repo;
+    setMeta(this.sql, "founding_repo", genesis.repo);
     try {
-      if (!genesis.onboarding) await this.ports.artifacts.createRepo();
+      if (!genesis.onboarding) await this.newRepository(genesis);
       main = await this.ports.artifacts.readMain();
+      if (main === null && !genesis.onboarding) throw new Error("main has no first commit");
       remote = await this.ports.artifacts.canonicalRemote();
     } catch {
-      this.foundingRepo = null;
+      // Wake the alarm: it settles whatever the new repository still owes (request b6b51de7).
+      this.committed();
       throw artroomError("unavailable", "The canonical repository could not be created or read. Retry the same found.");
     }
     if (main !== null) {
       const cfg = await this.ports.artifacts.readConfig(main).catch(() => {
-        this.foundingRepo = null;
         throw artroomError("unavailable", "The canonical repository could not be read. Try again.");
       });
       const parsed = this.parseConfig(cfg.policy, cfg.checkers);
       if (!parsed.ok) {
-        this.foundingRepo = null;
         throw artroomError("bad-request", `The policy on main is invalid: ${parsed.problems[0]}`);
       }
       if (parsed.doc) doc = parsed.doc;
@@ -364,10 +378,54 @@ export class RoomCore {
       this.sql.all("INSERT INTO keys (key, member, custody, added, state) VALUES (?, ?, 'client', 0, 'active')", genesis.admin.key, genesis.admin.handle);
       this.activate(doc, checkers, null, at);
     });
-    this.foundingRepo = null;
     if (main !== null) await this.landing.refreshMain().catch(() => undefined);
     this.committed();
     return this.roomId;
+  }
+
+  /**
+   * Public founding, step 6 (R-GEN-12; request b6b51de7): create the room's
+   * repository and give `main` its first commit, with no files, so that the
+   * first landing has a main to land on (R-LAND-2, R-PUB-4). Each remote step
+   * is a duty in lane B's ledger, recorded before it is sent: the create's
+   * 24-hour token and the first commit's 60-second token are owed revocation
+   * from their answers on. The genesis is sealed only once no token is left
+   * on the repository; until then `found` fails, and the alarm settles what
+   * is owed. One step at a time, and never after the room is founded, when
+   * the Room's own tokens may be live there.
+   */
+  private newRepository(genesis: Genesis): Promise<void> {
+    return this.serial(async () => {
+      if (this.founded) return;
+      const ws = this.workspaces;
+      await ws.createCanonical();
+      if ((await this.ports.artifacts.readMain()) === null) {
+        const remote = await this.ports.artifacts.canonicalRemote();
+        const push = this.remotes.firstCommit;
+        if (!push) throw new Error("this deployment cannot push a first commit");
+        // A refused push leaves main as it is; `found` reads it next.
+        await ws.withCanonicalToken((token) => push(remote, token, Date.parse(genesis.createdAt)));
+      }
+      if ((await ws.settleCanonical()) > 0) throw new Error("a token on the new repository is not yet revoked");
+    });
+  }
+
+  /** Before founding, the alarm's only work: settle what a public founding's new repository still owes. */
+  async settleFounding(): Promise<void> {
+    if (this.founded || !getMeta(this.sql, "founding_repo")) return;
+    await this.serial(async () => {
+      if (!this.founded) await this.workspaces.settleCanonical();
+    });
+  }
+
+  /** Before founding: when `settleFounding` is next due, or null. */
+  foundingDue(): number | null {
+    if (this.founded || !getMeta(this.sql, "founding_repo")) return null;
+    try {
+      return this.workspaces.nextDue();
+    } catch {
+      return null;
+    }
   }
 
   /** Parse `.artroom/` files strictly and validate them (R-POL-1). `doc` is null when there is no policy file. */

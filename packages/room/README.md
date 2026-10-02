@@ -200,7 +200,9 @@ Worker's `draft` and `found` (`ArtroomFounder`).
    4. authorizes the repository: for `new`, it must be the fresh identity
       derived from the draft value in the public namespace; for `import`,
       the grant must be signed by a configured operator key, for this
-      repository and this admin key;
+      repository and this admin key, in the deployment's import namespace.
+      A source whose namespace the deployment has no binding for is
+      refused here, and at `draft`, with `forbidden`;
    5. binds repository, room ID and name in the registry, in one atomic
       step (R-GEN-13). For an import, the registry also judges the grant's
       `notAfter` there, with its own clock: a first binding at or after it
@@ -208,7 +210,9 @@ Worker's `draft` and `found` (`ArtroomFounder`).
       completes;
    6. only then has the room create or read the repository and seal
       entries 0 and 1. The room itself refuses to do this unless the
-      registry binds it.
+      registry binds it. A new repository gets one commit on `main`, with
+      no files, and no live token, before the genesis is sealed (see
+      "Founding gaps").
 
 A failure in steps 1 to 5 binds nothing. A failure in step 6 is
 `unavailable`; the binding stays, and the same `found` again completes the
@@ -251,10 +255,12 @@ Before the first deploy (the file's header says the same):
 | `ROOM_KEY_SECRET` (secret) | Derives each new room's signing key and, for public founding, its repository identity |
 | `OPERATOR_KEYS` | Operator key IDs, comma-separated, whose onboarding grants are accepted (R-GEN-12) |
 | `PUBLIC_NAMESPACE` | The repository namespace reserved for public founding, default `artroom-public` |
-| `ARTIFACTS` (binding) | The Artifacts binding for the deployment's namespace |
-| `ARTIFACTS_NAMESPACE` | The namespace that binding reaches, default `PUBLIC_NAMESPACE` |
+| `ARTIFACTS` (binding) | The Artifacts binding for the public founding namespace |
+| `ARTIFACTS_NAMESPACE` | The namespace that binding reaches, default `PUBLIC_NAMESPACE`. If it is not `PUBLIC_NAMESPACE`, public founding is refused |
+| `IMPORT_ARTIFACTS` (binding) | Optional: the Artifacts binding for imported repositories. Without it (and `IMPORT_NAMESPACE`), imports are refused at `draft` |
+| `IMPORT_NAMESPACE` | The namespace `IMPORT_ARTIFACTS` reaches; the only one a grant may name. It must differ from `PUBLIC_NAMESPACE` (R-GEN-12) |
 | `PUBLISHER` (binding) | Lane B's `Publisher` Durable Object class (the git sandbox), one instance per room |
-| `ARTIFACTS_HOST` | The Artifacts host the sandbox's gateway lets the container reach, under `ARTIFACTS_NAMESPACE` |
+| `ARTIFACTS_HOST` | The Artifacts host the sandbox's gateway lets the container reach, under `ARTIFACTS_NAMESPACE` and `IMPORT_NAMESPACE` |
 
 A spike deployment, `artroom-spike-room` on the `gitseq-spike` namespace, is
 configured in [wrangler.spike.jsonc](wrangler.spike.jsonc) and deployed with

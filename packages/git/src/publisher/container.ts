@@ -21,12 +21,14 @@
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { type BuildResult, type Exec, GitOps, LOG_REF, type PinResult, type StageResult, type PreviewResult, SNAPSHOT_REF, type SnapshotFile, objectsRef } from "./gitops.ts";
 import { decodeLogPush, decodeLogStage, toLogOutcome, type LogPushOutcome, type LogStageRequest } from "./log-push.ts";
-import { type AllowedUpdates, FenceError, ZERO, checkUpdates, isReceivePack, readCommands } from "./ref-fence.ts";
+import { type AllowedUpdates, FenceError, ZERO, checkUpdates, isReceivePack, readCommands, repoPathOf } from "./ref-fence.ts";
 import type { PushOutcome } from "./push-outcome.ts";
 
 export interface PublisherEnv {
   readonly ARTIFACTS_HOST: string;
   readonly ARTIFACTS_NAMESPACE: string;
+  /** A deployment that also imports: the import namespace's repositories are reachable too (R-GEN-12). */
+  readonly IMPORT_NAMESPACE?: string;
 }
 
 /** What the gateway may do for one repository: add this token, and allow these ref updates (null: no push). */
@@ -153,14 +155,9 @@ export class Publisher extends DurableObject<PublisherEnv> {
     if (ready.exitCode !== 0) throw new Error("container not ready");
   }
 
-  /** Check a remote is an Artifacts repo in our namespace, and return its path. */
+  /** Check a remote is an Artifacts repo in one of our namespaces, and return its path. */
   private repoPath(remote: string): string {
-    const u = new URL(remote);
-    const prefix = `/git/${this.env.ARTIFACTS_NAMESPACE}/`;
-    if (u.protocol !== "https:" || u.hostname !== this.env.ARTIFACTS_HOST || !u.pathname.startsWith(prefix) || !u.pathname.endsWith(".git") || u.username || u.password || u.search) {
-      throw new Error("remote not allowed");
-    }
-    return u.pathname;
+    return repoPathOf(remote, this.env.ARTIFACTS_HOST, [this.env.ARTIFACTS_NAMESPACE, this.env.IMPORT_NAMESPACE]);
   }
 
   /** Point the container's HTTPS route for the Artifacts host at a gateway with these grants. */

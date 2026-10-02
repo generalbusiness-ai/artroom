@@ -9,8 +9,15 @@
 //
 // Public founding and the binding use the same namespace, as in production:
 // a room founded with `{ "kind": "new" }` gets a fresh repository in
-// gitseq-spike. A grant cannot name a repository in the public namespace, so
-// this deployment cannot import; OPERATOR_KEYS is set but has nothing to sign.
+// gitseq-spike. A grant cannot name a repository in the public namespace
+// (R-GEN-12), so importing needs a second binding, for another namespace:
+//
+//   "artifacts": [ …, { "binding": "IMPORT_ARTIFACTS", "namespace": "<import namespace>", "remote": true } ],
+//   "vars": { …, "IMPORT_NAMESPACE": "<import namespace>" }
+//
+// (request b6b51de7). The spike is allowed one namespace, gitseq-spike, so
+// it has no import binding: it founds public rooms, and refuses an import at
+// draft with that reason.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "artroom-spike-room",

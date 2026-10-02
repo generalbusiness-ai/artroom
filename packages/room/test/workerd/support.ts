@@ -144,6 +144,12 @@ export interface World {
   runnerDigest: ((checker: string) => string | null) | null;
   /** The most one log push may carry; lane L's default when null. */
   logTransfer: { objects: number; bytes: number } | null;
+  /**
+   * A second namespace this deployment binds, for imports (request
+   * b6b51de7): the room reaches it through `Remotes.bindings`, and the
+   * sandbox and log remote follow the repository's namespace.
+   */
+  imports: FakeArtifactsHost | null;
 }
 
 const worlds = new Map<string, World>();
@@ -182,7 +188,7 @@ function newWorld(): World {
       return host.put(gitObject("commit", encodeCommit({ tree: root, parents: parent ? [parent] : [], author: who, committer: who, message: "not the room\n" })));
     },
   };
-  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, runnerDigest: null, logTransfer: null };
+  const world: World = { artifacts, log, policy: faultyPolicy(), landing: { controls: host.controls }, bounds: {}, landingFault: null, runnerDigest: null, logTransfer: null, imports: null };
   (world as { instrument?: unknown }).instrument = (a: ArtifactsPort): ArtifactsPort =>
     new Proxy(a, {
       get(target, prop, receiver) {
@@ -211,6 +217,11 @@ setServicesFactory((_env, objectId) => {
   }
   const world = w;
   const host = world.artifacts;
+  // The host holding a repository: the import namespace's, by remote or by location, or the room's own.
+  const hostFor = (where: string): FakeArtifactsHost => (world.imports && (where === world.imports.namespace || where.includes(`/${world.imports.namespace}/`)) ? world.imports : host);
+  const publisher = new Proxy(host.stub, {
+    get: (_t, k) => (req: { canonical: { remote: string } }) => (hostFor(req.canonical.remote).stub as unknown as Record<string | symbol, (r: unknown) => unknown>)[k]!(req),
+  });
   return {
     policy: world.policy,
     runnerDigest: (checker: string) => (world.runnerDigest?.(checker) ?? null) as never,
@@ -219,9 +230,13 @@ setServicesFactory((_env, objectId) => {
       get namespace() {
         return host.namespace;
       },
-      publisher: host.stub,
+      get bindings() {
+        return world.imports ? { [world.imports.namespace]: world.imports.binding as unknown as ArtifactsBinding } : {};
+      },
+      publisher,
       // The production log remote, over the fake binding and the fake sandbox's pushLog and readLogRef.
-      logRemote: async (loc) => artifactsLogRemote(host.binding as unknown as ArtifactsBinding, host.logStub, loc),
+      logRemote: async (loc) => artifactsLogRemote(hostFor(loc.namespace).binding as unknown as ArtifactsBinding, hostFor(loc.namespace).logStub, loc),
+      firstCommit: (remote, token, at) => hostFor(remote).firstCommit(remote, token, at),
       sleep: async () => {},
       get logTransfer(): { objects: number; bytes: number } | undefined {
         return world.logTransfer ?? undefined;

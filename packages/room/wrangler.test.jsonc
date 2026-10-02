@@ -19,6 +19,7 @@
     "LEASE_SECONDS": "1800",
     "PUBLIC_URL": "https://artroom.test",
     "PUBLIC_NAMESPACE": "artroom-public",
+    "IMPORT_NAMESPACE": "acme-import",
     "OPERATOR_KEYS": ""
   }
 }
