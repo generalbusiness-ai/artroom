@@ -6,7 +6,8 @@
  * - pinned heads and merge previews in the publisher sandbox (`Pinning`);
  * - bounded, hash-cached path diffs through the Artifacts binding
  *   (`changedPaths`, `previewPlan`);
- * - the durable landing operation (`Landing`).
+ * - the durable landing operation (`Landing`);
+ * - the canonical mint ledger (`MintLedger`, protocol section 32).
  *
  * The publisher's Durable Object and gateway classes are in `./publisher`
  * (`Publisher`, `ArtifactsGateway`), because they need the Workers runtime.
@@ -53,6 +54,18 @@ export { ARTIFACTS_REFUSALS, artifactsRefusal, classifyGitPush, definitelyNotApp
 export type { PushOutcome } from "./publisher/push-outcome.ts";
 export { checkUpdates, readCommands, FenceError } from "./publisher/ref-fence.ts";
 export { canonicalTokens, completeInventory, readMainVia, withRetry } from "./artifacts.ts";
+export {
+  MINT_LISTING_MAX,
+  MINT_REVOKE_BACKOFF,
+  MINT_REVOKE_BATCH,
+  MINT_WAIT_MS,
+  MintLedger,
+  OBSERVE_WAIT,
+  OVERDUE_STEP_MS,
+  TAKEOVER_AHEAD_MS,
+  TAKEOVER_MOVE_MS,
+} from "./mints.ts";
+export type { LedgerToken, MintDuties, MintDuty, MintLedgerOptions, MintRepo, MintScope, MintState } from "./mints.ts";
 export { EMPTY_TREE_SHA, FIRST_COMMIT_IDENTITY, FIRST_COMMIT_MESSAGE, firstCommit, pushFirstCommit } from "./first-commit.ts";
 export type { FirstCommitOutcome, LooseObject } from "./first-commit.ts";
 export type { ArtifactsNamespace, CreatedRepo, RepoHandle } from "./artifacts.ts";
