@@ -8,33 +8,46 @@
  * Published history is never rewritten:
  * - an entry already published must be byte-identical in every later call;
  * - the push is fast-forward only, under a lease, and never forced;
- * - after an unclear answer, the publisher reads the ref back and either
- *   confirms, retries the same commit, or stops on an unexpected writer.
+ * - after any answer but a lease refusal, the publisher reads the ref back
+ *   and either confirms, retries the same commit, stops on a refusal, or
+ *   stops on an unexpected writer (R-LOG-20).
+ *
+ * The checkpoint names the commit's layout (R-LOG-16). Layout 1 is R-LOG-9
+ * as first written. Layout 2 (contract amendment 4) closes a segment at the
+ * object bound B as well as at 1,000 entries, chunks any file over B, and
+ * fans out every directory (R-LOG-17 to R-LOG-19, `layout.ts`); every object
+ * it would write is checked against B before anything is sent.
  *
  * Memory is bounded (request 5a7290b9). The entries come from an
  * `EntrySource` in batches (`READ_LIMITS`); a segment blob is never held
  * whole. Its size is counted first, then its ID is hashed, then its bytes
- * are read again for each staged part. Full segments of the parent are
- * reused by ID and not read at all. Retained files are read one at a time,
- * and only when the parent does not already hold them. Trees, the
- * checkpoint and the commit are small and built in memory.
+ * are read again for each staged part. A large line or retained file may be
+ * given in parts (`EntryLine`, `RetainedRef.read`), and is then hashed and
+ * sent in parts. Closed segments, files and shard directories of the parent
+ * are reused by ID and not read. Trees, the checkpoint and the commit are
+ * small and built in memory.
  */
 
-import type { Checkpoint, Digest, LogEntry, Seq, Sha } from "@generalbusiness/artroom-contract";
+import type { Checkpoint, Digest, LogEntry, LogLayout, Seq, Sha } from "@generalbusiness/artroom-contract";
 import { sha1 } from "@noble/hashes/legacy.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { canonicalize, parseStrict, utf8 } from "./canonical.ts";
 import { hex, verifySig } from "./crypto.ts";
 import { parseTime } from "./time.ts";
-import { Malformed, decodeCheckpoint, decodeEntry, segmentLines } from "./decode.ts";
-import { LOG_REF, ROOT, SEGMENT_SIZE, isRetainedPath, retainedPath, segmentPath, type Retained } from "./entries.ts";
+import { Malformed, decodeCheckpoint, decodeLayout } from "./decode.ts";
+import { LOG_REF, ROOT, SEGMENT_SIZE, type Retained } from "./entries.ts";
+import { CHUNKS, OBJECT_BOUND, Placement, chunkedLine, chunks, fanTrees, isChunked, placedBytes, twelve, type Leaf } from "./layout.ts";
+import { SETS, walkSet, type ListTree, type SetName } from "./tree.ts";
 import { encodeCommit, encodeTree, gitObject, parseCommit, parseTree, type GitObject, type GitReader, type GitRemote, type ObjectType, type StageOutcome, type StagePart, type StageWant, type TreeEntry } from "./git.ts";
+
+export { readLogFiles, readPublishedEntries } from "./tree.ts";
 
 export type PublishErrorCode =
   /** The call would change an entry already published. Nothing was pushed. */
   | "would-rewrite"
-  /** The entries or checkpoint are malformed: wrong order, wrong `through`, bad signature, or a source that changed while it was read. */
+  /** The entries or checkpoint are malformed: wrong order, wrong `through`, bad signature, a layout that does not follow the parent's, or a source that changed while it was read. */
   | "invalid-input"
-  /** The ref holds a commit this publisher did not write. It stops; an admin must look. */
+  /** The ref holds a commit this publisher did not write. It stops; `current` names the commit, so the Room can match it against its own. */
   | "unexpected-writer"
   /** Retries ran out with no clear answer. Call `publish` again with the same input: it completes forward. */
   | "unresolved"
@@ -44,16 +57,35 @@ export type PublishErrorCode =
    * (`GitRemote.stage`). Nothing was pushed. A remote that stages never
    * gives this error.
    */
-  | "cohort-too-large";
+  | "cohort-too-large"
+  /**
+   * Layout 2: an object the commit would write is over the object bound B
+   * (R-LOG-19), which means a fault in the publisher. Nothing was stored or
+   * pushed. Not retryable.
+   */
+  | "object-too-large"
+  /**
+   * The remote refused the push, and the ref reads back at the lease
+   * (R-LOG-20). The commit is not pushed again. Not retryable: `refusal`
+   * gives the remote's code and answer. An earlier attempt whose answer was
+   * lost may still apply, so the commit stays outstanding.
+   */
+  | "refused";
 
 export class PublishError extends Error {
   override readonly name = "PublishError";
   readonly code: PublishErrorCode;
   readonly retryable: boolean;
-  constructor(code: PublishErrorCode, message: string) {
+  /** `unexpected-writer`: the commit the ref holds (null: no ref). */
+  readonly current?: Sha | null;
+  /** `refused`: what the remote answered. */
+  readonly refusal?: { readonly code: string; readonly detail: string };
+  constructor(code: PublishErrorCode, message: string, extra: { readonly current?: Sha | null; readonly refusal?: { readonly code: string; readonly detail: string } } = {}) {
     super(message);
     this.code = code;
     this.retryable = code === "unresolved";
+    if (extra.current !== undefined) this.current = extra.current;
+    if (extra.refusal !== undefined) this.refusal = extra.refusal;
   }
 }
 
@@ -75,7 +107,7 @@ export interface PublisherOptions {
   readonly sleep?: (attempt: number) => Promise<void>;
   /** The most one push may send. Default `LOG_TRANSFER_LIMITS`, the publisher sandbox's bound (lane B, `LOG_PUSH_LIMITS`). */
   readonly maxTransfer?: { readonly objects: number; readonly bytes: number };
-  /** How much is read from an `EntrySource` at a time. Default `READ_LIMITS`. */
+  /** How much is read from an `EntrySource` at a time, and the largest part read of one line or file. Default `READ_LIMITS`. */
   readonly read?: { readonly entries: number; readonly bytes: number };
 }
 
@@ -92,11 +124,23 @@ export const LOG_TRANSFER_LIMITS = { objects: 100_000, bytes: 8 * 1024 * 1024 } 
  * How much the publisher reads from an `EntrySource` at once. The first
  * read of a segment, which measures each line, takes one entry at a time.
  * Later reads take at most `entries` entries and at most `bytes` of them,
- * by the measured lengths, and always at least one entry. One entry is
- * bounded only by where the Room stores it: a row of Durable Object SQLite
- * is at most 2 MB.
+ * by the measured lengths, and always at least one entry. A line or file
+ * given in parts is read at most `bytes` at a time.
  */
 export const READ_LIMITS = { entries: 64, bytes: 1024 * 1024 } as const;
+
+/**
+ * An entry's canonical line as bytes, read in parts. An `EntrySource` may
+ * return one in place of the entry, so that a large entry is never held
+ * whole: the publisher hashes it and sends it part by part (R-LOG-18).
+ */
+export interface EntryLine {
+  readonly seq: Seq;
+  /** The line's length in bytes (UTF-8). */
+  readonly bytes: number;
+  /** Bytes `offset` to `offset + length` of the line. */
+  read(offset: number, length: number): Uint8Array;
+}
 
 /**
  * A log's entries, read in batches (the Room reads them from its SQLite).
@@ -108,19 +152,24 @@ export const READ_LIMITS = { entries: 64, bytes: 1024 * 1024 } as const;
 export interface EntrySource {
   /** The last entry's seq: the checkpoint's `through`. */
   readonly through: Seq;
-  /** At most `limit` entries from seq `from`, in seq order. */
-  read(from: Seq, limit: number): readonly LogEntry[];
+  /** At most `limit` entries from seq `from`, in seq order; any of them may be an `EntryLine`. */
+  read(from: Seq, limit: number): readonly (LogEntry | EntryLine)[];
 }
 
 /**
  * A retained file named by its digest (R-LOG-7). Its body is read only when
- * the commit needs its bytes: when the parent does not already hold it.
+ * the commit needs its bytes: when the parent does not already hold it. With
+ * `bytes` and `read`, it is read in parts and never loaded whole.
  */
 export interface RetainedRef {
   readonly kind: Retained["kind"];
   /** `sha256:` and the hex SHA-256 of the body, which names the file. */
   readonly digest: Digest;
   readonly load: () => string;
+  /** The body's length in bytes (UTF-8), with `read`. */
+  readonly bytes?: number;
+  /** Bytes `offset` to `offset + length` of the body. */
+  readonly read?: (offset: number, length: number) => Uint8Array;
 }
 
 /**
@@ -130,11 +179,11 @@ export interface RetainedRef {
  * counted.
  */
 export interface PublicationStats {
-  /** The most canonical entry bytes read in one batch. */
+  /** The most canonical entry bytes read in one batch, or in one part of a line or file read in parts. */
   peakBatchBytes: number;
   /** The most bytes sent in one call: one stage call's parts, or one push's objects. */
   peakSendBytes: number;
-  /** The largest object built whole: a tree, the commit, the checkpoint, the genesis, a retained file. */
+  /** The largest object built whole: a tree, the commit, the checkpoint, the genesis, a retained file loaded whole. */
   peakObjectBytes: number;
   /** The largest segment blob, which is never built whole. */
   largestSegment: number;
@@ -142,9 +191,11 @@ export interface PublicationStats {
   hashedBytes: number;
   /** Segment bytes read again to stage or push them. */
   sentSegmentBytes: number;
+  /** Trees encoded. A tree reused from the parent by ID is not. */
+  treesBuilt: number;
 }
 
-const freshStats = (): PublicationStats => ({ peakBatchBytes: 0, peakSendBytes: 0, peakObjectBytes: 0, largestSegment: 0, hashedBytes: 0, sentSegmentBytes: 0 });
+const freshStats = (): PublicationStats => ({ peakBatchBytes: 0, peakSendBytes: 0, peakObjectBytes: 0, largestSegment: 0, hashedBytes: 0, sentSegmentBytes: 0, treesBuilt: 0 });
 
 /** Seconds since the epoch for an RFC 3339 time, for the commit's author line. */
 function epoch(at: string): number {
@@ -158,11 +209,16 @@ function identity(at: string): string {
   return `Artroom Room <room@artroom.invalid> ${epoch(at)} +0000`;
 }
 
-/** Canonical lines by seq, read in batches. */
+/** Canonical lines by seq, read in batches: text, or an `EntryLine` read in parts. */
 interface Lines {
   readonly through: Seq;
-  read(from: Seq, limit: number): readonly string[];
+  read(from: Seq, limit: number): readonly (string | EntryLine)[];
 }
+
+/** A line as the publisher reads it: its bytes, or a reader of its parts. */
+type Line = Uint8Array | EntryLine;
+const sizeOf = (l: Line): number => (l instanceof Uint8Array ? l.length : l.bytes);
+const isEntryLine = (x: unknown): x is EntryLine => typeof x === "object" && x !== null && typeof (x as EntryLine).read === "function";
 
 /** A retained file the caller passed: its bytes, or a reference to load them. */
 type RetainedIn = { readonly kind: Retained["kind"]; readonly body: string } | RetainedRef;
@@ -181,32 +237,47 @@ interface Cohort {
   /** The checkpoint's canonical text. */
   readonly checkpoint: string;
   readonly at: string;
+  /** The layout the checkpoint names; undefined for layout 1 (R-LOG-16). */
+  readonly layout: LogLayout | undefined;
   readonly retained: readonly RetainedIn[];
+}
+
+/** What a tree lists for a file: a blob, or (layout 2, over B) a directory of chunks. */
+interface Node {
+  readonly mode: TreeEntry["mode"];
+  readonly sha: Sha;
 }
 
 /**
  * What a log commit holds, by ID: enough to build its child without
- * reading its segments or retained files again.
+ * reading its closed segments, files or shard directories again.
  */
 interface Index {
   readonly through: Seq;
   readonly hash: Digest | null;
-  readonly genesis: Sha | null;
-  /** The blob of each segment, in order. */
-  readonly segments: readonly Sha[];
-  /** Every retained file's blob, by path. */
-  readonly retained: ReadonlyMap<string, Sha>;
-  /** Every tree and blob of the commit's tree: the remote holds them. */
+  readonly layout: LogLayout | undefined;
+  readonly genesis: Node | null;
+  /** Each segment's first seq and blob, in order. */
+  readonly segments: readonly { readonly first: Seq; readonly sha: Sha }[];
+  /** Layout 2: each chunked entry file, by its name in `entries/`. */
+  readonly entries: ReadonlyMap<string, Node>;
+  /** Every retained file, by its logical path (`artroom-log/v1/inputs/<hex>.json`). */
+  readonly retained: ReadonlyMap<string, Node>;
+  /** Every tree of the four directory sets, by path below `artroom-log/v1/` (`segments`, `segments/000`, ...). */
+  readonly trees: ReadonlyMap<string, Sha>;
+  /** Every tree and blob of the commit's tree that the index knows by ID: the remote holds them. */
   readonly present: ReadonlySet<string>;
 }
 
-const EMPTY: Index = { through: -1, hash: null, genesis: null, segments: [], retained: new Map(), present: new Set() };
+const EMPTY: Index = { through: -1, hash: null, layout: undefined, genesis: null, segments: [], entries: new Map(), retained: new Map(), trees: new Map(), present: new Set() };
 
 /** How to produce an object's bytes when they are sent. */
 type Body =
   | { readonly kind: "bytes"; readonly data: Uint8Array }
-  | { readonly kind: "segment"; readonly first: Seq; readonly count: number; readonly lens: Uint32Array }
-  | { readonly kind: "retained"; readonly load: () => string };
+  /** A segment: `lens` are the lines' lengths; `stubs` the `ChunkedLine` that stands for each chunked one, by index. */
+  | { readonly kind: "segment"; readonly first: Seq; readonly count: number; readonly lens: Uint32Array; readonly stubs: ReadonlyMap<number, Uint8Array> }
+  /** A file, or one chunk of it, read again from its source. */
+  | { readonly kind: "range"; readonly read: (offset: number, length: number) => Uint8Array };
 
 interface Planned {
   readonly sha: Sha;
@@ -223,6 +294,8 @@ interface Plan {
   readonly index: Index;
 }
 
+type Reader = (offset: number, length: number) => Uint8Array;
+
 const NL = new Uint8Array([0x0a]);
 
 export class LogPublisher {
@@ -235,6 +308,8 @@ export class LogPublisher {
   private lastCommit: Sha | null = null;
   /** `lastCommit`'s index; `EMPTY` before the first publication. */
   private index: Index = EMPTY;
+  /** The size of each blob this publisher has hashed, by ID: so the switch to layout 2 knows which kept files are over B. */
+  private readonly sizes = new Map<string, number>();
   private counters: PublicationStats = freshStats();
 
   constructor(remote: GitRemote, opts: PublisherOptions = {}) {
@@ -248,16 +323,18 @@ export class LogPublisher {
   }
 
   /**
-   * Resume from the ref: read the last log commit's trees and checkpoint,
-   * not its segments or retained files. A head that is not a log commit is
-   * `unexpected-writer`.
+   * Resume from a log commit: read its trees and checkpoint, not its
+   * segments or files. By default the commit is the ref's; `head` names
+   * another commit the caller wrote, such as an outstanding commit that the
+   * ref reads back at late, to build on it (R-LOG-20), or null for none. A
+   * head that is not a log commit is `unexpected-writer`.
    */
-  static async open(remote: GitRemote, opts: PublisherOptions = {}): Promise<LogPublisher> {
+  static async open(remote: GitRemote, opts: PublisherOptions = {}, head?: Sha | null): Promise<LogPublisher> {
     const p = new LogPublisher(remote, opts);
-    const head = await remote.readRef(p.ref);
-    if (head) {
-      p.index = await readIndex(remote, head);
-      p.lastCommit = head;
+    const at = head === undefined ? await remote.readRef(p.ref) : head;
+    if (at) {
+      p.index = await readIndex(remote, at);
+      p.lastCommit = at;
     }
     return p;
   }
@@ -320,15 +397,19 @@ export class LogPublisher {
       // Staging is asked again before every attempt: a restart may have lost it.
       if (staged && !(await this.stageAll(commit.sha, cohort.lines, send))) continue;
       const outcome = await this.remote.push(staged ? [] : this.materialize(cohort.lines, send), this.ref, commit.sha, lease);
-      if (outcome.ok || outcome.reason !== "lease-mismatch") {
-        // Read back: the only proof of where the ref is (R-LOG-8 step 5).
-        const now = await this.remote.readRef(this.ref);
-        if (now === commit.sha) return this.done(cohort, plan, attempt);
-        if (now === lease) continue; // not applied: push the same commit again
-        throw new PublishError("unexpected-writer", `${this.ref} is at ${now ?? "nothing"}, which this publisher did not write`);
+      if (!outcome.ok && outcome.reason === "lease-mismatch") {
+        if (outcome.current === commit.sha) return this.done(cohort, plan, attempt);
+        throw this.unexpected(outcome.current, `not the lease ${lease ?? "nothing"}`);
       }
-      if (outcome.current === commit.sha) return this.done(cohort, plan, attempt);
-      throw new PublishError("unexpected-writer", `${this.ref} is at ${outcome.current ?? "nothing"}, not the lease ${lease ?? "nothing"}`);
+      // Read back: the only proof of where the ref is (R-LOG-8 step 5, R-LOG-20).
+      const now = await this.remote.readRef(this.ref);
+      if (now === commit.sha) return this.done(cohort, plan, attempt);
+      if (now !== lease) throw this.unexpected(now, "which this publisher did not write");
+      if (!outcome.ok && outcome.reason === "refused")
+        throw new PublishError("refused", `the remote refused ${commit.sha} (${outcome.code}) and ${this.ref} is still at the lease; it is not pushed again: ${outcome.detail}`, {
+          refusal: { code: outcome.code, detail: outcome.detail },
+        });
+      // Not applied, and not refused: push the same commit again.
     }
     throw new PublishError("unresolved", `no clear answer after ${this.attempts} attempts; publish again with the same entries`);
   }
@@ -340,11 +421,12 @@ export class LogPublisher {
    * write (lane A, `PublisherPort.commitFor`).
    *
    * `publish` keeps the retained files of the commit it last wrote, and
-   * reuses its full segments. So when `parent` is that commit, both are
+   * reuses its closed segments. So when `parent` is that commit, both are
    * used here too, and an entry that differs from the published one is
-   * `would-rewrite`. For any other parent, every segment is built from
-   * `entries` and only `retained` is used. A Room that passes every
-   * retained file it holds gets the same commit either way.
+   * `would-rewrite`. For any other parent, every segment is placed and
+   * built from `entries` and the checkpoint's layout, and only `retained`
+   * is used. A Room that passes every retained file it holds gets the same
+   * commit either way.
    */
   commitFor(
     parent: Sha | null,
@@ -361,16 +443,23 @@ export class LogPublisher {
   private own(entries: readonly LogEntry[] | EntrySource, checkpoint: Checkpoint, retained: readonly (Retained | RetainedRef)[]): Cohort {
     const lines = Array.isArray(entries) ? ownedLines(entries as readonly LogEntry[]) : this.sourceLines(entries as EntrySource);
     if (lines.through < 0) throw new PublishError("invalid-input", "there are no entries to publish");
-    const last = parseStrict(lines.read(lines.through, 1)[0]!) as LogEntry;
+    const last = this.facts(lines.read(lines.through, 1)[0]);
     const text = canonicalize(checkpoint);
     const cp = parseStrict(text) as Checkpoint;
     if (cp.through !== last.seq || cp.hash !== last.hash)
       throw new PublishError("invalid-input", `the checkpoint names ${cp.through} ${cp.hash}, not the last entry`);
+    let layout: LogLayout | undefined;
+    try {
+      layout = cp.layout === undefined ? undefined : decodeLayout(cp.layout, "checkpoint.layout");
+    } catch (e) {
+      if (e instanceof Malformed) throw new PublishError("invalid-input", e.message);
+      throw e;
+    }
     const { sig, ...unsigned } = cp;
     if (!verifySig(cp.roomKey, sig, "artroom-checkpoint-v1", unsigned))
       throw new PublishError("invalid-input", "the checkpoint's signature is not valid");
-    const files: RetainedIn[] = retained.map((r) => ("body" in r ? { kind: r.kind, body: r.body } : { kind: r.kind, digest: r.digest, load: r.load }));
-    return { lines, through: last.seq, hash: last.hash, checkpoint: text, at: cp.at, retained: files };
+    const files: RetainedIn[] = retained.map((r) => ("body" in r ? { kind: r.kind, body: r.body } : { ...r }));
+    return { lines, through: last.seq, hash: last.hash, checkpoint: text, at: cp.at, layout, retained: files };
   }
 
   /** Lines read from a source, each checked for its seq, in batches. */
@@ -385,6 +474,10 @@ export class LogPublisher {
         const got = source.read(from, n);
         if (got.length !== n) throw new PublishError("invalid-input", `the source gave ${got.length} entries from ${from}, not ${n}`);
         return got.map((e, i) => {
+          if (isEntryLine(e)) {
+            if (e.seq !== from + i || !Number.isSafeInteger(e.bytes) || e.bytes < 0) throw new PublishError("invalid-input", `the line read for entry ${from + i} is for ${e.seq}, of ${e.bytes} bytes`);
+            return e;
+          }
           const line = canonicalize(e);
           const seq = (parseStrict(line) as LogEntry).seq;
           if (seq !== from + i) throw new PublishError("invalid-input", `entry ${from + i} has seq ${seq}`);
@@ -394,20 +487,58 @@ export class LogPublisher {
     };
   }
 
+  /** An entry's seq and hash: parsed from its line, or read from the fixed end of a line given in parts. */
+  private facts(x: string | EntryLine | undefined): { readonly seq: Seq; readonly hash: Digest } {
+    if (x === undefined) throw new PublishError("invalid-input", "an entry is missing");
+    if (typeof x === "string") {
+      const e = parseStrict(x) as LogEntry;
+      return { seq: e.seq, hash: e.hash };
+    }
+    const n = Math.min(x.bytes, 512);
+    const m = TAIL.exec(lenient.decode(this.part(x, x.bytes - n, n)));
+    if (!m || Number(m[2]) !== x.seq) throw new PublishError("invalid-input", `the line given for entry ${x.seq} does not end as a canonical entry`);
+    return { seq: x.seq, hash: m[1] as Digest };
+  }
+
   /**
-   * The one git serialization of a cohort on `parent`: R-LOG-9's layout,
-   * built from the parent's index and the lines that are new. `kept` adds
-   * the parent's retained files, as `publish` does. Synchronous.
+   * R-LOG-16: a log's first commit has `from` 0; a commit after a layout 2
+   * commit is layout 2 with the same `from`; the first layout 2 commit after
+   * layout 1 has the parent's `through` plus one. For a parent other than
+   * the publisher's own, its layout is not known here.
+   */
+  private checkLayout(parent: Sha | null, c: Cohort, base: Index, kept: boolean): void {
+    const lay = c.layout;
+    if (parent === null) {
+      if (lay && lay.from !== 0) throw new PublishError("invalid-input", `layout-changed: the first log commit has from 0, not ${lay.from}`);
+      return;
+    }
+    if (!kept) return;
+    if (base.layout && (!lay || lay.from !== base.layout.from))
+      throw new PublishError("invalid-input", `layout-changed: the parent is layout 2 from ${base.layout.from}, so this commit must be too, not ${lay ? `from ${lay.from}` : "layout 1"}`);
+    if (!base.layout && lay && lay.from !== base.through + 1)
+      throw new PublishError("invalid-input", `layout-changed: the first layout 2 commit has from ${base.through + 1}, one past its parent's through, not ${lay.from}`);
+  }
+
+  /**
+   * The one git serialization of a cohort on `parent`, in the layout its
+   * checkpoint names, built from the parent's index and the lines that are
+   * new. `kept` adds the parent's retained files, as `publish` does.
+   * Synchronous.
    *
    * Checks against the parent, when it has entries: the cohort is not
    * shorter; its entry at the parent's checkpoint has the checkpoint's
    * hash; and the published part of the parent's last segment is the same
-   * bytes, by ID. A full segment never changes, so it is reused by ID.
+   * bytes, by ID. A closed segment never changes, so it is reused by ID.
+   * In layout 2, every object to be written is checked against B.
    */
   private plan(parent: Sha | null, c: Cohort, base: Index, kept: boolean): Plan {
+    const lay = c.layout;
+    this.checkLayout(parent, c, base, kept);
     if (c.through < base.through) throw new PublishError("would-rewrite", `the cohort ends at ${c.through}, before the published entry ${base.through}; published history is never rewritten`);
-    if (base.through >= 0 && (parseStrict(c.lines.read(base.through, 1)[0]!) as LogEntry).hash !== base.hash)
+    if (base.through >= 0 && this.facts(c.lines.read(base.through, 1)[0]).hash !== base.hash)
       throw new PublishError("would-rewrite", `entry ${base.through} differs from the published entry; published history is never rewritten`);
+    /** The parent's files and trees have this commit's shape: the same layout. */
+    const same = base.layout?.version === lay?.version;
 
     const objects = new Map<string, Planned>();
     const add = (p: Planned): Sha => {
@@ -419,64 +550,127 @@ export class LogPublisher {
       const o = gitObject(type, data);
       return add({ sha: o.sha, type, size: data.length, body: { kind: "bytes", data } });
     };
+    const inMemory = (data: Uint8Array): Reader => {
+      this.counters.peakObjectBytes = Math.max(this.counters.peakObjectBytes, data.length);
+      return (o, l) => data.subarray(o, o + l);
+    };
 
-    // The genesis, from entry 0 (R-LOG-9).
-    let genesis = base.genesis;
+    // The genesis, from entry 0 (R-LOG-9); chunked if over B (R-LOG-18).
+    let genesis = same ? base.genesis : null;
     if (!genesis) {
-      const first = parseStrict(c.lines.read(0, 1)[0]!) as LogEntry;
-      if (first.seq !== 0 || first.entry?.type !== "system" || first.entry.event?.type !== "genesis") throw new Error("entry 0 must be genesis");
-      genesis = small("blob", utf8(canonicalize(first.entry.event.genesis)));
+      const g = this.genesisBytes(c.lines);
+      genesis = this.file(g.length, inMemory(g), inMemory(g), lay, add, base).node;
     }
 
-    // Segments: a full segment of the parent is reused; the others are streamed.
-    const segments: Sha[] = [];
-    for (let first = 0; first <= c.through; first += SEGMENT_SIZE) {
-      const k = first / SEGMENT_SIZE;
-      if (base.through >= first + SEGMENT_SIZE - 1) {
-        segments.push(base.segments[k]!);
-        continue;
+    // Segments (R-LOG-17): closed segments of the parent are reused; the parent's open one is read
+    // again and checked, and every new one is placed, entry by entry, by the layout's rule.
+    const segments: { first: Seq; sha: Sha }[] = [];
+    const entries = new Map<string, Node>(kept ? base.entries : []);
+    const open = base.segments.at(-1);
+    let start = 0;
+    let published: { readonly count: number; readonly sha: Sha } | null = null;
+    if (open) {
+      segments.push(...base.segments.slice(0, -1));
+      const count = base.through - open.first + 1;
+      if (count === SEGMENT_SIZE) {
+        segments.push(open); // closed by count in either layout
+        start = base.through + 1;
+      } else {
+        start = open.first;
+        published = { count, sha: open.sha };
       }
-      const count = Math.min(SEGMENT_SIZE, c.through - first + 1);
-      const published = base.through >= first ? { count: base.through - first + 1, sha: base.segments[k]! } : null;
-      segments.push(add(this.segment(c.lines, first, count, published)));
     }
+    // An entry over B from `from` on: its line is the chunked file entries/<seq>.jsonl, and a ChunkedLine stands for it (R-LOG-18).
+    const entryFile = (seq: Seq, line: Line): Uint8Array => {
+      const size = sizeOf(line);
+      const read: Reader = line instanceof Uint8Array ? (o, l) => line.subarray(o, o + l) : (o, l) => this.part(line, o, l);
+      const f = this.file(size, read, (o, l) => this.lineRange(c.lines, seq, size, o, l), lay, add, base);
+      entries.set(`${twelve(seq)}.jsonl`, f.node);
+      return utf8(chunkedLine(seq, size, `sha256:${f.digest}`));
+    };
+    const placer = new Placement(lay);
+    let first = start;
+    let lens: number[] = [];
+    const close = () => {
+      segments.push({ first, sha: add(this.segment(c.lines, first, Uint32Array.from(lens), lay, first === start ? published : null, entryFile)) });
+    };
+    for (let seq = start; seq <= c.through; seq++) {
+      const size = sizeOf(this.batch(c.lines, seq, 0, 1)[0]!);
+      if (placer.place(seq, size) && seq > first) {
+        close();
+        first = seq;
+        lens = [];
+      }
+      lens.push(size);
+    }
+    if (lens.length) close();
 
     // Retained files: the parent's (when kept) and the given ones, by path. A file the parent
-    // holds is not read; any other is read once here to hash it, and again when it is sent.
-    const files = new Map<string, Sha>(kept ? base.retained : []);
+    // holds is not read; any other is read here to hash it, and again when it is sent.
+    const files = new Map<string, Node>(kept ? base.retained : []);
+    const rebuilt = new Set<string>();
+    /** Whether a kept file of the parent keeps its tree entry: always in the same layout; at the switch to layout 2, a blob known to be at most B. */
+    const keeps = (n: Node) => same || (n.mode === "100644" && (this.sizes.get(n.sha) ?? Infinity) <= OBJECT_BOUND);
     for (const r of c.retained) {
+      if (!("body" in r)) {
+        const named = digestPath(r.kind, r.digest);
+        const held = named === null ? undefined : base.retained.get(named);
+        if (held !== undefined && keeps(held)) {
+          files.set(named!, held);
+          continue;
+        }
+      }
+      let f: { readonly node: Node; readonly digest: string };
       if ("body" in r) {
-        const path = retainedPath(r);
-        files.set(path, this.retainedBlob(add, () => r.body));
-        continue;
-      }
-      const named = digestPath(r.kind, r.digest);
-      const held = named === null ? undefined : base.retained.get(named);
-      if (held !== undefined) {
-        files.set(named!, held);
-        continue;
-      }
-      const body = r.load();
-      files.set(retainedPath({ kind: r.kind, body }), this.retainedBlob(add, r.load, body));
+        const data = utf8(r.body);
+        const read = inMemory(data);
+        f = this.file(data.length, read, read, lay, add, base);
+      } else f = this.retainedFile(r, lay, add, base);
+      const path = `${ROOT}/${r.kind === "input" ? "inputs" : "policies"}/${f.digest}.json`;
+      files.set(path, f.node);
+      rebuilt.add(path);
     }
+    // At the switch to layout 2, every kept file over B is chunked (R-LOG-19): one whose size is not known must be given.
+    if (kept && lay && !base.layout)
+      for (const [path, n] of base.retained)
+        if (!rebuilt.has(path) && !keeps(n))
+          throw new PublishError("invalid-input", `the switch to layout 2 needs the retained file ${path}, which the parent holds, to know whether it is over ${OBJECT_BOUND} bytes`);
 
     const checkpoint = small("blob", utf8(c.checkpoint));
 
-    // Trees, as `buildTree` makes them for the same files.
-    const trees: Sha[] = [];
-    const tree = (entries: readonly TreeEntry[]): Sha => {
-      const sha = small("tree", encodeTree(entries));
-      trees.push(sha);
+    // Trees: each directory set fanned out in layout 2 (R-LOG-19), listed whole in layout 1. A tree
+    // of the parent at the same path, with no new or changed member under it, is reused by ID.
+    const trees = new Map<string, Sha>();
+    const top: Sha[] = [];
+    const set = (name: SetName, leaves: readonly Leaf[], old: (name: string) => Node | undefined): Sha => {
+      const reuse = kept && same ? { old: (p: string) => base.trees.get(p ? `${name}/${p}` : name), changed: (l: Leaf) => old(l.name)?.sha !== l.sha || old(l.name)?.mode !== l.mode } : undefined;
+      const t = fanTrees(leaves, SETS[name], lay === undefined, reuse);
+      for (const x of t.trees) {
+        trees.set(x.path ? `${name}/${x.path}` : name, x.sha);
+        if (!x.data) continue;
+        this.counters.treesBuilt++;
+        this.counters.peakObjectBytes = Math.max(this.counters.peakObjectBytes, x.data.length);
+        add({ sha: x.sha, type: "tree", size: x.data.length, body: { kind: "bytes", data: x.data } });
+      }
+      return t.root;
+    };
+    const tree = (list: readonly TreeEntry[]): Sha => {
+      this.counters.treesBuilt++;
+      const sha = small("tree", encodeTree(list));
+      top.push(sha);
       return sha;
     };
     const blob = (name: string, sha: Sha): TreeEntry => ({ name, mode: "100644", sha });
     const dir = (name: string, sha: Sha): TreeEntry => ({ name, mode: "40000", sha });
-    const v1: TreeEntry[] = [blob("genesis.json", genesis), blob("checkpoint.json", checkpoint)];
-    v1.push(dir("segments", tree(segments.map((sha, k) => blob(segmentPath(k * SEGMENT_SIZE).slice(`${ROOT}/segments/`.length), sha)))));
-    for (const sub of ["inputs", "policies"]) {
+    const leaf = (name: string, n: Node): Leaf => ({ name, mode: n.mode, sha: n.sha });
+    const v1: TreeEntry[] = [{ name: "genesis.json", ...genesis }, blob("checkpoint.json", checkpoint)];
+    const baseSegments = new Map(base.segments.map((s) => [`${twelve(s.first)}.jsonl`, { mode: "100644", sha: s.sha } as const]));
+    v1.push(dir("segments", set("segments", segments.map((s) => leaf(`${twelve(s.first)}.jsonl`, { mode: "100644", sha: s.sha })), (n) => baseSegments.get(n))));
+    if (entries.size) v1.push(dir("entries", set("entries", [...entries].map(([n, x]) => leaf(n, x)), (n) => base.entries.get(n))));
+    for (const sub of ["inputs", "policies"] as const) {
       const prefix = `${ROOT}/${sub}/`;
-      const entries = [...files].filter(([path]) => path.startsWith(prefix)).map(([path, sha]) => blob(path.slice(prefix.length), sha));
-      if (entries.length) v1.push(dir(sub, tree(entries)));
+      const leaves = [...files].filter(([path]) => path.startsWith(prefix)).map(([path, n]) => leaf(path.slice(prefix.length), n));
+      if (leaves.length) v1.push(dir(sub, set(sub, leaves, (n) => base.retained.get(prefix + n))));
     }
     const root = tree([dir("artroom-log", tree([dir("v1", tree(v1))]))]);
 
@@ -491,110 +685,212 @@ export class LogPublisher {
     const commit = gitObject("commit", data);
     const send = [...objects.values()].filter((o) => !base.present.has(o.sha));
     send.push({ sha: commit.sha, type: "commit", size: data.length, body: { kind: "bytes", data } });
-    const present = new Set<string>([genesis, checkpoint, ...segments, ...files.values(), ...trees]);
-    return { commit, send, index: { through: c.through, hash: c.hash, genesis, segments, retained: files, present } };
+    // The guard (R-LOG-19): in layout 2 no object written is over B, except a segment of entries before `from`.
+    if (lay)
+      for (const o of send)
+        if (o.size > OBJECT_BOUND && !(o.body.kind === "segment" && o.body.first + o.body.count - 1 < lay.from))
+          throw new PublishError("object-too-large", `the ${o.type} ${o.sha} would be ${o.size} bytes, over the object bound ${OBJECT_BOUND} (R-LOG-19): a fault in the publisher. Nothing was stored or pushed`);
+    const present = new Set<string>([...objects.keys(), genesis.sha, checkpoint, ...segments.map((s) => s.sha), ...[...entries.values()].map((n) => n.sha), ...[...files.values()].map((n) => n.sha), ...trees.values(), ...top]);
+    return { commit, send, index: { through: c.through, hash: c.hash, layout: lay, genesis, segments, entries, retained: files, trees, present } };
   }
 
-  /** Plan a retained file's blob: hash its bytes once; keep only how to read them again. */
-  private retainedBlob(add: (p: Planned) => Sha, load: () => string, body = load()): Sha {
-    const data = utf8(body);
-    this.counters.peakObjectBytes = Math.max(this.counters.peakObjectBytes, data.length);
-    return add({ sha: gitObject("blob", data).sha, type: "blob", size: data.length, body: { kind: "retained", load } });
+  /** The genesis file's bytes, from entry 0. */
+  private genesisBytes(lines: Lines): Uint8Array {
+    const x = lines.read(0, 1)[0];
+    const text = x === undefined ? undefined : typeof x === "string" ? x : lenient.decode(this.part(x, 0, x.bytes));
+    const first = text === undefined ? undefined : (parseStrict(text) as LogEntry);
+    if (!first || first.seq !== 0 || first.entry?.type !== "system" || first.entry.event?.type !== "genesis") throw new Error("entry 0 must be genesis");
+    return utf8(canonicalize(first.entry.event.genesis));
+  }
+
+  /** A retained file given by reference: read in parts when it can be, otherwise loaded whole. */
+  private retainedFile(r: RetainedRef, lay: LogLayout | undefined, add: (p: Planned) => Sha, base: Index): { readonly node: Node; readonly digest: string } {
+    if (r.read && r.bytes !== undefined) {
+      const parts = { bytes: r.bytes, read: r.read };
+      const read: Reader = (o, l) => this.part(parts, o, l);
+      return this.file(r.bytes, read, read, lay, add, base);
+    }
+    const body = utf8(r.load());
+    this.counters.peakObjectBytes = Math.max(this.counters.peakObjectBytes, body.length);
+    const again: Reader = (o, l) => {
+      const data = utf8(r.load());
+      if (data.length !== body.length) throw new PublishError("invalid-input", `retained file ${r.digest} was ${body.length} bytes and is now ${data.length}`);
+      return data.subarray(o, o + l);
+    };
+    return this.file(body.length, (o, l) => body.subarray(o, o + l), again, lay, add, base);
+  }
+
+  /**
+   * Plan one file of the tree: a blob, or in layout 2 a directory of
+   * chunks when it is over B (R-LOG-18, one rule for every file). Its bytes
+   * are read once here, in parts, for its SHA-256 (which names a retained
+   * file and a `ChunkedLine`) and for the ID of its blob or of each chunk;
+   * they are read again from `again` only when sent. A chunk directory the
+   * parent already holds is not planned again.
+   */
+  private file(size: number, read: Reader, again: Reader, lay: LogLayout | undefined, add: (p: Planned) => Sha, base: Index): { readonly node: Node; readonly digest: string } {
+    const chunked = lay !== undefined && size > OBJECT_BOUND;
+    const parts = chunked ? chunks(size) : [{ name: "", offset: 0, bytes: size }];
+    const whole = sha256.create();
+    const step = this.readLimits.bytes;
+    const blobs: Planned[] = parts.map((p) => {
+      const h = sha1.create().update(utf8(`blob ${p.bytes}\0`));
+      for (let at = 0; at < p.bytes; at += step) {
+        const n = Math.min(step, p.bytes - at);
+        const b = read(p.offset + at, n);
+        if (b.length !== n) throw new PublishError("invalid-input", `a file of ${size} bytes gave ${b.length} bytes at ${p.offset + at}, not ${n}`);
+        h.update(b);
+        whole.update(b);
+      }
+      const read2: Reader = (o, l) => again(p.offset + o, l);
+      return { sha: hex(h.digest()) as Sha, type: "blob", size: p.bytes, body: { kind: "range", read: read2 } };
+    });
+    const digest = hex(whole.digest());
+    if (!chunked) {
+      this.sizes.set(blobs[0]!.sha, size);
+      return { node: { mode: "100644", sha: add(blobs[0]!) }, digest };
+    }
+    const t = fanTrees(parts.map((p, k) => ({ name: p.name, mode: "100644" as const, sha: blobs[k]!.sha })), CHUNKS, false);
+    if (!base.present.has(t.root)) {
+      for (const b of blobs) add(b);
+      for (const x of t.trees) {
+        this.counters.treesBuilt++;
+        add({ sha: x.sha, type: "tree", size: x.data!.length, body: { kind: "bytes", data: x.data! } });
+      }
+    }
+    return { node: { mode: "40000", sha: t.root }, digest };
+  }
+
+  /** Bytes `offset` to `offset + length` of a line or file given in parts, checked for length. */
+  private part(x: { readonly bytes: number; read(offset: number, length: number): Uint8Array }, offset: number, length: number): Uint8Array {
+    const b = x.read(offset, length);
+    if (b.length !== length) throw new PublishError("invalid-input", `a read of ${length} bytes at ${offset} gave ${b.length}`);
+    this.counters.peakBatchBytes = Math.max(this.counters.peakBatchBytes, b.length);
+    return b;
+  }
+
+  /** Bytes `offset` to `offset + length` of entry `seq`'s line, read again from the entries. */
+  private lineRange(lines: Lines, seq: Seq, size: number, offset: number, length: number): Uint8Array {
+    const x = lines.read(seq, 1)[0];
+    if (x === undefined) throw new PublishError("invalid-input", `the entries ended before ${seq}`);
+    const line = typeof x === "string" ? utf8(x) : x;
+    if (sizeOf(line) !== size) throw new PublishError("invalid-input", `entry ${seq} was ${size} bytes and is now ${sizeOf(line)}; the source changed while it was read`);
+    if (line instanceof Uint8Array) {
+      this.counters.peakBatchBytes = Math.max(this.counters.peakBatchBytes, line.length);
+      return line.subarray(offset, offset + length);
+    }
+    return this.part(line, offset, length);
+  }
+
+  /** Hash a line or stub into each of `hs`, a part at a time when it is given in parts. */
+  private feed(hs: readonly { update(b: Uint8Array): unknown }[], line: Line): void {
+    if (line instanceof Uint8Array) {
+      for (const h of hs) h.update(line);
+      return;
+    }
+    const step = this.readLimits.bytes;
+    for (let at = 0; at < line.bytes; at += step) {
+      const b = this.part(line, at, Math.min(step, line.bytes - at));
+      for (const h of hs) h.update(b);
+    }
   }
 
   /**
    * How many lines to read from line `i` of `count`: one when their lengths
    * are not yet measured; otherwise as many as fit the read limits by their
-   * measured lengths, and at least one.
+   * measured lengths, stopping before a line a `ChunkedLine` stands for, and
+   * at least one.
    */
-  private batchSize(i: number, count: number, lens?: Uint32Array): number {
+  private batchSize(i: number, count: number, lens?: Uint32Array, stubs?: ReadonlyMap<number, Uint8Array>): number {
     if (!lens) return 1;
     const { entries, bytes } = this.readLimits;
     const most = Math.min(entries, count - i);
     let n = 1;
-    for (let sum = lens[i]!; n < most && sum + lens[i + n]! <= bytes; n++) sum += lens[i + n]!;
+    for (let sum = lens[i]!; n < most && !stubs?.has(i + n) && sum + lens[i + n]! <= bytes; n++) sum += lens[i + n]!;
     return n;
   }
 
-  /** Read one batch of lines from line `i` of a run that starts at seq `first`, as UTF-8 bytes. */
-  private batch(lines: Lines, first: Seq, i: number, count: number, lens?: Uint32Array): Uint8Array[] {
-    const batch = lines.read(first + i, this.batchSize(i, count, lens)).map(utf8);
+  /** Read one batch of lines from line `i` of a run that starts at seq `first`: text as UTF-8 bytes, a line in parts as it is. */
+  private batch(lines: Lines, first: Seq, i: number, count: number, lens?: Uint32Array, stubs?: ReadonlyMap<number, Uint8Array>): Line[] {
+    const batch = lines.read(first + i, this.batchSize(i, count, lens, stubs)).map((x) => (typeof x === "string" ? utf8(x) : x));
     if (batch.length === 0) throw new PublishError("invalid-input", `the entries ended at ${first + i - 1}`);
-    this.counters.peakBatchBytes = Math.max(this.counters.peakBatchBytes, batch.reduce((n, b) => n + b.length, 0));
+    this.counters.peakBatchBytes = Math.max(this.counters.peakBatchBytes, batch.reduce((n, b) => n + (b instanceof Uint8Array ? b.length : 0), 0));
     return batch;
   }
 
-  /** Each line of `count` from `first`, as UTF-8 bytes, read in batches. */
-  private eachLine(lines: Lines, first: Seq, count: number, f: (i: number, bytes: Uint8Array) => void, lens?: Uint32Array): void {
-    for (let i = 0; i < count; ) for (const b of this.batch(lines, first, i, count, lens)) f(i++, b);
-  }
-
   /**
-   * A segment blob, never held whole: one pass counts its size, which the
-   * blob's header needs; a second hashes it. When the parent published the
-   * first `published.count` of its lines, the second pass also hashes that
-   * prefix and requires the parent's blob ID: the published part of the
-   * last segment is checked byte for byte.
+   * A segment blob, never held whole. Its lines were measured as they were
+   * placed, so its size, which the blob's header needs, is known; this pass
+   * hashes it. A line that R-LOG-18 chunks becomes its entry file and is
+   * replaced by its `ChunkedLine`. When the parent published the first
+   * `published.count` of its lines, the pass also hashes that prefix and
+   * requires the parent's blob ID: the published part of the last segment
+   * is checked byte for byte.
    */
-  private segment(lines: Lines, first: Seq, count: number, published: { readonly count: number; readonly sha: Sha } | null): Planned {
-    const lens = new Uint32Array(count);
+  private segment(lines: Lines, first: Seq, lens: Uint32Array, lay: LogLayout | undefined, published: { readonly count: number; readonly sha: Sha } | null, entryFile: (seq: Seq, line: Line) => Uint8Array): Planned {
+    const count = lens.length;
+    const placed = (i: number) => (isChunked(lay, first + i, lens[i]!) ? placedBytes(first + i, lens[i]!) : lens[i]!);
     let size = count - 1;
-    this.eachLine(lines, first, count, (i, b) => {
-      lens[i] = b.length;
-      size += b.length;
-    });
+    for (let i = 0; i < count; i++) size += placed(i);
     const h = sha1.create().update(utf8(`blob ${size}\0`));
     let prefix: ReturnType<typeof sha1.create> | null = null;
     if (published) {
       let n = published.count - 1;
-      for (let i = 0; i < published.count; i++) n += lens[i]!;
+      for (let i = 0; i < published.count; i++) n += placed(i);
       prefix = sha1.create().update(utf8(`blob ${n}\0`));
     }
-    this.eachLine(lines, first, count, (i, b) => {
-      if (b.length !== lens[i]) throw new PublishError("invalid-input", `entry ${first + i} was ${lens[i]} bytes and is now ${b.length}; the source changed while it was read`);
-      const inPrefix = prefix !== null && i < published!.count;
-      if (i > 0) {
-        h.update(NL);
-        if (inPrefix) prefix!.update(NL);
+    const stubs = new Map<number, Uint8Array>();
+    for (let i = 0; i < count; )
+      for (const b of this.batch(lines, first, i, count, lens)) {
+        if (sizeOf(b) !== lens[i]) throw new PublishError("invalid-input", `entry ${first + i} was ${lens[i]} bytes and is now ${sizeOf(b)}; the source changed while it was read`);
+        let data: Line = b;
+        if (isChunked(lay, first + i, lens[i]!)) {
+          data = entryFile(first + i, b);
+          stubs.set(i, data);
+        }
+        const hs = prefix !== null && i < published!.count ? [h, prefix] : [h];
+        if (i > 0) for (const x of hs) x.update(NL);
+        this.feed(hs, data);
+        i++;
       }
-      h.update(b);
-      if (inPrefix) prefix!.update(b);
-    }, lens);
     if (prefix && hex(prefix.digest()) !== published!.sha)
       throw new PublishError("would-rewrite", `an entry from ${first} to ${first + published!.count - 1} differs from the published entry; published history is never rewritten`);
     this.counters.hashedBytes += size + (published ? size : 0);
     this.counters.largestSegment = Math.max(this.counters.largestSegment, size);
-    return { sha: hex(h.digest()) as Sha, type: "blob", size, body: { kind: "segment", first, count, lens } };
+    return { sha: hex(h.digest()) as Sha, type: "blob", size, body: { kind: "segment", first, count, lens, stubs } };
   }
 
   /** Bytes `offset` to `offset + length` of a planned object, read again from its source. */
   private bytesOf(lines: Lines, o: Planned, offset: number, length: number): Uint8Array {
     const body = o.body;
     if (body.kind === "bytes") return body.data.subarray(offset, offset + length);
-    if (body.kind === "retained") {
-      const data = utf8(body.load());
-      if (data.length !== o.size) throw new PublishError("invalid-input", `retained file ${o.sha} was ${o.size} bytes and is now ${data.length}`);
-      return data.subarray(offset, offset + length);
+    if (body.kind === "range") {
+      const data = body.read(offset, length);
+      if (data.length !== length) throw new PublishError("invalid-input", `${o.type} ${o.sha} gave ${data.length} bytes at ${offset}, not ${length}`);
+      return data;
     }
     // A segment: start at the line that holds `offset`, and read lines in batches until the part is full.
+    // A line a ChunkedLine stands for is never read again: its stub is sent.
+    const len = (i: number) => body.stubs.get(i)?.length ?? body.lens[i]!;
     const out = new Uint8Array(length);
     let i = 0;
     let at = 0;
-    while (i < body.count - 1 && at + body.lens[i]! + 1 <= offset) at += body.lens[i++]! + 1;
+    while (i < body.count - 1 && at + len(i) + 1 <= offset) at += len(i++) + 1;
     let filled = 0;
-    const put = (src: Uint8Array, pos: number) => {
+    const put = (src: Line, pos: number) => {
       const lo = Math.max(pos, offset);
-      const hi = Math.min(pos + src.length, offset + length);
+      const hi = Math.min(pos + sizeOf(src), offset + length);
       if (hi > lo) {
-        out.set(src.subarray(lo - pos, hi - pos), lo - offset);
+        out.set(src instanceof Uint8Array ? src.subarray(lo - pos, hi - pos) : this.part(src, lo - pos, hi - lo), lo - offset);
         filled += hi - lo;
       }
     };
     while (filled < length && i < body.count) {
-      for (const b of this.batch(lines, body.first, i, body.count, body.lens)) {
-        if (b.length !== body.lens[i]) throw new PublishError("invalid-input", `entry ${body.first + i} was ${body.lens[i]} bytes and is now ${b.length}; the source changed while it was read`);
+      const stub = body.stubs.get(i);
+      for (const b of stub ? [stub] : this.batch(lines, body.first, i, body.count, body.lens, body.stubs)) {
+        if (sizeOf(b) !== len(i)) throw new PublishError("invalid-input", `entry ${body.first + i} was ${len(i)} bytes and is now ${sizeOf(b)}; the source changed while it was read`);
         put(b, at);
-        at += b.length;
+        at += sizeOf(b);
         if (i < body.count - 1) put(NL, at++);
         i++;
         if (filled >= length) break;
@@ -654,12 +950,21 @@ export class LogPublisher {
     return true;
   }
 
+  private unexpected(current: Sha | null, why: string): PublishError {
+    return new PublishError("unexpected-writer", `${this.ref} is at ${current ?? "nothing"}, ${why}`, { current });
+  }
+
   private done(cohort: Cohort, plan: Plan, attempts: number): PublishResult {
     this.lastCommit = plan.commit.sha;
     this.index = plan.index;
     return { commit: plan.commit.sha, through: cohort.through, hash: cohort.hash, publishedThrough: cohort.through, attempts };
   }
 }
+
+/** The fixed end of every canonical entry line: its hash, prev, signature and seq. */
+const TAIL = /,"format":"artroom-log-v1","hash":"(sha256:[0-9a-f]{64})","prev":(?:null|"sha256:[0-9a-f]{64}"),"roomSig":"[A-Za-z0-9_-]+","seq":(0|[1-9][0-9]*)\}$/;
+/** For reading the end of a line, which may start inside a character. */
+const lenient = new TextDecoder();
 
 /** An array's canonical lines, copied and checked now. */
 function ownedLines(entries: readonly LogEntry[]): Lines {
@@ -699,18 +1004,20 @@ export function publicationDue(policy: BatchPolicy, lag: number, oldestUnpublish
 // ------------------------------------------------------------------ reading
 
 /**
- * A log commit's index, from its trees and checkpoint only: no segment or
- * retained file is read. A commit without R-LOG-9's layout, or whose
- * segments do not match its checkpoint, is `unexpected-writer`.
+ * A log commit's index, from its trees and checkpoint only: no segment,
+ * entry file or retained file is read. A commit without the shape of the
+ * layout its checkpoint names (R-LOG-9; R-LOG-16 to R-LOG-19), or whose
+ * segments do not match its checkpoint, is `unexpected-writer`. Byte bounds
+ * are left to `verify`.
  */
 async function readIndex(reader: GitReader, commit: Sha): Promise<Index> {
-  const notLog = (why: string) => new PublishError("unexpected-writer", `${commit} is not a log commit this publisher can extend: ${why}`);
+  const notLog = (why: string) => new PublishError("unexpected-writer", `${commit} is not a log commit this publisher can extend: ${why}`, { current: commit });
   const c = await reader.readObject(commit);
   if (c.type !== "commit") throw notLog("it is not a commit");
   const present = new Set<string>();
-  const tree = async (sha: Sha, path: string): Promise<TreeEntry[]> => {
+  const list: ListTree = async (sha) => {
     const t = await reader.readObject(sha);
-    if (t.type !== "tree") throw notLog(`${path} is not a tree`);
+    if (t.type !== "tree") throw notLog(`${sha} is not a tree`);
     present.add(sha);
     return parseTree(t.data);
   };
@@ -719,10 +1026,9 @@ async function readIndex(reader: GitReader, commit: Sha): Promise<Index> {
     if (!e) throw notLog(`it has no ${path}`);
     return e;
   };
-  const root = await tree(parseCommit(c.data).tree, "root");
-  const top = await tree(find(root, "artroom-log", "40000", "artroom-log").sha, "artroom-log");
-  const v1 = await tree(find(top, "v1", "40000", ROOT).sha, ROOT);
-  const genesis = find(v1, "genesis.json", "100644", `${ROOT}/genesis.json`).sha;
+  const root = await list(parseCommit(c.data).tree);
+  const top = await list(find(root, "artroom-log", "40000", "artroom-log").sha);
+  const v1 = await list(find(top, "v1", "40000", ROOT).sha);
   const cpSha = find(v1, "checkpoint.json", "100644", `${ROOT}/checkpoint.json`).sha;
   let cp: Checkpoint;
   try {
@@ -731,53 +1037,48 @@ async function readIndex(reader: GitReader, commit: Sha): Promise<Index> {
     if (e instanceof Malformed) throw notLog(e.message);
     throw e;
   }
-  const segs = await tree(find(v1, "segments", "40000", `${ROOT}/segments`).sha, `${ROOT}/segments`);
-  const segments: Sha[] = [];
-  for (const e of segs) {
-    if (e.mode !== "100644" || `${ROOT}/segments/${e.name}` !== segmentPath(segments.length * SEGMENT_SIZE)) throw notLog(`segment ${e.name} is out of place`);
-    segments.push(e.sha);
-  }
-  if (segments.length !== Math.floor(cp.through / SEGMENT_SIZE) + 1) throw notLog(`it has ${segments.length} segments for entries through ${cp.through}`);
-  const retained = new Map<string, Sha>();
-  for (const sub of ["inputs", "policies"]) {
-    const e = v1.find((x) => x.name === sub && x.mode === "40000");
-    if (!e) continue;
-    for (const f of await tree(e.sha, `${ROOT}/${sub}`)) {
-      const path = `${ROOT}/${sub}/${f.name}`;
-      if (f.mode !== "100644" || !isRetainedPath(path)) throw notLog(`${path} is not a retained file`);
-      retained.set(path, f.sha);
-    }
-  }
-  for (const sha of [genesis, cpSha, ...segments, ...retained.values()]) present.add(sha);
-  return { through: cp.through, hash: cp.hash, genesis, segments, retained, present };
-}
+  const layout = cp.layout;
+  const g = v1.find((x) => x.name === "genesis.json" && (x.mode === "100644" || layout !== undefined));
+  if (!g) throw notLog(`it has no ${ROOT}/genesis.json`);
 
-/** The files under `artroom-log/v1/` in a log commit, by path. Reads every file: for verification, not for the Room. */
-export async function readLogFiles(reader: GitReader, commit: Sha): Promise<Map<string, Uint8Array>> {
-  const c = await reader.readObject(commit);
-  if (c.type !== "commit") throw new Error(`${commit} is not a commit`);
-  const out = new Map<string, Uint8Array>();
-  const walk = async (tree: Sha, prefix: string) => {
-    const t = await reader.readObject(tree);
-    if (t.type !== "tree") throw new Error(`${tree} is not a tree`);
-    for (const e of parseTree(t.data)) {
-      const path = prefix ? `${prefix}/${e.name}` : e.name;
-      if (e.mode === "40000") await walk(e.sha, path);
-      else out.set(path, (await reader.readObject(e.sha)).data);
+  const trees = new Map<string, Sha>();
+  const members = async (name: SetName): Promise<ReadonlyMap<string, TreeEntry>> => {
+    const e = v1.find((x) => x.name === name && x.mode === "40000");
+    if (!e) {
+      if (name === "segments") throw notLog(`it has no ${ROOT}/segments`);
+      return new Map();
     }
+    const m = await walkSet(list, e.sha, SETS[name], layout === undefined);
+    if (m.problems.length) throw notLog(`${ROOT}/${name}: ${m.problems[0]}`);
+    for (const [p, sha] of m.trees) trees.set(p ? `${name}/${p}` : name, sha);
+    return m.leaves;
   };
-  await walk(parseCommit(c.data).tree, "");
-  return out;
-}
 
-/** The segment lines of a log commit's files, in order. */
-function publishedLines(files: ReadonlyMap<string, Uint8Array>): string[] {
-  const lines: string[] = [];
-  for (let first = 0; files.has(segmentPath(first)); first += SEGMENT_SIZE) lines.push(...segmentLines(files.get(segmentPath(first))!));
-  return lines;
-}
+  // Segments: layout 1 every 1,000 entries; layout 2 from 0, in order, at most 1,000 entries each.
+  const segments: { first: Seq; sha: Sha }[] = [];
+  for (const [name, e] of [...(await members("segments"))].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const first = Number(name.slice(0, 12));
+    const prev = segments.at(-1)?.first;
+    const placed = layout === undefined ? first === segments.length * SEGMENT_SIZE : prev === undefined ? first === 0 : first > prev && first - prev <= SEGMENT_SIZE;
+    if (e.mode !== "100644" || !placed) throw notLog(`segment ${name} is out of place`);
+    segments.push({ first, sha: e.sha });
+  }
+  const last = segments.at(-1)?.first ?? 0;
+  if (layout === undefined ? segments.length !== Math.floor(cp.through / SEGMENT_SIZE) + 1 : cp.through < last || cp.through - last >= SEGMENT_SIZE)
+    throw notLog(`it has ${segments.length} segments for entries through ${cp.through}`);
 
-/** The entries a log commit publishes, in order. Throws `Malformed` on content that is not a log entry. */
-export async function readPublishedEntries(reader: GitReader, commit: Sha): Promise<LogEntry[]> {
-  return publishedLines(await readLogFiles(reader, commit)).map(decodeEntry);
+  const entries = new Map<string, Node>();
+  if (layout)
+    for (const [name, e] of await members("entries")) {
+      if (e.mode !== "40000") throw notLog(`${ROOT}/entries/${name} is not a chunk directory`);
+      entries.set(name, { mode: e.mode, sha: e.sha });
+    }
+  const retained = new Map<string, Node>();
+  for (const sub of ["inputs", "policies"] as const)
+    for (const [name, e] of await members(sub)) {
+      if (layout === undefined && e.mode !== "100644") throw notLog(`${ROOT}/${sub}/${name} is not a retained file`);
+      retained.set(`${ROOT}/${sub}/${name}`, { mode: e.mode, sha: e.sha });
+    }
+  for (const sha of [g.sha, cpSha, ...segments.map((s) => s.sha), ...[...entries.values()].map((n) => n.sha), ...[...retained.values()].map((n) => n.sha)]) present.add(sha);
+  return { through: cp.through, hash: cp.hash, layout, genesis: { mode: g.mode, sha: g.sha }, segments, entries, retained, trees, present };
 }

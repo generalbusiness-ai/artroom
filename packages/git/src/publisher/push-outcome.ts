@@ -41,6 +41,25 @@ const BEFORE_SEND = [
   /does not appear to be a git repository/,
 ];
 
+/**
+ * Codes Artifacts answers to a pack before it updates any ref (contract
+ * amendment 4, R-LOG-20), so a push that gets one is refused. Measured live
+ * on 2026-10-02 (`packages/room/measure/logbig/results/`): an object over
+ * 33,554,432 bytes. Add only codes that Artifacts is known to answer before
+ * any ref update: an answer is never `rejected` when the ref might have
+ * changed.
+ */
+export const ARTIFACTS_REFUSALS: readonly string[] = ["artifacts_git_receive_pack_object_too_large"];
+
+/** The Artifacts refusal code in a push's output (`remote: <code>` on a line of its own), or null. */
+export function artifactsRefusal(text: string): string | null {
+  for (const line of text.split("\n")) {
+    const m = /^remote: ([a-z0-9_]+)\s*$/.exec(line);
+    if (m && ARTIFACTS_REFUSALS.includes(m[1]!)) return m[1]!;
+  }
+  return null;
+}
+
 /** Classify `git push --porcelain` for one destination ref. */
 export function classifyGitPush(exitCode: number, stdout: string, stderr: string, dstRef: string): PushOutcome {
   const detail = (stdout + "\n" + stderr).trim().slice(-600);
@@ -60,6 +79,8 @@ export function classifyGitPush(exitCode: number, stdout: string, stderr: string
     return { outcome: "unknown", detail }; // includes "[remote failure]": sent, no status
   }
   if (exitCode === 0) return { outcome: "unknown", detail }; // success without a status line for our ref
+  // Artifacts refused the pack before updating any ref; git then reports only a hang-up (R-LOG-20).
+  if (artifactsRefusal(stderr)) return { outcome: "rejected", reason: "remote-rejected", detail };
   if (AFTER_SEND.some((r) => r.test(stderr))) return { outcome: "unknown", detail };
   if (BEFORE_SEND.some((r) => r.test(stderr))) return { outcome: "error", detail };
   return { outcome: "unknown", detail };

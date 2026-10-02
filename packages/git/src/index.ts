@@ -48,7 +48,7 @@ export { decodeLogPush, decodeLogStage, fromB64url, toB64url, toLogOutcome, LOG_
 export type { LogPushOutcome, LogPushRequest, LogStageRequest } from "./publisher/log-push.ts";
 export type { Exec, ExecResult, BuildResult, LogObject, PinResult, PreviewResult, SnapshotFile, StageChunk, StageResult, StageWant } from "./publisher/gitops.ts";
 export { GitPublisher, landMessage } from "./publisher/git-publisher.ts";
-export { classifyGitPush, definitelyNotApplied } from "./publisher/push-outcome.ts";
+export { ARTIFACTS_REFUSALS, artifactsRefusal, classifyGitPush, definitelyNotApplied } from "./publisher/push-outcome.ts";
 export type { PushOutcome } from "./publisher/push-outcome.ts";
 export { checkUpdates, readCommands, FenceError } from "./publisher/ref-fence.ts";
 export { canonicalTokens, readMainVia, withRetry } from "./artifacts.ts";

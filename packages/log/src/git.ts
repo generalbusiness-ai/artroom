@@ -158,7 +158,15 @@ export type PushOutcome =
   /** The ref was not at the lease: someone else moved it. Nothing was written to the ref. */
   | { readonly ok: false; readonly reason: "lease-mismatch"; readonly current: Sha | null }
   /** The push failed without a clear answer (network, timeout). The ref may or may not have moved. */
-  | { readonly ok: false; readonly reason: "unknown"; readonly detail: string };
+  | { readonly ok: false; readonly reason: "unknown"; readonly detail: string }
+  /**
+   * The remote answered that it did not apply this push (R-LOG-20): a
+   * `[rejected]` or `[remote rejected]` status other than a lease refusal,
+   * or a code the remote gives before it updates any ref, such as Artifacts'
+   * `artifacts_git_receive_pack_object_too_large`. `code` is that code, or
+   * the kind of status. It proves only that this attempt did not apply.
+   */
+  | { readonly ok: false; readonly reason: "refused"; readonly code: string; readonly detail: string };
 
 /** An object a publication will stage: its ID, type and length in bytes. */
 export interface StageWant {
@@ -249,12 +257,23 @@ export class StagingArea {
   }
 }
 
-/** An in-memory repository. `failNext` simulates lost answers for retry tests. */
+/** The code Artifacts answers for a pack holding an object over its limit, before it updates any ref (measured 2026-10-02). */
+export const OBJECT_TOO_LARGE = "artifacts_git_receive_pack_object_too_large";
+
+/** An in-memory repository. `failNext` simulates lost answers and refusals for retry tests. */
 export class MemoryGit implements GitRemote {
   readonly objects = new Map<string, { readonly type: ObjectType; readonly data: Uint8Array }>();
   readonly refs = new Map<string, Sha>();
-  /** Pushes to fail with `unknown` before (`"before"`) or after (`"after"`) the ref moves. */
-  failNext: ("before" | "after")[] = [];
+  /**
+   * Pushes to fail with `unknown` before (`"before"`) or after (`"after"`)
+   * the ref moves, or to refuse without moving it (`"refused"`).
+   */
+  failNext: ("before" | "after" | "refused")[] = [];
+  /**
+   * Like Artifacts: refuse a push, before the ref moves, when an object it
+   * would add to the ref's history is larger than this many bytes.
+   */
+  objectLimit = Infinity;
   pushes = 0;
   readonly staging = new StagingArea(
     (sha) => this.objects.has(sha),
@@ -279,15 +298,44 @@ export class MemoryGit implements GitRemote {
     this.pushes++;
     const fail = this.failNext.shift();
     if (fail === "before") return { ok: false, reason: "unknown", detail: "simulated failure before the update" };
+    if (fail === "refused") return { ok: false, reason: "refused", code: "remote-rejected", detail: "simulated [remote rejected]" };
     const current = this.refs.get(ref) ?? null;
     if (current !== lease) return { ok: false, reason: "lease-mismatch", current };
     for (const o of objects) {
       if (gitObject(o.type, o.data).sha !== o.sha) throw new Error(`object ${o.sha} does not match its content`);
-      this.objects.set(o.sha, { type: o.type, data: o.data });
+      if (o.data.length > this.objectLimit) return { ok: false, reason: "refused", code: OBJECT_TOO_LARGE, detail: `remote: ${OBJECT_TOO_LARGE}` };
     }
+    if (this.objectLimit !== Infinity) {
+      // Staged objects reach the remote only with the push: check what the push adds to the ref's history.
+      const old = current ? this.reachable(current) : new Set<string>();
+      const sent = new Map(objects.map((o) => [o.sha as string, o.data]));
+      for (const sha of this.reachable(next, sent)) {
+        const size = sent.get(sha)?.length ?? this.objects.get(sha)?.data.length ?? 0;
+        if (!old.has(sha) && size > this.objectLimit) return { ok: false, reason: "refused", code: OBJECT_TOO_LARGE, detail: `remote: ${OBJECT_TOO_LARGE}` };
+      }
+    }
+    for (const o of objects) this.objects.set(o.sha, { type: o.type, data: o.data });
     if (!this.objects.has(next)) throw new Error(`commit ${next} was not sent`);
     this.refs.set(ref, next);
     if (fail === "after") return { ok: false, reason: "unknown", detail: "simulated lost answer after the update" };
     return { ok: true };
+  }
+
+  /** Every object reachable from `commit`, through its parents, here or among `extra`. */
+  private reachable(commit: string, extra: ReadonlyMap<string, Uint8Array> = new Map()): Set<string> {
+    const seen = new Set<string>();
+    const walk = (sha: string, kind: "commit" | "tree" | "blob") => {
+      if (seen.has(sha)) return;
+      seen.add(sha);
+      const data = this.objects.get(sha)?.data ?? extra.get(sha);
+      if (!data || kind === "blob") return;
+      if (kind === "commit") {
+        const c = parseCommit(data);
+        walk(c.tree, "tree");
+        for (const p of c.parents) walk(p, "commit");
+      } else for (const e of parseTree(data)) walk(e.sha, e.mode === "40000" ? "tree" : "blob");
+    };
+    walk(commit, "commit");
+    return seen;
   }
 }
