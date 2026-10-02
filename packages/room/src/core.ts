@@ -177,7 +177,8 @@ export class RoomCore {
         sql: this.sql,
         artifacts: this.artifacts,
         prefix: /^[A-Za-z0-9._-]{1,40}$/.test(name) ? name : `r${sha256Hex(utf8(name)).slice(0, 32)}`,
-        wake: async () => this.committed(),
+        // The persisted alarm (follow-up c9cd4cd8): resolves only once storage has it, before any snapshot create is sent.
+        wake: this.wake ?? (async () => this.committed()),
         now: () => this.now(),
         ...(this.remotes.sleep ? { sleep: this.remotes.sleep } : {}),
       });

@@ -239,10 +239,14 @@ export class Room extends DurableObject<RoomEnv> {
     return run;
   }
 
-  /** On a fresh object: founding debt in the ledger gets an alarm, though no found request comes (plan 004). */
+  /**
+   * On a fresh object: whatever the ledgers owe gets an alarm, though no
+   * request comes. Before founding, the founding debt (plan 004); after, all
+   * the alarm's work, including snapshot, workspace and job-token cleanup
+   * (follow-up c9cd4cd8).
+   */
   private async recover(): Promise<void> {
-    if (this.core.founded) return;
-    const due = this.core.foundingDue();
+    const due = this.core.founded ? this.core.nextAlarm() : this.core.foundingDue();
     if (due !== null) await this.wake(due);
   }
 
