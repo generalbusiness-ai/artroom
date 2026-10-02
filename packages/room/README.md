@@ -1241,38 +1241,66 @@ strengthened.
 | The alarm not set from due revocations | "cleanup fails …" |
 | A failed revocation retried at once | "cleanup fails …" (after it asserted the retry is due later) |
 
-### A token mint whose answer is lost
+### A token mint whose answer is lost (review 1701f73e)
 
-A preliminary finding on revision 4 (`277c2375`): a whole-tree job's
-canonical `createToken` can apply at Artifacts while its answer is lost.
-What each failure did:
+The checker's review of revision 4 (`277c2375`) found that a whole-tree
+job's canonical `createToken` can apply at Artifacts while its answer is
+lost. What each failure did:
 
 - refused before anything changed (an Artifacts error that says so): no
   token existed; the job was due again later. Correct.
 - applied, then the answer lost (a transport error), or no answer at all:
-  a live token existed that nothing recorded, revoked or watched, until its
-  own expiry. Nothing was sent on it.
+  a live token existed that nothing recorded, revoked or watched. Its
+  expiry ran from when Artifacts applied it, so a mint applied late gave a
+  token that outlived the attempt's deadline (in the checker's control,
+  by 25 seconds). Nothing was sent on it.
 - a malformed answer: with no token ID, the same untracked token; with an
   ID but no token text, the job could be sent as `Bearer undefined`.
 
-Now the mint is recorded before Artifacts is asked (`mint:<job>` in
-`job_tokens`). A usable answer (ID and text) settles the record in the
-step that records the token by its ID. A definite refusal settles it at
-once. A lost or malformed answer leaves it unresolved, with the error,
-until the token it may have made could no longer be live: the attempt's
-deadline, later than any expiry the mint asked for. The jobs step and the
-alarm settle due records, so a restart keeps them, and nothing is ever
-sent on an unknown mint. An inventory of the canonical repository's tokens
-cannot settle it sooner: the repository holds other owners' tokens
-(pinning, the log, landings, other jobs), and without the token's ID the
-Room cannot tell which one is its own.
+**The fix** ([src/jobs.ts](src/jobs.ts)). The mint is recorded before
+Artifacts is asked (`mint:<job>` in `job_tokens`, with the attempt's
+deadline). A usable answer (ID and text) settles the record in the step
+that records the token by its ID; a definite refusal settles it at once.
+A lost or malformed answer leaves it unresolved, with the error, and
+nothing is ever sent on an unknown mint.
+
+An unresolved mint is not settled by time: a token applied late can
+outlive the deadline. Artifacts' token inventory gives each token's ID,
+scope, state and expiry but no owner, and the canonical repository holds
+other owners' tokens (pinning, the log, landings, other jobs), so the Room
+can neither pick out this mint's token nor revoke unknown tokens safely.
+It settles the record only on a complete, well-formed inventory (as many
+tokens as its total, each with an ID, a known state and a readable
+expiry), taken at or after the attempt's deadline, that shows no live
+token the Room cannot account for. The accounted tokens are those of jobs
+in flight and ended tokens whose revocation is still owed. Otherwise the
+record stays, saying why, retried with backoff and set on the alarm, so a
+restart keeps it; a late token keeps it open until it has really expired.
+The residual: a request that Artifacts applies only after such an
+inventory, taken after the deadline, would not be seen.
 
 Controls in [test/workerd/job-token-mint.test.ts](test/workerd/job-token-mint.test.ts),
-on the real Room Durable Object and SQLite: applied then lost, with and
-without a restart; a malformed answer; a refusal that changed nothing; an
-answer still outstanding past the deadline. Mutations: 6 of 7 caught. The
-equivalent one settles a record before its deadline: a record is only
-reached once it is due, and it is due at its deadline.
+on the real Room Durable Object and SQLite:
+
+| Test | What it shows |
+|---|---|
+| "applied, then the answer lost …" | Nothing is sent; the mint stays recorded until the deadline; the next attempt is sent with its own token; then the inventory settles it |
+| "applied, the answer lost, and the room restarts …" | The record survives an abort and a fresh stub, with its alarm, and settles after the deadline |
+| "review 1701f73e: a mint applied 30 seconds late, its answer lost …" | The checker's reproduction: nothing is sent; past the deadline the late token still reads, so the duty stays (across a restart), saying a live token is unaccounted for; it settles only once the token has expired |
+| "the room stops while a mint's answer is outstanding …" | The record made before the call survives; an inventory after the deadline reconciles it |
+| "an inventory that is incomplete does not settle the duty; a live token the Room knows does not hold it open" | An inventory with fewer tokens than its total proves nothing; the sent attempt's live, known token does not block settlement |
+| "a malformed answer (no token text) …" | As unknown as a lost one: nothing is sent, the mint stays recorded |
+| "a refusal that changed nothing settles the mint at once" | No record is left |
+| "an answer still outstanding …" | The record exists while the call is out; a late answer's token is ended and the record settled |
+
+**Mutations.** 11 of 12 were caught: no record before the call; a lost
+answer treated as no token; a refusal kept unresolved; a malformed answer
+accepted; a usable answer leaving the record; settling by the deadline
+alone; an incomplete inventory accepted; in-flight tokens not accounted
+for; expired or revoked tokens counted as live; an unaccounted live token
+ignored; no backoff. The equivalent one checks a record before its
+deadline: a record is only reached once it is due, and it is due at its
+deadline.
 
 ## Founding gaps (request b6b51de7)
 
