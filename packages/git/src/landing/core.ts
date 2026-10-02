@@ -14,6 +14,10 @@
  *   Elapsed time, token expiry or a lost container never release it.
  * - `aborted` needs proof that no push can still land: every push attempt
  *   ended with an outcome that shows nothing was applied (R-PUB-6, R-REV-5).
+ * - A token whose revocation failed is still owed one after its operation
+ *   ends (R-PUB-3). That duty has its own records and due time, so it never
+ *   holds the slot or delays a receipt, and its answer decides nothing about
+ *   whether a push landed (R-PUB-2).
  */
 
 import type {
@@ -64,9 +68,14 @@ export const FORWARD_BACKOFF = { firstMs: 1_000, maxMs: 60_000 } as const;
 export const UNEXPECTED_READBACK_MS = 300_000;
 /** Backoff for a failed preparation step. */
 export const PREPARE_BACKOFF = { firstMs: 2_000, maxMs: 120_000 } as const;
+/** Backoff for revoking a known token of an ended operation: 1 s doubling to 5 min. Never a deadline. */
+export const TOKEN_CLEANUP_BACKOFF = { firstMs: 1_000, maxMs: 300_000 } as const;
+/** Most owed revocations one `reconcile` tries. */
+const CLEANUP_BATCH = 20;
 
 const ACTIVE = ["accepted", "preparing", "ready", "publishing", "unresolved"] as const;
 const PRE_RESERVATION = new Set(["accepted", "preparing", "ready"]);
+const ACTIVE_STATES: ReadonlySet<string> = new Set(ACTIVE);
 
 const FIX: Record<RetryReason, string> = {
   "generation-moved": "A newer generation was proposed on this lane. Land that generation instead.",
@@ -105,6 +114,12 @@ export class LandingCore {
     );
     sql.all("CREATE INDEX IF NOT EXISTS artroom_land_op_state ON artroom_land_op (state, ord)");
     sql.all("CREATE TABLE IF NOT EXISTS artroom_land_meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)");
+    // Known tokens of ended operations whose revocation is owed (R-PUB-3). `backoff` is the last wait used.
+    sql.all(
+      "CREATE TABLE IF NOT EXISTS artroom_land_token_cleanup (op TEXT NOT NULL, n INTEGER NOT NULL, token TEXT NOT NULL, due INTEGER NOT NULL, backoff INTEGER NOT NULL, PRIMARY KEY (op, n))",
+    );
+    sql.all("CREATE INDEX IF NOT EXISTS artroom_land_token_cleanup_due ON artroom_land_token_cleanup (due)");
+    this.adoptEndedTokens();
   }
 
   // ------------------------------------------------------------ storage
@@ -128,6 +143,39 @@ export class LandingCore {
       op.order,
       JSON.stringify(op),
     );
+    if (!ACTIVE_STATES.has(op.state)) this.oweRevocations(op);
+  }
+
+  /**
+   * An operation that is no longer active gets no more publication work, but
+   * its known tokens that are not revoked are still owed a revocation. Record
+   * each one, by its own ID, in the same transaction. Not due at once: the
+   * engine tried to revoke it just before.
+   */
+  private oweRevocations(op: LandRecord): void {
+    for (const p of op.pushes ?? []) {
+      if (!p.tokenId || p.tokenRevoked) continue;
+      this.sql.all(
+        "INSERT INTO artroom_land_token_cleanup (op, n, token, due, backoff) VALUES (?, ?, ?, ?, ?) ON CONFLICT (op, n) DO NOTHING",
+        op.id,
+        p.n,
+        p.tokenId,
+        this.now() + TOKEN_CLEANUP_BACKOFF.firstMs,
+        TOKEN_CLEANUP_BACKOFF.firstMs,
+      );
+    }
+  }
+
+  /** Once per room: ended operations stored before the cleanup records existed owe their unrevoked tokens too. */
+  private adoptEndedTokens(): void {
+    this.tx(() => {
+      if (this.meta("token-cleanup") !== null) return;
+      const marks = ACTIVE.map(() => "?").join(", ");
+      for (const r of this.sql.all(`SELECT body FROM artroom_land_op WHERE state NOT IN (${marks})`, ...ACTIVE)) {
+        this.oweRevocations(JSON.parse(need(text(r, "body"), "body")) as LandRecord);
+      }
+      this.setMeta("token-cleanup", "1");
+    });
   }
 
   private slotRaw(): Slot {
@@ -215,8 +263,12 @@ export class LandingCore {
     return s.state === "held" ? { op: s.op, reservedAt: s.reservedAt } : null;
   }
 
-  /** The earliest time the driver has work due, for the Room's alarm. */
-  nextDue(): number | null {
+  /**
+   * The earliest time the driver has work due, for the Room's alarm. While a
+   * cleanup pass is still waiting on an answer, the owed revocations are not
+   * due before `cleanupNotBefore`: that pass will answer or time out by then.
+   */
+  nextDue(cleanupNotBefore: number | null = null): number | null {
     let due: number | null = null;
     const at = (t: number) => (due = due === null ? t : Math.min(due, t));
     for (const op of this.active()) {
@@ -225,6 +277,8 @@ export class LandingCore {
       else if ((op.state === "preparing" && op.integration === undefined) || (op.integration !== undefined && op.readinessPending)) at(op.retryAt ?? this.now());
       else if (op.state === "ready" && this.slotRaw().state === "free") at(this.now());
     }
+    const cleanup = this.sql.all("SELECT MIN(due) AS t FROM artroom_land_token_cleanup")[0]?.["t"];
+    if (typeof cleanup === "number") at(cleanupNotBefore === null ? cleanup : Math.max(cleanup, cleanupNotBefore));
     return due;
   }
 
@@ -668,12 +722,38 @@ export class LandingCore {
     });
   }
 
+  /** Artifacts answered the revocation. No receipt: it changes nothing about the outcome. */
   tokenRevoked(id: OpId, n: number): void {
     this.tx(() => {
       const op = need(this.get(id), id);
       this.attempt(op, n).tokenRevoked = true;
       this.save(op);
+      this.sql.all("DELETE FROM artroom_land_token_cleanup WHERE op = ? AND n = ?", id, n);
     });
+  }
+
+  /** Owed revocations of ended operations' tokens that are due now, earliest first. */
+  cleanupDue(): { readonly op: OpId; readonly n: number; readonly tokenId: string }[] {
+    return this.sql
+      .all("SELECT op, n, token FROM artroom_land_token_cleanup WHERE due <= ? ORDER BY due, op, n LIMIT ?", this.now(), CLEANUP_BATCH)
+      .map((r) => ({ op: need(text(r, "op"), "op") as OpId, n: Number(r["n"]), tokenId: need(text(r, "token"), "token") }));
+  }
+
+  /** A revocation of an ended operation's token failed. Try it again later, with backoff; never give it up. */
+  cleanupFailed(id: OpId, n: number): void {
+    this.tx(() => {
+      const last = this.sql.all("SELECT backoff FROM artroom_land_token_cleanup WHERE op = ? AND n = ?", id, n)[0]?.["backoff"];
+      if (typeof last !== "number") return;
+      const wait = Math.min(last * 2, TOKEN_CLEANUP_BACKOFF.maxMs);
+      this.sql.all("UPDATE artroom_land_token_cleanup SET due = ?, backoff = ? WHERE op = ? AND n = ?", this.now() + wait, wait, id, n);
+    });
+  }
+
+  /** Every owed revocation of an ended operation's token, without token IDs. */
+  tokenCleanup(): { readonly op: OpId; readonly n: number; readonly dueAt: number; readonly backoffMs: number }[] {
+    return this.sql
+      .all("SELECT op, n, due, backoff FROM artroom_land_token_cleanup ORDER BY due, op, n")
+      .map((r) => ({ op: need(text(r, "op"), "op") as OpId, n: Number(r["n"]), dueAt: Number(r["due"]), backoffMs: Number(r["backoff"]) }));
   }
 
   /** Tokens minted for this publication and not yet revoked. */
