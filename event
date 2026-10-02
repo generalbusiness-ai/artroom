@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d66027f736ae483663c71e3c419707676b827e44","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa, which no longer changes packages/git/test/workspaces.test.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cf4ccddab5bad0e97585cf69510c1afa6467c175","text":"Republished at 987c62a5f4490778be898025c4c24d31ed4028fa; the successor stands at packages/mcp/README.md."}
