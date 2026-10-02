@@ -27,6 +27,8 @@ export type {
 } from "./landing/types.ts";
 export { Workspaces, forkName, MIN_TOKEN_TTL_S } from "./workspace/workspaces.ts";
 export type { WorkspacesOptions } from "./workspace/workspaces.ts";
+export { MAX_RETAIN_MS, RetirementOwed, SnapshotRepos } from "./snapshot/repos.ts";
+export type { SnapshotRepo, SnapshotReposOptions, SnapshotToken, SnapshotWriter } from "./snapshot/repos.ts";
 export {
   DEFAULT_BOUNDS,
   EMPTY_TREE,
@@ -41,13 +43,13 @@ export {
 export type { DiffBounds, DiffResult, DiffStats, TreeEntry, TreeReader } from "./diff/treediff.ts";
 export { ContainerPublisher, Pinning } from "./publisher/client.ts";
 export type { PublisherClientOptions, PublisherStub } from "./publisher/client.ts";
-export { GitOps, HARDENING, integrationRef, objectsRef, pinnedRef } from "./publisher/gitops.ts";
+export { GitOps, HARDENING, SNAPSHOT_AUTHOR, SNAPSHOT_REF, integrationRef, objectsRef, pinnedRef } from "./publisher/gitops.ts";
 export type { Exec, ExecResult, BuildResult, PinResult, PreviewResult, SnapshotFile } from "./publisher/gitops.ts";
 export { GitPublisher, landMessage } from "./publisher/git-publisher.ts";
 export { classifyGitPush, definitelyNotApplied } from "./publisher/push-outcome.ts";
 export type { PushOutcome } from "./publisher/push-outcome.ts";
 export { checkUpdates, readCommands, FenceError } from "./publisher/ref-fence.ts";
 export { canonicalTokens, readMainVia, withRetry } from "./artifacts.ts";
-export type { ArtifactsNamespace, RepoHandle } from "./artifacts.ts";
+export type { ArtifactsNamespace, CreatedRepo, RepoHandle } from "./artifacts.ts";
 export { durableSql } from "./sql.ts";
 export type { Sql, SqlRow, SqlValue } from "./sql.ts";

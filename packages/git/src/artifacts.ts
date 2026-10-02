@@ -34,6 +34,21 @@ export interface RepoHandle extends TreeReader {
 
 export interface ArtifactsNamespace {
   get(name: string): Promise<RepoHandle>;
+  /**
+   * Create a new, empty repository (no refs). The answer carries one write
+   * token, in plaintext, which the caller must revoke when done with it.
+   * Throws `ALREADY_EXISTS` if the name is taken.
+   */
+  create(name: string, opts?: { readonly description?: string; readonly setDefaultBranch?: string }): Promise<CreatedRepo>;
+  /** Delete a repository and every token minted for it. True if deleted, false if there was none. */
+  delete(name: string): Promise<boolean>;
+}
+
+/** What `create` answers (a subset of the binding's `ArtifactsCreateRepoResult`). */
+export interface CreatedRepo {
+  readonly name: string;
+  readonly remote: string;
+  readonly token: string;
 }
 
 /** An Artifacts error, as thrown by the binding. */

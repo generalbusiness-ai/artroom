@@ -19,7 +19,7 @@
  */
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
-import { type BuildResult, type Exec, GitOps, type PinResult, type PreviewResult, type SnapshotFile, objectsRef } from "./gitops.ts";
+import { type BuildResult, type Exec, GitOps, type PinResult, type PreviewResult, SNAPSHOT_REF, type SnapshotFile, objectsRef } from "./gitops.ts";
 import { type AllowedUpdates, FenceError, ZERO, checkUpdates, isReceivePack, readCommands } from "./ref-fence.ts";
 import type { PushOutcome } from "./push-outcome.ts";
 
@@ -198,14 +198,13 @@ export class Publisher extends DurableObject<PublisherEnv> {
   }
 
   /**
-   * Write a filtered snapshot into a checker's snapshot repository
-   * (R-CARRY-9). The canonical repo is read only; the snapshot token may only
-   * create `storeRef`, at the commit just built.
+   * Write a filtered snapshot into its own new, empty repository
+   * (R-CARRY-15, R-CARRY-16). The canonical repo is read only; the store's
+   * token may only create `SNAPSHOT_REF`, at the commit just built.
    */
   writeSnapshot(req: {
     readonly canonical: RemoteAccess;
     readonly store: RemoteAccess;
-    readonly storeRef: string;
     readonly files: readonly SnapshotFile[];
     readonly message: string;
   }): Promise<string> {
@@ -216,12 +215,12 @@ export class Publisher extends DurableObject<PublisherEnv> {
       ],
       () =>
         this.ops.writeSnapshot(
-          { canonical: req.canonical.remote, store: req.store.remote, storeRef: req.storeRef, files: req.files, message: req.message },
+          { canonical: req.canonical.remote, store: req.store.remote, files: req.files, message: req.message },
           {
             beforeStore: (sha) =>
               this.route([
                 [req.canonical, null],
-                [req.store, { [req.storeRef]: { old: ZERO, new: sha } }],
+                [req.store, { [SNAPSHOT_REF]: { old: ZERO, new: sha } }],
               ]),
           },
         ),

@@ -99,13 +99,23 @@ export class Fleet {
   private readonly dir: string;
   private readonly repos: (url: string) => string | null;
 
-  constructor(dir: string, repos: Record<string, string>) {
+  /** Artifacts' own check of a request's token, when the fleet models it: false answers 401. */
+  private readonly authorize: ((path: string, authorization: string | null) => boolean) | undefined;
+
+  /**
+   * `repos` maps a repository name to its directory, or looks it up. With
+   * `authorize`, the upstream behind each gateway answers as Artifacts
+   * would: 401 for a token that is not live for that repository.
+   */
+  constructor(dir: string, repos: Record<string, string> | ((name: string) => string | null), o: { authorize?: (path: string, authorization: string | null) => boolean } = {}) {
     this.dir = dir;
     this.image = join(dir, "image");
+    this.authorize = o.authorize;
     mkdirSync(join(this.image, "tools"), { recursive: true });
+    const lookup = typeof repos === "function" ? repos : (name: string) => repos[name] ?? null;
     this.repos = (url) => {
       const m = new RegExp(`^https://${HOST.replace(/\./g, "\\.")}/git/ns/([A-Za-z0-9._-]+)\\.git$`).exec(url);
-      return m ? (repos[m[1]!] ?? null) : null;
+      return m ? lookup(m[1]!) : null;
     };
   }
 
@@ -114,6 +124,7 @@ export class Fleet {
     const upstream = (async (input: string | URL | Request, init?: RequestInit) => {
       const r = input instanceof Request ? input : new Request(input, init);
       this.upstream.push(`${new URL(r.url).pathname} ${r.headers.get("authorization")}`);
+      if (this.authorize && !this.authorize(new URL(r.url).pathname, r.headers.get("authorization"))) return new Response("Unauthorized\n", { status: 401 });
       return new Response("objects");
     }) as typeof fetch;
     const host = new RunnerHost<FakeGateway>({

@@ -12,16 +12,17 @@
  * - `Publisher` (from the git package) builds filtered snapshots, in its own
  *   container, which is never a runner's.
  * - `HarnessLedger` and the `/h/*` routes play the room for live runs: they
- *   build jobs, mint read tokens, record checks in the harness ledger, and
- *   probe the runner. Every route needs the `x-lg-key` header to equal the
- *   `LG_KEY` secret. The production entrypoints never submit to the harness
- *   ledger.
+ *   build jobs, prepare each filtered snapshot in its own repository and mint
+ *   each job's read token (the git package's `SnapshotRepos`, R-CARRY-16),
+ *   record checks in the harness ledger, and probe the runner. Every route
+ *   needs the `x-lg-key` header to equal the `LG_KEY` secret. The production
+ *   entrypoints never submit to the harness ledger.
  */
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import type { ActRecord, Check, CheckJob, Digest, Result, RoomId, Sha, SignedEnvelope } from "@generalbusiness/artroom-contract";
 import { checkerInputs, filterSnapshot, snapshotDigest, type SnapshotEntry } from "@generalbusiness/artroom-policy";
-import { withRetry } from "@generalbusiness/artroom-git";
+import { type ArtifactsNamespace, SnapshotRepos, durableSql, withRetry } from "@generalbusiness/artroom-git";
 import type { CheckerServices, RoomPort, RunnerProvider } from "./checker.ts";
 import { TestsChecker, TypesChecker } from "./checkers.ts";
 import { LlmReviewer, type Model } from "./llm.ts";
@@ -32,6 +33,7 @@ import { importSigner } from "./signing.ts";
 import { Ledger } from "./ledger.ts";
 import { CA, type RunnerBox } from "./container.ts";
 import { runnerProvider, type RunnerStub } from "./sandbox.ts";
+import { snapshotCommitId, snapshotMessage } from "./snapshot-commit.ts";
 import type { Publisher } from "@generalbusiness/artroom-git/worker";
 
 export { RunnerBox, RunnerGateway } from "./container.ts";
@@ -165,7 +167,67 @@ export class HarnessLedger extends DurableObject<Env> {
   async records(): Promise<ActRecord[]> {
     return [...(await this.ctx.storage.list<ActRecord>({ prefix: "rec:" })).values()];
   }
+
+  // The room's snapshot repositories (R-CARRY-16): one per snapshot commit, one token per job, retired durably.
+  private snaps_: SnapshotRepos | null = null;
+  private snaps(): SnapshotRepos {
+    return (this.snaps_ ??= new SnapshotRepos({ sql: durableSql(this.ctx.storage), artifacts: this.env.ARTIFACTS as unknown as ArtifactsNamespace, prefix: SNAPSHOT_PREFIX }));
+  }
+  private async arm(): Promise<void> {
+    const due = this.snaps().nextDue();
+    if (due !== null) await this.ctx.storage.setAlarm(Math.max(due, Date.now() + 1000));
+  }
+  /** Prepare the snapshot repository for `commit`: the publisher writes the snapshot into a new, empty repository. */
+  async prepareSnapshot(req: { readonly commit: Sha; readonly canonical: string; readonly files: SnapshotEntry[]; readonly message: string }): Promise<{ name: string; remote: string }> {
+    try {
+      const repo = await this.snaps().prepare(req.commit, async (store) => {
+        const canon = await withRetry(() => this.env.ARTIFACTS.get(req.canonical));
+        const remote = (await canon.info()).remote;
+        const read = await withRetry(() => canon.createToken("read", 300));
+        try {
+          return await this.env.PUBLISHER.getByName(`snap-${req.canonical}`).writeSnapshot({
+            canonical: { remote, token: read.plaintext },
+            store: { remote: store.remote, token: store.token },
+            files: req.files,
+            message: req.message,
+          });
+        } finally {
+          await canon.revokeToken(read.id).catch(() => false);
+        }
+      });
+      return { name: repo.name, remote: repo.remote };
+    } finally {
+      await this.arm();
+    }
+  }
+  /** A job's read token for its snapshot's repository only, expiring by its deadline. */
+  async mintSnapshotToken(commit: Sha, job: string, deadline: number): Promise<{ id: string; token: string; expiresAt: number }> {
+    try {
+      const t = await this.snaps().mint(commit, job, deadline);
+      return { id: t.id, token: t.token, expiresAt: t.expiresAt };
+    } finally {
+      await this.arm();
+    }
+  }
+  /** The job has ended: revoke its token, and retire the repository if no job is left. Returns the duties still owed. */
+  async endSnapshotJob(commit: Sha, job: string): Promise<number> {
+    try {
+      return await this.snaps().end(commit, job);
+    } finally {
+      await this.arm();
+    }
+  }
+  async snapshotDuties() {
+    return { pending: this.snaps().pending(), nextDue: this.snaps().nextDue(), duties: this.snaps().duties() };
+  }
+  override async alarm(): Promise<void> {
+    await this.snaps().reconcile();
+    await this.arm();
+  }
 }
+
+/** Every harness snapshot repository is named `artroom-lg--snap-<commit>`. */
+const SNAPSHOT_PREFIX = "artroom-lg";
 
 // ------------------------------------------------------------------ harness
 
@@ -178,37 +240,29 @@ async function mint(env: Env, repo: string, scope: "read" | "write", ttl: number
   return { id: t.id, plaintext: t.plaintext, revoke: () => r.revokeToken(t.id).catch(() => false) };
 }
 
-/** Build a filtered snapshot of `commit` in the checker's snapshot repo, as the room's publisher would. */
+/**
+ * A filtered snapshot of `commit`, as the room makes it (R-CARRY-15,
+ * R-CARRY-16): list the commit's files, keep the checker's inputs, derive the
+ * snapshot commit, and have the publisher write it into that commit's own new
+ * repository. A repository is reused only for the same snapshot commit.
+ */
 async function buildSnapshot(env: Env, repo: string, commit: Sha, checker: string, declared: string[]) {
-  const canonRemote = (await (await env.ARTIFACTS.get(repo)).info()).remote;
-  const storeName = `${repo}--snap-${checker}`;
-  const store = await withRetry(() => env.ARTIFACTS.get(storeName)).catch(async () => {
-    await withRetry(() => env.ARTIFACTS.create(storeName, { setDefaultBranch: "main" }));
-    const s = await env.ARTIFACTS.get(storeName);
-    for (const t of (await s.listTokens()).tokens) if (t.state === "active") await s.revokeToken(t.id);
-    return s;
-  });
-  const storeRemote = (await store.info()).remote;
+  const canon = await withRetry(() => env.ARTIFACTS.get(repo));
+  const canonRemote = (await canon.info()).remote;
   const paths = checkerInputs(declared, { verdicts: true, checks: true, globalInputs: [], dependsOn: {} }) ?? [];
-  const pub = env.PUBLISHER.getByName(`snap-${repo}`);
   const cr = await mint(env, repo, "read", 300);
-  const sw = await mint(env, storeName, "write", 300);
+  let all: SnapshotEntry[];
   try {
-    const all = (await pub.listTree({ canonical: { remote: canonRemote, token: cr.plaintext }, commit })) as unknown as SnapshotEntry[];
-    const files = filterSnapshot(all, paths);
-    const digest = await snapshotDigest(files);
-    const snap = await pub.writeSnapshot({
-      canonical: { remote: canonRemote, token: cr.plaintext },
-      store: { remote: storeRemote, token: sw.plaintext },
-      storeRef: `refs/artroom/snapshots/${digest.slice(7)}`,
-      files,
-      message: `Artroom filtered snapshot for ${checker}\n\nDigest: ${digest}\n`,
-    });
-    return { store: storeName, storeRemote, commit: snap as Sha, digest, paths, files: files.map((f) => f[0]) };
+    all = (await env.PUBLISHER.getByName(`snap-${repo}`).listTree({ canonical: { remote: canonRemote, token: cr.plaintext }, commit })) as unknown as SnapshotEntry[];
   } finally {
     await cr.revoke();
-    await sw.revoke();
   }
+  const files = filterSnapshot(all, paths);
+  const digest = await snapshotDigest(files);
+  const message = snapshotMessage(checker, digest);
+  const snapshot = await snapshotCommitId(files, message);
+  const store = await env.LEDGER.getByName(env.ROOM_ID).prepareSnapshot({ commit: snapshot, canonical: repo, files, message });
+  return { name: store.name, remote: store.remote, commit: snapshot, digest, paths, files: files.map((f) => f[0]) };
 }
 
 async function makeJob(env: Env, b: Record<string, unknown>): Promise<{ job: CheckJob; revoke: () => Promise<unknown>; snapshot?: unknown }> {
@@ -219,22 +273,28 @@ async function makeJob(env: Env, b: Record<string, unknown>): Promise<{ job: Che
   const info = await canon.info();
   const meta = await canon.readCommit(commit);
   if (!meta) throw new Error(`commit ${commit} not found`);
+  const id = `job_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}` as const;
+  const deadline = Date.now() + 15 * 60_000;
   let input: CheckJob["input"] = { kind: "tree", tree: meta.treeHash as Sha };
   let integration = commit;
-  let readRepo = repo;
   let readUrl = info.remote;
   let snapshot: unknown;
+  let tok: { plaintext: string; revoke: () => Promise<unknown> };
   if (Array.isArray(b["scoped"])) {
     const s = await buildSnapshot(env, repo, commit, checker, b["scoped"] as string[]);
     input = { kind: "filtered", snapshot: s.digest, paths: s.paths };
     integration = s.commit;
-    readRepo = s.store;
-    readUrl = s.storeRemote;
-    snapshot = { store: s.store, files: s.files, digest: s.digest };
+    readUrl = s.remote;
+    snapshot = { repo: s.name, commit: s.commit, files: s.files, digest: s.digest };
+    const ledger = env.LEDGER.getByName(env.ROOM_ID);
+    const t = await ledger.mintSnapshotToken(s.commit, id, deadline);
+    tok = { plaintext: t.token, revoke: () => ledger.endSnapshotJob(s.commit, id) };
+  } else {
+    const t = await mint(env, repo, "read", 900);
+    tok = { plaintext: t.plaintext, revoke: t.revoke };
   }
-  const tok = await mint(env, readRepo, "read", 900);
   const job: CheckJob = {
-    id: `job_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`,
+    id,
     room: env.ROOM_ID as RoomId,
     lane: "act_1001_abcdef01",
     generation: Number(b["generation"] ?? 1),
@@ -251,14 +311,31 @@ async function makeJob(env: Env, b: Record<string, unknown>): Promise<{ job: Che
     volatile: checker === "llm-review",
     advisory: checker === "llm-review",
     runner: null,
-    deadline: new Date(Date.now() + 15 * 60_000).toISOString(),
+    deadline: new Date(deadline).toISOString(),
   };
   return { job, revoke: tok.revoke, snapshot };
 }
 
 /** Probes run inside a runner after checkout, as untrusted code would. */
 async function probe(env: Env, b: Record<string, unknown>) {
-  const made = await makeJob(env, b);
+  // An older, wider snapshot of the same commit (for example `src/**`), built first and kept in use by a held
+  // job while this job runs, so its repository exists throughout (review bdcc7cc9, R-CARRY-16).
+  let older: { name: string; remote: string; commit: Sha; tree: string | null; files: string[]; end: () => Promise<unknown> } | null = null;
+  if (Array.isArray(b["older"])) {
+    const s = await buildSnapshot(env, String(b["repo"]), String(b["commit"]) as Sha, String(b["checker"]), b["older"] as string[]);
+    const held = `job_held_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+    const ledger = env.LEDGER.getByName(env.ROOM_ID);
+    await ledger.mintSnapshotToken(s.commit, held, Date.now() + 15 * 60_000);
+    const tree = (await (await env.ARTIFACTS.get(s.name)).readCommit(s.commit))?.treeHash ?? null;
+    older = { name: s.name, remote: s.remote, commit: s.commit, tree, files: s.files, end: () => ledger.endSnapshotJob(s.commit, held) };
+  }
+  let made: Awaited<ReturnType<typeof makeJob>>;
+  try {
+    made = await makeJob(env, b);
+  } catch (e) {
+    await older?.end();
+    throw e;
+  }
   const { revoke, snapshot } = made;
   const job = ownJob(made.job);
   if (isRefusal(job)) return { refused: job };
@@ -290,10 +367,30 @@ async function probe(env: Env, b: Record<string, unknown>) {
       }
       results.push(await run(["git", "rev-list", "--all", "--count"]));
     }
-    return { job: { id: job.id, input: job.input, integration: job.integration }, snapshot, head: ws.head, results, git: (await git(session.runner, ws, ["log", "--oneline", "-1"])).stdout.trim() };
+    if (older) {
+      // By known ID, from this job's own repository: the older snapshot's commit and root tree.
+      results.push(await run(["git", "-c", `http.sslCAInfo=${CA}`, "fetch", "--no-write-fetch-head", job.readUrl, older.commit]));
+      if (older.tree) results.push(await run(["git", "-c", `http.sslCAInfo=${CA}`, "fetch", "--no-write-fetch-head", job.readUrl, older.tree]));
+      results.push(await run(["git", "show", `${older.commit}:src/secret.txt`]));
+      // The older snapshot's own repository.
+      results.push(await run(["git", "ls-remote", older.remote]));
+    }
+    // Every ref this job's server advertises.
+    results.push(await run(["git", "ls-remote", job.readUrl]));
+    // The exact current commit, by ID.
+    results.push(await run(["git", "-c", `http.sslCAInfo=${CA}`, "fetch", "--no-write-fetch-head", job.readUrl, job.integration]));
+    return {
+      job: { id: job.id, input: job.input, integration: job.integration },
+      snapshot,
+      older: older ? { repo: older.name, commit: older.commit, tree: older.tree, files: older.files.length, hasSecret: older.files.includes("src/secret.txt") } : null,
+      head: ws.head,
+      results,
+      git: (await git(session.runner, ws, ["log", "--oneline", "-1"])).stdout.trim(),
+    };
   } finally {
     await session.close();
     await revoke();
+    await older?.end();
   }
 }
 
@@ -338,6 +435,8 @@ export default {
           return json({ ...(await probe(env, b)), ms: Date.now() - t0 });
         case "records":
           return json(await env.LEDGER.getByName(env.ROOM_ID).records());
+        case "snapshots":
+          return json(await env.LEDGER.getByName(env.ROOM_ID).snapshotDuties());
         default:
           return json({ error: "unknown route" }, 404);
       }

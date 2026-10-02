@@ -115,6 +115,21 @@ export interface IntegrateRequest {
 /** One file of a snapshot: path, git mode and blob SHA (the order R-CARRY-9 digests). */
 export type SnapshotFile = readonly [path: string, mode: string, blob: string];
 
+/** The one ref of a snapshot repository (R-CARRY-16). */
+export const SNAPSHOT_REF = "refs/artroom/snapshot";
+
+/** Author and committer of every snapshot commit (R-CARRY-15, `SnapshotIdentity`). */
+export const SNAPSHOT_AUTHOR = { name: "Artroom Snapshot", email: "snapshot@artroom.invalid" } as const;
+
+const SNAPSHOT_ENV = {
+  GIT_AUTHOR_NAME: SNAPSHOT_AUTHOR.name,
+  GIT_AUTHOR_EMAIL: SNAPSHOT_AUTHOR.email,
+  GIT_AUTHOR_DATE: "@0 +0000",
+  GIT_COMMITTER_NAME: SNAPSHOT_AUTHOR.name,
+  GIT_COMMITTER_EMAIL: SNAPSHOT_AUTHOR.email,
+  GIT_COMMITTER_DATE: "@0 +0000",
+};
+
 export interface IntegrateHooks {
   /** Called with the new merge commit before it is pushed to `storeRef`, so the gateway can allow exactly that update. */
   readonly beforeStore?: (integration: string) => Promise<void>;
@@ -336,12 +351,7 @@ export class GitOps {
     return { kind: "clean", integration, ref: req.storeRef, fastForward: false };
   }
 
-  /**
-   * Publish: compare-and-swap main from `expectedMain` to `integration`
-   * (R-PUB-4). Fetches the integration from `integrationRef` if this sandbox
-   * no longer has it. The outcome is landed, rejected, error or unknown.
-   */
-  // ------------------------------------------------------------ filtered snapshots (R-CARRY-9, R-EXEC-7)
+  // ------------------------------------------------------------ filtered snapshots (R-CARRY-15, R-CARRY-16)
 
   /** Every file in a commit's tree as `[path, mode, blob]`: regular files, executables and symlinks. */
   listTree(canonical: string, commit: string): Promise<SnapshotFile[]> {
@@ -361,13 +371,18 @@ export class GitOps {
   }
 
   /**
-   * Write a filtered snapshot: a root commit (no parents, no history) whose
-   * tree has exactly `files`, pushed to `storeRef` in `store`, a repository
-   * that holds only snapshots for one checker. The runner reads only that
-   * repository, so it can see nothing else (R-CARRY-9).
+   * Write a filtered snapshot (R-CARRY-15, R-CARRY-16): the fixed commit
+   * whose tree has exactly `files`, with no parent, author and committer
+   * `SNAPSHOT_AUTHOR` at time 0, and the Room's `message`. It goes into
+   * `store`, the snapshot's own new repository, at `SNAPSHOT_REF` only.
+   *
+   * `store` must be empty: a repository that already has any ref is refused
+   * and nothing is pushed, so a repository is never given a second snapshot
+   * or anything else. Pushing one commit into an empty repository sends
+   * exactly that commit's closure: the commit, its trees and its blobs.
    */
   writeSnapshot(
-    req: { readonly canonical: string; readonly store: string; readonly storeRef: string; readonly files: readonly SnapshotFile[]; readonly message: string },
+    req: { readonly canonical: string; readonly store: string; readonly files: readonly SnapshotFile[]; readonly message: string },
     hooks: IntegrateHooks = {},
   ): Promise<string> {
     return this.exclusive(req.canonical, async () => {
@@ -385,14 +400,12 @@ export class GitOps {
           await this.ok("update-index", ["-C", dir, "update-index", ...args], env);
         }
         const tree = assertSha(await this.ok("write-tree", ["-C", dir, "write-tree"], env), "tree");
-        const date = "@0 +0000";
-        const commit = assertSha(
-          await this.ok("commit-tree", ["-C", dir, "commit-tree", tree, "-m", req.message], { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }),
-          "snapshot",
-        );
+        const commit = assertSha(await this.ok("commit-tree", ["-C", dir, "commit-tree", "--no-gpg-sign", tree, "-m", req.message], SNAPSHOT_ENV), "snapshot");
+        const refs = await this.ok("ls-remote", ["ls-remote", req.store]);
+        if (refs !== "") throw new Error("the snapshot repository is not empty; a snapshot is written only into a new, empty repository");
         await hooks.beforeStore?.(commit);
-        const stored = await this.createRef(dir, req.store, commit, assertRef(req.storeRef));
-        if (stored.kind !== "pinned") throw new Error(`could not store the snapshot at ${req.storeRef}`);
+        const stored = await this.createRef(dir, req.store, commit, SNAPSHOT_REF);
+        if (stored.kind !== "pinned") throw new Error(`could not store the snapshot at ${SNAPSHOT_REF}`);
         return commit;
       } finally {
         await this.opts.exec(["rm", "-f", index], { env: {} }).catch(() => undefined);
@@ -400,6 +413,11 @@ export class GitOps {
     });
   }
 
+  /**
+   * Publish: compare-and-swap main from `expectedMain` to `integration`
+   * (R-PUB-4). Fetches the integration from `integrationRef` if this sandbox
+   * no longer has it. The outcome is landed, rejected, error or unknown.
+   */
   pushMain(canonical: string, integration: string, expectedMain: string, fromRef: string): Promise<PushOutcome> {
     return this.exclusive(canonical, () => this.pushMainNow(canonical, integration, expectedMain, fromRef));
   }

@@ -59,7 +59,10 @@ function holding(p: RunnerProvider, hold: (job: CheckJob) => Promise<void> | voi
   };
 }
 
-async function world(repos: (f: Fixture) => Record<string, string> = (f) => ({ canon: f.canonical, canon2: f.canonical })) {
+/** The canonical repo (as `canon` and `canon2`) and every repository in the fake Artifacts. */
+const everyRepo = (f: Fixture) => (name: string) => (name === "canon" || name === "canon2" ? f.canonical : f.artifacts.has(name) ? f.artifacts.local(name) : null);
+
+async function world(repos: (f: Fixture) => (name: string) => string | null = everyRepo) {
   const f = new Fixture();
   const fleet = new Fleet(f.root, repos(f));
   onTestFinished(async () => {
@@ -362,10 +365,10 @@ test("G3: the service signs its own copy of the job: changing any field, nested 
 });
 
 test("G3: a scoped job's paths and snapshot, and the reviewer's note, come from the service's copy", async () => {
-  const { f, ledger, services } = await world((f) => ({ canon: f.canonical, snapshots: join(f.root, "snapshots.git") }));
+  const { f, ledger, services } = await world();
   const c1 = await f.init();
   const snap = await f.snapshot(c1, ["src/add.js"]);
-  const j = job(snap.commit, { kind: "filtered", snapshot: snap.digest, paths: [...snap.paths] }, { readUrl: urlOf("snapshots") });
+  const { job: j } = await f.snapshotJob(snap);
   ledger.issue(j);
   const original = structuredClone(j);
   const g = gate();
@@ -402,15 +405,15 @@ test("G3: a scoped job's paths and snapshot, and the reviewer's note, come from 
 // ------------------------------------------------------------------ G4
 
 test("G4: structured git output is read whole and unchanged: a scoped tree over 64 KiB and a credential-shaped file name verify", async () => {
-  const { f, fleet } = await world((f) => ({ snapshots: join(f.root, "snapshots.git") }));
+  const { f, fleet } = await world();
   const odd = `src/${tok("abcdefghij0123456789")}.js`;
   const files: Record<string, string> = { ...PROJECT, [odd]: "export const odd = 1;\n" };
   for (let i = 0; i < 1800; i++) files[`src/file-${String(i).padStart(4, "0")}.js`] = "export const n = 1;\n";
   const c = await f.init(files);
   const snap = await f.snapshot(c, ["src/**"]);
-  const listing = await new LocalRunner().exec(["git", "--git-dir", join(f.root, "snapshots.git"), "ls-tree", "-r", "-z", "--full-tree", snap.commit]);
+  const listing = await new LocalRunner().exec(["git", "--git-dir", snap.store, "ls-tree", "-r", "-z", "--full-tree", snap.commit]);
   assert.ok(listing.stdout.length > 65_536, `the listing is ${listing.stdout.length} bytes`);
-  const j = job(snap.commit, { kind: "filtered", snapshot: snap.digest, paths: snap.paths }, { readUrl: urlOf("snapshots") });
+  const { job: j } = await f.snapshotJob(snap);
   const session = await runnerProvider({ fresh: () => fleet.make().host, registry: [] }).open(bind(j));
   try {
     const co = await checkout(session.runner, j, session);
