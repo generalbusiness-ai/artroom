@@ -61,7 +61,7 @@ import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, pub
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
-import { issueJobs, oweJobs } from "./jobs.ts";
+import { issueJobs, moveJobMints, oweJobs } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
@@ -216,19 +216,17 @@ export class RoomCore {
       const repo = await this.snapshotRepos.prepare(s.commit, async (store) => {
         const snap = await this.ports.artifacts.snapshot(s.integration, s.paths);
         if (!snap) throw new Error("the integration's snapshot could not be read");
-        const canonical = await this.artifacts.get(this.location().name);
-        const read = await canonical.createToken("read", 300);
-        try {
-          written = await this.remotes.writeSnapshot({
-            canonical: { remote: await this.canonicalRemoteReady(), token: read.plaintext },
+        const remote = await this.canonicalRemoteReady();
+        // A 300-second canonical read token, through the mint ledger (R-MINT-1): revoked afterwards, or owed.
+        written = await this.mints.withToken(`snapshot:${s.commit}`, "read", () => 300, (read) =>
+          this.remotes.writeSnapshot({
+            canonical: { remote, token: read.plaintext },
             store: { remote: store.remote, token: store.token },
             files: snap.entries,
             message: snapshotMessage(s.checker, s.digest),
-          });
-          return written;
-        } finally {
-          await canonical.revokeToken(read.id).catch(() => false);
-        }
+          }),
+        );
+        return written;
       });
       // A reused repository was written for the same commit; a new one holds what the publisher wrote.
       return { commit: (written ?? repo.commit) as Sha, remote: repo.remote };
@@ -293,11 +291,24 @@ export class RoomCore {
       create: (name, o) => this.binding().create(name, o),
       delete: (name) => this.binding().delete(name),
     };
-    const adapter = new ArtifactsAdapter({ binding: this.artifacts, stub: r.publisher, location: () => this.location(), ...(r.bounds ? { bounds: r.bounds } : {}), ...sleep });
+    const canonicalRepo = () => this.artifacts.get(this.location().name);
+    this.mints = new MintLedger({
+      sql: this.sql,
+      repo: canonicalRepo,
+      now: () => this.now(),
+      // The persisted alarm: resolves only once storage has it, before any create is sent (R-MINT-2).
+      wake: this.wake ?? (async () => this.committed()),
+      // Point lookups in the Room's other records of token IDs: job tokens, and the landing's token rows (R-MINT-7).
+      known: (id) => !!one(this.sql, "SELECT 1 AS x FROM job_tokens WHERE token_id = ?", id) || this.landing.core.knownToken(id),
+      ...sleep,
+    });
+    // A room stored before mint lane C: its check jobs' own mint records move into the ledger, once.
+    moveJobMints(this.sql, this.mints, this.now());
+    const adapter = new ArtifactsAdapter({ binding: this.artifacts, stub: r.publisher, location: () => this.location(), mints: this.mints, ...(r.bounds ? { bounds: r.bounds } : {}), ...sleep });
     this.ports = {
       policy: opts.services.policy,
       artifacts: r.wrapArtifacts ? r.wrapArtifacts(adapter) : adapter,
-      log: async () => LogPublisher.open(await r.logRemote(this.location()), r.logTransfer ? { maxTransfer: r.logTransfer } : {}),
+      log: async () => LogPublisher.open(await r.logRemote(this.location(), this.mints), r.logTransfer ? { maxTransfer: r.logTransfer } : {}),
     };
     // The canonical repository, read when used: a room learns it at founding.
     const self = this;
@@ -312,21 +323,10 @@ export class RoomCore {
         return remote;
       },
     };
-    const canonicalRepo = () => this.artifacts.get(this.location().name);
-    this.mints = new MintLedger({
-      sql: this.sql,
-      repo: canonicalRepo,
-      now: () => this.now(),
-      // The persisted alarm: resolves only once storage has it, before any create is sent (R-MINT-2).
-      wake: this.wake ?? (async () => this.committed()),
-      // Point lookups in the Room's other records of token IDs: job tokens, and the landing's token rows (R-MINT-7).
-      known: (id) => !!one(this.sql, "SELECT 1 AS x FROM job_tokens WHERE token_id = ?", id) || this.landing.core.knownToken(id),
-      ...sleep,
-    });
     this.landing = new Landing({
       sql: this.sql,
       room: this.host(),
-      publisher: new ContainerPublisher({ stub: r.publisher, artifacts: this.artifacts, canonical, ...sleep }),
+      publisher: new ContainerPublisher({ stub: r.publisher, artifacts: this.artifacts, canonical, mints: this.mints, ...sleep }),
       tokens: publicationTokens({ mints: this.mints, repo: canonicalRepo, ...sleep }),
       now: () => this.now(),
       ...(r.landingFault ? { fault: r.landingFault } : {}),

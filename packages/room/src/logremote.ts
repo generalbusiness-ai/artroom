@@ -3,7 +3,7 @@
  * Artifacts binding and lane B's publisher sandbox (`LogRemoteStub`).
  *
  * - The ref is read by the sandbox (`readLogRef`, `git ls-remote`) under a
- *   read token of at most 60 seconds, revoked afterwards: the binding's
+ *   read token of 60 seconds, revoked afterwards: the binding's
  *   `log({ ref })` resolves branches, tags and commit IDs, and returns
  *   nothing for `refs/artroom/log`. A ref that cannot be read throws; it is
  *   never taken to be absent.
@@ -11,8 +11,12 @@
  *   only if they hash to the ID asked for. The binding's `readCommit` and
  *   `readTree` throw for an object of another type, and `readBlob` returns
  *   null, so each kind is tried in turn; the hash check keeps that safe.
- * - Pushes go to the sandbox (`pushLog`) under a write token of at most 60
+ * - Pushes go to the sandbox (`pushLog`) under a write token of 60
  *   seconds, revoked afterwards. The answer is lane L's `PushOutcome`.
+ * - Both tokens are canonical mints (R-MINT-1), minted and revoked through
+ *   the Room's mint ledger: the record and wake-up are stored before the
+ *   request, a lost answer stays an unknown record, and a revocation that
+ *   fails stays owed for a later alarm, never dropped.
  * - A publication larger than one transfer is staged first, in bounded
  *   parts, through the sandbox (`stageLog`, no token: the sandbox stages
  *   locally), and then pushed with no objects. The answer is lane L's
@@ -25,29 +29,24 @@
  */
 
 import type { Sha } from "@generalbusiness/artroom-contract";
-import type { LogRemoteStub } from "@generalbusiness/artroom-git";
+import type { LogRemoteStub, MintLedger } from "@generalbusiness/artroom-git";
 import { encodeCommit, encodeTree, gitObject, type GitObject, type ObjectType, type PushOutcome, type StageOutcome, type StagePart, type StageWant, type TreeEntry } from "@generalbusiness/artroom-log";
 import type { ArtifactsBinding, RepoLocation } from "./artifacts.ts";
 import type { StagingRemote } from "./ports.ts";
 
 export type { LogRemoteStub };
 
-export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStub, repo: RepoLocation): StagingRemote {
+export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStub, repo: RepoLocation, mints: Pick<MintLedger, "withToken">): StagingRemote {
   const handle = () => binding.get(repo.name);
   const exact = (type: ObjectType, data: Uint8Array, sha: string) => {
     const o = gitObject(type, data);
     if (o.sha !== sha) throw new Error(`object ${sha} could not be read exactly`);
     return { type, data };
   };
-  /** Run `fn` with a token of at most 60 seconds on the canonical repository, revoked afterwards. */
-  const withToken = async <T>(scope: "read" | "write", fn: (canonical: { remote: string; token: string }) => Promise<T>): Promise<T> => {
-    const r = await handle();
-    const t = await r.createToken(scope, 60);
-    try {
-      return await fn({ remote: (await r.info()).remote, token: t.plaintext });
-    } finally {
-      await r.revokeToken(t.id).catch(() => false);
-    }
+  /** Run `fn` with a 60-second token on the canonical repository, through the mint ledger: revoked afterwards, or owed. */
+  const withToken = async <T>(purpose: string, scope: "read" | "write", fn: (canonical: { remote: string; token: string }) => Promise<T>): Promise<T> => {
+    const remote = (await (await handle()).info()).remote;
+    return mints.withToken(purpose, scope, () => 60, (t) => fn({ remote, token: t.plaintext }));
   };
   /** A read of one kind: null when the object is not of that kind (a throw or null from the binding). */
   const attempt = async <T>(read: () => Promise<T | null>): Promise<T | null> => {
@@ -59,7 +58,7 @@ export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStu
   };
   return {
     async readRef(ref: string): Promise<Sha | null> {
-      return withToken("read", (canonical) => stub.readLogRef({ canonical, ref }));
+      return withToken(`log-read:${ref}`, "read", (canonical) => stub.readLogRef({ canonical, ref }));
     },
     async readObject(sha: Sha) {
       const r = await handle();
@@ -84,7 +83,7 @@ export function artifactsLogRemote(binding: ArtifactsBinding, stub: LogRemoteStu
       throw new Error(`object ${sha} could not be read`);
     },
     async push(objects: readonly GitObject[], ref: string, next: Sha, lease: Sha | null): Promise<PushOutcome> {
-      return withToken("write", (canonical) =>
+      return withToken(`log-push:${next}`, "write", (canonical) =>
         stub.pushLog({ canonical, objects: objects.map((o) => ({ type: o.type, data: partB64url(o.data) })), ref, next, lease }) as Promise<PushOutcome>,
       );
     },

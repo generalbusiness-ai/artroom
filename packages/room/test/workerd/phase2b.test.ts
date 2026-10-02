@@ -473,10 +473,13 @@ describe("the adapters' boundaries", () => {
     const loc = { namespace: a.namespace, name: a.canonical };
     // Live, the binding's log({ ref }) returns nothing for the log ref; the sandbox's readLogRef sees it.
     expect(await a.canonicalRepo().log({ ref: "refs/artroom/log", limit: 1 })).toEqual([]);
-    const remote = artifactsLogRemote(a.binding as unknown as ArtifactsBinding, a.logStub, loc);
-    expect(await remote.readRef("refs/artroom/log")).toBe(p.commit);
-    // Live, readCommit and readTree throw for an object of another type; every tree and blob is still read.
-    const report = await verifyLog(remote);
+    // Inside the room's object: its tokens are minted and revoked through the room's mint ledger.
+    const report = await inDO(r, async (room) => {
+      const remote = artifactsLogRemote(a.binding as unknown as ArtifactsBinding, a.logStub, loc, room.core.mints);
+      expect(await remote.readRef("refs/artroom/log")).toBe(p.commit);
+      // Live, readCommit and readTree throw for an object of another type; every tree and blob is still read.
+      return verifyLog(remote);
+    });
     expect(report).toMatchObject({ ok: true, failures: [] });
     expect(a.remoteCalls.get("readCommit")).toBeGreaterThan(0);
     // Every token the remote minted, read and write, lived at most 60 seconds, and was revoked.
@@ -490,8 +493,10 @@ describe("the adapters' boundaries", () => {
     const r = await makeRoom();
     const a = r.world.artifacts;
     const unreadable = { ...a.logStub, readLogRef: async () => Promise.reject(new Error("ls-remote failed")) };
-    const remote = artifactsLogRemote(a.binding as unknown as ArtifactsBinding, unreadable, { namespace: a.namespace, name: a.canonical });
-    await expect(remote.readRef("refs/artroom/log")).rejects.toThrow(/ls-remote failed/);
+    await inDO(r, async (room) => {
+      const remote = artifactsLogRemote(a.binding as unknown as ArtifactsBinding, unreadable, { namespace: a.namespace, name: a.canonical }, room.core.mints);
+      await expect(remote.readRef("refs/artroom/log")).rejects.toThrow(/ls-remote failed/);
+    });
     expect(a.canonicalRepo().activeTokens()).toEqual([]);
     // Through the Room: publication is unavailable, nothing advances, and a later read completes it.
     await r.admin.ok("claim", null, { goal: "g", scope: ["src/**"] });
@@ -519,7 +524,9 @@ describe("the adapters' boundaries", () => {
         return Object.assign(Object.create(repo), { readBlob: async () => new Blob(["not what was stored"]) });
       },
     } as unknown as ArtifactsBinding;
-    await expect(verifyLog(artifactsLogRemote(lying, a.logStub, { namespace: a.namespace, name: a.canonical }))).rejects.toThrow(/could not be read/);
+    await inDO(r, async (room) => {
+      await expect(verifyLog(artifactsLogRemote(lying, a.logStub, { namespace: a.namespace, name: a.canonical }, room.core.mints))).rejects.toThrow(/could not be read/);
+    });
   });
 
   it("with a policy carry rule in force but no runner pinned, a check does not carry: it reruns (R-CARRY-14)", async () => {

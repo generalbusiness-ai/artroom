@@ -26,7 +26,9 @@
  * (R-OBL-7).
  *
  * A whole-tree job reads the canonical repository with a read token minted
- * for the attempt. A filtered job reads only its own snapshot repository
+ * for the attempt through the Room's mint ledger (R-MINT-1), with the
+ * attempt's deadline as `notAfter`, and claimed into `job_tokens` in one
+ * transaction (R-MINT-4). A filtered job reads only its own snapshot repository
  * (R-CARRY-16): one per snapshot commit, reused only for the same commit,
  * with a token per attempt, ended when the attempt ends. It is issued only
  * if the commit the publisher wrote is the one the Room recorded (R-CARRY-15
@@ -36,14 +38,14 @@
 import type { CheckInput, CheckJob, Digest, Glob, LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { checkerInputs } from "@generalbusiness/artroom-policy";
-import { completeInventory } from "@generalbusiness/artroom-git";
+import { MINT_WAIT_MS, errorNote, within, type MintLedger } from "@generalbusiness/artroom-git";
 import type { ActivePolicyFull, RoomCore } from "./core.ts";
 import { hex, randomBytes } from "./crypto.ts";
-import { redact } from "./diag.ts";
 import { iso } from "./ids.ts";
 import { generationRow, laneRow } from "./model.ts";
 import { obligationsFor } from "./obligations.ts";
-import { num, one, str } from "./store.ts";
+import type { Sql } from "./ports.ts";
+import { getMeta, num, one, setMeta, str } from "./store.ts";
 
 /** Time a job has beyond the checker's own timeout, to start a runner, fetch, sign and submit. */
 export const JOB_MARGIN_S = 300;
@@ -71,15 +73,35 @@ interface JobRow {
 
 const isPreview = (owner: string) => owner.startsWith("op_preview_");
 
+/** The meta key under which a stored room's `mint:<job>` rows were moved into the mint ledger. */
+export const JOB_MINTS_MOVED = "job_mints_moved";
+
 /**
- * Artifacts error codes that mean the request was refused and changed
- * nothing (as lane B's `refusedUnchanged`): a definite answer. Any other
- * failure, a lost answer included, may have applied.
+ * A room stored before mint lane C recorded each whole-tree job's canonical
+ * mint as its own `mint:<job>` row in `job_tokens`, before Artifacts was
+ * asked. Once, under a meta key, every such row moves into the mint ledger
+ * as an `unknown` record, in one transaction with the rows' deletion: none
+ * is lost, and none is settled (R-MINT-5). A room with none only sets the
+ * key. Called at every object start; after the first, it reads one meta row.
  */
-const REFUSED_UNCHANGED = new Set(["ALREADY_EXISTS", "INVALID_INPUT", "INVALID_REPO_NAME", "INVALID_TTL", "NOT_FOUND"]);
-function refusedUnchanged(e: unknown): boolean {
-  const x = e as { code?: unknown; numericCode?: unknown } | null;
-  return typeof x?.code === "string" && REFUSED_UNCHANGED.has(x.code) && typeof x.numericCode === "number";
+export function moveJobMints(sql: Sql, mints: Pick<MintLedger, "adopt">, now: number): void {
+  if (getMeta(sql, JOB_MINTS_MOVED) !== null) return;
+  sql.transaction(() => {
+    // `mint:` up to, not including, `mint;`: a range of the primary key.
+    const rows = sql.all("SELECT token_id, expires_at FROM job_tokens WHERE token_id >= 'mint:' AND token_id < 'mint;' ORDER BY token_id");
+    mints.adopt(
+      rows.map((r) => ({
+        purpose: `job:${str(r, "token_id")!.slice("mint:".length)}`,
+        scope: "read" as const,
+        sentAt: now,
+        // The row's `expires_at` was the attempt's deadline.
+        notAfter: num(r, "expires_at"),
+        note: "moved from the check job's own mint record; sent before this time, with its answer lost",
+      })),
+    );
+    if (rows.length > 0) sql.all("DELETE FROM job_tokens WHERE token_id >= 'mint:' AND token_id < 'mint;'");
+    setMeta(sql, JOB_MINTS_MOVED, "1");
+  });
 }
 
 /** Each room's attempts being waited for, by job ID: calling one stops the wait. Memory only; the row is the state. */
@@ -181,105 +203,62 @@ async function endToken(core: RoomCore, token: string, job: string, expiresAt: n
   return settleToken(core, token);
 }
 
-/** The longest wait between checks of a mint whose outcome is unknown. */
-export const MINT_RECHECK_MAX_MS = 6 * 3600_000;
-
-/**
- * Watch a mint whose answer was lost or malformed. Its outcome stays
- * unknown: Artifacts may still apply the request, at a time nothing bounds,
- * and the token's expiry runs from then. So the record is never settled
- * here, by time or by an inventory. It settles only by an answer: a
- * refusal that changed nothing, or a usable answer, whose token is then
- * recorded and revoked through the ended-token debt (`issue`). Artifacts'
- * token inventory names no owner, and the canonical repository holds other
- * owners' tokens, so the Room neither picks out this mint's token nor
- * revokes tokens it cannot attribute. What an inventory shows is kept on
- * the record as an observation (`last_error`), and it is checked again with
- * backoff, at most every `MINT_RECHECK_MAX_MS`. The records are the Room's
- * open cleanup duties (`jobTokenDuties`).
- */
-async function watchMint(core: RoomCore, mint: string, notBefore: number, attempts: number): Promise<void> {
-  const note = (what: string): void =>
-    void core.sql.all(
-      "UPDATE job_tokens SET attempts = ?, next_ms = ?, last_error = ? WHERE token_id = ?",
-      attempts + 1,
-      core.now() + Math.min(5_000 * 2 ** (attempts + 1), MINT_RECHECK_MAX_MS),
-      redact(`outcome unknown; ${what}`),
-      mint,
-    );
-  if (core.now() < notBefore) return void core.sql.all("UPDATE job_tokens SET next_ms = ? WHERE token_id = ?", notBefore, mint);
-  try {
-    const repo = await core.artifacts.get(core.location().name);
-    const inventory = await repo.listTokens();
-    // The shared rule (follow-up c9cd4cd8): every record accounted for and well formed, scope included.
-    let tokens: ReturnType<typeof completeInventory>;
-    try {
-      tokens = completeInventory(inventory, "the canonical repository's token inventory");
-    } catch (e) {
-      return note(e instanceof Error ? e.message : String(e));
-    }
-    // Accounted for: every token the Room knows by its ID, each owned by its row here (held by a job, or ended).
-    const known = new Set(core.sql.all("SELECT token_id FROM job_tokens WHERE token_id NOT LIKE 'mint:%'").map((r) => str(r, "token_id")!));
-    const unaccounted = tokens.filter((t) => t.state === "active" && Date.parse(t.expiresAt) > core.now() && !known.has(t.id)).length;
-    // An observation only: a clean inventory shows absence now, not that the mint can never apply.
-    note(`${unaccounted} live token(s) on the canonical repository not accounted for at ${iso(core.now())}`);
-  } catch (e) {
-    note(`the token inventory could not be read: ${String(e)}`);
-  }
-}
-
 /**
  * The Room's records of job tokens, for operators: tokens held by a job
- * (owned here until revoked or expired), ended tokens still owed
- * revocation, and mints whose outcome is unknown. `expiresAt` is a known
- * token's real expiry; an unknown mint's is unknown (null). `nextCheckAt`
- * is when the record is next due: a revocation attempt, or another
- * observation of an unknown mint.
+ * (owned here until revoked or expired), and ended tokens still owed
+ * revocation. `expiresAt` is the token's reported expiry; `nextCheckAt` is
+ * when the record is next due. A whole-tree job's mint whose outcome is
+ * unknown is a record of the canonical mint ledger (`core.mints.duties`).
  */
 export function jobTokenDuties(core: RoomCore): {
   readonly token: string;
-  readonly kind: "held" | "revoke" | "unknown-mint";
+  readonly kind: "held" | "revoke";
   readonly expiresAt: number | null;
   readonly nextCheckAt: number;
   readonly attempts: number;
   readonly status: string | null;
 }[] {
-  return core.sql.all("SELECT * FROM job_tokens ORDER BY token_id").map((r) => {
-    const token = str(r, "token_id")!;
-    const kind = token.startsWith("mint:") ? ("unknown-mint" as const) : str(r, "last_error") === "held" ? ("held" as const) : ("revoke" as const);
-    return {
-      token,
-      kind,
-      expiresAt: kind === "unknown-mint" ? null : num(r, "expires_at"),
-      nextCheckAt: num(r, "next_ms")!,
-      attempts: num(r, "attempts") ?? 0,
-      status: str(r, "last_error"),
-    };
-  });
+  return core.sql.all("SELECT * FROM job_tokens ORDER BY token_id").map((r) => ({
+    token: str(r, "token_id")!,
+    kind: str(r, "last_error") === "held" ? ("held" as const) : ("revoke" as const),
+    expiresAt: num(r, "expires_at"),
+    nextCheckAt: num(r, "next_ms")!,
+    attempts: num(r, "attempts") ?? 0,
+    status: str(r, "last_error"),
+  }));
 }
 
-/** Try one ended canonical token's revocation. Settled by Artifacts' answer, or by its known expiry passing; otherwise retried. */
+/**
+ * Try one ended canonical token's revocation, by its ID. Settled by
+ * Artifacts' answer, or once its known expiry has passed, with no
+ * revocation (R-MINT-4); a token with no known expiry is never settled by
+ * time. The repository lookup and the revocation share one bounded wait.
+ * The expiry is checked again after the lookup, immediately before the
+ * send, and nothing is sent once the wait has ended; a late answer changes
+ * nothing. A failure is kept on the row as safe metadata only, with
+ * backoff, for a later alarm.
+ */
 async function settleToken(core: RoomCore, token: string): Promise<void> {
   const row = one(core.sql, "SELECT expires_at, attempts FROM job_tokens WHERE token_id = ?", token);
   if (!row) return;
-  // A mint whose answer was lost: no ID to revoke, and its token's expiry ran from whenever Artifacts applied it.
-  if (token.startsWith("mint:")) return watchMint(core, token, num(row, "expires_at")!, num(row, "attempts") ?? 0);
+  const expires = num(row, "expires_at");
+  const expired = () => expires !== null && expires <= core.now();
+  const settle = () => void core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", token);
+  if (expired()) return settle();
+  const end = Date.now() + MINT_WAIT_MS;
+  let note: string;
   try {
-    const repo = await core.artifacts.get(core.location().name);
-    await repo.revokeToken(token);
-    core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", token);
+    const repo = await within((async () => core.artifacts.get(core.location().name))(), MINT_WAIT_MS, null);
+    if (expired()) return settle();
+    if (!repo || Date.now() >= end) note = "the repository was not reached in time";
+    else if (await within(repo.revokeToken(token).then(() => true), end - Date.now(), false)) return settle();
+    else note = "revocation: no answer in time";
   } catch (e) {
-    const expires = num(row, "expires_at");
-    if (expires !== null && expires <= core.now()) return void core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", token);
-    const attempts = (num(row, "attempts") ?? 0) + 1;
-    core.sql.all(
-      "UPDATE job_tokens SET attempts = ?, next_ms = ?, last_error = ? WHERE token_id = ?",
-      attempts,
-      core.now() + Math.min(5_000 * 2 ** attempts, 300_000),
-      redact(String(e)),
-      token,
-    );
+    note = errorNote("revocation failed", e);
   }
+  if (expired()) return settle();
+  const attempts = (num(row, "attempts") ?? 0) + 1;
+  core.sql.all("UPDATE job_tokens SET attempts = ?, next_ms = ?, last_error = ? WHERE token_id = ?", attempts, core.now() + Math.min(5_000 * 2 ** attempts, 300_000), note, token);
 }
 
 /** The owner's hold on this integration now, or null: the land operation a check names, if any. */
@@ -357,55 +336,25 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       const tree = await core.ports.artifacts.treeOf(j.integration);
       if (!tree) throw new Error("the integration's tree could not be read");
       const readUrl = (await core.canonicalRemoteReady()) as `https://${string}`;
-      const repo = await core.artifacts.get(core.location().name);
-      // The mint is recorded before Artifacts is asked (`mint:<job>`): if its answer is lost, a token may exist, or
-      // may yet be made, that the Room cannot name. The record stays, unresolved and visible, until an answer
-      // settles it (`watchMint`); nothing bounds its token's lifetime, not the attempt's deadline either.
-      const intent = `mint:${jobId}`;
-      core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, 'minting') ON CONFLICT (token_id) DO NOTHING", intent, deadline, deadline);
-      let t: Awaited<ReturnType<typeof repo.createToken>>;
-      try {
-        // Asked to expire before the deadline claimed above; what Artifacts returns is checked below (R-EXEC-9).
-        t = await repo.createToken("read", Math.floor((deadline - core.now()) / 1000) - TOKEN_MARGIN_S);
-      } catch (e) {
-        // A refusal that changed nothing settles it; any other failure may have minted a token.
-        if (refusedUnchanged(e)) core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
-        else core.sql.all("UPDATE job_tokens SET last_error = ? WHERE token_id = ?", `answer lost: ${redact(String(e))}`, intent);
-        throw e;
-      }
-      // An answer without the token's ID and text cannot be used or revoked: as unknown as a lost one.
-      if (typeof t?.id !== "string" || !t.id || typeof t.plaintext !== "string" || !t.plaintext) {
-        core.sql.all("UPDATE job_tokens SET last_error = 'malformed answer' WHERE token_id = ?", intent);
-        throw new Error("Artifacts answered the mint without a usable token");
-      }
-      const expires = Date.parse(t.expiresAt);
-      const known = Number.isFinite(expires) ? expires : null;
-      // A token that is not read-only, or whose expiry is unknown or after the deadline, is refused and ended.
-      const accepted = t.scope === "read" && known !== null && known <= deadline;
-      // Known now: ownership passes from the mint record to a record of the token itself, in one transaction, so
-      // either both happen or neither does. An accepted token's record is due at its expiry, a refused one's now.
-      // A late answer, after the attempt was superseded, lands here too, and its token is ended below by its ID.
+      // Through the canonical mint ledger (R-MINT-2, R-MINT-3, R-EXEC-9). Its record and wake-up are stored before
+      // the request, and a lost answer stays an unknown record. The lifetime asked is computed after the wake-up, from
+      // the send time, to end before the deadline claimed above. The deadline is the request's `notAfter`: a token
+      // whose reported expiry is later is never returned, and the ledger owes its revocation.
+      const t = await core.mints.mint(`job:${jobId}`, "read", (sentAt) => Math.floor((deadline - sentAt) / 1000) - TOKEN_MARGIN_S, { notAfter: deadline });
+      // The handoff: the token's `job_tokens` row is written and the ledger's record claimed in one transaction
+      // (R-MINT-4). Due at its expiry: an accepted token ends by the deadline.
       try {
         core.sql.transaction(() => {
-          core.sql.all(
-            "INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, ?) ON CONFLICT (token_id) DO UPDATE SET expires_at = excluded.expires_at, next_ms = excluded.next_ms, last_error = excluded.last_error",
-            t.id,
-            known,
-            accepted ? known! : core.now(),
-            accepted ? "held" : "refused",
-          );
-          core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
+          core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, 'held')", t.id, t.expiresAt, t.expiresAt);
+          t.claim();
         });
       } catch (e) {
-        // The handoff could not be written: the mint record stays. While its ID is known here, the token is
-        // revoked now; only once Artifacts confirms that is the mint record settled.
-        const revoked = await repo.revokeToken(t.id).then(() => true, () => false);
-        if (revoked) core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
+        // Not claimed: the ledger still owns the token and revokes it now; a revocation that fails stays owed there.
+        await t.release().catch(() => undefined);
         throw e;
       }
       tokenId = t.id;
-      tokenExpires = known;
-      if (!accepted) throw new Error("Artifacts minted a token that would outlive the job");
+      tokenExpires = t.expiresAt;
       move(core, mine, "token = ?", tokenId);
       target = { integration: j.integration, input: { kind: "tree", tree }, readUrl, token: t.plaintext };
     }

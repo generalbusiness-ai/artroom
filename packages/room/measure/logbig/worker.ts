@@ -91,12 +91,12 @@ export class Room extends BaseRoom {
 
   /** Push the pending commit through the Room's own log remote, with no objects, and return lane B's answer in full. */
   async lbPushProbe(): Promise<unknown> {
-    const core = this.core as unknown as { remotes: { logRemote: (l: unknown) => Promise<{ push: (o: [], ref: string, next: string, lease: string | null) => Promise<unknown> }> }; location(): unknown; sql: RoomCore["sql"] };
+    const core = this.core as unknown as { remotes: { logRemote: (l: unknown, m: unknown) => Promise<{ push: (o: [], ref: string, next: string, lease: string | null) => Promise<unknown> }> }; location(): unknown; mints: unknown; sql: RoomCore["sql"] };
     const pending = getMeta(core.sql, "pending_publication");
     if (!pending) return { pending: null };
     const expected = (JSON.parse(pending) as { expected: string }).expected;
     const lease = getMeta(core.sql, "log_commit");
-    const remote = await core.remotes.logRemote(core.location());
+    const remote = await core.remotes.logRemote(core.location(), core.mints);
     return { expected, lease, outcome: await remote.push([], "refs/artroom/log", expected, lease) };
   }
 
@@ -106,12 +106,12 @@ export class Room extends BaseRoom {
    */
   async lbAbortAfterStages(k: number): Promise<{ armed: number }> {
     type Remote = { stage: (...a: unknown[]) => Promise<unknown> } & Record<string, unknown>;
-    const core = this.core as unknown as { remotes: { logRemote: (l: unknown) => Promise<Remote> }; publisherCache: unknown };
+    const core = this.core as unknown as { remotes: { logRemote: (l: unknown, m: unknown) => Promise<Remote> }; publisherCache: unknown };
     const remotes = core.remotes;
     const original = remotes.logRemote;
     let n = 0;
-    remotes.logRemote = async (l) => {
-      const remote = await original(l);
+    remotes.logRemote = async (l, m) => {
+      const remote = await original(l, m);
       return {
         ...remote,
         stage: async (...a: unknown[]) => {

@@ -192,7 +192,7 @@ const num = (r: SqlRow | undefined, c: string): number | null => {
 };
 
 /** Resolve with `p`'s value, reject with its error, or resolve `late` after `ms`. A late result is dropped. */
-function within<T, L>(p: Promise<T>, ms: number, late: L): Promise<T | L> {
+export function within<T, L>(p: Promise<T>, ms: number, late: L): Promise<T | L> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const t = new Promise<L>((resolve) => {
     timer = setTimeout(() => resolve(late), ms);
@@ -322,6 +322,20 @@ export class MintLedger {
       this.count(moved.length - unknown, unknown);
       if (this.summary().takeover !== null) this.sql.all("UPDATE artroom_mint_summary SET takeover = NULL WHERE k = 1");
     });
+  }
+
+  /**
+   * Take over creates that an earlier owner recorded, whose outcome is
+   * unknown: a stored room's own records from before this ledger owned
+   * them (mint lane C moves a check job's `mint:<job>` rows here once).
+   * Each becomes an `unknown` record, kept like any other (R-MINT-5).
+   * Synchronous: call it inside the transaction that removes the earlier
+   * records, so none is lost and none is kept twice. One summary write.
+   */
+  adopt(records: readonly { readonly purpose: string; readonly scope: MintScope; readonly sentAt: number; readonly notAfter: number | null; readonly note: string }[]): void {
+    for (const r of records)
+      this.sql.all("INSERT INTO artroom_mint (purpose, scope, not_after, sent_at, state, last_error) VALUES (?, ?, ?, ?, 'unknown', ?)", r.purpose, r.scope, r.notAfter, r.sentAt, r.note);
+    this.count(0, records.length);
   }
 
   // ---------------------------------------------------------------- mint

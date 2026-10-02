@@ -12,6 +12,8 @@ function binding(seen: string[]): ArtifactsBinding {
 }
 
 const SHA = "a".repeat(40);
+/** Object reads take no token: the mint ledger is never reached here. */
+const noMints = { withToken: () => Promise.reject(new Error("no token is minted for an object read")) };
 
 describe("production services: one deployment, a binding per namespace (request b6b51de7)", () => {
   it("the import namespace's binding serves rooms whose repository is there; the public binding serves the rest", async () => {
@@ -23,8 +25,8 @@ describe("production services: one deployment, a binding per namespace (request 
     expect(Object.keys(r.bindings ?? {})).toEqual(["imp"]);
     expect(typeof r.firstCommit).toBe("function");
     // The log remote follows the repository's namespace.
-    await (await r.logRemote({ namespace: "imp", name: "x" })).readObject(SHA as never).catch(() => undefined);
-    await (await r.logRemote({ namespace: "pub", name: "y" })).readObject(SHA as never).catch(() => undefined);
+    await (await r.logRemote({ namespace: "imp", name: "x" }, noMints)).readObject(SHA as never).catch(() => undefined);
+    await (await r.logRemote({ namespace: "pub", name: "y" }, noMints)).readObject(SHA as never).catch(() => undefined);
     expect(imp.length > 0 && imp.every((n) => n === "x")).toBe(true);
     expect(pub.length > 0 && pub.every((n) => n === "y")).toBe(true);
   });
@@ -34,7 +36,7 @@ describe("production services: one deployment, a binding per namespace (request 
     expect(servicesFor({ PUBLIC_NAMESPACE: "pub", ARTIFACTS: binding(pub) } as unknown as RoomEnv, "o").remotes.bindings).toEqual({});
     const r = servicesFor({ PUBLIC_NAMESPACE: "pub", ARTIFACTS: binding(pub), IMPORT_NAMESPACE: "imp" } as unknown as RoomEnv, "o").remotes;
     expect(r.bindings).toEqual({});
-    await expect((await r.logRemote({ namespace: "imp", name: "x" })).readObject(SHA as never)).rejects.toThrow();
+    await expect((await r.logRemote({ namespace: "imp", name: "x" }, noMints)).readObject(SHA as never)).rejects.toThrow();
     expect(pub).toEqual([]);
   });
 });

@@ -174,6 +174,11 @@ describe("review 786e9606 P2 1: a preparation that outlives its deadline sends n
     a.holdToken = null;
     await Promise.all([first, second]);
     await settled(r);
+    // Attempt 1's token, minted late, would outlive its deadline: the mint ledger owes it, and its next pass revokes it.
+    await inDO(r, async (room) => {
+      await room.core.steps.mints();
+      await room.core.mints.idle();
+    });
     // Only attempt 2 was sent; attempt 1's token, minted late, was ended.
     expect(seen.map((s) => s.job.id.slice(-2))).toEqual(["_2"]);
     const late = [...a.canonicalRepo().tokens.values()].slice(before).filter((t) => t.plaintext !== tokenOf(seen[0]!.job));

@@ -93,11 +93,10 @@ const SCHEMA = [
      obligation TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, integration TEXT NOT NULL, base TEXT NOT NULL,
      state TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, next_ms INTEGER NOT NULL, token TEXT, outcome TEXT,
      UNIQUE (owner, integration, obligation, config))`,
-  // Canonical read tokens of job attempts that the Room has ended but Artifacts has not yet confirmed revoked:
-  // retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose expiry
-  // is not known is retried until it is revoked. A row `mint:<job>` is a mint in progress, written before
-  // Artifacts is asked; if the answer is lost it stays until an answer settles it (a refusal that changed
-  // nothing, or a usable answer whose token is then revoked); `expires_at` is only when it is first checked.
+  // Canonical read tokens of job attempts, claimed from the mint ledger (R-MINT-4): held by an attempt until it
+  // ends, then retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose
+  // expiry is not known is retried until it is revoked. A row `mint:<job>` is a stored room's mint record from
+  // before mint lane C; it moves into the mint ledger once, at the object's start (`moveJobMints`).
   `CREATE TABLE IF NOT EXISTS job_tokens (token_id TEXT PRIMARY KEY, expires_at INTEGER, next_ms INTEGER NOT NULL,
      attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)`,
   // R-LOG-13: notify runs after commit, from this durable queue.
