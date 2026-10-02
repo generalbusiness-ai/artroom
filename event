@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7d2d52b66d93462ab319cc61ebf0847b83a07219","text":"Merge retired a covered predecessor; the successor is at packages/git/src/index.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7d318f37ebee9cfd5980f5b8847a71f988a2c459","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-laneG-checkers.md."}
