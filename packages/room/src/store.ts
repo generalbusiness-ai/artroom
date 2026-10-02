@@ -221,12 +221,14 @@ export const ROOM_MIGRATIONS: readonly Migration[] = [
       // integration and policy version.
       sql.all(`CREATE TABLE IF NOT EXISTS check_judged (lane TEXT NOT NULL, generation INTEGER NOT NULL, integration TEXT NOT NULL, obligation TEXT NOT NULL,
         act TEXT NOT NULL, policy TEXT NOT NULL, event TEXT NOT NULL, PRIMARY KEY (lane, generation, integration, obligation, act, policy))`);
-      // Check jobs the Room owes a checker service (R-EXEC-8): one per landing operation, canonical integration, obligation
-      // and configuration. `owed` is due at next_ms; `sent` is due again at next_ms, its deadline, if no answer came;
-      // `done` keeps its outcome.
-      sql.all(`CREATE TABLE IF NOT EXISTS check_jobs (id TEXT PRIMARY KEY, lane TEXT NOT NULL, generation INTEGER NOT NULL, obligation TEXT NOT NULL,
-        checker TEXT NOT NULL, config TEXT NOT NULL, integration TEXT NOT NULL, base TEXT NOT NULL, op TEXT NOT NULL, state TEXT NOT NULL,
-        attempts INTEGER NOT NULL DEFAULT 0, next_ms INTEGER NOT NULL, outcome TEXT, UNIQUE (op, integration, obligation, config))`);
+      // Check jobs (R-EXEC-8): one logical job per owner (a preview or a landing operation), canonical integration,
+      // obligation and configuration. `owed` is due at next_ms. `sent` is attempt `attempt`, in flight until next_ms,
+      // its deadline, with its token `token`; after that it is due again. `done` keeps its outcome. Every change is
+      // made only for the attempt it read, so a late answer never overwrites a newer attempt.
+      sql.all(`CREATE TABLE IF NOT EXISTS check_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, lane TEXT NOT NULL, generation INTEGER NOT NULL,
+        obligation TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, integration TEXT NOT NULL, base TEXT NOT NULL,
+        state TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, next_ms INTEGER NOT NULL, token TEXT, outcome TEXT,
+        UNIQUE (owner, integration, obligation, config))`);
     },
   },
 ];

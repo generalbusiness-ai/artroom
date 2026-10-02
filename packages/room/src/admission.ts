@@ -1085,8 +1085,12 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   if (pv?.state === "clean" && pv.integration) prepared.push({ integration: pv.integration, op: null });
   for (const op of core.landing.activeViews())
     if (op.lane === laneId && op.generation === generation && "integration" in op && op.integration) prepared.push({ integration: op.integration, op: op.id });
+  // A job the landing did not wait for (an advisory obligation, R-OBL-7) may answer after it landed: its check binds
+  // the landed integration, when it names that operation.
+  const landed = body.landOp !== undefined ? core.landing.view(body.landOp) : null;
+  if (landed?.state === "landed" && landed.lane === laneId && landed.generation === generation) prepared.push({ integration: landed.integration, op: landed.id });
   const jobs = body.landOp === undefined ? prepared : prepared.filter((p) => p.op === body.landOp);
-  if (body.landOp !== undefined && !jobs.length) return binding(`The check names ${body.landOp}, which is not an active landing of this generation.`);
+  if (body.landOp !== undefined && !jobs.length) return binding(`The check names ${body.landOp}, which is not an active or landed landing of this generation.`);
   // R-CARRY-15 step 5: a scoped check may bind a snapshot commit the room recorded for one of these integrations. Several
   // integrations can share one snapshot commit, so the commit alone never names the canonical integration (review 95323c2b).
   const snapshotRows = core.sql.all("SELECT * FROM check_snapshots WHERE commit_sha = ?", body.integration);

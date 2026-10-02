@@ -687,11 +687,6 @@ export class RoomCore {
     this.defer(p);
   }
 
-  /** Is this deferred work running now? */
-  running(key: string): boolean {
-    return this.inFlight.has(key);
-  }
-
   /** Wait until no deferred work is running. */
   async idle(): Promise<void> {
     while (this.pending.size) await Promise.all([...this.pending]);
@@ -875,12 +870,12 @@ export class RoomCore {
         };
     }
     await this.carryChecks(op, integration, policy);
-    await this.recordSnapshots(op, integration, policy);
+    await this.recordSnapshots(op.lane, op.generation, integration, policy);
     const obligations = obligationsFor(this.sql, op.lane, op.generation, { doc: policy.doc, checkers: policy.checkers, integration });
     const openReview = obligations.find((o) => o.kind === "review" && o.state !== "met");
     if (openReview) return { kind: "retry", reason: "obligation-open", fix: `The obligation ${openReview.id} is open again. Meet it, then land again.` };
     // Every check obligation still open on this integration gets a job, advisory ones too (R-EXEC-8, R-OBL-7).
-    oweJobs(this, op.lane, op.generation, integration, op.expectedMain, op.id, policy);
+    oweJobs(this, op.id, op.lane, op.generation, integration, op.expectedMain, policy);
     const waiting: `obl_${string}`[] = [];
     for (const o of obligations) {
       // An advisory obligation is neither waited for nor failed by its check (R-OBL-7).
@@ -1066,8 +1061,8 @@ export class RoomCore {
    * built from, and what a contract-shaped scoped check binds as its
    * `integration` (R-OBL-3, R-CARRY-9; review a711f7b6).
    */
-  async recordSnapshots(op: LandRecord, integration: Sha, policy: ActivePolicyFull): Promise<void> {
-    const gen = generationRow(this.sql, op.lane, op.generation);
+  async recordSnapshots(lane: LaneId, generation: number, integration: Sha, policy: ActivePolicyFull): Promise<void> {
+    const gen = generationRow(this.sql, lane, generation);
     if (!gen) return;
     for (const spec of gen.obligations) {
       if (spec.kind !== "check") continue;
@@ -1162,6 +1157,12 @@ export class RoomCore {
       }
       const prev = json<Record<string, unknown>>(one(this.sql, "SELECT body FROM previews WHERE id = ?", id), "body")!;
       this.sql.all("UPDATE previews SET state = ?, body = ?, main = ?, updated_ms = ? WHERE id = ?", body["state"] as string, JSON.stringify({ ...prev, ...body }), main, this.now(), id);
+      // A check obligation open on a clean preview of a generation not yet landed gets a job (R-EXEC-8). Its base is
+      // the main commit the preview was built on (R-EXEC-10).
+      const lane = str(r, "lane") as LaneId;
+      const generation = num(r, "generation")!;
+      if (body["state"] === "clean" && !generationRow(this.sql, lane, generation)?.landed)
+        oweJobs(this, id as OpId, lane, generation, body["integration"] as Sha, main ?? (body["integration"] as Sha), this.activePolicy());
     }
   }
 

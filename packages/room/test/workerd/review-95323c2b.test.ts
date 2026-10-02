@@ -139,7 +139,7 @@ describe("review 95323c2b P2: a shared snapshot commit is not a reverse key to a
     const { r, ci, first, second } = await twoLandings(volatileCfg);
     // The shared snapshot commit, naming the other landing's operation, from either side.
     const a = expectRefusal(await ci.act("check", { lane: second.lane, generation: 1 }, snapshotCheck(volatileCfg, second.rec, first.opId)), "check-binding");
-    expect(a.reason).toMatch(/not an active landing of this generation/);
+    expect(a.reason).toMatch(/not an active or landed landing of this generation/);
     expectRefusal(await ci.act("check", { lane: first.lane, generation: 1 }, snapshotCheck(volatileCfg, first.rec, second.opId)), "check-binding");
     // An operation that does not exist.
     expectRefusal(await ci.act("check", { lane: second.lane, generation: 1 }, snapshotCheck(volatileCfg, second.rec, "op_9_99999999")), "check-binding");

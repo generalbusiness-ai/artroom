@@ -130,6 +130,9 @@ const activate = (r: TestRoom, change: (p: ActivePolicyFull) => Pick<ActivePolic
     room.core.sql.transaction(() => room.core.activate(next.doc, next.checkers, null, iso(clock.now)));
   });
 
+/** Let the work a commit started finish, such as the proposal's preview. */
+const settled = (r: TestRoom) => inDO(r, (room) => room.core.idle());
+
 /** A checker service as a service binding gives it (R-EXEC-8). It records each job and answers as told. */
 function checkerService(r: TestRoom, ci: Client, answer: (job: CheckJob) => Partial<CheckBody> | "refuse" = () => ({})) {
   const seen: { job: CheckJob; tokenLive: boolean }[] = [];
@@ -204,11 +207,13 @@ describe("R-CARRY-13: every check carry judgment is a sealed check-carried event
     expect(evs).toHaveLength(1);
     expect(evs[0]).toMatchObject({ integration: after.integration, act: check.id, outcome: { carried: false, notCarried: { act: check.id, code: "policy-rejected", rule: "checks" } } });
     expect(evs[0]!.decisions.map((d) => [d.rule, d.outcome.result])).toEqual([["checks", "no-carry"]]);
-    // One job for I1, and a new one for I2: it names the snapshot commit the Room recorded for I2, the landing, and I2's base.
+    // The landing had one job for I1, and a new one for I2: it names the snapshot commit the Room recorded for I2, the
+    // landing, and I2's base. (Its previews had jobs of their own.)
     const rec = await inDO(r, (room) => room.core.sql.all("SELECT commit_sha, digest FROM check_snapshots WHERE integration = ?", after.integration!)[0]!);
-    expect(seen).toHaveLength(2);
-    expect(seen[0]!.job.base).not.toBe(after.expectedMain);
-    expect(seen[1]!.job).toMatchObject({ integration: rec["commit_sha"], landOp: after.id, base: after.expectedMain, input: { kind: "filtered", snapshot: rec["digest"] } });
+    const landing = seen.filter((s) => s.job.landOp === after.id);
+    expect(landing).toHaveLength(2);
+    expect(landing[0]!.job.base).not.toBe(after.expectedMain);
+    expect(landing[1]!.job).toMatchObject({ integration: rec["commit_sha"], landOp: after.id, base: after.expectedMain, input: { kind: "filtered", snapshot: rec["digest"] } });
     void i1;
   });
 
@@ -329,9 +334,11 @@ describe("R-CARRY-15, R-CARRY-16: a filtered job only for the recorded commit, i
   it("R-CARRY-15 the publisher writes the snapshot with another identity: its ID differs and no job is issued; once it writes the recorded commit, the job is issued for it", async () => {
     const { r, alice, ci } = await checkRoom(scoped);
     const mode = { wrong: true };
+    const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    // Bound once the preview is computed: this test follows the landing's job.
+    await settled(r);
     const prepared = snapshotRepos(r, mode);
     const seen = checkerService(r, ci);
-    const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
     const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
     await tick(r, 2);
     const integration = (await op(r, l.op.id)).integration!;
@@ -359,8 +366,9 @@ describe("R-CARRY-15, R-CARRY-16: a filtered job only for the recorded commit, i
 describe("R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding", () => {
   it("R-EXEC-8, R-EXEC-9, R-EXEC-10 a whole-tree job carries base, volatile, advisory, runner and a GitAuthEnv with a read token for the canonical repository, revoked after the answer", async () => {
     const { r, alice, ci } = await checkRoom(whole);
-    const seen = checkerService(r, ci);
     const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    await settled(r);
+    const seen = checkerService(r, ci);
     const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
     await tick(r, 3);
     const done = await op(r, l.op.id);
@@ -394,7 +402,7 @@ describe("R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding", ()
     expect(minted.scope).toBe("read");
     expect(job.deadline).toBe(iso(minted.expiresAt));
     expect(canonical.admits(token, "read")).toBe(false);
-    expect(await inDO(r, (room) => room.core.sql.all("SELECT state, outcome FROM check_jobs WHERE id = ?", job.id))).toEqual([{ state: "done", outcome: expect.stringMatching(/^act_/) }]);
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT state, outcome FROM check_jobs WHERE id || '_' || attempt = ?", job.id))).toEqual([{ state: "done", outcome: expect.stringMatching(/^act_/) }]);
   });
 
   it("R-EXEC-8 no service binding for the checker: no job is owed, and the landing waits for a check", async () => {
@@ -409,7 +417,6 @@ describe("R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding", ()
   /** A landing prepared step by step, with its job owed but not yet issued: the landing and jobs steps are held. */
   async function owedJob() {
     const { r, doc, alice, ci } = await checkRoom(whole);
-    const seen = checkerService(r, ci);
     await inDO(r, async (room) => {
       await room.core.idle();
       const run = room.core.run.bind(room.core);
@@ -418,6 +425,8 @@ describe("R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding", ()
       };
     });
     const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+    await settled(r);
+    const seen = checkerService(r, ci);
     const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
     await inDO(r, (room) => room.core.landing.prepare(l.op.id));
     const waiting = await op(r, l.op.id);
@@ -452,13 +461,14 @@ describe("R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding", ()
       const cfg: CheckerConfig = { ...whole, volatile };
       const { r, alice, ci } = await checkRoom(cfg);
       let flip = true;
-      const seen = checkerService(r, ci, (job) => (flip ? { volatile: !job.volatile } : {}));
       const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
+      await settled(r);
+      const seen = checkerService(r, ci, (job) => (flip ? { volatile: !job.volatile } : {}));
       const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
       await tick(r, 2);
       const first = seen.find((s) => s.job.landOp === l.op.id)!.job;
       expect(first.volatile).toBe(volatile);
-      expect(await inDO(r, (room) => room.core.sql.all("SELECT outcome FROM check_jobs WHERE id = ?", first.id))).toEqual([{ outcome: "refused: check-binding" }]);
+      expect(await inDO(r, (room) => room.core.sql.all("SELECT outcome FROM check_jobs WHERE id || '_' || attempt = ?", first.id))).toEqual([{ outcome: "refused: check-binding" }]);
       expect(await inDO(r, (room) => room.core.sql.all("SELECT act FROM evidence WHERE kind = 'check'"))).toEqual([]);
       flip = false;
       const integration = (await op(r, l.op.id)).integration!;
