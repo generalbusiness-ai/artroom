@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b54fe4482215ca1dfedc039acc092715eb145ae0"}
+{"kind":"promise","text":"Review founding revision 3 at e695c7b6aa034292ff1372ca489485fe1ed93b74 and all 39 artifacts; test delayed delete isolation, durable recovery, binding admission and preservation of later main. No live deployment or credential changes."}
