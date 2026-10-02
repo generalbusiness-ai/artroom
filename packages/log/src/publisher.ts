@@ -550,7 +550,6 @@ export class LogPublisher {
       for (let i = 0; i < published.count; i++) n += lens[i]!;
       prefix = sha1.create().update(utf8(`blob ${n}\0`));
     }
-    let hashed = 0;
     this.eachLine(lines, first, count, (i, b) => {
       if (b.length !== lens[i]) throw new PublishError("invalid-input", `entry ${first + i} was ${lens[i]} bytes and is now ${b.length}; the source changed while it was read`);
       const inPrefix = prefix !== null && i < published!.count;
@@ -560,9 +559,7 @@ export class LogPublisher {
       }
       h.update(b);
       if (inPrefix) prefix!.update(b);
-      hashed += b.length + (i > 0 ? 1 : 0);
     }, lens);
-    if (hashed !== size) throw new PublishError("invalid-input", `segment ${first} hashed ${hashed} bytes, not ${size}`);
     if (prefix && hex(prefix.digest()) !== published!.sha)
       throw new PublishError("would-rewrite", `an entry from ${first} to ${first + published!.count - 1} differs from the published entry; published history is never rewritten`);
     this.counters.hashedBytes += size + (published ? size : 0);

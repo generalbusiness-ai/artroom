@@ -216,6 +216,17 @@ describe("guards", () => {
     expect(git.refs.get(LOG_REF)).toBe(p.head);
   });
 
+  test("size mismatch: a retained file whose body changes between hashing and sending is invalid-input; nothing is pushed", async () => {
+    const { sim, git, p, lane } = await published();
+    const extra = { kind: "input" as const, body: canonicalize({ note: "a new replay context" }) };
+    let loads = 0;
+    const ref: RetainedRef = { kind: "input", digest: `sha256:${sha256Hex(utf8(extra.body))}`, load: () => (++loads > 1 ? canonicalize({ note: "another, longer replay context" }) : extra.body) };
+    note(sim, lane, 30);
+    const pushes = git.pushes;
+    await expect(p.publish(sourceOf(sim.entries).source, sim.checkpoint(), [ref])).rejects.toMatchObject({ code: "invalid-input" });
+    expect(git.pushes).toBe(pushes);
+  });
+
   test("out of order: a source that returns entries out of seq order is invalid-input", async () => {
     const { sim, p } = await published();
     const { source } = sourceOf(sim.entries, { swap: (seq, e) => (seq === 43 ? sim.entries[44]! : seq === 44 ? sim.entries[43]! : e) });
