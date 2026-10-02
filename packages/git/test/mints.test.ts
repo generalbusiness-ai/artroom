@@ -431,6 +431,7 @@ test("(4) an ID without text is owed and revoked by that ID", async () => {
   await assert.rejects(r.ledger.mint("preview:l1", "write", ttl60), /no token text/);
   const rec = only(r.sql);
   assert.equal(rec["state"], "owed");
+  assert.equal(r.wakes[r.wakes.length - 1], r.clock.t, "a wake-up for its revocation, due now");
   assert.equal(rec["token"], "tok_1");
   assert.equal(r.ledger.duties().owed, 1);
   await alarm(r);
@@ -945,7 +946,10 @@ test("(10) scale: 10,000 kept unknown records, 1,000 known IDs and new unknowns 
     if (revoked.length > 0) {
       assert.deepEqual(revoked, owedIds.slice(passes * 20, passes * 20 + 20), "each pass takes the next 20, earliest due first");
       passes++;
-      if (passes < 5) assert.equal(r.ledger.nextDue(), r.clock.t + 1_000, "exactly 1 s ahead while any remain overdue");
+      if (passes < 5) {
+        assert.equal(r.ledger.nextDue(), r.clock.t + 1_000, "exactly 1 s ahead while any remain overdue");
+        assert.equal(r.wakes[r.wakes.length - 1], r.clock.t + 1_000, "the pass stores that wake-up when it ends");
+      }
     } else if (r.repo.lists > lists) {
       assert.equal(s.written.get("artroom_mint") ?? 0, 0, "an observation writes no record");
     }
