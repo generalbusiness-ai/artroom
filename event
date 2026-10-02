@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0d6e5b40c685850727574402ad8cd6da06c3a39a","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/results/mcp-stage0-checks-2026-10-02T11-47-36-135Z.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:18c6b1002afc0eef4fb5742c61b8e500899568b8","text":"Merge retired a covered predecessor; the successor is at packages/room/measure/mcp-stage0.mjs."}
