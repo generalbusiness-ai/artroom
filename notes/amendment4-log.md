@@ -246,17 +246,17 @@ masked"). All three were then killed.
 
 ## Gates
 
-Run at the final head, one suite at a time:
+Run one suite at a time at `f545b5d4`, the last code commit; later commits change only this note:
 
 | Gate | Result |
 |---|---|
-| root `npm run typecheck` | GATE-TYPECHECK |
-| root `npm test` | GATE-ROOT |
-| log, Node (`npm run test:node`) | GATE-LOG-NODE |
-| log, workerd (`npm run test:workerd`) | GATE-LOG-WORKERD |
-| git, Node (`npm test`) | GATE-GIT-NODE |
-| git, workerd (`npm run test:workers`) | GATE-GIT-WORKERD |
-| git, `npm run test:log` | GATE-GIT-LOG |
+| root `npm run typecheck` | exit 0 |
+| root `npm test` | exit 0, every workspace (log 185 Node + 180 workerd; git 164; room 86 Node + 276 workerd; policy 199 + 198, 1 skipped; ui 141; cli 102; client 86 + 2; mcp 66 + 1; checkers 33) |
+| log, Node (`npm run test:node`) | 185 passed, 13 files (within root `npm test`) |
+| log, workerd (`npm run test:workerd`) | 180 passed, 12 files (within root `npm test`) |
+| git, Node (`npm test`) | 164 passed (within root `npm test`) |
+| git, workerd (`npm run test:workers`) | 8 passed, exit 0 |
+| git, `npm run test:log` | 12 passed, exit 0 |
 
 ## Follow-ups and open questions
 
