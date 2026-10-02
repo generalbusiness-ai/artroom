@@ -232,7 +232,8 @@ describe("4d. a scoped check binds the snapshot commit the room recorded for the
     const { lane, head } = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
     const l = await alice.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
     await tick(r);
-    const integration = (await op(r, l.op.id)).integration!;
+    const landOp = await op(r, l.op.id);
+    const integration = landOp.integration!;
     // The room recorded the snapshot commit when the check obligation started waiting on this integration.
     const rec = await inDO(r, (room) => room.core.sql.all("SELECT * FROM check_snapshots WHERE integration = ?", integration)[0]!);
     const paths = checkerInputs(scoped.inputs, doc.carry)!;
@@ -255,10 +256,14 @@ describe("4d. a scoped check binds the snapshot commit the room recorded for the
       obligation: "obl_unit-tests",
       check: "unit",
       integration: rec["commit_sha"] as Sha,
+      base: landOp.expectedMain,
       input: { kind: "filtered", snapshot: rec["digest"] as never, paths },
       readUrl: "https://artifacts.test/snapshots.git",
-      gitAuthEnv: {},
+      gitAuthEnv: { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: "Authorization: Bearer fixture" },
       config: digestJson(scoped),
+      volatile: scoped.volatile,
+      advisory: false,
+      runner: null,
       landOp: l.op.id,
       deadline: iso(clock.now + 900_000),
     };

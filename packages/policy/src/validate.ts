@@ -187,11 +187,16 @@ export function validateCheckerConfig(config: unknown): Validation<CheckerConfig
     p.add("checker", "must be a JSON object");
     return result(p, config, "checker configuration");
   }
-  p.keys("checker", config, ["format", "inputs", "volatile", "timeoutSeconds"]);
+  p.keys("checker", config, ["format", "inputs", "volatile", "timeoutSeconds", "advisory", "runner"]);
   if (config["format"] !== "artroom-checker-v1") p.add("format", "must be artroom-checker-v1");
   if (config["inputs"] !== undefined) p.globs("inputs", config["inputs"], true);
   if (typeof config["volatile"] !== "boolean") p.add("volatile", "must be true or false");
   const t = config["timeoutSeconds"];
   if (!Number.isSafeInteger(t) || (t as number) < 1) p.add("timeoutSeconds", "must be a positive integer");
+  // Amendment 3 (bc351fa8): advisory checkers and a pinned runner environment (R-OBL-7, R-EXEC-11).
+  if (config["advisory"] !== undefined && typeof config["advisory"] !== "boolean") p.add("advisory", "must be true or false");
+  if (config["runner"] !== undefined && (typeof config["runner"] !== "string" || !/^sha256:[0-9a-f]{64}$/.test(config["runner"]))) {
+    p.add("runner", "must be a sha256: digest of 64 lowercase hex characters");
+  }
   return result(p, config, "checker configuration");
 }
