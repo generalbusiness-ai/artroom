@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:401992b8c077f5678a04194d4c294711ec493a23","text":"Replaced by the review request for exact head 53537a58559861905b1b050487fcfd5f7f22341b; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"artifact","text":"docs/protocol.md at exact a5185fa671f1b373a64f695e6e5450ea7257ca36 on request/founding-gaps, under promise git:sha1…0c6334e on request git:sha1…654c577","body":{"commit":"a5185fa671f1b373a64f695e6e5450ea7257ca36","path":"docs/protocol.md"}}
