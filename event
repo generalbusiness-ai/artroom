@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ebdabee4f70551f99fbe2214b1f4c26f05a9a6a2","text":"Merge retired a covered predecessor; the successor is at packages/git/src/landing/core.ts."}
+{"kind":"promise","text":"Builder takes the canonical token mint ownership and attribution contract decision (plans/README.md section 'Canonical mint ownership'), now that plan 003 has landed at 3ac55e96: a design note and contract text for review first; implementing lanes follow the approved design."}
