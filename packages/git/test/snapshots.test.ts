@@ -470,22 +470,28 @@ test("a wake-up is persisted before every remote effect, and a host stopped at a
 
 test("a late callback from a stopped host cannot finish or settle a later attempt (fenced by name)", async () => {
   const { clock, ns, host } = durable();
-  const old = host();
-  let release!: () => void;
-  const gate = new Promise<void>((r) => (release = r));
-  const slow = old.prepare(C1, async () => (await gate, C1));
+  const gated = () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const writer: SnapshotWriter = async () => (await gate, C1);
+    return { writer, release };
+  };
+  const a = gated();
+  const slow = host().prepare(C1, a.writer);
   await new Promise((r) => setTimeout(r, 0));
-  // A new host takes over after the preparation window and prepares the same snapshot again.
+  // A new host takes over after the preparation window and prepares the same snapshot again; its write is still running.
   clock.advance(PREPARE_WINDOW_MS + 1);
   const fresh = host();
-  const r = await fresh.prepare(C1, async () => C1);
-  await fresh.reconcile();
-  // The old host's writer returns at last.
-  release();
-  await assert.rejects(slow, /superseded|NOT_FOUND/);
-  assert.equal(ns.repos.has(r.name), true);
+  const b = gated();
+  const next = fresh.prepare(C1, b.writer);
+  await new Promise((r) => setTimeout(r, 0));
+  // The stopped host's writer returns first: it must not make the new attempt's row ready.
+  a.release();
+  await assert.rejects(slow, /superseded/);
+  b.release();
+  const r = await next;
   const t = await fresh.mint(C1, "job_1", clock.t + 15 * 60_000);
-  assert.equal(t.name, r.name);
+  assert.deepEqual([t.name, t.remote], [r.name, r.remote], "the job reads the current attempt's repository");
   await fresh.reconcile();
-  assert.deepEqual(ns.created.filter((n) => ns.repos.has(n)), [r.name], "only the current attempt's repository is left, while its job runs");
+  assert.deepEqual(ns.created.filter((n) => ns.repos.has(n)), [r.name], "the superseded attempt's repository is deleted");
 });

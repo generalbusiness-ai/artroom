@@ -32,8 +32,11 @@
  * - `done`: settled, with the reason.
  *
  * Every duty is written before the remote effect it covers, and `wake` (the
- * Room's alarm) is set from `nextDue()` before each create, write and mint,
- * so a host that stops at any await leaves its debt scheduled. The alarm
+ * Room's alarm) is set from `nextDue()` before each create and write, and
+ * after every change to the duties, so a host that stops at any await
+ * leaves its debt scheduled. A mint needs no new duty: the repository's
+ * deletion, owed and scheduled since its creation, removes a token whose
+ * answer is lost. The alarm
  * calls `reconcile()`. A repository is deleted when its preparation stops
  * (15 minutes at most after creation), or when its last job ends or its
  * last deadline passes.
@@ -62,8 +65,8 @@ export interface SnapshotReposOptions {
   readonly retainMs?: number;
   /**
    * Persist a wake-up at `at` (ms), for example the Room's alarm, which then
-   * calls `reconcile()`. Called with `nextDue()` before every remote effect
-   * and after every change to the duties.
+   * calls `reconcile()`. Called with `nextDue()` before each create and
+   * write, and after every change to the duties.
    */
   readonly wake?: (at: number) => Promise<void>;
   readonly now?: () => number;
@@ -322,8 +325,8 @@ export class SnapshotRepos {
       const ttl = Math.floor((deadline - this.now()) / 1000) - TOKEN_MARGIN_S;
       if (ttl < MIN_TOKEN_TTL_S) throw new Error("the job's deadline is too soon for a token");
       const repo = await withRetry(() => this.artifacts.get(name), this.retry);
-      // The repository's deletion is owed and scheduled, and removes any token whose answer is lost.
-      await this.wake();
+      // One attempt. The repository's deletion is already owed and scheduled (by `prepare`), and removes any
+      // token whose answer is lost; that token also expires by the deadline.
       const t = await repo.createToken("read", ttl);
       const expiresAt = Date.parse(t.expiresAt);
       const recorded = this.sql.transaction(() => {
@@ -341,6 +344,7 @@ export class SnapshotRepos {
         );
         return true;
       });
+      // The deletion may now be due sooner (a short deadline).
       await this.wake();
       if (!recorded) {
         await this.settle(commit);
