@@ -151,10 +151,11 @@ export async function issueJobs(core: RoomCore): Promise<void> {
       token: str(r, "token"),
     };
     // An expired attempt: stop waiting for it, and end its token. A recorded token was accepted only if it expires
-    // by the attempt's deadline, which is `next_ms`.
+    // by the attempt's deadline, which is `next_ms`. A failure to record that is not swallowed: the token's owner
+    // (its `job_tokens` row, or the snapshot repositories' ledger) is unchanged, and the alarm tries again.
     if (j.state === "sent") {
       waitsOf(core).get(`${j.id}_${j.attempt}`)?.();
-      if (j.token) await endToken(core, j.token, `${j.id}_${j.attempt}`, num(r, "next_ms")).catch(() => undefined);
+      if (j.token) await endToken(core, j.token, `${j.id}_${j.attempt}`, num(r, "next_ms"));
     }
     await issue(core, j).catch(() => move(core, j, "next_ms = ?", core.now() + JOB_RETRY_MS));
   }
@@ -164,14 +165,16 @@ export async function issueJobs(core: RoomCore): Promise<void> {
  * End an attempt's token. `token` is a canonical read token's ID, or
  * `snapshot:<commit>` for a filtered job's token, which the snapshot
  * repositories revoke (with their own durable duties), retiring the
- * repository once no job is left. A canonical token is recorded in
- * `job_tokens` before it is revoked, and stays there until Artifacts
- * confirms the revocation or its known expiry has passed.
+ * repository once no job is left. A canonical token is owned by its
+ * `job_tokens` row from the moment its ID is known (`issue`); ending it
+ * makes that row due now, and the row stays until Artifacts confirms the
+ * revocation or its known expiry has passed. A failure to write is not
+ * swallowed: the row keeps the token, due at its expiry at the latest.
  */
 async function endToken(core: RoomCore, token: string, job: string, expiresAt: number | null): Promise<unknown> {
   if (token.startsWith("snapshot:")) return core.snapshots.end(token.slice("snapshot:".length) as Sha, job);
   core.sql.all(
-    "INSERT INTO job_tokens (token_id, expires_at, next_ms) VALUES (?, ?, ?) ON CONFLICT (token_id) DO UPDATE SET expires_at = COALESCE(job_tokens.expires_at, excluded.expires_at), next_ms = excluded.next_ms",
+    "INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, 'ended') ON CONFLICT (token_id) DO UPDATE SET expires_at = COALESCE(job_tokens.expires_at, excluded.expires_at), next_ms = excluded.next_ms, last_error = 'ended'",
     token,
     expiresAt,
     core.now(),
@@ -228,16 +231,34 @@ async function watchMint(core: RoomCore, mint: string, notBefore: number, attemp
   }
 }
 
-/** The Room's open cleanup duties for job tokens: ended tokens still owed revocation, and mints whose outcome is unknown. */
-export function jobTokenDuties(core: RoomCore): { readonly token: string; readonly kind: "revoke" | "unknown-mint"; readonly expiresAt: number | null; readonly nextAt: number; readonly attempts: number; readonly status: string | null }[] {
-  return core.sql.all("SELECT * FROM job_tokens ORDER BY token_id").map((r) => ({
-    token: str(r, "token_id")!,
-    kind: str(r, "token_id")!.startsWith("mint:") ? ("unknown-mint" as const) : ("revoke" as const),
-    expiresAt: num(r, "expires_at"),
-    nextAt: num(r, "next_ms")!,
-    attempts: num(r, "attempts") ?? 0,
-    status: str(r, "last_error"),
-  }));
+/**
+ * The Room's records of job tokens, for operators: tokens held by a job
+ * (owned here until revoked or expired), ended tokens still owed
+ * revocation, and mints whose outcome is unknown. An unknown mint has no
+ * known expiry: `checkFrom` is only when it was first checked.
+ */
+export function jobTokenDuties(core: RoomCore): {
+  readonly token: string;
+  readonly kind: "held" | "revoke" | "unknown-mint";
+  readonly expiresAt: number | null;
+  readonly checkFrom: number | null;
+  readonly nextAt: number;
+  readonly attempts: number;
+  readonly status: string | null;
+}[] {
+  return core.sql.all("SELECT * FROM job_tokens ORDER BY token_id").map((r) => {
+    const token = str(r, "token_id")!;
+    const kind = token.startsWith("mint:") ? ("unknown-mint" as const) : str(r, "last_error") === "held" ? ("held" as const) : ("revoke" as const);
+    return {
+      token,
+      kind,
+      expiresAt: kind === "unknown-mint" ? null : num(r, "expires_at"),
+      checkFrom: kind === "unknown-mint" ? num(r, "expires_at") : null,
+      nextAt: num(r, "next_ms")!,
+      attempts: num(r, "attempts") ?? 0,
+      status: str(r, "last_error"),
+    };
+  });
 }
 
 /** Try one ended canonical token's revocation. Settled by Artifacts' answer, or by its known expiry passing; otherwise retried. */
@@ -315,7 +336,8 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
   let tokenId: string | null = null;
   let tokenExpires: number | null = null;
   let target: { integration: Sha; input: CheckInput; readUrl: `https://${string}`; token: string };
-  const end = () => (tokenId ? endToken(core, tokenId, jobId, tokenExpires).catch(() => undefined) : Promise.resolve());
+  // Not caught: the token's owner is durable before this runs, and a failure here leaves it as it was.
+  const end = () => (tokenId ? endToken(core, tokenId, jobId, tokenExpires) : Promise.resolve());
   try {
     const inputs = checkerInputs(cfg.config.inputs, policy.doc.carry);
     if (inputs) {
@@ -359,19 +381,39 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
         core.sql.all("UPDATE job_tokens SET last_error = 'malformed answer' WHERE token_id = ?", intent);
         throw new Error("Artifacts answered the mint without a usable token");
       }
-      // Known now: from here the token is ended by its ID (and the intent is settled in the same step). A late
-      // answer, after the attempt was superseded, lands here too: its token is then ended below, by its ID.
-      core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
-      tokenId = t.id;
-      tokenExpires = Date.parse(t.expiresAt);
-      if (!Number.isFinite(tokenExpires)) tokenExpires = null;
+      const expires = Date.parse(t.expiresAt);
+      const known = Number.isFinite(expires) ? expires : null;
       // A token that is not read-only, or whose expiry is unknown or after the deadline, is refused and ended.
-      if (t.scope !== "read" || tokenExpires === null || tokenExpires > deadline) throw new Error("Artifacts minted a token that would outlive the job");
+      const accepted = t.scope === "read" && known !== null && known <= deadline;
+      // Known now: ownership passes from the mint record to a record of the token itself, in one transaction, so
+      // either both happen or neither does. An accepted token's record is due at its expiry, a refused one's now.
+      // A late answer, after the attempt was superseded, lands here too, and its token is ended below by its ID.
+      try {
+        core.sql.transaction(() => {
+          core.sql.all(
+            "INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, ?) ON CONFLICT (token_id) DO UPDATE SET expires_at = excluded.expires_at, next_ms = excluded.next_ms, last_error = excluded.last_error",
+            t.id,
+            known,
+            accepted ? known! : core.now(),
+            accepted ? "held" : "refused",
+          );
+          core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
+        });
+      } catch (e) {
+        // The handoff could not be written: the mint record stays. While its ID is known here, the token is
+        // revoked now; only once Artifacts confirms that is the mint record settled.
+        const revoked = await repo.revokeToken(t.id).then(() => true, () => false);
+        if (revoked) core.sql.all("DELETE FROM job_tokens WHERE token_id = ?", intent);
+        throw e;
+      }
+      tokenId = t.id;
+      tokenExpires = known;
+      if (!accepted) throw new Error("Artifacts minted a token that would outlive the job");
       move(core, mine, "token = ?", tokenId);
       target = { integration: j.integration, input: { kind: "tree", tree }, readUrl, token: t.plaintext };
     }
   } catch {
-    // Not prepared: this attempt's credentials are ended, and the job is due again later.
+    // Not prepared: this attempt's credentials are ended (their owner is already durable), and the job is due again.
     await end();
     move(core, mine, "state = 'owed', next_ms = ?, token = NULL", core.now() + JOB_RETRY_MS);
     return;
