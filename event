@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f32a6c89c3ed0298fa2aea8a5f35ab8ca1421b5b","text":"Merge retired a covered predecessor; the successor is at packages/git/test/ref-fence.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f50d64b423702857e96fd873505dff4e4e12449d","text":"Merge retired a covered predecessor; the successor is at packages/room/src/config.ts."}
