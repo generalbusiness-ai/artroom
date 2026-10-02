@@ -1,0 +1,615 @@
+{
+  "run": "2026-10-02T06-40-59-778Z",
+  "url": "https://artroom-spike-room.inguz.workers.dev",
+  "namespace": "gitseq-spike",
+  "steps": [
+    {
+      "step": "found: draft",
+      "ok": true,
+      "atMs": 174,
+      "detail": {
+        "status": 200,
+        "repo": "gitseq-spike/c23e21dc78253e5f7cc13726e58a9d56"
+      }
+    },
+    {
+      "step": "found: found",
+      "ok": true,
+      "atMs": 2849,
+      "detail": {
+        "status": 200,
+        "room": "room_1f6d5e4f8be1cb07bcd183cb5dd3f123"
+      }
+    },
+    {
+      "step": "found: the room's repository is an incarnation of its identity",
+      "ok": true,
+      "atMs": 3279,
+      "detail": {
+        "base": "c23e21dc78253e5f7cc13726e58a9d56",
+        "incarnation": "c23e21dc78253e5f7cc13726e58a9d56-1",
+        "listing": "done"
+      }
+    },
+    {
+      "step": "route: no bearer is 401 with WWW-Authenticate",
+      "ok": true,
+      "atMs": 3406,
+      "detail": {
+        "status": 401,
+        "wwwAuthenticate": "Bearer realm=\"artroom\""
+      }
+    },
+    {
+      "step": "route: an unknown bearer is 401 invalid_token",
+      "ok": true,
+      "atMs": 3449,
+      "detail": {
+        "status": 401,
+        "wwwAuthenticate": "Bearer realm=\"artroom\", error=\"invalid_token\""
+      }
+    },
+    {
+      "step": "redeem @mcp-driver",
+      "ok": true,
+      "atMs": 3588,
+      "detail": {
+        "status": 200,
+        "member": "@mcp-driver",
+        "role": "agent",
+        "delegation": "act_4_4130210f",
+        "mcp": "https://artroom-spike-room.inguz.workers.dev/v1/rooms/room_1f6d5e4f8be1cb07bcd183cb5dd3f123/mcp",
+        "expiresAt": "2026-10-02T07:41:03.252Z"
+      }
+    },
+    {
+      "step": "legacy mode: connect and tools/list",
+      "ok": true,
+      "atMs": 3742,
+      "detail": {
+        "protocol": "2025-11-25",
+        "era": "legacy",
+        "tools": [
+          "claim",
+          "workspace",
+          "propose",
+          "note",
+          "review",
+          "land",
+          "renew",
+          "release",
+          "attention",
+          "explain"
+        ]
+      }
+    },
+    {
+      "step": "2026-07-28: connect, instructions and tools/list",
+      "ok": true,
+      "atMs": 3833,
+      "detail": {
+        "protocol": "2026-07-28",
+        "instructionsLength": 378,
+        "instructions": "Artroom coordinates changes to one git repository. Call attention first to see what needs you. To change code: claim the paths, get a workspace, push with git, propose the commit, land it, then release. A refusal is an answer, not a failure: read rule, reason and fix, and do the fix. After a timeout, repeat the call with the same idempotencyKey. Never print or commit a token.",
+        "tools": [
+          {
+            "name": "claim",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "workspace",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "propose",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "note",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "review",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "land",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "renew",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "release",
+            "outputSchemaRoot": "object",
+            "refusalForm": true
+          },
+          {
+            "name": "attention",
+            "outputSchemaRoot": "object",
+            "refusalForm": false
+          },
+          {
+            "name": "explain",
+            "outputSchemaRoot": "object",
+            "refusalForm": false
+          }
+        ]
+      }
+    },
+    {
+      "step": "claim",
+      "ok": true,
+      "atMs": 3913,
+      "detail": {
+        "ms": 80,
+        "lane": "act_5_146c8c35",
+        "lease": {
+          "holder": "@mcp-driver",
+          "generation": 1,
+          "expiresAt": "2026-10-02T07:11:03.587Z"
+        },
+        "by": {
+          "via": "delegation",
+          "member": "@mcp-driver",
+          "role": "agent",
+          "key": "key_EV7TjO-0m6AGxNIuuXYcpv0mEfZGJWPfBcW7jHFBV7A",
+          "delegation": "act_4_4130210f",
+          "grantor": "key__ntAg1Wb6ocKyEp25B_qsqWrvY-RkxohKZCOl_WUBm0"
+        },
+        "text": "Claimed lane act_5_146c8c35 with lease 1."
+      }
+    },
+    {
+      "step": "claim retried with the same idempotencyKey returns the same act",
+      "ok": true,
+      "atMs": 3959,
+      "detail": {
+        "first": "act_5_146c8c35",
+        "retry": "act_5_146c8c35"
+      }
+    },
+    {
+      "step": "workspace: ready, with a grant",
+      "ok": true,
+      "atMs": 6131,
+      "detail": {
+        "ms": 2172,
+        "op": {
+          "id": "op_ws_act_5_146c8c35_1",
+          "kind": "workspace",
+          "lane": "act_5_146c8c35",
+          "updatedAt": "2026-10-02T06:41:05.794Z",
+          "state": "ready",
+          "detail": {
+            "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/c23e21dc78253e5f7cc13726e58a9d56-1--act_5_146c8c35.git",
+            "leaseGeneration": 1
+          }
+        },
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike/c23e21dc78253e5f7cc13726e58a9d56-1--act_5_146c8c35.git",
+        "expiresAt": "2026-10-02T07:10:57.770Z",
+        "text": "Workspace ready: push to grant.remote with grant.token."
+      }
+    },
+    {
+      "step": "git clone the fork",
+      "ok": true,
+      "atMs": 6493,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "git push to the fork",
+      "ok": true,
+      "atMs": 7242,
+      "detail": {
+        "head": "2fd99fffab4bf269366dcb21128a34b0ff57d5d5",
+        "code": 0
+      }
+    },
+    {
+      "step": "propose",
+      "ok": true,
+      "atMs": 8850,
+      "detail": {
+        "ms": 1608,
+        "generation": 1,
+        "changed": [
+          {
+            "status": "added",
+            "path": "mcp0/driver.md"
+          }
+        ],
+        "obligations": [],
+        "preview": {
+          "id": "op_preview_6",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T06:41:08.490Z",
+          "lane": "act_5_146c8c35",
+          "generation": 1,
+          "state": "pending"
+        },
+        "text": "Proposed generation 1."
+      }
+    },
+    {
+      "step": "a refusal conforms to the advertised outputSchema (validated by the MCP client)",
+      "ok": true,
+      "atMs": 9602,
+      "detail": {
+        "rule": "generation-moved",
+        "reason": "The lane is at generation 1, not 0.",
+        "fix": "Propose on the current generation.",
+        "text": "Refused (generation-moved): The lane is at generation 1, not 0. Fix: Propose on the current generation."
+      }
+    },
+    {
+      "step": "land",
+      "ok": true,
+      "atMs": 10774,
+      "detail": {
+        "ms": 1126,
+        "op": {
+          "id": "op_land_8",
+          "kind": "land",
+          "updatedAt": "2026-10-02T06:41:10.265Z",
+          "lane": "act_5_146c8c35",
+          "generation": 1,
+          "head": "2fd99fffab4bf269366dcb21128a34b0ff57d5d5",
+          "act": "act_8_32353da9",
+          "leaseGeneration": 1,
+          "expectedMain": "30e21cf37fc62ff5a39b3e55c84fef17863ae192",
+          "policyVersion": "act_1_e7654aac",
+          "attempts": 1,
+          "integration": "2fd99fffab4bf269366dcb21128a34b0ff57d5d5",
+          "evidence": [],
+          "publication": 1,
+          "reservedAt": 10,
+          "state": "landed",
+          "receipt": "act_11_29d1f1d2"
+        },
+        "text": "Landing op_land_8 is landed."
+      }
+    },
+    {
+      "step": "attention after the cursor: the room's updates for this agent",
+      "ok": true,
+      "atMs": 10821,
+      "detail": {
+        "items": [
+          {
+            "text": "Landing op_land_8 is landed.",
+            "open": true
+          }
+        ],
+        "cursor": "c1.eyJrIjoiYXR0ZW50aW9uIiwibiI6MTEsInAiOjF9",
+        "publishedThrough": -1
+      }
+    },
+    {
+      "step": "explain the landing act",
+      "ok": true,
+      "atMs": 10873,
+      "detail": {
+        "act": "act_8_32353da9",
+        "kind": "land",
+        "outcome": "accepted",
+        "decisions": 1
+      }
+    },
+    {
+      "step": "release",
+      "ok": true,
+      "atMs": 11004,
+      "detail": {
+        "text": "Done: act_12_8a450ab4."
+      }
+    },
+    {
+      "step": "redeem @claude-code",
+      "ok": true,
+      "atMs": 11148,
+      "detail": {
+        "status": 200,
+        "member": "@claude-code",
+        "role": "agent",
+        "delegation": "act_15_1d03b05c",
+        "mcp": "https://artroom-spike-room.inguz.workers.dev/v1/rooms/room_1f6d5e4f8be1cb07bcd183cb5dd3f123/mcp",
+        "expiresAt": "2026-10-02T07:41:10.661Z"
+      }
+    },
+    {
+      "step": "claude -p: the cold agent's run",
+      "ok": true,
+      "atMs": 57904,
+      "detail": {
+        "exit": 0,
+        "ms": 46756,
+        "transcript": "measure/results/mcp-stage0-claude-2026-10-02T06-40-59-778Z.jsonl",
+        "model": "claude-opus-5-5",
+        "claudeCodeVersion": "2.1.287",
+        "mcpServers": [
+          {
+            "name": "artroom",
+            "status": "connected",
+            "source": "dynamic"
+          }
+        ],
+        "artroomTools": [
+          "mcp__artroom__attention",
+          "mcp__artroom__claim",
+          "mcp__artroom__explain",
+          "mcp__artroom__land",
+          "mcp__artroom__note",
+          "mcp__artroom__propose",
+          "mcp__artroom__release",
+          "mcp__artroom__renew",
+          "mcp__artroom__review",
+          "mcp__artroom__workspace"
+        ],
+        "turns": 15,
+        "costUsd": 0.2523328,
+        "usage": {
+          "input_tokens": 28,
+          "cache_creation_input_tokens": 15864,
+          "cache_read_input_tokens": 304544,
+          "output_tokens": 3220,
+          "output_tokens_details": {
+            "thinking_tokens": 175
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 15864,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "not_available",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 186,
+              "cache_read_input_tokens": 25768,
+              "cache_creation_input_tokens": 441,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 441
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "toolCalls": [
+          "ToolSearch",
+          "mcp__artroom__attention",
+          "mcp__artroom__claim",
+          "mcp__artroom__workspace",
+          "Bash",
+          "Bash",
+          "Bash",
+          "Bash",
+          "Write",
+          "Bash",
+          "Bash",
+          "mcp__artroom__propose",
+          "mcp__artroom__land",
+          "mcp__artroom__release"
+        ],
+        "refusals": [],
+        "toolErrors": 2,
+        "result": "I claimed a lane for `claude/hello.md`, cloned its workspace with git, and committed one line (\"Hello from Claude, landed through an Artroom lane.\") as `0339e9f`, then pushed it, proposed it and landed it on main with no reviews required. I then released the lane with a handover note; the write token appeared in my git commands but stopped working at release, and it was never printed or committed.",
+        "isError": false
+      }
+    },
+    {
+      "step": "canonical main after the run",
+      "ok": true,
+      "atMs": 58858,
+      "detail": {
+        "main": "0339e9ff0064eb014d09f8d069d58b59b6416ab8",
+        "landed": [
+          {
+            "who": "driver",
+            "lane": "act_5_146c8c35",
+            "integration": "2fd99fffab4bf269366dcb21128a34b0ff57d5d5"
+          }
+        ]
+      }
+    }
+  ],
+  "cleanup": {
+    "ok": true,
+    "duties": [
+      {
+        "duty": "revoke-agent-key",
+        "member": "@mcp-driver",
+        "key": "key__ntAg1Wb6ocKyEp25B_qsqWrvY-RkxohKZCOl_WUBm0",
+        "outcome": "done"
+      },
+      {
+        "duty": "bearer-refused",
+        "member": "@mcp-driver",
+        "key": "key__ntAg1Wb6ocKyEp25B_qsqWrvY-RkxohKZCOl_WUBm0",
+        "outcome": "done"
+      },
+      {
+        "duty": "revoke-agent-key",
+        "member": "@claude-code",
+        "key": "key_TXAxgWhKWfbA2j-Bn-1CMtTrEJk5a-LNXQk60cq2Wzc",
+        "outcome": "done"
+      },
+      {
+        "duty": "bearer-refused",
+        "member": "@claude-code",
+        "key": "key_TXAxgWhKWfbA2j-Bn-1CMtTrEJk5a-LNXQk60cq2Wzc",
+        "outcome": "done"
+      },
+      {
+        "duty": "inventory",
+        "repos": [
+          "c23e21dc78253e5f7cc13726e58a9d56-1",
+          "c23e21dc78253e5f7cc13726e58a9d56-1--act_5_146c8c35",
+          "c23e21dc78253e5f7cc13726e58a9d56-1--act_16_21e34ac7"
+        ],
+        "outcome": "done"
+      },
+      {
+        "duty": "list-tokens",
+        "repo": "c23e21dc78253e5f7cc13726e58a9d56-1--act_16_21e34ac7",
+        "outcome": "done"
+      },
+      {
+        "duty": "delete-repo",
+        "repo": "c23e21dc78253e5f7cc13726e58a9d56-1--act_16_21e34ac7",
+        "outcome": "done"
+      },
+      {
+        "duty": "list-tokens",
+        "repo": "c23e21dc78253e5f7cc13726e58a9d56-1--act_5_146c8c35",
+        "outcome": "done"
+      },
+      {
+        "duty": "delete-repo",
+        "repo": "c23e21dc78253e5f7cc13726e58a9d56-1--act_5_146c8c35",
+        "outcome": "done"
+      },
+      {
+        "duty": "list-tokens",
+        "repo": "c23e21dc78253e5f7cc13726e58a9d56-1",
+        "outcome": "done"
+      },
+      {
+        "duty": "delete-repo",
+        "repo": "c23e21dc78253e5f7cc13726e58a9d56-1",
+        "outcome": "done"
+      },
+      {
+        "duty": "final-inventory",
+        "repos": [
+          "c23e21dc78253e5f7cc13726e58a9d56-1",
+          "c23e21dc78253e5f7cc13726e58a9d56-1--act_5_146c8c35",
+          "c23e21dc78253e5f7cc13726e58a9d56-1--act_16_21e34ac7"
+        ],
+        "outcome": "done"
+      }
+    ],
+    "unresolved": [],
+    "reposLeft": []
+  },
+  "repo": "gitseq-spike/c23e21dc78253e5f7cc13726e58a9d56",
+  "room": "room_1f6d5e4f8be1cb07bcd183cb5dd3f123",
+  "name": "mcp-stage0-muqlgvbk",
+  "canonical": "c23e21dc78253e5f7cc13726e58a9d56-1",
+  "claude": {
+    "config": {
+      "mcpServers": {
+        "artroom": {
+          "type": "http",
+          "url": "https://artroom-spike-room.inguz.workers.dev/v1/rooms/room_1f6d5e4f8be1cb07bcd183cb5dd3f123/mcp",
+          "headers": {
+            "Authorization": "Bearer ${ARTROOM_BEARER}"
+          }
+        }
+      }
+    },
+    "task": "You are connected to an Artroom room through the MCP server named artroom. Claim a lane, make a one-line change to the repository (add a file named claude/hello.md containing one line of your choice), propose it, and land it. Use plain git in this directory for cloning and pushing, as the artroom tools describe. Finish by releasing the lane, then report what you did in two sentences.",
+    "run": {
+      "exit": 0,
+      "ms": 46756,
+      "transcript": "measure/results/mcp-stage0-claude-2026-10-02T06-40-59-778Z.jsonl",
+      "model": "claude-opus-5-5",
+      "claudeCodeVersion": "2.1.287",
+      "mcpServers": [
+        {
+          "name": "artroom",
+          "status": "connected",
+          "source": "dynamic"
+        }
+      ],
+      "artroomTools": [
+        "mcp__artroom__attention",
+        "mcp__artroom__claim",
+        "mcp__artroom__explain",
+        "mcp__artroom__land",
+        "mcp__artroom__note",
+        "mcp__artroom__propose",
+        "mcp__artroom__release",
+        "mcp__artroom__renew",
+        "mcp__artroom__review",
+        "mcp__artroom__workspace"
+      ],
+      "turns": 15,
+      "costUsd": 0.2523328,
+      "usage": {
+        "input_tokens": 28,
+        "cache_creation_input_tokens": 15864,
+        "cache_read_input_tokens": 304544,
+        "output_tokens": 3220,
+        "output_tokens_details": {
+          "thinking_tokens": 175
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 15864,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "not_available",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 186,
+            "cache_read_input_tokens": 25768,
+            "cache_creation_input_tokens": 441,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 441
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "toolCalls": [
+        "ToolSearch",
+        "mcp__artroom__attention",
+        "mcp__artroom__claim",
+        "mcp__artroom__workspace",
+        "Bash",
+        "Bash",
+        "Bash",
+        "Bash",
+        "Write",
+        "Bash",
+        "Bash",
+        "mcp__artroom__propose",
+        "mcp__artroom__land",
+        "mcp__artroom__release"
+      ],
+      "refusals": [],
+      "toolErrors": 2,
+      "result": "I claimed a lane for `claude/hello.md`, cloned its workspace with git, and committed one line (\"Hello from Claude, landed through an Artroom lane.\") as `0339e9f`, then pushed it, proposed it and landed it on main with no reviews required. I then released the lane with a handover note; the write token appeared in my git commands but stopped working at release, and it was never printed or committed.",
+      "isError": false
+    }
+  },
+  "main": "0339e9ff0064eb014d09f8d069d58b59b6416ab8",
+  "ok": true,
+  "ms": 62613
+}
