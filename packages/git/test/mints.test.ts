@@ -13,6 +13,7 @@ import {
   MINT_WAIT_MS,
   MintLedger,
   OBSERVE_WAIT,
+  redactNote,
   OVERDUE_STEP_MS,
   TAKEOVER_AHEAD_MS,
   TAKEOVER_MOVE_MS,
@@ -100,6 +101,8 @@ class Repo implements MintRepo {
   /** Every revocation asked, by ID, in order. */
   readonly revokes: string[] = [];
   revokeDown = false;
+  /** While set, every revocation fails with this error. */
+  revokeError: ((id: string) => Error) | null = null;
   holdRevokes = false;
   readonly heldRevokes: { id: string; gate: ReturnType<typeof deferred<void>> }[] = [];
   lists = 0;
@@ -136,6 +139,7 @@ class Repo implements MintRepo {
   async revokeToken(id: string): Promise<boolean> {
     this.revokes.push(id);
     if (this.revokeDown) throw internal();
+    if (this.revokeError) throw this.revokeError(id);
     if (this.holdRevokes) {
       const gate = deferred<void>();
       this.heldRevokes.push({ id, gate });
@@ -186,6 +190,8 @@ function room(o: { waitMs?: number; sql?: Sql; clock?: Clock } = {}) {
     alarm: null as number | null,
     wakes: [] as number[],
     wakeFails: false,
+    /** While set, looking up the repository never answers. */
+    lookupHangs: false,
     /** Room time one wake takes to store. */
     wakeTakesMs: 0,
     ledger: null as unknown as MintLedger,
@@ -193,7 +199,7 @@ function room(o: { waitMs?: number; sql?: Sql; clock?: Clock } = {}) {
     start(): MintLedger {
       r.ledger = new MintLedger({
         sql,
-        repo: async () => repo,
+        repo: () => (r.lookupHangs ? new Promise<MintRepo>(() => {}) : Promise.resolve(repo)),
         now: clock.now,
         wake: async (at) => {
           if (r.wakeFails) throw new Error("storage refused the alarm");
@@ -1048,4 +1054,158 @@ test("(10) the observation schedule doubles from 1 min to 6 h; a new unknown bri
     r.clock.advance(1_000);
   }
   assert.equal(r.repo.lists - lists, 1, "one inventory in that minute, whatever the rate of new unknowns");
+});
+
+// ------------------------------------------------- checker's early findings on 658d10af
+
+test("(checker 1) a repository lookup that never answers: mint sends nothing and writes no record, within the wait", async () => {
+  const r = room({ waitMs: 30 });
+  r.lookupHangs = true;
+  await assert.rejects(r.ledger.mint("publish:op:1", "write", ttl60), /repository was not reached within 30 ms/);
+  assert.equal(r.repo.creates.length, 0);
+  assert.equal(rows(r.sql).length, 0);
+  assert.equal(r.wakes.length, 0);
+});
+
+test("(checker 1) a repository lookup that never answers: the observation ends within the wait, records its result and next time, and settles nothing", async () => {
+  const r = room({ waitMs: 30 });
+  r.repo.plans = ["lose"];
+  await assert.rejects(r.ledger.mint("a", "read", ttl60));
+  r.lookupHangs = true;
+  await alarm(r);
+  const o = r.ledger.duties().observation;
+  assert.equal(o.at, r.clock.t);
+  assert.match(String(o.result), /repository was not reached/);
+  assert.equal(o.unaccounted, null);
+  assert.equal(o.nextAt, r.clock.t + 60_000);
+  assert.equal(r.repo.lists, 0);
+  assert.equal(only(r.sql)["state"], "unknown");
+});
+
+test("(checker 1) a repository lookup that never answers: the revocation pass ends within the wait; each record takes its backoff, stays owed, and is revoked later", async () => {
+  const r = room({ waitMs: 30 });
+  r.repo.plans = [(t) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() })];
+  await assert.rejects(r.ledger.mint("a", "write", () => 86_400));
+  r.lookupHangs = true;
+  await alarm(r);
+  const rec = only(r.sql);
+  assert.deepEqual([rec["state"], rec["backoff"], rec["due"]], ["owed", 1_000, r.clock.t + 1_000]);
+  assert.match(String(rec["last_error"]), /repository was not reached/);
+  assert.equal(r.repo.revokes.length, 0);
+  r.clock.advance(100);
+  assert.equal(r.ledger.nextDue(), r.clock.t + 900, "its backoff, not an overdue continuation");
+  r.lookupHangs = false;
+  r.clock.advance(900);
+  await alarm(r);
+  assert.deepEqual(r.repo.revokes, ["tok_1"]);
+  assert.equal(rows(r.sql).length, 0);
+});
+
+/** Neither the stored rows, the summary nor duties() contain `secret`. */
+function assertNoSecret(r: ReturnType<typeof room>, secret: string): void {
+  const stored = JSON.stringify([rows(r.sql), summary(r.sql), r.ledger.duties()]);
+  assert.equal(stored.includes(secret), false, `stored text contains ${secret}`);
+}
+
+test("(checker 2) an opaque plaintext echoed in an Authorization: Bearer revocation error is neither stored nor shown", async () => {
+  const r = room();
+  const secret = "syntheticOpaqueCredentialOnly";
+  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: secret })];
+  const t = await r.ledger.mint("a", "read", ttl60);
+  assert.equal(t.plaintext, secret);
+  r.repo.revokeError = () => new Error(`Authorization: Bearer ${secret}`);
+  await t.release();
+  assert.equal(only(r.sql)["state"], "owed");
+  assert.match(String(only(r.sql)["last_error"]), /revocation failed/);
+  assertNoSecret(r, secret);
+  // The pass's failures too.
+  r.clock.advance(1_000);
+  await alarm(r);
+  assert.equal(r.repo.revokes.length, 2);
+  assertNoSecret(r, secret);
+});
+
+test("(checker 2) a short plaintext, and one in the error's name, echoed raw; and an unusable answer's text: none is stored", async () => {
+  const r = room();
+  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: "k9" })];
+  const short = await r.ledger.mint("a", "read", ttl60);
+  r.repo.revokeError = () => new Error("refused for k9");
+  await short.release();
+  assertNoSecret(r, "k9");
+
+  const named = "Zq7opaqueName";
+  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: named })];
+  const n = await r.ledger.mint("b", "read", ttl60);
+  r.repo.revokeError = () => Object.assign(new Error("revocation refused"), { name: named });
+  await n.release();
+  assertNoSecret(r, named);
+
+  // An answer that cannot be used still carried text; it is owed, and its revocation error echoes that text.
+  const unusable = "Wx3unusableText";
+  r.repo.plans = [(t) => ({ ...(full(t) as object), scope: "write", plaintext: unusable })];
+  await assert.rejects(r.ledger.mint("c", "read", ttl60));
+  r.repo.revokeError = () => new Error(`no such token ${unusable}`);
+  r.clock.advance(1_000);
+  await alarm(r);
+  assertNoSecret(r, unusable);
+  assert.equal(rows(r.sql).length, 3);
+});
+
+test("(checker 2) a claim rolled back, then a release whose error echoes the text: the record's own plaintext is still removed", async () => {
+  const r = room();
+  const secret = "Rb5claimedThenReleased";
+  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: secret })];
+  const t = await r.ledger.mint("a", "read", ttl60);
+  assert.throws(() =>
+    r.sql.transaction(() => {
+      t.claim();
+      throw new Error("the owner's transaction fails");
+    }),
+  );
+  r.repo.revokeError = () => new Error(`token ${secret} is busy`);
+  await t.release();
+  assert.equal(only(r.sql)["state"], "owed");
+  assertNoSecret(r, secret);
+});
+
+test("(checker 2) with no plaintext in memory (a new host): Artifacts tokens, Bearer, Basic and Authorization values are redacted at any length, and stored text is bounded", async () => {
+  const r = room();
+  const held = await r.ledger.mint("a", "write", () => 86_400);
+  r.start(); // the new host holds no text
+  const art = `art_v12_${"A1".repeat(400)}?expires=1800000060`;
+  r.repo.revokeError = () =>
+    new Error(`denied ${art} Bearer opaqueAfterRestart Basic dXNlcjpwYXNzd29yZA== Authorization: rawHeaderValue ${"x".repeat(5_000)}`);
+  await alarm(r);
+  const note = String(only(r.sql)["last_error"]);
+  for (const secret of [held.plaintext, "A1A1A1", "opaqueAfterRestart", "dXNlcjpwYXNzd29yZA", "rawHeaderValue"]) assertNoSecret(r, secret);
+  assert.ok(note.length <= 300, `bounded, not ${note.length}`);
+  assert.match(note, /<token>.*Bearer <redacted>.*Basic <redacted>.*Authorization: <redacted>/);
+});
+
+test("(checker 2) a create failure's error and an observation's error are redacted too", async () => {
+  const r = room();
+  const secret = "Hd2heldOpaque";
+  r.repo.plans = [(t) => ({ ...(full(t) as object), plaintext: secret })];
+  const t = await r.ledger.mint("a", "read", ttl60);
+  r.repo.createToken = async () => {
+    throw new Error(`upstream said Authorization: Bearer leakedCreate and ${secret}`);
+  };
+  await assert.rejects(r.ledger.mint("b", "read", ttl60));
+  r.repo.listTokens = async () => {
+    throw new Error(`listing failed for ${secret} art_v1_${"z".repeat(30)}`);
+  };
+  await alarm(r);
+  assert.match(String(r.ledger.duties().observation.result), /no inventory/);
+  assertNoSecret(r, secret);
+  assertNoSecret(r, "leakedCreate");
+  assertNoSecret(r, "zzzzzzzzzz");
+  await t.release();
+});
+
+test("(checker 2) redactNote: secrets first, then patterns, then the bound", () => {
+  assert.equal(redactNote("a k9 b", ["k9"]), "a <token> b");
+  assert.equal(redactNote(`x art_v1_${"q".repeat(2_000)}?expires=1 y`), "x <token> y");
+  assert.equal(redactNote("Authorization: Basic abc"), "Authorization: Basic <redacted>");
+  assert.equal(redactNote("authorization=opaque"), "authorization=<redacted>");
+  assert.equal(redactNote("y".repeat(1_000)).length, 300);
 });
