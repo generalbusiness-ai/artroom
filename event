@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4979dd278bbc9eba471d0878e3308441f0c0b49b","text":"Merge retired a covered predecessor; the successor is at spikes/pi-durable/vitest.config.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:518f93547b432b9ef159976ee3eddc61a9ea05ba","text":"Merge retired a covered predecessor; the successor is at spikes/pi-durable/test/check/tsconfig.broken.json."}
