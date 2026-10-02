@@ -129,3 +129,35 @@ asserting the right outcome:
 Changed: "a check judged and not carried is shown with why; a failed check
 is never judged". Removed (replaced by the cases above): "carried check
 evidence takes its reason from the event, not from the evidence record".
+
+The first mutation run found that dropping the integration match survived,
+because every test event that changed the integration also changed the
+operation. A merge preview keeps its operation ID when main moves, so
+`8789285b` adds that case to "successive integrations".
+
+Mutation results, run after `8789285b` with `vitest run` on the whole UI
+suite, each mutant reverted with `git checkout`; the tree was clean
+afterwards. Every mutant turned at least one test red (vitest exit 1).
+
+| Mutant | Red tests |
+|---|---|
+| R1 `carriedBy` ignores the policy | policy activation… |
+| R2 `carriedBy` ignores the operation | successive integrations… |
+| R3 `carriedBy` ignores the integration | successive integrations… |
+| R4 `carriedBy` as in revision 1 (no policy, operation or integration) | 4 tests: successive integrations, policy activation, the reviewer's case, only historical events |
+| R5 A preview with no integration still matches | a preview without an integration… |
+| R6 The judgments list drops the other-policy marker | policy activation… |
+| F1 The mock judges a failed check again | preparing never carries a failed required check…; a check judged and not carried…; a failed check is never judged |
+| F2 A failed required check with evidence does not wait | preparing never carries a failed required check…; the landing never waits for the advisory check… |
+| F3 The advisory check waits too (control) | control: a failed advisory check…; the landing never waits for the advisory check… |
+
+Gates at `8789285b`:
+
+| Gate | Exit |
+|---|---|
+| `npm run typecheck` (packages/ui) | 0 |
+| `npm test` (packages/ui): 8 files, 107 tests | 0 |
+| `npm run build` (packages/ui) | 0 |
+| `npx playwright test` (packages/ui): 7 tests; screenshots regenerated in `b8312128`, unchanged since | 0 |
+| `npm run typecheck` (root) | 0 |
+| `npm test` (root) | 0 |
