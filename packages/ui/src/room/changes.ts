@@ -13,9 +13,13 @@
  * deleted or renamed, the rename source, and the file modes) and its hunks
  * with `CONTEXT` lines of context on each side. Two versions are the same
  * edit to a path only when that metadata is equal and every hunk, context
- * included, is in the other version too. Hunks are compared without their
- * line numbers, so a rebase that moves an edit up or down does not show; one
- * that changes a line within `CONTEXT` lines of an edit does.
+ * included, is in the other version too, at the same place in the file it
+ * was made against (its parent). When the two versions' parents differ at
+ * that path, an old hunk's parent lines are mapped into the new parent by a
+ * line diff of the two parents, so a rebase that only moves an edit does not
+ * show. If they do not map one to one (the parent changed within the hunk)
+ * and the new version has the same hunk, the interdiff says it could not
+ * tell whether the edit moved, rather than calling it the same.
  *
  * A header is author-supplied and proves nothing. Nothing here feeds
  * obligations, evidence or the carry rule, which stay path-based.
@@ -80,6 +84,11 @@ export interface FileInterdiff {
   /** Hunks only the new version has, and those only the old one had. */
   readonly now: readonly Hunk[];
   readonly before: readonly Hunk[];
+  /**
+   * The same hunk in both versions, where the old one's place could not be
+   * found in the new version's parent: it may be the same edit, or one moved.
+   */
+  readonly unsure: readonly { readonly before: Hunk; readonly now: Hunk }[];
 }
 
 type Bound = "depth" | "entries" | "commits" | "lines" | "line-bytes" | "work";
@@ -178,6 +187,8 @@ type TooLarge = Extract<Interdiff, { kind: "too-large" }>;
 interface FilePatch {
   readonly meta: FileMeta;
   readonly hunks: readonly Hunk[];
+  /** The file the hunks were made against: its blob, and its lines when they were read. */
+  readonly parent: { readonly hash: string | null; readonly lines: readonly string[] };
 }
 type Patch = { readonly kind: "ok"; readonly files: Map<RepoPath, FilePatch> } | TooLarge;
 type Spend = (work: number) => boolean;
@@ -194,9 +205,9 @@ async function interdiff(store: CommitStore, a: CommitInfo, b: CommitInfo, bound
     const x = pa.files.get(path);
     const y = pb.files.get(path);
     const meta = sameMeta(x?.meta, y?.meta) ? null : { before: x?.meta ?? null, now: y?.meta ?? null };
-    const now = minus(y?.hunks ?? [], x?.hunks ?? []);
-    const before = minus(x?.hunks ?? [], y?.hunks ?? []);
-    if (meta || now.length || before.length) files.push({ path, meta, now, before });
+    const hunks = x?.hunks.length && y?.hunks.length ? matchHunks(x, y, spend) : { now: y?.hunks ?? [], before: x?.hunks ?? [], unsure: [] };
+    if (!hunks) return { kind: "too-large", bound: "work", limit: bounds.maxWork };
+    if (meta || hunks.now.length || hunks.before.length || hunks.unsure.length) files.push({ path, meta, ...hunks });
   }
   return { kind: "ok", files };
 }
@@ -204,16 +215,60 @@ async function interdiff(store: CommitStore, a: CommitInfo, b: CommitInfo, bound
 const sameMeta = (x: FileMeta | undefined, y: FileMeta | undefined) =>
   x === y || (!!x && !!y && x.status === y.status && x.from === y.from && x.oldMode === y.oldMode && x.newMode === y.newMode);
 
-/** The hunks of `a` that `b` does not have, each hunk of `b` matching at most once. Line numbers are not compared. */
-function minus(a: readonly Hunk[], b: readonly Hunk[]): Hunk[] {
-  const key = (h: Hunk) => h.lines.join("\n");
-  const count = new Map<string, number>();
-  for (const h of b) count.set(key(h), (count.get(key(h)) ?? 0) + 1);
-  return a.filter((h) => {
-    const n = count.get(key(h)) ?? 0;
-    count.set(key(h), n - 1);
-    return n <= 0;
-  });
+const key = (h: Hunk) => h.lines.join("\n");
+const parentLength = (h: Hunk) => h.lines.filter((l) => !l.startsWith("+")).length;
+
+/**
+ * Pair the two versions' hunks for one path. A pair is the same edit when
+ * its lines are equal and the old hunk's place, mapped into the new parent,
+ * is the new hunk's place. Null when mapping is over the work bound.
+ */
+function matchHunks(x: FilePatch, y: FilePatch, spend: Spend): Pick<FileInterdiff, "now" | "before" | "unsure"> | null {
+  const place = placeIn(x.parent, y.parent, spend);
+  if (!place) return null;
+  const now: (Hunk | null)[] = [...y.hunks];
+  const left: { h: Hunk; at: number | null }[] = [];
+  for (const h of x.hunks) {
+    const at = place(h.oldStart, parentLength(h));
+    const i = now.findIndex((g) => g !== null && g.oldStart === at && key(g) === key(h));
+    if (i >= 0) now[i] = null;
+    else left.push({ h, at });
+  }
+  const before: Hunk[] = [];
+  const unsure: { before: Hunk; now: Hunk }[] = [];
+  for (const { h, at } of left) {
+    const i = at === null ? now.findIndex((g) => g !== null && key(g) === key(h)) : -1;
+    if (i >= 0) {
+      unsure.push({ before: h, now: now[i]! });
+      now[i] = null;
+    } else before.push(h);
+  }
+  return { now: now.filter((g) => g !== null), before, unsure };
+}
+
+/**
+ * Where a region of the old parent (first line, counting from 1, and length)
+ * is in the new parent: the same place when the blobs are equal, otherwise by
+ * a line diff of the two. Null for a region that does not map one to one, in
+ * order. The outer null: the diff is over the work bound.
+ */
+function placeIn(a: FilePatch["parent"], b: FilePatch["parent"], spend: Spend): ((start: number, length: number) => number | null) | null {
+  if (a.hash === b.hash) return (start) => start;
+  const ops = lineDiff(a.lines, b.lines, spend);
+  if (!ops) return null;
+  const to: number[] = []; // for each old parent line, its index in the new parent, or -1
+  let j = 0;
+  for (const o of ops) {
+    if (o.op === "same") to.push(j++);
+    else if (o.op === "del") to.push(-1);
+    else j++;
+  }
+  return (start, length) => {
+    const first = to[start - 1];
+    if (length === 0 || first === undefined || first < 0) return null;
+    for (let k = 1; k < length; k++) if (to[start - 1 + k] !== first + k) return null;
+    return first + 1;
+  };
 }
 
 /** One commit's own edits: for each path it changes, what it did and its hunks. */
@@ -228,7 +283,7 @@ async function patch(store: CommitStore, c: CommitInfo, bounds: Bounds, spend: S
     const meta: FileMeta = { status: change.status, from: change.status === "renamed" ? change.from : null, oldMode: from?.mode ?? null, newMode: to?.mode ?? null };
     // The same blob on both sides (a pure rename or mode change): no hunks, nothing to read.
     if (from && to && from.hash === to.hash) {
-      files.set(change.path, { meta, hunks: [] });
+      files.set(change.path, { meta, hunks: [], parent: { hash: from.hash, lines: [] } });
       continue;
     }
     const [x, y] = [await lines(store, from), await lines(store, to)];
@@ -240,7 +295,7 @@ async function patch(store: CommitStore, c: CommitInfo, bounds: Bounds, spend: S
     }
     const ops = lineDiff(x, y, spend);
     if (!ops) return { kind: "too-large", bound: "work", limit: bounds.maxWork };
-    files.set(change.path, { meta, hunks: toHunks(ops, CONTEXT) });
+    files.set(change.path, { meta, hunks: toHunks(ops, CONTEXT), parent: { hash: from?.hash ?? null, lines: x } });
   }
   return { kind: "ok", files };
 }

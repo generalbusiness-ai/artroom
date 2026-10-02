@@ -76,7 +76,7 @@ export function InterdiffView({ d, from, to }: { d: Interdiff; from: number; to:
   if (!d.files.length)
     return (
       <p class="small muted" data-interdiff="same">
-        The same edits as in generation {from}, to the same files with the same modes and surrounding lines: only rebased or reworded.
+        The same edits as in generation {from}, at the same places in the same files, with the same modes and surrounding lines: only rebased or reworded.
       </p>
     );
   return (
@@ -91,6 +91,14 @@ export function InterdiffView({ d, from, to }: { d: Interdiff; from: number; to:
           )}
           {f.now.length > 0 && <Hunks hunks={f.now} label={`Edits only in generation ${to}'s version`} />}
           {f.before.length > 0 && <Hunks hunks={f.before} label={`Edits only in generation ${from}'s version`} />}
+          {f.unsure.map((u, i) => (
+            <div key={`u${i}`} data-interdiff-unsure>
+              <Hunks
+                hunks={[u.now]}
+                label={`Could not tell whether this edit moved. Both versions have it, but the lines generation ${from}'s version made it against (from line ${u.before.oldStart}) changed in generation ${to}'s parent.`}
+              />
+            </div>
+          ))}
         </div>
       ))}
     </div>

@@ -46,8 +46,8 @@ describe("P2: tree-change metadata is compared", () => {
     expect(await compare(repo, [parent, parent], { "a.txt": null, "b.txt": "retained contents\n" }, { "a.txt": null, "c.txt": "retained contents\n" })).toEqual({
       kind: "ok",
       files: [
-        { path: "b.txt", meta: { before: renamed("a.txt"), now: null }, now: [], before: [] },
-        { path: "c.txt", meta: { before: null, now: renamed("a.txt") }, now: [], before: [] },
+        { path: "b.txt", meta: { before: renamed("a.txt"), now: null }, now: [], before: [], unsure: [] },
+        { path: "c.txt", meta: { before: null, now: renamed("a.txt") }, now: [], before: [], unsure: [] },
       ],
     });
   });
@@ -57,7 +57,7 @@ describe("P2: tree-change metadata is compared", () => {
     const parent = repo.commit(null, { "x.txt": "same\n", "y.txt": "same\n" }, "base");
     expect(await compare(repo, [parent, parent], { "x.txt": null, "c.txt": "same\n" }, { "y.txt": null, "c.txt": "same\n" })).toEqual({
       kind: "ok",
-      files: [{ path: "c.txt", meta: { before: renamed("x.txt"), now: renamed("y.txt") }, now: [], before: [] }],
+      files: [{ path: "c.txt", meta: { before: renamed("x.txt"), now: renamed("y.txt") }, now: [], before: [], unsure: [] }],
     });
   });
 
@@ -67,7 +67,7 @@ describe("P2: tree-change metadata is compared", () => {
     const parent = repo.commit(null, { "run.sh": "#!/bin/sh\necho hello\n", "other.txt": "1\n" }, "base");
     expect(await compare(repo, [parent, parent], { "other.txt": "2\n" }, { "other.txt": "2\n", "run.sh": exec("#!/bin/sh\necho hello\n") })).toEqual({
       kind: "ok",
-      files: [{ path: "run.sh", meta: { before: null, now: { status: "modified", from: null, oldMode: "100644", newMode: "100755" } }, now: [], before: [] }],
+      files: [{ path: "run.sh", meta: { before: null, now: { status: "modified", from: null, oldMode: "100644", newMode: "100755" } }, now: [], before: [], unsure: [] }],
     });
   });
 
@@ -83,6 +83,7 @@ describe("P2: tree-change metadata is compared", () => {
           meta: { before: { status: "modified", from: null, oldMode: "100644", newMode: "100644" }, now: { status: "modified", from: null, oldMode: "100644", newMode: "100755" } },
           now: [],
           before: [],
+          unsure: [],
         },
       ],
     });
@@ -206,8 +207,8 @@ describe("the interdiff on screen", () => {
         d={{
           kind: "ok",
           files: [
-            { path: "c.txt", meta: { before: renamed("x.txt"), now: renamed("y.txt") }, now: [], before: [] },
-            { path: "run.sh", meta: { before: null, now: { status: "modified", from: null, oldMode: "100644", newMode: "100755" } }, now: [], before: [] },
+            { path: "c.txt", meta: { before: renamed("x.txt"), now: renamed("y.txt") }, now: [], before: [], unsure: [] },
+            { path: "run.sh", meta: { before: null, now: { status: "modified", from: null, oldMode: "100644", newMode: "100755" } }, now: [], before: [], unsure: [] },
           ],
         }}
         from={1}
@@ -223,7 +224,7 @@ describe("the interdiff on screen", () => {
   });
 
   test("each hunk shows where it is, with its context", () => {
-    render(<InterdiffView d={{ kind: "ok", files: [{ path: "auth.ts", meta: null, now: [{ oldStart: 2, newStart: 2, lines: [" function second() {", "-  return allow();", "+  return deny();"] }], before: [] }] }} from={1} to={2} />);
+    render(<InterdiffView d={{ kind: "ok", files: [{ path: "auth.ts", meta: null, now: [{ oldStart: 2, newStart: 2, lines: [" function second() {", "-  return allow();", "+  return deny();"] }], before: [], unsure: [] }] }} from={1} to={2} />);
     const patch = document.querySelector("pre.patch")!;
     expect(patch.textContent).toBe("@@ -2 +2 @@\n function second() {\n-  return allow();\n+  return deny();\n");
     expect([...patch.querySelectorAll("span")].map((s) => s.className)).toEqual(["hunk", "", "del", "add"]);
