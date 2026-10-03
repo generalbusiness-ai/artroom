@@ -855,11 +855,19 @@ and each application with `wrangler containers delete <id>`.
 **Verified after.** The Workers list now holds `artroom-spike-checkers`
 and `artroom-spike-room` only, and the applications list
 `artroom-spike-room-publisher` and `artroom-spike-checkers-runnerbox`
-only. The Room still answers at
-`https://artroom-spike-room.inguz.workers.dev/` (404 for `/`, its route
-response, as before). The checker service has `workers_dev: false`, so
-no URL probes it; its evidence is that it stays in the Workers list and
-its container application stays in the applications list. Nothing else
+only. That is inventory preservation; the runtime check is separate.
+The checker service has `workers_dev: false`, so no URL probes it, and
+a root-path 404 from the Room's URL is only its route response. The
+runtime evidence is the smoke's checks phase, run after the deletions
+(`SPIKE_PHASE=checks`, 02:23 UTC, Room `59636ae9` as before): all 32
+steps ok, including "the Room dispatched the job, and the checker's
+signed check was admitted" (waited 10.4 seconds; the runner ran `npm ci`
+and `npm test` and passed), the lane landed, the log was published and
+`artroom verify` exit 0 through entry 15. Cleanup `ok`, 0 unresolved,
+no repository left. Record:
+[spike-smoke-2026-10-03T02-23-15-764Z.json](../packages/room/measure/results/spike-smoke-2026-10-03T02-23-15-764Z.json).
+So both services answered, through the Room's own service binding, with
+the four resources gone. Nothing else
 on the account was touched: no other Worker, application, namespace,
 registry image or token. The before and after listings and the four
 deletion receipts, with account identifiers reduced to Worker names,
