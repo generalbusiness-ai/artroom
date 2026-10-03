@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:57221cf5f356c284b2627104ade1c106cca69881","text":"Merge retired a covered predecessor; the successor is at .github/workflows/row-writes.yml."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:57e2a21fc665dea67847be62e40527de1213d33d","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/checks.test.ts."}
