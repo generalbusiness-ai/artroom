@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:45a37f59492fe2b5a4b10a64327501d797e4fdf6","text":"Replaced by the review request for exact head 55139e15d00daf462387ec7cba5a47f2ccc2a892; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"promise","text":"I will independently review exact 55139e15d00daf462387ec7cba5a47f2ccc2a892, including pre-founding upgrade recovery, bounded restart cleanup, failure isolation and the retained safe-error guard controls."}
