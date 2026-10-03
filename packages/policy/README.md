@@ -252,6 +252,25 @@ export { policy, owners, requireCheck, requireReview, carry, lanes, rule } from 
 The helper imports only types from the contract, so this adds no runtime
 cycle.
 
+## Reading a catalogue: `@generalbusiness/artroom-policy/declared`
+
+Clients need a few declared-acts functions and none of the evaluator. The
+export `./declared` (`src/declared.ts`) gives them, and loads no expression
+engine:
+
+- the binding identity (`bindingOf`, `bindingSubject`, `bindingsOf`) and
+  the code-review declarations (`CODE_REVIEW_ACTS`);
+- `STEP_FIELD_SPECS` (`src/steps.ts`): each step's own body fields with
+  their types, for a form. A Room test checks that it agrees with
+  admission (`packages/room/test/node/declared-steps-a5d64b35.test.ts`);
+- `src/catalogue.ts`: `meaningOf` and `governs` (a record under the
+  declarations of its own seq), `fieldsOf` and `targetsOf` (the fields of
+  an act), `builtForBinding` (the binding a named code-review method
+  carries in a room), and `expandGrant` (a grant as the signed map its
+  grantor signs).
+
+These decide nothing. The room judges every act again at admission.
+
 ## Contract gaps and how they were resolved
 
 The policy amendment (protocol section 26) resolved or kept open each gap

@@ -71,6 +71,38 @@ landing. Only a finished landing that did not land suggests a new
 Other commands: `renew`, `note`, `review`, `explain`, `log`, `agents-md`
 and `mcp`. Run `artroom help` for all of them.
 
+## Acts a room declares
+
+A room may declare acts of its own in its policy document.
+
+```sh
+artroom acts                 # what this room declares
+artroom acts take-part       # one act: its fields, who may sign it, its binding
+artroom act take-part --binding sha256:… --set part=bass
+```
+
+- `artroom acts KIND` prints the binding. `artroom act` needs it with
+  `--binding`: it names the meaning you read, and the CLI never chooses
+  one for you.
+- The target is `--lane LANE` (a thread), `--lane LANE --generation N` (a
+  version), `--entry ACT` (an entry), `--target JSON`, or nothing.
+- `--set FIELD=VALUE` gives a field, read by its declared type; a list of
+  globs is comma-separated. `--body JSON` gives several at once.
+- The lease, the lane's generation and a version's head are read from the
+  room when you leave them out, as the named commands read them.
+- If the meaning changed since you read it, the act is refused
+  `binding-stale` and nothing is done. The CLI prints the active meaning,
+  what changed where the room still has the earlier version, and the
+  command with the new binding. Run it only if that is still what you
+  intend.
+- A failed command is finished by running it again with its
+  `--idempotency-key`: the journal holds the act with its binding, and
+  sends the same bytes.
+
+`artroom log` and `artroom explain` show a declared act with the label its
+kind had at that entry's own seq, and say where a kind was retired.
+`artroom acts --at SEQ` shows the declarations in force at an entry.
+
 ## When something fails part way
 
 The CLI writes each act, login and redemption to a journal in its config

@@ -4326,3 +4326,203 @@ These continue section 32.1's list.
     `hand-over` naming a historical opening kind is judged at admission
     from the thread's recorded settings (stage 4); a thread with no
     reservation length cannot be handed over.
+
+### 33.10 Stage 5: the generic act and the declarations read (a5d64b35, fa120186)
+
+Stage 5 of note section 8.5 gives clients the declared acts: a read of a
+room's declarations with their bindings, an act of any declared kind in the
+client, over HTTPS, in the CLI and as two MCP tools, and records shown under
+the declarations of their own seq. This section adds to section 33.3's rows
+for R-API-9 and R-CRED-10 and amends the rules below. It renumbers nothing.
+It records the planner's clarification `fa120186` on two points: readers
+use `D(s)`, and a generic bound check may use the MCP endpoint.
+
+#### Amended rules
+
+| Rule | Amendment |
+|---|---|
+| R-API-3 | One more read route, `GET /v1/rooms/:room/declarations`, with the same credential as every read. With no query it answers with the active policy version's declarations. `?at=<seq>` answers with the version in force for the entry at that seq. `?policy=<version>` answers with that version. Both together, a seq that is not a whole number from 0, or a malformed version, is `bad-request`. A version the room does not retain is `not-found`. `POST /v1/rooms/:room/acts` takes a signed envelope of either version (`AnySignedEnvelope`). It takes nothing else: a bearer token on that route gives no authority, and a bearer act sent there is `bad-request` |
+| R-API-5 and the reads | `ReadQuery` gains `{ q: "acts", at?, policy? }`, answered with a `Catalogue` or `null` (`ReadResults.acts`). `RoomApi` gains `acts()`, `actsAt()` and `act()`. `Explanation.kind` and `EntrySummary.kind` may be any kind name, and `Explanation` gains `meaning` |
+| R-API-9 | The MCP tool `acts` takes an optional `at` (a seq) or `policy` (a version), never both, and returns the `Catalogue`; for a version the room does not retain it returns `{ outcome: "not-found" }` (`ActsNotFound`), because MCP structured content must be an object. The MCP tool `act` takes `kind`, `target`, `body`, `binding` and `idempotencyKey`, all required, and calls `RoomApi.act` with them unchanged. It never reads a binding for the agent. A `binding-stale` refusal is an ordinary tool result; its text names the active binding and policy version and says that nothing was done. `explain` returns the `Explanation`, whose `meaning` is the kind's meaning at the entry's own seq. The ten named tools are unchanged. The descriptor shape (titles, annotations, toolsets) and any further read tools are the MCP core's (`a9788a59`), not this section's |
+| R-CRED-10 | As below, "Bearer sessions and the generic act" |
+| R-DECL-16 | In a client: as below, "The generic act in a client" |
+| R-DECL-17 | A grantor's client builds a `delegate` op or an invitation `session` from the active catalogue: `*`, or a list of kinds, becomes the delegable platform kinds and a map from each declared kind to its active binding. A kind the grantor's role may not grant, or that the document does not declare, stops the build with an error that names it; nothing is signed with a smaller grant than was asked for. In a `v1` room the legacy shape is built, with the kinds as given |
+| R-DECL-23 | As below, "Reading a record" |
+
+#### The declarations read
+
+A `Catalogue` describes one policy version: its `policy` (the version, the
+ID of its `policy-activated` entry), `since` (that entry's seq) and `until`
+(the seq of the next `policy-activated` entry, or `null` while the version
+is active). A version governs the entries from `since` up to, and not
+including, `until`.
+
+- For a `v2` document it is an `ActsCatalogue`: `vocabulary: "declared"`,
+  the document's `steps` and `lanes`, and for each declared kind its
+  declaration and its binding (R-DECL-15). Platform kinds are not listed.
+- For a `v1` document it is a `LegacyCatalogue`: `vocabulary:
+  "artroom-legacy-v1"`, and nothing else. A `v1` version has no
+  declarations and no bindings (R-DECL-1).
+- A declared kind carries `retired`: the seq of the first later
+  `policy-activated` entry whose document does not declare that kind. It is
+  absent while every later document declares it. A still later document
+  that declares the same name again does not remove it.
+
+The read with no selector answers with the active version. It is what a
+caller reads before it prepares an act. A retained earlier version is
+`D(s)` for every entry in its interval.
+
+#### The generic act in a client
+
+1. `act(kind, target, body, { binding, idempotencyKey })` signs envelope
+   `v: 2` with exactly the kind, target, body and binding given. The
+   binding is required. It is the one the caller read from the catalogue,
+   for the meaning it intends.
+2. A client never reads the catalogue to act, never replaces a binding,
+   and never signs an act again on its own. On `binding-stale` it returns
+   the refusal, whose `current` names the active binding and policy
+   version. The caller reads the declaration and, if that meaning is still
+   what it intends, calls again with the new binding. That second call is
+   a new act.
+3. A prepared act keeps its binding (`PreparedAct.binding`, and inside the
+   signed envelope). Sending it again sends the same bytes, or for a bearer
+   session the same kind, target, body, binding and idempotency key. An
+   exact retry of an act the room accepted returns the original record,
+   also after an activation changed the kind's meaning (R-IDEM-2).
+4. A platform kind is refused by the generic act before anything is sent:
+   `renew` and `roster` keep `v: 1` and their own methods.
+5. The named methods of the code-review module (`claim`, `propose`, `note`,
+   `review`, `check`, `land`, `release`) stay. With a key, a handle reads
+   the active catalogue once. Under a `v1` document it signs `v: 1`, as
+   before. Under a `v2` document it signs `v: 2` with the binding of the
+   code-review declaration the method was built for, under the room's
+   steps version and `lanes`. That is not the room's own declaration's
+   binding: where the two differ, the room refuses `binding-stale`. After
+   a `binding-stale` or `kind-undeclared` refusal the handle forgets the
+   catalogue it read, so the caller's next call reads again; the refused
+   act is not sent again. With a bearer session the room adds the built-for
+   binding itself (stage 2), and the handle reads nothing.
+6. The command line follows the same rules. `artroom act` requires
+   `--binding`; it never chooses one. It prints the active meaning after
+   `binding-stale`, and what changed since the meaning the user read where
+   the room still retains that version.
+
+#### Bearer sessions and the generic act
+
+These replace R-CRED-10's items "`check`: over RPC only" and "The HTTPS
+client" for a room whose active document is `v2`. Everything else in
+R-CRED-10 stands.
+
+- **Signing.** For a declared act the caller gives `kind`, `target`,
+  `body`, `idempotencyKey` and `binding` (`DeclaredBearerAct`). The room
+  signs envelope `v: 2` with exactly that binding, with the session key
+  under the session's delegation. It never chooses, replaces or looks up a
+  binding for such an act. With no `binding`, the act is a named tool's
+  (R-API-9 as amended in section 33.3).
+- **The legacy rule stands.** A bearer `check` of the legacy vocabulary
+  goes by `bearerAct` over RPC only. There is no named MCP `check` tool.
+  A handle connected over HTTPS with a bearer token refuses its `check`
+  and `roster` methods with `forbidden` before it sends anything.
+- **A generic bound check.** In a `v2` room a generic act, with its
+  binding, may run a declared `check` step over the MCP endpoint. That
+  includes a bearer HTTPS client, whose generic act is one call of the MCP
+  tool `act`. The rule looks at the step, not at the word `check`: a
+  declared kind of any name whose step is `check` is covered. This amends
+  the earlier wording, which excluded HTTPS only because no tool carried a
+  check.
+- **No new authority.** The delegation's signed map must name that exact
+  kind with that exact binding (R-DECL-17). The session's member's role
+  and the active declaration must allow it (R-DECL-11). Every guard of
+  the check step applies as it does to a key-signed check: the obligation,
+  checker, integration, input, configuration and runner of R-OBL-3, and
+  the rule that a thread's holder and a version's proposer never meet
+  their own check obligation. A generic submission is not independent
+  evidence because it is generic.
+- **What is excluded.** A `v: 1` act is never accepted on the generic
+  path: the generic act is always `v: 2`, and a `v1` room refuses a `v: 2`
+  envelope at step 1. `roster` is never accepted from a bearer; on the
+  generic path a platform kind in a `v: 2` envelope is `bad-request`.
+  Bearer acts are never accepted on `POST /v1/rooms/:room/acts`.
+- **Key-signed checks.** A check signed with a member's own key over
+  HTTPS, or by a Worker under a delegation, stays available with the same
+  authority as before, in `v: 2` with its exact binding.
+- **Not here.** The checker service's own path, `CheckJobV2` naming the
+  act and binding to sign and the `prepared` event, is stage 4's. Allowing
+  this transport does not build it.
+
+#### Reading a record
+
+Readers are the UI, the client, the CLI and the MCP tools.
+
+- A reader shows a record with the label, targets and fields of the
+  catalogue that governs the record's own seq. It never uses the active
+  catalogue for an old record. The active catalogue is for preparing new
+  acts.
+- `RecordMeaning` is what a kind meant under one catalogue: `declared`,
+  with the label, declaration, binding and `retired`; `platform`, for
+  `renew`, `roster` and `recover`; `artroom-legacy-v1`, for a kind of the
+  legacy vocabulary under a `v1` document, with `retired` set to the seq
+  where another version replaced it; or `unknown`, for a kind the document
+  in force did not know.
+- A reader that shows a kind with `retired` says so, with the seq.
+- A later document that declares a retired name again gives it a new
+  binding. Old records keep the label and binding of their own seq. The
+  policy version and the binding tell the two meanings apart.
+- A label, help or wording edit leaves the binding equal. A record made
+  before the edit shows the label in force at its own seq.
+- The `explain` read carries the entry's `meaning`, computed by the room
+  under the same rule.
+
+#### Acceptance cases (stage 5)
+
+Each is normative, and each has a test in the stage 5 report
+(`plans/README.md`).
+
+| Case | Expected result | Rules |
+|---|---|---|
+| **Generic act.** A member signs a declared kind that no client method names, over HTTPS; a bearer does the same through the MCP tool `act` | Admitted; the log holds a `v: 2` envelope with the binding given; the record has the act's own kind | R-DECL-16, R-API-9 |
+| **Changed meaning.** An act prepared under a kind's binding, sent after an activation that changed a body field, a target, or a hold | `binding-stale` with the active binding and policy version; nothing recorded; the client sends nothing more and reads nothing | R-DECL-16 |
+| **Label-only edit.** The same, after an activation that changed only `label`, `help` or wording | Admitted: the binding is equal | R-DECL-15 |
+| **Lost result.** The answer to an accepted act is lost; the client retries | The same bytes are sent; one entry; the original record. After a meaning change, the exact retry still returns it | R-IDEM-2, R-DECL-16 |
+| **Undeclared kind.** A generic act of a kind the active document does not declare | `kind-undeclared`, unrecorded | R-DECL-23 |
+| **Role and grant.** A role `who.roles` does not list; a grant whose map lacks the kind; a grant made for an earlier binding; a grant whose grantor's role lost the kind | `role-forbids`; `delegation-invalid` in each grant case | R-DECL-11, R-DECL-17 |
+| **Expanded grant.** `*` expanded before an activation that adds a kind; a grant signed before a meaning change and sent after it | The new kind is not covered; the delayed grant is `binding-stale`, unrecorded | R-DECL-17 |
+| **Legacy controls.** In a `v1` room: a named method; the generic act; the `acts` read | `v: 1` as before; `bad-request`, nothing recorded; the legacy catalogue | R-DECL-1 |
+| **Named methods in a `v2` room.** A room with the code-review declarations; a room whose `claim` differs | `v: 2` with the built-for binding, admitted; `binding-stale`, and the method is not sent again | R-API-9 |
+| **Generic check.** A bearer whose map names a declared check act under another name, with its binding; one whose map lacks it; one with a stale binding; the version's proposer | Admitted and the obligation met; `delegation-invalid`; `delegation-invalid` or `binding-stale`; `not-authorized-checker` | R-CRED-10, R-OBL-3 |
+| **Excluded on the generic path.** A platform kind; an act with no binding; any act in a `v1` room; a bearer act on `POST /acts` | Each refused before anything is recorded | R-CRED-10 |
+| **Old records.** A room that was `v1`, then declared a kind, relabelled it, retired it and declared the name again with another shape | Each record explains with the label and binding of its own seq; the retired kind's records name the retirement seq; the legacy record names where the `v1` era ended | R-DECL-23 |
+
+#### Types
+
+| What | Where |
+|---|---|
+| `Catalogue`, `ActsCatalogue`, `LegacyCatalogue`, `CatalogueAct`, `RecordMeaning`, `AnyEnvelope`, `AnySignedEnvelope`, `DeclaredRecord` | `packages/contract/src/declarations.ts` |
+| `ReadQuery` and `ReadResults` (`acts`), `RoomApi.act`, `acts`, `actsAt`, `GenericActOptions`, `CatalogueAt`, `AnyBearerAct`, `ActsNotFound`, the `acts` and `act` entries of `McpTools`, the route `GET /v1/rooms/:room/declarations`, `Explanation.meaning` | `packages/contract/src/transports.ts` |
+| Each step's own fields with their types, `STEP_FIELD_SPECS` | `packages/policy/src/steps.ts` |
+| `meaningOf`, `governs`, `fieldsOf`, `targetsOf`, `builtForBinding`, `expandGrant` | `packages/policy/src/catalogue.ts`; also the export `@generalbusiness/artroom-policy/declared`, which loads no evaluator |
+
+`ActsCatalogue` was `{ policy, steps, acts }` in section 33.7. It gains
+`vocabulary`, `since`, `until`, `lanes` and the `retired` mark. `LogEntry`
+is unchanged: in a `v2` room an entry's envelope may be a
+`DeclaredEnvelope` or a `recover` envelope, and readers treat it as
+`AnyEnvelope`.
+
+#### Open points
+
+These continue section 33.9's list.
+
+49. **No client method signs `recover`.** The platform kind `recover`
+    (R-DECL-21) is admitted by the room from stage 2, and no client, CLI
+    or MCP surface builds its envelope. Stage 5's request does not name
+    it. Until one does, configuration recovery in a `v2` room needs an
+    envelope signed by hand with an admin's own key.
+50. **The cost of `retired`.** The read finds each kind's retirement by
+    reading later policy documents in order, and stops when every kind has
+    one. It is linear in the number of later versions for a kind that is
+    still declared. A room with very many activations may want the mark
+    stored at activation.
+51. **`LogEntry` and declared envelopes.** `LogEntry` keeps its `v: 1`
+    envelope type so that this stage changes no file of `packages/log`,
+    which stage 3 owns. Readers cast to `AnyEnvelope`. The type should
+    widen when stage 3's decoder lands.
