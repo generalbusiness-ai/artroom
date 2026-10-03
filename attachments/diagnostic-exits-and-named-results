@@ -1,0 +1,240 @@
+[
+  {
+    "name": "unmodified",
+    "head": "b7b9d8dfe6f37866bfd57a94d7118d35d93bd8e0",
+    "sourceHash": {
+      "packages/client/src/envelope.ts": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9",
+      "packages/client/src/room.ts": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4"
+    },
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055556.169416,
+      "end": 1791055561.94329,
+      "cmd": [
+        "npm",
+        "run",
+        "typecheck"
+      ]
+    },
+    "test": {
+      "exit": 1,
+      "start": 1791055561.943296,
+      "end": 1791055564.117682,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.workers.config.ts",
+        "test/workerd/checker-stage5-boundaries.test.ts",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-diagnostic-controls/unmodified.vitest.json"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "checker independent stage 5 boundaries sequential historical reads observe retirement after a confirmed current catalogue",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a delayed historical response cannot repopulate stale retirement after a confirmed current catalogue",
+        "status": "failed",
+        "messages": [
+          "AssertionError: later read must not reuse a response older than the activation it observed: expected undefined to be 3 // Object.is equality\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/room/test/workerd/checker-stage5-boundaries.test.ts:61:119\n    at private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        ]
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after none caller-input reuse",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after body caller-input reuse",
+        "status": "failed",
+        "messages": [
+          "AssertionError: the prepared act should retain the originally signed intent: expected { signatureStillVerifies: false, \u2026(1) } to deeply equal { signatureStillVerifies: true, \u2026(1) }\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/room/test/workerd/checker-stage5-boundaries.test.ts:77:124\n    at private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        ]
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after target caller-input reuse",
+        "status": "failed",
+        "messages": [
+          "AssertionError: the prepared act should retain the originally signed intent: expected { signatureStillVerifies: false, \u2026(1) } to deeply equal { signatureStillVerifies: true, \u2026(1) }\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/room/test/workerd/checker-stage5-boundaries.test.ts:77:124\n    at private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        ]
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after snapshot caller-input reuse",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a current delegable refusal leaves the binding equal and preserves the accepted exact MCP retry",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries an unknown legal kind and own typed field traverse HTTPS and MCP unchanged",
+        "status": "passed",
+        "messages": []
+      }
+    ]
+  },
+  {
+    "name": "owned-snapshot",
+    "head": "b7b9d8dfe6f37866bfd57a94d7118d35d93bd8e0",
+    "sourceHash": {
+      "packages/client/src/envelope.ts": "d60eba92c30f206c9248944a2f66fe2edfb2b27565cc266562a6fbdd72d20e2a",
+      "packages/client/src/room.ts": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4"
+    },
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055564.127428,
+      "end": 1791055569.8984299,
+      "cmd": [
+        "npm",
+        "run",
+        "typecheck"
+      ]
+    },
+    "test": {
+      "exit": 0,
+      "start": 1791055569.8984342,
+      "end": 1791055571.941319,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.workers.config.ts",
+        "test/workerd/checker-stage5-boundaries.test.ts",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-diagnostic-controls/owned-snapshot.vitest.json",
+        "-t",
+        "a prepared key act"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "checker independent stage 5 boundaries sequential historical reads observe retirement after a confirmed current catalogue",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a delayed historical response cannot repopulate stale retirement after a confirmed current catalogue",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after none caller-input reuse",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after body caller-input reuse",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after target caller-input reuse",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after snapshot caller-input reuse",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a current delegable refusal leaves the binding equal and preserves the accepted exact MCP retry",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries an unknown legal kind and own typed field traverse HTTPS and MCP unchanged",
+        "status": "skipped",
+        "messages": []
+      }
+    ]
+  },
+  {
+    "name": "cache-read-generation",
+    "head": "b7b9d8dfe6f37866bfd57a94d7118d35d93bd8e0",
+    "sourceHash": {
+      "packages/client/src/envelope.ts": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9",
+      "packages/client/src/room.ts": "e4f59419b0f740d4c54af96ed6c0938f21ad37314f5d3b111c7cc76b57f1da17"
+    },
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055571.9506419,
+      "end": 1791055577.764298,
+      "cmd": [
+        "npm",
+        "run",
+        "typecheck"
+      ]
+    },
+    "test": {
+      "exit": 0,
+      "start": 1791055577.7643032,
+      "end": 1791055579.740819,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.workers.config.ts",
+        "test/workerd/checker-stage5-boundaries.test.ts",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-diagnostic-controls/cache-read-generation.vitest.json",
+        "-t",
+        "historical"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "checker independent stage 5 boundaries sequential historical reads observe retirement after a confirmed current catalogue",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a delayed historical response cannot repopulate stale retirement after a confirmed current catalogue",
+        "status": "passed",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after none caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after body caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after target caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after snapshot caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a current delegable refusal leaves the binding equal and preserves the accepted exact MCP retry",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries an unknown legal kind and own typed field traverse HTTPS and MCP unchanged",
+        "status": "skipped",
+        "messages": []
+      }
+    ]
+  }
+]

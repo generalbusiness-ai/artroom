@@ -1,0 +1,112 @@
+/** Independent checker boundaries at b7b9d8df; private clone only. */
+import { describe, it, expect } from 'vitest';
+import { exports } from 'cloudflare:workers';
+import { envelopeOf, isArtroomError, type ActsCatalogue, type Claim } from '@generalbusiness/artroom-contract';
+import { verifyValue, type PreparedAct } from '@generalbusiness/artroom-client';
+import { validatePolicyV2 } from '@generalbusiness/artroom-policy';
+import { activate, bindingIn, declaredRoom, headSeq, ok, v2 } from './declared-support.ts';
+import { ASK, bearer, httpClient, mcpTool } from './declared-stage5-support.ts';
+import { addMember, DECLARED } from './support.ts';
+const withAsk = (change = ASK) => v2(a => { a['ask'] = change; });
+const attempt = async (p: Promise<unknown>) => p.catch(e => { if (isArtroomError(e)) return e; throw e; });
+async function ready() {
+  const r = await declaredRoom(withAsk());
+  const bob = await addMember(r, '@bob', 'member');
+  const claim = await ok<Claim>(r, bob, 'claim', null, { goal: 'g', scope: ['src/**'] });
+  const api = await httpClient(r, bob.keys);
+  const binding = (await bindingIn(r, 'ask'))!;
+  return { r, bob, claim, api, binding };
+}
+describe.skipIf(DECLARED)('checker independent stage 5 boundaries', () => {
+  it('sequential historical reads observe retirement after a confirmed current catalogue', async () => {
+    const r = await declaredRoom(withAsk());
+    const a = (await r.admin.read({ q: 'acts' })) as ActsCatalogue;
+    await activate(r, withAsk({ ...ASK, label: 'Question' }));
+    const api = await httpClient(r, r.admin.keys);
+    expect((await api.actsAt({ policy: a.policy }) as ActsCatalogue).acts['ask']).not.toHaveProperty('retired');
+    await activate(r, v2());
+    const current = await api.acts();
+    expect((await api.actsAt({ policy: a.policy }) as ActsCatalogue).acts['ask']!.retired).toBe(current.since);
+  });
+  it('a delayed historical response cannot repopulate stale retirement after a confirmed current catalogue', async () => {
+    const r = await declaredRoom(withAsk());
+    const a = (await r.admin.read({ q: 'acts' })) as ActsCatalogue;
+    await activate(r, withAsk({ ...ASK, label: 'Question' }));
+    let arrived!: () => void;
+    let release!: () => void;
+    const seen = new Promise<void>(resolve => { arrived = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let held = false;
+    const delayed: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      const response = await exports.default.fetch(request);
+      if (!held && new URL(request.url).searchParams.get('policy') === a.policy) {
+        held = true; arrived(); await gate;
+      }
+      return response;
+    };
+    const api = await httpClient(r, r.admin.keys, { fetch: delayed });
+    const oldRead = api.actsAt({ policy: a.policy });
+    await seen;
+    await activate(r, v2());
+    const current = await api.acts();
+    try {
+      release();
+      const old = await oldRead as ActsCatalogue;
+      expect(old.acts['ask']).not.toHaveProperty('retired');
+      const next = await api.actsAt({ policy: a.policy }) as ActsCatalogue;
+      const fresh = await api.actsAt({ policy: a.policy }, { fresh: true }) as ActsCatalogue;
+      expect(fresh.acts['ask']!.retired).toBe(current.since);
+      console.info(JSON.stringify({ probe: 'historical-race', observedActivation: current.since, delayedRetired: old.acts['ask']!.retired ?? null, nextRetired: next.acts['ask']!.retired ?? null, freshRetired: fresh.acts['ask']!.retired }));
+      expect(next.acts['ask']!.retired, 'later read must not reuse a response older than the activation it observed').toBe(current.since);
+    } finally { release(); await oldRead; }
+  });
+  for (const change of ['none', 'body', 'target', 'snapshot'] as const) {
+    it(`a prepared key act remains exact after ${change} caller-input reuse`, async () => {
+      const { r, bob, claim, api, binding } = await ready();
+      const body = { text: 'original' };
+      const target = { act: claim.id };
+      let kept!: PreparedAct;
+      const first = await api.act('ask', target, body, { binding, idempotencyKey: 'kept', onPrepared: p => { kept = change === 'snapshot' ? structuredClone(p) : p; } });
+      expect(first).toMatchObject({ kind: 'ask', text: 'original' });
+      if (change === 'body' || change === 'snapshot') body.text = 'second question';
+      if (change === 'target') target.act = (await ok<Claim>(r, bob, 'claim', null, { goal: 'other', scope: ['docs/**'] })).id;
+      const unchanged = await verifyValue('artroom-envelope-v1', kept.signed!.envelope, kept.signed!.sig, bob.key);
+      const result = await attempt(api.replay(kept));
+      console.info(JSON.stringify({ probe: change, signatureStillVerifies: unchanged, original: first, replayResult: result }));
+      expect({ signatureStillVerifies: unchanged, result }, 'the prepared act should retain the originally signed intent').toEqual({ signatureStillVerifies: true, result: first });
+    });
+  }
+  it('a current delegable refusal leaves the binding equal and preserves the accepted exact MCP retry', async () => {
+    const { r, claim, binding } = await ready();
+    const b = await bearer(r, '@agent', 'agent', { kinds: [], acts: { ask: binding } });
+    const args = { kind: 'ask', target: { act: claim.id }, body: { text: 'original' }, binding, idempotencyKey: 'ask-original' };
+    const first = await mcpTool(r, b.bearer, 'act', args);
+    expect(first.structuredContent).toMatchObject({ kind: 'ask', text: 'original' });
+    await activate(r, withAsk({ ...ASK, who: { ...ASK.who, delegable: false } }));
+    expect(await bindingIn(r, 'ask')).toBe(binding);
+    const seq = await headSeq(r);
+    expect((await mcpTool(r, b.bearer, 'act', { ...args, idempotencyKey: 'ask-new' })).structuredContent).toMatchObject({ refused: true, rule: 'delegation-invalid' });
+    expect((await mcpTool(r, b.bearer, 'act', args)).structuredContent).toEqual(first.structuredContent);
+    expect(await headSeq(r)).toBe(seq);
+  });
+  it('an unknown legal kind and own typed field traverse HTTPS and MCP unchanged', async () => {
+    const doc = v2(a => { a['ask-bass'] = { ...ASK, body: { toString: { type: 'text' as const, max: 80 }, part: { type: 'enum', values: ['bass', 'keys'] } } }; });
+    expect(validatePolicyV2(doc)).toMatchObject({ ok: true });
+    const r = await declaredRoom(doc);
+    const bob = await addMember(r, '@bob', 'member');
+    const claim = await ok<Claim>(r, bob, 'claim', null, { goal: 'g', scope: ['src/**'] });
+    const binding = (await bindingIn(r, 'ask-bass'))!;
+    const api = await httpClient(r, bob.keys);
+    const ownBody = { toString: 'first', part: 'bass' };
+    const direct = await api.act('ask-bass', { act: claim.id }, ownBody, { binding });
+    expect(direct).toMatchObject({ kind: 'ask-bass' });
+    const recorded = (await api.log()).acts.find(e => e.seq === ('seq' in direct ? direct.seq : -1))!;
+    expect(envelopeOf(recorded)).toMatchObject({ v: 2, kind: 'ask-bass', binding, target: { act: claim.id }, body: { toString: 'first', part: 'bass' } });
+    const b = await bearer(r, '@agent', 'agent', { kinds: [], acts: { 'ask-bass': binding } });
+    const viaMcp = (await mcpTool(r, b.bearer, 'act', { kind: 'ask-bass', target: { act: claim.id }, body: { toString: 'second', part: 'keys' }, binding, idempotencyKey: 'unknown-kind' })).structuredContent;
+    expect(viaMcp).toMatchObject({ kind: 'ask-bass' });
+    const delegated = (await api.log()).acts.find(e => e.seq === viaMcp.seq)!;
+    expect(envelopeOf(delegated)).toMatchObject({ v: 2, kind: 'ask-bass', binding, body: { toString: 'second', part: 'keys' } });
+  });
+});
