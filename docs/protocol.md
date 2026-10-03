@@ -4641,9 +4641,20 @@ Readers are the UI, the client, the CLI and the MCP tools.
 - Every reader names a thread by one rule, `threadTitle`:
   1. its `goal`, when that is not empty;
   2. else the title of its opening act, `titleOf`: the label in force at
-     that act's seq, then `: ` and the value of the act's first body field
-     other than `scope` and `because`, when it has one;
+     that act's seq, then `: ` and the value of one body field, when the
+     body has one other than `scope` and `because`;
   3. else the thread's ID, when the opening act is not at hand.
+- The field is the first present by name that the opening act's own
+  declaration types as `text`. That declaration is the one of `D(s)`, the
+  document in force at the opening act's seq, never the active one
+  (R-DECL-23). "Text" is the declared type, not the type of the value: an
+  enum's value, a member handle and an entry ID are strings too. `open`,
+  the step an opening act runs, brings only `scope`, so no step field is
+  considered.
+- When no such field is present, the field is the first present by name,
+  of any type. The same holds when the reader has no declared field types
+  for the act: a kind of the legacy vocabulary, a platform kind, a kind
+  the document does not declare, or a label alone.
 - "First" is by field name. The room keeps a body as canonical JSON, whose
   keys are sorted, so the order a caller typed is not recorded. Sorting
   gives one title from the typed body and from the record.
@@ -4691,7 +4702,7 @@ Each is normative, and each has a test in the stage 5 report
 | **Dropped twice.** A kind declared, dropped, declared again and dropped again | Each version that declared it is marked with the first later version that did not | R-DECL-23 |
 | **Retired after the read.** A handle keeps an ended version; a later activation drops one of its kinds; the handle then sees that activation | The next `actsAt` answer carries the mark. With no sign of the activation the kept answer is given, and `fresh` reads again | R-DECL-23 |
 | **Thread kind.** A thread opened by `claim` and one opened by an application's own act | The lane reads give `claim` and the opening kind; an act whose `threads` omits that kind is `wrong-thread` | R-DECL-6, R-DECL-8 |
-| **Thread name.** A thread with no goal, read after its opening kind's label changed | Named by the label of the opening act's seq and its first field by name; the CLI and the MCP tool `act` print the same name | R-DECL-23 |
+| **Thread name.** A thread with no goal, read after its opening kind's label or field types changed | Named by the label of the opening act's seq and its first text field by name under that seq's declaration, or its first field by name when none is text; the CLI and the MCP tool `act` print the same name | R-DECL-23 |
 
 #### Types
 
@@ -4730,12 +4741,14 @@ These continue section 33.9's list.
     envelope as `AnyEnvelope` without a cast of their own. The type should
     widen when stage 3's decoder lands.
 52. **Which field names a thread.** The name of a thread with no goal
-    uses the opening act's first body field by name, because the room
-    does not record the order a caller typed or the order a declaration
-    lists its fields: both are kept as canonical JSON. An application that
-    wants a chosen field in the name has no way to say so. A declaration
-    could name that field. That would be a new member of the declaration,
-    and this stage does not add one.
+    uses the opening act's first text field by name, and its first field
+    by name when it has no text field (planner's decision `c37653e1`). It
+    goes by name because the room does not record the order a caller
+    typed or the order a declaration lists its fields: both are kept as
+    canonical JSON. So an application with two text fields gets the
+    earlier name, and cannot choose the other. A declaration could name
+    the field. That would be a new member of the declaration, and this
+    stage does not add one.
 
 ## 34. Contract amendment 7 (a9788a59): the MCP core
 

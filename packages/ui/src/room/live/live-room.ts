@@ -59,6 +59,11 @@ export interface LiveOptions {
   readonly onViewer?: (member: MemberId) => void;
 }
 
+/** The snapshot with this active catalogue and the policy version it names. */
+function withCatalogue(snap: RoomSnapshot, catalogue: Catalogue | null): RoomSnapshot {
+  return { ...snap, catalogue, policy: { ...snap.policy, version: catalogue?.policy ?? null, activatedAt: catalogue?.since ?? null } };
+}
+
 export class LiveRoom implements RoomAdapter {
   readonly kind: "mock" | "live";
   readonly viewers: readonly MemberId[];
@@ -69,6 +74,12 @@ export class LiveRoom implements RoomAdapter {
    * that activation may retire one of their kinds. This adapter keeps no earlier version of its own.
    */
   private active: Catalogue | null = null;
+  /**
+   * The newest activation this adapter has confirmed: the `since` of the newest catalogue it has read, or -1 before
+   * any. It only grows. A read that fails leaves the page without a catalogue; it does not undo what was confirmed,
+   * so an older answer that arrives afterwards still cannot bring an earlier catalogue back.
+   */
+  private confirmed = -1;
   /** The code-review bindings under each policy version, by kind. A version's steps and lanes never change. */
   private readonly builtFor = new Map<string, Promise<ReadonlyMap<string, Binding>>>();
   private readonly listeners = new Set<() => void>();
@@ -106,7 +117,7 @@ export class LiveRoom implements RoomAdapter {
     }
     this.refreshing = this.load()
       .then((snap) => {
-        this.snap = snap;
+        this.snap = this.current(snap);
       })
       .catch((err: unknown) => {
         const note = typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : "The room did not answer.";
@@ -130,6 +141,36 @@ export class LiveRoom implements RoomAdapter {
     } catch {
       return null; // G5U:catalogue-unavailable
     }
+  }
+
+  /**
+   * Take one completed read of the active catalogue, and return the catalogue this adapter now holds. Reads can
+   * complete out of order: a load and an explicit read each ask the room, and the older question may be answered
+   * last. An answer never replaces a later activation this adapter has already confirmed, as the room's handle
+   * never keeps an overtaken answer (`actsAt`). `known` is the catalogue held when the question was asked.
+   */
+  private confirm(read: Catalogue | null, known: Catalogue | null): Catalogue | null {
+    if (read === null) {
+      // "Not available" says nothing of its own age: it stands only if no other answer was taken while it was on its way.
+      if (this.active !== known) return this.active; // G5U:catalogue-overtaken
+      this.active = null;
+      return null;
+    }
+    // An answer from before an activation confirmed here. `since` only grows, and what was confirmed outlasts a
+    // failed read: the page then stays without a catalogue rather than go back to an earlier one.
+    if (read.since < this.confirmed) return this.active; // G5U:catalogue-older
+    this.confirmed = read.since; // G5U:catalogue-confirmed
+    this.active = read;
+    return read;
+  }
+
+  /**
+   * A loaded snapshot under the catalogue held now, or with none when the newest read failed. An explicit read may
+   * have confirmed a later activation, or failed, after this load read the catalogue and before it finished; the
+   * page must not go back to the catalogue the load read.
+   */
+  private current(snap: RoomSnapshot): RoomSnapshot {
+    return withCatalogue(snap, this.active); // G5U:refresh-current
   }
 
   /** `D(s)`: the catalogue that governs the entry at `seq`. */
@@ -174,16 +215,18 @@ export class LiveRoom implements RoomAdapter {
   }
 
   private async load(): Promise<RoomSnapshot> {
-    const [roster, lanePage, attention, log, catalogue] = await Promise.all([
+    const known = this.active;
+    const [roster, lanePage, attention, log, read] = await Promise.all([
       this.room.members(),
       readAll((cursor) => this.room.lanes({ limit: 500, ...(cursor ? { cursor } : {}) })),
       readAll((cursor) => this.room.attention({ limit: 200, ...(cursor ? { cursor } : {}) })),
       this.readLog(),
       this.activeCatalogue(),
     ]);
-    // The active catalogue of this load. Reading it also tells the handle of any new activation, so that it drops
-    // the earlier versions it kept: one of their kinds may have been retired.
-    this.active = catalogue; // G5U:catalogue-refresh
+    // The active catalogue of this load, unless a later one was confirmed while it ran. Reading it also tells the
+    // handle of any new activation, so that it drops the earlier versions it kept: one of their kinds may have been
+    // retired.
+    const catalogue = this.confirm(read, known); // G5U:catalogue-refresh
     const lanes: Lane[] = [...lanePage.items];
     const proposals: Proposal[] = [];
     for (const lane of lanes) {
@@ -318,10 +361,13 @@ export class LiveRoom implements RoomAdapter {
   }
 
   async readCatalogue(): Promise<Catalogue | null> {
-    const catalogue = await this.activeCatalogue();
-    this.active = catalogue;
+    const known = this.active;
+    // What was just read is what `governing` answers from: an activation this read learned of ends the earlier
+    // catalogue's interval, and may have retired one of its kinds (R-DECL-23). An answer older than what is already
+    // confirmed changes nothing, and the caller gets the catalogue held now.
+    const catalogue = this.confirm(await this.activeCatalogue(), known); // G5U:catalogue-read
     if (this.snap) {
-      this.snap = { ...this.snap, catalogue, policy: { ...this.snap.policy, version: catalogue?.policy ?? null, activatedAt: catalogue?.since ?? null } };
+      this.snap = withCatalogue(this.snap, catalogue);
       for (const l of this.listeners) l();
     }
     return catalogue;
@@ -331,11 +377,15 @@ export class LiveRoom implements RoomAdapter {
     return this.governing(seq);
   }
 
-  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding): Promise<Result<DeclaredRecord>> {
-    // Exactly this kind, target, body and binding, once (R-DECL-16).
-    const r = await this.room.act(kind, target, body, { binding }); // G5U:act-binding
-    void this.refresh();
-    return r;
+  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding, idempotencyKey?: string): Promise<Result<DeclaredRecord>> {
+    try {
+      // Exactly this kind, target, body and binding, once (R-DECL-16), under the caller's idempotency key if it gave one.
+      const key = idempotencyKey !== undefined ? { idempotencyKey } : {}; // G5U:act-key
+      return await this.room.act(kind, target, body, { binding, ...key }); // G5U:act-binding
+    } finally {
+      // Also when the answer was lost: the act may be in the log, and the page should show it.
+      void this.refresh(); // G5U:act-refresh
+    }
   }
 
   async review(at: ProposalAt, draft: ReviewDraft): Promise<Result<Review>> {

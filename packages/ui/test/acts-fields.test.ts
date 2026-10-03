@@ -153,7 +153,7 @@ describe("reading a whole body and a target", () => {
 describe("a record under the meaning in force at its own seq (R-DECL-23)", () => {
   const meaning: RecordMeaning = { vocabulary: "declared", policy: "act_1_aaaaaaaa", kind: "cue", label: "Cue", declaration: SETLIST_ACTS["cue"]!, binding: `sha256:${"1".repeat(64)}`, retired: 14 };
 
-  test("the label, the retirement, the target in words and every field by name; because is left to the reasons", () => {
+  test("the label, the retirement, the declaration at that seq, the target in words and every field by name; because is left to the reasons", () => {
     const m = entryMeaning({ kind: "cue", target: { act: "act_4_0a1b2c3d" }, body: { signal: "head", to: "@noor", because: [{ act: "act_2_00000000" }] } }, meaning);
     expect(m).toEqual({
       vocabulary: "declared",
@@ -161,6 +161,7 @@ describe("a record under the meaning in force at its own seq (R-DECL-23)", () =>
       label: "Cue",
       policy: "act_1_aaaaaaaa",
       binding: `sha256:${"1".repeat(64)}`,
+      declaration: SETLIST_ACTS["cue"],
       help: "A short signal to the band, attached to an entry.",
       retired: 14,
       target: "Entry act_4_0a1b2c3d",

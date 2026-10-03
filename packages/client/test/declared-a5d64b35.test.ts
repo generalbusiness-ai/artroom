@@ -304,14 +304,15 @@ describe("an ended version is not final: a later activation can retire its kinds
 });
 
 describe("what readers call a record and a thread (R-DECL-23)", () => {
-  test("titleOf: the label at the record's seq and its first field by name, the order the room records, other than scope and because", async () => {
+  test("titleOf: the label at the record's seq and, where no declared text field is present, its first field by name, the order the room records, other than scope and because", async () => {
     await room.activate(withAsk());
     const alice = await joinAs(room, "@alice");
     const c = (await alice.api.acts()) as ActsCatalogue;
     const ask = meaningOf(c, "ask");
     expect(titleOf(ask, { text: "Which key?", urgency: "high" })).toBe("Ask: Which key?");
     expect(titleOf(ask, { scope: ["songs/**"], because: [{ act: "act_1_00000000" }], title: "Blue Bossa" })).toBe("Ask: Blue Bossa");
-    // The body a caller typed and the record the room keeps (keys sorted) give one title: the first field by name.
+    // `ask` declares one field, `text`. With it absent there is no text field to prefer, and the title falls back to
+    // the first field by name. The body a caller typed and the record the room keeps (keys sorted) give one title.
     expect(titleOf(ask, { title: "Blue Bossa", key: "c" })).toBe("Ask: c");
     expect(titleOf(ask, { key: "c", title: "Blue Bossa" })).toBe("Ask: c");
     expect(titleOf(ask, { scope: ["songs/**"], because: [] })).toBe("Ask");

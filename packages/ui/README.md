@@ -266,6 +266,12 @@ A refresh of the snapshot behind an open form does not change the form.
   declarations again, lists what changed, and sends again only when the
   person presses "Send it with the new meaning". If the new meaning needs a
   field the form does not have yet, nothing is sent until it is filled in.
+- When the room's answer does not arrive, and the error says the act may
+  have been recorded, the form says the outcome is unresolved. It never
+  says the act was not taken. "Ask again, the same act" sends exactly
+  what was sent, with the same idempotency key: the room returns the
+  record it made, or records the act once (R-IDEM-2). Until then the form
+  sends no other act.
 - On `kind-undeclared` it says the room no longer has that act and returns
   to the list.
 - Any other refusal shows the room's rule with the reason and fix as given,
@@ -279,17 +285,21 @@ policy declares five acts for a band's setlist (`setlist.ts`): start a
 song, add a part, cue, sign off, wrap up. A second policy version renames
 one, reshapes another and drops a third, so the feed shows each case
 above. The in-memory room is a stand-in: it has no signatures, expiring
-leases, policy rules, landing or idempotency.
+leases, policy rules or landing. It answers a generic act's idempotency
+key as the Room does (R-IDEM-2 to R-IDEM-4).
 
 **Not done here.**
 
 - The form has no input for `because` (the reasons an act rests on).
 - The form does not send `recover` or the platform kinds.
-- A lost answer is not retried with the same idempotency key from the
-  form. The client handle owns retries.
+- After a lost answer the form asks again only when the person says so.
+  It keeps the act and its idempotency key for as long as the form stays
+  open: it does not store them, so closing the page loses them, and the
+  act's outcome is then read from the feed.
 - The Room, Proposal and Needs-you screens keep the review application's
   wording ("lane", "claim", "generation"). A thread opened by another
-  application's act is named by that act's label and first field.
+  application's act is named by that act's label and its first text field
+  by name, read with the declaration in force when the thread opened.
 - Steps and hold settings the Room does not run until stage 4 (hand-over,
   scope templates, reservations, comments with no anchor, two steps in one
   act) are described by `fieldsOf` already, so the form needs no change

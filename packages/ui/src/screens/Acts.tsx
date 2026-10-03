@@ -19,8 +19,8 @@
  */
 
 import { useRef, useState } from "preact/hooks";
-import { SHAPE_TAG, SHAPE_TEXT, TARGET_INPUTS, declarationChanges, fieldsOf, own, readBody, readTarget, targetsOf, typeText, type ActField } from "../room/acts.ts";
-import type { ActDeclaration, ActsCatalogue, DeclaredRecord, Refusal, TargetShape } from "../room/contract.ts";
+import { SHAPE_TAG, SHAPE_TEXT, TARGET_INPUTS, declarationChanges, fieldsOf, newIdempotencyKey, own, readBody, readTarget, targetsOf, typeText, type ActField } from "../room/acts.ts";
+import type { ActDeclaration, ActsCatalogue, Binding, DeclaredRecord, DeclaredTarget, Json, Refusal, TargetShape } from "../room/contract.ts";
 import { isRefusal } from "../room/contract.ts";
 import { Badge, RefusalNotice, WhyLink } from "../ui/bits.tsx";
 import { useApp } from "../ui/context.ts";
@@ -31,6 +31,19 @@ import { href } from "../ui/router.ts";
 const orList = (items: readonly string[]) => (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} or ${items.at(-1)}`);
 const whoText = (d: ActDeclaration) => (d.who.roles.length ? `Admins, and anyone with the role ${orList(d.who.roles.map(String))}.` : "Admins only.");
 
+/**
+ * One act as it was sent: the declarations it was read under, its target,
+ * body and binding, and its idempotency key. If the room's answer is lost,
+ * exactly this is sent again, so the room can tell it is the same act.
+ */
+interface Intent {
+  readonly under: ActsCatalogue;
+  readonly target: DeclaredTarget;
+  readonly body: { readonly [field: string]: Json };
+  readonly binding: Binding;
+  readonly key: string;
+}
+
 type Status =
   | { readonly state: "editing" }
   | { readonly state: "sending" }
@@ -39,6 +52,8 @@ type Status =
   /** The meaning changed. `fresh` is what the room declares now; nothing is sent until the person confirms. */
   | { readonly state: "stale"; readonly fresh: ActsCatalogue; readonly changes: readonly string[] }
   | { readonly state: "gone" }
+  /** The answer was lost: the room may have recorded the act. `intent` is what was sent, kept to ask again unchanged. */
+  | { readonly state: "unresolved"; readonly intent: Intent; readonly message: string }
   | { readonly state: "failed"; readonly message: string };
 
 function FieldInput({ f, value, problem, onInput }: { f: ActField; value: string; problem: string | undefined; onInput: (v: string) => void }) {
@@ -178,12 +193,21 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
       return; // G5U:no-send-on-problems
     }
     setProblems({ target: {}, body: {} });
+    await deliver({ under, target: t.target, body: b.body, binding: under.acts[kind]!.binding, key: newIdempotencyKey() }); // G5U:send-binding
+  };
+
+  /** Send one intent, exactly as it is. Asking again after a lost answer calls this with the same intent and key. */
+  const deliver = async (intent: Intent) => {
+    const under = intent.under;
     setStatus({ state: "sending" });
     let r;
     try {
-      r = await adapter.act(kind, t.target, b.body, under.acts[kind]!.binding); // G5U:send-binding
+      r = await adapter.act(kind, intent.target, intent.body, intent.binding, intent.key); // G5U:same-intent
     } catch (err) {
-      setStatus({ state: "failed", message: typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : "The room did not answer." });
+      const message = typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : "The room did not answer.";
+      // An error that says the act may have been recorded is a lost answer, not a rejection (R-IDEM-2).
+      if (typeof err === "object" && err !== null && (err as { maybeRecorded?: unknown }).maybeRecorded === true) setStatus({ state: "unresolved", intent, message }); // G5U:unresolved
+      else setStatus({ state: "failed", message });
       return;
     }
     if (!isRefusal(r)) {
@@ -241,7 +265,8 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
       data-act-form={kind}
       onSubmit={(e) => {
         e.preventDefault();
-        if (status.state !== "sending" && status.state !== "stale") void send(held);
+        // While an answer is unresolved, the form sends no new act: only the same one can be asked again.
+        if (status.state !== "sending" && status.state !== "stale" && status.state !== "unresolved") void send(held); // G5U:unresolved-no-new
       }}
     >
       <div class="stack-sm">
@@ -299,6 +324,25 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
           </div>
         </div>
       )}
+      {status.state === "unresolved" && (
+        <div class="notice warn stack-sm" role="alert" data-unresolved={kind}>
+          <div class="notice-title">
+            <Icon name="alert" /> The room's answer did not arrive
+          </div>
+          <p>“{d.label}” may have been recorded, or it may not: {status.message}</p>
+          <p class="small">
+            Asking again sends exactly the same act, with the same idempotency key (<code>{status.intent.key}</code>). If the room recorded it the first time, it answers with that record and records nothing new.
+          </p>
+          <div class="row">
+            <button class="btn primary" type="button" onClick={() => void deliver(status.intent)}>
+              Ask again, the same act
+            </button>
+            <button class="btn" type="button" onClick={onBack}>
+              Leave it
+            </button>
+          </div>
+        </div>
+      )}
       {status.state === "refused" && <RefusalNotice refusal={status.refusal} />}
       {status.state === "failed" && (
         <div class="notice warn" role="alert">
@@ -316,7 +360,7 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
         </div>
       )}
 
-      {status.state !== "stale" && (
+      {status.state !== "stale" && status.state !== "unresolved" && (
         <div class="row">
           <button class="btn primary" type="submit" disabled={status.state === "sending"}>
             {status.state === "sending" ? "Sending…" : `Send “${d.label}”`}

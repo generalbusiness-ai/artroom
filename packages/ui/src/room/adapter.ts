@@ -14,6 +14,7 @@
 
 import type { ChangeHistory } from "./changes.ts";
 import type {
+  ActDeclaration,
   ActId,
   AttentionItem,
   Binding,
@@ -80,6 +81,8 @@ export interface EntryMeaning {
   readonly policy: PolicyVersion;
   /** For a declared kind: the binding of that meaning. Two meanings of one name differ here. */
   readonly binding?: Binding;
+  /** For a declared kind: its declaration at the record's seq. A thread's name is read with its field types. */
+  readonly declaration?: ActDeclaration;
   readonly help?: string;
   /** The seq at which a later document dropped the kind, or replaced the legacy vocabulary. */
   readonly retired?: Seq;
@@ -350,8 +353,13 @@ export interface RoomAdapter {
    * at (R-DECL-16). The adapter sends exactly this kind, target, body and
    * binding, once. It never reads the catalogue, replaces the binding or
    * sends again by itself.
+   *
+   * With `idempotencyKey`, the same call made again is the same act: if the
+   * room recorded it the first time, it returns that result and records
+   * nothing new (R-IDEM-2). A caller whose answer was lost uses it to ask
+   * again. An error that says `maybeRecorded` is such a lost answer.
    */
-  act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding): Promise<Result<DeclaredRecord>>;
+  act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding, idempotencyKey?: string): Promise<Result<DeclaredRecord>>;
 
   /** Members the viewer may switch to. The mock lets a demo view any queue; live has one identity. */
   readonly viewers: readonly MemberId[];

@@ -140,6 +140,32 @@ export interface PreparedAct {
   readonly signed?: AnySignedEnvelope;
 }
 
+/** `value` and everything inside it, frozen. */
+function frozen<T>(value: T): T {
+  if (typeof value === "object" && value !== null) {
+    Object.freeze(value);
+    for (const inner of Object.values(value)) frozen(inner); // G5:intent-frozen-deep
+  }
+  return value;
+}
+
+/**
+ * The handle's own copy of an act's target and body, deeply frozen. A
+ * prepared act must stay the bytes that were signed, or for a bearer the
+ * call that was made, whatever the caller does afterwards with the objects
+ * it passed in: the envelope and the prepared act hold these copies, never
+ * the caller's objects (R-IDEM-2).
+ */
+function ownedIntent<T, B>(target: T, body: B): { readonly target: T; readonly body: B } {
+  let copy: { target: T; body: B };
+  try {
+    copy = { target: structuredClone(target), body: structuredClone(body) };
+  } catch {
+    throw artroomError("bad-request", "An act's target and body must be plain data: the handle keeps them, to send the act again unchanged."); // G5:intent-plain
+  }
+  return frozen(copy); // G5:intent-frozen
+}
+
 /** `ActOptions`, plus a hook to persist the prepared act before it is first sent. */
 export interface ClientActOptions extends ActOptions {
   readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
@@ -315,8 +341,9 @@ abstract class RoomCore {
   }
 
   /** One of the named methods' acts: built, signed for a key, and sent. */
-  protected async named<T>(kind: EnvelopeKind, target: unknown, body: unknown, opts?: ClientActOptions): Promise<Result<T>> {
+  protected async named<T>(kind: EnvelopeKind, givenTarget: unknown, givenBody: unknown, opts?: ClientActOptions): Promise<Result<T>> {
     const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
+    const { target, body } = ownedIntent(givenTarget, givenBody); // G5:named-owned
     const kept = this.#unanswered.get(idempotencyKey);
     let prepared: PreparedAct;
     if (kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)) {
@@ -369,11 +396,17 @@ abstract class RoomCore {
    * key and bytes, by `replay`) of an act the room accepted returns the
    * original record, also after an activation (R-IDEM-2).
    */
-  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: GenericActOptions & Pick<ClientGenericActOptions, "onPrepared">): Promise<Result<DeclaredRecord>> {
+  async act(
+    kind: KindName,
+    givenTarget: DeclaredTarget,
+    givenBody: { readonly [field: string]: Json },
+    opts: GenericActOptions & Pick<ClientGenericActOptions, "onPrepared">,
+  ): Promise<Result<DeclaredRecord>> {
     const binding = checkBinding(opts?.binding);
     if (typeof kind !== "string" || isPlatformKind(kind))
       throw artroomError("bad-request", `${String(kind)} is a platform kind, signed in envelope v: 1 with no binding. Use its own method.`); // G5:generic-platform
     const idempotencyKey = checkIdempotencyKey(opts.idempotencyKey ?? newIdempotencyKey());
+    const { target, body } = ownedIntent(givenTarget, givenBody); // G5:act-owned
     const prepared: PreparedAct =
       this.bearer !== undefined
         ? { kind, target, body, idempotencyKey, binding }
@@ -560,16 +593,24 @@ abstract class RoomCore {
    * the handle sees a later activation: in a read of the active catalogue,
    * a log page, an update, or a refusal that names the active policy
    * version. A reader that follows the room therefore sees current marks.
+   * An answer that arrives after the handle has learnt of a later activation
+   * from another answer is returned to its caller but not kept, since it
+   * may have been read before that activation.
    * `{ fresh: true }` reads from the room whatever the handle kept.
    */
   async actsAt(at: CatalogueAt, opts: { readonly fresh?: boolean } = {}): Promise<Catalogue | null> {
     const kept = opts.fresh === true ? undefined : this.#ended.find((c) => (at.seq !== undefined ? governs(c, at.seq) : c.policy === at.policy)); // G5:catalogue-cache
     if (kept) return kept;
+    const known = this.#activation;
     const c = await this.read(at.seq !== undefined ? { q: "acts", at: at.seq } : { q: "acts", policy: at.policy });
     if (c === null) return null;
+    // An answer is kept only if nothing else told the handle of a later activation while it was on its way. If
+    // something did, this answer may have been read before that activation, and its `retired` marks are then older
+    // than what the handle already knows: keeping it would bring them back.
+    const overtaken = this.#activation !== known; // G5:cache-overtaken
     // What this answer says about activations: its own, and the one that ended it.
     this.#sawActivation(c.until ?? c.since); // G5:cache-read
-    if (c.until !== null) {
+    if (c.until !== null && !overtaken) {
       const i = this.#ended.findIndex((k) => k.policy === c.policy);
       if (i >= 0) this.#ended[i] = c; // G5:cache-replace
       else this.#ended.push(c);

@@ -24,7 +24,8 @@ export function laneGoal(snap: RoomSnapshot, lane: ActId | undefined): string {
   const l = snap.lanes.find((x) => x.lane === lane);
   if (!l) return "an unknown lane";
   // The one rule every reader uses (docs/protocol.md section 33.10): the goal; for a thread an application opened
-  // with its own act, that act's label in force when it opened and its first field by name; else the thread's ID.
+  // with its own act, that act's label in force when it opened and its first text field by name, as the act's
+  // declaration typed its fields then; else the thread's ID.
   const m = snap.feed.find((f) => f.id === l.lane)?.meaning;
   return threadTitle(l, m ? { meaning: m, body: Object.fromEntries(m.fields.map((f) => [f.name, f.value])) } : undefined); // G5U:thread-name
 }

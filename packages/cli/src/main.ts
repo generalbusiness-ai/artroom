@@ -1168,7 +1168,7 @@ const COMMANDS: Record<string, Command> = {
       }
       const label = active?.acts[kind]?.declaration.label;
       const lines = [`Done: ${label !== undefined ? `${label} (${kind})` : kind}, recorded as ${out.id}.`];
-      // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and first field.
+      // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and its first text field by name.
       const opened = out as { lane?: unknown; goal?: unknown; effect?: { type?: unknown } };
       if (active !== undefined && opened.effect?.type === "opened" && typeof opened.lane === "string") {
         const title = threadTitle({ lane: opened.lane, goal: typeof opened.goal === "string" ? opened.goal : "" }, { meaning: meaningOf(active, kind), body: sent }); // G5:cli-thread

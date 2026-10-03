@@ -118,8 +118,11 @@ An ended version's declarations never change, but its `retired` marks can:
 a later activation may drop one of its kinds. The handle drops the versions
 it kept when it sees a later activation, in `acts()`, another `actsAt()`
 answer, a `log()` page, an update, or a refusal that names the active
-policy version. A handle that has seen nothing since may answer the marks
-it read. `actsAt(at, { fresh: true })` always reads the room.
+policy version. An answer that arrives after the handle learnt of a later
+activation from another answer is returned to its caller but not kept: it
+may have been read before that activation. A handle that has seen nothing
+since may answer the marks it read. `actsAt(at, { fresh: true })` always
+reads the room.
 
 `envelopeOf(entry)` gives a log entry's envelope in either version, with a
 declared act's `binding`, or null for a system entry.
@@ -128,9 +131,13 @@ A `Lane` has `kind`: the kind of the act that opened the thread. The acts
 that may act on it are those whose declaration's `threads` names that kind.
 A thread opened by an application's own act may have no goal.
 `threadTitle(lane, { meaning, body })` gives the name every reader uses:
-the goal, or else the opening act's label and its first field by name
-(`titleOf`). The opening act's ID is the lane's ID, so one `explain(lane.lane)`
-gives both the `meaning` and, through `envelopeOf`, the body.
+the goal, or else the opening act's label and its first text field by name
+(`titleOf`). "Text" is the type the act's own declaration gave the field
+when the thread opened, so pass the `meaning` of the opening act's own seq.
+With no text field present, or with only a label at hand, it is the first
+field by name. The opening act's ID is the lane's ID, so one
+`explain(lane.lane)` gives both the `meaning` and, through `envelopeOf`,
+the body.
 
 To grant in a `v2` room, build the op with `delegateOp(room, role, { to,
 kinds, lanes, expiresAt })` or the session with `invitationSession(room,
@@ -146,7 +153,11 @@ With a bearer token, `act()` goes to the MCP tool `act` over HTTPS, and to
 ## Finishing an act after a restart
 
 Act methods also take `onPrepared`, which receives the act once it is
-resolved and, for a key, signed. Save it. Later, `resubmit({ url }, roomId,
+resolved and, for a key, signed. Save it. The prepared act holds the
+handle's own frozen copy of the target and body, taken before signing: you
+may change or reuse the objects you passed in, and the saved act stays the
+bytes that were signed. A target or body that is not plain data is
+`bad-request`. Later, `resubmit({ url }, roomId,
 signed)` sends the signed envelope straight back to the room, unchanged.
 It needs no handle, read session or new signature, so it works even after
 the key is retired or revoked, and the room returns the original result

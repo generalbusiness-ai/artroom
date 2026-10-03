@@ -101,7 +101,8 @@ artroom act take-part --binding sha256:… --set part=bass
 
 When an act opens a thread, `artroom act` prints a second line that names
 the thread as every reader does: by its goal, or by the act's label and its
-first field by name.
+first text field by name (its first field by name when it has no text
+field).
 
 `artroom log` and `artroom explain` show a declared act with the label its
 kind had at that entry's own seq, and say where a kind was retired.
