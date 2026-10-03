@@ -188,6 +188,12 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .input { width: 100%; }
 .field { display: grid; gap: 5px; }
 .field > span { font-size: 13px; font-weight: 560; color: var(--muted); }
+.field > label { font-size: 13px; font-weight: 560; color: var(--muted); }
+.field > p { margin: 0; }
+/* A record's own fields, under the label in force at its entry. Long values wrap inside the feed. */
+.kv.record { font-size: 13px; margin: 2px 0; }
+.kv.record dd { min-width: 0; overflow-wrap: anywhere; }
+.kv.record dd.row { gap: 6px; }
 .hint { font-size: 13px; color: var(--subtle); }
 
 .btn {

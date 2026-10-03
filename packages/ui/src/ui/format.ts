@@ -20,7 +20,14 @@ export const short = (sha: string) => sha.slice(0, 7);
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function laneGoal(snap: RoomSnapshot, lane: ActId | undefined): string {
-  return snap.lanes.find((l) => l.lane === lane)?.goal ?? "an unknown lane";
+  const l = snap.lanes.find((x) => x.lane === lane);
+  if (!l) return "an unknown lane";
+  if (l.goal) return l.goal;
+  // A thread an application opened with its own act has no goal. Name it by that act, in the words in force when it opened.
+  const m = snap.feed.find((f) => f.id === l.lane)?.meaning;
+  if (!m) return l.lane;
+  const first = m.fields.find((f) => f.name !== "scope");
+  return first ? `${m.label}: ${first.value}` : m.label;
 }
 
 export function latest(snap: RoomSnapshot, lane: ActId): Proposal | undefined {
