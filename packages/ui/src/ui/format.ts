@@ -1,5 +1,6 @@
 /** Plain-English formatting helpers. Times are relative to the room clock, so the mock is deterministic. */
 
+import { threadTitle } from "@generalbusiness/artroom-policy/declared";
 import type { RoomSnapshot } from "../room/adapter.ts";
 import type { ActId, Proposal, Timestamp } from "../room/contract.ts";
 
@@ -20,7 +21,13 @@ export const short = (sha: string) => sha.slice(0, 7);
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function laneGoal(snap: RoomSnapshot, lane: ActId | undefined): string {
-  return snap.lanes.find((l) => l.lane === lane)?.goal ?? "an unknown lane";
+  const l = snap.lanes.find((x) => x.lane === lane);
+  if (!l) return "an unknown lane";
+  // The one rule every reader uses (docs/protocol.md section 33.10): the goal; for a thread an application opened
+  // with its own act, that act's label in force when it opened and its first text field by name, as the act's
+  // declaration typed its fields then; else the thread's ID.
+  const m = snap.feed.find((f) => f.id === l.lane)?.meaning;
+  return threadTitle(l, m ? { meaning: m, body: Object.fromEntries(m.fields.map((f) => [f.name, f.value])) } : undefined); // G5U:thread-name
 }
 
 export function latest(snap: RoomSnapshot, lane: ActId): Proposal | undefined {

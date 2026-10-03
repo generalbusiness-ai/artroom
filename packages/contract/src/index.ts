@@ -57,12 +57,16 @@ export type {
 export type {
   ActOptions,
   ArtroomFounder,
+  ActsNotFound,
+  AnyBearerAct,
   ArtroomService,
   BearerAct,
   BearerRequest,
   ByteStream,
+  CatalogueAt,
   DraftedRoom,
   ExplainNotFound,
+  GenericActOptions,
   Founding,
   InvitationLink,
   RepoSource,
@@ -96,6 +100,7 @@ export type {
   UpdateStream,
 } from "./transports.ts";
 export {
+  envelopeOf,
   holdsSlot,
   isActId,
   isArtroomError,

@@ -8,6 +8,8 @@ import type { ArtroomError, Refusal } from "./errors.ts";
 import type { LandOp, LandTerminal, SlotHolding } from "./landing.ts";
 import type { Lane } from "./lanes.ts";
 import type { Evidence, Carried } from "./evidence.ts";
+import type { AnyEnvelope } from "./declarations.ts";
+import type { LogEntry } from "./log.ts";
 
 const SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
@@ -74,4 +76,15 @@ export function isHeld(lane: Lane): lane is Extract<Lane, { readonly state: "hel
 
 export function isCarried(evidence: Evidence): evidence is Carried {
   return evidence.basis === "carried";
+}
+
+/**
+ * The signed envelope of an act or a recorded refusal, as it may be in any
+ * room (R-DECL-16): a legacy or platform envelope (`v: 1`), a declared act
+ * (`v: 2`, with its `binding`), or `recover`. Null for a system entry.
+ * `LogEntry` types its envelope as `v: 1`; readers of a `v2` room's log use
+ * this instead of a cast.
+ */
+export function envelopeOf(entry: LogEntry): AnyEnvelope | null {
+  return entry.entry.type === "system" ? null : (entry.entry.act.envelope as unknown as AnyEnvelope); // G5:envelope-of
 }

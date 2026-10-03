@@ -20,7 +20,8 @@ beforeEach(async () => {
 });
 afterEach(() => room.stop());
 
-const REFUSING = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release"] as const;
+// `act`, the generic declared act (declared acts stage 5), can refuse as the named act tools can.
+const REFUSING = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release", "act"] as const;
 const head = (c: string) => c.repeat(40);
 
 async function client(a: Redeemed, mode: VersionNegotiationMode): Promise<Client> {

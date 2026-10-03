@@ -7,6 +7,7 @@ export type Route =
   | { readonly name: "needs" }
   | { readonly name: "room" }
   | { readonly name: "policy" }
+  | { readonly name: "acts"; readonly kind?: string }
   | { readonly name: "proposal"; readonly lane: ActId; readonly generation?: number; readonly focus?: "review" };
 
 export function parseRoute(hash: string): Route {
@@ -16,6 +17,8 @@ export function parseRoute(hash: string): Route {
       return { name: "room" };
     case "policy":
       return { name: "policy" };
+    case "acts":
+      return { name: "acts", ...(parts[1] ? { kind: decodeURIComponent(parts[1]) } : {}) };
     case "lane": {
       const lane = parts[1] as ActId | undefined;
       if (!lane) return { name: "room" };
@@ -31,6 +34,7 @@ export const href = {
   needs: () => "#/needs-you",
   room: () => "#/room",
   policy: () => "#/policy",
+  acts: (kind?: string) => `#/acts${kind ? `/${encodeURIComponent(kind)}` : ""}`,
   proposal: (lane: ActId, generation?: number, focus?: "review") => `#/lane/${lane}${generation ? `/${generation}` : ""}${focus ? `/${focus}` : ""}`,
 };
 

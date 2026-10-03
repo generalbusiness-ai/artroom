@@ -33,8 +33,9 @@ import type {
   Sha,
   Timestamp,
 } from "./ids.ts";
-import type { NoteAnchor, ProposalRef, ReviewBody } from "./acts.ts";
-import type { LaneTarget } from "./envelope.ts";
+import type { Authority, Flag, NoteAnchor, ProposalRef, ReviewBody } from "./acts.ts";
+import type { Envelope, LaneTarget } from "./envelope.ts";
+import type { Base64Url } from "./ids.ts";
 import type { CheckJob } from "./checker.ts";
 import type { PlatformRule } from "./errors.ts";
 import type {
@@ -311,6 +312,39 @@ export interface DeclaredEnvelope {
 export type DeclaredBearerAct = Pick<DeclaredEnvelope, "kind" | "binding" | "target" | "body" | "idempotencyKey">;
 
 /**
+ * Every envelope a room may be sent (R-API-3 as amended, stage 5): the
+ * legacy and platform envelopes (`v: 1`), a declared act (`v: 2`), and
+ * `recover`. Which of them a room admits is its active document's
+ * vocabulary (R-DECL-1).
+ */
+export type AnyEnvelope = Envelope | DeclaredEnvelope | RecoverEnvelope;
+
+/** An envelope of either version and its signature (R-SIG-1). */
+export interface AnySignedEnvelope<E extends AnyEnvelope = AnyEnvelope> {
+  readonly envelope: E;
+  readonly sig: Base64Url;
+}
+
+/**
+ * The record of a declared act (R-DECL-16; stage 2 produces it, stage 5
+ * types it). Its `kind` is the act's own kind. Its other fields are those
+ * of the record its step produces: an `open` or `take` gives a claim's
+ * fields, a `version` a proposal's, and so on.
+ */
+export interface DeclaredRecord {
+  readonly id: ActId;
+  readonly seq: Seq;
+  readonly kind: KindName;
+  readonly by: Authority;
+  readonly at: Timestamp;
+  readonly after?: OpId;
+  readonly flags: readonly Flag[];
+  readonly because?: readonly Reason[];
+  /** The step's own fields. */
+  readonly [field: string]: unknown;
+}
+
+/**
  * The platform kind `recover` (R-DECL-21): configuration recovery in a `v2`
  * room, judged by platform code under R-ADMIN-5 to R-ADMIN-8.
  */
@@ -432,12 +466,94 @@ export interface HandedOverEffect {
 
 // ------------------------------------------------------------------- reads
 
-/** The active declarations and their bindings, as the `acts` read and MCP tool give them (R-API-9 as amended). */
-export interface ActsCatalogue {
-  readonly policy: PolicyVersion;
-  readonly steps: StepsVersion;
-  readonly acts: Readonly<Record<KindName, { readonly declaration: ActDeclaration; readonly binding: Binding }>>;
+/** One declared kind in a catalogue: its declaration, its binding, and when a later document dropped it. */
+export interface CatalogueAct {
+  readonly declaration: ActDeclaration;
+  /** The kind's binding under this document (R-DECL-15). An act of this kind carries it. */
+  readonly binding: Binding;
+  /**
+   * The seq of the first later `policy-activated` entry whose document does
+   * not declare this kind (R-DECL-23). Absent while every later document
+   * declares it. A later document that declares the name again does not
+   * remove it: records made under this document keep this meaning.
+   */
+  readonly retired?: Seq;
 }
+
+/** The entries one policy version governs: from its `policy-activated` entry up to the next one. */
+interface CatalogueInterval {
+  /** The policy version: the ID of its `policy-activated` entry (R-POL-12). */
+  readonly policy: PolicyVersion;
+  /** That entry's seq. Entries from `since` are judged under this document. */
+  readonly since: Seq;
+  /** The seq of the next `policy-activated` entry, or null while this version is active. */
+  readonly until: Seq | null;
+}
+
+/**
+ * The declarations of one `v2` policy version and their bindings, as the
+ * `acts` read and MCP tool give them (R-API-9 as amended; stage 5). The
+ * active version is for preparing new acts. A retained earlier version is
+ * `D(s)` for every entry in its interval: readers show those records with
+ * its labels and fields (R-DECL-23).
+ */
+export interface ActsCatalogue extends CatalogueInterval {
+  readonly vocabulary: "declared";
+  readonly steps: StepsVersion;
+  /** The document's `lanes`, the conflict mode of a hold that names none. A binding depends on it (R-DECL-15). */
+  readonly lanes: LaneMode;
+  readonly acts: Readonly<Record<KindName, CatalogueAct>>;
+}
+
+/** A `v1` policy version: its entries are the legacy vocabulary's, with no declarations and no bindings (R-DECL-1). */
+export interface LegacyCatalogue extends CatalogueInterval {
+  readonly vocabulary: "artroom-legacy-v1";
+}
+
+/** What the `acts` read returns for one policy version. */
+export type Catalogue = ActsCatalogue | LegacyCatalogue;
+
+/**
+ * What a record's kind meant at its own seq, `D(s)` (R-DECL-23). A reader
+ * shows the record with this label and these fields, never with the active
+ * vocabulary's. `artroom-policy`'s `meaningOf` derives it from the catalogue
+ * that governs the record's seq.
+ */
+export type RecordMeaning =
+  | {
+      /** A kind the document in force declared. */
+      readonly vocabulary: "declared";
+      readonly policy: PolicyVersion;
+      readonly kind: KindName;
+      readonly label: string;
+      readonly declaration: ActDeclaration;
+      readonly binding: Binding;
+      /** The seq at which a later document dropped the kind; absent while every later document declares it. */
+      readonly retired?: Seq;
+    }
+  | {
+      /** `renew`, `roster` or `recover`: judged by platform code in every room (R-DECL-2). */
+      readonly vocabulary: "platform";
+      readonly policy: PolicyVersion;
+      readonly kind: string;
+      readonly label: string;
+    }
+  | {
+      /** A kind of the legacy vocabulary, under a `v1` document (R-DECL-1). */
+      readonly vocabulary: "artroom-legacy-v1";
+      readonly policy: PolicyVersion;
+      readonly kind: string;
+      readonly label: string;
+      /** The seq at which another policy version replaced this `v1` one; absent while it is active. */
+      readonly retired?: Seq;
+    }
+  | {
+      /** The document in force did not know the kind: a recorded refusal of it, or a record of another interval. */
+      readonly vocabulary: "unknown";
+      readonly policy: PolicyVersion;
+      readonly kind: string;
+      readonly label: string;
+    };
 
 // ------------------------------------------------------------------ verify
 

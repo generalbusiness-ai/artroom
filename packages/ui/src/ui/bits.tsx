@@ -1,6 +1,7 @@
 /** Small shared pieces. Every status pairs colour with words. */
 
 import type { ComponentChildren } from "preact";
+import type { EntryMeaning } from "../room/adapter.ts";
 import type { ActId, LandOp, MemberId, Refusal, Timestamp } from "../room/contract.ts";
 import { useApp } from "./context.ts";
 import { clock, relative, short } from "./format.ts";
@@ -84,6 +85,32 @@ export function RefusalNotice({ refusal, title }: { refusal: Refusal; title?: st
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * A record as its own declarations described it (R-DECL-23): the label in
+ * force at the record's seq, its target, and each field by name. A kind
+ * dropped later says when; a kind the policy did not declare says so.
+ */
+export function RecordFields({ meaning }: { meaning: EntryMeaning }) {
+  return (
+    <dl class="kv record" data-record={meaning.kind}>
+      <dt>Act</dt>
+      <dd class="row">
+        <span>{meaning.label}</span>
+        <code>{meaning.kind}</code>
+        {meaning.vocabulary === "unknown" && <Badge tone="warn">Not declared at this entry</Badge>}
+        {meaning.retired !== undefined && <Badge tone="outline">Retired at seq {meaning.retired}</Badge>}
+      </dd>
+      {meaning.target && (
+        <>
+          <dt>On</dt>
+          <dd>{meaning.target}</dd>
+        </>
+      )}
+      {meaning.fields.flatMap((f) => [<dt key={`${f.name}-k`}>{f.name}</dt>, <dd key={`${f.name}-v`}>{f.value}</dd>])}
+    </dl>
   );
 }
 

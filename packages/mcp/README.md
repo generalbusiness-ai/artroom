@@ -30,6 +30,37 @@ the same schema and the same structured content, never wrapped in
 `{ result }`. The server instructions are 378 characters, under the 512
 that Codex keeps.
 
+## Acts a room declares: `acts` and `act`
+
+Beside the ten named tools there are two generic ones (R-API-9 as amended,
+docs/protocol.md section 33.10).
+
+- `acts` lists the acts the room declares: each kind's label, targets,
+  body fields, who may sign it, help and its `binding`. With `at` (a seq)
+  or `policy` (a version) it gives the declarations in force then, with
+  `retired` on a kind a later version dropped. A room on the legacy
+  vocabulary declares none; its text says to use the named tools.
+- `act` does any declared act. `kind`, `target`, `body`, `binding` and
+  `idempotencyKey` are all required. The binding is the one `acts` gave
+  for the meaning the agent read. The tool passes it to the room
+  unchanged and never reads one for the agent.
+
+On `binding-stale` nothing was done. The tool's text names the active
+binding and policy version and tells the agent to read `acts` before it
+acts again. The tool does not act again by itself.
+
+`explain` shows an act with the label its kind had at the act's own seq.
+
+When `act` opens a thread, the first line of its text names the thread as
+every reader does: by its goal, or by the act's label and its first text
+field by name (its first field by name when it has no text field). `acts` with `at` or `policy` reads the room each time, so a kind
+retired since the last call is shown as retired.
+
+The descriptor shape (titles, annotations, toolsets) and the further read
+tools of the MCP core (`a9788a59`) are not part of this change. `acts` and
+`act` are written in the existing shape, in their own block of
+`src/tools.ts`, so the core's descriptors can be added beside them.
+
 ## On Workers
 
 ```ts

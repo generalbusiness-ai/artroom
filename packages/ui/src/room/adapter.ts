@@ -14,13 +14,20 @@
 
 import type { ChangeHistory } from "./changes.ts";
 import type {
+  ActDeclaration,
   ActId,
   AttentionItem,
+  Binding,
+  Catalogue,
   Check,
   Decision,
+  DeclaredRecord,
+  DeclaredTarget,
   Flag,
   Generation,
   Glob,
+  Json,
+  KindName,
   Lane,
   LandOp,
   MemberId,
@@ -34,6 +41,7 @@ import type {
   ProposalRef,
   PublicationSlot,
   Reason,
+  RecordMeaning,
   Refusal,
   RepoPath,
   Result,
@@ -59,6 +67,31 @@ export interface Person {
   readonly teams: readonly MemberId[];
 }
 
+/**
+ * What a record's kind meant at its own seq, as a reader sees it (R-DECL-23):
+ * the label and fields of the declarations in force there, never the active
+ * ones. Built by `entryMeaning` (acts.ts) from the contract's `RecordMeaning`.
+ */
+export interface EntryMeaning {
+  readonly vocabulary: RecordMeaning["vocabulary"];
+  readonly kind: string;
+  /** The label in force at the record's seq. */
+  readonly label: string;
+  /** The policy version that governed the record. */
+  readonly policy: PolicyVersion;
+  /** For a declared kind: the binding of that meaning. Two meanings of one name differ here. */
+  readonly binding?: Binding;
+  /** For a declared kind: its declaration at the record's seq. A thread's name is read with its field types. */
+  readonly declaration?: ActDeclaration;
+  readonly help?: string;
+  /** The seq at which a later document dropped the kind, or replaced the legacy vocabulary. */
+  readonly retired?: Seq;
+  /** The target in plain words; null for an act with none. */
+  readonly target: string | null;
+  /** The body's fields by name, as recorded. */
+  readonly fields: readonly { readonly name: string; readonly value: string }[];
+}
+
 /** One log entry, as the activity feed shows it. */
 export interface FeedEntry {
   readonly id: ActId;
@@ -77,6 +110,12 @@ export interface FeedEntry {
   /** For a system event about a landing operation: that operation. */
   readonly op?: OpId;
   readonly flags: readonly Flag[];
+  /**
+   * For an act or a recorded refusal whose governing declarations could be
+   * read: what its kind meant at its own seq. Absent for a system event, and
+   * when the transport could not read the declarations.
+   */
+  readonly meaning?: EntryMeaning;
 }
 
 /** A `check-carried` system event (R-CARRY-13). */
@@ -153,6 +192,12 @@ export interface RoomSnapshot {
   /** The room's own log counters (LogPage.head and publishedThrough): the publication lag is head − publishedThrough. */
   readonly log: { readonly head: Seq; readonly publishedThrough: Seq };
   readonly policy: PolicyView;
+  /**
+   * The active policy version's declarations and bindings, for preparing a
+   * new act. Null when the transport cannot read them. Old records are never
+   * read through this: each carries its own `meaning`.
+   */
+  readonly catalogue: Catalogue | null;
   readonly source: { readonly kind: "mock" | "live"; readonly status: "live" | "connecting" | "offline"; readonly note?: string };
 }
 
@@ -193,6 +238,8 @@ export interface Why {
   readonly reasons: readonly Reason[];
   /** True when the entry is at or below `publishedThrough`. */
   readonly published: boolean;
+  /** For an act or a recorded refusal: what its kind meant at its own seq (R-DECL-23). */
+  readonly meaning?: EntryMeaning;
 }
 
 // --------------------------------------------------------------- dry run
@@ -291,6 +338,28 @@ export interface RoomAdapter {
   review(at: ProposalAt, draft: ReviewDraft): Promise<Result<Review>>;
   note(anchor: NoteAnchor, text: string, replyTo?: ActId): Promise<Result<Note>>;
   dryRun(draft: DraftRule): Promise<Result<DryRunResult>>;
+
+  /**
+   * Read the active declarations again, and put them in the snapshot. Null
+   * when the transport cannot read them. The act form calls this after a
+   * `binding-stale` or `kind-undeclared` refusal; nothing else rereads on
+   * the user's behalf.
+   */
+  readCatalogue(): Promise<Catalogue | null>;
+  /** The declarations that governed the entry at `seq`, `D(s)`. Null when the room retains none, or cannot say. */
+  catalogueAt(seq: Seq): Promise<Catalogue | null>;
+  /**
+   * Submit one act of a declared kind with the binding the user was looking
+   * at (R-DECL-16). The adapter sends exactly this kind, target, body and
+   * binding, once. It never reads the catalogue, replaces the binding or
+   * sends again by itself.
+   *
+   * With `idempotencyKey`, the same call made again is the same act: if the
+   * room recorded it the first time, it returns that result and records
+   * nothing new (R-IDEM-2). A caller whose answer was lost uses it to ask
+   * again. An error that says `maybeRecorded` is such a lost answer.
+   */
+  act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding, idempotencyKey?: string): Promise<Result<DeclaredRecord>>;
 
   /** Members the viewer may switch to. The mock lets a demo view any queue; live has one identity. */
   readonly viewers: readonly MemberId[];

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { FeedEntry } from "../room/adapter.ts";
 import type { Lane, LandOp } from "../room/contract.ts";
 import { isAdvisory } from "../room/checks.ts";
-import { Actor, Badge, Glob, LandBadge, RefusalNotice, Sha, When, WhyLink } from "../ui/bits.tsx";
+import { Actor, Badge, Glob, LandBadge, RecordFields, RefusalNotice, Sha, When, WhyLink } from "../ui/bits.tsx";
 import { useApp } from "../ui/context.ts";
 import { clock, laneGoal, latest, onlyCheckpointWaits, plural, relative, unpublished } from "../ui/format.ts";
 import { LandingDetail, landingFacts } from "../ui/landing.tsx";
@@ -117,7 +117,7 @@ function LaneCard({ lane }: { lane: Lane }) {
       <div class="lane-top">
         <div class="grow stack-sm">
           <a class="lane-goal" href={href.proposal(lane.lane)} data-nav="item">
-            {lane.goal}
+            {laneGoal(snap, lane.lane)}
           </a>
           <div class="lane-meta">
             {lane.state === "held" ? (
@@ -241,6 +241,7 @@ function FeedItem({ e, fresh }: { e: FeedEntry; fresh: boolean }) {
       </span>
       <div class="stack-sm">
         <p class="feed-text">{e.text}</p>
+        {e.meaning && (e.meaning.vocabulary === "declared" || e.meaning.vocabulary === "unknown") && <RecordFields meaning={e.meaning} />}
         {e.refusal && <RefusalNotice refusal={e.refusal} />}
         {afterOp && (
           <p class="small tone-warn">
