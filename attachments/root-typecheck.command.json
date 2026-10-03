@@ -1,0 +1,15 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "typecheck"
+  ],
+  "cwd": "/tmp/artroom-planner-ui-4567-ajquzk40/repo",
+  "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+  "start": 1791063030.990079,
+  "start_utc": "2026-10-03T21:30:30.990079+00:00",
+  "end": 1791063037.816535,
+  "exit": 0,
+  "log": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-cli-retry-era-_eylsugl/root-typecheck.log",
+  "private_fixture_included": true
+}

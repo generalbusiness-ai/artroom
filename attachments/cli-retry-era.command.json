@@ -1,0 +1,18 @@
+{
+  "command": [
+    "npx",
+    "vitest",
+    "run",
+    "test/planner-title-retry-era.test.ts",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile=/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-cli-retry-era-_eylsugl/cli-retry-era.vitest.json"
+  ],
+  "cwd": "/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli",
+  "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+  "start": 1791063085.5975502,
+  "start_utc": "2026-10-03T21:31:25.597550+00:00",
+  "end": 1791063089.284043,
+  "exit": 1,
+  "log": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-cli-retry-era-_eylsugl/cli-retry-era.log"
+}

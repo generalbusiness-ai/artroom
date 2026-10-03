@@ -1,0 +1,40 @@
+{
+  "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+  "sources": [
+    {
+      "path": "packages/cli/src/main.ts",
+      "sha256": "4e78eca7ec15b72ec72f43a661c51612edeab7a5af2c02f3233f3ea18eb365b1",
+      "blob": "be8441cb6f48a516a1ffe5f0a1e63615b71c671b"
+    },
+    {
+      "path": "packages/cli/src/config.ts",
+      "sha256": "2fbc5c3dae91b568df3fe6aa7ef07ec27576a42fc01e020875296efa0ecb16ed",
+      "blob": "48eeee2bc4d37c9df65cacea913f5e6eb8db8577"
+    },
+    {
+      "path": "packages/cli/test/harness.ts",
+      "sha256": "050f5c3ea1317c0cdd807c714cb80c835f6b0253a9c1b409573daf678df2f7ee",
+      "blob": "03c8e74e5b73963e3f75811d9fb049b366c6ac7f"
+    },
+    {
+      "path": "packages/cli/test/declared-a5d64b35.test.ts",
+      "sha256": "d70f7765d13285d14850230dc2583bb9798feb99cee0d775834cfce8b041f22f",
+      "blob": "24701da6ab5792d0972044df14e4bb7b37ab5b73"
+    },
+    {
+      "path": "packages/client/src/room.ts",
+      "sha256": "6e0a397ba7f07fb1593c51d1f4a7dca55bb49c30ea9324488eeb59c05a2b2a28",
+      "blob": "77c0f9b12a4a47a6fcfcadce928b5ed11199e142"
+    },
+    {
+      "path": "packages/client/test/support/fake-room.ts",
+      "sha256": "f26259921e31e1c5f1ef78ed2c027d4ebf41184f85990dceec3d9d8a11447349",
+      "blob": "0a6ad45e5cb5b6049a4d4fde2f468feac79bc45e"
+    },
+    {
+      "path": "packages/policy/src/catalogue.ts",
+      "sha256": "0522e8c997109b32db8443efedbbc03c82ac18bfb701f4ea7f10557b1ee4b19b",
+      "blob": "79cce93bc4afd6717b80be486c15d4ecd73d7a91"
+    }
+  ]
+}
