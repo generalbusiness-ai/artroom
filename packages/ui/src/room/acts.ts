@@ -345,7 +345,7 @@ export function entryMeaning(env: { readonly kind: string; readonly target: unkn
     kind: meaning.kind,
     label: meaning.label, // G5U:record-label
     policy: meaning.policy,
-    ...(meaning.vocabulary === "declared" ? { binding: meaning.binding, ...(meaning.declaration.help !== undefined ? { help: meaning.declaration.help } : {}) } : {}),
+    ...(meaning.vocabulary === "declared" ? { binding: meaning.binding, declaration: meaning.declaration, ...(meaning.declaration.help !== undefined ? { help: meaning.declaration.help } : {}) } : {}), // G5U:record-declaration
     ...("retired" in meaning && meaning.retired !== undefined ? { retired: meaning.retired } : {}), // G5U:record-retired
     target: targetText(env.target),
     fields,

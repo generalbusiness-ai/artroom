@@ -140,15 +140,18 @@ describe("act: any declared act, with the binding the agent read", () => {
 });
 
 describe("act: a thread it opened is named as every reader names it", () => {
-  const SONG: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { title: { type: "text", max: 80 }, year: { type: "text", max: 4, optional: true } }, who: { roles: ["member", "agent"] }, hold: { scope: "body.scope", workspace: true } };
+  const SONG: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { key: { type: "enum", values: ["c", "d"], optional: true }, title: { type: "text", max: 80 }, year: { type: "text", max: 4, optional: true } }, who: { roles: ["member", "agent"] }, hold: { scope: "body.scope", workspace: true } };
 
-  test("by its goal; with no goal, by the act's label at its own seq and its first field; by its ID alone if the declarations cannot be read", async () => {
+  test("by its goal; with no goal, by the act's label at its own seq and its first text field by name; by its ID alone if the declarations cannot be read", async () => {
     await room.activate({ ...CODE_REVIEW_ACTS, "start-song": SONG });
     const binding = (await room.bindingOf("start-song"))!;
     const b = await agent({ "start-song": binding, claim: (await room.bindingOf("claim"))!, note: (await room.bindingOf("note"))! });
     const song = await tool(b, "act", { kind: "start-song", target: null, body: { year: "1963", title: "Blue Bossa", scope: ["songs/blue-bossa/**"] }, binding, idempotencyKey: "s1" });
     const id = song.structuredContent.id as string;
     expect(first(song)).toBe(`Done: ${id}. It opened thread ${id}: Start a song: Blue Bossa.`);
+    // `key` comes first by name, but it is an enum: the thread is named by its first text field, the title.
+    const keyed = await tool(b, "act", { kind: "start-song", target: null, body: { key: "d", title: "So What", scope: ["songs/so-what/**"] }, binding, idempotencyKey: "s3" });
+    expect(first(keyed)).toBe(`Done: ${String(keyed.structuredContent.id)}. It opened thread ${String(keyed.structuredContent.id)}: Start a song: So What.`);
     const claim = await tool(b, "act", { kind: "claim", target: null, body: { goal: "Rate-limit login", scope: ["src/**"] }, binding: (await room.bindingOf("claim"))!, idempotencyKey: "c1" });
     expect(first(claim)).toBe(`Done: ${claim.structuredContent.id}. It opened thread ${claim.structuredContent.id}: Rate-limit login.`);
     const note = await tool(b, "act", { kind: "note", target: { act: id }, body: { text: "Nice" }, binding: (await room.bindingOf("note"))!, idempotencyKey: "n1" });

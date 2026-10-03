@@ -268,7 +268,8 @@ engine:
   an act), `builtForBinding` (the binding a named code-review method
   carries in a room), `expandGrant` (a grant as the signed map its
   grantor signs), and `titleOf` and `threadTitle` (what readers call a
-  record and a thread).
+  thread: its goal, or its opening act's label and first text field by
+  name, under the declaration of that act's own seq).
 
 These decide nothing. The room judges every act again at admission.
 

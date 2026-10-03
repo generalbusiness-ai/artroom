@@ -213,7 +213,7 @@ function headline(name: McpToolName, out: unknown): string {
 /**
  * When an act opened a thread: one sentence that names the thread as every
  * reader does, by its goal, or by the act's label at its own seq and its
- * first field (R-DECL-23). The declarations are read only when the thread
+ * first text field by name (R-DECL-23, section 33.10). The declarations are read only when the thread
  * has no goal; if that read fails the thread is named by its ID alone.
  */
 async function openedThread(room: RoomApi, input: McpInput<"act">, out: unknown): Promise<string | undefined> {

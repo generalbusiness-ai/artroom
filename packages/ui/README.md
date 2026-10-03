@@ -298,7 +298,8 @@ key as the Room does (R-IDEM-2 to R-IDEM-4).
   act's outcome is then read from the feed.
 - The Room, Proposal and Needs-you screens keep the review application's
   wording ("lane", "claim", "generation"). A thread opened by another
-  application's act is named by that act's label and first field.
+  application's act is named by that act's label and its first text field
+  by name, read with the declaration in force when the thread opened.
 - Steps and hold settings the Room does not run until stage 4 (hand-over,
   scope templates, reservations, comments with no anchor, two steps in one
   act) are described by `fieldsOf` already, so the form needs no change

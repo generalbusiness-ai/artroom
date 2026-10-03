@@ -14,6 +14,7 @@
 
 import type { ChangeHistory } from "./changes.ts";
 import type {
+  ActDeclaration,
   ActId,
   AttentionItem,
   Binding,
@@ -80,6 +81,8 @@ export interface EntryMeaning {
   readonly policy: PolicyVersion;
   /** For a declared kind: the binding of that meaning. Two meanings of one name differ here. */
   readonly binding?: Binding;
+  /** For a declared kind: its declaration at the record's seq. A thread's name is read with its field types. */
+  readonly declaration?: ActDeclaration;
   readonly help?: string;
   /** The seq at which a later document dropped the kind, or replaced the legacy vocabulary. */
   readonly retired?: Seq;

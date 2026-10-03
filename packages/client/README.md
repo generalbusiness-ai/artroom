@@ -131,9 +131,13 @@ A `Lane` has `kind`: the kind of the act that opened the thread. The acts
 that may act on it are those whose declaration's `threads` names that kind.
 A thread opened by an application's own act may have no goal.
 `threadTitle(lane, { meaning, body })` gives the name every reader uses:
-the goal, or else the opening act's label and its first field by name
-(`titleOf`). The opening act's ID is the lane's ID, so one `explain(lane.lane)`
-gives both the `meaning` and, through `envelopeOf`, the body.
+the goal, or else the opening act's label and its first text field by name
+(`titleOf`). "Text" is the type the act's own declaration gave the field
+when the thread opened, so pass the `meaning` of the opening act's own seq.
+With no text field present, or with only a label at hand, it is the first
+field by name. The opening act's ID is the lane's ID, so one
+`explain(lane.lane)` gives both the `meaning` and, through `envelopeOf`,
+the body.
 
 To grant in a `v2` room, build the op with `delegateOp(room, role, { to,
 kinds, lanes, expiresAt })` or the session with `invitationSession(room,

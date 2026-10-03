@@ -102,8 +102,9 @@ describe("activation: a declared record shows its label, its target and its fiel
     expect(within(cue).getByText("On").nextElementSibling!.textContent).toBe(`Entry ${s1.id}`);
     expect(screen.getByText("@keys-bot: Cue.")).toBeTruthy();
     // A thread with no goal is named by its opening act, in that act's own words.
-    // Named by the one rule every reader uses: the opening act's label and its first field by name, which here is `key`.
-    expect(screen.getByRole("link", { name: "Start a song: c" }).getAttribute("href")).toBe(`#/lane/${s1.id}`);
+    // Named by the one rule every reader uses: the opening act's label and its first text field by name. `key` comes
+    // first by name, but it is an enum; `title` is the text a person wrote.
+    expect(screen.getByRole("link", { name: "Start a song: Blue Bossa" }).getAttribute("href")).toBe(`#/lane/${s1.id}`);
   });
 
   test("a review or a comment under an application's own name is still evidence for the review screens, by its step", async () => {
@@ -347,8 +348,10 @@ describe("the demo room: an application that is not code review, end to end", ()
     const { container } = renderAt("#/room", adapter);
     const text = container.querySelector("ol.feed")!.parentElement!.textContent!;
     for (const verb of ["claimed", "proposed", "approved generation", "wrote a note", "asked to land"]) expect(text).not.toContain(verb);
-    // Both songs are in the key of c, and a thread with no goal is named by its opening act's first field by name.
-    expect(screen.getAllByRole("link", { name: "Start a song: c" })).toHaveLength(2);
+    // Both songs are in the key of c. A thread with no goal is named by its opening act's first text field, its title.
+    expect(screen.queryAllByRole("link", { name: "Start a song: c" })).toHaveLength(0);
+    expect(screen.getAllByRole("link", { name: "Start a song: Blue Bossa" })).toHaveLength(1);
+    expect(screen.getAllByRole("link", { name: "Start a song: Footprints" })).toHaveLength(1);
     expect(document.querySelector("[data-record='wrap-up']")!.textContent).toContain("Retired at seq");
     // The viewer can be switched, as in the scripted demo.
     expect(adapter.viewers).toEqual(["@noor", "@ivo", "@keys-bot", "@sam"]);

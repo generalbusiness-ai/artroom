@@ -80,31 +80,50 @@ function valueText(v: unknown): string {
   return JSON.stringify(v);
 }
 
+/** The names of the body fields a declaration types as text. Own names only: a field may be named `toString`. */
+function textFields(declaration: ActDeclaration): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const [name, field] of Object.entries(declaration.body ?? {})) if (field.type === "text") out.add(name); // G5:title-text-type
+  return out;
+}
+
 /**
- * A short title for a record: its label at its own seq, then the value of
- * its first body field other than `scope` and `because`, when it has one.
+ * A short title for the record of an act that opened a thread: its label at
+ * its own seq, then the value of one body field, when it has one.
  * `Start a song: Blue Bossa`.
+ *
+ * Which field: the first by name that the act's own declaration, as it was
+ * at the record's seq, types as text. A text field is what a person wrote
+ * to be read; an enum, a number or an ID seldom names anything. "Text" is
+ * the declared type, not the type of the value: an enum's value is a string
+ * too. With no such field present, or with no declaration at hand (a legacy,
+ * platform or unknown kind, or a caller that has only the label), it is the
+ * first field by name. `scope` and `because` never name a thread, and
+ * `scope` is all that the `open` step itself brings, so no step field is
+ * considered.
  *
  * "First" is by name, which is the order the room records a body in: the
  * log keeps canonical JSON, whose keys are sorted. Sorting here gives the
  * same title from the body a caller typed and from the record a reader
  * reads back.
  */
-export function titleOf(meaning: { readonly label: string }, body: unknown): string {
+export function titleOf(meaning: { readonly label: string; readonly declaration?: ActDeclaration }, body: unknown): string {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return meaning.label;
-  const names = Object.keys(body).sort(); // G5:title-order
-  const name = names.find((n) => n !== "scope" && n !== "because"); // G5:title-first
-  const first = name === undefined ? undefined : ([name, (body as Record<string, unknown>)[name]] as const);
-  return first ? `${meaning.label}: ${valueText(first[1])}` : meaning.label;
+  const names = Object.keys(body)
+    .sort() // G5:title-order
+    .filter((n) => n !== "scope" && n !== "because"); // G5:title-first
+  const text = meaning.declaration ? textFields(meaning.declaration) : null;
+  const name = names.find((n) => text?.has(n)) ?? names[0]; // G5:title-text
+  return name === undefined ? meaning.label : `${meaning.label}: ${valueText((body as Record<string, unknown>)[name])}`;
 }
 
 /**
  * What a reader calls a thread. A thread a `claim` opened has a goal. A
  * thread an application opened with its own act may have none: it is then
- * named by that act, in the words in force when it opened (`titleOf`), and
- * by its ID when the opening act is not at hand.
+ * named by that act, in the words and field types in force when it opened
+ * (`titleOf`), and by its ID when the opening act is not at hand.
  */
-export function threadTitle(lane: { readonly lane: string; readonly goal: string }, opening?: { readonly meaning: { readonly label: string }; readonly body: unknown }): string {
+export function threadTitle(lane: { readonly lane: string; readonly goal: string }, opening?: { readonly meaning: { readonly label: string; readonly declaration?: ActDeclaration }; readonly body: unknown }): string {
   if (lane.goal !== "") return lane.goal; // G5:title-goal
   return opening ? titleOf(opening.meaning, opening.body) : lane.lane;
 }
