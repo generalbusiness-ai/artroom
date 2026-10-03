@@ -59,6 +59,7 @@ export type { PushOutcome } from "./publisher/push-outcome.ts";
 export { checkUpdates, readCommands, FenceError } from "./publisher/ref-fence.ts";
 export { completeInventory, readMainVia, withRetry } from "./artifacts.ts";
 export {
+  MINT_CLOCK_ALLOWANCE_MS,
   MINT_LISTING_MAX,
   MINT_RETRY,
   MINT_REVOKE_BACKOFF,

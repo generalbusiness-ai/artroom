@@ -100,6 +100,16 @@ export interface MintDuties {
 
 /** The bounded wait for one create, revocation or listing. */
 export const MINT_WAIT_MS = 30_000;
+/**
+ * How far a reported expiry may pass the answer's arrival plus the lifetime
+ * asked. Artifacts sets the expiry by its own clock, and the Room reads the
+ * arrival by its own: on the spike, Artifacts' expiry for a 600 s pinning
+ * token came 67 ms after the Room's arrival plus 600 s, so every canonical
+ * mint was refused and every propose failed (request df6ff8d3). The same
+ * margin as the deadline margins (`TOKEN_MARGIN_S`). An answer that gives a
+ * longer lifetime than this still fails the check; `notAfter` has no margin.
+ */
+export const MINT_CLOCK_ALLOWANCE_MS = 5_000;
 /** The takeover time is set this far ahead … */
 export const TAKEOVER_AHEAD_MS = 60_000;
 /** … whenever it is less than this far away. */
@@ -498,7 +508,7 @@ export class MintLedger {
     return { ok: false, error, retry: "e" in first && retriable(first.e) && applied === "unknown" };
   }
 
-  /** Classify an answer. Usable only with text, the scope asked, and a readable expiry within both bounds, for a waiting caller. */
+  /** Classify an answer. Usable only with text, the scope asked, and a readable expiry within both bounds (the lifetime's with `MINT_CLOCK_ALLOWANCE_MS`), for a waiting caller. */
   private classify(answer: unknown, scope: MintScope, ttlS: number, notAfter: number | null, waiting: boolean): Outcome {
     const a = answer as { id?: unknown; plaintext?: unknown; scope?: unknown; expiresAt?: unknown } | null;
     if (typeof a?.id !== "string" || a.id.length === 0) return { kind: "unknown", why: "an answer without a token ID" };
@@ -512,7 +522,7 @@ export class MintLedger {
           ? "another scope"
           : expiresAt === null
             ? "an unreadable expiry"
-            : expiresAt > arrival + ttlS * 1000
+            : expiresAt > arrival + ttlS * 1000 + MINT_CLOCK_ALLOWANCE_MS
               ? "an expiry later than the lifetime asked"
               : notAfter !== null && expiresAt > notAfter
                 ? "an expiry after notAfter"
