@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4c2645898a0545ff92d5a13cd6a8cc1cb31fd5c5","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/pin-delay.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:57221cf5f356c284b2627104ade1c106cca69881","text":"Merge retired a covered predecessor; the successor is at .github/workflows/row-writes.yml."}
