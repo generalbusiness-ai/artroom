@@ -256,8 +256,8 @@ export function statusOf(j: Judging, v: Version, spec: ObligationSpec, integrati
   }
   // Checks carried onto an integration of this version (R-CARRY-6 to 10): only on that integration, and only under
   // the policy version that judged the carry (R-CARRY-13).
-  for (const c of j.fold.checkCarries.values()) {
-    if (c.lane !== v.lane || c.generation !== v.generation || c.obligation !== spec.id || c.policy !== j.version) continue; // V:carry-policy
+  for (const c of j.fold.checkCarriesOn(v.lane, v.generation, spec.id)) {
+    if (c.policy !== j.version) continue; // V:carry-policy
     if (integration && c.integration !== integration) continue;
     const r = j.fold.evidenceByAct(c.act);
     if (!r || acts.includes(r.act) || !valid(r)) continue;

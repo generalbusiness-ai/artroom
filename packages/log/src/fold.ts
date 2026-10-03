@@ -205,20 +205,43 @@ export class Fold {
   /** Kinds that have opened a thread in this log: the historical opening kinds of R-DECL-8. */
   readonly openingKinds = new Set<string>();
   readonly prepared: Prepared[] = [];
-  /** Every accepted review and check, in seq order. */
-  readonly evidence: EvidenceRow[] = [];
-  /** The latest carry of a check onto each lane, generation, integration and obligation. */
-  readonly checkCarries = new Map<string, CheckCarry>();
+  /** Every accepted review and check: by version in seq order, and by act. Each lookup is one map read. */
+  private readonly evidenceByVersion = new Map<string, EvidenceRow[]>();
+  private readonly evidenceById = new Map<ActId, EvidenceRow>();
+  /** The latest carry of a check onto each integration, by lane, generation and obligation. */
+  private readonly checkCarries = new Map<string, Map<Sha, CheckCarry>>();
   /** Each `check-carried` judgement made: lane, generation, integration, obligation, act and policy (R-CARRY-13). */
   readonly checkJudged = new Set<string>();
 
+  /** Record an accepted review or check. Rows arrive in seq order. */
+  addEvidence(row: EvidenceRow): void {
+    const k = key(row.lane, row.generation);
+    const rows = this.evidenceByVersion.get(k);
+    if (rows) rows.push(row);
+    else this.evidenceByVersion.set(k, [row]);
+    this.evidenceById.set(row.act, row);
+  }
+
   /** The evidence on one version, in seq order (the room's `evidenceOn`). */
-  evidenceOn(lane: LaneId, generation: number): EvidenceRow[] {
-    return this.evidence.filter((e) => e.lane === lane && e.generation === generation);
+  evidenceOn(lane: LaneId, generation: number): readonly EvidenceRow[] {
+    return this.evidenceByVersion.get(key(lane, generation)) ?? [];
   }
 
   evidenceByAct(act: ActId): EvidenceRow | null {
-    return this.evidence.find((e) => e.act === act) ?? null;
+    return this.evidenceById.get(act) ?? null;
+  }
+
+  /** Record a carried check: the latest carry onto its integration replaces an earlier one (the room's `check_carries`). */
+  addCheckCarry(c: CheckCarry): void {
+    const k = `${key(c.lane, c.generation)}/${c.obligation}`;
+    const carries = this.checkCarries.get(k) ?? new Map<Sha, CheckCarry>();
+    carries.set(c.integration, c);
+    this.checkCarries.set(k, carries);
+  }
+
+  /** The checks carried onto integrations of one version for one obligation. */
+  checkCarriesOn(lane: LaneId, generation: number, obligation: ObligationId): readonly CheckCarry[] {
+    return [...(this.checkCarries.get(`${key(lane, generation)}/${obligation}`)?.values() ?? [])];
   }
 
   thread(lane: unknown): Thread | null {

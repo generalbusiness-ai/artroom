@@ -583,8 +583,12 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   };
 
   /** Report a proof limit once per entry and detail. */
+  const reported = new Set<string>();
   const limit = (seq: Seq, detail: string) => {
-    if (!limits.some((l) => l.seq === seq && l.detail === detail)) limits.push({ reason: "git-unwitnessed", seq, detail });
+    const k = `${seq}\u0000${detail}`;
+    if (reported.has(k)) return;
+    reported.add(k);
+    limits.push({ reason: "git-unwitnessed", seq, detail });
   };
 
   /**
@@ -1187,7 +1191,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         if (ev.outcome.carried) {
           const row = fold.evidenceByAct(ev.act);
           const head = fold.version(ev.lane, row?.generation ?? ev.generation)?.head ?? (body as CheckBody).integration;
-          fold.checkCarries.set(carryKey(ev.lane, ev.generation, ev.integration, ev.obligation), {
+          fold.addCheckCarry({
             lane: ev.lane,
             generation: ev.generation,
             integration: ev.integration,
@@ -1403,7 +1407,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         const thread = fold.thread(at.lane);
         const v = fold.version(at.lane as LaneId, at.generation);
         if (thread && v)
-          fold.evidence.push({
+          fold.addEvidence({
             act: id,
             seq: i,
             kind: evidenceKind,
