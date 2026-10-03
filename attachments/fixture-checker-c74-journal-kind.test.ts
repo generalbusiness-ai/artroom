@@ -1,0 +1,66 @@
+/** Independent CLI display attribution controls; local FakeRoom transport, not production Room admission. */
+import { createHash } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import type { ActDeclaration } from "@generalbusiness/artroom-contract";
+import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
+import { Store } from "../src/config.ts";
+import { useHarness } from "./harness.ts";
+const { h, cli, login } = useHarness();
+afterEach(() => vi.restoreAllMocks());
+const SONG: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { key: { type: "enum", values: ["c", "d"] }, title: { type: "text", max: 80 } }, who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
+const TUNE: ActDeclaration = { ...SONG, label: "Begin a different tune" };
+function observe(name: string, value: unknown) {
+  console.info("CHECKER_C74_JOURNAL", JSON.stringify({ name, value }));
+  const dir = process.env["ARTROOM_CHECKER_C74_EVIDENCE"];
+  if (dir) { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, name + ".json"), JSON.stringify(value, null, 2) + "\n"); }
+}
+describe("checker c74 saved journal reports the original recorded kind", () => {
+  for (const state of ["prepared", "answered"] as const) for (const alternateKind of [false, true]) {
+    test(`saved ${state}, alternateKind=${alternateKind}: original intent, one effect and original historical display`, async () => {
+      const home = join(h.tmp, "alice"); expect((await login(home, "@alice")).code).toBe(0);
+      await h.room.activate({ ...CODE_REVIEW_ACTS, "start-song": SONG, "start-tune": TUNE });
+      const songBinding = (await h.room.bindingOf("start-song"))!;
+      const tuneBinding = (await h.room.bindingOf("start-tune"))!;
+      const key = "saved-display";
+      const signatures = vi.spyOn(crypto.subtle, "sign");
+      const argv = (kind: string, binding: string, title: string, scope: string) => ["act", kind, "--binding", binding, "--set", "key=c", "--set", "title=" + title, "--set", "scope=" + scope, "--idempotency-key", key];
+      const sent: string[] = []; const events: { run: string; method: string; path: string }[] = []; let run = "first";
+      const watch: typeof fetch = async (input, init) => {
+        const url = new URL(String(input)); const method = init?.method ?? "GET";
+        events.push({ run, method, path: url.pathname + url.search });
+        if (method === "POST" && url.pathname.endsWith("/acts")) sent.push(String(init!.body));
+        return fetch(input, init);
+      };
+      if (state === "prepared") h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+      const first = await cli(home, argv("start-song", songBinding, "Footprints", "songs/original/**"), h.tmp, {
+        fetch: watch, ...(state === "answered" ? { step: (at: string) => { if (at === "act-answered") throw new Error("owned interruption after saved answer"); } } : {}),
+      });
+      expect(first.code).toBe(1);
+      const store = new Store({ ARTROOM_HOME: home }); const kept = store.entry(h.room.id, "act", key)!;
+      expect(kept.state).toBe(state); expect(kept.prepared.kind).toBe("start-song");
+      expect(kept.prepared.binding).toBe(songBinding); expect(kept.prepared.body).toMatchObject({ key: "c", title: "Footprints", scope: ["songs/original/**"] });
+      const songs = () => h.room.entries.filter(e => e.entry.type === "act" && (e.entry.act.envelope.kind as string) === "start-song");
+      expect(songs()).toHaveLength(1); const original = songs()[0]!;
+      run = "finish";
+      const finished = await cli(home, argv(alternateKind ? "start-tune" : "start-song", alternateKind ? tuneBinding : songBinding, "New caller text", "songs/reused/**"), h.tmp, { fetch: watch });
+      expect(finished.code).toBe(0);
+      expect(songs()).toHaveLength(1); expect(h.room.lanes.size).toBe(1);
+      expect(h.room.entries.filter(e => e.entry.type === "act" && (e.entry.act.envelope.kind as string) === "start-tune")).toHaveLength(0);
+      expect(sent).toHaveLength(state === "prepared" ? 5 : 1); expect(new Set(sent).size).toBe(1);
+      expect(new Set(sent.map(s => JSON.parse(s).sig)).size).toBe(1);
+      const actSignatures = signatures.mock.calls.map(call => new TextDecoder().decode(call[2])).filter(bytes => bytes.startsWith("artroom-envelope-v1\n") && JSON.parse(bytes.slice(bytes.indexOf("\n") + 1)).idempotencyKey === key);
+      expect(actSignatures, "the original act is signed once; finishing signs no act again").toHaveLength(1);
+      expect(JSON.parse(sent[0]!).envelope).toMatchObject({ kind: "start-song", binding: songBinding, body: { key: "c", title: "Footprints", scope: ["songs/original/**"] }, idempotencyKey: key });
+      expect(events.filter(e => e.run === "finish" && e.path.includes("/declarations")).map(e => e.path.slice(e.path.indexOf("?")))).toEqual([`?at=${original.seq}`]);
+      const finalSend = events.findIndex(e => e.run === "finish" && e.method === "POST" && e.path.endsWith("/acts"));
+      const historicalRead = events.findIndex(e => e.run === "finish" && e.path.endsWith(`/declarations?at=${original.seq}`));
+      if (state === "prepared") expect(historicalRead).toBeGreaterThan(finalSend);
+      expect(store.entry(h.room.id, "act", key)).toBeUndefined();
+      observe(`${state}-${alternateKind ? "different-kind" : "same-kind"}`, { state, alternateKind, savedKind: kept.prepared.kind, savedBinding: kept.prepared.binding, originalSeq: original.seq, posts: sent.length, uniqueSignedBytes: new Set(sent).size, uniqueSignatures: new Set(sent.map(s => JSON.parse(s).sig)).size, actSigningCalls: actSignatures.length, signedBodySHA256: createHash("sha256").update(sent[0]!).digest("hex"), events, actualOutput: finished.out });
+      expect.soft(finished.out.split("\n")[0], "the Done line attributes the receipt to the original saved kind, label and record").toMatch(/^Done: Start a song \(start-song\), recorded as act_\d+_[0-9a-f]{8}\.$/);
+      expect.soft(finished.out.split("\n")[1], "the saved opening is named using its original kind's declaration and body").toMatch(/^Thread: Start a song: Footprints \(lane act_\d+_[0-9a-f]{8}\)\.$/);
+    });
+  }
+});

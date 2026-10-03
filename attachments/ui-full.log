@@ -1,0 +1,63 @@
+
+> @generalbusiness/artroom-ui@0.0.0 test
+> vitest run --reporter=default --reporter=json --outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/ui-full.vitest.json
+
+
+ RUN  v5.0.3 /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/ui
+
+ ✓ test/acts-fields.test.ts (22 tests) 11ms
+ ✓ test/review-0fd98c41.test.ts (6 tests) 163ms
+ ✓ test/checker-ui-f606-races.test.ts (6 tests) 173ms
+ ✓ test/review-8df737b8.test.ts (6 tests) 220ms
+ ✓ test/review-fcd7391d.test.ts (12 tests) 356ms
+ ✓ test/review-f3fff92c.test.tsx (8 tests) 15ms
+ ✓ test/review-125ee638.test.tsx (15 tests) 31ms
+ ✓ test/policy-runtime.test.ts (19 tests) 494ms
+ ✓ test/checker-ui-preflight.test.tsx (12 tests) 567ms
+ ✓ test/review-88a20f74.test.tsx (17 tests) 515ms
+ ✓ test/declared-rendering.test.tsx (15 tests) 687ms
+ ✓ test/change-history.test.tsx (11 tests) 831ms
+   ✓ the Proposal screen (5)
+     ✓ the interdiff opens and closes from the keyboard 345ms
+stdout | test/checker-ui-624-observations.test.ts > checker624 availability after a completed equal-catalogue read > an earlier error cannot blank a successful later answer, reuseEqualResult=false
+{"probe":"completed equal catalogue before earlier error","reuse":false,"confirmed":2,"lateAnswer":2,"snapshot":2}
+
+stdout | test/checker-ui-624-observations.test.ts > checker624 availability after a completed equal-catalogue read > an earlier error cannot blank a successful later answer, reuseEqualResult=true
+{"probe":"completed equal catalogue before earlier error","reuse":true,"confirmed":2,"lateAnswer":2,"snapshot":2}
+
+ ✓ test/checker-ui-624-observations.test.ts (3 tests) 13ms
+ ✓ test/review-fb27de86.test.tsx (27 tests) 1374ms
+stdout | test/planner-ui-unavailable.test.ts > planner confirmed activation through an unavailable read > an older held answer stays behind a confirmed activation after a newer read fails, laterActivation=true
+{"probe":"explicit after unavailable","confirmed":2,"restored":null,"expectedPolicy":"act_2_2eeb2724","governingPolicy":"act_2_2eeb2724"}
+
+ ✓ test/review-82f2743b.test.tsx (19 tests) 1346ms
+ ✓ test/mock-room.test.ts (9 tests) 288ms
+stdout | test/planner-ui-unavailable.test.ts > planner confirmed activation through an unavailable read > an older completed load cannot be published after the newest confirmed catalogue becomes unavailable
+{"probe":"load after unavailable","loaded":3,"confirmed":5,"published":null}
+
+ ✓ test/acts-screen.test.tsx (17 tests) 1550ms
+ ✓ test/checker-ui-catalogue-cache.test.ts (3 tests) 29ms
+ ✓ test/live-room.test.tsx (3 tests) 380ms
+ ✓ test/planner-ui-unavailable.test.ts (4 tests) 204ms
+ ✓ test/screens.test.tsx (17 tests) 1782ms
+   ✓ Policy (3)
+     ✓ a draft refuse rule shows which claims it would have refused 375ms
+ ✓ test/amendment-3.test.tsx (19 tests) 1861ms
+   ✓ advisory obligations never block (R-OBL-7) (5)
+     ✓ a failing advisory check reads as advisory, not as a blocked change 341ms
+   ✓ carried check evidence binds its reason to its destination and policy (review a4241e41) (6)
+     ✓ successive integrations: only the event for the current integration counts, earlier or later 315ms
+ ✓ test/thread-names-c37653e1.test.ts (3 tests) 226ms
+ ✓ test/glob-diff.test.ts (4 tests) 5ms
+ ✓ test/checker-ui-f606-intents.test.tsx (3 tests) 362ms
+
+ Test Files  25 passed (25)
+      Tests  280 passed (280)
+   Start at  18:20:02
+   Duration  5.56s (transform 37%, environment 30%, tests 20%, import 13%)
+
+Environment  happy-dom was created 25 times · 19.71s total, 30% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
+JSON report written to /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/ui-full.vitest.json

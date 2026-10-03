@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "npm",
+    "test",
+    "--",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/cli-full.vitest.json"
+  ],
+  "cwd": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/cli",
+  "start": "2026-10-03T22:20:01.712381+00:00",
+  "end": "2026-10-03T22:20:14.263188+00:00",
+  "exitCode": 1,
+  "runnerSHA256": "ba63eaceebbed2122af26fbb743e62b522df0b27e18920046207d73eaf8b37ec",
+  "environmentEvidencePaths": {
+    "ARTROOM_CHECKER_TITLE_EVIDENCE": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/observations/title-retained",
+    "ARTROOM_CHECKER_C74_EVIDENCE": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/observations/journal-kind"
+  }
+}

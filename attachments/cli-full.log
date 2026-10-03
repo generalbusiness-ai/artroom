@@ -1,0 +1,218 @@
+
+> @generalbusiness/artroom-cli@0.0.0 test
+> vitest run --reporter=default --reporter=json --outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/cli-full.vitest.json
+
+
+ RUN  v4.1.11 /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/cli
+
+stdout | test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=false, activateAfterRecord=false
+{"retry":false,"activateAfterRecord":false,"governing":"act_3_89047717","current":"act_3_89047717","seq":4,"posts":1,"uniqueSignedBodies":1,"signedBodySHA256":"adc060998630b445b4c5304fe91940f5f9869c436b84181d39991c0253454c01","actualOutput":"Done: Start a song (start-song), recorded as act_4_5e676ba1.\nThread: Start a song: Footprints (lane act_4_5e676ba1)."}
+
+stdout | test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=false, activateAfterRecord=true
+{"retry":false,"activateAfterRecord":true,"governing":"act_3_4cf50e3c","current":"act_5_b4c596fd","seq":4,"posts":1,"uniqueSignedBodies":1,"signedBodySHA256":"1d4bce73f0532058c90b1a0dec44926af949a03e25f22300cddaf457b07a5075","actualOutput":"Done: Start a song (start-song), recorded as act_4_757b0c0d.\nThread: Start a song: Footprints (lane act_4_757b0c0d)."}
+
+stdout | test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > control: label-only activation before the CLI read prints the new historical title
+CHECKER_TITLE_OBSERVATION {"name":"before-read-control","value":{"out":{"code":0,"out":"Done: Begin a tune (score), recorded as act_5_a0eb973b.\nThread: Begin a tune: Nardis (lane act_5_a0eb973b).","err":""},"historical":{"id":"act_5_a0eb973b","seq":5,"policy":"act_4_0a2c4a86","label":"Begin a tune","binding":"sha256:d116745a9144eb892a65c21acab4ed441c979c5fe7f3a2a1869b94c019f84058"},"bindingUnchanged":true}}
+
+stdout | test/checker-hygiene-marker.test.ts > checker: a room-supplied lane cannot inject settings through the credential marker
+CHECKER_MARKER {"claimCode":1,"workspaceCode":2,"hasRealLane":true}
+
+ ✓ test/checker-hygiene-marker.test.ts (1 test) 535ms
+   ✓ checker: a room-supplied lane cannot inject settings through the credential marker  531ms
+stdout | test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > label-only activation between preparation and admission must print the accepted record's new historical title
+CHECKER_TITLE_OBSERVATION {"name":"before-admission-era","value":{"out":{"code":0,"out":"Done: Begin a tune (score), recorded as act_5_46df0c06.\nThread: Begin a tune: Nardis (lane act_5_46df0c06).","err":""},"changed":true,"historical":{"id":"act_5_46df0c06","seq":5,"policy":"act_4_7a4b9a88","label":"Begin a tune","binding":"sha256:d116745a9144eb892a65c21acab4ed441c979c5fe7f3a2a1869b94c019f84058"},"bindingUnchanged":true}}
+
+stdout | test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > paired timing control: a label-only activation after admission must keep the record's old historical title
+CHECKER_TITLE_OBSERVATION {"name":"after-admission-control","value":{"out":{"code":0,"out":"Done: Open a score (score), recorded as act_4_7f4d2739.\nThread: Open a score: Nardis (lane act_4_7f4d2739).","err":""},"changed":true,"historical":{"id":"act_4_7f4d2739","seq":4,"policy":"act_3_bbf031de","label":"Open a score","binding":"sha256:d116745a9144eb892a65c21acab4ed441c979c5fe7f3a2a1869b94c019f84058"},"bindingUnchanged":true}}
+
+ ✓ test/checker-title-era-624.test.ts (3 tests) 666ms
+     ✓ control: label-only activation before the CLI read prints the new historical title  439ms
+stdout | test/checker-c74-journal-kind.test.ts > checker c74 saved journal reports the original recorded kind > saved prepared, alternateKind=false: original intent, one effect and original historical display
+CHECKER_C74_JOURNAL {"name":"prepared-same-kind","value":{"state":"prepared","alternateKind":false,"savedKind":"start-song","savedBinding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","originalSeq":4,"posts":5,"uniqueSignedBytes":1,"uniqueSignatures":1,"actSigningCalls":1,"signedBodySHA256":"afd2ba9c2e84cb5d2df87e4749f2c09c3a4dfd745618c25c93dec60fbddaaa83","events":[{"run":"first","method":"POST","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/requests"},{"run":"first","method":"GET","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/log?limit=1"},{"run":"first","method":"GET","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/declarations"},{"run":"first","method":"POST","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/requests"},{"run":"finish","method":"GET","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/log?limit=1"},{"run":"finish","method":"GET","path":"/v1/rooms/room_bf43747ba96f276142d35518a0ec2e7f/declarations?at=4"}],"actualOutput":"Done: Start a song (start-song), recorded as act_4_5264ef3e.\nThread: Start a song: Footprints (lane act_4_5264ef3e)."}}
+
+ ✓ test/review-f7c79158.test.ts (4 tests) 1892ms
+     ✓ repro 1: an older release, recovered after a newer lane's workspace replaced its credential, keeps that credential and selection  982ms
+     ✓ recovery from another directory removes the released lane's own credential, and only that  618ms
+stdout | test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=true, activateAfterRecord=false
+{"retry":true,"activateAfterRecord":false,"governing":"act_3_93650e74","current":"act_3_93650e74","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"9c15ac34c3e6587432543fbe08be089969060e686203231e41e2499584f5d4fe","actualOutput":"Done: Start a song (start-song), recorded as act_4_187625b4.\nThread: Start a song: Footprints (lane act_4_187625b4)."}
+
+ ✓ test/review-c033fb54.test.ts (4 tests) 2662ms
+     ✓ unmapped pending: the release names the manual step and keeps the pending entry; the file is untouched  756ms
+     ✓ installed and mapped: the release keeps both the installed record and the mapping  591ms
+     ✓ interrupted and retried: the duty is kept until the user removes the file, and then settled  534ms
+     ✓ the reservation is cancelled independently, and a successor's completed installation settles the kept duty  779ms
+stdout | test/checker-c74-journal-kind.test.ts > checker c74 saved journal reports the original recorded kind > saved prepared, alternateKind=true: original intent, one effect and original historical display
+CHECKER_C74_JOURNAL {"name":"prepared-different-kind","value":{"state":"prepared","alternateKind":true,"savedKind":"start-song","savedBinding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","originalSeq":4,"posts":5,"uniqueSignedBytes":1,"uniqueSignatures":1,"actSigningCalls":1,"signedBodySHA256":"c191db91811e707a9cafcd8fc4436f6b8728f1520a6d859a3f90e984e7961b35","events":[{"run":"first","method":"POST","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/requests"},{"run":"first","method":"GET","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/log?limit=1"},{"run":"first","method":"GET","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/declarations"},{"run":"first","method":"POST","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/requests"},{"run":"finish","method":"GET","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/log?limit=1"},{"run":"finish","method":"GET","path":"/v1/rooms/room_f0b572506abcbe872531fc6b12727be3/declarations?at=4"}],"actualOutput":"Done: Begin a different tune (start-tune), recorded as act_4_93837d0a.\nThread: Begin a different tune: Footprints (lane act_4_93837d0a)."}}
+
+stdout | test/checker-c74-journal-kind.test.ts > checker c74 saved journal reports the original recorded kind > saved answered, alternateKind=false: original intent, one effect and original historical display
+CHECKER_C74_JOURNAL {"name":"answered-same-kind","value":{"state":"answered","alternateKind":false,"savedKind":"start-song","savedBinding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","originalSeq":4,"posts":1,"uniqueSignedBytes":1,"uniqueSignatures":1,"actSigningCalls":1,"signedBodySHA256":"082e534abcb401f9b19f4f6ea5e8e97de04236669e8d2cff7434543f40bbd8c8","events":[{"run":"first","method":"POST","path":"/v1/rooms/room_e4fac6d9227cbb8a828d2ff606dcde15/requests"},{"run":"first","method":"GET","path":"/v1/rooms/room_e4fac6d9227cbb8a828d2ff606dcde15/log?limit=1"},{"run":"first","method":"GET","path":"/v1/rooms/room_e4fac6d9227cbb8a828d2ff606dcde15/declarations"},{"run":"first","method":"POST","path":"/v1/rooms/room_e4fac6d9227cbb8a828d2ff606dcde15/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_e4fac6d9227cbb8a828d2ff606dcde15/requests"},{"run":"finish","method":"GET","path":"/v1/rooms/room_e4fac6d9227cbb8a828d2ff606dcde15/log?limit=1"},{"run":"finish","method":"GET","path":"/v1/rooms/room_e4fac6d9227cbb8a828d2ff606dcde15/declarations?at=4"}],"actualOutput":"Done: Start a song (start-song), recorded as act_4_b6419dfd.\nThread: Start a song: Footprints (lane act_4_b6419dfd)."}}
+
+stdout | test/checker-c74-journal-kind.test.ts > checker c74 saved journal reports the original recorded kind > saved answered, alternateKind=true: original intent, one effect and original historical display
+CHECKER_C74_JOURNAL {"name":"answered-different-kind","value":{"state":"answered","alternateKind":true,"savedKind":"start-song","savedBinding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","originalSeq":4,"posts":1,"uniqueSignedBytes":1,"uniqueSignatures":1,"actSigningCalls":1,"signedBodySHA256":"d2ec040ebc421adf9464a4f0a7e9eb2c46c924e483b84193743dddefe08a152c","events":[{"run":"first","method":"POST","path":"/v1/rooms/room_31cacb19de021757b1408ab22210b7ce/requests"},{"run":"first","method":"GET","path":"/v1/rooms/room_31cacb19de021757b1408ab22210b7ce/log?limit=1"},{"run":"first","method":"GET","path":"/v1/rooms/room_31cacb19de021757b1408ab22210b7ce/declarations"},{"run":"first","method":"POST","path":"/v1/rooms/room_31cacb19de021757b1408ab22210b7ce/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_31cacb19de021757b1408ab22210b7ce/requests"},{"run":"finish","method":"GET","path":"/v1/rooms/room_31cacb19de021757b1408ab22210b7ce/log?limit=1"},{"run":"finish","method":"GET","path":"/v1/rooms/room_31cacb19de021757b1408ab22210b7ce/declarations?at=4"}],"actualOutput":"Done: Begin a different tune (start-tune), recorded as act_4_53cc0775.\nThread: Begin a different tune: Footprints (lane act_4_53cc0775)."}}
+
+ ❯ test/checker-c74-journal-kind.test.ts (4 tests | 2 failed) 3298ms
+     ✓ saved prepared, alternateKind=false: original intent, one effect and original historical display  1761ms
+     × saved prepared, alternateKind=true: original intent, one effect and original historical display 1451ms
+     ✓ saved answered, alternateKind=false: original intent, one effect and original historical display 37ms
+     × saved answered, alternateKind=true: original intent, one effect and original historical display 46ms
+stdout | test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=true, activateAfterRecord=true
+{"retry":true,"activateAfterRecord":true,"governing":"act_3_8f15e9b0","current":"act_5_028cf2ea","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"a5bebccc0edef3bb0a951c887a709b3c2a53184b2389791a0b5c194be7d5e60a","actualOutput":"Done: Start a song (start-song), recorded as act_4_081e2766.\nThread: Start a song: Footprints (lane act_4_081e2766)."}
+
+ ✓ test/planner-title-retry-era.test.ts (4 tests) 3471ms
+     ✓ a known original receipt keeps its label and thread name, retry=true, activateAfterRecord=false  1611ms
+     ✓ a known original receipt keeps its label and thread name, retry=true, activateAfterRecord=true  1443ms
+ ✓ test/review-80d3710c.test.ts (7 tests) 3468ms
+     ✓ repro 1: an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both (recovery interrupted at [] first)  1015ms
+     ✓ repro 1: an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both (recovery interrupted at ["credential-removed"] first)  817ms
+     ✓ repro 1: an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both (recovery interrupted at ["config-written"] first)  723ms
+     ✓ the released lease's own credential is still removed when nothing newer replaced it  462ms
+ ✓ test/hygiene-55be0661.test.ts (59 tests) 3883ms
+     ✓ an injecting lane in the mark adds no git setting, remote or credential file  353ms
+     ✓ an injecting lease in the mark adds no git setting, remote or credential file  313ms
+     ✓ every character the patterns admit, in every field, reads back through git as the whole file: one mark and exactly one setting  319ms
+     ✓ an injecting remote: exit 1, no remote, no credential, no setting, nothing pending  502ms
+     ✓ an injecting token: exit 1, no remote, no credential, no setting, nothing pending  365ms
+     ✓ a claim answered with an injecting lane: exit 1, the lane is not selected, and workspace has no lane to install  361ms
+     ✓ an injecting lease, in both the lane and the grant: exit 1 before anything is pending, and a valid workspace still installs and releases  425ms
+ ✓ test/cli.test.ts (11 tests) 4115ms
+     ✓ login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release  1133ms
+     ✓ a lost login response is finished by running the same command again, joining once  1438ms
+     ✓ artroom mcp serves the ten tools over stdio from the real bin  1016ms
+ ✓ test/review-744a018a.test.ts (7 tests) 4503ms
+     ✓ an older workspace delayed at the read session does not overwrite a newer workspace for another lane  872ms
+     ✓ an older workspace delayed at the held-lane read does not overwrite a newer workspace for another lane  647ms
+     ✓ an older workspace delayed at the token response does not overwrite a newer workspace for another lane  670ms
+     ✓ workspaces in unrelated repositories do not supersede each other  680ms
+     ✓ a workspace for Room A delayed at the read session does not overwrite Room B's newer installation in the same repository  659ms
+     ✓ a workspace for Room A delayed at the token response does not overwrite Room B's newer installation in the same repository  447ms
+     ✓ a release in Room A leaves Room B's newer installation in the same repository alone  525ms
+ ✓ test/declared-a5d64b35.test.ts (20 tests) 4839ms
+     ✓ a v1 room says it declares none, and names the commands to use  360ms
+     ✓ an act that opens a thread names it as every reader does: its goal, or the act's label and first text field by name  319ms
+     ✓ the lease, the generation and a version's head are read from the room when left out, as the named commands read them  397ms
+     ✓ an act whose answer was lost is resent unchanged with its key, also after the meaning changed, and returns the original record  1544ms
+ ✓ test/review-0b9119de.test.ts (10 tests) 5576ms
+     ✓ the saved act goes back unchanged, and the receipt has the label and the thread's name from the body the journal kept  1444ms
+     ✓ after a later label-only activation the finished act still has the label it was admitted under  1439ms
+     ✓ when no session can be opened to read the words, the saved act is still finished and its receipt given  1447ms
+ ✓ test/review-f47a509c.test.ts (21 tests) 7238ms
+     ✓ a lost success response, then a separate run after HEAD, the lane and the lease changed, returns the original proposal  1762ms
+     ✓ a journaled key used with another command is a usage error, and --json errors name the key  1433ms
+     ✓ a wait that runs out names the same operation, and the next wait finishes it  1126ms
+     ✓ after its token is revoked, an unfinished bearer act is not resent; the CLI says so and forgets it  1508ms
+ ✓ test/review-f30be7f6.test.ts (12 tests) 8152ms
+     ✓ same lane: a lease-1 response that arrives after release, reclaim and a lease-2 workspace installs nothing  916ms
+     ✓ different lanes: an older response for lane X does not replace lane Y's newer workspace in the same repository  631ms
+     ✓ two overlapping workspaces: the one started last owns the installation, whichever answer arrives first  570ms
+     ✓ a release while the workspace is being prepared: the revoked token is never installed  346ms
+     ✓ a failed installation leaves nothing a later workspace or release mistakes for its own  645ms
+     ✓ the exact revision-4 answered release-lane entry returns its kept receipt, changes nothing local, and names the manual steps  390ms
+     ✓ a revision-2 prepared claim with no state or intent is resent unchanged, and its lane is not selected  1431ms
+     ✓ a revision-4 prepared claim with a value-based intent is resent unchanged, and its lane is not selected  1429ms
+     ✓ a schema-1 config with a path-only mapping and an old marker: release removes nothing it cannot prove, and says so  317ms
+     ✓ a config or journal entry from a newer schema is refused, and nothing is sent  1432ms
+ ✓ test/review-4758945b.test.ts (13 tests) 8316ms
+     ✓ failed before the token: a later lane's failed reservation does not stop the release of the installed lane  738ms
+     ✓ failed install: a reservation that recorded its installation and stopped before writing leaves the installed lane removable  683ms
+     ✓ delayed retry: a release of lane X while lane Y's workspace waits for its token lets Y install afterwards  847ms
+     ✓ a recovered release does not cancel a newer reservation for the same lane  654ms
+     ✓ a fresh release after the upgrade removes the mapped credential, proved by its installation mark, and says so  438ms
+     ✓ a schema-2 mapping whose file has no installation mark keeps the file and the mapping, and names the manual step  324ms
+     ✓ a schema-2 mapping whose file another Room has since replaced: the newer credential is left, and the duty is done  496ms
+     ✓ an older journal's release, recovered after another Room replaced the credential, changes nothing and names the manual steps  494ms
+     ✓ an old lock held by a live command is never taken: the other process waits, then writes after it  951ms
+     ✓ a holder that crashed is recovered: its process is gone on this host  392ms
+     ✓ a live holder in another process is waited for, and named, never removed  1833ms
+     ✓ a lock from another host, or a recovery left by a crashed recoverer, is named for the user, not removed  340ms
+ ✓ test/review-7040317d.test.ts (9 tests) 8588ms
+     ✓ lanes: Y writes but is never mapped, then Z stops before writing; releasing Y removes Y's credential  1096ms
+     ✓ Rooms: Y in Room A writes but is never mapped, then Room B's Z stops before writing; Room A's release removes Y  787ms
+     ✓ a completed later installation settles the earlier ones; the successor's file is then left by Y's release  578ms
+     ✓ a recovery file held by a live recoverer is waited on, then named, and nothing is removed  3625ms
+     ✓ a recovery file from another host is named for manual action, not removed  545ms
+     ✓ an empty recovery file (a crash between creating and writing it) is named, not removed  522ms
+     ✓ an empty lock file is waited on, then named, not removed  525ms
+     ✓ a recoverer that completes while this command waits lets it acquire the lock  610ms
+ ✓ test/review-17013617.test.ts (14 tests) 9334ms
+     ✓ after the key is retired and sessions end, the same command returns the original claim  1666ms
+     ✓ after the key is compromised and sessions end, the same command returns the original claim  1445ms
+     ✓ a failing session request and a failing genesis read do not block the receipt  1439ms
+     ✓ a recorded refusal whose answer was lost is returned again, with its entry  1443ms
+     ✓ an envelope signed for another room is refused before anything is sent  1428ms
+     ✓ release interrupted after act-answered finishes: credential gone, lane forgotten, one release  339ms
+     ✓ release interrupted after credential-removed finishes: credential gone, lane forgotten, one release  340ms
+     ✓ release interrupted after config-written finishes: credential gone, lane forgotten, one release  343ms
+     ✓ release whose credential removal fails keeps the answer until removal succeeds  399ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/checker-c74-journal-kind.test.ts > checker c74 saved journal reports the original recorded kind > saved prepared, alternateKind=true: original intent, one effect and original historical display
+AssertionError: the Done line attributes the receipt to the original saved kind, label and record: expected 'Done: Begin a different tune (start-t…' to match /^Done: Start a song \(start-song\), r…/
+
+- Expected:
+/^Done: Start a song \(start-song\), recorded as act_\d+_[0-9a-f]{8}\.$/
+
++ Received:
+"Done: Begin a different tune (start-tune), recorded as act_4_93837d0a."
+
+ ❯ test/checker-c74-journal-kind.test.ts:62:133
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/checker-c74-journal-kind.test.ts > checker c74 saved journal reports the original recorded kind > saved prepared, alternateKind=true: original intent, one effect and original historical display
+AssertionError: the saved opening is named using its original kind's declaration and body: expected 'Thread: Begin a different tune: Footp…' to match /^Thread: Start a song: Footprints \(l…/
+
+- Expected:
+/^Thread: Start a song: Footprints \(lane act_\d+_[0-9a-f]{8}\)\.$/
+
++ Received:
+"Thread: Begin a different tune: Footprints (lane act_4_93837d0a)."
+
+ ❯ test/checker-c74-journal-kind.test.ts:63:125
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/checker-c74-journal-kind.test.ts > checker c74 saved journal reports the original recorded kind > saved answered, alternateKind=true: original intent, one effect and original historical display
+AssertionError: the Done line attributes the receipt to the original saved kind, label and record: expected 'Done: Begin a different tune (start-t…' to match /^Done: Start a song \(start-song\), r…/
+
+- Expected:
+/^Done: Start a song \(start-song\), recorded as act_\d+_[0-9a-f]{8}\.$/
+
++ Received:
+"Done: Begin a different tune (start-tune), recorded as act_4_53cc0775."
+
+ ❯ test/checker-c74-journal-kind.test.ts:62:133
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/checker-c74-journal-kind.test.ts > checker c74 saved journal reports the original recorded kind > saved answered, alternateKind=true: original intent, one effect and original historical display
+AssertionError: the saved opening is named using its original kind's declaration and body: expected 'Thread: Begin a different tune: Footp…' to match /^Thread: Start a song: Footprints \(l…/
+
+- Expected:
+/^Thread: Start a song: Footprints \(lane act_\d+_[0-9a-f]{8}\)\.$/
+
++ Received:
+"Thread: Begin a different tune: Footprints (lane act_4_53cc0775)."
+
+ ❯ test/checker-c74-journal-kind.test.ts:63:125
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed | 16 passed (17)
+      Tests  2 failed | 201 passed (203)
+   Start at  18:20:02
+   Duration  11.30s (transform 8.51s, setup 0ms, import 18.60s, tests 80.53s, environment 1ms)
+
+JSON report written to /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/cli-full.vitest.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/cli
+npm error workspace @generalbusiness/artroom-cli@0.0.0
+npm error location /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/cli
+npm error command failed
+npm error command sh -c vitest run --reporter=default --reporter=json --outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/cli-full.vitest.json

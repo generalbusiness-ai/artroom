@@ -1,0 +1,46 @@
+
+> @generalbusiness/artroom-client@0.0.0 test
+> npm run test:node && npm run test:workerd test/checker-title-624.test.ts --reporter=default --reporter=json --outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/client-title.vitest.json
+
+
+> @generalbusiness/artroom-client@0.0.0 test:node
+> vitest run --config vitest.config.ts
+
+
+ RUN  v4.1.11 /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/client
+
+
+ Test Files  14 passed (14)
+      Tests  151 passed (151)
+   Start at  18:20:03
+   Duration  7.78s (transform 4.31s, setup 0ms, import 7.39s, tests 16.02s, environment 1ms)
+
+npm warn Unknown cli config "--reporter". This will stop working in the next major version of npm.
+npm warn Unknown cli config "--outputFile". This will stop working in the next major version of npm.
+
+> @generalbusiness/artroom-client@0.0.0 test:workerd
+> vitest run --config vitest.workers.config.ts test/checker-title-624.test.ts
+
+
+ RUN  v4.1.11 /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/client
+
+No test files found, exiting with code 1
+
+filter: test/checker-title-624.test.ts
+include: test/workerd/**/*.test.ts
+exclude:  **/node_modules/**, **/.git/**
+
+npm error Lifecycle script `test:workerd` failed with error:
+npm error code 1
+npm error path /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/client
+npm error workspace @generalbusiness/artroom-client@0.0.0
+npm error location /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/client
+npm error command failed
+npm error command sh -c vitest run --config vitest.workers.config.ts test/checker-title-624.test.ts
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/client
+npm error workspace @generalbusiness/artroom-client@0.0.0
+npm error location /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/client
+npm error command failed
+npm error command sh -c npm run test:node && npm run test:workerd test/checker-title-624.test.ts --reporter=default --reporter=json --outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/client-title.vitest.json
