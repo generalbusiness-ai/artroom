@@ -18,51 +18,52 @@
  *   it would replay consistently;
  * - the decisions themselves, as before: `policy-decision-mismatch`.
  *
- * What the fold cannot witness is taken from the context the room retained
- * for the matching call, and stated as a proof limit: a version's base and
- * changed paths when the Git objects are absent (`git-unwitnessed`), and,
- * until the obligation and evidence fold of stage 6, the `obligations` and
- * `reviews` of a land input, the `reviewers` of a notify directory, and each
- * `carry` call's evidence, changes since and facts. Which earlier verdicts a
- * `carry` call is owed for is not derived either: recorded `carry` calls are
- * accounted for where carrying may happen, and their proposal and budget are
- * rebuilt.
+ * Every input is rebuilt from the fold: the actor, lane, proposal and room
+ * of each call (fold.ts, roster.ts); a land input's obligations and
+ * reviews, a notify directory's reviewers, and each carry call's evidence,
+ * policy comparison and revocation fact (obligations.ts). Which verdicts a
+ * `carry` call is owed for is derived too, so an omitted call and a call
+ * for evidence that is owed none both fail.
+ *
+ * What the log does not carry is taken from the context the room retained
+ * for the matching call, and reported as a proof limit (`git-unwitnessed`):
+ * a version's base and changed paths, and the paths changed since an
+ * earlier verdict's head, when the Git objects are absent; and, for a check
+ * on a filtered snapshot with no `prepared` event, whether it counts for
+ * the integration asked about, and a check carry's new tree and snapshot.
  *
  * Each guard is one statement marked `// V:<id>`, a row of the mutation
  * table in plans/README.md ("Declared acts stage 3").
  */
 
-import type {
-  Authority,
-  Decision,
-  Digest,
-  Envelope,
-  NotifyDirectory,
-  PolicyActor,
-  PolicyProposal,
-  ReplayContext,
-  Step,
-} from "@generalbusiness/artroom-contract";
+import type { ActId, Authority, CarryFactsRecord, Decision, Digest, Envelope, NotifyDirectory, PolicyActor, PolicyProposal, ReplayContext, Step } from "@generalbusiness/artroom-contract";
 import { ARTROOM_LEGACY_V1 } from "@generalbusiness/artroom-contract";
-import { actMeter, evaluateCarry, evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, type ActMeter, type ActivePolicy, type InputOf, type RuleEvaluation } from "@generalbusiness/artroom-policy";
+import {
+  actMeter,
+  evaluateCarry,
+  evaluateLand,
+  evaluateNotify,
+  evaluateRefuse,
+  evaluateRequire,
+  type ActMeter,
+  type ActivePolicy,
+  type CarryResult,
+  type InputOf,
+  type LandResult,
+  type NotifyResult,
+  type RefuseResult,
+  type RequireResult,
+  type RuleEvaluation,
+} from "@generalbusiness/artroom-policy";
 import { canonicalize } from "./canonical.ts";
 import type { RosterReplay } from "./roster.ts";
 import type { Fold, Thread } from "./fold.ts";
+import { actorOf } from "./obligations.ts";
+
+export { actorOf };
 
 type Ctx<K extends ReplayContext["kind"]> = Extract<ReplayContext, { readonly kind: K }>;
 type Refusal = { readonly rule: string; readonly reason: string };
-
-/**
- * One call the room had to make. `input` rebuilds the call's input from the
- * fold; `from` is the context the room retained for the recorded call in
- * this place, used only for what the fold cannot witness.
- */
-export type Call =
-  | { readonly kind: "refuse"; readonly input: () => InputOf<"refuse">; readonly recoveryKey: boolean }
-  | { readonly kind: "require"; readonly input: () => InputOf<"require"> }
-  | { readonly kind: "carry"; readonly input: (from: Ctx<"carry">) => InputOf<"carry">; readonly purpose: Thread["purpose"] }
-  | { readonly kind: "land"; readonly input: (from: Ctx<"land"> | null) => InputOf<"land"> }
-  | { readonly kind: "notify"; readonly input: InputOf<"notify">; readonly directory: (from: Ctx<"notify"> | null) => NotifyDirectory };
 
 export type CallFailure = {
   readonly reason: "decision-missing" | "decision-extra" | "context-mismatch" | "policy-decision-mismatch" | "stamp-mismatch" | "policy-version-mismatch" | "input-missing" | "malformed";
@@ -77,11 +78,31 @@ export interface Calls {
   readonly retained: Retained;
   /** Whether a decision's stamp is the profile it must name. */
   readonly stampOk: (d: Decision) => boolean;
+  /**
+   * False under the legacy vocabulary: the calls are made, so the fold
+   * follows what the room decided, but nothing is compared with the record
+   * (R-DECL-1: verify judges `v1` entries as it did before declared acts).
+   */
+  readonly compare: boolean;
 }
 
-export type CallsResult =
-  | { readonly ok: true; readonly refusal: Refusal | null; readonly replayed: number }
-  | { readonly ok: false; readonly failure: CallFailure };
+/** One call made: the evaluator's result, or why the record does not match it. */
+export type Made<R> = { readonly ok: true; readonly result: R } | { readonly ok: false; readonly failure: CallFailure };
+
+/** A `carry` call for one earlier verdict or check. */
+export interface CarryStep {
+  /** The evidence the call is for: a recorded carry call is this one's only if it names the same act. */
+  readonly act: ActId;
+  /** The rebuilt input, or null when it cannot be rebuilt without the retained context `from` and there is none. */
+  readonly input: (from: Ctx<"carry"> | null) => InputOf<"carry"> | null;
+  /** The platform facts: the revocation, and for a check its binding and the new integration. Null as for `input`. */
+  readonly facts: (from: Ctx<"carry"> | null) => Partial<CarryFactsRecord> | null;
+  readonly purpose: Thread["purpose"];
+  /** A check carry has its own act budget (the room's `carryChecks`); a verdict's is the act's. */
+  readonly ownBudget?: boolean;
+  /** True when the call may not have been owed (obligations.ts `Candidate.maybe`): made only if a recorded call names its evidence. */
+  readonly optional?: boolean;
+}
 
 const same = (a: unknown, b: unknown) => canonicalize(a) === canonicalize(b);
 
@@ -106,160 +127,193 @@ function differences(a: unknown, b: unknown, at = "", out: string[] = []): strin
   return out;
 }
 
-async function call(policy: ActivePolicy, c: Exclude<Call, { kind: "carry" }>, from: ReplayContext | null, meter: ActMeter) {
-  switch (c.kind) {
-    case "refuse":
-      return evaluateRefuse(policy, c.input(), { budget: meter, recoveryKey: c.recoveryKey });
-    case "require":
-      return evaluateRequire(policy, c.input(), { budget: meter });
-    case "land":
-      return evaluateLand(policy, c.input(from as Ctx<"land"> | null), { budget: meter });
-    case "notify":
-      return evaluateNotify(policy, c.input, c.directory(from as Ctx<"notify"> | null));
-  }
-}
-
 /**
- * Make the required calls of one entry, in order, and compare them with
- * the decisions it recorded. The plan stops at the first call that refuses,
- * as admission does; a recomputation does not stop (R-POL-9): its carry
- * calls follow a failed `require`. `refusal` is the first refusal.
+ * The required calls of one entry, made in order on one act meter, each
+ * compared with the recorded call in its place. The caller makes the calls
+ * admission had to make, stops where admission stops, and then calls
+ * `finish`, which fails any recorded call left over.
  */
-export async function compareCalls(plan: readonly Call[], recorded: readonly Decision[], c: Calls, stopAtRefusal = true): Promise<CallsResult> {
-  const groups = callsOf(recorded);
-  const fail = (reason: CallFailure["reason"], detail: string): CallsResult => ({ ok: false, failure: { reason, detail } });
-  for (const g of groups)
-    for (const d of g.decisions) {
-      if (!c.stampOk(d)) return fail("stamp-mismatch", `${d.rule}: stamp ${d.stamp.profile} ${d.stamp.jsonata} is not the profile in force`);
-      if (d.policy !== c.policy.version) return fail("policy-version-mismatch", `${d.rule} names policy ${d.policy}; the policy in force is ${c.policy.version}`);
-    }
-  const meter = actMeter();
-  let next = 0;
-  let replayed = 0;
-  let refusal: Refusal | null = null;
+export class CallSession {
+  private readonly groups: ReturnType<typeof callsOf>;
+  private readonly meter: ActMeter = actMeter();
+  private next = 0;
+  /** Decisions compared and found equal. */
+  replayed = 0;
+  /** The first refusal a call made. */
+  refusal: Refusal | null = null;
+
+  private readonly c: Calls;
+
+  private constructor(recorded: readonly Decision[], c: Calls) {
+    this.groups = callsOf(recorded);
+    this.c = c;
+  }
+
+  /** Open a session, after checking that every recorded decision names the profile and policy in force. */
+  static open(recorded: readonly Decision[], c: Calls): Made<CallSession> {
+    if (c.compare)
+      for (const d of recorded) {
+        if (!c.stampOk(d)) return { ok: false, failure: { reason: "stamp-mismatch", detail: `${d.rule}: stamp ${d.stamp.profile} ${d.stamp.jsonata} is not the profile in force` } };
+        if (d.policy !== c.policy.version) return { ok: false, failure: { reason: "policy-version-mismatch", detail: `${d.rule} names policy ${d.policy}; the policy in force is ${c.policy.version}` } };
+      }
+    return { ok: true, result: new CallSession(recorded, c) };
+  }
+
+  private fail<R>(reason: CallFailure["reason"], detail: string): Made<R> {
+    return { ok: false, failure: { reason, detail } };
+  }
+
   /** The retained context of the recorded call at `next`, when it is of `kind`. */
-  const fromNext = (kind: Decision["kind"]): { ok: true; value: ReplayContext | null } | { ok: false; result: CallsResult } => {
-    const g = groups[next];
-    if (!g || g.kind !== kind) return { ok: true, value: null };
-    const r = c.retained(g.digest);
-    if (!r.ok) return { ok: false, result: fail(r.reason, r.detail) };
+  private fromNext<K extends Decision["kind"]>(kind: K): Made<Ctx<K> | null> {
+    const g = this.groups[this.next];
+    if (!g || g.kind !== kind) return { ok: true, result: null };
+    const r = this.c.retained(g.digest);
+    // Under the legacy vocabulary the record is followed, never judged here: replaying it is the caller's.
+    if (!this.c.compare) return { ok: true, result: r.ok && (r.value as ReplayContext).kind === kind ? (r.value as Ctx<K>) : null };
+    if (!r.ok) return this.fail(r.reason, r.detail);
     const v = r.value as ReplayContext;
-    if (v.kind !== kind) return { ok: false, result: fail("context-mismatch", `a ${kind} decision names a ${String(v.kind)} context`) }; // V:context-kind
-    return { ok: true, value: v };
-  };
+    if (v.kind !== kind) return this.fail("context-mismatch", `a ${kind} decision names a ${String(v.kind)} context`); // V:context-kind
+    return { ok: true, result: v as Ctx<K> };
+  }
+
   /** Compare one made call with the recorded call at `next`. */
-  const compare = (what: string, made: readonly RuleEvaluation[], from: ReplayContext | null): CallsResult | null => {
-    const g = groups[next];
+  private compare(what: string, made: readonly RuleEvaluation[], from: ReplayContext | null): CallFailure | null {
+    const g = this.groups[this.next];
+    if (!this.c.compare) {
+      // Keep step with the record, so a later call can read its retained context.
+      if (g && g.kind === made[0]!.decision.kind) this.next++;
+      return null;
+    }
+    const fail = (reason: CallFailure["reason"], detail: string): CallFailure => ({ reason, detail });
     if (!g || g.kind !== made[0]!.decision.kind)
       return fail("decision-missing", `the ${what} call decides ${made.map((e) => `${e.decision.rule} (${e.decision.outcome.result})`).join(", ")}, and no ${made[0]!.decision.kind} decision is recorded in its place`); // V:missing
     const digest = made[0]!.decision.input;
     if (g.digest !== digest) return fail("context-mismatch", `the ${what} call's retained context ${g.digest} is not the one rebuilt from the log, ${digest}; they differ at ${differences(from, made[0]!.context).join(", ")}`); // V:context
     const expected = made.map((e) => e.decision);
     if (!same(expected, g.decisions)) return fail("policy-decision-mismatch", `recorded ${canonicalize(g.decisions.map((d) => [d.rule, d.outcome]))}, made ${canonicalize(expected.map((d) => [d.rule, d.outcome]))}`); // V:outcome
-    replayed += g.decisions.length;
-    next++;
+    this.replayed += g.decisions.length;
+    this.next++;
     return null;
-  };
-  try {
-    for (const step of plan) {
-      if (step.kind === "carry") {
-        // Carrying: each recorded carry call here is accounted for, its proposal and budget rebuilt (see the module note).
-        while (groups[next]?.kind === "carry") {
-          const from = fromNext("carry");
-          if (!from.ok) return from.result;
-          const ctx = from.value as Ctx<"carry">;
-          const facts = { ...(ctx.facts?.revoked ? { revoked: ctx.facts.revoked } : {}), ...(ctx.facts?.check ? { check: ctx.facts.check } : {}) };
-          const r = await evaluateCarry(c.policy, step.input(ctx), facts, { budget: meter, purpose: step.purpose });
-          if (r.evaluations.length === 0) return fail("decision-extra", `a carry call is recorded where the evaluator decides nothing`); // V:carry-extra
-          const bad = compare("carry", r.evaluations, ctx);
-          if (bad) return bad;
-        }
-        continue;
-      }
-      const from = fromNext(step.kind);
-      if (!from.ok) return from.result;
-      const r = await call(c.policy, step, from.value, meter);
-      if (r.evaluations.length === 0) continue; // the evaluator asks nothing here: skipped, or no rule applies
-      const bad = compare(step.kind, r.evaluations, from.value);
-      if (bad) return bad;
-      if ("refusal" in r && r.refusal && refusal === null) {
-        refusal = { rule: r.refusal.rule, reason: r.refusal.reason };
-        if (stopAtRefusal) break;
-      }
+  }
+
+  /** Make one call, and compare it when it decided something: the evaluator asks nothing when it is skipped or no rule applies. */
+  private async made<R extends { readonly evaluations: readonly RuleEvaluation[] }>(what: string, kind: Decision["kind"], call: (from: ReplayContext | null) => Promise<R>): Promise<Made<R>> {
+    const from = this.fromNext(kind);
+    if (!from.ok) return from;
+    let r: R;
+    try {
+      r = await call(from.result);
+    } catch (e) {
+      // A context the evaluator cannot own (not profile JSON) is not the room's context.
+      if (!this.c.compare) throw e;
+      return this.fail("context-mismatch", `a required call could not be rebuilt: ${(e as Error).message}`);
     }
-  } catch (e) {
-    // A context the evaluator cannot own (not profile JSON) is not the room's context.
-    return fail("context-mismatch", `a required call could not be rebuilt: ${(e as Error).message}`);
+    if (r.evaluations.length) {
+      const bad = this.compare(what, r.evaluations, from.result);
+      if (bad) return { ok: false, failure: bad };
+    }
+    const refusal = (r as { refusal?: { rule: string; reason: string } | null }).refusal;
+    if (refusal && this.refusal === null) this.refusal = { rule: refusal.rule, reason: refusal.reason };
+    return { ok: true, result: r };
   }
-  if (next < groups.length) {
-    const g = groups[next]!;
-    return fail("decision-extra", `the ${g.kind} decisions ${g.decisions.map((d) => d.rule).join(", ")} (context ${g.digest}) answer no call the room had to make`); // V:extra
+
+  refuse(input: InputOf<"refuse">, recoveryKey: boolean): Promise<Made<RefuseResult>> {
+    return this.made("refuse", "refuse", () => evaluateRefuse(this.c.policy, input, { budget: this.meter, recoveryKey }));
   }
-  return { ok: true, refusal, replayed };
+
+  require(input: InputOf<"require">): Promise<Made<RequireResult>> {
+    return this.made("require", "require", () => evaluateRequire(this.c.policy, input, { budget: this.meter }));
+  }
+
+  /** A land call. `input` may read the retained context for what the log cannot decide (see the module note). */
+  land(input: (from: Ctx<"land"> | null) => InputOf<"land">): Promise<Made<LandResult>> {
+    return this.made("land", "land", (from) => evaluateLand(this.c.policy, input(from as Ctx<"land"> | null), { budget: this.meter }));
+  }
+
+  notify(input: InputOf<"notify">, directory: NotifyDirectory): Promise<Made<NotifyResult>> {
+    return this.made("notify", "notify", () => evaluateNotify(this.c.policy, input, directory));
+  }
+
+  /**
+   * A carry call for one earlier verdict or check. The result is null when
+   * the call cannot be rebuilt without Git objects and no recorded call
+   * names its evidence: nothing is compared then, and the caller reports
+   * the limit. A recorded carry call that names this evidence where the
+   * evaluator decides nothing is `decision-extra`.
+   */
+  async carry(step: CarryStep): Promise<Made<CarryResult | null>> {
+    const from = this.fromNext("carry");
+    if (!from.ok) return from;
+    const mine = from.result !== null && from.result.input.evidence.act === step.act ? from.result : null;
+    if (step.optional && !mine) return { ok: true, result: null };
+    let r: CarryResult;
+    try {
+      const input = step.input(mine);
+      const facts = step.facts(mine);
+      if (input === null || facts === null) return { ok: true, result: null };
+      r = await evaluateCarry(this.c.policy, input, facts, { budget: step.ownBudget ? actMeter() : this.meter, purpose: step.purpose });
+    } catch (e) {
+      if (!this.c.compare) throw e;
+      return this.fail("context-mismatch", `a required call could not be rebuilt: ${(e as Error).message}`);
+    }
+    if (r.evaluations.length === 0) {
+      if (mine) return this.fail("decision-extra", `a carry call for ${step.act} is recorded where the evaluator decides nothing`); // V:carry-extra
+      return { ok: true, result: r };
+    }
+    const bad = this.compare("carry", r.evaluations, from.result);
+    return bad ? { ok: false, failure: bad } : { ok: true, result: r };
+  }
+
+  /** After the last required call: a recorded call left over answers no call the room had to make. */
+  finish(): CallFailure | null {
+    if (!this.c.compare || this.next >= this.groups.length) return null;
+    const g = this.groups[this.next]!;
+    return { reason: "decision-extra", detail: `the ${g.kind} decisions ${g.decisions.map((d) => d.rule).join(", ")} (context ${g.digest}) answer no call the room had to make` }; // V:extra
+  }
 }
 
 // ----------------------------------------------------------------- inputs
-
-/** The acting member as policy sees it (R-EVAL-3, the room's `policyActor`). */
-export function actorOf(roster: RosterReplay, by: Authority): PolicyActor {
-  return { member: by.member, role: by.role, teams: by.member ? roster.teamsOf(by.member) : [], delegated: by.via === "delegation" };
-}
 
 /** A member as policy sees them when no act is theirs (the room's `policyActorOf`, for recomputation). */
 export function memberActor(roster: RosterReplay, member: PolicyActor["member"]): PolicyActor {
   return { member, role: member ? roster.roleOf(member) : null, teams: member ? roster.teamsOf(member) : [], delegated: false };
 }
 
-/** What a plan needs from verify's state. */
+/** What an input needs from verify's state. */
 export interface World {
   readonly fold: Fold;
   readonly roster: RosterReplay;
-  readonly doc: ActivePolicy["doc"];
+  /** True under a `v2` document: the lane carries its thread's kind (R-EVAL-3 as amended). */
+  readonly declared: boolean;
 }
 
-/** A `refuse` call for an act, on its thread (or none), before it (R-POL-2, R-ADM-1 step 9). */
-export function refuseCall(w: World, env: Envelope, by: Authority, thread: Thread | null, proposal: PolicyProposal | null): Call {
-  const input: InputOf<"refuse"> = {
+/** A `refuse` input for an act, on its thread (or none), before it (R-POL-2, R-ADM-1 step 9). */
+export function refuseInput(w: World, env: Envelope, by: Authority, thread: Thread | null, proposal: PolicyProposal | null): InputOf<"refuse"> {
+  return {
     kind: "refuse",
     act: { kind: env.kind as never, target: env.target as never, body: env.body as never },
     actor: actorOf(w.roster, by),
-    lane: w.fold.policyLane(thread, true),
+    lane: w.fold.policyLane(thread, w.declared),
     proposal,
     room: w.roster.counts(),
   };
-  return { kind: "refuse", input: () => input, recoveryKey: by.via === "recovery" };
 }
 
-/** A `require` call for a version (R-POL-3), by its proposer or the act's signer. */
-export function requireCall(w: World, actor: PolicyActor, thread: Thread, proposal: PolicyProposal): Call {
-  const input: InputOf<"require"> = { kind: "require", actor, lane: w.fold.policyLane(thread, true), proposal, room: w.roster.counts() };
-  return { kind: "require", input: () => input };
+/** A `require` input for a version (R-POL-3), by its proposer or the act's signer. */
+export function requireInput(w: World, actor: PolicyActor, thread: Thread, proposal: PolicyProposal): InputOf<"require"> {
+  return { kind: "require", actor, lane: w.fold.policyLane(thread, w.declared), proposal, room: w.roster.counts() };
 }
 
-/** `carry` calls for a version, each on its recorded evidence, with the version's proposal (R-POL-4). */
-export function carryCall(thread: Thread, proposal: PolicyProposal): Call {
-  return { kind: "carry", purpose: thread.purpose, input: (from) => ({ ...from.input, proposal }) };
-}
-
-/** A `land` call at `stage` (R-POL-6). Its obligations and reviews are the retained context's (see the module note). */
-export function landCall(w: World, actor: PolicyActor, thread: Thread, proposal: PolicyProposal, stage: "land" | "reservation"): Call {
-  return {
-    kind: "land",
-    input: (from) => ({
-      kind: "land",
-      actor,
-      lane: w.fold.policyLane(thread, true),
-      proposal,
-      obligations: from?.input.obligations ?? [],
-      reviews: from?.input.reviews ?? [],
-      stage,
-    }),
-  };
-}
-
-/** A `notify` call for an act, with the input the room built when it was sealed (R-POL-5, R-LOG-13). */
-export function notifyCall(input: InputOf<"notify">, roles: NotifyDirectory["roles"]): Call {
-  return { kind: "notify", input, directory: (from) => ({ roles, reviewers: from?.directory.reviewers ?? [] }) };
+/** A `land` input at `stage` (R-POL-6), with the obligations and reviews rebuilt from the fold (obligations.ts). */
+export function landInput(
+  w: World,
+  actor: PolicyActor,
+  thread: Thread,
+  proposal: PolicyProposal,
+  evidence: Pick<InputOf<"land">, "obligations" | "reviews">,
+  stage: "land" | "reservation",
+): InputOf<"land"> {
+  return { kind: "land", actor, lane: w.fold.policyLane(thread, w.declared), proposal, obligations: evidence.obligations, reviews: evidence.reviews, stage };
 }
 
 // ------------------------------------------------------- where admission stops

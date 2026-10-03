@@ -12,7 +12,12 @@
  *   and current scope; `proposed` effects add its versions;
  * - `land-op` effects name each landing operation and the act behind it;
  * - `obligations-recomputed` events record a version's blocked refusal;
- * - `prepared` events record the integrations the room prepared (R-DECL-20).
+ * - `prepared` events record the integrations the room prepared (R-DECL-20);
+ * - each version keeps the obligations its `require` call made, the policy
+ *   version that made them and the verdicts carried onto it; each accepted
+ *   review and check is an evidence row, with the facts fixed at its
+ *   admission; each `check-carried` event is a judgement, and a carry when
+ *   it carried (obligations.ts reads these).
  *
  * Stage 3 takes receipt effects as recorded; re-deriving them and comparing
  * (`effect-mismatch`) is stage 6. A version's base and changed paths are its
@@ -24,22 +29,31 @@
 import type {
   ActId,
   Authority,
+  Carried,
+  CheckBody,
   Envelope,
+  Flag,
   Glob,
+  KeyId,
   LaneId,
   LanePurpose,
   MemberId,
+  ObligationId,
   OpId,
   PathChange,
   PolicyDocument,
   PolicyLane,
   PolicyProposal,
+  PolicyVersion,
   Receipt,
   RepoPath,
+  ReviewBody,
   Sha,
   SystemEvent,
+  TeamId,
+  Verdict,
 } from "@generalbusiness/artroom-contract";
-import { ownersFor } from "@generalbusiness/artroom-policy";
+import { ownersFor, type ObligationSpec } from "@generalbusiness/artroom-policy";
 import { parseCommit, parseTree, type GitReader } from "./git.ts";
 import { declarationOf, type Vocabulary } from "./declared.ts";
 
@@ -75,6 +89,80 @@ export interface Version {
   readonly act: ActId;
   /** The refusal that blocks landing, from the latest `obligations-recomputed` event (R-POL-9). */
   blocked: { readonly rule: string } | null;
+  /** The policy version in force when it was proposed (the room's `generations.policy`). */
+  readonly policy: PolicyVersion | null;
+  /**
+   * The obligations the `require` call made, at the proposal or at the
+   * latest recomputation that was not blocked (R-POL-3, R-POL-9), with
+   * advisory checks marked (R-OBL-7). The platform's `obl_admin-approval`
+   * is added from the witness's paths (obligations.ts `specsOf`).
+   */
+  required: readonly ObligationSpec[];
+  /** The policy version that made `required`. */
+  specPolicy: PolicyVersion | null;
+  /** Whether the proposal's receipt opened `obl_admin-approval`: used only while the version has no witness. */
+  readonly adminOpened: boolean;
+  /** Earlier verdicts carried onto this version, by obligation (R-CARRY-1 to 5). */
+  carried: readonly { readonly obligation: ObligationId; readonly evidence: Carried }[];
+  /**
+   * Earlier verdicts whose carry onto this version the log cannot decide:
+   * the paths changed since their head need Git objects that are absent,
+   * and no carry call is recorded for them. Each either carried on the
+   * platform's conditions alone, or did not.
+   */
+  maybe: readonly { readonly obligation: ObligationId; readonly act: ActId }[];
+}
+
+/** What verify derived about a version when its proposal was admitted. */
+export interface Made {
+  readonly policy: PolicyVersion | null;
+  readonly required: readonly ObligationSpec[];
+  readonly carried: readonly { readonly obligation: ObligationId; readonly evidence: Carried }[];
+  readonly maybe: readonly { readonly obligation: ObligationId; readonly act: ActId }[];
+}
+
+/**
+ * One accepted review or check, with the facts fixed at its admission
+ * (R-REV-1, R-OBL-2, R-OBL-3; the room's `evidence` table).
+ */
+export interface EvidenceRow {
+  readonly act: ActId;
+  readonly seq: number;
+  readonly kind: "review" | "check";
+  readonly lane: LaneId;
+  readonly generation: number;
+  readonly head: Sha;
+  readonly member: MemberId;
+  readonly key: KeyId;
+  /** The grantor key, for a delegated act. */
+  readonly grantor: KeyId | null;
+  readonly verdict: Verdict | null;
+  readonly flags: readonly Flag[];
+  readonly authority: Authority;
+  /** The member's teams when it was admitted. */
+  readonly teams: readonly TeamId[];
+  /** Whether the member was the version's proposer or the thread's holder when it was admitted. */
+  readonly author: boolean;
+  readonly body: ReviewBody | CheckBody;
+  /**
+   * For a check, the integration it counts for (R-CARRY-15 step 5): its own
+   * `integration`, or the integration a `prepared` event names for the
+   * snapshot commit it ran on. Null for a review. Undefined when the log
+   * cannot say: a check on a filtered snapshot with no `prepared` event for
+   * its version.
+   */
+  readonly canonical: Sha | null | undefined;
+}
+
+/** A check carried onto an integration by a `check-carried` event (R-CARRY-13; the room's `check_carries`). */
+export interface CheckCarry {
+  readonly lane: LaneId;
+  readonly generation: number;
+  readonly integration: Sha;
+  readonly obligation: ObligationId;
+  readonly act: ActId;
+  readonly evidence: Carried;
+  readonly policy: PolicyVersion;
 }
 
 /** A landing operation: the `land` act that started it (R-LAND-1). */
@@ -95,6 +183,9 @@ export interface Prepared {
 
 const key = (lane: string, generation: number) => `${lane}/${generation}`;
 
+/** The key of a check carry: one per lane, generation, integration and obligation. */
+export const carryKey = (lane: string, generation: number, integration: string, obligation: string) => `${lane}/${generation}/${integration}/${obligation}`;
+
 /** Every path a change names: old and new for a rename (R-PROP-4); sorted and distinct, as the room's `changedPaths`. */
 export function changedPaths(changed: readonly PathChange[]): RepoPath[] {
   const out = new Set<string>();
@@ -114,6 +205,21 @@ export class Fold {
   /** Kinds that have opened a thread in this log: the historical opening kinds of R-DECL-8. */
   readonly openingKinds = new Set<string>();
   readonly prepared: Prepared[] = [];
+  /** Every accepted review and check, in seq order. */
+  readonly evidence: EvidenceRow[] = [];
+  /** The latest carry of a check onto each lane, generation, integration and obligation. */
+  readonly checkCarries = new Map<string, CheckCarry>();
+  /** Each `check-carried` judgement made: lane, generation, integration, obligation, act and policy (R-CARRY-13). */
+  readonly checkJudged = new Set<string>();
+
+  /** The evidence on one version, in seq order (the room's `evidenceOn`). */
+  evidenceOn(lane: LaneId, generation: number): EvidenceRow[] {
+    return this.evidence.filter((e) => e.lane === lane && e.generation === generation);
+  }
+
+  evidenceByAct(act: ActId): EvidenceRow | null {
+    return this.evidence.find((e) => e.act === act) ?? null;
+  }
 
   thread(lane: unknown): Thread | null {
     return typeof lane === "string" ? (this.threads.get(lane as LaneId) ?? null) : null;
@@ -150,7 +256,7 @@ export class Fold {
    * Fold an accepted act's effects. `witness` is the base and changed paths
    * of a version it made, as verify accepted them.
    */
-  applyAct(id: ActId, env: Envelope, receipt: Receipt, vocab: Vocabulary, witness: Witness | null): void {
+  applyAct(id: ActId, env: Envelope, receipt: Receipt, vocab: Vocabulary, witness: Witness | null, made: Made = { policy: null, required: [], carried: [], maybe: [] }): void {
     const target = env.target as { lane?: unknown; generation?: unknown } | null;
     const lane = target && typeof target.lane === "string" ? (target.lane as LaneId) : null;
     let self = false;
@@ -203,6 +309,12 @@ export class Fold {
             proposer: receipt.authority.member!,
             act: id,
             blocked: null,
+            policy: made.policy,
+            required: made.required,
+            specPolicy: made.policy,
+            adminOpened: receipt.effects.some((x) => x.type === "obligations" && x.generation === effect.generation && x.opened.includes("obl_admin-approval" as ObligationId)),
+            carried: made.carried,
+            maybe: made.maybe,
           });
           break;
         }
@@ -291,7 +403,8 @@ async function readTree(reader: GitReader, sha: Sha): Promise<Map<string, { sha:
   }
 }
 
-async function treeOf(reader: GitReader, commit: Sha): Promise<Sha | null> {
+/** A commit's tree, or null when the commit object is absent. */
+export async function treeOf(reader: GitReader, commit: Sha): Promise<Sha | null> {
   try {
     const o = await reader.readObject(commit);
     return o.type === "commit" ? parseCommit(o.data).tree : null;

@@ -341,6 +341,11 @@ export class RosterReplay {
     return { admins, members };
   }
 
+  /** A key's revocation, as evidence validity reads it (R-REV-1, the room's `revocationOf`): its reason, or null. */
+  revocationOf(key: KeyId): RevocationReason | null {
+    return this.revocation(key);
+  }
+
   /** Active members by role, each list in handle order, to expand `role:` principals (R-POL-5). */
   roles(): Partial<Record<Role, MemberId[]>> {
     const out: Partial<Record<Role, MemberId[]>> = {};
