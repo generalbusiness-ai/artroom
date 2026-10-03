@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/package.json","body":{"commit":"965c911a58687f634a03a820826c0fd619246185","path":"packages/room/package.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/room/src/artifacts.ts","body":{"commit":"965c911a58687f634a03a820826c0fd619246185","path":"packages/room/src/artifacts.ts"}}
