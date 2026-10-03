@@ -1,8 +1,8 @@
 /**
- * Review 17013617, P2 (client): the RPC update decoder's stream lifecycle
- * (R-API-8), tested with native streams. The pipe owns the source; the
- * caller owns the decoded stream. Cancel ends the subscription with or
- * without a reader; failures are ArtroomErrors.
+ * The RPC subscription's newline-delimited bytes become a stream of updates
+ * (R-API-8), tested with native streams and no room. The pipe owns the
+ * source; the caller owns the decoded stream. Cancel ends the subscription
+ * with or without a reader; failures are ArtroomErrors (review 17013617).
  */
 
 import { describe, expect, test } from "vitest";
@@ -14,7 +14,8 @@ import { decodeUpdates } from "../src/room.ts";
 const decode = (s: ReadableStream<Uint8Array>) => decodeUpdates(s as unknown as ByteStream);
 
 const line = (c: string) => `${JSON.stringify({ cursor: c, entries: [], attention: [], publishedThrough: 0 } satisfies Omit<Update, "cursor"> & { cursor: string })}\n`;
-const settle = () => new Promise((r) => setTimeout(r, 20));
+/** Lets the stream's own microtasks and one timer turn run. */
+const settle = () => new Promise((r) => setTimeout(r, 1));
 
 /** A native byte stream that records whether it was cancelled, and with what. */
 function source(chunks: Uint8Array[] = [], opts: { close?: boolean; fail?: boolean } = {}) {

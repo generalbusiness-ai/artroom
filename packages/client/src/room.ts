@@ -104,7 +104,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** Retries `attempt` after retryable failures, then says how to retry safely. */
-export async function withRetries<T>(attempt: () => Promise<T>, retries: number, idempotencyKey: string | undefined): Promise<T> {
+export async function withRetries<T>(attempt: () => Promise<T>, retries: number, idempotencyKey: string | undefined, backoff: ClientOptions["backoff"] = undefined): Promise<T> {
   for (let n = 0; ; n++) {
     try {
       return await attempt();
@@ -118,7 +118,8 @@ export async function withRetries<T>(attempt: () => Promise<T>, retries: number,
           message: `${e.message} Retry with idempotency key ${idempotencyKey}: if the act was recorded, the room returns the original result (R-IDEM-2).`,
         } satisfies ArtroomError;
       }
-      await sleep(Math.min(e.retryAfterMs ?? 200 * 2 ** n, 5_000));
+      const wait = Math.min(e.retryAfterMs ?? 200 * 2 ** n, 5_000);
+      await sleep(backoff ? backoff(wait) : wait);
     }
   }
 }
@@ -280,7 +281,7 @@ abstract class RoomCore {
   async #signedRequest(body: RequestBody): Promise<Result<RequestResult>> {
     if (this.bearer !== undefined) return this.bearer.request(body);
     // Each attempt is signed afresh: the room refuses a nonce it has seen (R-CRED-6).
-    return withRetries(async () => this.wire.request(await signRequest(this.id, this.identity, body, this.now())), this.opts.retries ?? 3, undefined);
+    return withRetries(async () => this.wire.request(await signRequest(this.id, this.identity, body, this.now())), this.opts.retries ?? 3, undefined, this.opts.backoff);
   }
 
   // -------------------------------------------------------------------- acts
@@ -436,12 +437,12 @@ abstract class RoomCore {
     if (act.signed === undefined) {
       if (this.bearer === undefined) throw artroomError("bad-request", "This act was prepared for a bearer session; it has no signature.");
       const bearer = this.bearer;
-      return withRetries(() => bearer.act(act.kind, act.target, act.body, act.idempotencyKey, act.binding), retries, act.idempotencyKey); // G5:replay-binding
+      return withRetries(() => bearer.act(act.kind, act.target, act.body, act.idempotencyKey, act.binding), retries, act.idempotencyKey, this.opts.backoff); // G5:replay-binding
     }
     if (act.signed.envelope.room !== this.id) throw artroomError("bad-request", "This act was prepared for another room.");
     const signed = act.signed;
     // The same signed bytes on every attempt: a retry is the same request (R-IDEM-1, R-IDEM-2).
-    return withRetries(() => this.wire.submit(signed), retries, act.idempotencyKey);
+    return withRetries(() => this.wire.submit(signed), retries, act.idempotencyKey, this.opts.backoff);
   }
 
   claim(input: ClaimInput, opts?: ClientActOptions): Promise<Result<Claim>> {
@@ -679,6 +680,7 @@ export class HttpRoomClient extends RoomCore implements HttpRoom {
       },
       onError: onError ?? (() => {}),
       onClose: () => this.#watches.delete(sub),
+      backoff: this.opts.backoff ?? ((ms) => ms),
     });
     this.#watches.add(sub);
     return sub;
@@ -708,6 +710,7 @@ interface WatchDeps {
   onUpdate(update: Update): void;
   onError(error: ArtroomError): void;
   onClose(): void;
+  backoff(ms: number): number;
 }
 
 class WatchSubscription implements Watch {
@@ -794,7 +797,7 @@ class WatchSubscription implements Watch {
   #retry(): void {
     if (this.#closed) return;
     const delay = Math.min(250 * 2 ** this.#failures++, 10_000);
-    this.#timer = setTimeout(() => void this.#connect(), delay);
+    this.#timer = setTimeout(() => void this.#connect(), this.#deps.backoff(delay));
   }
 
   close(): void {

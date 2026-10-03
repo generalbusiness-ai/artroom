@@ -286,7 +286,7 @@ export class FakeRoom {
           this.#waiters.delete(done);
           resolve();
         };
-        const t = setTimeout(done, Math.min(left, 20));
+        const t = setTimeout(done, Math.min(left, 2));
         this.#waiters.add(done);
       });
     }

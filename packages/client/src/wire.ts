@@ -44,6 +44,13 @@ export interface ClientOptions {
   readonly retries?: number;
   /** The clock, for tests. Default `Date.now`. */
   readonly now?: () => number;
+  /**
+   * The time to wait before another attempt, given the wait the client
+   * chose, in milliseconds: a retry's backoff or a watch's reconnect delay.
+   * For tests, which pass a function that shortens it. Default: the wait
+   * unchanged.
+   */
+  readonly backoff?: (ms: number) => number;
 }
 
 export type RequestResult = WorkspaceOp | WorkspaceGrant | Session;

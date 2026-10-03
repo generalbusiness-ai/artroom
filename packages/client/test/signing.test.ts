@@ -7,10 +7,12 @@
 
 import { createPublicKey, verify as nodeVerify } from "node:crypto";
 import { describe, expect, test } from "vitest";
-import { isArtroomError } from "@generalbusiness/artroom-contract";
+import { isArtroomError, type Binding } from "@generalbusiness/artroom-contract";
 import {
+  buildDeclaredEnvelope,
   buildEnvelope,
   canonicalize,
+  checkBinding,
   fromBase64Url,
   generateSigner,
   keyIdOf,
@@ -23,6 +25,8 @@ import {
   verifyValue,
 } from "../src/index.ts";
 
+const ROOM = "room_0123456789abcdef0123456789abcdef";
+const B = (c: string) => `sha256:${c.repeat(64)}` as Binding;
 const hex = (h: string) => Uint8Array.from(h.match(/../g)!.map((b) => parseInt(b, 16)));
 const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 
@@ -79,25 +83,28 @@ describe("canonical bytes (R-SIG-2: RFC 8785)", () => {
     expect(canonicalize({ a: 1, plan: undefined, note: null })).toBe('{"a":1,"note":null}');
   });
 
-  test.each([
-    ["a fraction", { n: 1.5 }],
-    ["an unsafe integer", { n: 2 ** 53 }],
-    ["negative zero", { n: -0 }],
-    ["NaN", { n: Number.NaN }],
-    ["a lone high surrogate", { s: `a${String.fromCharCode(0xd800)}b` }],
-    ["a lone low surrogate in a key", { [String.fromCharCode(0xdc00)]: 1 }],
-    ["a Date", { d: new Date(0) }],
-    ["a bigint", { n: 1n }],
-    ["undefined in an array", { a: [undefined] }],
-  ])("refuses %s with bad-request (R-SIG-3)", (_what, value) => {
-    let thrown: unknown;
-    try {
-      canonicalize(value);
-    } catch (e) {
-      thrown = e;
+  test("refuses what has no canonical form with bad-request (R-SIG-3)", () => {
+    const refused: readonly (readonly [string, unknown])[] = [
+      ["a fraction", { n: 1.5 }],
+      ["an unsafe integer", { n: 2 ** 53 }],
+      ["negative zero", { n: -0 }],
+      ["NaN", { n: Number.NaN }],
+      ["a lone high surrogate", { s: `a${String.fromCharCode(0xd800)}b` }],
+      ["a lone low surrogate in a key", { [String.fromCharCode(0xdc00)]: 1 }],
+      ["a Date", { d: new Date(0) }],
+      ["a bigint", { n: 1n }],
+      ["undefined in an array", { a: [undefined] }],
+    ];
+    for (const [what, value] of refused) {
+      let thrown: unknown;
+      try {
+        canonicalize(value);
+      } catch (e) {
+        thrown = e;
+      }
+      expect(isArtroomError(thrown), what).toBe(true);
+      expect((thrown as { code: string }).code, what).toBe("bad-request");
     }
-    expect(isArtroomError(thrown)).toBe(true);
-    expect((thrown as { code: string }).code).toBe("bad-request");
   });
 });
 
@@ -184,5 +191,24 @@ describe("keys and signatures (R-SIG-1, R-ID-4)", () => {
     expect(again.key).toBe(signer.key);
     const msg = new TextEncoder().encode("same");
     expect(toHex(await again.sign(msg))).toBe(toHex(await signer.sign(msg)));
+  });
+});
+
+describe("the declared envelope (R-DECL-16, R-SIG-1 as amended)", () => {
+  test("v: 2 with the binding inside the signed bytes, under the same domain tag; a changed binding breaks the signature", async () => {
+    const { signer } = await generateSigner();
+    const env = buildDeclaredEnvelope(ROOM, { signer }, "ask", B("a"), { act: "act_1_00000000" }, { text: "x" }, "k1");
+    expect(env).toEqual({ v: 2, room: ROOM, actor: signer.key, kind: "ask", binding: B("a"), target: { act: "act_1_00000000" }, body: { text: "x" }, idempotencyKey: "k1" });
+    const signed = await signEnvelope(env, signer);
+    expect(await verifyValue("artroom-envelope-v1", signed.envelope, signed.sig, signer.key)).toBe(true);
+    expect(await verifyValue("artroom-envelope-v1", { ...signed.envelope, binding: B("b") }, signed.sig, signer.key)).toBe(false);
+    expect(await verifyValue("artroom-envelope-v1", { ...signed.envelope, v: 1 }, signed.sig, signer.key)).toBe(false);
+    // Under a delegation the envelope names it, as a v: 1 envelope does.
+    expect(buildDeclaredEnvelope(ROOM, { signer, delegation: "act_9_00000000" }, "ask", B("a"), null, {}, "k2")).toMatchObject({ delegation: "act_9_00000000" });
+  });
+
+  test("a binding is sha256: and 64 lowercase hex digits, or the call is refused before anything is built", () => {
+    expect(checkBinding(B("a"))).toBe(B("a"));
+    for (const bad of [undefined, null, "", "sha256:abc", B("A"), `sha1:${"a".repeat(64)}`, 7]) expect(() => checkBinding(bad)).toThrow(/binding/);
   });
 });
