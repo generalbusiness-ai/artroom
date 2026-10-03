@@ -1,0 +1,45 @@
+{
+  "head": "3e6241dff9853f83f3a47e429e564c2b0baceb04",
+  "fixtureHash": "95e802eac7b345a93dfc5c36201eb4ffcc98b34ca4e983b881448e59346ddb1f",
+  "typecheck": {
+    "exit": 0,
+    "start": 1791057534.932668,
+    "end": 1791057545.065375
+  },
+  "async": {
+    "exit": 0,
+    "start": 1791057545.065505,
+    "end": 1791057549.6155038,
+    "cmd": [
+      "npx",
+      "vitest",
+      "run",
+      "--config",
+      "vitest.workers.config.ts",
+      "test/workerd/checker-stage5-repair-edges.test.ts",
+      "--testNamePattern",
+      "checker repair asynchronous ownership",
+      "--reporter=verbose",
+      "--reporter=json",
+      "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-3e6241df-ku4tjh27/final-repair-edges-v3/async.vitest.json"
+    ]
+  },
+  "diagnostic": {
+    "exit": 1,
+    "start": 1791057549.615617,
+    "end": 1791057553.5471292,
+    "cmd": [
+      "npx",
+      "vitest",
+      "run",
+      "--config",
+      "vitest.workers.config.ts",
+      "test/workerd/checker-stage5-repair-edges.test.ts",
+      "--testNamePattern",
+      "checker repair plain-data error contract",
+      "--reporter=verbose",
+      "--reporter=json",
+      "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-3e6241df-ku4tjh27/final-repair-edges-v3/diagnostic.vitest.json"
+    ]
+  }
+}

@@ -1,8 +1,0 @@
-binding-shape-string exact single replacement; root compile before test; one named AssertionError; actual JSON matches; restored hash matches.
-named-original-retry exact single replacement; root compile before test; one named AssertionError; actual JSON matches; restored hash matches.
-grant-current-role exact single replacement; root compile before test; one named AssertionError; actual JSON matches; restored hash matches.
-mcp-explicit-binding exact single replacement; root compile before test; one named AssertionError; actual JSON matches; restored hash matches.
-cli-step-own-field exact single replacement; root compile before test; one named AssertionError; actual JSON matches; restored hash matches.
-historical-cache-invalidation exact single replacement; root compile before test; one named AssertionError; actual JSON matches; restored hash matches.
-All 42 frozen hashes match; five immutable source/restoration hashes and both fixture hashes match; adjacent actual JSON is four pass/two AssertionErrors.
-HEAD b7b9d8dfe6f37866bfd57a94d7118d35d93bd8e0 status ''
