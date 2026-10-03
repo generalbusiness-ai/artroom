@@ -156,9 +156,11 @@ describe("condition 1: decoding by grammar, and kind, binding, body and who unde
   test("a fresh replay of a log whose landed document activates a kind verifies, with every required call made", async () => {
     const r = await verify(open(ACTIVATES));
     expect(r.failures).toEqual([]);
-    expect(r).toMatchObject({ ok: true, verifiedThrough: 18, publishedThrough: 18, unsupported: null, limits: [] });
-    // refuse, notify, refuse+require, notify, notify, land (two rules), notify, land-evaluated (two rules), refuse, notify.
-    expect(r.decisionsReplayed).toBe(13);
+    expect(r).toMatchObject({ ok: true, verifiedThrough: 21, publishedThrough: 21, unsupported: null, limits: [] });
+    // refuse, notify, refuse+require, notify, notify, land (two rules), notify, land-evaluated (two rules), refuse, notify, refuse, notify.
+    expect(r.decisionsReplayed).toBe(15);
+    const late = contextOf(open(ACTIVATES), decisions(open(ACTIVATES), 20)[0]!) as Extract<ReplayContext, { kind: "refuse" }>;
+    expect(late.input.actor.teams).toEqual(["@core"]);
   });
 
   test("kind-undeclared: a forged entry of a kind no document declares", async () => {

@@ -8,8 +8,8 @@
  *
  * - declared-activates-kind: a v2 room whose landed policy change activates
  *   a document adding the kind `standup` and changing `note`'s meaning,
- *   with an act of the new kind; refuse, require, land and notify calls;
- *   the room's repository objects.
+ *   with acts of the new kind, one after a team names its signer; refuse,
+ *   require, land and notify calls; the room's repository objects.
  * - declared-refusals: recorded refusals at each place admission stops: a
  *   refuse rule, a platform guard after the refuse rules (`outside-claim`),
  *   a platform guard before any policy (`obligation-open`), and a landing
@@ -104,6 +104,9 @@ const DOC_B = valid({
   const standup = await room.act({ signer: bob, kind: "standup", target: null, body: { text: "The stand-up kind is live." } }); // 16
   await room.drainNotify(); // 17
   await room.act({ signer: bob, kind: "note", target: { act: standup.id }, body: { text: "First one." } }); // 18
+  await room.act({ signer: alice, kind: "roster", target: null, body: { op: "team", team: "@core", members: ["@bob"] } }); // 19
+  await room.act({ signer: bob, kind: "standup", target: null, body: { text: "Teams now count." } }); // 20: its actor input names the team
+  await room.drainNotify(); // 21
   write("declared-activates-kind", room.fixture("A v2 room: a landed policy change activates a document that adds the kind standup and changes note's meaning; refuse, require, land and notify calls; the repository's objects."));
 }
 

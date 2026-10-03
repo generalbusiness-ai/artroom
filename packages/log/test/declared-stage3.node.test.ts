@@ -48,7 +48,7 @@ describe("a fresh clone, through artroom verify", () => {
     const r = spawnSync(process.execPath, [cli, "verify", await room(true), "--json"], { encoding: "utf8" });
     expect(r.status, r.stderr).toBe(0);
     const report = JSON.parse(r.stdout) as { ok: boolean; verifiedThrough: number; failures: unknown[]; limits: unknown[] };
-    expect(report).toMatchObject({ ok: true, verifiedThrough: 18, failures: [], limits: [] });
+    expect(report).toMatchObject({ ok: true, verifiedThrough: 21, failures: [], limits: [] });
   });
 
   test("without the pinned head the log still verifies, and the version is reported git-unwitnessed", async () => {
