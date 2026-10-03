@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-01-jam-room.md","body":{"commit":"6ce1e3ab2be01174b00945785b95b429f9a0dc28","path":"notes/2026-10-01-jam-room.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:235387e5c27eec5221fa7710dccbea97c9150b88","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-jam-room.md."}
