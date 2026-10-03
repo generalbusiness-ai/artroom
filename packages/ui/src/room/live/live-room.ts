@@ -319,7 +319,9 @@ export class LiveRoom implements RoomAdapter {
 
   async readCatalogue(): Promise<Catalogue | null> {
     const catalogue = await this.activeCatalogue();
-    this.active = catalogue;
+    // What was just read is what `governing` answers from: an activation this read learned of ends the earlier
+    // catalogue's interval, and may have retired one of its kinds (R-DECL-23).
+    this.active = catalogue; // G5U:catalogue-read
     if (this.snap) {
       this.snap = { ...this.snap, catalogue, policy: { ...this.snap.policy, version: catalogue?.policy ?? null, activatedAt: catalogue?.since ?? null } };
       for (const l of this.listeners) l();
@@ -331,11 +333,15 @@ export class LiveRoom implements RoomAdapter {
     return this.governing(seq);
   }
 
-  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding): Promise<Result<DeclaredRecord>> {
-    // Exactly this kind, target, body and binding, once (R-DECL-16).
-    const r = await this.room.act(kind, target, body, { binding }); // G5U:act-binding
-    void this.refresh();
-    return r;
+  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding, idempotencyKey?: string): Promise<Result<DeclaredRecord>> {
+    try {
+      // Exactly this kind, target, body and binding, once (R-DECL-16), under the caller's idempotency key if it gave one.
+      const key = idempotencyKey !== undefined ? { idempotencyKey } : {}; // G5U:act-key
+      return await this.room.act(kind, target, body, { binding, ...key }); // G5U:act-binding
+    } finally {
+      // Also when the answer was lost: the act may be in the log, and the page should show it.
+      void this.refresh(); // G5U:act-refresh
+    }
   }
 
   async review(at: ProposalAt, draft: ReviewDraft): Promise<Result<Review>> {

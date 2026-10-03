@@ -173,6 +173,16 @@ export type BodyRead = { readonly ok: true; readonly body: { readonly [field: st
  */
 export const own = <T>(o: Readonly<Record<string, T>>, name: string): T | undefined => (Object.hasOwn(o, name) ? o[name] : undefined); // G5U:own-name
 
+/**
+ * A new idempotency key for one act a person sends: 1 to 64 characters of
+ * `A-Z`, `a-z`, `0-9`, `_` and `-` (R-IDEM-1). The form keeps it with the
+ * act, so that asking again after a lost answer is the same act.
+ */
+export function newIdempotencyKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return `ui-${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
 /** Read every field of a form. One problem per field; the body is built only when there are none. */
 export function readBody(fields: readonly ActField[], raw: Readonly<Record<string, string>>): BodyRead {
   const body: Record<string, Json> = {};

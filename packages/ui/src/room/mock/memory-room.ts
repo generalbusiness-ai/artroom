@@ -10,7 +10,8 @@
  * in the Room's order, as far as a demo needs: role, then kind and binding
  * (never recorded), then body (never recorded), then the thread (recorded).
  * It is a stand-in, not the Room: it has no signatures, no leases that
- * expire, no policy rules, no landing and no idempotency.
+ * expire, no policy rules and no landing. A generic act sent with an
+ * idempotency key is answered as R-IDEM-2 to R-IDEM-4 say.
  */
 
 import { bindingsOf, fieldsOf, governs, meaningOf, PLATFORM_KIND_LIST } from "@generalbusiness/artroom-policy/declared";
@@ -87,6 +88,10 @@ export class MemoryRoom {
   publishedThrough = 0;
   /** Every generic act this room was sent, in order: the tests read it to show what was and was not resubmitted. */
   readonly sent: { readonly kind: string; readonly binding: string; readonly body: unknown; readonly target: unknown }[] = [];
+  /** The idempotency key each of those acts came with, in the same order; undefined where it came with none. */
+  readonly keys: (string | undefined)[] = [];
+  /** What the room recorded under each idempotency key: the act's own text and its answer. */
+  private readonly answered: Record<string, { readonly act: string; readonly result: Result<DeclaredRecord> }> = Object.create(null) as Record<string, never>;
   private readonly entries: LogEntry[] = [];
   private readonly versions: Version[] = [];
   private readonly threads = new Map<ActId, Thread>();
@@ -195,8 +200,23 @@ export class MemoryRoom {
    * One act of a declared kind, with the binding its caller read (R-DECL-16).
    * The room compares that binding with the active one and never replaces it.
    */
-  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: { readonly binding: Binding }): Promise<Result<DeclaredRecord>> {
+  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: { readonly binding: Binding; readonly idempotencyKey?: string }): Promise<Result<DeclaredRecord>> {
     this.sent.push({ kind, binding: opts.binding, body, target });
+    this.keys.push(opts.idempotencyKey);
+    const key = opts.idempotencyKey;
+    if (key === undefined) return this.admit(kind, target, body, opts);
+    // R-IDEM-2 and R-IDEM-3: the same key with the same act returns what was recorded; with another act it is refused.
+    const text = JSON.stringify([kind, opts.binding, target, body]);
+    const prior = own(this.answered, key);
+    if (prior) return prior.act === text ? prior.result : refuse("idempotency-mismatch", "This idempotency key was already used for a different act.", "Use a new idempotency key for a new act."); // G5U:mock-same-act
+    const result = await this.admit(kind, target, body, opts);
+    // R-IDEM-4: only what the room recorded is kept, an accepted act or a recorded refusal.
+    if (!("refused" in result) || result.act !== undefined) this.answered[key] = { act: text, result }; // G5U:mock-recorded-only
+    return result;
+  }
+
+  /** One generic act, decided once. */
+  private async admit(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: { readonly binding: Binding }): Promise<Result<DeclaredRecord>> {
     const v = this.active();
     if (v.doc === "legacy") throw badRequest("envelope.v must be 1."); // a v1 room refuses a v: 2 envelope at step 1
     if ((PLATFORM_KIND_LIST as readonly string[]).includes(kind)) throw badRequest(`${kind} is a platform kind; it has its own method.`);
