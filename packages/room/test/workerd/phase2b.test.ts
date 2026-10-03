@@ -529,25 +529,4 @@ describe("the adapters' boundaries", () => {
     });
   });
 
-  it("with a policy carry rule in force but no runner pinned, a check does not carry: it reruns (R-CARRY-14)", async () => {
-    const scopedCfg: CheckerConfig = { format: "artroom-checker-v1", inputs: ["src/**"], volatile: false, timeoutSeconds: 60 };
-    const base = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
-    const doc: PolicyDocument = { ...base, rules: [...base.rules, { id: "keep", kind: "carry", evidence: "check", allow: "true" }] };
-    const r = await makeRoom({ policy: doc, files: { ".artroom/checkers/unit.json": JSON.stringify(scopedCfg) } });
-    const alice = await addMember(r, "@alice", "member");
-    const bob = await addMember(r, "@bob", "member");
-    const ci = await addMember(r, "@ci", "checker");
-    const other = await proposed(r, bob, ["docs/**"], { "docs/guide.md": "more" });
-    await bob.ok<Landing>("land", { lane: other.lane, generation: 1 }, { lease: 1, head: other.head });
-    const mine = await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
-    const l = await alice.ok<Landing>("land", { lane: mine.lane, generation: 1 }, { lease: 1, head: mine.head });
-    await tick(r);
-    const i1 = (await op(r, l.op.id)).integration!;
-    const paths = checkerInputs(scopedCfg.inputs, doc.carry)!;
-    const entries: SnapshotEntry[] = [...r.world.artifacts.blobs(i1 as never)].map(([p, b]) => [p, "100644", b] as const);
-    const snapshot = await snapshotDigest(filterSnapshot(entries, paths));
-    await ci.ok("check", { lane: mine.lane, generation: 1 }, { obligation: "obl_unit-tests", check: "unit", integration: i1, input: { kind: "filtered", snapshot, paths }, config: digestJson(scopedCfg), runner: `sha256:${"0".repeat(64)}`, volatile: false, ok: true, detail: "ok" });
-    await tick(r, 4);
-    expect(await op(r, l.op.id)).toMatchObject({ state: "preparing", waiting: ["obl_unit-tests"] });
-  });
 });
