@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1d557c36f1585a8a5d40f740c199502871c442b4","text":"Merge retired a covered predecessor; the successor is at packages/room/src/logremote.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1e6d62a3a329eba0d3694cb34ee90a6034543bbe","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/job-token-mint.test.ts."}
