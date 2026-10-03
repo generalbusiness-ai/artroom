@@ -80,6 +80,12 @@ export class LiveRoom implements RoomAdapter {
    * so an older answer that arrives afterwards still cannot bring an earlier catalogue back.
    */
   private confirmed = -1;
+  /**
+   * How many completed reads of the active catalogue this adapter has taken as the one it holds. A question notes
+   * the count when it is asked. Whether another answer was taken meanwhile is told by this count, never by
+   * comparing catalogue objects: a room's handle may give the same object for two reads of an unchanged catalogue.
+   */
+  private taken = 0;
   /** The code-review bindings under each policy version, by kind. A version's steps and lanes never change. */
   private readonly builtFor = new Map<string, Promise<ReadonlyMap<string, Binding>>>();
   private readonly listeners = new Set<() => void>();
@@ -147,12 +153,12 @@ export class LiveRoom implements RoomAdapter {
    * Take one completed read of the active catalogue, and return the catalogue this adapter now holds. Reads can
    * complete out of order: a load and an explicit read each ask the room, and the older question may be answered
    * last. An answer never replaces a later activation this adapter has already confirmed, as the room's handle
-   * never keeps an overtaken answer (`actsAt`). `known` is the catalogue held when the question was asked.
+   * never keeps an overtaken answer (`actsAt`). `asked` is the count of answers taken when the question was asked.
    */
-  private confirm(read: Catalogue | null, known: Catalogue | null): Catalogue | null {
+  private confirm(read: Catalogue | null, asked: number): Catalogue | null {
     if (read === null) {
       // "Not available" says nothing of its own age: it stands only if no other answer was taken while it was on its way.
-      if (this.active !== known) return this.active; // G5U:catalogue-overtaken
+      if (this.taken !== asked) return this.active; // G5U:catalogue-overtaken
       this.active = null;
       return null;
     }
@@ -161,6 +167,7 @@ export class LiveRoom implements RoomAdapter {
     if (read.since < this.confirmed) return this.active; // G5U:catalogue-older
     this.confirmed = read.since; // G5U:catalogue-confirmed
     this.active = read;
+    this.taken += 1; // G5U:catalogue-taken
     return read;
   }
 
@@ -215,7 +222,7 @@ export class LiveRoom implements RoomAdapter {
   }
 
   private async load(): Promise<RoomSnapshot> {
-    const known = this.active;
+    const asked = this.taken;
     const [roster, lanePage, attention, log, read] = await Promise.all([
       this.room.members(),
       readAll((cursor) => this.room.lanes({ limit: 500, ...(cursor ? { cursor } : {}) })),
@@ -226,7 +233,7 @@ export class LiveRoom implements RoomAdapter {
     // The active catalogue of this load, unless a later one was confirmed while it ran. Reading it also tells the
     // handle of any new activation, so that it drops the earlier versions it kept: one of their kinds may have been
     // retired.
-    const catalogue = this.confirm(read, known); // G5U:catalogue-refresh
+    const catalogue = this.confirm(read, asked); // G5U:catalogue-refresh
     const lanes: Lane[] = [...lanePage.items];
     const proposals: Proposal[] = [];
     for (const lane of lanes) {
@@ -361,11 +368,11 @@ export class LiveRoom implements RoomAdapter {
   }
 
   async readCatalogue(): Promise<Catalogue | null> {
-    const known = this.active;
+    const asked = this.taken;
     // What was just read is what `governing` answers from: an activation this read learned of ends the earlier
     // catalogue's interval, and may have retired one of its kinds (R-DECL-23). An answer older than what is already
     // confirmed changes nothing, and the caller gets the catalogue held now.
-    const catalogue = this.confirm(await this.activeCatalogue(), known); // G5U:catalogue-read
+    const catalogue = this.confirm(await this.activeCatalogue(), asked); // G5U:catalogue-read
     if (this.snap) {
       this.snap = withCatalogue(this.snap, catalogue);
       for (const l of this.listeners) l();

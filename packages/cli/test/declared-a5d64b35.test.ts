@@ -25,7 +25,6 @@ const ASK: ActDeclaration = {
 };
 const withAsk = (ask: ActDeclaration = ASK) => ({ ...CODE_REVIEW_ACTS, ask });
 const posts = (route: string) => h.room.requests.filter((r) => r.method === "POST" && r.route === route).length;
-const gets = (route: string) => h.room.requests.filter((r) => r.method === "GET" && r.route === route).length;
 
 /** A member logged in, a v2 room that declares `ask`, an entry to ask about, and `ask`'s binding. */
 async function ready(ask: ActDeclaration = ASK) {
@@ -340,12 +339,19 @@ describe("the journal keeps the binding: a lost answer is finished with the same
     expect(recorded).toHaveLength(1);
     // The meaning changes before the user finishes the command.
     await h.room.activate(withAsk({ ...ASK, body: { text: { type: "text", max: 50 } } }));
-    const reads = gets("/declarations");
-    const again = await cli(alice, ["act", "ask", "--binding", binding, "--entry", claim.id, "--set", "text=once", "--idempotency-key", "ask-once"]);
+    const reads: string[] = [];
+    const again = await cli(alice, ["act", "ask", "--binding", binding, "--entry", claim.id, "--set", "text=once", "--idempotency-key", "ask-once"], h.tmp, {
+      fetch: (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/declarations")) reads.push(url.search);
+        return fetch(input, init);
+      },
+    });
     expect(again.code).toBe(0);
     expect(again.out).toContain(`recorded as act_${recorded[0]!.seq}_`);
-    // The journaled act went back as it was: no catalogue read, no new signature, no second entry.
-    expect(gets("/declarations")).toBe(reads);
+    // The journaled act went back as it was: no read of the active declarations, no new signature, no second entry.
+    // The one read is made after the answer, of the declarations at the record's own seq, for the words printed.
+    expect(reads).toEqual([`?at=${recorded[0]!.seq}`]);
     expect(h.room.entries.filter((e) => e.entry.type === "act" && (e.entry.act.envelope.kind as string) === "ask")).toHaveLength(1);
     // A new act under that binding is stale now.
     expect((await cli(alice, ["act", "ask", "--binding", binding, "--entry", claim.id, "--set", "text=twice"])).code).toBe(3);
