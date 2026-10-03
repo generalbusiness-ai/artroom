@@ -20,6 +20,7 @@ import type { Check, CheckerConfig, CheckJob, Claim, Landing, OpId, Proposal, Re
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import { setAlarmDelay, type Room } from "../../src/index.ts";
 import { JOB_BATCH, JOBS_DUE_SQL, JOB_TOKENS_DUE_SQL, jobTokensDue, setJobTokenWait } from "../../src/jobs.ts";
+import { ROOM_SCRUB_TABLES, safeJobStatus } from "../../src/store.ts";
 import { artifactsErrors, type FakeRepo } from "../../src/memory/artifacts.ts";
 import { addMember, Client, clock, day, makeRoom, pushChange, type TestRoom } from "./support.ts";
 
@@ -1013,4 +1014,55 @@ describe("mint lane C: the due indexes reach a room stored before them (review 9
           expect(room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'")).toEqual([]);
         });
       }));
+
+  it("review 31ad41d5: a room at version 2 with the error scrub stopped mid-table, reopened: migration 3 adds the indexes and leaves the cursor; production alarms resume the scrub from its cursor, finish it and remove the cursor; a restart then changes nothing", () =>
+    ahead(async () => {
+      const before = await makeRoom();
+      const due = clock.now + 3600_000;
+      const jobTokensTable = ROOM_SCRUB_TABLES.findIndex((t) => t.table === "job_tokens");
+      expect(jobTokensTable).toBeGreaterThan(0);
+      const cursor = JSON.stringify({ table: jobTokensTable, after: "tok_a" });
+      await inDO(before, async (room, state) => {
+        await room.core.idle();
+        room.core.sql.all("DROP INDEX job_tokens_due");
+        room.core.sql.all("DROP INDEX check_jobs_due");
+        room.core.sql.all("UPDATE schema_version SET v = 2 WHERE id = 1");
+        // The scrub stopped in job_tokens after `tok_a`; `tok_b` and `tok_c` still hold legacy text, and `tok_held` is owned.
+        for (const id of ["tok_a", "tok_b", "tok_c"]) room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, ?)", id, due, due, LEGACY);
+        room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tok_held', ?, ?, 'held')", due, due);
+        room.core.sql.all("INSERT INTO meta (k, v) VALUES ('error_scrub', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", cursor);
+        await state.storage.deleteAlarm();
+      });
+      const r = await restarted(before);
+      const opened = await inDO(r, async (room, state) => ({
+        v: room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")[0]!["v"],
+        indexes: room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('job_tokens_due', 'check_jobs_due') ORDER BY name").map((x) => x["name"]),
+        cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'")[0]?.["v"],
+        alarm: await state.storage.getAlarm(),
+        plan: plan(room, JOB_TOKENS_DUE_SQL),
+      }));
+      expect(opened).toMatchObject({ v: 3, indexes: ["check_jobs_due", "job_tokens_due"], cursor, plan: ["SEARCH job_tokens USING COVERING INDEX job_tokens_due (next_ms<?)"] });
+      expect(opened.alarm).not.toBeNull(); // recovery stored the scrub's alarm, with no request
+      // Production alarms only.
+      for (let i = 0; i < 10; i++) {
+        if ((await inDO(r, (room) => room.core.sql.all("SELECT 1 AS x FROM meta WHERE k = 'error_scrub'"))).length === 0) break;
+        clock.now = Math.max(clock.now, (await stored(r)) ?? clock.now);
+        expect(await alarm(r)).toBe(true);
+        await settle(r);
+      }
+      const rows = async (x: TestRoom) => Object.fromEntries((await inDO(x, (room) => room.core.sql.all("SELECT token_id, expires_at, next_ms, last_error FROM job_tokens ORDER BY token_id"))).map((row) => [row["token_id"], row]));
+      const finished = await rows(r);
+      expect(await inDO(r, (room) => room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'"))).toEqual([]);
+      // Resumed after its cursor: the rows after it are safe; the row before it is not revisited.
+      expect([finished["tok_b"]!["last_error"], finished["tok_c"]!["last_error"]]).toEqual([safeJobStatus(LEGACY), safeJobStatus(LEGACY)]);
+      expect(safeJobStatus(LEGACY)).not.toBe(LEGACY);
+      expect(finished["tok_a"]!["last_error"]).toBe(LEGACY);
+      // Ownership and deadlines kept.
+      expect(finished["tok_held"]).toEqual({ token_id: "tok_held", expires_at: due, next_ms: due, last_error: "held" });
+      for (const id of ["tok_a", "tok_b", "tok_c"]) expect([finished[id]!["expires_at"], finished[id]!["next_ms"]]).toEqual([due, due]);
+      // A restart changes nothing.
+      const again = await restarted(r);
+      expect(await rows(again)).toEqual(finished);
+      expect(await inDO(again, (room) => ({ v: room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")[0]!["v"], cursor: room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'") }))).toEqual({ v: 3, cursor: [] });
+    }));
 });

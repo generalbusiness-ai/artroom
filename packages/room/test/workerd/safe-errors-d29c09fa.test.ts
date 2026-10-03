@@ -361,6 +361,9 @@ describe("request d29c09fa: in a founded room the upgrade drains through recover
       for (let i = 0; i < 10; i++) if (!(await runDurableObjectAlarm(again.stub as unknown as DurableObjectStub<Room>))) break;
       const after = await inDO(again, (room) => ({
         cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'").length,
+        // Mint lane C: the composed chain ran from version 1, the due indexes at 3.
+        v: room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")[0]!["v"],
+        indexes: room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('job_tokens_due', 'check_jobs_due') ORDER BY name").map((x) => x["name"]),
         gone: room.core.canonicalGone() !== null,
         rows: [
           room.core.sql.all("SELECT last_error FROM artroom_ws_duty WHERE reason = 'legacy'")[0]!["last_error"],
@@ -370,6 +373,8 @@ describe("request d29c09fa: in a founded room the upgrade drains through recover
       }));
       expect(after).toEqual({
         cursor: 0,
+        v: 3,
+        indexes: ["check_jobs_due", "job_tokens_due"],
         gone,
         rows: [`workspace step failed: ${WITHHELD}`, `snapshot step failed: ${WITHHELD}`, `revocation failed: ${WITHHELD}`],
       });

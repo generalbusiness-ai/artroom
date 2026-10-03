@@ -522,7 +522,7 @@ describe("request d29c09fa: the error upgrade drains in an unfounded room, throu
   const sample = ["legacy", "Founding", "Credential"].join("");
 
   /** Put a legacy provider text in a workspace step, set the store back to version 1, and reopen the object with no alarm stored. */
-  async function legacyReopened(id: string, where: "done" | "any"): Promise<{ founded: boolean; cursor: unknown[]; alarm: number | null; debt: boolean }> {
+  async function legacyReopened(id: string, where: "done" | "any"): Promise<{ founded: boolean; cursor: unknown[]; alarm: number | null; debt: boolean; chain: unknown }> {
     await runInDurableObject(roomStub(id), async (room: Room, state: DurableObjectState) => {
       expect(room.core.founded).toBe(false);
       const rows = room.core.sql.all(`SELECT id FROM artroom_ws_duty${where === "done" ? " WHERE state = 'done'" : ""} ORDER BY id`);
@@ -537,6 +537,14 @@ describe("request d29c09fa: the error upgrade drains in an unfounded room, throu
       cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'"),
       alarm: await state.storage.getAlarm(),
       debt: room.core.foundingDue() !== null,
+      // Mint lane C: the composed chain (scrub at 2, due indexes at 3) ran from version 1 in the unfounded room, and
+      // its next alarm is the earlier of the founding debt and the scrub's work.
+      chain: {
+        v: room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")[0]!["v"],
+        indexes: room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('job_tokens_due', 'check_jobs_due') ORDER BY name").map((x) => x["name"]),
+        due: room.core.unfoundedDue() === Math.min(...[room.core.foundingDue(), room.core.scrubDue()].filter((t): t is number => t !== null)),
+        scrubFirst: room.core.unfoundedDue() === room.core.scrubDue(),
+      },
     }));
   }
 
@@ -564,6 +572,7 @@ describe("request d29c09fa: the error upgrade drains in an unfounded room, throu
     expect(before.cursor).toHaveLength(1);
     expect(before.debt).toBe(false);
     expect(before.alarm).not.toBeNull(); // recovery stored the upgrade's alarm, with no founding debt left
+    expect(before.chain).toEqual({ v: 3, indexes: ["check_jobs_due", "job_tokens_due"], due: true, scrubFirst: true });
     // No founding retry, and no direct call to scrubErrors: the production recovery and alarm route.
     const after = await drained(id);
     expect(JSON.stringify(after.rows), "terminal legacy founding error remains without any cleanup alarm").not.toContain(sample);
@@ -580,6 +589,7 @@ describe("request d29c09fa: the error upgrade drains in an unfounded room, throu
     expect(before).toMatchObject({ founded: false, debt: true });
     expect(before.cursor).toHaveLength(1);
     expect(before.alarm).not.toBeNull();
+    expect(before.chain).toEqual({ v: 3, indexes: ["check_jobs_due", "job_tokens_due"], due: true, scrubFirst: true });
     advance(60_000);
     const after = await drained(id);
     expect(JSON.stringify(after.rows)).not.toContain(sample);
