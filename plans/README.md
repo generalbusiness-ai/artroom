@@ -21,7 +21,7 @@ Parent read every cited production path and test pattern. Read-only synthetic pr
 
 `packages/git/src/artifacts.ts:110,115` and `publisher/client.ts:84` retry non-idempotent canonical token creation after potentially applied internal errors (see artifacts.ts:60–68). `packages/room/src/logremote.ts:45` mints before its finally block. A lost answer can leave an unnamed token outside a cleanup owner's records; a usable publication answer can also be lost between mint and durable pushToken recording at landing/engine.ts:266–267. The ownership loss is evidenced, but a safe complete recovery design needs a contract decision: canonical inventories do not identify an owner and contain concurrent unrelated tokens. Do not turn this into a blanket revoke-all plan. Request explicit ownership of that design and its implementing lanes. Known tokens need durable handoffs; unknown effects need honest observation/retention or a documented provider completion fence. No unauthorized access or credential disclosure is claimed. Measured 60-second publication and longer pin token TTLs remain adopted behavior.
 
-Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A landed at `7be42275` (review `84b71c71`): see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lane B landed at `574568b2` (review `1266c4a7`): see [Mint lane B](#mint-lane-b-request-78f0971c). Lane C is implemented, pending review: see [Mint lane C](#mint-lane-c-request-5ff58c9a).
+Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A landed at `7be42275` (review `84b71c71`): see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lane B landed at `574568b2` (review `1266c4a7`): see [Mint lane B](#mint-lane-b-request-78f0971c). Lane C is implemented, pending review: see [Mint lane C](#mint-lane-c-request-5ff58c9a). The lane fork's read token for pinning, which the design left out of scope, is lane F (request `02836f9a`), implemented, pending review: see [Mint lane F](#mint-lane-f-request-02836f9a).
 
 ## Considered and excluded
 
@@ -948,3 +948,155 @@ Run at the exact head that carries this section, serially, with logs in `/privat
 ### Not changed here
 
 The fork read token in `pinObjects` (request `02836f9a`). `MintLedger`'s behaviour (lane A) and the publication token (lane B). Showing the ledger's records to admins stays with the cleanup projection request (`8d249233`). Requests `8bd623cc` (row writes) and `d29c09fa` (error sinks) touch `core.ts` and `jobs.ts`; this branch will merge main when they land.
+
+## Mint lane F (request 02836f9a)
+
+Status: DONE, pending checker exact-head review. Gitseq request `02836f9a`, branch `request/fork-token`, cut from main `965c911a`. The approved mint ownership design ([notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), "Out of scope", review `ad6cc052`) left one token outside every ledger: the 600-second read token that `Pinning.pinObjects` mints on the lane's fork. It had a hidden retry (`withRetry` around a create that may have applied) and a dropped revocation. This lane gives it a ledger owned by the fork's owner, and applies [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-2 to R-MINT-7) to it by analogy. The head for review is the commit that carries this section.
+
+**Scope.** New: `packages/git/src/workspace/fork-tokens.ts` (the ledger), `packages/git/test/fork-tokens.test.ts` (28 Node tests) and `packages/room/test/workerd/fork-token-02836f9a.test.ts` (7 Durable Object tests). Changed: `packages/git/src/workspace/workspaces.ts` (builds and owns the ledger, checks provenance for it, keeps its held tokens in the fork's sweep, two token indexes), `publisher/client.ts` (`withForkToken` removed; `Pinning` takes the ledger), `mints.ts` (exports `MINT_RETRY`, the retry limits, unchanged), `index.ts` (exports), the Git harness (`measure/harness/worker.ts`), `packages/room/src/artifacts.ts` and `core.ts` (the adapter passes the ledger; a `forkTokens` step and loop kind; `nextAlarm`), the source scan (`test/node/mint-sites-scan.test.ts`), and the two package READMEs. No Room migration. Nothing was deployed, no live Cloudflare call was made, and no credential was created, rotated or used.
+
+### Who owns the fork
+
+A lane fork has no durable store of its own. It is an Artifacts repository, and the only object that creates, provisions, sweeps and records it is the Room, through lane B's `Workspaces` on the Room's SQLite (`artroom_ws`, `artroom_ws_duty`). So `Workspaces` is the fork's lifecycle owner, and the ledger belongs to it: `Workspaces` builds a `ForkTokens` in its constructor and exposes it as `workspaces.forkTokens`. Its tables (`artroom_fork_mint`, `artroom_fork_mint_watch`, `artroom_fork_mint_summary`) sit beside the workspace tables. The canonical `MintLedger`, its tables and its records are not used: a fork token never appears in `room.core.mints.duties()` (R1 checks this).
+
+### What was built
+
+- **Before the create.** `mint(fork, purpose, ttl)` first looks the fork up through its owner, within the bounded wait (30 s, `MINT_WAIT_MS`). The owner checks provenance (`Workspaces.ourFork`): a repository at the fork's name that is not this room's fork, an absent fork, or one still being created is refused, and nothing is sent to it. Then one transaction writes the record as `sent` (fork, purpose `pin-objects:<head>`, read, 600 s, send time) and moves the takeover time 60 s ahead if it is less than 30 s away. Then the wake-up is awaited. If the record or the wake-up cannot be stored, the record is deleted and nothing is sent. After the wake-up, the record is checked to be still `sent`, then the create is sent and waited on for at most 30 s.
+- **The answer** is classified once, whenever it arrives. Usable: a token ID and text, read scope, and a readable expiry no later than the answer's arrival plus the lifetime asked, for a caller still waiting; the record becomes `held`. A token ID otherwise: `owed`, due at once, with its reported expiry or none. A refusal that changed nothing (`refusedUnchanged`): the record is deleted. Anything else, including a transport failure, `INTERNAL_ERROR`, an answer without an ID and the 30 s wait running out: `unknown`. A late answer is applied to its own record only, by its row ID and expected state, and never reaches a caller. If recording an answer fails, the record keeps its state and the ID is revoked at once; the record ends only when that revocation is answered.
+- **Retries.** The hidden retry is gone. Only `retriable()` errors (`INTERNAL_ERROR`, `UPSTREAM_UNAVAILABLE`) are retried, with the canonical ledger's limits (5 attempts, from 0.5 s), and each attempt is a new record, sent only after the earlier record holds its outcome (`unknown`). A transport failure or a lost answer is not retried.
+- **Release.** `withToken` revokes the token by its ID however the pin ends, waiting at most 30 s. An answer deletes the record. A failure, a timeout or a completion that does not commit makes it `owed`, due in 1 s; a late answer to that revocation changes nothing.
+- **Takeover.** The constructor (so each object start, in a founded room at `recover()`, which reaches it through `nextAlarm()`) turns every `sent` record into `unknown` and every `held` record into `owed`, due at once, in one indexed update.
+- **The alarm.** `reconcile()` keeps or clears the takeover time, starts a revocation pass (not awaited), and observes at most one fork (awaited, bounded). A pass takes at most 20 owed records due now, earliest due first, then by row ID (index `artroom_fork_mint_state`); one runs at a time; while it waits on an answer, owed records are not eligible before that attempt's timeout. A pass that finds expired records settles only those, with no lookup and no call, and ends. Otherwise each fork in the batch is looked up once, bounded and with provenance; each record's readable expiry is checked again immediately before its revocation; results are written in one transaction. Backoff: 1 s doubling to 5 min, never past a readable expiry. A record with no readable expiry is never settled by time.
+- **Watching unknown creates.** Each fork with unknown records has one watch row: its count of unknown records and its observation. An alarm observes at most one fork, the one due earliest (index `artroom_fork_mint_watch_due`): one bounded lookup and listing, `completeInventory`, at most 1,000 records, and a count of live tokens that nobody attributes by ID. A token counts as attributed if a ledger record names it (index `artroom_fork_mint_token`), or if the fork's owner holds it: the lane's lease token (`artroom_ws.token_id`) or a token revocation the workspace owes (`artroom_ws_duty.token_id`). Both are point lookups on two new indexes. Each observation makes one write, to that fork's watch row. The next is due after a wait doubling from 1 min to 6 h; a new unknown record never brings it sooner than 1 min after the last; a fork whose unknown records were all settled by their own late answers is not observed. No record is written, settled or revoked by an observation.
+- **`nextDue()`** is the earliest of the owed records' due time, the earliest fork observation, and the takeover time while a record is `sent` or `held`. A time already passed counts as now plus 1 s; a still-future time counts as itself.
+- **The fork's sweep** (R-WS-3; plans 001 and 002) now keeps the read tokens the ledger holds for a pin in progress, as well as the lease's recorded token.
+- **The Room.** `ArtifactsAdapter` passes a delegate to `workspaces.forkTokens` to `Pinning` (the workspaces are built once the room is founded). The alarm runs the ledger as its own step and loop kind, `forkTokens`: self-timed like `mints`, so a failure of the step takes that kind's backoff, which ends only when the step runs. `nextAlarm()` includes `forkTokens.nextDue()`, after that backoff. The kind is not in `NEEDS_REPOSITORY`: forks are separate repositories, so the ledger runs and is scheduled while the canonical repository is gone, as workspace cleanup is.
+- **Safe metadata.** Every stored error is `errorNote(stage, e)`, using the existing stages.
+- **The source scan** allows `workspace/fork-tokens.ts` one reach of `createToken`, as `mints.ts`, `workspaces.ts` and `snapshot/repos.ts` have; `publisher/client.ts` now reaches it nowhere, and a reach put back there fails the scan.
+
+### Where the fork ledger differs from section 32, and why
+
+| Rule | Canonical ledger | Fork ledger | Why |
+|---|---|---|---|
+| R-MINT-1 | Owner: `MintLedger`, the Room's canonical records | Owner: `Workspaces`, the fork's lifecycle owner; its own tables | The request's condition; R-MINT-1 says fork tokens are not canonical mints |
+| R-MINT-2 | Lifetime computed after the wake-up, then stored by a second update | Lifetime (fixed, 600 s) recorded with the record before the wake-up; after the wake-up the record is only checked to be still `sent` | There is no `notAfter`, so a slow wake-up cannot carry the lifetime past any bound. One write fewer per mint |
+| R-MINT-2 | One repository, looked up before the record | The fork is looked up, with provenance, before the record; every create, revocation and listing goes through the same check | A fork's name can be held by another repository (plan 002); nothing is ever sent to it |
+| R-MINT-3 | Scope asked; `notAfter` | Read scope only; no `notAfter` | Pinning asks for one kind of token, and no fork token has a deadline |
+| R-MINT-4 | `claim()` hands a token to another owner | No handoff: the caller always releases | Pinning uses the token only for the length of one sandbox call |
+| R-MINT-5 | Never revokes a token it cannot match by ID; never sweeps the canonical repository | The ledger never revokes a token it cannot match by ID. The fork's owner still sweeps the fork under R-WS-3 and plans 001 and 002: an inventory at lease end and around provisioning revokes every active token that no lease records. That rule is unchanged | The canonical repository holds other owners' tokens; a lane fork holds only the Room's own. A late-applied unknown read token can therefore be revoked by a later sweep of the fork, though never by this ledger, and its record stays `unknown` either way: a sweep never settles a record. This lane adds the ledger's held tokens to the sweep's keep set, so a sweep cannot cut a pin short |
+| R-MINT-5, R-MINT-7 | One shared observation of the canonical repository | One watch row per fork; at most one fork observed per alarm, earliest due first | Each fork is its own repository with its own listing |
+| R-MINT-7 | A known ID's keyed record is the ledger row, `job_tokens` or `artroom_land_token` | The ledger row (indexed by token ID); a lease token is keyed by `artroom_ws.token_id`, a workspace's owed revocation by `artroom_ws_duty.token_id` | The two workspace indexes make those point lookups |
+| R-MINT-7 | Not scheduled while the canonical repository is gone | Scheduled and run while it is gone | Forks are not the canonical repository |
+| Migrations | Lane C's indexes are Room migration 3 | No Room migration. The ledger's tables and indexes, and the two workspace indexes, are made by their owners' constructors (`CREATE … IF NOT EXISTS`), which run at every object start, so a stored room gains them at its first start after this change (F17) | These tables are the Git package's, not the Room schema's, as `artroom_mint` is. No legacy rows exist: the old code kept no record of fork tokens, so nothing needs to be moved |
+
+The exposure bound (R-MINT-6) is the same: an unknown or late-applied fork read token lasts at most its 600 s lifetime from when Artifacts applies it (open point 44). No lifetime changes.
+
+### Choices for the checker
+
+1. **The retry stays, as new records.** The request asked to remove the hidden retry; R-MINT-2 allows a retry as a new request with its own record, and the canonical half of the same pin retries that way. Removing every retry would make a transient `INTERNAL_ERROR` fail the proposal (the design rejected that for canonical sites). Each retry leaves its unknown predecessor kept and watched.
+2. **The step runs while the canonical repository is gone** (table above).
+3. **The fork's sweep keeps held read tokens.** Without it, a lease that ends during a pin revokes the pin's token. The sweep's other behaviour is unchanged. A create that applies but whose answer is not yet recorded can still be swept; the pin then fails and the proposal's 503 is retried, as before.
+4. **The owner's two indexes** are on existing workspace tables, made in the constructor. Building them over a stored room's `artroom_ws_duty` (which keeps settled rows) is a one-time cost at the first start.
+5. **A record left `sent` because the host stopped between the record and the send** becomes `unknown` at the next start, though nothing was sent. The ledger cannot tell it from one sent, so it keeps it, as the canonical ledger does.
+
+### Tests: rule map
+
+Node: `packages/git/test/fork-tokens.test.ts`, 28 tests (F1 to F22), against a fork double whose create can apply and then throw, lose its answer, hold its answer, answer late or refuse, and whose revocations can fail or be held; F15 to F18 and F20 go through the real owner, `Workspaces`. Room: `packages/room/test/workerd/fork-token-02836f9a.test.ts`, 7 tests (R1 to R7), real Room objects with Durable Object storage and stored alarms, alarms run only through `runDurableObjectAlarm`, hooks on one object or one world's fake repositories, and in R6 a write spy on that object's SQL only. Without this lane the Node file does not load and every Room test fails (there is no `workspaces.forkTokens`).
+
+| Condition or rule | Tests |
+|---|---|
+| Recorded durably before its create; a wake-up stored first (R-MINT-2) | F1, F2, F3, F18, R5 |
+| Owned by the fork's own ledger, not the canonical one | F15, F16, F17, F20, R1, the source scan |
+| No hidden non-idempotent retry; a retry is a new record (R-MINT-2) | F4, F5 (two), F6 |
+| Lost answer (R-MINT-3, R-MINT-5) | F4, R1, R6 |
+| Late apply (R-MINT-3, R-MINT-5, R-MINT-6) | F7 (late ID, late refusal, late loss; applied after a restart), R4 |
+| Failed revoke: owed by ID, bounded and backed-off retry, a late success not taken as success (R-MINT-4) | F9 (three), F12, F22, R2, R7 |
+| Restart between any two steps (R-MINT-4, R-MINT-7) | F10 (after the record, after the wake-up, while the answer is out, while held, while owed, during a revocation), F7, F15, F21, R3, R4 |
+| Never settled by time or inventory; never revokes an unattributed token (R-MINT-5) | F4, F7, F8, F13, R1, R4 |
+| Answers that cannot be used (R-MINT-3) | F8 |
+| A failed handoff (R-MINT-3) | F21 |
+| Wake-ups, takeover, overdue step (R-MINT-7) | F10, F11, F12, R1, R3, R4, R7 |
+| Bounded, indexed, earliest-first work; one write per observation; idle writes nothing (R-MINT-7) | F12, F13, F17, F19, F22, R6 |
+| Provenance; the owner's known tokens and sweep | F15, F16, F20 |
+| Safe metadata at the sinks | F9, R2 |
+| Duties pageable, without token text (R-MINT-5) | F14 |
+
+### Mutation table
+
+Each mutant was applied alone by a script (`/private/tmp/claude-501/-Users-hughpyle-play-gitseq/3a928963-7b06-44e6-b22a-1b24ab3c0e34/scratchpad/mutants.py`) to the committed tree, the named suites were run (N: the Node file; R: the Room file; S: the source scan), and the file was restored from its saved text; the tree was clean after each run. 45 mutants, all red. Every test in both new files is red under at least one. A first run at `adceb503` had 44 mutants and one survivor, L30: the pass's own expiry check already avoided a lookup, so F22 did not show what the settle-only pass is for. F22 now holds another record's revocation and checks that the expired record is settled at once. The 44 were run again at `873b5044`, and L34 was added for F6.
+
+| Mutant | File | Mutation | Suites | Red tests |
+|---|---|---|---|---|
+| L1 | `fork-tokens.ts` | no wake-up stored before the send | N, R | F1, F2, F10, F18, R5 |
+| L2 | `fork-tokens.ts` | a failed wake-up still sends | N, R | F2, F18, R5 |
+| L3 | `fork-tokens.ts` | the hidden retry back: the create retried under one record | N, R | F5 |
+| L4 | `fork-tokens.ts` | any failure retried, not only a transient one | N, R | F4, F13, F14, F19, F20, R1, R6 |
+| L5 | `fork-tokens.ts` | an unknown record settled by time (its lifetime) | N, R | F4, F7, R1, R4 |
+| L6 | `fork-tokens.ts` | an unknown record settled by a clean inventory | N, R | F4, F7, R1, R4 |
+| L7 | `fork-tokens.ts` | the observation revokes tokens no record names (a sweep) | N, R | F7, F8, F10, F20, R4 |
+| L8 | `fork-tokens.ts` | a late answer's ID left unknown | N, R | F7, F13 |
+| L9 | `fork-tokens.ts` | a late refusal leaves the record unknown | N, R | F7, F13 |
+| L10 | `fork-tokens.ts` | a failed revocation dropped (the record deleted) | N, R | F9, F10, F11, F12, F14, F22, R2, R7 |
+| L11 | `fork-tokens.ts` | a revocation with no answer in time taken as answered | N, R | F9 |
+| L12 | `fork-tokens.ts` | no backoff growth after a failed revocation | N, R | F9 |
+| L13 | `fork-tokens.ts` | settlement at an unreadable expiry | N, R | F8, F9 |
+| L14 | `fork-tokens.ts` | no takeover at a host's start | N, R | F7, F10, F15, F21, R3, R4 |
+| L15 | `fork-tokens.ts` | the takeover time left out of nextDue | N, R | F11 |
+| L16 | `fork-tokens.ts` | the takeover time not moved ahead by a live alarm | N, R | F11 |
+| L17 | `fork-tokens.ts` | overdue work returned as is (no 1 s step) | N, R | F10, F11, F12, R1, R3, R4, R7 |
+| L18 | `fork-tokens.ts` | an overdue step under 1 s | N, R | F10, F11, F12, R1, R3, R4, R7 |
+| L19 | `fork-tokens.ts` | a pass ordered by row ID, not due time | N, R | F12 |
+| L20 | `fork-tokens.ts` | an unbounded pass (1,000 a pass) | N, R | F12 |
+| L21 | `fork-tokens.ts` | the pass awaited by the alarm's work | N, R | F12 |
+| L22 | `fork-tokens.ts` | owed records eligible while a pass waits on an answer | N, R | F12 |
+| L23 | `fork-tokens.ts` | observations not earliest due first | N, R | F13 |
+| L24 | `fork-tokens.ts` | an observation written to each record | N, R | F13 |
+| L25 | `fork-tokens.ts` | a new unknown record brings the observation sooner than 1 min after the last | N, R | F13 |
+| L26 | `fork-tokens.ts` | a fork with no unknown records still observed | N, R | F13 |
+| L27 | `fork-tokens.ts` | a failed handoff: the token not revoked at once | N, R | F21 |
+| L28 | `fork-tokens.ts` | no expiry check after the fork lookup, before the revocation | N, R | F22 |
+| L29 | `fork-tokens.ts` | no expiry check before each later revocation | N, R | F22 |
+| L30 | `fork-tokens.ts` | settlement at expiry looks the fork up first (no settle-only pass) | N, R | F22 |
+| L31 | `fork-tokens.ts` | the fork lookup not bounded | N, R | F3 |
+| L32 | `fork-tokens.ts` | the create not bounded | N, R | F7, F13 |
+| L33 | `fork-tokens.ts` | a failed revocation stores the provider's text | N, R | F9, R2 |
+| L34 | `fork-tokens.ts` | a refusal that changed nothing kept as unknown | N, R | F6, F7, F13 |
+| O1 | `workspaces.ts` | the owner: provenance not checked before a request to the fork | N, R | F15 |
+| O2 | `workspaces.ts` | the owner: the sweep's keep set without the held fork tokens | N, R | F16 |
+| O3 | `workspaces.ts` | the owner: its known token lookups dropped | N, R | F20 |
+| O4 | `workspaces.ts` | the owner: its token indexes not made | N, R | F17 |
+| O5 | `workspaces.ts` | the owner: with no wake-up store, the fork token is still sent | N, R | F18 |
+| C1 | `client.ts` | pinObjects mints the fork token directly, outside the ledger (as before) | S, R | R1, R2, R3, R4, R5, R6, source scan (3) |
+| K1 | `core.ts` | the Room: the forkTokens step does nothing | R | R1, R2, R3, R4, R6, R7 |
+| K2 | `core.ts` | the Room: nextAlarm leaves out the fork ledger | R | R1, R7 |
+| K3 | `core.ts` | the Room: the step ignores its fence | R | R7 |
+| K4 | `core.ts` | the Room: nextAlarm ignores the fence | R | R7 |
+| K5 | `core.ts` | the Room: the fork ledger's kind not self-timed | R | R7 |
+
+### Gates
+
+Run serially under bash at `873b5044` (the code head; this head differs from it only in this file), by `gates.sh` in the scratch directory, each exit code recorded. The same gates run again at this head; their exit codes are in the delivery report.
+
+| Gate | Exit | Tests |
+|---|---|---|
+| `npm ci` | 0 | |
+| `npm run typecheck` (root) | 0 | |
+| `npm test` (root) | 0 | every workspace's `test`: Git Node 332; Room node 202 and workerd 518; the other packages as on main |
+| `npm run typecheck -w @generalbusiness/artroom-git` | 0 | |
+| `npm test -w @generalbusiness/artroom-git` (Node) | 0 | 332 passed, 0 failed (304 on main plus the 28 of `fork-tokens.test.ts`) |
+| `npm run test:workers -w @generalbusiness/artroom-git` | 0 | 11 passed |
+| `npm run typecheck -w @generalbusiness/artroom-room` | 0 | |
+| `npm run test:node -w @generalbusiness/artroom-room` | 0 | 202 passed (15 files) |
+| `npm run test:workerd -w @generalbusiness/artroom-room` | 0 | 518 passed (39 files; 511 on main plus the 7 of `fork-token-02836f9a.test.ts`) |
+| `npm exec -w @generalbusiness/artroom-room -- wrangler deploy --dry-run` | 0 | bundles only; nothing uploaded |
+| The Git harness: `tsc` with a scratch tsconfig over `src` and `measure/harness/worker.ts` | 0 | |
+| The Git harness: `wrangler deploy --dry-run -c measure/harness/wrangler.jsonc` | 0 | bundles only; nothing uploaded |
+
+The tree was clean before and after the gates.
+
+### Not changed here
+
+- The fork's sweep rule (R-WS-3, plans 001 and 002), apart from keeping the held read tokens.
+- The protocol text. Section 32 stays about canonical mints; this section records the analogy. If the checker wants R-MINT-1 to name the fork ledger, that is a contract change for its own request.
+- The lease token mint in `workspaces.ts`, and snapshot repository tokens.
+- Showing the fork ledger's records to admins: `forkTokens.duties()` pages them, as `mints.duties()` does, for the cleanup projection request (`8d249233`).
