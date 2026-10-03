@@ -57,13 +57,13 @@ import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, SnapshotPort, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, knownArtifactsCode, publicationTokens } from "@generalbusiness/artroom-git";
+import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, knownArtifactsCode, publicationTokens, scrubBatch, type ScrubCursor } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
 import { issueJobs, oweJobs } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
-import { PUBLICATION_CODES, createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
+import { PUBLICATION_CODES, ROOM_SCRUB_TABLES, createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
 import { report, toConsole } from "./diag.ts";
 import { matchGlob } from "./glob.ts";
@@ -1773,6 +1773,8 @@ export class RoomCore {
     mints: async (due: LoopDue = this.loopAllowed) => {
       if (due("mints")) await this.reconcileMints();
     },
+    // The one-time upgrade of error fields stored before request d29c09fa: one bounded batch per run.
+    errors: async () => this.scrubErrors(),
   } as const;
 
   /** Start one durable step now, in the background. A commit's own work is not held back by an earlier failure's backoff. */
@@ -1840,6 +1842,22 @@ export class RoomCore {
    */
   async reconcileMints(): Promise<void> {
     if (this.founded) await this.mints.reconcile();
+  }
+
+  /**
+   * One batch of the upgrade migration 2 started (request d29c09fa): at most
+   * `SCRUB_BATCH` rows of one table, in one transaction with its cursor. The
+   * last batch deletes the cursor; with none stored this reads one meta row
+   * and writes nothing.
+   */
+  scrubErrors(): void {
+    const stored = getMeta(this.sql, "error_scrub");
+    if (stored === null) return;
+    this.sql.transaction(() => {
+      const next = scrubBatch(this.sql, ROOM_SCRUB_TABLES, JSON.parse(stored) as ScrubCursor);
+      if (next) setMeta(this.sql, "error_scrub", JSON.stringify(next));
+      else this.sql.all("DELETE FROM meta WHERE k = 'error_scrub'");
+    });
   }
 
   /**
@@ -1954,6 +1972,8 @@ export class RoomCore {
     if (revoke !== null) times.push(revoke);
     // The 5-second loop, while its work makes progress; each kind on its own backoff after a failure (budgets.ts `ALARM`).
     for (const kind of this.loopPendingKinds()) if (this.loopAllowed(kind)) times.push(backoff[kind]?.next ?? now + ALARM.pendingIntervalMs);
+    // The error upgrade (request d29c09fa), until its last batch.
+    if (getMeta(this.sql, "error_scrub") !== null) times.push(now);
     // Log publication: when due, never sooner than the loop's interval from now.
     const publication = this.publicationDueAt();
     if (publication !== null) times.push(Math.max(publication, now + ALARM.pendingIntervalMs));

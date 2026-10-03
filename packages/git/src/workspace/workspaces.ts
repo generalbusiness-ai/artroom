@@ -531,7 +531,8 @@ export class Workspaces {
       const info = await fork.info();
       // Positive provenance: exactly a fork of this canonical repo, in this namespace.
       if (info.source !== `artifacts:${this.namespace}/${this.canonical}`) {
-        throw new NotOurFork(`A repository named ${name} exists but is not a fork of ${this.namespace}/${this.canonical}. It was not used or changed.`);
+        // A fixed message: the stored and shown error keeps no names (request d29c09fa).
+        throw new NotOurFork("A repository at the lane's fork name is not a fork of the room's repository. It was not used or changed.");
       }
       return { kind: "ours", fork, remote: info.remote };
     } catch (e) {

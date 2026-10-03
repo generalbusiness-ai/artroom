@@ -71,6 +71,7 @@ export type { ErrorStage, LedgerToken, MintDuties, MintDuty, MintLedgerOptions, 
 export { EMPTY_TREE_SHA, FIRST_COMMIT_IDENTITY, FIRST_COMMIT_MESSAGE, firstCommit, pushFirstCommit } from "./first-commit.ts";
 export type { FirstCommitOutcome, LooseObject } from "./first-commit.ts";
 export type { ArtifactsNamespace, CreatedRepo, RepoHandle } from "./artifacts.ts";
-export { WITHHELD, isSafeErrorText, safeErrorText, scrubLegacyErrors } from "./safe-errors.ts";
+export { SCRUB_BATCH, SCRUB_TABLES, WITHHELD, isSafeErrorText, safeErrorText, scrubBatch, scrubLegacyErrors } from "./safe-errors.ts";
+export type { ScrubCursor, ScrubTable } from "./safe-errors.ts";
 export { durableSql } from "./sql.ts";
 export type { Sql, SqlRow, SqlValue } from "./sql.ts";

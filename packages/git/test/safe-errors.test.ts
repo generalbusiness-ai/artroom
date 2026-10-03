@@ -13,7 +13,7 @@ import { ContainerPublisher, type PublisherStub } from "../src/publisher/client.
 import { GitError, type GitOps } from "../src/publisher/gitops.ts";
 import { outcomeNote } from "../src/publisher/push-outcome.ts";
 import type { ArtifactsNamespace, RepoHandle } from "../src/artifacts.ts";
-import { WITHHELD, isSafeErrorText, safeErrorText, scrubLegacyErrors } from "../src/safe-errors.ts";
+import { type ScrubCursor, type ScrubTable, WITHHELD, isSafeErrorText, safeErrorText, scrubBatch, scrubLegacyErrors } from "../src/safe-errors.ts";
 import { Clock, ControlledPublisher, ECHOED, FakeRoom, FakeTokens, Fixture, actId, echoNote, echoing, everyRow, laneId, noEcho, nodeSql, opId } from "./support.ts";
 
 async function world() {
@@ -172,7 +172,7 @@ test("d29c09fa: the shared validator accepts every form the sinks write, and not
     "outcome unknown; 3 live token(s) on the canonical repository not accounted for at 2026-10-02T12:00:00.000Z",
     "held",
     "2 token cleanup step(s) on the fork are still owed; trying again later",
-    "A repository named canon--act_1 exists but is not a fork of ns/canon. It was not used or changed.",
+    "A repository at the lane's fork name is not a fork of the room's repository. It was not used or changed.",
     `landing step failed: ${WITHHELD}`,
   ];
   for (const t of ok) assert.ok(isSafeErrorText(t), t);
@@ -185,6 +185,7 @@ test("d29c09fa: the shared validator accepts every form the sinks write, and not
     `answer lost: ${legacy()}`,
     "integration failed: ArtifactsError",
     "integration failed: Error SOMETHING_NEW",
+    `A repository named ${ECHOED[0]} exists but is not a fork of ns/canon. It was not used or changed.`,
     "",
   ];
   for (const t of bad) assert.ok(!isSafeErrorText(t), t);
@@ -213,11 +214,15 @@ test("d29c09fa, reopen: a landing record stored with provider text shows only sa
   assert.equal(reopened.status()?.lastError, `main could not be read: ${WITHHELD}`);
   noEcho("the reopened projections", reopened.status(), reopened.view(w.id), reopened.activeViews(), w.room.log);
   // The scrub rewrites the rows, and a second run changes nothing.
-  assert.equal(scrubLegacyErrors(w.sql), 1);
+  scrubLegacyErrors(w.sql);
   const rec = reopened.core.get(w.id)!;
   assert.deepEqual([rec.lastError, rec.pushes![0]!.detail], [`main could not be read: ${WITHHELD}`, `push did not answer: ${WITHHELD}`]);
   noEcho("the scrubbed rows", everyRow(w.sql));
-  assert.equal(scrubLegacyErrors(w.sql), 0);
+  {
+    const once = everyRow(w.sql);
+    scrubLegacyErrors(w.sql); // a second run changes nothing
+    assert.equal(everyRow(w.sql), once);
+  }
 });
 
 test("d29c09fa: the scrub keeps safe values as they are", async (t) => {
@@ -227,6 +232,51 @@ test("d29c09fa: the scrub keeps safe values as they are", async (t) => {
   w.pub.push = () => Promise.reject(echoing());
   await w.engine.publish();
   const before = everyRow(w.sql);
-  assert.equal(scrubLegacyErrors(w.sql), 0);
+  {
+    const once = everyRow(w.sql);
+    scrubLegacyErrors(w.sql); // a second run changes nothing
+    assert.equal(everyRow(w.sql), once);
+  }
   assert.equal(everyRow(w.sql), before);
+});
+
+test("d29c09fa: a terminal landing record keeps its body, and the upgrade rewrites only its error fields", async (t) => {
+  const w = await world();
+  t.after(w.dispose);
+  await reserved(w);
+  assert.equal(await w.engine.publish(), true);
+  assert.equal(w.engine.view(w.id)?.state, "landed");
+  const body = JSON.parse(String(w.sql.all("SELECT body FROM artroom_land_op WHERE id = ?", w.id)[0]!["body"]));
+  const legacyBody = { ...body, lastError: legacy("integration failed: "), pushes: body.pushes.map((p: object) => ({ ...p, detail: legacy() })) };
+  w.sql.all("UPDATE artroom_land_op SET body = ? WHERE id = ?", JSON.stringify(legacyBody), w.id);
+  scrubLegacyErrors(w.sql);
+  const after = JSON.parse(String(w.sql.all("SELECT body FROM artroom_land_op WHERE id = ?", w.id)[0]!["body"]));
+  // Everything but the two error fields is as it was: state, receipt, tokens, outcomes, timing.
+  assert.deepEqual(after, { ...body, lastError: `integration failed: ${WITHHELD}`, pushes: body.pushes.map((p: object) => ({ ...p, detail: `landing step failed: ${WITHHELD}` })) });
+  noEcho("a terminal record", everyRow(w.sql));
+});
+
+test("d29c09fa: the upgrade runs in bounded batches with a cursor, skips a table that does not exist, and ends", () => {
+  const sql = nodeSql();
+  sql.all("CREATE TABLE t (id INTEGER PRIMARY KEY, last_error TEXT)");
+  const values = [legacy(), "held", null, legacy("revocation failed: "), echoNote("create failed"), legacy(), legacy()];
+  values.forEach((v, i) => sql.all("INSERT INTO t (id, last_error) VALUES (?, ?)", i + 1, v));
+  const tables: ScrubTable[] = [
+    { table: "missing", key: "id", columns: ["last_error"], fix: () => ({ last_error: "x" }) },
+    { table: "t", key: "id", columns: ["last_error"], fix: (r) => (typeof r["last_error"] === "string" && !isSafeErrorText(r["last_error"]) ? { last_error: safeErrorText(r["last_error"], "revocation failed") } : null) },
+  ];
+  const changed = () => sql.all("SELECT id FROM t WHERE last_error LIKE '%withheld'").map((r) => r["id"]);
+  let c: ScrubCursor | null = scrubBatch(sql, tables, { table: 0, after: null }, 3);
+  assert.deepEqual(c, { table: 1, after: null });
+  c = scrubBatch(sql, tables, c!, 3);
+  assert.deepEqual([c, changed()], [{ table: 1, after: 3 }, [1]]);
+  c = scrubBatch(sql, tables, c!, 3);
+  assert.deepEqual([c, changed()], [{ table: 1, after: 6 }, [1, 4, 6]]);
+  c = scrubBatch(sql, tables, c!, 3);
+  assert.deepEqual([c, changed()], [null, [1, 4, 6, 7]]);
+  assert.deepEqual(
+    sql.all("SELECT last_error FROM t ORDER BY id").map((r) => r["last_error"]),
+    [`revocation failed: ${WITHHELD}`, "held", null, `revocation failed: ${WITHHELD}`, echoNote("create failed"), `revocation failed: ${WITHHELD}`, `revocation failed: ${WITHHELD}`],
+  );
+  noEcho("the upgraded rows", everyRow(sql));
 });

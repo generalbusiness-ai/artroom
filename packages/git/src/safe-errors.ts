@@ -6,11 +6,16 @@
  * itself. `isSafeErrorText` accepts exactly that language and nothing else,
  * so a value written before the rule (provider text, even redacted) never
  * passes. `safeErrorText` is what a projection shows and what the one-time
- * scrub (`scrubLegacyErrors`) stores: the value if it is safe, otherwise a
- * fixed phrase, `<stage>: legacy error withheld`.
+ * upgrade (`scrubBatch`) stores: the value if it is safe, otherwise a fixed
+ * phrase, `<stage>: legacy error withheld`.
+ *
+ * The language has no free-text production: every part is a fixed phrase, a
+ * name or code from a fixed list, a bounded integer or a timestamp. So a
+ * value it accepts cannot hold provider text, whatever wrote it; any other
+ * value is replaced whole, never cleaned.
  */
 
-import type { Sql } from "./sql.ts";
+import type { Sql, SqlRow, SqlValue } from "./sql.ts";
 import { ERROR_STAGES, type ErrorStage, SAFE_CODES, SAFE_NAMES } from "./mints.ts";
 import { ARTIFACTS_REFUSALS } from "./publisher/push-outcome.ts";
 
@@ -25,7 +30,6 @@ const NOTE = `${STAGE}: (?:${NAME}(?: (?:${alt(SAFE_CODES)}))?(?: \\(\\d{1,5}\\)
 /** `outcomeNote`'s output. */
 const OUTCOME = `push answered: (?:landed|error|unknown|rejected \\((?:lease|non-fast-forward|remote-rejected)\\)(?: (?:${alt(ARTIFACTS_REFUSALS)}))?)`;
 const ISO = "\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z";
-const NAMEPART = "[A-Za-z0-9._-]{1,100}";
 const SAFE = new RegExp(
   "^(?:" +
     [
@@ -42,7 +46,7 @@ const SAFE = new RegExp(
       "ended|held|minting|refused|malformed answer",
       // Workspaces' own failures (`CleanupOwed`, `NotOurFork`).
       "\\d{1,9} token cleanup step\\(s\\) on the fork are still owed; trying again later",
-      `A repository named ${NAMEPART} exists but is not a fork of ${NAMEPART}/${NAMEPART}\\. It was not used or changed\\.`,
+      "A repository at the lane's fork name is not a fork of the room's repository\\. It was not used or changed\\.",
     ].join("|") +
     ")$",
 );
@@ -64,55 +68,97 @@ export function safeErrorText<T extends string | null | undefined>(text: T, fall
 
 const tableExists = (sql: Sql, name: string) => sql.all("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = ?", name).length > 0;
 
+/** A table whose error fields the upgrade makes safe: its key, the columns it reads, and the change for one row (null: none). */
+export interface ScrubTable {
+  readonly table: string;
+  readonly key: string;
+  readonly columns: readonly string[];
+  readonly fix: (row: SqlRow) => Readonly<Record<string, SqlValue>> | null;
+}
+
+/** Where the upgrade is: the index of its table in the list, and the last key done there. */
+export interface ScrubCursor {
+  readonly table: number;
+  readonly after: SqlValue;
+}
+
+/** The most rows one upgrade batch reads, and so writes. */
+export const SCRUB_BATCH = 500;
+
+const unsafe = (v: SqlValue | undefined): v is string => typeof v === "string" && !isSafeErrorText(v);
+
 /**
- * Rewrite every error field this package stores (request d29c09fa) that is
- * not safe: the landing records' `lastError` and push attempts' `detail`,
- * workspaces' `error` and their steps' `last_error`, and snapshot steps'
- * `last_error`. Safe values stay, so a second run changes nothing. Run it
- * inside the host's migration transaction; a table that does not exist yet
- * is skipped. Returns how many rows it rewrote.
+ * This package's mutable error fields (request d29c09fa), in every row,
+ * terminal and completed ones too: the landing records' `lastError` and push
+ * attempts' `detail` (the record's JSON body; ownership, tokens, outcomes and
+ * timing are left as they are), workspaces' `error` (revoked rows keep it),
+ * and workspace and snapshot steps' `last_error`. Safe values stay.
  */
-export function scrubLegacyErrors(sql: Sql): number {
-  let n = 0;
-  if (tableExists(sql, "artroom_land_op")) {
-    for (const r of sql.all("SELECT id, body FROM artroom_land_op")) {
+export const SCRUB_TABLES: readonly ScrubTable[] = [
+  {
+    table: "artroom_land_op",
+    key: "id",
+    columns: ["body"],
+    fix: (r) => {
       const body = JSON.parse(String(r["body"])) as { lastError?: string; pushes?: { detail?: string | null }[] };
       let changed = false;
-      if (typeof body.lastError === "string" && !isSafeErrorText(body.lastError)) {
+      if (unsafe(body.lastError)) {
         body.lastError = safeErrorText(body.lastError, "landing step failed");
         changed = true;
       }
       for (const p of body.pushes ?? []) {
-        if (typeof p.detail === "string" && !isSafeErrorText(p.detail)) {
-          p.detail = safeErrorText(p.detail, "landing step failed");
+        if (unsafe(p.detail ?? undefined)) {
+          p.detail = safeErrorText(p.detail as string, "landing step failed");
           changed = true;
         }
       }
-      if (changed) {
-        sql.all("UPDATE artroom_land_op SET body = ? WHERE id = ?", JSON.stringify(body), r["id"] as string);
-        n++;
-      }
-    }
-  }
-  if (tableExists(sql, "artroom_ws")) {
-    for (const r of sql.all("SELECT lane, error FROM artroom_ws WHERE error IS NOT NULL")) {
-      const error = JSON.parse(String(r["error"])) as { message?: unknown };
-      if (isSafeErrorText(error.message)) continue;
+      return changed ? { body: JSON.stringify(body) } : null;
+    },
+  },
+  {
+    table: "artroom_ws",
+    key: "lane",
+    columns: ["error"],
+    fix: (r) => {
+      if (typeof r["error"] !== "string") return null;
+      const error = JSON.parse(r["error"]) as { message?: unknown };
+      if (isSafeErrorText(error.message)) return null;
       error.message = safeErrorText(typeof error.message === "string" ? error.message : "", "could not provision the workspace");
-      sql.all("UPDATE artroom_ws SET error = ? WHERE lane = ?", JSON.stringify(error), r["lane"] as string);
-      n++;
-    }
+      return { error: JSON.stringify(error) };
+    },
+  },
+  { table: "artroom_ws_duty", key: "id", columns: ["last_error"], fix: (r) => (unsafe(r["last_error"]) ? { last_error: safeErrorText(r["last_error"], "workspace step failed") } : null) },
+  { table: "artroom_snap_duty", key: "id", columns: ["last_error"], fix: (r) => (unsafe(r["last_error"]) ? { last_error: safeErrorText(r["last_error"], "snapshot step failed") } : null) },
+];
+
+/**
+ * One bounded upgrade batch: at most `limit` rows of one table, after the
+ * cursor, each rewritten only if it holds an unsafe value. Call it inside a
+ * transaction and store what it returns: the next cursor, or null when every
+ * table is done. A table that does not exist holds nothing written before the
+ * rule. Running a batch again changes nothing it already made safe.
+ */
+export function scrubBatch(sql: Sql, tables: readonly ScrubTable[], cursor: ScrubCursor, limit = SCRUB_BATCH): ScrubCursor | null {
+  const t = tables[cursor.table];
+  if (!t) return null;
+  const next = (): ScrubCursor | null => (cursor.table + 1 < tables.length ? { table: cursor.table + 1, after: null } : null);
+  if (!tableExists(sql, t.table)) return next();
+  const cols = [t.key, ...t.columns].join(", ");
+  const rows =
+    cursor.after === null
+      ? sql.all(`SELECT ${cols} FROM ${t.table} ORDER BY ${t.key} LIMIT ?`, limit)
+      : sql.all(`SELECT ${cols} FROM ${t.table} WHERE ${t.key} > ? ORDER BY ${t.key} LIMIT ?`, cursor.after, limit);
+  for (const r of rows) {
+    const set = t.fix(r);
+    if (!set) continue;
+    const names = Object.keys(set);
+    sql.all(`UPDATE ${t.table} SET ${names.map((n) => `${n} = ?`).join(", ")} WHERE ${t.key} = ?`, ...names.map((n) => set[n]!), r[t.key]!);
   }
-  for (const [table, fallback] of [
-    ["artroom_ws_duty", "workspace step failed"],
-    ["artroom_snap_duty", "snapshot step failed"],
-  ] as const) {
-    if (!tableExists(sql, table)) continue;
-    for (const r of sql.all(`SELECT id, last_error FROM ${table} WHERE last_error IS NOT NULL`)) {
-      if (isSafeErrorText(r["last_error"])) continue;
-      sql.all(`UPDATE ${table} SET last_error = ? WHERE id = ?`, safeErrorText(String(r["last_error"]), fallback), r["id"] as number);
-      n++;
-    }
-  }
-  return n;
+  return rows.length === limit ? { table: cursor.table, after: rows[rows.length - 1]![t.key]! } : next();
+}
+
+/** Every batch at once, for a host with no alarm (tests, harnesses). The Room runs one batch per alarm. */
+export function scrubLegacyErrors(sql: Sql, tables: readonly ScrubTable[] = SCRUB_TABLES): void {
+  let c: ScrubCursor | null = { table: 0, after: null };
+  while (c) c = sql.transaction(() => scrubBatch(sql, tables, c!));
 }

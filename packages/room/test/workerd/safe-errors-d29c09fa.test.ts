@@ -37,8 +37,9 @@ function echoing(fields: Record<string, unknown> = { code: "INTERNAL_ERROR", num
 const echoNote = (stage: string) => `${stage}: Error INTERNAL_ERROR (10400) status 503`;
 
 /** Every row of every table, the reads, and the operator diagnoses: none may hold the provider's text. */
-async function clean(r: TestRoom, extra: unknown[] = []): Promise<void> {
+async function clean(r: TestRoom, extra: unknown[] = [], opts: { rows: boolean } = { rows: true }): Promise<void> {
   const rows = await inDO(r, (room) => {
+    if (!opts.rows) return [];
     const tables = room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").map((x) => String(x["name"]));
     return tables.map((t) => [t, room.core.sql.all(`SELECT * FROM "${t}"`)]);
   });
@@ -180,7 +181,7 @@ describe("request d29c09fa: a failed log publication stores and names a known co
 });
 
 describe("request d29c09fa: rows stored with provider text before the rule, reopened", () => {
-  it("migration 2 rewrites every legacy error field at rest when the object opens, before any retry, and no projection shows the text; safe values stay", async () => {
+  it("on reopen no projection shows the text, before any retry; migration 2's upgrade then rewrites every legacy error field at rest in bounded batches, terminal rows included, and stops; safe values and state stay", async () => {
     const { r, op, lane } = await accepted();
     await ready(r, op);
     await inDO(r, async (room) => {
@@ -251,6 +252,39 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
       tid_legacy_held: "held",
       "mint:job_safe_1": "answer lost: create failed: Error INTERNAL_ERROR (10400)",
     });
+    // Before the upgrade's first batch, a row may still hold the text; nothing shown does.
+    await clean(again, [shown, wsView], { rows: false });
+
+    // Migration 2 only started the upgrade: its cursor is stored, and the alarm is due now while it lasts.
+    const started = await inDO(again, (room) => ({
+      cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'")[0]?.["v"],
+      due: room.core.nextAlarm()! <= room.core.now(),
+      tokens: room.core.sql.all("SELECT token_id, expires_at, next_ms, attempts FROM job_tokens ORDER BY token_id"),
+    }));
+    expect(started.cursor).toBe(JSON.stringify({ table: 0, after: null }));
+    expect(started.due).toBe(true);
+    // One bounded batch per run, until the last deletes the cursor.
+    let batches = 0;
+    while (await inDO(again, (room) => room.core.sql.all("SELECT 1 AS x FROM meta WHERE k = 'error_scrub'").length > 0)) {
+      await inDO(again, (room) => room.core.scrubErrors());
+      expect(++batches).toBeLessThan(20);
+    }
+    // Ownership, expiry, retry timing and kinds of the job tokens are as they were; only their errors changed.
+    expect(await inDO(again, (room) => room.core.sql.all("SELECT token_id, expires_at, next_ms, attempts FROM job_tokens ORDER BY token_id"))).toEqual(started.tokens);
+    expect(Object.fromEntries((await inDO(again, (room) => jobTokenDuties(room.core))).map((d) => [d.token, d.kind]))).toMatchObject({
+      "mint:job_legacy_1": "unknown-mint",
+      tid_legacy_revoke: "revoke",
+      tid_legacy_held: "held",
+    });
+    // Done: a further run writes nothing.
+    const done = await inDO(again, (room) => {
+      const tables = room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").map((x) => String(x["name"]));
+      const dump = () => JSON.stringify(tables.map((t) => room.core.sql.all(`SELECT * FROM "${t}"`)));
+      const before = dump();
+      room.core.scrubErrors();
+      return before === dump();
+    });
+    expect(done).toBe(true);
 
     // The rows themselves are rewritten, and the store is at version 2.
     const rows = await inDO(again, (room) => {

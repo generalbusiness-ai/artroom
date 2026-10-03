@@ -10,7 +10,7 @@
 
 import type { Digest, Seq } from "@generalbusiness/artroom-contract";
 import type { Sql, SqlRow, SqlValue } from "./ports.ts";
-import { isSafeErrorText, knownArtifactsCode, safeErrorText, scrubLegacyErrors } from "@generalbusiness/artroom-git";
+import { SCRUB_TABLES, isSafeErrorText, knownArtifactsCode, safeErrorText, type ScrubCursor, type ScrubTable } from "@generalbusiness/artroom-git";
 
 /**
  * Version 1: the base schema. The spike deployment's earlier versions (2 to
@@ -168,20 +168,33 @@ export function safeJobStatus(text: string | null): string | null {
   return safeErrorText(text, "revocation failed");
 }
 
+/** The Room's tables the upgrade makes safe: the Git package's, then the job tokens (their state words, `held` and the rest, are safe and stay). */
+export const ROOM_SCRUB_TABLES: readonly ScrubTable[] = [
+  ...SCRUB_TABLES,
+  {
+    table: "job_tokens",
+    key: "token_id",
+    columns: ["last_error"],
+    fix: (r) => {
+      const was = str(r, "last_error");
+      const now = safeJobStatus(was);
+      return now !== was ? { last_error: now } : null;
+    },
+  },
+];
+
 /**
- * Version 2 (request d29c09fa): every error field stored before the
- * safe-metadata rule is rewritten to safe metadata. Safe values stay; any
- * other becomes `<stage>: legacy error withheld`. The Git package's tables
- * (landing records, workspaces, snapshot steps), the job tokens, and the
- * publication's code (an unknown one becomes `transport`).
+ * Version 2 (request d29c09fa): error fields stored before the safe-metadata
+ * rule are upgraded. This step only starts it, in O(1): it stores the
+ * upgrade's cursor (`error_scrub`) when a table that could hold such a field
+ * has rows, and makes an unknown publication code `transport`. The alarm then
+ * runs one bounded batch at a time (`RoomCore.scrubErrors`, `SCRUB_BATCH`
+ * rows) and deletes the cursor when every table is done; nothing runs after
+ * that. Signed history (entries, records, acts) is never rewritten.
  */
 function scrubErrors(sql: Sql): void {
-  scrubLegacyErrors(sql);
-  for (const r of sql.all("SELECT token_id, last_error FROM job_tokens WHERE last_error IS NOT NULL")) {
-    const was = str(r, "last_error");
-    const now = safeJobStatus(was);
-    if (now !== was) sql.all("UPDATE job_tokens SET last_error = ? WHERE token_id = ?", now, str(r, "token_id"));
-  }
+  const held = (t: string) => one(sql, "SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = ?", t) !== undefined && one(sql, `SELECT 1 AS x FROM ${t} LIMIT 1`) !== undefined;
+  if (ROOM_SCRUB_TABLES.some((t) => held(t.table))) setMeta(sql, "error_scrub", JSON.stringify({ table: 0, after: null } satisfies ScrubCursor));
   const code = getMeta(sql, "publication_error");
   if (code !== null && code !== "transport" && !PUBLICATION_CODES.has(code) && knownArtifactsCode({ code }) === null) setMeta(sql, "publication_error", "transport");
 }

@@ -1594,9 +1594,15 @@ test("d29c09fa, reopen: a failed workspace and steps stored with provider text s
   assert.ok(v?.state === "failed");
   assert.equal(v.error.message, `could not provision the workspace: ${WITHHELD}`);
   noEcho("the reopened view", v, reopened.duties());
-  assert.equal(scrubLegacyErrors(sql), 1 + stepErrors(reopened).length);
+  // Ending the workspace does not erase its row: a revoked row keeps its error, and the upgrade covers it too.
+  sql.all("UPDATE artroom_ws SET state = 'revoked' WHERE lane = ?", lane);
+  scrubLegacyErrors(sql);
   assert.equal(JSON.parse(String(sql.all("SELECT error FROM artroom_ws WHERE lane = ?", lane)[0]!["error"])).message, `could not provision the workspace: ${WITHHELD}`);
   for (const [, e] of stepErrors(reopened)) assert.equal(e, `workspace step failed: ${WITHHELD}`);
   noEcho("the scrubbed rows", everyRow(sql));
-  assert.equal(scrubLegacyErrors(sql), 0);
+  {
+    const once = everyRow(sql);
+    scrubLegacyErrors(sql); // a second run changes nothing
+    assert.equal(everyRow(sql), once);
+  }
 });

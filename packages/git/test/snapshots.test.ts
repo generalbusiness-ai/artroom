@@ -665,11 +665,15 @@ test("d29c09fa, reopen: snapshot steps stored with provider text are rewritten o
   const [first] = sql.all("SELECT id FROM artroom_snap_duty ORDER BY id").map((r) => r["id"] as number);
   sql.all("UPDATE artroom_snap_duty SET last_error = ? WHERE id = ?", `snapshot create failed: ${echoing().message}`, first!);
   host(); // reopen
-  assert.equal(scrubLegacyErrors(sql), 1);
+  scrubLegacyErrors(sql);
   assert.deepEqual(dutyErrors(sql), [
     ["create", `snapshot create failed: ${WITHHELD}`],
     ["create", echoNote("snapshot create failed")],
   ]);
   noEcho("the scrubbed rows", everyRow(sql));
-  assert.equal(scrubLegacyErrors(sql), 0);
+  {
+    const once = everyRow(sql);
+    scrubLegacyErrors(sql); // a second run changes nothing
+    assert.equal(everyRow(sql), once);
+  }
 });
