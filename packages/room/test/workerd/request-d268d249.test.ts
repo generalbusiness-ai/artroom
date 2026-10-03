@@ -418,7 +418,7 @@ describe("request d268d249: credentials known by their syntax are redacted whate
     for (const f of ["horse", "battery", "abcd"]) expect(JSON.stringify(d)).not.toContain(f);
   });
 
-  it("retained job errors keep safe metadata only (request d29c09fa), at all three sinks: a lost mint, an unreadable inventory, a failed revocation", async () => {
+  it("retained job errors keep safe metadata only (request d29c09fa), at all three sinks: a lost mint, an unreadable inventory, a failed revocation (since mint lane C, the mint ledger's)", async () => {
     const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: `sha256:${"0".repeat(64)}` };
     const r = await makeRoom({ policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })), files: { ".artroom/checkers/unit.json": JSON.stringify(whole), "package.json": "{}" } });
     // The canonical repository's methods named in `failing` throw an error with every case's credential, in its
@@ -457,34 +457,35 @@ describe("request d268d249: credentials known by their syntax are redacted whate
         await room.core.idle();
         return room.core.sql.all("SELECT token_id, expires_at, next_ms, last_error FROM job_tokens ORDER BY token_id");
       });
-    // jobs.ts, the lost mint: `answer lost: …`, with no provider text: the name is not one `errorNote` allows (request d29c09fa).
-    failing.add("createToken");
-    const lost = await jobs();
-    const mint = lost.find((x) => String(x["token_id"]).startsWith("mint:"))!;
-    expect(mint["last_error"]).toBe("answer lost: create failed: an error of another kind");
+    const ledger = () => inDO(r, (room) => room.core.mints.duties({ limit: 1000 }));
     const clean = (e: string) => {
       expect(e).not.toContain("abcd");
       for (const [, , gone] of SYNTAX_CASES) for (const g of gone) expect(e).not.toContain(g);
     };
-    clean(String(mint["last_error"]));
-    // jobs.ts, the unknown mint's observation and the ended token's revocation: once the mint's deadline has passed,
-    // the inventory cannot be read; the next attempt mints a token, the checker refuses, and its revocation fails.
+    // The lost mint: the mint ledger's unknown record keeps the stage and safe metadata only.
+    failing.add("createToken");
+    await jobs();
+    const [lost] = (await ledger()).records;
+    expect(lost).toMatchObject({ purpose: expect.stringMatching(/^job:/), state: "unknown", lastError: "create failed: an error of another kind" });
+    // The ledger's observation of unknown creates, and the ended token's revocation: the inventory cannot be read;
+    // the next attempt mints a token, the checker refuses, and its revocation fails.
     failing.clear();
     failing.add("listTokens");
     failing.add("revokeToken");
-    clock.now = Math.max(Number(mint["next_ms"]), Number(mint["expires_at"])) + 1;
-    await jobs();
-    clock.now += 60_000;
+    clock.now = Number((await inDO(r, (room) => room.core.sql.all("SELECT next_ms FROM check_jobs")))[0]!["next_ms"]);
     const rows = await jobs();
-    const errors = rows.map((x) => String(x["last_error"]));
-    const of = (mintRow: boolean) => rows.filter((x) => String(x["token_id"]).startsWith("mint:") === mintRow).map((x) => String(x["last_error"]));
-    expect(of(true)).toEqual(["outcome unknown; the token inventory could not be read: an error of another kind"]);
-    expect(of(false)).toEqual(["revocation failed: an error of another kind"]);
-    for (const e of errors) clean(e);
-    // Every row of every table, and the operators' view of the job tokens, hold none of it either (request d29c09fa).
+    await inDO(r, async (room) => {
+      await room.core.steps.mints();
+      await room.core.mints.idle();
+    });
+    const d = await ledger();
+    expect(d.observation.result).toBe("no inventory: the listing failed: an error of another kind");
+    expect(rows.map((x) => String(x["last_error"]))).toEqual(["revocation failed: an error of another kind"]);
+    for (const e of [String(lost!.lastError), String(d.observation.result), ...rows.map((x) => String(x["last_error"])), ...d.records.map((x) => String(x.lastError))]) clean(e);
+    // Every row of every table, the ledger's duties and the operators' view of the job tokens hold none of it either.
     const everything = await inDO(r, (room) => {
       const tables = room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").map((x) => String(x["name"]));
-      return JSON.stringify([tables.map((t) => room.core.sql.all(`SELECT * FROM "${t}"`)), jobTokenDuties(room.core)]);
+      return JSON.stringify([tables.map((t) => room.core.sql.all(`SELECT * FROM "${t}"`)), room.core.mints.duties({ limit: 1000 }), jobTokenDuties(room.core)]);
     });
     // The distinctive parts only: short ones ("cd", "it") occur in any room's rows.
     for (const g of ["hunter", "horse", "battery", "staple", "q1w2", "e3r4", "Bearer", "password"]) expect(everything).not.toContain(g);

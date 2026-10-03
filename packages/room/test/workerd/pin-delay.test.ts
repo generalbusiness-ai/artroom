@@ -169,6 +169,51 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     expect(fenced).not.toBe(due);
   });
 
+  it("set, composed with lane C (main 965c911a): the delayed pin, the mint ledger, the error upgrade, the job-token pass and the check jobs each offer one due time and the earliest wins; per-kind backoff and the repository-gone fences hold", async () => {
+    setPinDelay(DELAY);
+    const r = await makeRoom();
+    await proposed(r);
+    const due = clock.now + DELAY;
+    await inDO(r, (room) => room.core.idle());
+    await tick(r, 2);
+    const next = (mints: number | null) => inDO(r, (room) => {
+      (room.core.mints as unknown as { nextDue: () => number | null }).nextDue = () => mints;
+      return room.core.nextAlarm();
+    });
+    const sql = (q: string, ...b: (string | number)[]) => inDO(r, (room) => room.core.sql.all(q, ...b));
+    const meta = (k: string, v: string | null) => (v === null ? sql("DELETE FROM meta WHERE k = ?", k) : sql("INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", k, v));
+    const job = (at: number | null) =>
+      at === null
+        ? sql("DELETE FROM check_jobs WHERE id = 'job_probe'")
+        : sql("INSERT INTO check_jobs (id, owner, lane, generation, obligation, checker, config, integration, base, state, next_ms) VALUES ('job_probe', 'op_probe', 'act_probe', 1, 'obl_probe', 'tests', 'sha256:probe', ?, ?, 'owed', ?) ON CONFLICT (id) DO UPDATE SET next_ms = excluded.next_ms", "a".repeat(40), "a".repeat(40), at);
+    const token = (at: number | null) =>
+      at === null ? sql("DELETE FROM job_tokens WHERE token_id = 'tok_probe'") : sql("INSERT INTO job_tokens (token_id, expires_at, next_ms) VALUES ('tok_probe', NULL, ?) ON CONFLICT (token_id) DO UPDATE SET next_ms = excluded.next_ms", at);
+    // Alone, the delayed pin.
+    expect(await next(null)).toBe(due);
+    // Each earlier candidate in turn wins.
+    await job(due - 8_000);
+    expect(await next(due - 4_000)).toBe(due - 8_000);
+    await job(null);
+    await token(due - 6_000);
+    expect(await next(due - 4_000)).toBe(due - 6_000);
+    expect(await next(due - 7_000)).toBe(due - 7_000);
+    // The job-token pass's own backoff moves only its time.
+    await meta("loop_backoff", JSON.stringify({ jobTokens: { attempts: 1, next: due + 30_000 } }));
+    expect(await next(null)).toBe(due);
+    await meta("loop_backoff", null);
+    // The upgrade running: due at once, ahead of all.
+    await meta("error_scrub", "0");
+    expect(await next(due - 4_000)).toBe(clock.now);
+    await meta("error_scrub", null);
+    // The repository gone: the pin, the ledger and the job-token pass are fenced; the check jobs are not.
+    await meta("canonical_gone", JSON.stringify({ since: new Date(clock.now).toISOString(), head: 0 }));
+    await job(due + 9_000);
+    expect(await next(due - 4_000)).toBe(due + 9_000);
+    await job(null);
+    const fenced = await next(due - 4_000);
+    expect([due, due - 4_000, due - 6_000]).not.toContain(fenced);
+  });
+
   it("set, before founding: the room's start dates no pins and the unfounded schedule (founding debt and error upgrade) is unchanged", async () => {
     setPinDelay(DELAY);
     const stub = env.ROOMS.get(env.ROOMS.idFromName(`room_unfounded_pin_${clock.now}`)) as unknown as DurableObjectStub<Room>;

@@ -103,7 +103,7 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
     return { r, land, first, deadline, ...s };
   }
 
-  it("a slow call past its deadline: the next jobs step issues a new attempt with a new token, revokes the expired one, and leaves nothing past due; a late refusal of the first attempt changes nothing", async () => {
+  it("a slow call past its deadline: the next jobs step issues a new attempt with a new token, ends the expired one, and leaves nothing past due; a late refusal of the first attempt changes nothing", async () => {
     const { r, land, first, deadline, seen, late } = await sentAndHanging(["hang", "hang"]);
     clock.now = deadline + 1;
     await inDO(r, (room) => room.core.steps.jobs());
@@ -113,9 +113,11 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
     expect([first.id.endsWith("_1"), second.id.endsWith("_2"), second.id.slice(0, -2) === first.id.slice(0, -2)]).toEqual([true, true, true]);
     expect(Date.parse(second.deadline)).toBeGreaterThan(clock.now);
     const canonical = r.world.artifacts.canonicalRepo();
+    // Ended: it expired by its deadline, so its record is settled with no revocation needed (R-MINT-4), and it reads nothing.
     const old = [...canonical.tokens.values()].find((t) => t.plaintext === tokenOf(first))!;
-    expect(old.revoked).toBe(true);
+    expect(old.expiresAt).toBeLessThanOrEqual(deadline);
     expect(canonical.admits(tokenOf(first), "read")).toBe(false);
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT token_id FROM job_tokens WHERE token_id = ?", old.id))).toEqual([]);
     expect(canonical.admits(tokenOf(second), "read")).toBe(true);
     expect(await jobsOf(r)).toMatchObject([{ state: "sent", attempt: 2, next_ms: Date.parse(second.deadline) }]);
     expect(await inDO(r, (room) => room.core.nextAlarm())).toBeGreaterThan(clock.now);
@@ -180,9 +182,11 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
     expect(seen).toHaveLength(2);
     expect(await jobsOf(r)).toMatchObject([{ state: "done", attempt: 2, outcome: expect.stringMatching(/^act_/) }]);
     expect(await op(r, land.op.id)).toMatchObject({ state: "landed" });
-    // Nothing in memory ended the first attempt: the step that found it expired revoked its token.
+    // Nothing in memory ended the first attempt: the step that found it expired ended its token, which had expired by
+    // its deadline; its record is settled, and it reads nothing.
     const firstToken = [...r.world.artifacts.canonicalRepo().tokens.values()].find((t) => t.plaintext === tokenOf(seen[0]!))!;
-    expect(firstToken.revoked).toBe(true);
+    expect(r.world.artifacts.canonicalRepo().admits(firstToken.plaintext, "read")).toBe(false);
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT token_id FROM job_tokens WHERE token_id = ?", firstToken.id))).toEqual([]);
     void late; // The first attempt's call belonged to the stopped object.
   });
 });

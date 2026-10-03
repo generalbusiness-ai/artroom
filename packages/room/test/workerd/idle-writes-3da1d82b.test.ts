@@ -29,6 +29,8 @@ const inDO = <T>(room: TestRoom, fn: (r: Room) => T) => runInDurableObject(stubO
 /** Writes counted on one Room object: SQL rows written, and alarms stored. */
 interface Writes {
   rows: number;
+  /** Rows written by the canonical mint ledger's statements (mint lane C: the log remote's tokens are its records). */
+  ledgerRows: number;
   alarms: number;
   readonly statements: string[];
 }
@@ -39,7 +41,7 @@ interface Writes {
  * `rowsWritten` from the object's real SQLite.
  */
 async function spy(room: TestRoom): Promise<Writes> {
-  const w: Writes = { rows: 0, alarms: 0, statements: [] };
+  const w: Writes = { rows: 0, ledgerRows: 0, alarms: 0, statements: [] };
   await runInDurableObject(stubOf(room), (r: Room, state) => {
     const sql = r.core.sql as { all: (q: string, ...b: unknown[]) => unknown[] };
     sql.all = (q, ...b) => {
@@ -47,6 +49,7 @@ async function spy(room: TestRoom): Promise<Writes> {
       const rows = c.toArray();
       if (c.rowsWritten > 0) {
         w.rows += c.rowsWritten;
+        if (q.includes("artroom_mint")) w.ledgerRows += c.rowsWritten;
         w.statements.push(q.slice(0, 80));
       }
       return rows;
@@ -184,8 +187,20 @@ describe("request 3da1d82b: failing work backs off", () => {
     expect(inHour(2)).toBe(12);
     // One row per retry (its backoff), after the first failure stored its cohort, code and backoff (2 rows each);
     // and one alarm stored per run.
-    expect(w.rows).toBeLessThanOrEqual(ran.length + 5);
-    expect(w.alarms).toBe(ran.length);
+    expect(w.rows - w.ledgerRows).toBeLessThanOrEqual(ran.length + 5);
+    // Since mint lane C, each log token is a record of the canonical mint ledger: per mint exactly four record
+    // statements (the record, the lifetime asked, the answer, the deletion at its revocation), and per run at most two
+    // summary writes (the takeover time set, then cleared) and one more stored alarm (the takeover wake-up). A fixed
+    // cost per retry, never growing with the retries.
+    const count = (head: string) => w.statements.filter((q) => q.startsWith(head)).length;
+    const mints = count("INSERT INTO artroom_mint ");
+    expect(mints).toBeGreaterThan(0);
+    for (const head of ["UPDATE artroom_mint SET ttl = ?", "UPDATE artroom_mint SET state = 'held'", "DELETE FROM artroom_mint WHERE id = ?"]) expect(count(head)).toBe(mints);
+    expect(count("UPDATE artroom_mint_summary")).toBeLessThanOrEqual(2 * ran.length);
+    expect(w.statements.filter((q) => q.includes("artroom_mint")).length).toBe(4 * mints + count("UPDATE artroom_mint_summary"));
+    expect(mints % ran.length).toBe(0); // the same number of mints in every retry
+    expect(w.alarms).toBeGreaterThanOrEqual(ran.length);
+    expect(w.alarms).toBeLessThanOrEqual(2 * ran.length);
     // Nothing was settled: the same cohort is still pending, and the log ref never moved.
     expect(await inDO(room, (r) => r.core.pendingPublication())).not.toBeNull();
     expect(room.world.log.ref).toBeNull();

@@ -250,7 +250,7 @@ setServicesFactory((_env, objectId) => {
       // The sandbox writes a snapshot into a repository beside the canonical one: in the import namespace for an imported room.
       writeSnapshot: (req) => hostFor(req.store.remote).writeSnapshot(req),
       // The production log remote, over the fake binding and the fake sandbox's pushLog and readLogRef.
-      logRemote: async (loc) => artifactsLogRemote(hostFor(loc.namespace).binding as unknown as ArtifactsBinding, hostFor(loc.namespace).logStub, loc),
+      logRemote: async (loc, mints) => artifactsLogRemote(hostFor(loc.namespace).binding as unknown as ArtifactsBinding, hostFor(loc.namespace).logStub, loc, mints),
       firstCommit: (remote, token, at) => hostFor(remote).firstCommit(remote, token, at),
       sleep: async () => {},
       get logTransfer(): { objects: number; bytes: number } | undefined {

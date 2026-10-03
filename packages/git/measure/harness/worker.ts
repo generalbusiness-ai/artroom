@@ -77,8 +77,6 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
   private wire(repo: string, remote: string): void {
     const stub = this.env.PUBLISHER.getByName(repo) as unknown as PublisherStub;
     const artifacts = this.env.ARTIFACTS as unknown as ArtifactsNamespace;
-    const opts = { stub, artifacts, canonical: { name: repo, remote } };
-    this.pinning = new Pinning(opts);
     this.workspaces = new Workspaces({ sql: this.sql, artifacts, canonical: repo, namespace: this.env.ARTIFACTS_NAMESPACE });
     const canonical = () => withRetry(() => artifacts.get(repo));
     const mints = new MintLedger({
@@ -92,6 +90,8 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
       known: (id) => this.landing?.core.knownToken(id) ?? false,
     });
     this.mints = mints;
+    const opts = { stub, artifacts, canonical: { name: repo, remote }, mints };
+    this.pinning = new Pinning(opts);
     this.landing = new Landing({
       sql: this.sql,
       room: this,

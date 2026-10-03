@@ -61,7 +61,7 @@ import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, kno
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
-import { issueJobs, oweJobs } from "./jobs.ts";
+import { issueJobs, jobsDue, jobTokensDue, moveJobMints, oweJobs, revokeJobTokens } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { PUBLICATION_CODES, ROOM_SCRUB_TABLES, createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
@@ -145,18 +145,19 @@ export interface Recomputation {
  * durable backoff after a failure (request 3da1d82b): an alarm that fires
  * early for other work skips a kind whose backoff has not ended.
  */
-export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing", "mints"] as const;
+export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing", "mints", "jobTokens"] as const;
 export type LoopKind = (typeof LOOP_KINDS)[number];
 /** Whether a kind of loop work may run now. */
 export type LoopDue = (kind: LoopKind) => boolean;
 /** Loop work that needs the canonical repository. */
-const NEEDS_REPOSITORY: ReadonlySet<LoopKind> = new Set(["pins", "previews", "provision", "landing", "mints"]);
+const NEEDS_REPOSITORY: ReadonlySet<LoopKind> = new Set(["pins", "previews", "provision", "landing", "mints", "jobTokens"]);
 /**
  * Loop work timed by its own durable due times (`nextAlarm`), never pending
- * by the 5-second loop: the landing engine and the canonical mint ledger.
+ * by the 5-second loop: the landing engine, the canonical mint ledger and
+ * ended job tokens' revocations.
  * Its backoff, after a failure of the step itself, ends only when it runs.
  */
-const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints"]);
+const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints", "jobTokens"]);
 
 let faultHook: ((point: string) => void) | null = null;
 
@@ -225,19 +226,17 @@ export class RoomCore {
       const repo = await this.snapshotRepos.prepare(s.commit, async (store) => {
         const snap = await this.ports.artifacts.snapshot(s.integration, s.paths);
         if (!snap) throw new Error("the integration's snapshot could not be read");
-        const canonical = await this.artifacts.get(this.location().name);
-        const read = await canonical.createToken("read", 300);
-        try {
-          written = await this.remotes.writeSnapshot({
-            canonical: { remote: await this.canonicalRemoteReady(), token: read.plaintext },
+        const remote = await this.canonicalRemoteReady();
+        // A 300-second canonical read token, through the mint ledger (R-MINT-1): revoked afterwards, or owed.
+        written = await this.mints.withToken(`snapshot:${s.commit}`, "read", () => 300, (read) =>
+          this.remotes.writeSnapshot({
+            canonical: { remote, token: read.plaintext },
             store: { remote: store.remote, token: store.token },
             files: snap.entries,
             message: snapshotMessage(s.checker, s.digest),
-          });
-          return written;
-        } finally {
-          await canonical.revokeToken(read.id).catch(() => false);
-        }
+          }),
+        );
+        return written;
       });
       // A reused repository was written for the same commit; a new one holds what the publisher wrote.
       return { commit: (written ?? repo.commit) as Sha, remote: repo.remote };
@@ -304,11 +303,24 @@ export class RoomCore {
       create: (name, o) => this.binding().create(name, o),
       delete: (name) => this.binding().delete(name),
     };
-    const adapter = new ArtifactsAdapter({ binding: this.artifacts, stub: r.publisher, location: () => this.location(), ...(r.bounds ? { bounds: r.bounds } : {}), ...sleep });
+    const canonicalRepo = () => this.artifacts.get(this.location().name);
+    this.mints = new MintLedger({
+      sql: this.sql,
+      repo: canonicalRepo,
+      now: () => this.now(),
+      // The persisted alarm: resolves only once storage has it, before any create is sent (R-MINT-2).
+      wake: this.wake ?? (async () => this.committed()),
+      // Point lookups in the Room's other records of token IDs: job tokens, and the landing's token rows (R-MINT-7).
+      known: (id) => !!one(this.sql, "SELECT 1 AS x FROM job_tokens WHERE token_id = ?", id) || this.landing.core.knownToken(id),
+      ...sleep,
+    });
+    // A room stored before mint lane C: its check jobs' own mint records move into the ledger, once.
+    moveJobMints(this.sql, this.mints, this.now());
+    const adapter = new ArtifactsAdapter({ binding: this.artifacts, stub: r.publisher, location: () => this.location(), mints: this.mints, ...(r.bounds ? { bounds: r.bounds } : {}), ...sleep });
     this.ports = {
       policy: opts.services.policy,
       artifacts: r.wrapArtifacts ? r.wrapArtifacts(adapter) : adapter,
-      log: async () => LogPublisher.open(await r.logRemote(this.location()), r.logTransfer ? { maxTransfer: r.logTransfer } : {}),
+      log: async () => LogPublisher.open(await r.logRemote(this.location(), this.mints), r.logTransfer ? { maxTransfer: r.logTransfer } : {}),
     };
     // The canonical repository, read when used: a room learns it at founding.
     const self = this;
@@ -323,21 +335,10 @@ export class RoomCore {
         return remote;
       },
     };
-    const canonicalRepo = () => this.artifacts.get(this.location().name);
-    this.mints = new MintLedger({
-      sql: this.sql,
-      repo: canonicalRepo,
-      now: () => this.now(),
-      // The persisted alarm: resolves only once storage has it, before any create is sent (R-MINT-2).
-      wake: this.wake ?? (async () => this.committed()),
-      // Point lookups in the Room's other records of token IDs: job tokens, and the landing's token rows (R-MINT-7).
-      known: (id) => !!one(this.sql, "SELECT 1 AS x FROM job_tokens WHERE token_id = ?", id) || this.landing.core.knownToken(id),
-      ...sleep,
-    });
     this.landing = new Landing({
       sql: this.sql,
       room: this.host(),
-      publisher: new ContainerPublisher({ stub: r.publisher, artifacts: this.artifacts, canonical, ...sleep }),
+      publisher: new ContainerPublisher({ stub: r.publisher, artifacts: this.artifacts, canonical, mints: this.mints, ...sleep }),
       tokens: publicationTokens({ mints: this.mints, repo: canonicalRepo, ...sleep }),
       now: () => this.now(),
       ...(r.landingFault ? { fault: r.landingFault } : {}),
@@ -1831,6 +1832,10 @@ export class RoomCore {
       if (due("landing")) await this.resumeLanding();
     },
     jobs: () => issueJobs(this),
+    // Ended check job tokens owed revocation (mint lane C): a bounded pass, started and never awaited.
+    jobTokens: async (due: LoopDue = this.loopAllowed) => {
+      if (due("jobTokens")) revokeJobTokens(this);
+    },
     snapshots: async () => {
       if (this.founded) await this.snapshotRepos.reconcile();
     },
@@ -1931,8 +1936,9 @@ export class RoomCore {
   /**
    * May this kind of loop work run at all? Work that needs the canonical
    * repository (pins, previews, provisioning, landing and its evaluations,
-   * the mint ledger's revocations and observations) waits, kept, while it is
-   * gone: it cannot succeed (request 3da1d82b).
+   * the mint ledger's revocations and observations, ended job tokens'
+   * revocations) waits, kept, while it is gone: it cannot succeed (request
+   * 3da1d82b).
    */
   readonly loopAllowed: LoopDue = (kind) => !(NEEDS_REPOSITORY.has(kind) && this.canonicalGone() !== null);
 
@@ -2037,12 +2043,13 @@ export class RoomCore {
       snap = null;
     }
     if (snap !== null) times.push(snap);
-    // Check jobs owed, and jobs sent whose deadline passed with no answer.
-    const job = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM check_jobs WHERE state != 'done'"), "t");
+    // Check jobs owed, and jobs sent whose deadline passed with no answer; a batch left over 1 s ahead.
+    const job = jobsDue(this);
     if (job !== null) times.push(job);
-    // Ended job tokens whose revocation Artifacts has not confirmed yet.
-    const revoke = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM job_tokens"), "t");
-    if (revoke !== null) times.push(revoke);
+    // Ended job tokens whose revocation Artifacts has not confirmed yet: their own kind, which needs the canonical
+    // repository and waits for its backoff after a failure of its step (mint lane C); a backlog 1 s ahead.
+    const revoke = gone ? null : jobTokensDue(this);
+    if (revoke !== null) times.push(Math.max(revoke, backoff.jobTokens?.next ?? revoke));
     // A pin the spike's PIN_DELAY_MS left for later (assert 66a41558) is a due time, under the pins loop's fence and
     // backoff. Read once, and only with the switch on (null otherwise, with no read).
     const pinDue = this.nextPinDue();
