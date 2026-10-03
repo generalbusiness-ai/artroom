@@ -333,9 +333,6 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
       "This invitation is for a key the client holds; it can be redeemed only with a join the client signs.",
       "Make a key, sign a join, and send it to redeem with custody client.",
     );
-  // Decided here so that a redemption refused for its session makes no key. It is decided again inside the queue.
-  const first = sessionGrant(core, inv);
-  if ("refusal" in first) return first.refusal;
   const memberKey = newKeyPair();
   const sessionKey = newKeyPair();
   const ttl = inv.session?.ttlSeconds ?? 24 * 3600;
@@ -359,7 +356,7 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
       // The session's grant, under the document in force at `snap`: an activation while this redemption waited in the
       // queue changes what the session may grant, and its shape. An activation after this moves the head, and the
       // attempt is made again.
-      const granted = sessionGrant(core, inv); // G2:session-in-queue
+      const granted = sessionGrant(core, inv);
       if ("refusal" in granted) return granted.refusal;
       const grant = signed({
         v: 1,
@@ -483,18 +480,9 @@ export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): 
     // under a used key: it stays built for the document in force, and admission answers idempotency-mismatch,
     // naming the original entry (R-IDEM-3), not a field the caller never sent.
     const again = build(earlier.v, earlier.binding);
-    if (sameDigest(again, earlier.digest)) env = again; // G2:bearer-same-act
+    if (digestJson(again) === earlier.digest) env = again; // G2:bearer-same-act
   }
   return submit(core, { envelope: env, sig: sign(b.seed, "artroom-envelope-v1", env) }, "submitted");
-}
-
-/** Is this envelope the one whose digest the room recorded? An envelope outside the signed JSON profile is no one's retry. */
-function sameDigest(env: Envelope, digest: string): boolean {
-  try {
-    return digestJson(env) === digest;
-  } catch {
-    return false;
-  }
 }
 
 /**

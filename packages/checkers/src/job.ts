@@ -131,7 +131,9 @@ export function checkJob(job: CheckJob, exp: JobExpectations): BoundJob | Refusa
   // R-DECL-18: a v2 room's job names the kind and the binding to sign, both or neither.
   const { kind, binding } = job as Partial<CheckJobV2>;
   if (kind !== undefined || binding !== undefined) {
-    if (typeof kind !== "string" || !KIND.test(kind) || typeof binding !== "string" || !DIGEST.test(binding)) return refuse("The job's kind or binding is missing or malformed."); // G2:job-signed-as
+    if (typeof kind !== "string" || typeof binding !== "string") return refuse("The job names a kind or a binding, but not both."); // G2:job-both
+    if (!KIND.test(kind)) return refuse("The job's kind is malformed."); // G2:job-kind
+    if (!DIGEST.test(binding)) return refuse("The job's binding is malformed."); // G2:job-binding-form
   }
   if (job.input.kind === "tree") {
     if (!SHA.test(job.input.tree)) return refuse("The tree is not a 40-character SHA-1.");

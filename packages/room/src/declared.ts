@@ -57,18 +57,16 @@ export function fill(template: string, facts: RefusalFacts): string {
 }
 
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
 /** `text` cut to at most `max` UTF-8 bytes, never inside a character. */
 export function clipBytes(text: string, max: number): string {
-  if (text.length <= max / 3 || encoder.encode(text).length <= max) return text;
-  let bytes = 0;
-  let out = "";
-  for (const ch of text) {
-    bytes += encoder.encode(ch).length;
-    if (bytes > max) break;
-    out += ch;
-  }
-  return out;
+  const bytes = encoder.encode(text);
+  if (bytes.length <= max) return text;
+  // Back to a character's first byte: a continuation byte is 10xxxxxx.
+  let end = max;
+  while ((bytes[end]! & 0xc0) === 0x80) end--; // G2:fill-bound-character
+  return decoder.decode(bytes.subarray(0, end));
 }
 
 /**

@@ -12,10 +12,9 @@
  */
 
 import type { CheckerConfigV2, PlatformRule, PolicyDocumentV2, Step, TargetShape } from "@generalbusiness/artroom-contract";
-import { PolicyEvalError } from "./errors.ts";
 import { globProblem } from "./glob.ts";
 import { Problems, checkerFields, documentFields, isObj, result, type Obj, type Validation } from "./validate.ts";
-import { canonicalJson, safeName } from "./values.ts";
+import { safeName } from "./values.ts";
 
 /** The platform's bounds on declarations (R-DECL-26). */
 export const DECLARATION_BOUNDS = {
@@ -238,17 +237,26 @@ export function validatePolicyV2(doc: unknown, ctx: PolicyV2Context = {}): Polic
   soundness(p, acts, warnings, openers);
   checkers(p, ctx.checkers ?? {}, acts);
   // R-DECL-26: the bounds above still allow a document of several megabytes, more than a room can store in one row.
-  if (canonicalBytesExceed(doc, DECLARATION_BOUNDS.documentBytes)) p.add("policy", `the document's canonical JSON must be at most ${DECLARATION_BOUNDS.documentBytes} bytes`); // G2:doc-bytes
+  const size = canonicalBytes(doc);
+  if (size === null) p.add("policy", "must be plain JSON"); // G2:doc-plain
+  else if (size > DECLARATION_BOUNDS.documentBytes) p.add("policy", `the document's canonical JSON must be at most ${DECLARATION_BOUNDS.documentBytes} bytes`); // G2:doc-bytes
   return done();
 }
 
-/** Is the value's canonical JSON longer than `max` bytes? The walk stops at the first byte over. A value outside the profile is not judged here. */
-function canonicalBytesExceed(value: unknown, max: number): boolean {
+/**
+ * The UTF-8 size of a JSON value's canonical form (RFC 8785), or null if
+ * it has none. Sorting keys does not change a size, and RFC 8785 writes
+ * strings and safe integers as `JSON.stringify` does, so this is the size
+ * of the compact JSON text. It is counted here, not by the evaluator's
+ * canonical writer: that one refuses the key names it reserves, which a
+ * legal owner path such as `constructor` is, before it has counted what
+ * follows them.
+ */
+function canonicalBytes(value: unknown): number | null {
   try {
-    canonicalJson(value, max, Number.MAX_SAFE_INTEGER);
-    return false;
-  } catch (error) {
-    return error instanceof PolicyEvalError && error.code === "value_bytes";
+    return new TextEncoder().encode(JSON.stringify(value)).length;
+  } catch {
+    return null;
   }
 }
 

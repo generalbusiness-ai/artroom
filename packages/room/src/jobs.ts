@@ -35,7 +35,7 @@
  * step 4).
  */
 
-import type { AnyPolicyDocument, Binding, CheckerConfig, CheckInput, CheckJob, Digest, Glob, LaneId, OpId, Refusal, Sha } from "@generalbusiness/artroom-contract";
+import type { AnyPolicyDocument, Binding, CheckerConfig, CheckerConfigV2, CheckInput, CheckJob, CheckJobV2, Digest, Glob, LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { bindingSubject, checkerInputs, isDeclared } from "@generalbusiness/artroom-policy";
 import { MINT_WAIT_MS, OVERDUE_STEP_MS, errorNote, within, type MintLedger } from "@generalbusiness/artroom-git";
@@ -363,18 +363,23 @@ function current(core: RoomCore, j: JobRow) {
 }
 
 /** The kind and binding a v2 room's job tells its checker to sign (R-DECL-18, `CheckJobV2`); nothing under a v1 document. */
-function signedAs(policy: ActivePolicyFull, config: CheckerConfig): { readonly kind: string; readonly binding: Binding } | Record<string, never> {
+function signedAs(policy: ActivePolicyFull, config: CheckerConfig): { readonly kind?: string; readonly binding?: Binding } {
   const doc = policy.doc as AnyPolicyDocument;
-  const act = (config as { act?: unknown }).act;
-  if (!isDeclared(doc) || typeof act !== "string" || !Object.hasOwn(doc.acts, act)) return {};
+  // A v2 document activates only with `artroom-checker-v2` configurations, each naming an act it declares (R-DECL-18).
+  if (!isDeclared(doc)) return {};
+  const act = (config as unknown as CheckerConfigV2).act;
   return { kind: act, binding: digestJson(bindingSubject(doc, act)) as Binding };
 }
 
-/** Did the binding in force change after this job was sent? The refusal names the active one (R-DECL-16). */
-function staleSince(job: CheckJob, r: Refusal): boolean {
-  const sent = (job as { binding?: string }).binding;
-  const current = (r as { current?: { binding?: string } }).current?.binding;
-  return sent !== undefined && current !== undefined && sent !== current;
+/**
+ * Has an activation replaced the binding this job named, while the job is
+ * still needed? Judged from the Room's own state, never from what the
+ * checker service answered: a service cannot make the Room send a job again.
+ */
+function reboundSince(core: RoomCore, j: JobRow, job: CheckJob): boolean {
+  const now = current(core, j);
+  if (!now) return false; // G2:job-rebound-needed
+  return signedAs(now.policy, now.cfg.config).binding !== (job as Partial<CheckJobV2>).binding; // G2:job-rebound
 }
 
 async function issue(core: RoomCore, j: JobRow): Promise<void> {
@@ -499,7 +504,7 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
       // R-DECL-18: a check signed under a binding an activation has since replaced is refused binding-stale. The job
       // is then due again, and its next attempt names the binding in force, or ends as no longer needed. A checker
       // that was given the active binding and is still refused is not asked again.
-      if (result !== null && isRefusal(result) && result.rule === "binding-stale" && staleSince(job, result)) move(core, sent, "state = 'owed', next_ms = ?, token = NULL", core.now() + JOB_RETRY_MS); // G2:job-reissue
+      if (result !== null && isRefusal(result) && result.rule === "binding-stale" && reboundSince(core, sent, job)) move(core, sent, "state = 'owed', next_ms = ?, token = NULL", core.now() + JOB_RETRY_MS); // G2:job-reissue
       else if (result !== null) move(core, sent, "state = 'done', outcome = ?, token = NULL", isRefusal(result) ? `refused: ${result.rule}` : result.id);
     } catch {
       // No answer: due again soon, if this attempt is still the current one.

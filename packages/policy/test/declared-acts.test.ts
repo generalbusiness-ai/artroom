@@ -355,10 +355,43 @@ describe("bounds added by stage 2 (request fd6f00b6; R-DECL-2, R-DECL-12, R-DECL
     }
     const exact = sized(helps);
     expect(bytes(exact)).toBe(BOUND);
+    // The size the validator counts is the size of the canonical form.
+    expect(new TextEncoder().encode(JSON.stringify(exact)).length).toBe(BOUND);
     expect(problems(exact)).toEqual([]);
     helps[0] = helps[0]! + 1;
     const more = sized(helps);
     expect(bytes(more)).toBe(BOUND + 1);
     expect(problems(more)).toEqual(["policy: the document's canonical JSON must be at most 1048576 bytes"]);
+  });
+
+  // An owner path or a dependency glob may be any legal glob, `constructor` and `prototype` included. The evaluator's
+  // canonical writer refuses those as keys, so the document's size is not counted with it (checker finding 23766004).
+  const keyed: readonly (readonly [string, (d: Doc, name: string) => void])[] = [
+    ["an owner path", (d, name) => (d["owners"] = { [name]: ["role:admin"] })],
+    ["a dependency glob", (d, name) => ((d["carry"] as Any)["dependsOn"] = { [name]: ["src/**"] })],
+  ];
+  for (const name of ["constructor", "prototype"])
+    for (const [what, put] of keyed) {
+      test(`${what} named ${name} is legal, and the document with it validates`, () => {
+        const d = codeReview();
+        put(d, name);
+        expect(problems(d)).toEqual([]);
+      });
+      test(`G2:doc-bytes: ${what} named ${name} does not hide a document over the bound`, () => {
+        const d = codeReview();
+        put(d, name);
+        const rule: Any = { id: "describe", kind: "notify", on: ["claim"], to: ["role:admin"], why: "A change.", description: "x".repeat(1048576) };
+        (d["rules"] as Any[]).push(rule);
+        expect(problems(d)).toEqual(["policy: the document's canonical JSON must be at most 1048576 bytes"]);
+        // The same rule with a short description is valid: only the size refuses the document.
+        rule["description"] = "x";
+        expect(problems(d)).toEqual([]);
+      });
+    }
+
+  test("G2:doc-plain: a document that has no JSON form is refused, not thrown on", () => {
+    const d = codeReview();
+    (d["rules"] as Any[]).push({ id: "describe", kind: "notify", on: ["claim"], to: ["role:admin"], why: "A change.", description: 10n });
+    expect(problems(d)).toContain("policy: must be plain JSON");
   });
 });

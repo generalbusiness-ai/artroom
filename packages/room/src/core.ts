@@ -183,7 +183,7 @@ const POLICY_CACHE = 4;
 function deepFreeze<T>(value: T): T {
   if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
     Object.freeze(value);
-    for (const v of Object.values(value)) deepFreeze(v);
+    for (const v of Object.values(value)) deepFreeze(v); // G2:policy-frozen-deep
   }
   return value;
 }
@@ -743,7 +743,7 @@ export class RoomCore {
       digest: str(r, "digest") as Digest,
       checkers: JSON.parse(str(r, "checkers")!) as ActivePolicyFull["checkers"],
     });
-    if (this.policyCache.size >= POLICY_CACHE) this.policyCache.delete(this.policyCache.keys().next().value!);
+    if (this.policyCache.size >= POLICY_CACHE) this.policyCache.delete(this.policyCache.keys().next().value!); // G2:policy-cache-bound
     this.policyCache.set(version, policy);
     return policy;
   }
@@ -1129,8 +1129,10 @@ export class RoomCore {
       // (R-DECL-16), and a grant covers a kind only for the binding its grantor signed (R-DECL-17). So a landing
       // under a delegation whose binding is no longer the active one has lost its authority. A member's own key
       // needs no grant: its landing completes under the declaration it was admitted in (R-DECL-23).
-      if (j.authority.via === "delegation" && isDeclared(doc) && !isPlatformKind(env.kind) && (env as { binding?: string }).binding !== this.declaredBinding(env.kind))
-        return { reason: "authority-lost", fix: `The delegation was granted for an earlier meaning of ${env.kind}. Ask the grantor to delegate again, then land again.` }; // G2:revalidate-binding
+      // (Under a v1 document, and for a platform kind, there is no active binding, and nothing to compare.)
+      const active = this.declaredBinding(env.kind);
+      if (j.authority.via === "delegation" && active !== null && (env as { binding?: string }).binding !== active) // G2:revalidate-binding
+        return { reason: "authority-lost", fix: `The delegation was granted for an earlier meaning of ${env.kind}. Ask the grantor to delegate again, then land again.` };
     }
     const policy = this.activePolicy();
     const gen = generationRow(this.sql, op.lane, op.generation);

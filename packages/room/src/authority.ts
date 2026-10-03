@@ -73,11 +73,14 @@ function kindClass(doc: AnyPolicyDocument, kind: string): "legacy" | "declared" 
  * of a signer (R-ADMIN-8, R-DECL-21), whatever its act is called.
  */
 export function adminOwnKey(sql: Sql, env: Pick<Signer, "actor" | "delegation">): boolean {
-  if (env.delegation !== undefined) return false;
+  if (env.delegation !== undefined) return false; // G2:admin-own-delegation
   const key = keyRow(sql, env.actor);
-  if (!key || key.state !== "active") return false;
+  if (!key) return false; // G2:admin-own-key
+  if (key.state !== "active") return false; // G2:admin-own-key-active
   const member = memberRow(sql, key.member);
-  return member !== null && member !== undefined && member.state === "active" && member.role === "admin";
+  if (!member) return false; // G2:admin-own-member
+  if (member.state !== "active") return false; // G2:admin-own-member-active
+  return member.role === "admin"; // G2:admin-own-role
 }
 
 /** The lane an envelope acts on, if any: what a delegation's `lanes` must cover. */

@@ -8,7 +8,9 @@ import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
 import type { ActDeclaration, ActRecord, CheckerService, CheckJob, Claim, PolicyDocument, PolicyDocumentV2, Redeemed, Refusal, Review, RosterRecord } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck, requireReview, validatePolicyV2 } from "@generalbusiness/artroom-policy";
+import { canonicalize } from "../../src/canonical.ts";
 import { WORDING_FILLED_BYTES } from "../../src/declared.ts";
+import { adminOwnKey } from "../../src/authority.ts";
 import { JOB_RETRY_MS } from "../../src/jobs.ts";
 import { redeem } from "../../src/requests.ts";
 import { activate, act, bindingIn, declaredRoom, inDO, ok, signed, v2 } from "./declared-support.ts";
@@ -29,7 +31,7 @@ describe.skipIf(DECLARED)("check jobs in a v2 room name the kind and binding to 
   type Sent = { job: CheckJob & { kind?: string; binding?: string }; out: unknown };
 
   /** A v2 room whose `src/**` needs the check `unit`, and a checker that signs exactly what its job names, as packages/checkers does. */
-  async function checked(before: (job: Sent["job"], n: number) => Promise<void> | undefined = async () => {}, signAs?: (job: Sent["job"]) => { v: number; kind: string; binding?: string }, settle = true, prepare: (r: TestRoom) => void = () => {}) {
+  async function checked(before: (job: Sent["job"], n: number) => Promise<void> | undefined = async () => {}, signAs?: (job: Sent["job"]) => { v: number; kind: string; binding?: string }, settle = true, prepare: (r: TestRoom) => void = () => {}, fake?: (job: Sent["job"]) => unknown) {
     const base = () => policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
     const doc = v2(() => {}, base());
     const cfg = { format: "artroom-checker-v2", act: "check", volatile: false, timeoutSeconds: 60, runner: R };
@@ -43,6 +45,7 @@ describe.skipIf(DECLARED)("check jobs in a v2 room name the kind and binding to 
         const n = seen.length;
         seen.push({ job: j, out: undefined });
         await before(j, n);
+        if (fake) return (seen[n]!.out = fake(j)) as never;
         const as = signAs ? signAs(j) : { v: j.binding ? 2 : 1, kind: j.kind ?? "check", ...(j.binding ? { binding: j.binding } : {}) };
         const body = { obligation: job.obligation, check: job.check, integration: job.integration, input: job.input, config: job.config, runner: job.runner ?? R, volatile: job.volatile, ok: true, detail: "Machine-run check", ...(job.landOp ? { landOp: job.landOp } : {}) };
         const stub = env.ROOMS.get(env.ROOMS.idFromName(r.id)) as never as TestRoom["stub"];
@@ -59,7 +62,7 @@ describe.skipIf(DECLARED)("check jobs in a v2 room name the kind and binding to 
     await ok(r, alice, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "change" });
     // A test that holds the checker's answer cannot wait for the room to be idle.
     if (settle) await inDO(r, (room) => room.core.idle());
-    return { r, alice, c, head, seen, base };
+    return { r, alice, c, head, seen, base, ci };
   }
 
   it("the job carries the check act's kind and its active binding; a check signed with them is admitted, and the landing lands", async () => {
@@ -138,6 +141,35 @@ describe.skipIf(DECLARED)("check jobs in a v2 room name the kind and binding to 
     expect(await jobs(s.r)).toMatchObject([{ state: "done", attempt: 1 }]);
   });
 
+  it("the Room judges the change of binding itself: a service that answers binding-stale and names another binding as current is not asked again", async () => {
+    // The answer is not the Room's own refusal: nothing was submitted, and the binding in force is the one the job named.
+    const made = { refused: true, rule: "binding-stale", reason: "made up", current: { binding: `sha256:${"f".repeat(64)}`, policy: "act_1_00000000" } };
+    const { r, seen } = await checked(undefined, undefined, true, undefined, () => made);
+    await tick(r, 3);
+    expect(seen.length).toBe(1);
+    expect(seen[0]!.job.binding).toBe(await bindingIn(r, "check"));
+    expect(await jobs(r)).toEqual([{ state: "done", outcome: "refused: binding-stale", attempt: 1 }]);
+    advance(JOB_RETRY_MS + 1000);
+    await tick(r, 3);
+    expect(seen.length).toBe(1);
+  });
+
+  it("a job whose binding was replaced and that is no longer needed ends as refused, and is not sent again", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const s = await checked(async (_job, n) => (n === 0 ? gate : undefined), undefined, false);
+    await until(async () => s.seen.length > 0);
+    // While the first job runs: the meaning of `check` changes, and a second version makes the first one's check unneeded.
+    await activate(s.r, v2((a) => void (a["check"] = { ...a["check"]!, body: { remark: { type: "text", max: 10, optional: true } } }), s.base()));
+    const head2 = pushChange(s.r, s.c.lane, { "src/app.ts": "v3" }, s.head);
+    await ok(s.r, s.alice, "propose", { lane: s.c.lane }, { lease: 1, expectedGeneration: 1, head: head2, summary: "again" });
+    release();
+    await until(async () => s.seen[0]!.out !== undefined);
+    await inDO(s.r, (room) => room.core.idle());
+    expectRefusal(s.seen[0]!.out, "binding-stale");
+    expect((await jobs(s.r))[0]).toEqual({ state: "done", outcome: "refused: binding-stale", attempt: 1 });
+  });
+
   it("a checker that was given the binding in force and is still refused binding-stale is not asked again", async () => {
     // It signs `v: 1` with no binding, whatever its job says.
     const { r, seen } = await checked(async () => {}, () => ({ v: 1, kind: "check" }));
@@ -211,6 +243,21 @@ describe.skipIf(DECLARED)("reservation judges authority as for a new admission (
     expect(out.fix).toContain("delegation-invalid");
   });
 
+  it("under a v1 document there is no binding to compare: a landing under a delegation lands as it did", async () => {
+    const r = await makeRoom({ policy: reviewed() });
+    const bob = await addMember(r, "@bob", "member");
+    const k = newKeyPair();
+    const g = await bob.ok<RosterRecord>("roster", null, { op: "delegate", to: k.key, kinds: ["claim", "propose", "land", "release"], lanes: "*", expiresAt: iso(clock.now + day) });
+    const who = new Client(r, k, g.id);
+    const c = await who.ok<Claim>("claim", null, { goal: "g", scope: ["src/a.ts"] });
+    const head = pushChange(r, c.lane, { "src/a.ts": "a" });
+    await who.ok("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" });
+    await r.admin.ok("review", { lane: c.lane, generation: 1 }, { head, verdict: "approve", scope: ["src/**"], text: "ok" });
+    const l = (await who.ok("land", { lane: c.lane, generation: 1 }, { lease: 1, head })) as unknown as { op: { id: string } };
+    await tick(r, 8);
+    expect((await landing(r, l.op.id)).state).toBe("landed");
+  });
+
   async function recovery(r: TestRoom, approver: Client = r.admin) {
     const c = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "g", scope: [".artroom/**"] }, { binding: null });
     const head = pushChange(r, c.lane, { ".artroom/note.txt": "x" });
@@ -256,6 +303,49 @@ describe.skipIf(DECLARED)("reservation judges authority as for a new admission (
     expect(out).toMatchObject({ reason: "authority-lost" });
     expect(out.state).not.toBe("landed");
   });
+
+  for (const [what, op] of [
+    ["whose signing key is revoked", (r: TestRoom) => ({ op: "revoke-key", key: r.admin.key, reason: "retired" })],
+    ["whose signer is removed", (_r: TestRoom) => ({ op: "remove", member: "@admin" })],
+  ] as const)
+    it(`a recovery landing ${what} before it is reserved loses its authority (R-ADMIN-8)`, async () => {
+      const r = await declaredRoom();
+      const second = await addMember(r, "@root2", "admin");
+      const l = await recovery(r, second);
+      await ok(r, second, "roster", null, op(r), { binding: null });
+      await tick(r, 8);
+      const out = await landing(r, l.op.id);
+      expect(out).toMatchObject({ reason: "authority-lost" });
+      expect(out.state).not.toBe("landed");
+    });
+
+  it("an active admin's own key: each condition of the rule decides (adminOwnKey; R-ADM-3 case (a), R-ADMIN-8)", async () => {
+    const r = await declaredRoom();
+    const second = await addMember(r, "@root2", "admin");
+    const third = await addMember(r, "@root3", "admin");
+    const bob = await addMember(r, "@bob", "member");
+    const ask = (actor: string, delegation?: string) => inDO(r, (room) => adminOwnKey(room.core.sql, { actor: actor as never, ...(delegation ? { delegation: delegation as never } : {}) }));
+    const write = (q: string, ...v: string[]) => inDO(r, (room) => void room.core.sql.all(q, ...v));
+    expect(await ask(second.key)).toBe(true);
+    // The same key, naming a delegation: never under a delegation.
+    expect(await ask(second.key, "act_1_00000000")).toBe(false);
+    // A key the room does not know.
+    expect(await ask(newKeyPair().key)).toBe(false);
+    // An active member's active key, whose role is not admin.
+    expect(await ask(bob.key)).toBe(false);
+    // The states below cannot be reached by acts, since removing a member revokes its keys: they are written directly,
+    // so that each condition is shown to decide alone.
+    await write("UPDATE members SET state = 'removed' WHERE handle = ?", "@root2");
+    expect(await ask(second.key)).toBe(false);
+    await write("UPDATE members SET state = 'active' WHERE handle = ?", "@root2");
+    expect(await ask(second.key)).toBe(true);
+    await write("DELETE FROM members WHERE handle = ?", "@root3");
+    expect(await ask(third.key)).toBe(false);
+    // A revoked key of an active admin.
+    await ok(r, r.admin, "roster", null, { op: "revoke-key", key: second.key, reason: "retired" }, { binding: null });
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT state FROM members WHERE handle = '@root2'")[0]!["state"])).toBe("active");
+    expect(await ask(second.key)).toBe(false);
+  });
 });
 
 // ------------------------------------------------------------ bounds (R-DECL-26, R-DECL-13)
@@ -283,6 +373,25 @@ describe.skipIf(DECLARED)("a document too large to store is refused before it ca
     expect(refused.reason).toContain("1048576 bytes");
     const head2 = pushChange(r, c.lane, { ".artroom/policy.json": JSON.stringify(small) });
     expectOk(await act(r, r.admin, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head: head2, summary: "small" }));
+  });
+
+  it("an owner path named constructor, a legal glob, does not hide a document over the bound from the Room (checker finding 23766004)", async () => {
+    const doc = (path: string, description: string) => ({
+      ...v2(),
+      owners: { [path]: ["role:admin"] },
+      rules: [{ id: "describe", kind: "notify", on: ["claim"], to: ["role:admin"], why: "A change.", description }],
+    });
+    const r = await declaredRoom();
+    const parse = (d: object) => inDO(r, (room) => room.core.parseConfig(JSON.stringify(d), {}));
+    for (const path of ["src/**", "constructor", "prototype"]) {
+      const big = doc(path, "x".repeat(1048576));
+      // The Room's own canonical form, which is what it stores, is over the bound.
+      expect(new TextEncoder().encode(canonicalize(big as never)).length).toBeGreaterThan(1048576);
+      const refused = await parse(big);
+      expect(refused.ok, path).toBe(false);
+      expect(!refused.ok && refused.problems, path).toEqual(["policy: the document's canonical JSON must be at most 1048576 bytes"]);
+      expect((await parse(doc(path, "x"))).ok, path).toBe(true);
+    }
   });
 
   it("the validator names the bound, and only when the document is over it", () => {
@@ -320,6 +429,14 @@ describe.skipIf(DECLARED)("refusal wording is filled only with facts in the room
     expect(out.reason).toBe(long.repeat(85).slice(0, 8192));
     expect(out.fix).toBe(`a${long.repeat(10)}${"é".repeat(30)}`);
     expect(bytes(out.fix!)).toBe(8191);
+    // A text of exactly 8,192 bytes is not cut.
+    const fit = `${"p".repeat(8192 - 8130)}${"{path}".repeat(10)}`;
+    const exact = await declaredRoom(v2((a) => void (a["propose"] = { ...a["propose"]!, refusals: { "outside-claim": { reason: fit, fix: fit } } })));
+    const c2 = await ok<Claim>(exact, exact.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    const head2 = pushChange(exact, c2.lane, { [long]: "x" });
+    const whole = expectRefusal(await act(exact, exact.admin, "propose", { lane: c2.lane }, { lease: 1, expectedGeneration: 0, head: head2, summary: "s" }), "outside-claim");
+    expect(whole.reason).toBe(`${"p".repeat(62)}${long.repeat(10)}`);
+    expect(bytes(whole.reason)).toBe(8192);
     // The recorded entry holds the same bounded text.
     const sealed = await inDO(r, (room) => String(room.core.sql.all("SELECT body FROM entries WHERE id = ?", out.act!)[0]!["body"]));
     expect(sealed).toContain(out.fix!);
@@ -353,6 +470,21 @@ describe.skipIf(DECLARED)("the active document is parsed once per version, not o
       return sql.__reads;
     });
     expect(reads).toBeLessThanOrEqual(1);
+  });
+
+  it("at most four versions are kept, and a version no longer kept is read again as it was", async () => {
+    const r = await declaredRoom();
+    const first = await inDO(r, (room) => room.core.activePolicy().version);
+    for (let i = 0; i < 6; i++) {
+      await activate(r, v2((a) => void (a["note"] = { ...a["note"]!, label: `Note ${i}` })));
+      await inDO(r, (room) => room.core.activePolicy());
+    }
+    const kept = await inDO(r, (room) => (room.core as unknown as { policyCache: Map<string, unknown> }).policyCache);
+    expect(kept.size).toBe(4);
+    expect(kept.has(first)).toBe(false);
+    const again = await inDO(r, (room) => (room.core.policyAt(first)!.doc as unknown as PolicyDocumentV2).acts["note"]!.label);
+    expect(again).toBe("Note");
+    expect(await inDO(r, (room) => (room.core.activePolicy().doc as unknown as PolicyDocumentV2).acts["note"]!.label)).toBe("Note 5");
   });
 
   it("a kept policy cannot be changed by its reader, and a new activation is read at once", async () => {
