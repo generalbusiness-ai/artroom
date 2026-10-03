@@ -1,0 +1,22 @@
+{
+  "path": "/Users/hughpyle/play/artroom/plans/005-2026-10-03-browser-cloud-work.md",
+  "sha256": "446c1d362b70db398956b9e28aa157d3db903d43ae2bc057ed119b5dea47b6b1",
+  "bytes": 30262,
+  "lines": 409,
+  "words": 4386,
+  "local_links": [],
+  "stories": [
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      1
+    ],
+    [
+      3,
+      1
+    ]
+  ]
+}
