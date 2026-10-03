@@ -1197,8 +1197,10 @@ const COMMANDS: Record<string, Command> = {
       const { api, room } = await open(ctx);
       // The tool list follows this credential's authorization, read from the roster at each `tools/list` (R-API-14):
       // a key file is the member's own key; a bearer file acts under the session's delegation.
-      const caller = async () => callerFromRoster(await api.members(), room.custody === "room" ? { key: room.key, session: true } : { key: room.key });
-      const handle = serveArtroomStdio(api, { caller, ...(toolset !== undefined ? { toolset } : {}) });
+      const who = room.custody === "room" ? { key: room.key, session: true } : { key: room.key }; // GM:cli-caller
+      const caller = async () => callerFromRoster(await api.members(), who);
+      const asked = toolset !== undefined ? { toolset } : {}; // GM:cli-toolset
+      const handle = serveArtroomStdio(api, { caller, ...asked });
       await new Promise<void>((resolve) => process.stdin.once("end", resolve));
       await handle.close();
       return EXIT.ok;

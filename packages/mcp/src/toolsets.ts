@@ -87,8 +87,8 @@ export async function eligible(caller: McpCaller, catalogue: Catalogue): Promise
     if (!(caller.role === "admin" || (a.declaration.who.roles as readonly string[]).includes(caller.role))) return false; // GM:who
     if (d === undefined) return true; // A member's own key needs no grant map.
     if (a.declaration.who.delegable === false) return false; // GM:delegable
-    if (d.acts === undefined || !Object.hasOwn(d.acts, kind)) return false; // GM:map-entry
-    return d.acts[kind] === a.binding; // GM:map-binding
+    // The signed map must name the kind, and for the binding that is active now. The map is only read.
+    return d.acts !== undefined && Object.hasOwn(d.acts, kind) && d.acts[kind] === a.binding; // GM:map-binding
   });
   const named: string[] = [];
   for (const kind of NAMED_ACT_KINDS) {
@@ -112,7 +112,7 @@ export function defaultToolset(caller: McpCaller, e: Eligible): McpToolset {
   switch (caller.role) {
     case "admin":
     case "maintainer":
-      return "all";
+      return "all"; // GM:default-all
     case "checker":
       return "reviewer"; // GM:checker-default
     default:

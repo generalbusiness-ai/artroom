@@ -52,8 +52,8 @@ const idempotencyKey: JsonSchema = {
 /** The longest any tool waits (R-API-15). A larger `waitMs`, or one that is not a whole number from 0, is `bad-request`. */
 export const MAX_WAIT_MS = 45_000 satisfies McpMaxWaitMs; // GM:wait-max
 const waitMs = (dflt: number): JsonSchema => ({
-  type: "integer",
-  minimum: 0,
+  type: "integer", // GM:wait-whole
+  minimum: 0, // GM:wait-from-zero
   maximum: MAX_WAIT_MS,
   description: `How long to wait, in milliseconds: a whole number from 0 to ${MAX_WAIT_MS}. Default ${dflt}.`,
 });
@@ -153,7 +153,7 @@ const claim = {
       expectedGeneration: { ...expectedGeneration, description: "Only with `lane`: the lane's current generation." },
       idempotencyKey,
     },
-    required: ["scope", "idempotencyKey"],
+    required: ["scope", "idempotencyKey"], // GM:key-claim
     additionalProperties: false,
   },
   outputSchema: record("The Claim: `lane`, `lease` (`holder`, `generation`, `expiresAt`), `scope`, `overlaps`.", ["lane", "lease", "scope", "overlaps"]),
@@ -197,7 +197,7 @@ const renew = {
     "Extend your lease on a lane so you keep it while you work. Any accepted act on the lane also extends it.",
     "On refusal: `lease-fenced` or `not-holder`: the lease already ended, so claim the lane again before you continue.",
   ].join(" "),
-  inputSchema: { type: "object", properties: { lane, lease, idempotencyKey }, required: ["lane", "lease", "idempotencyKey"], additionalProperties: false },
+  inputSchema: { type: "object", properties: { lane, lease, idempotencyKey }, required: ["lane", "lease", "idempotencyKey"], additionalProperties: false }, // GM:key-renew
   outputSchema: record("The renewal, with the new `lease.expiresAt`.", ["lane", "lease"]),
 } as const satisfies McpToolDescriptor<"renew">;
 
@@ -215,7 +215,7 @@ const release = {
   inputSchema: {
     type: "object",
     properties: { lane, lease, note: text("Optional. A handover note: what is done, what is left, what to watch."), idempotencyKey },
-    required: ["lane", "lease", "idempotencyKey"],
+    required: ["lane", "lease", "idempotencyKey"], // GM:key-release
     additionalProperties: false,
   },
   outputSchema: record("The release.", ["lane"]),
@@ -238,7 +238,7 @@ const propose = {
   inputSchema: {
     type: "object",
     properties: { lane, lease, head: sha, expectedGeneration, summary: text("What changed and why, for reviewers."), because, idempotencyKey },
-    required: ["lane", "lease", "head", "expectedGeneration", "summary", "idempotencyKey"],
+    required: ["lane", "lease", "head", "expectedGeneration", "summary", "idempotencyKey"], // GM:key-propose
     additionalProperties: false,
   },
   outputSchema: record("The Proposal: `generation`, `head`, `changed`, `obligations`, `preview`.", ["lane", "generation", "head", "obligations"]),
@@ -258,7 +258,7 @@ const note = {
   inputSchema: {
     type: "object",
     properties: { anchor, text: text("The note. Plain text or Markdown."), replyTo: id("Optional. The note this replies to."), idempotencyKey },
-    required: ["anchor", "text", "idempotencyKey"],
+    required: ["anchor", "text", "idempotencyKey"], // GM:key-note
     additionalProperties: false,
   },
   outputSchema: record("The note.", ["anchor", "text"]),
@@ -289,7 +289,7 @@ const review = {
       text: text("Your reasons."),
       idempotencyKey,
     },
-    required: ["lane", "generation", "head", "verdict", "scope", "text", "idempotencyKey"],
+    required: ["lane", "generation", "head", "verdict", "scope", "text", "idempotencyKey"], // GM:key-review
     additionalProperties: false,
   },
   outputSchema: record("The review, with the obligations it met in `fulfils`.", ["verdict", "fulfils"]),
@@ -312,7 +312,7 @@ const land = {
   inputSchema: {
     type: "object",
     properties: { lane, lease, generation, head: sha, waitMs: waitMs(0), idempotencyKey },
-    required: ["lane", "lease", "generation", "head", "idempotencyKey"],
+    required: ["lane", "lease", "generation", "head", "idempotencyKey"], // GM:key-land
     additionalProperties: false,
   },
   outputSchema: record("The landing, with the landing operation in `op`.", ["lane", "generation", "op"]),
@@ -515,7 +515,7 @@ const act = {
   title: "Do a declared act",
   method: "act",
   annotations: CHANGES,
-  toolsets: ["builder", "reviewer", "all"],
+  toolsets: ["builder", "reviewer", "all"], // GM:act-toolsets
   description: [
     "Do any act this room declares, including one with no named tool. First call `acts` and read the kind's declaration.",
     "Give `kind`, the `target` its declaration accepts (null, `{ lane }`, `{ lane, generation }`, `{ act }` or a line anchor),",
@@ -536,7 +536,7 @@ const act = {
       binding,
       idempotencyKey,
     },
-    required: ["kind", "target", "body", "binding", "idempotencyKey"],
+    required: ["kind", "target", "body", "binding", "idempotencyKey"], // GM:key-act
     additionalProperties: false,
   },
   outputSchema: record("The act's record: its own `kind`, and the fields its step produces.", []),

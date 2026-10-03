@@ -616,8 +616,10 @@ describe("attention with waitMs waits for an item for the caller (R-API-15)", ()
     const r = recording({
       attention: () => page,
       subscribe: (_c: unknown, opts: { waitMs: number }) => {
-        if (opts.waitMs > 0) polls++;
-        return { cursor: "u1", entries: [], attention: [], publishedThrough: 3 };
+        if (opts.waitMs === 0) return { cursor: "u1", entries: [], attention: [], publishedThrough: 3 };
+        // A waiting poll: it would end a wait at once, so a wait that should not happen shows as a poll.
+        polls++;
+        return { cursor: "u2", entries: [], attention: [{ id: "att_2" }], publishedThrough: 3 };
       },
     });
     const started = Date.now();
@@ -834,6 +836,9 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
     await room.activate(null);
     const legacy = await active();
     expect(await shown({ role: "admin" }, legacy)).toEqual(without(ORDER, "act"));
+    // A checker's own key there: the legacy table lets it sign `note`, and nothing else an MCP tool names.
+    expect(await shown({ role: "checker" }, legacy)).toEqual(["note", "attention", "explain", "lanes", "lane", "proposal", "acts"]);
+    expect(await eligible({ role: "checker" }, legacy)).toEqual({ named: ["note"], generic: [] });
     expect(await shown(agent({ ask: current["ask"]! }, "*"), legacy)).toEqual(without(SETS.builder, "act"));
   });
 

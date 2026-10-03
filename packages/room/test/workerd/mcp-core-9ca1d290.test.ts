@@ -21,7 +21,7 @@ import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy";
 import type { CallerView } from "../../src/requests.ts";
 import { activate, bindingIn, declaredRoom, headSeq, laneRowOf, ok, v2 } from "./declared-support.ts";
 import { ASK, ORIGIN, bearer } from "./declared-stage5-support.ts";
-import { addMember, b64url, call, clock, day, DECLARED, digestBytes, failure, iso, makeRoom, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
+import { addMember, b64url, call, clock, day, DECLARED, digestBytes, iso, makeRoom, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
 
 /** The fixed order of `tools/list` (R-API-13). */
 const ORDER = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release", "attention", "explain", "lanes", "lane", "proposal", "operation", "acts", "act"];
@@ -104,10 +104,11 @@ describe.skipIf(DECLARED)("the Room gives its MCP endpoint the caller's authoriz
   it("an unknown token, and a bearer whose key was revoked, are unauthenticated; tools/list answers 401", async () => {
     const r = await declaredRoom(doc());
     const b = await bearer(r, "@agent", "agent", { kinds: ["renew"], acts: {} });
-    expect((await failure(r.stub.caller("brr_not_a_token"))).code).toBe("unauthenticated");
+    const refusedAs = async (token: string) => ((await r.stub.caller(token)) as { error?: { code: string } }).error?.code;
+    expect(await refusedAs("brr_not_a_token")).toBe("unauthenticated");
     expect((await rpc(r, b.bearer, "tools/list")).status).toBe(200);
     await r.admin.ok("roster", null, { op: "revoke-key", key: b.key, reason: "retired" });
-    expect((await failure(r.stub.caller(b.bearer))).code).toBe("unauthenticated");
+    expect(await refusedAs(b.bearer)).toBe("unauthenticated");
     expect((await rpc(r, b.bearer, "tools/list")).status).toBe(401);
   });
 });

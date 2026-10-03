@@ -92,7 +92,7 @@ export function createMcpFetch<Env>(opts: McpWorkerOptions<Env>): (request: Requ
     let toolset: McpToolset | undefined;
     try {
       const asked = url.searchParams.getAll("toolset");
-      if (asked.length > 1) return jsonRpcError(400, "Give one toolset.", {}, { name: "ArtroomError", code: "bad-request", message: "Give one toolset.", retryable: false });
+      if (asked.length > 1) return jsonRpcError(400, "Give one toolset.", {}, { name: "ArtroomError", code: "bad-request", message: "Give one toolset.", retryable: false }); // GM:toolset-one
       toolset = toolsetOf(asked.length === 1 ? asked[0] : undefined); // GM:toolset-query
     } catch (e) {
       if (!isArtroomError(e)) throw e;
