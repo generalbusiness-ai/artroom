@@ -1671,7 +1671,7 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
         case "invite": {
           const exp = parseTime(op.expiresAt)!;
           sql.all(
-            "INSERT INTO invitations (id, member, role, custody, expires_at, expires_ms, secret_hash, session) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO invitations (id, member, role, custody, expires_at, expires_ms, secret_hash, session, declared) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             id,
             op.member,
             op.role ?? null,
@@ -1680,6 +1680,8 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
             exp,
             op.secretHash,
             op.session ? JSON.stringify(op.session) : null,
+            // R-DECL-17: what an invitation with no session grants was fixed by the vocabulary it was admitted under.
+            isDeclared(ctx.policy.doc) ? 1 : null, // G2:invitation-era
           );
           break;
         }

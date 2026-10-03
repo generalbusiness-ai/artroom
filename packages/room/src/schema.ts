@@ -75,7 +75,8 @@ class Checker {
       if (!(required as readonly string[]).includes(k) && !(optional as readonly string[]).includes(k)) this.error(`${path}.${k}`, "is not a field of this type");
       if (v[k] === undefined) this.error(`${path}.${k}`, "is undefined; omit absent fields");
     }
-    for (const k of required) if (!(k in v)) this.error(`${path}.${k}`, "is required");
+    // Own properties only: a declared field may be named like an inherited one, such as toString (R-DECL-12).
+    for (const k of required) if (!Object.hasOwn(v, k)) this.error(`${path}.${k}`, "is required"); // G2:own-required
     return v as { readonly [k in R]: unknown } & { readonly [k in O]?: unknown };
   }
 
@@ -430,7 +431,7 @@ function declaredBody(c: Checker, d: ActDeclaration, target: unknown, body: unkn
   const required = [...steps.flatMap((s) => STEP_BODY[s].required), ...fields.filter(([, f]) => requiredOn(f, shape)).map(([n]) => n)];
   const optional = [...steps.flatMap((s) => STEP_BODY[s].optional), ...fields.filter(([, f]) => !requiredOn(f, shape)).map(([n]) => n), "because"];
   const b = c.object(body, "body", [...new Set(required)], [...new Set(optional)]) as Readonly<Record<string, unknown>>;
-  for (const [name, field] of fields) if (b[name] !== undefined) declaredField(c, field, b[name], `body.${name}`); // G2:declared-fields
+  for (const [name, field] of fields) if (Object.hasOwn(b, name)) declaredField(c, field, b[name], `body.${name}`); // G2:declared-fields
   for (const step of steps) stepFields(c, step, b); // G2:step-fields
   if (b["because"] !== undefined) c.reasons(b["because"], "body.because"); // G2:because
 }

@@ -155,7 +155,8 @@ export function delegation(sql: Sql, id: string): (Delegation & { readonly expir
   };
 }
 
-export function invitation(sql: Sql, id: string): (Invitation & { readonly expiresMs: number }) | null {
+/** An invitation as stored. `declared` says it was admitted under a `v2` document (R-DECL-17). */
+export function invitation(sql: Sql, id: string): (Invitation & { readonly expiresMs: number; readonly declared: boolean }) | null {
   const r = one(sql, "SELECT * FROM invitations WHERE id = ?", id);
   if (!r) return null;
   const role = str(r, "role");
@@ -171,6 +172,7 @@ export function invitation(sql: Sql, id: string): (Invitation & { readonly expir
     secretHash: str(r, "secret_hash") as Invitation["secretHash"],
     ...(session ? { session } : {}),
     ...(used !== null ? { used } : {}),
+    declared: num(r, "declared") === 1,
   };
 }
 

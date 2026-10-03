@@ -364,7 +364,7 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
     await ok<Claim>(r, bob, "claim", null, { goal: "g", scope: ["docs/**"] });
   });
 
-  it("an invitation whose session names declared kinds, redeemed after the room returned to a v1 document, is refused kind-undeclared and stays unused; a session that names only renew is redeemed", async () => {
+  it("an invitation whose session names declared kinds, redeemed after the room returned to a v1 document, is refused binding-stale and stays unused; a session that names only renew is redeemed", async () => {
     const r = await declaredRoom();
     const invite = async (member: string, acts: Record<string, string>) => {
       const bytes = randomBytes(32);
@@ -376,12 +376,29 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
     const renewOnly = await invite("@two", {});
     await activate(r, policy());
     const seq = await headSeq(r);
-    const refused = expectRefusal(await call(r.stub.redeem({ custody: "room", invitation: withClaim.id as never, secret: withClaim.secret }, "x")), "kind-undeclared");
-    expect(refused.reason).toContain("The kind claim is not declared");
+    const refused = expectRefusal(await call(r.stub.redeem({ custody: "room", invitation: withClaim.id as never, secret: withClaim.secret }, "x")), "binding-stale");
+    expect(refused.reason).toContain("declares no acts");
+    expect(refused.current).toEqual({ policy: await inDO(r, (room) => room.core.activePolicy().version) });
     expect(await headSeq(r)).toBe(seq);
     expect(await inDO(r, (room) => room.core.sql.all("SELECT used FROM invitations WHERE id = ?", withClaim.id)[0]!["used"])).toBeNull();
     const b = await call<Redeemed>(r.stub.redeem({ custody: "room", invitation: renewOnly.id as never, secret: renewOnly.secret }, "x"));
     expect((await r.admin.read({ q: "members" })).delegations.find((x) => x.id === b.delegation)!.kinds).toEqual(["renew"]);
+  });
+
+  it("an invitation admitted under a v2 document never gains a kind: with no session, redeemed after the room returned to v1, it grants renew and no legacy kind", async () => {
+    const r = await declaredRoom();
+    const bytes = randomBytes(32);
+    const inv = await ok<RosterRecord>(r, r.admin, "roster", null, { op: "invite", member: "@agent", role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(bytes) }, { binding: null });
+    await activate(r, policy());
+    const b = await call<Redeemed>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(bytes) }, "x"));
+    expect((await r.admin.read({ q: "members" })).delegations.find((x) => x.id === b.delegation)!.kinds).toEqual(["renew"]);
+    expectRefusal(await call(r.stub.bearerAct(b.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })), "delegation-invalid");
+    // The control: an invitation with no session admitted under a v1 document is the legacy `*`, as it always was.
+    const legacy = await makeRoom();
+    const lb = randomBytes(32);
+    const linv = await legacy.admin.ok<RosterRecord>("roster", null, { op: "invite", member: "@agent", role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(lb) });
+    const lr = await call<Redeemed>(legacy.stub.redeem({ custody: "room", invitation: linv.id, secret: b64url(lb) }, "x"));
+    expectOk(await call(legacy.stub.bearerAct(lr.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })));
   });
 
   it("bearer acts: the named tools' code-review binding is admitted where claim means the code-review claim, and binding-stale where it does not", async () => {
@@ -582,6 +599,22 @@ describe.skipIf(DECLARED)("a declared act's body is the application's own (R-DEC
     expect(await inDO(r, (room) => room.core.sql.all("SELECT goal FROM lanes WHERE id = ?", c.lane)[0]!["goal"])).toBe("");
     // Policy still judges it, whoever signs: recovery's bypass of refuse rules is not reachable from a declared field.
     expectRefusal(await act(r, r.admin, "claim", null, { goal: 0, purpose: "config-recovery", scope: ["docs/**"] }), "no-zero");
+  });
+});
+
+describe.skipIf(DECLARED)("declared field names are the body's own properties (R-DECL-12)", () => {
+  it("a field named like an inherited property is absent when the body omits it: optional toString is not read from the prototype, and required valueOf is required", async () => {
+    const r = await declaredRoom(
+      v2((a) => void (a["claim"] = { ...a["claim"]!, body: { ...a["claim"]!.body, toString: { type: "text" as const, max: 100, optional: true } } })),
+    );
+    const c = await ok<Claim>(r, r.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    expect(c.kind).toBe("claim");
+    expectRefusal(await act(r, r.admin, "claim", null, { goal: "g", scope: ["docs/**"], toString: 7 }), "invalid-body");
+    const strict = await declaredRoom(
+      v2((a) => void (a["claim"] = { ...a["claim"]!, body: { ...a["claim"]!.body, valueOf: { type: "text" as const, max: 100, requiredFor: ["none"] as const } } })),
+    );
+    expect(expectRefusal(await act(strict, strict.admin, "claim", null, { goal: "g", scope: ["src/**"] }), "invalid-body").reason).toBe("body.valueOf is required.");
+    expectOk(await act(strict, strict.admin, "claim", null, { goal: "g", scope: ["src/**"], valueOf: "v" }));
   });
 });
 
@@ -795,8 +828,8 @@ describe.skipIf(DECLARED)("migration 4 (thread kind, binding and lease; grant ma
       await inDO(r, (room) => {
         const sql = room.core.sql;
         sql.all("INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, why, handover, revert_of, kind) VALUES ('act_99_aaaaaaaa', 99, 'ordinary', 'r', NULL, '[\"**\"]', 0, 0, NULL, NULL, 'unheld', 'opened-by-room', NULL, 'op_land_1', 'room')");
-        // The store as version `from` had it: without the four columns.
-        for (const [table, column] of [["lanes", "kind"], ["lanes", "binding"], ["lanes", "lease_ms"], ["delegations", "acts"]]) sql.all(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+        // The store as version `from` had it: without the five columns.
+        for (const [table, column] of [["lanes", "kind"], ["lanes", "binding"], ["lanes", "lease_ms"], ["delegations", "acts"], ["invitations", "declared"]]) sql.all(`ALTER TABLE ${table} DROP COLUMN ${column}`);
         sql.all("UPDATE schema_version SET v = ? WHERE id = 1", from);
       });
       const r2 = await restarted(r);

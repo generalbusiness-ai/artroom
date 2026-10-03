@@ -27,11 +27,10 @@ import type {
   WorkspaceGrant,
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
-import { CODE_REVIEW_ACTS, bindingSubject, delegableBy as grantable, isDeclared, isPlatformKind, stepsOf } from "@generalbusiness/artroom-policy";
+import { CODE_REVIEW_ACTS, DELEGABLE_PLATFORM, bindingSubject, delegableBy as grantable, isDeclared, isPlatformKind, stepsOf } from "@generalbusiness/artroom-policy";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { admit, commit, decide, earlySteps, finalBoundary, refuseApplies, refuseInput, submit, type DecideOptions } from "./admission.ts";
 import { judge, refusal, type Judged } from "./authority.ts";
-import { kindUndeclared } from "./declared.ts";
 import { entryAt } from "./log.ts";
 import { utf8 } from "./canonical.ts";
 import { fault, Moved, type RoomCore } from "./core.ts";
@@ -244,11 +243,25 @@ function sessionGrant(core: RoomCore, inv: NonNullable<ReturnType<typeof invitat
   const doc = policy.doc as AnyPolicyDocument;
   const session = inv.session as (NonNullable<typeof inv.session> & { acts?: Readonly<Record<string, string>> }) | undefined;
   if (!isDeclared(doc)) {
-    // A session signed under a v2 document, redeemed after the room moved back to v1: the kinds its map names are no
-    // longer declared, so the redemption is refused and the invitation stays unused (R-DECL-17). Its map is never
+    // A session signed under a v2 document, redeemed after the room returned to v1: no binding of its map is the active
+    // one, so the redemption is refused binding-stale and the invitation stays unused (R-DECL-17). The map is never
     // dropped silently.
     const named = Object.keys(session?.acts ?? {});
-    if (named.length > 0) return { refusal: kindUndeclared(named[0]!, policy.version) }; // G2:session-v1
+    if (named.length > 0)
+      return {
+        refusal: refusal(
+          "binding-stale",
+          `The invitation's session was prepared for ${named[0]} as ${session!.acts![named[0]!]}; the room's active policy, version ${policy.version}, declares no acts.`,
+          "Ask an admin to invite again.",
+          { current: { policy: policy.version } },
+        ), // G2:session-v1
+      };
+    // An invitation admitted under a v2 document never gains a kind by a later return to v1: with no session it
+    // granted the delegable platform kinds of its role, and it still grants only those.
+    if (inv.declared && session === undefined) { // G2:invitation-no-gain
+      const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
+      return { kinds: role ? DELEGABLE_PLATFORM.filter((k) => (delegableBy(role) as readonly string[]).includes(k)) : [] };
+    }
     return { kinds: session?.kinds ?? "*" };
   }
   if (session?.acts !== undefined) return { kinds: session.kinds as readonly string[], acts: session.acts }; // G2:session-map
