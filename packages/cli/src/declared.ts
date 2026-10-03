@@ -104,14 +104,14 @@ export function parseValue(f: ActField, raw: string): Json {
     case "int": {
       if (!/^-?\d+$/.test(raw)) bad();
       const n = Number(raw);
-      if (!Number.isSafeInteger(n) || n < t.min || ("max" in t && n > t.max)) bad();
+      if (!Number.isSafeInteger(n) || n < t.min || ("max" in t && n > t.max)) bad(); // G5:cli-int
       return n;
     }
     case "bool":
-      if (raw !== "true" && raw !== "false") bad();
+      if (raw !== "true" && raw !== "false") bad(); // G5:cli-bool
       return raw === "true";
     case "enum":
-      if (!t.values.includes(raw)) bad();
+      if (!t.values.includes(raw)) bad(); // G5:cli-enum
       return raw;
     case "globs":
       return raw === "" ? [] : raw.split(",");
@@ -135,11 +135,11 @@ export function bodyOf(fields: readonly ActField[], base: Readonly<Record<string
     if (eq < 1) throw new FieldError(`--set takes NAME=VALUE, not ${JSON.stringify(pair)}.`);
     const name = pair.slice(0, eq);
     const f = known.get(name);
-    if (!f) throw new FieldError(`${name} is not a field of this act on this target. Its fields are: ${[...known.keys()].join(", ") || "none"}.`);
+    if (!f) throw new FieldError(`${name} is not a field of this act on this target. Its fields are: ${[...known.keys()].join(", ") || "none"}.`); // G5:cli-field-unknown
     body[name] = parseValue(f, pair.slice(eq + 1));
   }
   for (const name of Object.keys(body)) {
-    if (name !== "because" && !known.has(name)) throw new FieldError(`${name} is not a field of this act on this target. Its fields are: ${[...known.keys()].join(", ") || "none"}.`);
+    if (name !== "because" && !known.has(name)) throw new FieldError(`${name} is not a field of this act on this target. Its fields are: ${[...known.keys()].join(", ") || "none"}.`); // G5:cli-body-unknown
   }
   return body;
 }
@@ -172,6 +172,6 @@ export function meaningChanges(before: ActDeclaration, after: ActDeclaration): s
 
 /** A record's kind as the log shows it: the label in force at its own seq, and its retirement (R-DECL-23). */
 export function kindText(kind: string, m: RecordMeaning | undefined): string {
-  if (m === undefined || m.vocabulary !== "declared") return kind;
+  if (m === undefined || m.vocabulary !== "declared") return kind; // G5:cli-kind-label
   return `${kind} (${m.label}${m.retired !== undefined ? `, retired at seq ${m.retired}` : ""})`;
 }

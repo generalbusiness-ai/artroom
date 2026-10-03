@@ -530,7 +530,7 @@ async function staleText(ctx: Ctx, api: HttpRoomClient | undefined, kind: string
     let old;
     for (let i = 0; i < 8 && before !== null && before.since > 0 && old === undefined; i++) {
       before = await client.actsAt({ seq: before.since - 1 });
-      if (before?.vocabulary === "declared" && Object.hasOwn(before.acts, kind) && before.acts[kind]!.binding === given) old = before.acts[kind]!.declaration;
+      if (before?.vocabulary === "declared" && Object.hasOwn(before.acts, kind) && before.acts[kind]!.binding === given) old = before.acts[kind]!.declaration; // G5:cli-stale-old
     }
     if (old !== undefined) {
       const changed = meaningChanges(old, now.declaration);
@@ -1032,14 +1032,14 @@ const COMMANDS: Record<string, Command> = {
       const versions: Catalogue[] = [];
       for (const e of page.acts) {
         if (e.entry.type === "system") continue;
-        let c = versions.find((k) => governs(k, e.seq));
+        let c = versions.find((k) => governs(k, e.seq)); // G5:cli-log-version
         if (c === undefined) {
           const read = await api.actsAt({ seq: e.seq });
           if (read === null) continue;
           versions.push(read);
           c = read;
         }
-        meanings.set(e.seq, meaningOf(c, e.entry.act.envelope.kind));
+        meanings.set(e.seq, meaningOf(c, e.entry.act.envelope.kind)); // G5:cli-log-meaning
       }
       return print(ctx, page, () => logText(page.acts, page.head, page.publishedThrough, page.more, page.cursor, meanings));
     },
@@ -1050,7 +1050,7 @@ const COMMANDS: Record<string, Command> = {
     async run(ctx) {
       const at = int(ctx.values, "at");
       const policy = str(ctx.values, "policy");
-      if (at !== undefined && policy !== undefined) throw new UsageError("Give --at or --policy, not both.");
+      if (at !== undefined && policy !== undefined) throw new UsageError("Give --at or --policy, not both."); // G5:cli-acts-one
       if (policy !== undefined && !isActId(policy)) throw new UsageError("A policy version looks like act_12_0a1b2c3d.");
       const kind = ctx.args[0];
       const { api } = await open(ctx);
@@ -1088,8 +1088,8 @@ const COMMANDS: Record<string, Command> = {
       if (kind === undefined) throw new UsageError("Give the kind of act. To see what this room declares: artroom acts");
       const given = str(ctx.values, "binding");
       // The binding is never read for the user: it names the meaning they read, and only they know which that was (R-DECL-16).
-      if (given === undefined) throw new UsageError(`Give the binding of the meaning you read: --binding sha256:… It is printed by: artroom acts ${kind}`);
-      if (!/^sha256:[0-9a-f]{64}$/.test(given)) throw new UsageError("--binding takes the whole binding, sha256: and 64 hex digits, as artroom acts prints it.");
+      if (given === undefined) throw new UsageError(`Give the binding of the meaning you read: --binding sha256:… It is printed by: artroom acts ${kind}`); // G5:cli-binding-required
+      if (!/^sha256:[0-9a-f]{64}$/.test(given)) throw new UsageError("--binding takes the whole binding, sha256: and 64 hex digits, as artroom acts prints it."); // G5:cli-binding-format
       let base: Record<string, Json> = {};
       const raw = str(ctx.values, "body");
       if (raw !== undefined) {
@@ -1109,13 +1109,13 @@ const COMMANDS: Record<string, Command> = {
         async start(api, room, opts) {
           reader = api;
           const c = await api.acts();
-          if (c.vocabulary !== "declared") throw new UsageError("This room declares no acts of its own: it uses the legacy vocabulary. Use the named commands, such as artroom claim.");
+          if (c.vocabulary !== "declared") throw new UsageError("This room declares no acts of its own: it uses the legacy vocabulary. Use the named commands, such as artroom claim."); // G5:cli-legacy
           active = c;
           const a = Object.hasOwn(c.acts, kind) ? c.acts[kind] : undefined;
           if (a === undefined)
-            return { refused: true, rule: "kind-undeclared", reason: `The kind ${kind} is not declared in the room's active policy, version ${c.policy}.`, fix: "See what the room declares: artroom acts" };
+            return { refused: true, rule: "kind-undeclared", reason: `The kind ${kind} is not declared in the room's active policy, version ${c.policy}.`, fix: "See what the room declares: artroom acts" }; // G5:cli-undeclared
           // The meaning the user read is not the active one: nothing is signed. This is what the room would answer.
-          if (a.binding !== given)
+          if (a.binding !== given) // G5:cli-stale
             return {
               refused: true,
               rule: "binding-stale",
@@ -1126,7 +1126,7 @@ const COMMANDS: Record<string, Command> = {
           const target = targetOf(ctx, room);
           const shape = shapeOf(target);
           const fields = shape === null ? null : fieldsOf(a.declaration, shape);
-          if (shape === null || fields === null) throw new UsageError(`${kind} does not act on that target. It takes: ${targetsOf(a.declaration).join(", ")}. See: artroom acts ${kind}`);
+          if (shape === null || fields === null) throw new UsageError(`${kind} does not act on that target. It takes: ${targetsOf(a.declaration).join(", ")}. See: artroom acts ${kind}`); // G5:cli-target
           let body: Record<string, Json>;
           try {
             body = bodyOf(fields, base, list(ctx.values, "set"));
@@ -1141,19 +1141,19 @@ const COMMANDS: Record<string, Command> = {
           if (lane !== undefined && wants("lease") && fields.find((f) => f.name === "lease")!.required) {
             const h = await held(api, lane, room.member);
             if (isRefusal(h)) return h;
-            body["lease"] = h.lease.generation;
+            body["lease"] = h.lease.generation; // G5:cli-lease
           }
           if (lane !== undefined && wants("expectedGeneration")) {
             const l = await api.lane(lane);
-            if (l !== null) body["expectedGeneration"] = l.generation;
+            if (l !== null) body["expectedGeneration"] = l.generation; // G5:cli-generation
           }
           if (lane !== undefined && shape === "version" && wants("head")) {
             const p = await api.proposal({ lane, generation: (target as { generation: number }).generation });
-            if (p !== null) body["head"] = p.head;
+            if (p !== null) body["head"] = p.head; // G5:cli-head
           }
           const lacks = missing(fields, body);
-          if (lacks.length > 0) throw new UsageError(`${kind} on target ${shape} also needs: ${lacks.map((n) => `--set ${n}=…`).join(" ")}. See: artroom acts ${kind}`);
-          return api.act(kind, target, body, { binding: given as Binding, ...opts });
+          if (lacks.length > 0) throw new UsageError(`${kind} on target ${shape} also needs: ${lacks.map((n) => `--set ${n}=…`).join(" ")}. See: artroom acts ${kind}`); // G5:cli-missing
+          return api.act(kind, target, body, { binding: given as Binding, ...opts }); // G5:cli-binding-given
         },
       });
       if (isRefusal(out)) {

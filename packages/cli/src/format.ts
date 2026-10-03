@@ -23,7 +23,7 @@ export const short = (sha: string) => sha.slice(0, 12);
 export function refusalText(r: Refusal): string[] {
   const lines = [`Refused: ${r.rule}`, `  Reason: ${r.reason}`];
   if (r.fix) lines.push(`  Fix: ${r.fix}`);
-  if (r.rule === "binding-stale" && r.current?.binding !== undefined) lines.push(`  Active binding: ${r.current.binding}, in policy version ${String(r.current.policy)}.`);
+  if (r.rule === "binding-stale" && r.current?.binding !== undefined) lines.push(`  Active binding: ${r.current.binding}, in policy version ${String(r.current.policy)}.`); // G5:cli-refusal-current
   if (r.act) lines.push(`  Recorded as ${r.act}. For the details: artroom explain ${r.act}`);
   return lines;
 }
@@ -131,7 +131,7 @@ export function logText(acts: readonly LogEntry[], head: number, publishedThroug
 
 export function explainText(x: Explanation): string[] {
   const lines = [`${x.act}: ${kindText(x.kind, x.meaning)}, ${x.outcome}${x.published ? ", published" : ", not yet published"}.`];
-  if (x.meaning?.vocabulary === "declared") lines.push(`Meaning: ${x.meaning.kind} as declared in policy version ${x.meaning.policy}, binding ${x.meaning.binding}.`);
+  if (x.meaning?.vocabulary === "declared") lines.push(`Meaning: ${x.meaning.kind} as declared in policy version ${x.meaning.policy}, binding ${x.meaning.binding}.`); // G5:cli-explain-meaning
   if (x.entry.entry.type === "refusal") {
     const r = x.entry.entry.receipt.refusal;
     lines.push(`Refused by ${r.rule}: ${r.reason}${r.fix ? ` Fix: ${r.fix}` : ""}`);

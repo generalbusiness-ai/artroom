@@ -171,9 +171,22 @@ describe("artroom act: any declared act, under the binding the user read", () =>
     expect(res.code).toBe(0);
     const last = h.room.entries.at(-1)!;
     expect(last.entry.type === "act" && last.entry.act.envelope).toMatchObject({ v: 2, kind: "release", binding: release, target: { lane: claim.lane }, body: { lease: 1, note: "done" } });
-    // Someone who does not hold the lane is told so, and nothing is sent.
+    // A version step: the lease and the lane's generation are read; the user gives the head and the summary.
+    const second = JSON.parse((await cli(alice, ["claim", "docs/**", "--goal", "g2", "--json"])).out) as { lane: string };
+    const propose = (await h.room.bindingOf("propose"))!;
+    const head = "c".repeat(40);
+    expect((await cli(alice, ["act", "propose", "--binding", propose, "--lane", second.lane, "--set", `head=${head}`, "--set", "summary=s"])).code).toBe(0);
+    const proposed = h.room.entries.at(-1)!;
+    expect(proposed.entry.type === "act" && proposed.entry.act.envelope).toMatchObject({ kind: "propose", target: { lane: second.lane }, body: { lease: 1, expectedGeneration: 0, head, summary: "s" } });
+    // A review of that version: its head is read from the proposal.
+    const review = (await h.room.bindingOf("review"))!;
     const bob = join(h.tmp, "bob");
     await login(bob, "@bob");
+    const reviewed = await cli(bob, ["act", "review", "--binding", review, "--lane", second.lane, "--generation", "1", "--set", "verdict=approve", "--set", "scope=docs/**,src/**", "--set", "text=ok"]);
+    expect(reviewed.code).toBe(0);
+    const sealed = h.room.entries.at(-1)!;
+    expect(sealed.entry.type === "act" && sealed.entry.act.envelope).toMatchObject({ kind: "review", target: { lane: second.lane, generation: 1 }, body: { head, verdict: "approve", scope: ["docs/**", "src/**"], text: "ok" } });
+    // Someone who does not hold the lane is told so, and nothing is sent.
     const sent = posts("/acts");
     const not = await cli(bob, ["act", "release", "--binding", release, "--lane", claim.lane]);
     expect(not.code).toBe(3);

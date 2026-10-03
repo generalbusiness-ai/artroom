@@ -268,6 +268,24 @@ describe("the named methods (R-API-9 as amended)", () => {
   });
 });
 
+describe("a handle whose room changes vocabulary", () => {
+  test("v2 back to v1: the named act is bad-request at step 1, the handle forgets what it read, and the next call signs v: 1", async () => {
+    await room.activate(withAsk());
+    const alice = await joinAs(room, "@alice");
+    await alice.api.claim({ goal: "a", scope: ["src/**"] });
+    expect(lastEnvelope()).toMatchObject({ v: 2 });
+    await room.activate(null);
+    const reads = gets("/declarations");
+    const entries = room.entries.length;
+    expect((await caught(alice.api.claim({ goal: "b", scope: ["docs/**"] }))).code).toBe("bad-request");
+    expect(room.entries.length).toBe(entries);
+    const claim = await alice.api.claim({ goal: "b", scope: ["docs/**"] });
+    expect(isRefusal(claim)).toBe(false);
+    expect(lastEnvelope()).toMatchObject({ v: 1, kind: "claim" });
+    expect(gets("/declarations")).toBe(reads + 1);
+  });
+});
+
 describe("bearer sessions (R-CRED-10 as amended)", () => {
   async function agent(acts: Record<string, string>) {
     const { invitation, secret } = await room.invite("@agent", { role: "agent", custody: "room", kinds: [], acts });
