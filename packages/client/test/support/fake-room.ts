@@ -410,6 +410,12 @@ export class FakeRoom {
     return { ...r, act: FakeRoom.idOf(e) };
   }
 
+  /** As the Room: in a `v2` room the `opened` effect carries the thread's kind and the binding of the act that opened it (R-DECL-6). */
+  #openedAs(env: SignedEnvelope["envelope"]): { kind?: string; binding?: string | null } {
+    if (this.policies.at(-1)!.acts === null) return {};
+    return { kind: env.kind, binding: (env as { binding?: string }).binding ?? null };
+  }
+
   #base(e: LogEntry, kind: EnvelopeKind, by: Authority) {
     return { id: FakeRoom.idOf(e), seq: e.seq, kind, by, at: e.at, flags: [] as const };
   }
@@ -501,7 +507,8 @@ export class FakeRoom {
             return this.#refuse(signed, by, refusal("glob-invalid", "A scope pattern is not a valid glob.", "Use globs such as src/** or src/*.ts."));
           }
           const lease = { holder: member, generation: 1, expiresAt: this.iso(this.now() + LEASE_MS) };
-          const e = await this.#record(signed, by, [{ type: "opened", purpose: "ordinary", lease }]);
+          const opened = { type: "opened" as const, purpose: "ordinary" as const, lease, ...this.#openedAs(env) };
+          const e = await this.#record(signed, by, [opened]);
           const lane = FakeRoom.idOf(e);
           const overlaps = [...this.lanes.values()]
             .filter((l) => l.holder !== null && l.scope.some((t) => scope.some((m) => overlap(m, t))))
@@ -532,7 +539,7 @@ export class FakeRoom {
             scope,
             lease,
             overlaps,
-            effect: { type: "opened", purpose: "ordinary", lease },
+            effect: opened,
           };
           return claim;
         }
@@ -705,7 +712,7 @@ export class FakeRoom {
         if (target === null && (declared[env.kind]?.targets.none as readonly string[] | undefined)?.includes("open")) {
           const scope = (body["scope"] as string[] | undefined) ?? [];
           const lease = { holder: member, generation: 1, expiresAt: this.iso(this.now() + LEASE_MS) };
-          const effect = { type: "opened", purpose: "ordinary", lease };
+          const effect = { type: "opened", purpose: "ordinary", lease, ...this.#openedAs(env) };
           const e = await this.#record(signed, by, [effect]);
           const lane = FakeRoom.idOf(e);
           this.lanes.set(lane, { lane, seq: e.seq, kind: env.kind, goal: typeof body["goal"] === "string" ? body["goal"] : "", scope, holder: member, leaseGeneration: 1, expiresAt: this.now() + LEASE_MS, generations: [] });
