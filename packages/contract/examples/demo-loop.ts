@@ -26,6 +26,7 @@ import {
   type LandOp,
   type McpInput,
   type McpOutput,
+  type McpToolDescriptor,
   type McpToolName,
   type Proposal,
   type Refusal,
@@ -296,7 +297,7 @@ export async function person(signer: Signer): Promise<void> {
 // ------------------------------------------------- 8. an agent over MCP
 
 export async function agentOverMcp(): Promise<void> {
-  const claim = await callTool("claim", { goal: "Fix login copy", scope: ["src/ui/login/**"] });
+  const claim = await callTool("claim", { goal: "Fix login copy", scope: ["src/ui/login/**"], idempotencyKey: "claim-login-copy" });
   if (isRefusal(claim)) {
     explain(claim);
     return;
@@ -312,23 +313,44 @@ export async function agentOverMcp(): Promise<void> {
     return;
   }
   const head = await gitPush(ws.grant.remote, ws.grant.token);
-  const p = await callTool("propose", { ...held, head, expectedGeneration: 0, summary: "Copy fix." });
+  const p = await callTool("propose", { ...held, head, expectedGeneration: 0, summary: "Copy fix.", idempotencyKey: "propose-login-copy-1" });
   if (isRefusal(p)) {
     explain(p);
     return;
   }
-  const landing = await callTool("land", { ...held, generation: p.generation, head: p.head, waitMs: 60_000 });
+  const proposal = await callTool("proposal", { lane: p.lane, generation: p.generation });
+  if ("outcome" in proposal) return;
+  show(`${proposal.obligations.length} obligations`);
+  const landing = await callTool("land", {
+    ...held,
+    generation: p.generation,
+    head: p.head,
+    waitMs: 45_000,
+    idempotencyKey: "land-login-copy-1",
+  });
   if (isRefusal(landing)) {
     explain(landing);
     return;
   }
   if (isTerminal(landing.op)) show(`landing ${landing.op.state}`);
-  const queue = await callTool("attention", { limit: 20 });
+  else {
+    // One follow-up wait; on expiry `operation` returns the current state (R-API-15).
+    const op = await callTool("operation", { id: landing.op.id, kind: "land", waitMs: 45_000 });
+    if (!("outcome" in op)) show(`landing ${op.state}`);
+  }
+  const queue = await callTool("attention", { limit: 20, waitMs: 30_000 });
   show(`${queue.items.length} items; published through ${queue.publishedThrough}`);
   const why = await callTool("explain", { act: p.id });
   if (why.outcome === "not-found") show(`no act ${why.act}`);
   else show(`${why.decisions.length} decisions`);
 }
+
+/** A descriptor's toolsets must list the tool (R-API-14): the compiler checks it here. */
+export const reviewDescriptorToolsets: McpToolDescriptor<"review">["toolsets"] = ["reviewer", "all"];
+// @ts-expect-error `review` is not in the builder toolset.
+export const reviewInBuilder: McpToolDescriptor<"review">["toolsets"] = ["builder"];
+/** `operation` calls `RoomApi.op`. */
+export const operationMethod: McpToolDescriptor<"operation">["method"] = "op";
 
 /** A `Claim` record is a `Held`: the compiler checks it here. */
 export const claimIsHeld = (claim: Claim): Held => claim;
