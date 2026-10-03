@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/measure/results/spike-smoke-2026-10-03T02-23-15-764Z.json","body":{"commit":"d3f7d3a8b2b8cc44c7a6bf3c0d5eb942dc18057c","path":"packages/room/measure/results/spike-smoke-2026-10-03T02-23-15-764Z.json"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5d3421613b8dd1d271994db9f1bd54787e107733","text":"Merge retired a covered predecessor; the successor is at notes/deploy-spike.md."}
