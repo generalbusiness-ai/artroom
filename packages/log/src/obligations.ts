@@ -90,7 +90,8 @@ export function specsOf(v: Pick<Version, "witness" | "required" | "specPolicy" |
       ? ({ id: ADMIN_APPROVAL, rule: "admin-approval", policy, paths: [], kind: "review", from: ["role:admin"], count: 1, allowSelf: false } as ObligationSpec)
       : null;
   const out: ObligationSpec[] = admin ? [admin] : [];
-  for (const o of v.required) if (!out.some((s) => s.id === o.id)) out.push(o);
+  // The `require` call lists the admin obligation too, when it knew the paths: it is decided here, once.
+  for (const o of v.required) if (o.id !== ADMIN_APPROVAL && !out.some((s) => s.id === o.id)) out.push(o);
   return out;
 }
 

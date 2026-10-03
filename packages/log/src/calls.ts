@@ -172,9 +172,9 @@ export class CallSession {
     // Under the legacy vocabulary the record is followed, never judged here: replaying it is the caller's.
     if (!this.c.compare) return { ok: true, result: r.ok && (r.value as ReplayContext).kind === kind ? (r.value as Ctx<K>) : null };
     if (!r.ok) return this.fail(r.reason, r.detail);
+    // A decision that names a context of another kind has no context of its own: the rebuilt digest will not match it.
     const v = r.value as ReplayContext;
-    if (v.kind !== kind) return this.fail("context-mismatch", `a ${kind} decision names a ${String(v.kind)} context`); // V:context-kind
-    return { ok: true, result: v as Ctx<K> };
+    return { ok: true, result: v.kind === kind ? (v as Ctx<K>) : null };
   }
 
   /** Compare one made call with the recorded call at `next`. */

@@ -17,8 +17,12 @@
  */
 
 import { describe, expect, test } from "vitest";
-import type { Decision, LogEntry, ReplayContext, SystemEvent } from "@generalbusiness/artroom-contract";
+import type { Decision, Envelope, LogEntry, PolicyDocumentV2, ReplayContext, SystemEvent } from "@generalbusiness/artroom-contract";
 import { replay } from "@generalbusiness/artroom-policy";
+import { utf8 } from "../src/canonical.ts";
+import { sha256Hex } from "../src/crypto.ts";
+import { STEPS_V1, bodyProblem, vocabularyOf } from "../src/declared.ts";
+import { retain } from "../src/entries.ts";
 import { type VerifyReason } from "../src/verify.ts";
 import type { Fixture } from "./support/declared-room.ts";
 import { keys } from "./support/room-sim.ts";
@@ -175,11 +179,15 @@ describe("honest logs verify, with every input rebuilt from the fold", () => {
     // The advisory obligation is never listed (R-OBL-7).
     expect(obligation(landContext(log, S.land), "obl_lint")).toBeUndefined();
     // After the new policy: the carry was judged under the old one, and the build check names the old configuration.
+    // The new policy also adds an audit checker, whose configuration is the test checker's: nobody has run it.
     expect(landContext(log, S.t1evaluated3).input.obligations).toEqual([
       { id: "obl_src-review", met: true },
       { id: "obl_tests", met: false },
       { id: "obl_build", met: false },
+      { id: "obl_audit", met: false },
     ]);
+    expect(obligation(landContext(log, S.t5land), "obl_tests")!.met).toBe(true);
+    expect(obligation(landContext(log, S.t5land), "obl_audit")!.met).toBe(false);
     // Dave no longer qualifies for lib-review: the obligation is open and his verdict is not listed.
     expect(obligation(landContext(log, S.t4evaluated3), "obl_lib-review")!.met).toBe(false);
     expect(landContext(log, S.t4evaluated3).input.reviews.map((r) => r.by.member)).toEqual(["@alice"]);
@@ -260,6 +268,7 @@ describe("a land input's obligations are rebuilt (R-POL-6, R-OBL-1 to R-OBL-7)",
   test("context-mismatch: a check naming the earlier configuration, counted after the configuration changes", withObligations(S.t1evaluated3, setMet("obl_build", true)));
   test("context-mismatch: a verdict whose reviewer no longer qualifies under the new policy, still counted", withObligations(S.t4evaluated3, setMet("obl_lib-review", true)));
   test("context-mismatch: a check whose key was revoked as compromised, still counted", withObligations(S.t5evaluatedRevoked, setMet("obl_tests", true)));
+  test("context-mismatch: a check counted for another checker's obligation, whose configuration has the same digest", withObligations(S.t5land, setMet("obl_audit", true)));
   test("context-mismatch: a sole admin's self-approval, still counted when the room has two active admins", withObligations(S.t6evaluatedTwoAdmins, setMet("obl_admin-approval", true)));
   test("context-mismatch: a carried approval still counted after its reviewer objects on this version", withObligations(S.t1blocked, setMet("obl_src-review", true)));
   test("context-mismatch: the platform's obl_admin-approval left out of a land context", withObligations(S.t6land, (o) => o.filter((x) => x.id !== "obl_admin-approval")));
@@ -535,6 +544,29 @@ describe("check-carried events are rebuilt (R-CARRY-6 to R-CARRY-14)", () => {
     await forgeCall(log, S.carried, "carry", (c) => ({ ...c, input: { ...c.input, evidence: { ...c.input.evidence, by: { ...c.input.evidence.by, role: "member" } } } }));
     const f = await expectFailure(log, "context-mismatch", S.carried, { repo: false });
     expect(f.detail).toMatch(/input\.evidence\.by/);
+  });
+});
+
+// ===================================================== guards named by their own words
+
+describe("stage 3 guards whose failure another guard would also report: each is named by its own detail", () => {
+  test("malformed: a retained v2 document that is not a policy document is named so where it is decoded", async () => {
+    const log = open(ACTIVATES);
+    const doc = policyOf(log, idOf(log, 15)) as unknown as { acts: Record<string, unknown> };
+    const bad = { ...doc, acts: { ...doc.acts, room: doc.acts["standup"] } };
+    const retained = retain("policy", bad);
+    log.retained.push(retained);
+    withEvent(log, 15, (ev) => ({ ...ev, policy: `sha256:${sha256Hex(utf8(retained.body))}` }));
+    const f = await expectFailure(log, "malformed", 15);
+    expect(f.detail).toMatch(/the retained policy is not a policy document/);
+  });
+
+  test("body-invalid: a scope on a thread whose scope is fixed is a problem, by name", async () => {
+    const doc = { ...(policyOf(open(ACTIVATES), idOf(open(ACTIVATES), 15)) as unknown as PolicyDocumentV2) };
+    const fixedDoc = { ...doc, acts: { ...doc.acts, part: { label: "Take a part", targets: { none: ["open"], thread: ["take"] }, threads: ["part"], body: { name: { type: "segment", requiredFor: ["none"] } }, who: { roles: ["member"] }, hold: { scope: ["parts/{name}/**"] } } } } as unknown as PolicyDocumentV2;
+    const v = await vocabularyOf(fixedDoc, STEPS_V1);
+    const env = { v: 2, room: "room_x", actor: keys.bob.key, kind: "part", target: null, body: { name: "bass", scope: ["x/**"] }, idempotencyKey: "k" } as unknown as Envelope;
+    expect(bodyProblem(env, v, () => "fixed")).toEqual(expect.stringMatching(/scope is fixed/));
   });
 });
 

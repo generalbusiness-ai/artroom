@@ -264,13 +264,16 @@ const DOC_B = valid({
   const lint: CheckerConfigV2 = { format: "artroom-checker-v2", act: "check", volatile: false, timeoutSeconds: 600, runner: RUNNER, advisory: true };
   const build: CheckerConfigV2 = { format: "artroom-checker-v2", act: "check", volatile: true, timeoutSeconds: 600, runner: RUNNER };
   const build2: CheckerConfigV2 = { ...build, timeoutSeconds: 900 };
-  const rules = (libReviewers: string) => [
+  // A second checker with the test checker's configuration, digest for digest: a check counts only for its own checker.
+  const audit: CheckerConfigV2 = { ...test };
+  const rules = (libReviewers: string, audited = false) => [
     requireReview({ paths: "src/**", from: "@alice", id: "src-review" }),
     requireReview({ paths: "lib/**", from: libReviewers, id: "lib-review" }),
     requireReview({ paths: "docs/**", from: "role:maintainer", id: "docs-review", allowSelf: true }),
     requireCheck("test", { paths: "src/**", by: "@carol", id: "tests" }),
     requireCheck("lint", { paths: "src/**", by: "@carol", id: "lint" }),
     requireCheck("build", { paths: "src/**", by: "@carol", id: "build" }),
+    ...(audited ? [requireCheck("audit", { paths: "src/**", by: "@carol", id: "audit" })] : []),
     carry({
       allow: [
         { id: "verdicts-carry", evidence: "review", allow: "true" },
@@ -282,9 +285,10 @@ const DOC_B = valid({
   const freeze = rule({ id: "freeze", kind: "land", block: "false", reason: "Not on a freeze.", fix: "Wait for the freeze to end." });
   const c1 = valid(v2(policy(...rules("role:maintainer"))), { test, lint, build });
   const c2 = valid(v2(policy(...rules("role:maintainer"), freeze)), { test, lint, build });
-  const c3 = valid(v2(policy(...rules("@erin"), freeze)), { test, lint, build: build2 });
-  const c4 = valid(v2(policy(...rules("@erin"), freeze, requireReview({ paths: "**", from: "@alice", id: "broken", when: '"yes"' }))), { test, lint, build: build2 });
-  const c5 = valid(v2(policy(...rules("@erin"), freeze, rule({ id: "admins-see-lands", kind: "notify", on: ["land"], to: ["role:admin"], why: "A landing started." }))), { test, lint, build: build2 });
+  const later = { test, lint, build: build2, audit };
+  const c3 = valid(v2(policy(...rules("@erin", true), freeze)), later);
+  const c4 = valid(v2(policy(...rules("@erin", true), freeze, requireReview({ paths: "**", from: "@alice", id: "broken", when: '"yes"' }))), later);
+  const c5 = valid(v2(policy(...rules("@erin", true), freeze, rule({ id: "admins-see-lands", kind: "notify", on: ["land"], to: ["role:admin"], why: "A landing started." }))), later);
   const check = (room: DeclaredRoom, name: "test" | "build", config: CheckerConfigV2, lane: string, generation: number, integration: Sha, ok = true, landOp?: OpId) => ({
     signer: carol,
     kind: "check",
@@ -389,7 +393,7 @@ const DOC_B = valid({
   const land4 = await room.act(land(t4.id, 1, s1));
   await room.drainNotify();
   await room.land(opOf(land4), true);
-  await room.activate(c3, { test, lint, build: build2 });
+  await room.activate(c3, later);
   await room.recompute(); // thread 1's and thread 4's open versions
   await room.land(opOf(land1), true); // thread 1 under the new policy: its check carry was judged under the old one; its build check names the old configuration
   await room.carryChecks(opOf(land1), i2, { tree: room.treeOf(i2) }); // judged again under the new policy
@@ -430,7 +434,7 @@ const DOC_B = valid({
 
   // A policy whose require rule cannot be evaluated: each open version is blocked, keeps its obligations, and its
   // carried verdicts are still judged.
-  await room.activate(c4, { test, lint, build: build2 });
+  await room.activate(c4, later);
   await room.recompute();
   write("declared-carry", room.fixture("Obligations, evidence and carrying under a v2 document: verdicts carried, not carried and replaced; checks counted by integration, carried by check-carried events and judged again after an activation; an advisory and a failing check; an author's own approval; a policy that changes who qualifies; a revoked checker key; a sole admin's self-approval; a recomputation that fails."));
 }
