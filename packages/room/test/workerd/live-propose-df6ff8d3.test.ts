@@ -45,9 +45,11 @@ describe("request df6ff8d3: a propose with Artifacts' clock ahead of the Room's"
     await r.admin.ok("propose", { lane: b.lane }, { lease: 1, expectedGeneration: 0, head: hb, summary: "second" });
     const la = await r.admin.ok<Landing>("land", { lane: a.lane, generation: 1 }, { lease: 1, head: ha });
     await tick(r, 3);
+    expect(r.world.artifacts.main).toBe(ha);
     // The second lane is no longer a fast-forward of main: its integration is a merge the sandbox builds.
     const lb = await r.admin.ok<Landing>("land", { lane: b.lane, generation: 1 }, { lease: 1, head: hb });
     await tick(r, 3);
+    expect([ha, hb]).not.toContain(r.world.artifacts.main);
     for (const l of [la, lb]) expect(((await r.admin.read({ q: "op", op: l.op.id })) as LandOp).state).toBe("landed");
     const published = await call<{ through: number } | null>(r.stub.publishLog());
     expect(published?.through).toBeGreaterThan(0);

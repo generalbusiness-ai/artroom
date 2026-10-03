@@ -1000,3 +1000,11 @@ Logs could not be read to confirm it.
 | root `npm ci` | 0 | — |
 | root `npm run typecheck` | 0 | — |
 | root `npm test` | 0 | checkers 43; cli 162; client 88 Node and 2 workerd; git 225; log 198 Node and 193 workerd; mcp 73 Node and 5 workerd; policy 199 Node and 198 workerd (1 skipped); room 138 Node and 411 workerd; ui 141 |
+
+## Live propose 503 after mint lanes B and C (request df6ff8d3, 2026-10-03)
+
+From main `965c911a` (Room `5ad0e3f2`, 02:41 UTC), every `propose` was refused with 503 `unavailable`. The cause was the mint ledger's expiry check: Artifacts' expiry for the 600 s pinning token was 41 to 67 ms later than the Room's arrival time plus 600 s, because Artifacts' clock is ahead of the Room's. The fix allows 5 s. Deployed at 03:34 UTC from `0753d7de`: Room `6d15d828`, checker service `c18342a3`. The smoke then passed all 91 steps, with cleanup `ok`: [spike-smoke-2026-10-03T03-35-10-310Z.json](../packages/room/measure/results/spike-smoke-2026-10-03T03-35-10-310Z.json). The diagnosis, the two temporary diagnostic deploys and the tests are in [plans/README.md](../plans/README.md), "Live propose 503 after lanes B and C".
+
+**Reading a Room's diagnoses in `wrangler tail`.** The Room writes each diagnosis to the console, but its Durable Object events can reach the tail minutes late, some only when the object stops (a redeploy stops it). A line can also arrive on another event of the same object, such as an alarm that started while the failing call was running. So keep the tail running, and search every `Room` event, alarms included, not only the event of the failing call.
+
+**Keep the OAuth login fresh.** The smoke reads hugh's wrangler OAuth access token from wrangler's config on every Artifacts REST call, and wrangler refreshes it only when it runs. On 2026-10-03 the token expired during a run, so the smoke's cleanup was refused (`10000 Authentication error`). Run `env -u CLOUDFLARE_API_TOKEN npx -y wrangler@latest whoami` before a smoke run, unless a deploy has just run.
