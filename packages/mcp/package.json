@@ -1,7 +1,7 @@
 {
   "name": "@generalbusiness/artroom-mcp",
   "version": "0.0.0",
-  "description": "Artroom's MCP server: exactly the contract's ten tools, as a stateless Workers handler and as a local stdio server.",
+  "description": "Artroom's MCP server: the contract's sixteen tools, as a stateless Workers handler and as a local stdio server.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {

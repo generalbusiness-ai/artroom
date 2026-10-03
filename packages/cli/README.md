@@ -147,8 +147,10 @@ finish, run the same command again:
 - `artroom agents-md` prints a block for your repository's `AGENTS.md`
   that teaches an agent the loop in under 30 lines. Add `--mcp` after a
   `redeem` to describe the MCP tools instead.
-- `artroom mcp` runs the ten MCP tools over stdio, signing with your key,
-  for an agent on this machine.
+- `artroom mcp` runs the MCP tools over stdio, signing with your key,
+  for an agent on this machine. It shows the tools your role may use.
+  `--toolset builder`, `reviewer`, `observer` or `all` chooses another
+  list; a tool that is not listed can still be called.
 
 ## Where things are kept
 

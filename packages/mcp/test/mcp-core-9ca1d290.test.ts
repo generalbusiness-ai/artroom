@@ -735,6 +735,13 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
     // A checker's own key: the reviewer presentation, without `review`. `note` and the generic act are what its role may sign.
     expect(await shown({ role: "checker" }, c)).toEqual(without(SETS.reviewer, "review"));
     expect(defaultToolset({ role: "checker" }, await eligible({ role: "checker" }, c))).toBe("reviewer");
+    // The observer override is for a delegation only. A checker's own key that may sign nothing here keeps the
+    // reviewer presentation: its reads, and no act tool.
+    await room.activate({ ask: ASK });
+    const onlyAsk = await active();
+    expect(await eligible({ role: "checker" }, onlyAsk)).toEqual({ named: [], generic: [] });
+    expect(defaultToolset({ role: "checker" }, await eligible({ role: "checker" }, onlyAsk))).toBe("reviewer");
+    expect(await shown({ role: "checker" }, onlyAsk)).toEqual(["attention", "explain", "lanes", "lane", "proposal", "acts"]);
   });
 
   test("a caller may ask for another toolset; the list is that set, filtered by the same authority", async () => {
