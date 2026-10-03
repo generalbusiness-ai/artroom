@@ -1,0 +1,897 @@
+[
+  {
+    "id": "binding-shape-string",
+    "file": "packages/client/src/envelope.ts",
+    "baselineSourceSha256": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9",
+    "pattern": "a binding is sha256:",
+    "mutatedSourceSha256": "51a253e158fdad52cb79ee880c84ab6dfaf5742c7783595211cf6092806ce109",
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055579.789234,
+      "end": 1791055585.636756
+    },
+    "test": {
+      "exit": 1,
+      "start": 1791055585.6369789,
+      "end": 1791055586.216098,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.config.ts",
+        "test/declared-a5d64b35.test.ts",
+        "-t",
+        "a binding is sha256:",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-bounded-omissions/binding-shape-string.vitest.json"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "the declared envelope (R-DECL-16, R-SIG-1 as amended) v: 2 with the binding inside the signed bytes, under the same domain tag; a changed binding breaks the signature",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the declared envelope (R-DECL-16, R-SIG-1 as amended) a binding is sha256: and 64 lowercase hex digits, or the call is refused before anything is built",
+        "status": "failed",
+        "messages": [
+          "AssertionError: expected [Function] to throw an error\n    at Proxy.<anonymous> (file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/expect/dist/index.js:1552:16)\n    at Proxy.<anonymous> (file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/chai/index.js:1737:25)\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/client/test/declared-a5d64b35.test.ts:82:129\n    at file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+        ]
+      },
+      {
+        "name": "the catalogue reads acts() is always read from the room; actsAt() keeps an ended version and answers its whole interval without a read",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the catalogue reads meaningOf reads a kind under one catalogue: declared with its label and retirement, platform, legacy with its end, unknown",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the catalogue reads fieldsOf and targetsOf give a form its fields: the steps' own, then the declared ones, required by target",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) with no sign of a later activation the handle answers what it kept; { fresh: true } reads again and replaces it",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a read of the active catalogue, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a log page that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a read of another version that the activation ended, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a long-poll update that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a watched update that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after an update on the RPC stream that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a binding-stale refusal of a generic act, which names the active version, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a binding-stale refusal of a named act, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) a refusal or an update that names no later activation drops nothing",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) titleOf: the label at the record's seq and its first field by name, the order the room records, other than scope and because",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) threadTitle: the goal when the thread has one; else the opening act's title; else the thread's ID",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) envelopeOf gives a log entry's envelope in either version, with a declared act's binding, and null for a system entry",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) over HTTPS with a key: signed v: 2 with the caller's binding; over RPC the same; the catalogue is not read to act",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) a stale binding is returned as the room's refusal with the active binding; the handle sends it once and reads nothing",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) it refuses before sending: no binding, a malformed binding, a platform kind, a bad idempotency key",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) the prepared act carries the binding, and replay sends the same bytes: the original record, also after the meaning changed",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the named methods (R-API-9 as amended) in a v1 room they sign v: 1; in a v2 room, v: 2 with the built-for binding; renew and roster stay v: 1; one catalogue read per handle",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the named methods (R-API-9 as amended) the built-for binding is the code-review declaration's under the room's steps and lanes, never the room's own declaration's",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) a named act repeated with its key on the same handle, after a lost answer and a change of vocabulary, sends the same bytes and gets the original record",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) only the same act is the kept one: the same key with another body is built anew, and the room refuses it",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) a prepared declared act replayed after the room returned to the legacy vocabulary gets its original record; an act never accepted is refused at step 1",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a grant never gains a kind across a change of vocabulary (R-DECL-11, R-DECL-17) a session signed under a v2 document is refused under a v1 one, and the invitation stays unused",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a grant never gains a kind across a change of vocabulary (R-DECL-11, R-DECL-17) a kind whose declaration stops being delegable is not covered by a grant made before: the binding is equal, and the act is refused",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a handle whose room changes vocabulary v2 back to v1: the named act is bad-request at step 1, the handle forgets what it read, and the next call signs v: 1",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "bearer sessions (R-CRED-10 as amended) over RPC a generic act carries the caller's binding to bearerAct unchanged; a named act carries none",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "bearer sessions (R-CRED-10 as amended) replay of a bearer's generic act sends the kept binding, not a newer one",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "grants expanded before signing (R-DECL-17) delegateOp and invitationSession give the legacy shape in a v1 room and a signed map in a v2 room; problems are thrown, not dropped",
+        "status": "skipped",
+        "messages": []
+      }
+    ],
+    "validSemanticRed": true,
+    "restoredSourceSha256": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9",
+    "trackedDiff": ""
+  },
+  {
+    "id": "named-original-retry",
+    "file": "packages/client/src/room.ts",
+    "baselineSourceSha256": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4",
+    "pattern": "a named act repeated with its key on the same handle",
+    "mutatedSourceSha256": "9c16f3836ec675eec3fb34b879ec96573f539758c53808515fdedbff4d56f5e9",
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055586.229394,
+      "end": 1791055591.9929469
+    },
+    "test": {
+      "exit": 1,
+      "start": 1791055591.993195,
+      "end": 1791055592.569249,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.config.ts",
+        "test/declared-a5d64b35.test.ts",
+        "-t",
+        "a named act repeated with its key on the same handle",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-bounded-omissions/named-original-retry.vitest.json"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "the declared envelope (R-DECL-16, R-SIG-1 as amended) v: 2 with the binding inside the signed bytes, under the same domain tag; a changed binding breaks the signature",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the declared envelope (R-DECL-16, R-SIG-1 as amended) a binding is sha256: and 64 lowercase hex digits, or the call is refused before anything is built",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the catalogue reads acts() is always read from the room; actsAt() keeps an ended version and answers its whole interval without a read",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the catalogue reads meaningOf reads a kind under one catalogue: declared with its label and retirement, platform, legacy with its end, unknown",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the catalogue reads fieldsOf and targetsOf give a form its fields: the steps' own, then the declared ones, required by target",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) with no sign of a later activation the handle answers what it kept; { fresh: true } reads again and replaces it",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a read of the active catalogue, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a log page that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a read of another version that the activation ended, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a long-poll update that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a watched update that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after an update on the RPC stream that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a binding-stale refusal of a generic act, which names the active version, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a binding-stale refusal of a named act, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) a refusal or an update that names no later activation drops nothing",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) titleOf: the label at the record's seq and its first field by name, the order the room records, other than scope and because",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) threadTitle: the goal when the thread has one; else the opening act's title; else the thread's ID",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) envelopeOf gives a log entry's envelope in either version, with a declared act's binding, and null for a system entry",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) over HTTPS with a key: signed v: 2 with the caller's binding; over RPC the same; the catalogue is not read to act",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) a stale binding is returned as the room's refusal with the active binding; the handle sends it once and reads nothing",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) it refuses before sending: no binding, a malformed binding, a platform kind, a bad idempotency key",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) the prepared act carries the binding, and replay sends the same bytes: the original record, also after the meaning changed",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the named methods (R-API-9 as amended) in a v1 room they sign v: 1; in a v2 room, v: 2 with the built-for binding; renew and roster stay v: 1; one catalogue read per handle",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the named methods (R-API-9 as amended) the built-for binding is the code-review declaration's under the room's steps and lanes, never the room's own declaration's",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) a named act repeated with its key on the same handle, after a lost answer and a change of vocabulary, sends the same bytes and gets the original record",
+        "status": "failed",
+        "messages": [
+          "AssertionError: expected true to be false // Object.is equality\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/client/test/declared-a5d64b35.test.ts:495:30\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        ]
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) only the same act is the kept one: the same key with another body is built anew, and the room refuses it",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) a prepared declared act replayed after the room returned to the legacy vocabulary gets its original record; an act never accepted is refused at step 1",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a grant never gains a kind across a change of vocabulary (R-DECL-11, R-DECL-17) a session signed under a v2 document is refused under a v1 one, and the invitation stays unused",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a grant never gains a kind across a change of vocabulary (R-DECL-11, R-DECL-17) a kind whose declaration stops being delegable is not covered by a grant made before: the binding is equal, and the act is refused",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a handle whose room changes vocabulary v2 back to v1: the named act is bad-request at step 1, the handle forgets what it read, and the next call signs v: 1",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "bearer sessions (R-CRED-10 as amended) over RPC a generic act carries the caller's binding to bearerAct unchanged; a named act carries none",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "bearer sessions (R-CRED-10 as amended) replay of a bearer's generic act sends the kept binding, not a newer one",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "grants expanded before signing (R-DECL-17) delegateOp and invitationSession give the legacy shape in a v1 room and a signed map in a v2 room; problems are thrown, not dropped",
+        "status": "skipped",
+        "messages": []
+      }
+    ],
+    "validSemanticRed": true,
+    "restoredSourceSha256": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4",
+    "trackedDiff": ""
+  },
+  {
+    "id": "grant-current-role",
+    "file": "packages/policy/src/catalogue.ts",
+    "baselineSourceSha256": "53b1bc2014cd9362157676ba1f169acc01d9974de856246bec8effe64df4f93e",
+    "pattern": "delegateOp and invitationSession",
+    "mutatedSourceSha256": "35fd312ce9497e9f024057a1a3c6af7629e2d62e3fe992591e953a6730c46177",
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055592.582078,
+      "end": 1791055598.560961
+    },
+    "test": {
+      "exit": 1,
+      "start": 1791055598.5611992,
+      "end": 1791055599.1426601,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.config.ts",
+        "test/declared-a5d64b35.test.ts",
+        "-t",
+        "delegateOp and invitationSession",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-bounded-omissions/grant-current-role.vitest.json"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "the declared envelope (R-DECL-16, R-SIG-1 as amended) v: 2 with the binding inside the signed bytes, under the same domain tag; a changed binding breaks the signature",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the declared envelope (R-DECL-16, R-SIG-1 as amended) a binding is sha256: and 64 lowercase hex digits, or the call is refused before anything is built",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the catalogue reads acts() is always read from the room; actsAt() keeps an ended version and answers its whole interval without a read",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the catalogue reads meaningOf reads a kind under one catalogue: declared with its label and retirement, platform, legacy with its end, unknown",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the catalogue reads fieldsOf and targetsOf give a form its fields: the steps' own, then the declared ones, required by target",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) with no sign of a later activation the handle answers what it kept; { fresh: true } reads again and replaces it",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a read of the active catalogue, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a log page that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a read of another version that the activation ended, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a long-poll update that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a watched update that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after an update on the RPC stream that holds the activation, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a binding-stale refusal of a generic act, which names the active version, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) after a binding-stale refusal of a named act, the handle drops what it kept and the next answer has the room's marks",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "an ended version is not final: a later activation can retire its kinds (R-DECL-23) a refusal or an update that names no later activation drops nothing",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) titleOf: the label at the record's seq and its first field by name, the order the room records, other than scope and because",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) threadTitle: the goal when the thread has one; else the opening act's title; else the thread's ID",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "what readers call a record and a thread (R-DECL-23) envelopeOf gives a log entry's envelope in either version, with a declared act's binding, and null for a system entry",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) over HTTPS with a key: signed v: 2 with the caller's binding; over RPC the same; the catalogue is not read to act",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) a stale binding is returned as the room's refusal with the active binding; the handle sends it once and reads nothing",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) it refuses before sending: no binding, a malformed binding, a platform kind, a bad idempotency key",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the generic act (R-DECL-16) the prepared act carries the binding, and replay sends the same bytes: the original record, also after the meaning changed",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the named methods (R-API-9 as amended) in a v1 room they sign v: 1; in a v2 room, v: 2 with the built-for binding; renew and roster stay v: 1; one catalogue read per handle",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the named methods (R-API-9 as amended) the built-for binding is the code-review declaration's under the room's steps and lanes, never the room's own declaration's",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) a named act repeated with its key on the same handle, after a lost answer and a change of vocabulary, sends the same bytes and gets the original record",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) only the same act is the kept one: the same key with another body is built anew, and the room refuses it",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) a prepared declared act replayed after the room returned to the legacy vocabulary gets its original record; an act never accepted is refused at step 1",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a grant never gains a kind across a change of vocabulary (R-DECL-11, R-DECL-17) a session signed under a v2 document is refused under a v1 one, and the invitation stays unused",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a grant never gains a kind across a change of vocabulary (R-DECL-11, R-DECL-17) a kind whose declaration stops being delegable is not covered by a grant made before: the binding is equal, and the act is refused",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a handle whose room changes vocabulary v2 back to v1: the named act is bad-request at step 1, the handle forgets what it read, and the next call signs v: 1",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "bearer sessions (R-CRED-10 as amended) over RPC a generic act carries the caller's binding to bearerAct unchanged; a named act carries none",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "bearer sessions (R-CRED-10 as amended) replay of a bearer's generic act sends the kept binding, not a newer one",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "grants expanded before signing (R-DECL-17) delegateOp and invitationSession give the legacy shape in a v1 room and a signed map in a v2 room; problems are thrown, not dropped",
+        "status": "failed",
+        "messages": [
+          "AssertionError: expected { \u2026(8) } to deeply equal { \u2026(7) }\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/client/test/declared-a5d64b35.test.ts:633:21\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        ]
+      }
+    ],
+    "validSemanticRed": true,
+    "restoredSourceSha256": "53b1bc2014cd9362157676ba1f169acc01d9974de856246bec8effe64df4f93e",
+    "trackedDiff": ""
+  },
+  {
+    "id": "mcp-explicit-binding",
+    "file": "packages/mcp/src/run.ts",
+    "baselineSourceSha256": "0945d49015e74687615be9143b7958871d19dcf0bc1fe12cbcd38450ae18d6f4",
+    "pattern": "a current delegable refusal",
+    "mutatedSourceSha256": "53e7c5a240d903e674a272ce046cbc73ff857b9a51101fabecdc511b728c3824",
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055599.1555562,
+      "end": 1791055605.080072
+    },
+    "test": {
+      "exit": 1,
+      "start": 1791055605.0802948,
+      "end": 1791055607.0895941,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.workers.config.ts",
+        "test/workerd/checker-stage5-boundaries.test.ts",
+        "-t",
+        "a current delegable refusal",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-bounded-omissions/mcp-explicit-binding.vitest.json"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "checker independent stage 5 boundaries sequential historical reads observe retirement after a confirmed current catalogue",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a delayed historical response cannot repopulate stale retirement after a confirmed current catalogue",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after none caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after body caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after target caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after snapshot caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a current delegable refusal leaves the binding equal and preserves the accepted exact MCP retry",
+        "status": "failed",
+        "messages": [
+          "AssertionError: expected { refused: true, \u2026(3) } to match object { kind: 'ask', text: 'original' }\n(4 matching properties omitted from actual)\n    at Proxy.<anonymous> (private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/chai/index.js:1737:25)\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/room/test/workerd/checker-stage5-boundaries.test.ts:85:37\n    at private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        ]
+      },
+      {
+        "name": "checker independent stage 5 boundaries an unknown legal kind and own typed field traverse HTTPS and MCP unchanged",
+        "status": "skipped",
+        "messages": []
+      }
+    ],
+    "validSemanticRed": true,
+    "restoredSourceSha256": "0945d49015e74687615be9143b7958871d19dcf0bc1fe12cbcd38450ae18d6f4",
+    "trackedDiff": ""
+  },
+  {
+    "id": "cli-step-own-field",
+    "file": "packages/cli/src/main.ts",
+    "baselineSourceSha256": "5a026c44b76a1a2ad39f49f1e8ecdb495301c6227f81a863d625f2312b94c53d",
+    "pattern": "only a step's own field",
+    "mutatedSourceSha256": "d33b0defa8d93971c2cd290711e9b8a01c8026e3dd74f3b8845ec35c87b4f49b",
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055607.102565,
+      "end": 1791055612.94491
+    },
+    "test": {
+      "exit": 1,
+      "start": 1791055612.945153,
+      "end": 1791055613.586844,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "test/declared-a5d64b35.test.ts",
+        "-t",
+        "only a step's own field",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-bounded-omissions/cli-step-own-field.vitest.json"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "artroom acts: what the room declares a v1 room says it declares none, and names the commands to use",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom acts: what the room declares a v2 room lists each kind with its label and steps; acts KIND prints its fields, who may sign it, its binding and the command",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom acts: what the room declares --at and --policy read an earlier version; an unknown one fails; both together are a usage error",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read it sends the kind, target, typed fields and binding as given, and prints the label",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read an act that opens a thread names it as every reader does: its goal, or the act's label and first field",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read without --binding, or with a malformed one, nothing is read or sent: the CLI never chooses the meaning",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read fields are read by their declared types; an unknown field, a bad value, a missing field or a wrong target is a usage error and nothing is sent",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read a yes-or-no field takes true or false and nothing else",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read a field named like an inherited property is the body's own or it is missing; a change of such a field is listed as one",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read only a step's own field is read from the room: a field the declaration names expectedGeneration is the application's and is left alone",
+        "status": "failed",
+        "messages": [
+          "AssertionError: expected { lease: 1, expectedGeneration: +0 } to deeply equal { lease: 1 }\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/cli/test/declared-a5d64b35.test.ts:195:71\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        ]
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read a kind the room does not declare is refused, and a v1 room has no generic act",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "artroom act: any declared act, under the binding the user read the lease, the generation and a version's head are read from the room when left out, as the named commands read them",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a changed meaning is shown, never adopted for the user the binding the user read is no longer active: nothing is signed; the CLI prints the active meaning, what changed, and the command to act under it",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a changed meaning is shown, never adopted for the user what changed is listed against the version that held the binding the user gave, not merely the one before; with none, the CLI says it cannot list it",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a changed meaning is shown, never adopted for the user the meaning changes between the read and the send: the room refuses, the act is not sent again, and the same help is printed",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a changed meaning is shown, never adopted for the user a label-only edit is not a change of meaning: the act prepared before it is done, and nothing is listed as changed",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the journal keeps the binding: a lost answer is finished with the same bytes an act whose answer was lost is resent unchanged with its key, also after the meaning changed, and returns the original record",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "a bearer session: the generic act goes to the MCP endpoint artroom act under a room-custody token calls the act tool with the binding given; the room signs under the session's grant",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the log and explain show the label a kind had at the record's own seq legacy records print as before; a declared record prints its label; a retired kind says where; a reused name keeps the old label on old records",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "the log and explain show the label a kind had at the record's own seq explain prints the meaning the room gives for the record's seq; a refusal of a stale binding names the active one",
+        "status": "skipped",
+        "messages": []
+      }
+    ],
+    "validSemanticRed": true,
+    "restoredSourceSha256": "5a026c44b76a1a2ad39f49f1e8ecdb495301c6227f81a863d625f2312b94c53d",
+    "trackedDiff": ""
+  },
+  {
+    "id": "historical-cache-invalidation",
+    "file": "packages/client/src/room.ts",
+    "baselineSourceSha256": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4",
+    "pattern": "sequential historical reads",
+    "mutatedSourceSha256": "f97e4d649f63b0cadb30087dca7de5cd154ac02d084a09afaf8927eb303b2a1c",
+    "typecheck": {
+      "exit": 0,
+      "start": 1791055613.600516,
+      "end": 1791055619.46103
+    },
+    "test": {
+      "exit": 1,
+      "start": 1791055619.461262,
+      "end": 1791055621.474535,
+      "cmd": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.workers.config.ts",
+        "test/workerd/checker-stage5-boundaries.test.ts",
+        "-t",
+        "sequential historical reads",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-bounded-omissions/historical-cache-invalidation.vitest.json"
+      ]
+    },
+    "assertions": [
+      {
+        "name": "checker independent stage 5 boundaries sequential historical reads observe retirement after a confirmed current catalogue",
+        "status": "failed",
+        "messages": [
+          "AssertionError: expected undefined to be 3 // Object.is equality\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/room/test/workerd/checker-stage5-boundaries.test.ts:29:92\n    at private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        ]
+      },
+      {
+        "name": "checker independent stage 5 boundaries a delayed historical response cannot repopulate stale retirement after a confirmed current catalogue",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after none caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after body caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after target caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a prepared key act remains exact after snapshot caller-input reuse",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries a current delegable refusal leaves the binding equal and preserves the accepted exact MCP retry",
+        "status": "skipped",
+        "messages": []
+      },
+      {
+        "name": "checker independent stage 5 boundaries an unknown legal kind and own typed field traverse HTTPS and MCP unchanged",
+        "status": "skipped",
+        "messages": []
+      }
+    ],
+    "validSemanticRed": true,
+    "restoredSourceSha256": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4",
+    "trackedDiff": ""
+  }
+]

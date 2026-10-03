@@ -1,4 +1,0 @@
-{"name":"leading-U+FEFF-clipped-prefix","passed":true,"inputBytes":8195,"outputBytes":8192}
-{"name":"leading-U+FEFF-exact-cap","passed":true,"inputBytes":8192,"outputBytes":8192}
-{"name":"ordinary-multibyte-boundary","passed":true,"inputBytes":8195,"outputBytes":8191}
-{"name":"cut-before-three-byte-character","passed":true,"inputBytes":8196,"outputBytes":8190}

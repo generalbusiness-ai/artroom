@@ -1,0 +1,60 @@
+{
+  "head": "b7b9d8dfe6f37866bfd57a94d7118d35d93bd8e0",
+  "typecheck": {
+    "exit": 0,
+    "start": 1791055762.0940611,
+    "end": 1791055767.879554
+  },
+  "test": {
+    "exit": 1,
+    "start": 1791055767.879764,
+    "end": 1791055769.943769,
+    "cmd": [
+      "npx",
+      "vitest",
+      "run",
+      "--config",
+      "vitest.workers.config.ts",
+      "test/workerd/checker-stage5-intent-breadth.test.ts",
+      "--reporter=verbose",
+      "--reporter=json",
+      "--outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/final-adjacent-intent/test.vitest.json"
+    ]
+  },
+  "assertions": [
+    {
+      "name": "checker saved-intent breadth a prepared unsigned bearer act retains its own body after none",
+      "status": "passed",
+      "messages": []
+    },
+    {
+      "name": "checker saved-intent breadth a prepared named key act retains nested scope after none",
+      "status": "passed",
+      "messages": []
+    },
+    {
+      "name": "checker saved-intent breadth a prepared unsigned bearer act retains its own body after reuse",
+      "status": "failed",
+      "messages": [
+        "AssertionError: the saved bearer intent must not follow the caller original body object: expected { \u2026(2) } to deeply equal { \u2026(2) }\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/room/test/workerd/checker-stage5-intent-breadth.test.ts:25:123\n    at private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ]
+    },
+    {
+      "name": "checker saved-intent breadth a prepared named key act retains nested scope after reuse",
+      "status": "failed",
+      "messages": [
+        "AssertionError: the saved signed named intent must own its nested scope: expected { Object (savedBody, result) } to deeply equal { Object (savedBody, result) }\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/packages/room/test/workerd/checker-stage5-intent-breadth.test.ts:38:107\n    at private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-b7b9-xtzq7vcx/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ]
+    },
+    {
+      "name": "checker saved-intent breadth a prepared unsigned bearer act retains its own body after snapshot",
+      "status": "passed",
+      "messages": []
+    },
+    {
+      "name": "checker saved-intent breadth a prepared named key act retains nested scope after snapshot",
+      "status": "passed",
+      "messages": []
+    }
+  ]
+}

@@ -1,0 +1,138 @@
+{
+  "head": "b7b9d8dfe6f37866bfd57a94d7118d35d93bd8e0",
+  "cleanStatus": true,
+  "sourceHashChecks": [
+    {
+      "path": "packages/client/src/envelope.ts",
+      "diskHash": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9",
+      "commitHash": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9",
+      "expected": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9"
+    },
+    {
+      "path": "packages/client/src/room.ts",
+      "diskHash": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4",
+      "commitHash": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4",
+      "expected": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4"
+    },
+    {
+      "path": "packages/policy/src/catalogue.ts",
+      "diskHash": "53b1bc2014cd9362157676ba1f169acc01d9974de856246bec8effe64df4f93e",
+      "commitHash": "53b1bc2014cd9362157676ba1f169acc01d9974de856246bec8effe64df4f93e",
+      "expected": "53b1bc2014cd9362157676ba1f169acc01d9974de856246bec8effe64df4f93e"
+    },
+    {
+      "path": "packages/mcp/src/run.ts",
+      "diskHash": "0945d49015e74687615be9143b7958871d19dcf0bc1fe12cbcd38450ae18d6f4",
+      "commitHash": "0945d49015e74687615be9143b7958871d19dcf0bc1fe12cbcd38450ae18d6f4",
+      "expected": "0945d49015e74687615be9143b7958871d19dcf0bc1fe12cbcd38450ae18d6f4"
+    },
+    {
+      "path": "packages/cli/src/main.ts",
+      "diskHash": "5a026c44b76a1a2ad39f49f1e8ecdb495301c6227f81a863d625f2312b94c53d",
+      "commitHash": "5a026c44b76a1a2ad39f49f1e8ecdb495301c6227f81a863d625f2312b94c53d",
+      "expected": "5a026c44b76a1a2ad39f49f1e8ecdb495301c6227f81a863d625f2312b94c53d"
+    }
+  ],
+  "evidenceHashCount": 42,
+  "evidenceHashMismatches": [],
+  "mutantHashChecks": [
+    {
+      "id": "binding-shape-string",
+      "occurrences": 1,
+      "baselineHash": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9",
+      "matchesBaseline": true,
+      "matchesVariant": true
+    },
+    {
+      "id": "named-original-retry",
+      "occurrences": 1,
+      "baselineHash": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4",
+      "matchesBaseline": true,
+      "matchesVariant": true
+    },
+    {
+      "id": "grant-current-role",
+      "occurrences": 1,
+      "baselineHash": "53b1bc2014cd9362157676ba1f169acc01d9974de856246bec8effe64df4f93e",
+      "matchesBaseline": true,
+      "matchesVariant": true
+    },
+    {
+      "id": "mcp-explicit-binding",
+      "occurrences": 1,
+      "baselineHash": "0945d49015e74687615be9143b7958871d19dcf0bc1fe12cbcd38450ae18d6f4",
+      "matchesBaseline": true,
+      "matchesVariant": true
+    },
+    {
+      "id": "cli-step-own-field",
+      "occurrences": 1,
+      "baselineHash": "5a026c44b76a1a2ad39f49f1e8ecdb495301c6227f81a863d625f2312b94c53d",
+      "matchesBaseline": true,
+      "matchesVariant": true
+    },
+    {
+      "id": "historical-cache-invalidation",
+      "occurrences": 1,
+      "baselineHash": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4",
+      "matchesBaseline": true,
+      "matchesVariant": true
+    }
+  ],
+  "baselinePairs": [
+    {
+      "id": "binding-shape-string",
+      "passingPartners": [
+        {
+          "name": "the declared envelope (R-DECL-16, R-SIG-1 as amended) a binding is sha256: and 64 lowercase hex digits, or the call is refused before anything is built",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "named-original-retry",
+      "passingPartners": [
+        {
+          "name": "a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16) a named act repeated with its key on the same handle, after a lost answer and a change of vocabulary, sends the same bytes and gets the original record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "grant-current-role",
+      "passingPartners": [
+        {
+          "name": "grants expanded before signing (R-DECL-17) delegateOp and invitationSession give the legacy shape in a v1 room and a signed map in a v2 room; problems are thrown, not dropped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "mcp-explicit-binding",
+      "passingPartners": [
+        {
+          "name": "checker independent stage 5 boundaries a current delegable refusal leaves the binding equal and preserves the accepted exact MCP retry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "cli-step-own-field",
+      "passingPartners": [
+        {
+          "name": "artroom act: any declared act, under the binding the user read only a step's own field is read from the room: a field the declaration names expectedGeneration is the application's and is left alone",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "historical-cache-invalidation",
+      "passingPartners": [
+        {
+          "name": "checker independent stage 5 boundaries sequential historical reads observe retirement after a confirmed current catalogue",
+          "status": "passed"
+        }
+      ]
+    }
+  ]
+}

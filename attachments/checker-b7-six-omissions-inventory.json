@@ -1,0 +1,50 @@
+[
+  {
+    "id": "binding-shape-string",
+    "file": "packages/client/src/envelope.ts",
+    "old": "typeof binding !== \"string\" || !BINDING.test(binding)",
+    "new": "typeof binding !== \"string\" || (!BINDING.test(binding) && false)",
+    "occurrences": 1,
+    "originalSha256": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9"
+  },
+  {
+    "id": "named-original-retry",
+    "file": "packages/client/src/room.ts",
+    "old": "kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)",
+    "new": "kept !== undefined && Boolean(0) && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)",
+    "occurrences": 1,
+    "originalSha256": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4"
+  },
+  {
+    "id": "grant-current-role",
+    "file": "packages/policy/src/catalogue.ts",
+    "old": "const may = delegableBy(documentOf(catalogue, declarationsOf(catalogue)), role);",
+    "new": "const may = delegableBy(documentOf(catalogue, declarationsOf(catalogue)), \"admin\");",
+    "occurrences": 1,
+    "originalSha256": "53b1bc2014cd9362157676ba1f169acc01d9974de856246bec8effe64df4f93e"
+  },
+  {
+    "id": "mcp-explicit-binding",
+    "file": "packages/mcp/src/run.ts",
+    "old": "return room.act(input.kind, input.target, input.body, { binding: input.binding, idempotencyKey: input.idempotencyKey });",
+    "new": "return room.act(input.kind, input.target, input.body, { binding: `sha256:${\"0\".repeat(64)}`, idempotencyKey: input.idempotencyKey });",
+    "occurrences": 1,
+    "originalSha256": "0945d49015e74687615be9143b7958871d19dcf0bc1fe12cbcd38450ae18d6f4"
+  },
+  {
+    "id": "cli-step-own-field",
+    "file": "packages/cli/src/main.ts",
+    "old": "f.name === name && f.from === \"step\"",
+    "new": "f.name === name",
+    "occurrences": 1,
+    "originalSha256": "5a026c44b76a1a2ad39f49f1e8ecdb495301c6227f81a863d625f2312b94c53d"
+  },
+  {
+    "id": "historical-cache-invalidation",
+    "file": "packages/client/src/room.ts",
+    "old": "this.#ended.length = 0; // G5:cache-drop",
+    "new": "void this.#ended.length; // G5:cache-drop",
+    "occurrences": 1,
+    "originalSha256": "a8a88412e0e141303d6cbe0be827b25d0574b9c08962e3cc3658888e79981ad4"
+  }
+]
