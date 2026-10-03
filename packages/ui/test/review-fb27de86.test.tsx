@@ -14,7 +14,7 @@
  * worked.
  */
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/preact";
+import { cleanup, fireEvent, screen } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import { codeReviewPolicy, defaultPolicy, validatePolicyV2 } from "@generalbusiness/artroom-policy";
 import { fieldsOf, newIdempotencyKey, readBody } from "../src/room/acts.ts";
@@ -23,7 +23,7 @@ import { LiveRoom } from "../src/room/live/live-room.ts";
 import { BAND } from "../src/room/mock/declared-room.ts";
 import { MemoryRoom } from "../src/room/mock/memory-room.ts";
 import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
-import { renderAt } from "./helpers.tsx";
+import { renderAt, settled, waitFor } from "./helpers.tsx";
 
 const adapters: LiveRoom[] = [];
 afterEach(() => {
@@ -239,7 +239,7 @@ describe("fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM
     // Editing a field and submitting the form by the keyboard sends nothing: the only act that can go is the one kept.
     fireEvent.input(screen.getByLabelText(/^title/), { target: { value: "Another" } });
     fireEvent.submit(form());
-    await new Promise((r) => setTimeout(r, 20));
+    await settled();
     expect(room.sent).toHaveLength(1);
     expect(unresolved()).not.toBeNull();
     again();

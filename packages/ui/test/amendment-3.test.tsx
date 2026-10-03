@@ -4,7 +4,7 @@
  * (R-CARRY-13), and a live room has no per-change history (open point 39).
  */
 
-import { cleanup, render, screen, waitFor, within } from "@testing-library/preact";
+import { cleanup, render, screen, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import { App } from "../src/app.tsx";
 import type { CheckCarriedEvent, RoomSnapshot } from "../src/room/adapter.ts";
@@ -14,7 +14,7 @@ import { LiveRoom } from "../src/room/live/live-room.ts";
 import { MockRoom } from "../src/room/mock/mock-room.ts";
 import { DEFAULT_STEP, STEPS } from "../src/room/mock/scenario.ts";
 import { World } from "../src/room/mock/world.ts";
-import { laneId, renderAt, stepOf } from "./helpers.tsx";
+import { laneId, renderAt, stepOf, waitFor } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();

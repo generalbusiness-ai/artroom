@@ -7,7 +7,7 @@
  * live adapter, so these run the code a real room's records go through.
  */
 
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/preact";
+import { cleanup, fireEvent, screen, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
 import type { FeedEntry, RoomSnapshot } from "../src/room/adapter.ts";
@@ -18,7 +18,7 @@ import { LiveRoom } from "../src/room/live/live-room.ts";
 import { BAND, SETLIST_ACTS_2, declaredDemo } from "../src/room/mock/declared-room.ts";
 import { MemoryRoom, type MemoryDoc } from "../src/room/mock/memory-room.ts";
 import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
-import { renderAt } from "./helpers.tsx";
+import { renderAt, waitFor } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();

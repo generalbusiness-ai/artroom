@@ -13,13 +13,13 @@
  * back so that each test decides the order of answers itself.
  */
 
-import { waitFor } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import type { ActDeclaration, ActsCatalogue, Catalogue, DeclaredRecord, HttpRoom } from "../src/room/contract.ts";
 import { LiveRoom } from "../src/room/live/live-room.ts";
 import { BAND } from "../src/room/mock/declared-room.ts";
 import { MemoryRoom } from "../src/room/mock/memory-room.ts";
 import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
+import { waitFor } from "./helpers.tsx";
 
 const adapters: LiveRoom[] = [];
 afterEach(() => {

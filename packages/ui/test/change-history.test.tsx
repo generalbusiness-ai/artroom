@@ -3,14 +3,14 @@
  * change-id headers. Author-supplied; never an input to obligations,
  * evidence or carrying.
  */
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import { App } from "../src/app.tsx";
 import { changeHistory, LINE_BOUNDS, type ChangeHistory, type CommitInfo } from "../src/room/changes.ts";
 import { SCENARIO_COMMITS } from "../src/room/mock/commits.ts";
 import { MockRoom } from "../src/room/mock/mock-room.ts";
 import { MemoryRepo } from "../src/room/mock/repo.ts";
-import { laneId } from "./helpers.tsx";
+import { laneId, settled, waitFor } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();
@@ -143,13 +143,13 @@ describe("the Proposal screen", () => {
 
   test("shows nothing extra when the commits have no headers", async () => {
     await open("Rate-limit /api/login", 2);
-    await new Promise((r) => setTimeout(r, 20));
+    await settled();
     expect(screen.queryByTestId("change-history")).toBeNull();
   });
 
   test("shows nothing on a first generation", async () => {
     await open(SESSION, 1);
-    await new Promise((r) => setTimeout(r, 20));
+    await settled();
     expect(screen.queryByTestId("change-history")).toBeNull();
   });
 

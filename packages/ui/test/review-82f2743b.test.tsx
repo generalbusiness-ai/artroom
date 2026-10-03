@@ -2,7 +2,7 @@
  * Review 82f2743b: findings P1.2 to P2.6, each branch rendered.
  * (P1.1 is covered in policy-runtime.test.ts.)
  */
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { App } from "../src/app.tsx";
 import type { RoomSnapshot, Why } from "../src/room/adapter.ts";
@@ -11,7 +11,7 @@ import { LiveRoom } from "../src/room/live/live-room.ts";
 import { MockRoom } from "../src/room/mock/mock-room.ts";
 import { AppContext } from "../src/ui/context.ts";
 import { WhyDialog } from "../src/ui/WhyDialog.tsx";
-import { stepOf } from "./helpers.tsx";
+import { settled, stepOf, waitFor } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();
@@ -210,7 +210,7 @@ describe("P2.5 the why dialog shows the explanation of the act it was asked for"
     resolveB(why(ids[1], "Explanation B"));
     await screen.findByText("Explanation B");
     resolveA(why(ids[0], "Explanation A"));
-    await new Promise((r) => setTimeout(r, 20));
+    await settled();
     expect(screen.queryByText("Explanation A")).toBeNull();
     expect(screen.getByText("Explanation B")).toBeTruthy();
   });

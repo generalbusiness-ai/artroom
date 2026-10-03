@@ -8,7 +8,6 @@
  * gives it to the helper every reader shares.
  */
 
-import { waitFor } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import type { ActDeclaration, ActsCatalogue, DeclaredRecord, HttpRoom } from "../src/room/contract.ts";
 import { LiveRoom } from "../src/room/live/live-room.ts";
@@ -16,6 +15,7 @@ import { BAND } from "../src/room/mock/declared-room.ts";
 import { MemoryRoom } from "../src/room/mock/memory-room.ts";
 import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
 import { laneGoal } from "../src/ui/format.ts";
+import { waitFor } from "./helpers.tsx";
 
 const adapters: LiveRoom[] = [];
 afterEach(() => {

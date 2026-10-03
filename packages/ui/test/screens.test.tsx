@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/preact";
+import { cleanup, fireEvent, screen, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import { DEFAULT_STEP } from "../src/room/mock/scenario.ts";
-import { laneId, renderAt, stepOf } from "./helpers.tsx";
+import { laneId, renderAt, stepOf, waitFor } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();

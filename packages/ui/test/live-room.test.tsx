@@ -1,10 +1,11 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/preact";
+import { cleanup, render, screen } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import { App } from "../src/app.tsx";
 import type { Cursor, HttpRoom, Lane, LogEntry, Proposal, Sha, Update } from "../src/room/contract.ts";
 import { isRefusal } from "../src/room/contract.ts";
 import { LiveRoom } from "../src/room/live/live-room.ts";
 import { MockRoom } from "../src/room/mock/mock-room.ts";
+import { settled, waitFor } from "./helpers.tsx";
 
 const SECRET = "artifacts-write-token-DO-NOT-SHOW";
 const sha = (c: string) => c.repeat(40) as Sha;
@@ -102,7 +103,7 @@ describe("live adapter (stub over HttpRoom)", () => {
     await screen.findByText("Rate-limit /api/login", { selector: "a" });
     for (const hash of ["#/needs-you", "#/policy", `#/lane/${LANE}/1`]) {
       location.hash = hash;
-      await new Promise((r) => setTimeout(r, 10));
+      await settled();
       expect(container.innerHTML).not.toContain(SECRET);
     }
     await screen.findByText("This room cannot show the diff yet.");

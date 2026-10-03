@@ -5,14 +5,14 @@
  * and never resubmits a stale act on its own.
  */
 
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/preact";
+import { cleanup, fireEvent, screen, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
 import type { ActDeclaration, ActsCatalogue, HttpRoom, MemberId } from "../src/room/contract.ts";
 import { LiveRoom } from "../src/room/live/live-room.ts";
 import { BAND, SETLIST_ACTS_2, declaredDemo } from "../src/room/mock/declared-room.ts";
 import { MemoryRoom, type MemoryDoc } from "../src/room/mock/memory-room.ts";
 import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
-import { renderAt } from "./helpers.tsx";
+import { renderAt, settled, waitFor } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();
@@ -256,7 +256,7 @@ describe("a meaning that changed behind the form (binding-stale)", () => {
     expect(within(stale).getByText("New field: feel (one of straight, swung, latin, required).")).toBeTruthy();
     // The one stale act was sent, with the old binding. Nothing else, however long we wait.
     expect(room.sent.map((s) => s.binding)).toEqual([oldBinding]);
-    await new Promise((r) => setTimeout(r, 30));
+    await settled();
     expect(room.sent).toHaveLength(1);
     expect(document.querySelector("button[type='submit']")).toBeNull();
     // Confirming shows the new meaning's form; its new required field is missing, so nothing is sent yet.
