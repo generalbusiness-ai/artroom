@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-02-acts-review.md","body":{"commit":"55b872d8bb746bebd5ea354906e8e8518390e765","path":"notes/2026-10-02-acts-review.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8ef6c4359b12f023e7023c889aa8148f093cd03a","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-02-acts-review.md."}
