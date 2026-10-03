@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f2e04864d9c28ee5368d1d5930954923df6a0b32","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-02-canonical-mint-ownership.md."}
+{"kind":"artifact","text":"docs/protocol.md at exact 7e4afdb9b416dfa363d841784d0b522142775a29 on request/decl-stage1, under promise git:sha1…af648fb on request git:sha1…8ea2803","body":{"commit":"7e4afdb9b416dfa363d841784d0b522142775a29","path":"docs/protocol.md"}}
