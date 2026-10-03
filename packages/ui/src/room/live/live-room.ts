@@ -59,11 +59,6 @@ export interface LiveOptions {
   readonly onViewer?: (member: MemberId) => void;
 }
 
-/** How new a catalogue is: the seq of its activation. No catalogue is older than any. */
-function age(c: Catalogue | null): number {
-  return c === null ? -1 : c.since; // G5U:catalogue-age
-}
-
 /** The snapshot with this active catalogue and the policy version it names. */
 function withCatalogue(snap: RoomSnapshot, catalogue: Catalogue | null): RoomSnapshot {
   return { ...snap, catalogue, policy: { ...snap.policy, version: catalogue?.policy ?? null, activatedAt: catalogue?.since ?? null } };
@@ -79,6 +74,12 @@ export class LiveRoom implements RoomAdapter {
    * that activation may retire one of their kinds. This adapter keeps no earlier version of its own.
    */
   private active: Catalogue | null = null;
+  /**
+   * The newest activation this adapter has confirmed: the `since` of the newest catalogue it has read, or -1 before
+   * any. It only grows. A read that fails leaves the page without a catalogue; it does not undo what was confirmed,
+   * so an older answer that arrives afterwards still cannot bring an earlier catalogue back.
+   */
+  private confirmed = -1;
   /** The code-review bindings under each policy version, by kind. A version's steps and lanes never change. */
   private readonly builtFor = new Map<string, Promise<ReadonlyMap<string, Binding>>>();
   private readonly listeners = new Set<() => void>();
@@ -146,25 +147,30 @@ export class LiveRoom implements RoomAdapter {
    * Take one completed read of the active catalogue, and return the catalogue this adapter now holds. Reads can
    * complete out of order: a load and an explicit read each ask the room, and the older question may be answered
    * last. An answer never replaces a later activation this adapter has already confirmed, as the room's handle
-   * never keeps an overtaken answer (`actsAt`). `known` is the age of what was held when the question was asked.
+   * never keeps an overtaken answer (`actsAt`). `known` is the catalogue held when the question was asked.
    */
-  private confirm(read: Catalogue | null, known: number): Catalogue | null {
-    const held = this.active;
+  private confirm(read: Catalogue | null, known: Catalogue | null): Catalogue | null {
     if (read === null) {
-      // "Not available" says nothing of its own age: it stands only if nothing was confirmed while it was on its way.
-      if (age(held) !== known) return held; // G5U:catalogue-overtaken
-    } else if (read.since < age(held)) return held; // G5U:catalogue-older: an answer from before an activation confirmed here; `since` only grows
+      // "Not available" says nothing of its own age: it stands only if no other answer was taken while it was on its way.
+      if (this.active !== known) return this.active; // G5U:catalogue-overtaken
+      this.active = null;
+      return null;
+    }
+    // An answer from before an activation confirmed here. `since` only grows, and what was confirmed outlasts a
+    // failed read: the page then stays without a catalogue rather than go back to an earlier one.
+    if (read.since < this.confirmed) return this.active; // G5U:catalogue-older
+    this.confirmed = read.since; // G5U:catalogue-confirmed
     this.active = read;
     return read;
   }
 
   /**
-   * A loaded snapshot under the catalogue held now. An explicit read may have confirmed a later activation after
-   * this load read the catalogue and before it finished; the page must not go back to the earlier one.
+   * A loaded snapshot under the catalogue held now, or with none when the newest read failed. An explicit read may
+   * have confirmed a later activation, or failed, after this load read the catalogue and before it finished; the
+   * page must not go back to the catalogue the load read.
    */
   private current(snap: RoomSnapshot): RoomSnapshot {
-    const held = this.active;
-    return age(snap.catalogue) < age(held) ? withCatalogue(snap, held) : snap; // G5U:refresh-current
+    return withCatalogue(snap, this.active); // G5U:refresh-current
   }
 
   /** `D(s)`: the catalogue that governs the entry at `seq`. */
@@ -209,7 +215,7 @@ export class LiveRoom implements RoomAdapter {
   }
 
   private async load(): Promise<RoomSnapshot> {
-    const known = age(this.active);
+    const known = this.active;
     const [roster, lanePage, attention, log, read] = await Promise.all([
       this.room.members(),
       readAll((cursor) => this.room.lanes({ limit: 500, ...(cursor ? { cursor } : {}) })),
@@ -355,7 +361,7 @@ export class LiveRoom implements RoomAdapter {
   }
 
   async readCatalogue(): Promise<Catalogue | null> {
-    const known = age(this.active);
+    const known = this.active;
     // What was just read is what `governing` answers from: an activation this read learned of ends the earlier
     // catalogue's interval, and may have retired one of its kinds (R-DECL-23). An answer older than what is already
     // confirmed changes nothing, and the caller gets the catalogue held now.
