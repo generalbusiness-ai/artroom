@@ -212,7 +212,17 @@ export function toolResult(name: McpToolName, out: unknown): ToolResult {
   return { content: [{ type: "text", text }], structuredContent: out as Record<string, unknown>, isError: false };
 }
 
-export function errorResult(e: ArtroomError): ToolResult {
+export function errorResult(thrown: ArtroomError): ToolResult {
+  // A plain object with the error's own fields. A failure the room threw over RPC arrives as an `Error` instance, whose
+  // `message` is not enumerable and which MCP does not accept as structured content.
+  const e: ArtroomError = {
+    name: "ArtroomError",
+    code: thrown.code,
+    message: thrown.message,
+    retryable: thrown.retryable,
+    ...(thrown.retryAfterMs !== undefined ? { retryAfterMs: thrown.retryAfterMs } : {}),
+    ...(thrown.maybeRecorded !== undefined ? { maybeRecorded: thrown.maybeRecorded } : {}),
+  }; // G5:error-plain
   const hint = e.retryable ? " Retry the same call with the same idempotencyKey." : "";
   return {
     content: [{ type: "text", text: `Error (${e.code}): ${e.message}${hint}\n${JSON.stringify(e)}` }],

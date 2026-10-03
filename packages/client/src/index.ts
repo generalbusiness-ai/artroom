@@ -22,6 +22,7 @@ export { HttpRoomClient, RpcRoomClient, WS_PROTOCOL, WS_TOKEN_PREFIX, type Watch
 export type { ClientOptions } from "./wire.ts";
 export { canonicalize, canonicalBytes, digestOf } from "./canonical.ts";
 export { buildDeclaredEnvelope, buildEnvelope, checkBinding, signEnvelope, signRequest, type Identity } from "./envelope.ts";
+export { delegateOp, invitationSession, type GrantKinds } from "./grants.ts";
 // Reading a room's declarations (declared acts stage 5): the meaning of a record at its own seq, the fields of an
 // act, the binding a named method was built for, and a grant expanded into the map its grantor signs.
 export {
