@@ -55,7 +55,7 @@ describe("one vocabulary per document (R-DECL-1, R-DECL-6, R-DECL-15)", () => {
     const binding = (await bindingIn(d, "claim"))!;
     const c = await ok<Claim>(d, d.admin, "claim", null, claimBody());
     expect(c).toMatchObject({ kind: "claim", purpose: "ordinary", lease: { generation: 1, expiresAt: iso(clock.now + LEASE) } });
-    expect(await laneRowOf(d, c.lane)).toEqual({ kind: "claim", binding, lease_ms: LEASE, conflict: "exclusive", purpose: "ordinary" });
+    expect(await laneRowOf(d, c.lane)).toEqual({ kind: "claim", binding, lease_ms: LEASE, expires_ms: clock.now + LEASE, purpose: "ordinary", conflict: "exclusive" });
     expect((await entryOf(d, c.id)).entry.receipt!.effects.find((e) => e["type"] === "opened")).toMatchObject({ kind: "claim", binding });
     // The platform kinds stay v: 1; a v: 2 envelope of one is bad-request.
     expectOk(await act(d, d.admin, "renew", { lane: c.lane }, { lease: 1 }, { binding: null }));
@@ -70,9 +70,11 @@ describe("one vocabulary per document (R-DECL-1, R-DECL-6, R-DECL-15)", () => {
     expect(await failure(r.stub.submit(await signed(r, r.admin, "claim", null, claimBody(), { binding: null, v: 2 })))).toMatchObject({ code: "bad-request", message: "envelope.v must be 1." });
     expect((await failure(r.stub.submit(await signed(r, r.admin, "recover", null, { op: "open", goal: "g", scope: [".artroom/**"] }, { binding: null })))).code).toBe("bad-request");
     const legacy = await r.admin.ok<Claim>("claim", null, claimBody());
-    expect(await laneRowOf(r, legacy.lane)).toEqual({ kind: "claim", binding: null, lease_ms: null, conflict: null, purpose: "ordinary" });
+    expect(await laneRowOf(r, legacy.lane)).toMatchObject({ kind: "claim", binding: null, lease_ms: null, purpose: "ordinary", conflict: null });
     const opened = (await entryOf(r, legacy.id)).entry.receipt!.effects.find((e) => e["type"] === "opened")!;
     expect("kind" in opened || "binding" in opened).toBe(false);
+    // A reader is still told the thread's kind.
+    expect(await r.admin.read({ q: "lane", lane: legacy.lane })).toMatchObject({ kind: "claim" });
     // Admission judges step 1 again under the document it decides with, inside the queue: an activation between
     // the first check and the decision cannot let an envelope of the other vocabulary through.
     const other = await signed(r, r.admin, "claim", null, claimBody("lib/**"), { binding });
@@ -405,7 +407,7 @@ describe("room-custody sessions across a change of vocabulary (R-DECL-17, R-CRED
     const first = expectOk(await bearerAct<Claim>(r, b, { kind: "claim", target: null, body: claimBody(), idempotencyKey: "b1" }));
     expect((await entryOf(r, first.id)).entry.act!.envelope).toMatchObject({ v: 2, kind: "claim", binding: codeReview, delegation: b.delegation });
     // A platform kind is a v: 1 envelope with no binding.
-    const renewed = expectOk(await bearerAct(r, b, { kind: "renew", target: { lane: first.lane }, body: { lease: 1 }, idempotencyKey: "b2" }));
+    const renewed = expectOk<ActRecord>(await bearerAct(r, b, { kind: "renew", target: { lane: first.lane }, body: { lease: 1 }, idempotencyKey: "b2" }));
     expect((await entryOf(r, renewed.id)).entry.act!.envelope).toMatchObject({ v: 1, kind: "renew" });
     expect((await entryOf(r, renewed.id)).entry.act!.envelope).not.toHaveProperty("binding");
     // The room's claim changes after the grant. The tool's binding is the grant's, so step 4 passes, and step 4a
@@ -434,6 +436,8 @@ describe("room-custody sessions across a change of vocabulary (R-DECL-17, R-CRED
     const first = expectOk(await bearerAct(r, b, claim));
     const refused = expectRefusal(await bearerAct(r, b, release), "not-holder");
     expect(refused.act).toBeDefined();
+    // A bearer act that names a binding is not for a v1 room.
+    expect((await failure(r.stub.bearerAct(b.bearer, { ...claim, idempotencyKey: "bound-1", binding: `sha256:${"a".repeat(64)}` } as never))).code).toBe("bad-request");
     await activate(r, v2());
     const seq = await headSeq(r);
     expect(await bearerAct(r, b, claim)).toEqual(first);
@@ -445,7 +449,7 @@ describe("room-custody sessions across a change of vocabulary (R-DECL-17, R-CRED
     // From v2 to v1: the first attempt was a v: 2 envelope with the code-review binding.
     const d = await declaredRoom();
     const db = await bearer(d, "@agent", "agent", { kinds: ["renew"], acts: { claim: (await bindingIn(d, "claim"))! } });
-    const dFirst = expectOk(await bearerAct(d, db, claim));
+    const dFirst = expectOk<ActRecord>(await bearerAct(d, db, claim));
     await activate(d, policy());
     expect(await bearerAct(d, db, claim)).toEqual(dFirst);
     // Another act under the used key is built for the document in force, and admission names the original entry.
@@ -513,7 +517,7 @@ describe("threads have kinds, and an act acts only on the kinds its declaration 
     expectOk(await act(r, r.admin, "release", { lane: room }, { lease: 1 }));
     // A configuration-recovery thread takes only recover ops, and recover acts on no other thread, nor on an entry of none.
     const rec = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "repair", scope: [".artroom/policy.json"] }, { binding: null });
-    expect(await laneRowOf(r, rec.lane)).toEqual({ kind: "recover", binding: null, lease_ms: LEASE, conflict: "by-scope", purpose: "config-recovery" });
+    expect(await laneRowOf(r, rec.lane)).toMatchObject({ kind: "recover", binding: null, lease_ms: LEASE, purpose: "config-recovery", conflict: "by-scope" });
     expect(expectRefusal(await act(r, r.admin, "note", { act: rec.id }, { text: "hi" }), "wrong-thread").fix).toContain("recover");
     expectRefusal(await act(r, r.admin, "propose", { lane: rec.lane }, { lease: 1, expectedGeneration: 0, head: "a".repeat(40), summary: "s" }), "wrong-thread");
     expectRefusal(await act(r, r.admin, "recover", { lane: c.lane }, { op: "release", lease: 1 }, { binding: null }), "wrong-thread");
@@ -576,9 +580,9 @@ describe("a declared act's body is the application's own (R-DECL-12, R-DECL-21)"
       (a) => {
         a["claim"] = {
           ...a["claim"]!,
-          body: { goal: { type: "int", min: 0, max: 9, requiredFor: ["none"] }, purpose: { type: "enum", values: ["config-recovery", "demo"], optional: true }, toString: { type: "text", max: 100, optional: true }, valueOf: { type: "text", max: 100, optional: true } },
+          body: { goal: { type: "int", min: 0, max: 9, requiredFor: ["none"] }, purpose: { type: "enum", values: ["config-recovery", "demo"], optional: true }, toString: { type: "text" as const, max: 100, optional: true }, valueOf: { type: "text" as const, max: 100, optional: true } },
         };
-        a["start"] = { label: "Start", targets: { none: ["open"] }, body: { valueOf: { type: "text", max: 100 } }, who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
+        a["start"] = { label: "Start", targets: { none: ["open"] }, body: { valueOf: { type: "text" as const, max: 100 } }, who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
         a["note"] = { ...a["note"]!, body: { text: { type: "bool" } } };
         a["ack"] = { label: "Ack", targets: { version: ["review"] }, threads: ["claim"], who: { roles: ["member"] } };
       },
@@ -696,7 +700,7 @@ describe("the lease rule (R-DECL-6, R-DECL-9)", () => {
     // Any accepted act from the holder renews for the thread's recorded length (R-ADM-11).
     advance(60_000);
     await ok(r, r.admin, "note", { act: c.id }, { text: "still here" });
-    expect(await inDO(r, (x) => x.core.sql.all("SELECT expires_ms FROM lanes WHERE id = ?", c.lane)[0]!["expires_ms"])).toBe(clock.now + LEASE);
+    expect((await laneRowOf(r, c.lane)).expires_ms).toBe(clock.now + LEASE);
     // A new thread takes the new lease. Each expires at its own length.
     const n = await ok<Claim>(r, r.admin, "claim", null, claimBody("docs/**"));
     expect((await laneRowOf(r, n.lane)).lease_ms).toBe(600_000);

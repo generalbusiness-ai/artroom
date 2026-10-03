@@ -72,9 +72,9 @@ export async function ok<T extends ActRecord = ActRecord>(r: TestRoom, c: Client
   return expectOk(await act<T>(r, c, kind, target, body, s));
 }
 
-/** What a thread's row records of its opening (R-DECL-6, R-DECL-9). */
+/** What a thread's row records of its opening (R-DECL-6, R-DECL-9), and when its lease ends. */
 export const laneRowOf = (r: TestRoom, lane: string) =>
-  inDO(r, (room) => room.core.sql.all("SELECT kind, binding, lease_ms, conflict, purpose FROM lanes WHERE id = ?", lane)[0] as { kind: string; binding: string | null; lease_ms: number | null; conflict: string | null; purpose: string });
+  inDO(r, (room) => room.core.sql.all("SELECT kind, binding, lease_ms, expires_ms, purpose, conflict FROM lanes WHERE id = ?", lane)[0] as { kind: string; binding: string | null; lease_ms: number | null; expires_ms: number | null; purpose: string; conflict: string | null });
 
 /** A recorded entry, as the room sealed it. */
 export const entryOf = (r: TestRoom, id: string) =>

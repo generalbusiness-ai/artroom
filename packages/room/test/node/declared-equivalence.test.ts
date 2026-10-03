@@ -15,13 +15,15 @@
  *   vocabulary only `claim` and `propose` may.
  *
  * The rest is what a `v2` room adds: the declared field types, the target
- * shapes of a declaration, the envelope of `v: 2`, and grants as a signed map.
+ * shapes of a declaration, the envelope of `v: 2`, and grants as a signed
+ * map; and the two pure functions of `src/declared.ts`: the filling of
+ * refusal wording, and the list of what this room does not run yet.
  */
 
 import { describe, expect, it } from "vitest";
 import type { ActDeclaration, EnvelopeKind, PolicyDocumentV2, Role } from "@generalbusiness/artroom-contract";
 import { CODE_REVIEW_ACTS, codeReviewPolicy, defaultPolicy, delegableBy as vocabularyGrants, shapeOf } from "@generalbusiness/artroom-policy";
-import { stagedProblems } from "../../src/declared.ts";
+import { fill, stagedProblems, WORDING_FILLED_BYTES } from "../../src/declared.ts";
 import { checkBody, checkDeclaredTarget, checkSignedEnvelope, ShapeError } from "../../src/schema.ts";
 import { delegableBy, roleMaySign } from "../../src/roster.ts";
 
@@ -338,7 +340,7 @@ describe("the code-review declarations let each role sign, and grant, what the l
     expect(ROLES.filter((role) => roleMaySign(role, "ask", undefined, doc))).toEqual(["admin", "member"]);
     expect(ROLES.filter((role) => roleMaySign(role, "check", undefined, doc))).toEqual(["admin", "member"]);
     expect(ROLES.filter((role) => roleMaySign(role, "ask"))).toEqual([]);
-    for (const role of ROLES) for (const op of ["invite", "delegate", "set-role", "join", "rotate-recovery"]) expect(roleMaySign(role, "roster", op, doc), `${role} ${op}`).toBe(roleMaySign(role, "roster", op));
+    for (const role of ROLES) for (const op of ["invite", "delegate", "set-role", "join", "rotate-recovery"] as const) expect(roleMaySign(role, "roster", op, doc), `${role} ${op}`).toBe(roleMaySign(role, "roster", op));
     expect(roleMaySign("member", "roster", "delegate", doc)).toBe(true);
     expect(roleMaySign("member", "roster", "invite", doc)).toBe(false);
   });
@@ -348,5 +350,50 @@ describe("the code-review declarations let each role sign, and grant, what the l
       const g = vocabularyGrants(declared, role);
       expect([...g.declared, ...g.platform].sort(), role).toEqual([...delegableBy(role)].sort());
     }
+  });
+});
+
+describe("refusal wording is filled from the room's facts, and bounded (R-DECL-13)", () => {
+  const bytes = (t: string) => new TextEncoder().encode(t).length;
+
+  it("only the eight slots are filled, a slot with no fact with nothing; a filled text is cut to 8,192 bytes at a character boundary, and is a prefix of the text itself", () => {
+    expect(fill("{lane} is {holder}'s ({kind}, at {generation}){reservedFor}{until}{obligation}{path}{other}", { lane: "act_1_00000000", holder: "@admin", kind: "release", generation: "0" })).toBe("act_1_00000000 is @admin's (release, at 0){other}");
+    expect(WORDING_FILLED_BYTES).toBe(8192);
+    const path = `docs/${"d".repeat(200)}/${"e".repeat(200)}/${"f".repeat(200)}/${"g".repeat(200)}/x.md`;
+    expect(path.length).toBe(813);
+    // A template that repeats a slot cannot make a refusal larger than the bound.
+    expect(fill("{path}".repeat(85), { path })).toBe(path.repeat(85).slice(0, 8192));
+    // A text of exactly 8,192 bytes is not cut.
+    const exact = fill(`${"p".repeat(62)}${"{path}".repeat(10)}`, { path });
+    expect([exact, bytes(exact)]).toEqual([`${"p".repeat(62)}${path.repeat(10)}`, 8192]);
+    // The 8,192nd byte would be the first half of a two-byte character: the cut falls before it.
+    const split = fill(`a${"{path}".repeat(10)}${"é".repeat(40)}`, { path });
+    expect([split, bytes(split)]).toEqual([`a${path.repeat(10)}${"é".repeat(30)}`, 8191]);
+    // Nothing is decoded, so a leading U+FEFF, a legal character of a template, stays (defect 33).
+    const marked = fill(`\uFEFF${"{path}".repeat(11)}`, { path });
+    expect(marked).toBe(`\uFEFF${path.repeat(11)}`.slice(0, 1 + 8189));
+    expect([marked.charCodeAt(0), bytes(marked)]).toEqual([0xfeff, 8192]);
+  });
+});
+
+describe("what this room does not run before declared acts stage 4 (R-DECL-24, note section 8.5)", () => {
+  it("a valid document that uses one of the seven steps or hold settings is named, with the act; the code-review document uses none", () => {
+    const withActs = (change: (a: Record<string, ActDeclaration>) => void): PolicyDocumentV2 => {
+      const acts = structuredClone(CODE_REVIEW_ACTS) as Record<string, ActDeclaration>;
+      change(acts);
+      return { ...declared, acts };
+    };
+    const hold = (h: object) => (a: Record<string, ActDeclaration>) => void ((a["claim"] as { hold: unknown }).hold = h);
+    const cases: readonly (readonly [string, PolicyDocumentV2])[] = [
+      ["acts.propose: version then land in one act", withActs((a) => void (a["propose"] = { ...a["propose"]!, targets: { thread: ["version", "land"] } }))],
+      ["acts.pass: the step hand-over", withActs((a) => void (a["pass"] = { label: "Pass", targets: { thread: ["hand-over"] }, threads: ["claim"], who: { roles: ["member"] } }))],
+      ["acts.note: a comment on target none", withActs((a) => void (a["note"] = { ...a["note"]!, targets: { none: ["comment"], entry: ["comment"], line: ["comment"] } }))],
+      ["acts.claim: a scope template", withActs(hold({ scope: ["src/**"], workspace: true }))],
+      ["acts.claim: hold.conflict", withActs(hold({ scope: "body.scope", workspace: true, conflict: "exclusive" }))],
+      ["acts.claim: hold.reserveSeconds", withActs(hold({ scope: "body.scope", workspace: true, reserveSeconds: 60 }))],
+      ["acts.claim: a hold without a workspace", withActs(hold({ scope: "body.scope" }))],
+    ];
+    for (const [what, doc] of cases) expect(stagedProblems(doc), what).toEqual([`${what} is not run by this room until declared acts stage 4`]);
+    expect(stagedProblems(declared)).toEqual([]);
   });
 });
