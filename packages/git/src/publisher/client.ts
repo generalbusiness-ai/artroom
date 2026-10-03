@@ -10,6 +10,7 @@ import type { Sha } from "@generalbusiness/artroom-contract";
 import type { IntegrateResult } from "../landing/core.ts";
 import type { PublisherPort } from "../landing/engine.ts";
 import { type ArtifactsNamespace, type RepoHandle, readMainVia, withRetry } from "../artifacts.ts";
+import { errorNote } from "../mints.ts";
 import type { BuildResult, PinResult, PreviewResult } from "./gitops.ts";
 import { integrationRef, pinnedRef } from "./gitops.ts";
 import type { PushOutcome } from "./push-outcome.ts";
@@ -61,8 +62,6 @@ export interface PublisherClientOptions {
 
 import type { LogPushOutcome, LogPushRequest, LogStageRequest } from "./log-push.ts";
 import type { StageResult } from "./gitops.ts";
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Token lifetimes, in seconds. A token that expires during an upload refuses it (notes/2026-10-01-laneB-token-inflight.md). */
 export const TOKEN_TTL = {
@@ -120,7 +119,7 @@ export class ContainerPublisher implements PublisherPort {
       );
       return r.kind === "clean" ? { kind: "clean", integration: r.integration as Sha, ref: r.ref } : { kind: "conflict", paths: r.paths };
     } catch (e) {
-      return { kind: "error", detail: message(e) };
+      return { kind: "error", detail: errorNote("integration failed", e) }; // safe metadata only (request d29c09fa)
     }
   }
 

@@ -2107,7 +2107,7 @@ Left unchanged, with the reason:
 | `admission.ts` "The diff was not computed" | Not a catch: a missing pre-admission read, an internal invariant |
 | Catches that map to 400 or 401 (envelope, request and redemption shapes, JSON bodies, read cursors, room names in URLs, WebSocket tokens and cursors) | Not 5xx: the cause is the client's input, and the message says what is wrong |
 | `RoomCore.kick`, `runAll`, `Room.alarm`, the constructor's `recover`, `schedule`, `wake` | Background work, not an act's response. Each step leaves its durable state and the alarm retries it. Logging every retry is a separate decision about volume |
-| Job issue and preparation (`src/jobs.ts`), notify evaluation | Background and retried; they already keep a redacted `last_error` |
+| Job issue and preparation (`src/jobs.ts`), notify evaluation | Background and retried; they keep a `last_error` of safe metadata only (request d29c09fa: `errorNote`, never redacted text) |
 | `foundingDue`, `nextAlarm`, `simulate`, founding's `refreshMain` after the seal | Scheduling reads, control flow, or background work retried by the alarm |
 | `src/worker.ts` RPC entry (`RoomWireTarget`, `Artroom`) | No catch: `unwire` rethrows the Room's `ArtroomError` to the caller |
 
@@ -2133,7 +2133,8 @@ Left unchanged, with the reason:
   `createToken`, `listTokens` and `revokeToken` throw an error with every
   syntax case in its message and a Bearer credential in its name. All
   three `last_error` sinks in `src/jobs.ts` are checked: none holds a
-  credential.
+  credential. Since request d29c09fa they keep safe metadata only, and
+  the test checks that too, with every row of every table.
 - Redaction, unit: one case per rule and form (39 cases), the checker's
   three controls through `diagnosis`, a credential in the error's name,
   the input bound cutting a quoted value, identifiers kept, the

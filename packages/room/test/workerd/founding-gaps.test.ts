@@ -517,3 +517,75 @@ describe("plan 004: the founding debt has a persisted alarm before any create is
     expect(await alarmOf(quiet)).toBeNull();
   });
 });
+
+describe("request d29c09fa: the error upgrade drains in an unfounded room, through recovery and alarms alone", () => {
+  const sample = ["legacy", "Founding", "Credential"].join("");
+
+  /** Put a legacy provider text in a workspace step, set the store back to version 1, and reopen the object with no alarm stored. */
+  async function legacyReopened(id: string, where: "done" | "any"): Promise<{ founded: boolean; cursor: unknown[]; alarm: number | null; debt: boolean }> {
+    await runInDurableObject(roomStub(id), async (room: Room, state: DurableObjectState) => {
+      expect(room.core.founded).toBe(false);
+      const rows = room.core.sql.all(`SELECT id FROM artroom_ws_duty${where === "done" ? " WHERE state = 'done'" : ""} ORDER BY id`);
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) room.core.sql.all("UPDATE artroom_ws_duty SET last_error = ? WHERE id = ?", `Authorization: Bearer ${sample}`, row["id"]!);
+      room.core.sql.all("UPDATE schema_version SET v = 1 WHERE id = 1");
+      await state.storage.deleteAlarm();
+    });
+    await runInDurableObject(roomStub(id), (_room: Room, state: DurableObjectState) => state.abort("legacy upgrade")).catch(() => undefined);
+    return runInDurableObject(roomStub(id), async (room: Room, state: DurableObjectState) => ({
+      founded: room.core.founded,
+      cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'"),
+      alarm: await state.storage.getAlarm(),
+      debt: room.core.foundingDue() !== null,
+    }));
+  }
+
+  async function drained(id: string) {
+    for (let i = 0; i < 10; i++) if (!(await runDurableObjectAlarm(roomStub(id)))) break;
+    return runInDurableObject(roomStub(id), (room: Room) => ({
+      founded: room.core.founded,
+      cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'"),
+      rows: room.core.sql.all("SELECT last_error FROM artroom_ws_duty"),
+    }));
+  }
+
+  // The checker's control (review of 18d69cda), as it was run.
+  it("checker upgrade: an unfounded room scrubs terminal legacy founding errors using only recovery and alarms", async () => {
+    const f = await draftPublic();
+    const id = roomIdOf(f.drafted.genesis);
+    const a = f.world.artifacts;
+    a.failRemote("revokeToken", artifactsErrors.transport());
+    await rejects(worker.found(f.drafted.genesis, f.sig, f.drafted.draft), "unavailable");
+    advance(60_000);
+    expect(await runDurableObjectAlarm(roomStub(id))).toBe(true);
+    await runInDurableObject(roomStub(id), (room: Room) => expect(room.core.foundingDue()).toBeNull());
+    const before = await legacyReopened(id, "done");
+    expect(before.founded).toBe(false);
+    expect(before.cursor).toHaveLength(1);
+    expect(before.debt).toBe(false);
+    expect(before.alarm).not.toBeNull(); // recovery stored the upgrade's alarm, with no founding debt left
+    // No founding retry, and no direct call to scrubErrors: the production recovery and alarm route.
+    const after = await drained(id);
+    expect(JSON.stringify(after.rows), "terminal legacy founding error remains without any cleanup alarm").not.toContain(sample);
+    expect(after.cursor).toHaveLength(0);
+    expect(after.founded).toBe(false);
+  });
+
+  it("with founding debt still owed: the alarm runs both the upgrade and the founding cleanup, and every step's legacy text is gone", async () => {
+    const f = await draftPublic();
+    const id = roomIdOf(f.drafted.genesis);
+    f.world.artifacts.failRemote("revokeToken", artifactsErrors.transport());
+    await rejects(worker.found(f.drafted.genesis, f.sig, f.drafted.draft), "unavailable");
+    const before = await legacyReopened(id, "any");
+    expect(before).toMatchObject({ founded: false, debt: true });
+    expect(before.cursor).toHaveLength(1);
+    expect(before.alarm).not.toBeNull();
+    advance(60_000);
+    const after = await drained(id);
+    expect(JSON.stringify(after.rows)).not.toContain(sample);
+    expect(after.cursor).toHaveLength(0);
+    expect(after.founded).toBe(false);
+    // The founding debt is settled by the same alarms, as before.
+    expect(await runInDurableObject(roomStub(id), (room: Room) => room.core.foundingDue())).toBeNull();
+  });
+});

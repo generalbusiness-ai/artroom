@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { MAX_RETAIN_MS, PREPARE_WINDOW_MS, SnapshotRepos, type SnapshotWriter } from "../src/snapshot/repos.ts";
 import type { ArtifactsNamespace, MintedToken, RepoHandle, TokenInfo } from "../src/artifacts.ts";
 import type { Sql } from "../src/sql.ts";
-import { Clock, nodeSql } from "./support.ts";
+import { WITHHELD, scrubLegacyErrors } from "../src/safe-errors.ts";
+import { Clock, echoNote, echoing, everyRow, noEcho, nodeSql } from "./support.ts";
 
 class ArtifactsError extends Error {
   readonly code: string;
@@ -609,4 +610,70 @@ test("follow-up c9cd4cd8: a wake-up that cannot be stored sends no create; the s
   const r = await snaps.prepare(C1, async () => C1);
   assert.deepEqual(ns.created, [r.name]);
   assert.equal(wakes[1]!.createdBefore, 0, "the wake-up came before the create");
+});
+
+// ------------------------------------------------------------------ request d29c09fa: safe metadata at durable sinks
+
+const dutyErrors = (sql: Sql) => sql.all("SELECT kind, last_error FROM artroom_snap_duty WHERE last_error IS NOT NULL ORDER BY id").map((r) => [r["kind"], r["last_error"]]);
+
+test("d29c09fa: a create that fails with the provider's text keeps safe metadata only, and so does the next check of it", async () => {
+  const { clock, ns, sql, host } = durable();
+  const snaps = host();
+  ns.create = async () => {
+    throw echoing();
+  };
+  await assert.rejects(snaps.prepare(C1, async () => C1));
+  assert.deepEqual(dutyErrors(sql), [["create", echoNote("snapshot create failed")]]);
+  noEcho("a failed create", everyRow(sql), snaps.duties());
+  // The unresolved create is checked again; that lookup fails with the provider's text too.
+  ns.get = async () => {
+    throw echoing();
+  };
+  clock.t = snaps.nextDue()!;
+  assert.equal(await snaps.reconcile(), 1);
+  assert.deepEqual(dutyErrors(sql), [["create", echoNote("snapshot create not yet seen")]]);
+  noEcho("an unresolved create's check", everyRow(sql), snaps.duties());
+});
+
+test("d29c09fa: retirement that fails with the provider's text stays owed, and its rows keep safe metadata only", async () => {
+  const { clock, ns, sql, host } = durable();
+  const snaps = host();
+  const r = await snaps.prepare(C1, async () => C1);
+  await snaps.mint(C1, "job_a", clock.t + 15 * 60_000);
+  ns.repos.get(r.name)!.revokeToken = async () => {
+    throw echoing();
+  };
+  ns.delete = async () => {
+    throw echoing();
+  };
+  assert.equal(await snaps.end(C1, "job_a"), 2, "the revocation and the deletion are both owed");
+  const errors = dutyErrors(sql);
+  assert.deepEqual(errors.map(([k]) => k).sort(), ["delete", "revoke"]);
+  for (const [, e] of errors) assert.equal(e, echoNote("snapshot cleanup failed"));
+  noEcho("failed retirement", everyRow(sql), snaps.duties());
+});
+
+test("d29c09fa, reopen: snapshot steps stored with provider text are rewritten once by the scrub; safe ones stay", async () => {
+  const { ns, sql, host } = durable();
+  const snaps = host();
+  ns.create = async () => {
+    throw echoing();
+  };
+  await assert.rejects(snaps.prepare(C1, async () => C1));
+  await assert.rejects(snaps.prepare(C2, async () => C2));
+  // One legacy row; the other keeps its safe metadata.
+  const [first] = sql.all("SELECT id FROM artroom_snap_duty ORDER BY id").map((r) => r["id"] as number);
+  sql.all("UPDATE artroom_snap_duty SET last_error = ? WHERE id = ?", `snapshot create failed: ${echoing().message}`, first!);
+  host(); // reopen
+  scrubLegacyErrors(sql);
+  assert.deepEqual(dutyErrors(sql), [
+    ["create", `snapshot create failed: ${WITHHELD}`],
+    ["create", echoNote("snapshot create failed")],
+  ]);
+  noEcho("the scrubbed rows", everyRow(sql));
+  {
+    const once = everyRow(sql);
+    scrubLegacyErrors(sql); // a second run changes nothing
+    assert.equal(everyRow(sql), once);
+  }
 });

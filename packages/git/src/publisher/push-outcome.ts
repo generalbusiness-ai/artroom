@@ -86,6 +86,17 @@ export function classifyGitPush(exitCode: number, stdout: string, stderr: string
   return { outcome: "unknown", detail };
 }
 
+/**
+ * What a durable record keeps of a push's answer (request d29c09fa): the
+ * outcome, the kind of refusal, and an Artifacts refusal code from
+ * `ARTIFACTS_REFUSALS`. Never git's or the remote's text, which can echo a
+ * URL or a header.
+ */
+export function outcomeNote(o: PushOutcome): string {
+  const code = o.outcome === "rejected" ? artifactsRefusal(o.detail) : null;
+  return `push answered: ${o.outcome}${o.outcome === "rejected" ? ` (${o.reason})` : ""}${code ? ` ${code}` : ""}`;
+}
+
 /** True when this outcome proves the push did not and cannot update the ref. */
 export function definitelyNotApplied(outcome: PushOutcome["outcome"] | null): boolean {
   return outcome === "error" || outcome === "rejected";
