@@ -178,7 +178,19 @@ export function checkSignedEnvelope(v: unknown, doc?: AnyPolicyDocument): void {
   } else if (e.binding !== undefined) c.error("envelope.binding", "is only for an envelope of v: 2"); // G2:binding-v1
   if (kind === "renew" || kind === "roster") return checkTarget(c, kind, e.target, e.body);
   if (kind === "recover") return recoverTarget(c, e.target, e.body);
-  declaredTarget(c, declarationOf(doc, kind), e.target); // G2:declared-target
+  // A declared kind's target is not judged here. Which shapes the kind's declaration accepts is judged after step 4a
+  // (`checkDeclaredTarget`), in the same words, so an act signed for an earlier meaning is answered binding-stale and an
+  // exact retry is answered before either. Nothing before that point reads more of a target than a string `lane`.
+}
+
+/**
+ * A declared act's target against its active declaration (R-DECL-4), after
+ * step 4a has shown the envelope carries that declaration's binding. Throws
+ * `ShapeError` with `bad-request`, in the words step 1 used for the legacy
+ * kinds.
+ */
+export function checkDeclaredTarget(doc: AnyPolicyDocument, kind: string, target: unknown): void {
+  declaredTarget(new Checker("bad-request"), declarationOf(doc, kind), target); // G2:declared-target
 }
 
 /**

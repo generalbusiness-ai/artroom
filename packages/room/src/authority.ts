@@ -7,6 +7,7 @@
  */
 
 import type {
+  EnvelopeKind,
   AdmissionPath,
   AnyPolicyDocument,
   Authority,
@@ -49,6 +50,17 @@ export interface Signer {
  * table, `declared` by `who` and the grant map, `recover` by R-DECL-21 at
  * step 7, `undeclared` left to step 4a, which refuses it.
  */
+/** The legacy act each `recover` op stands for (R-DECL-21), for the role table of R-GEN-5. Own properties only. */
+const RECOVER_LEGACY: Readonly<Record<string, EnvelopeKind | undefined>> = Object.assign(Object.create(null) as Record<string, EnvelopeKind>, {
+  open: "claim",
+  take: "claim",
+  version: "propose",
+  approve: "review",
+  land: "land",
+  release: "release",
+  note: "note",
+});
+
 function kindClass(doc: AnyPolicyDocument, kind: string): "legacy" | "declared" | "recover" | "undeclared" {
   if (!isDeclared(doc) || kind === "renew" || kind === "roster") return "legacy";
   if (kind === "recover") return "recover";
@@ -124,6 +136,12 @@ export function judge(
     // R-GEN-5 as amended: the legacy table, or a declared kind's `who.roles` with admin implicit (R-DECL-11).
     if (!roleMaySign(member.role, kind, undefined, cls === "declared" ? doc : undefined))
       return no("role-forbids", `The role ${member.role} may not sign ${kind}.`, "Ask an admin for a role that may."); // G2:who-roles
+  } else if (cls === "recover") {
+    // R-DECL-21: exactly as a legacy configuration-recovery lane. A role that could not sign the legacy act an op
+    // stands for is refused here, unrecorded; any other signer is judged admin-required at step 7, as it was.
+    const legacy = as ? "propose" : RECOVER_LEGACY[String((env.body as { op?: unknown } | null)?.op)];
+    if (legacy !== undefined && !roleMaySign(member.role, legacy))
+      return no("role-forbids", `The role ${member.role} may not sign recover.`, "Configuration recovery needs an active admin's own key."); // G2:recover-role
   }
   return { ok: true, authority: { via: "member", member: member.handle, role: member.role, key: actor }, flags: [] };
 }

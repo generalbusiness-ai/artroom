@@ -155,7 +155,7 @@ export const DUE_INDEXES = [
 /**
  * The columns of version 4 (declared acts stage 2, request fd6f00b6): a
  * thread's kind, the binding of the act that opened it, and the lease length
- * recorded when it opened (R-DECL-6, R-DECL-9); a delegation's signed grant
+ * and the conflict mode recorded when it opened (R-DECL-6, R-DECL-9); a delegation's signed grant
  * map, and whether an invitation was admitted under a `v2` document
  * (R-DECL-17). Null where the legacy vocabulary leaves them unset.
  */
@@ -163,6 +163,7 @@ export const DECLARED_COLUMNS: readonly (readonly [table: string, column: string
   ["lanes", "kind", "TEXT"],
   ["lanes", "binding", "TEXT"],
   ["lanes", "lease_ms", "INTEGER"],
+  ["lanes", "conflict", "TEXT"],
   ["delegations", "acts", "TEXT"],
   ["invitations", "declared", "INTEGER"],
 ];

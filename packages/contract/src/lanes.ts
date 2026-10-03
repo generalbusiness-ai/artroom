@@ -117,7 +117,18 @@ export type LaneEffect =
    * The lane is the entry that records this effect. Its ID depends on the
    * entry's hash, so it is never written here (R-LOG-12).
    */
-  | { readonly type: "opened"; readonly purpose: LanePurpose; readonly lease: Lease }
+  | {
+      readonly type: "opened";
+      readonly purpose: LanePurpose;
+      readonly lease: Lease;
+      /**
+       * In a room whose active document is `v2`: the thread's kind, and the
+       * binding of the act that opened it, null for a `recover` thread
+       * (R-LOG-6 as amended, R-DECL-6). Absent under a `v1` document.
+       */
+      readonly kind?: string;
+      readonly binding?: string | null;
+    }
   | {
       readonly type: "rescoped";
       readonly lane: LaneId;
