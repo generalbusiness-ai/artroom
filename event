@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:291a9d44e09ea420b76cf30f8405828923ee4eb1","text":"Merge retired a covered predecessor; the successor is at docs/protocol.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2a973b290271b53a264aece51ab2b85149891fab","text":"Merge retired a covered predecessor; the successor is at packages/git/src/workspace/workspaces.ts."}
