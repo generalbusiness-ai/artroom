@@ -7,6 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  MINT_CLOCK_ALLOWANCE_MS,
   MINT_LISTING_MAX,
   MINT_REVOKE_BACKOFF,
   MINT_REVOKE_BATCH,
@@ -481,7 +482,7 @@ test("(4) another scope, a longer expiry, or an expiry after notAfter that passe
   const iso = (ms: number) => new Date(ms).toISOString();
   r.repo.plans = [
     (t) => ({ ...(full(t) as object), scope: "write" }),
-    (t) => ({ ...(full(t) as object), expiresAt: iso(t.expiresAt + 1) }),
+    (t) => ({ ...(full(t) as object), expiresAt: iso(t.expiresAt + MINT_CLOCK_ALLOWANCE_MS + 1) }),
   ];
   await assert.rejects(r.ledger.mint("read:a", "read", ttl60), /another scope/);
   await assert.rejects(r.ledger.mint("read:b", "read", ttl60), /later than the lifetime asked/);
@@ -495,6 +496,30 @@ test("(4) another scope, a longer expiry, or an expiry after notAfter that passe
   const exact = await r.ledger.mint("job:j1_2", "read", ttl60, { notAfter: r.clock.t + 60_000 });
   assert.equal(exact.expiresAt, r.clock.t + 60_000);
   await exact.release();
+});
+
+test("(4) Artifacts' clock ahead of the Room's (request df6ff8d3): an expiry 67 ms past the arrival plus the lifetime asked, as on the spike, and one exactly the allowance past, are usable; 1 ms more is owed; notAfter has no allowance", async () => {
+  assert.equal(MINT_CLOCK_ALLOWANCE_MS, 5_000);
+  const r = room();
+  const iso = (ms: number) => new Date(ms).toISOString();
+  r.repo.plans = [
+    (t) => ({ ...(full(t) as object), expiresAt: iso(t.expiresAt + 67) }),
+    (t) => ({ ...(full(t) as object), expiresAt: iso(t.expiresAt + MINT_CLOCK_ALLOWANCE_MS) }),
+    (t) => ({ ...(full(t) as object), expiresAt: iso(t.expiresAt + MINT_CLOCK_ALLOWANCE_MS + 1) }),
+    (t) => ({ ...(full(t) as object), expiresAt: iso(t.expiresAt + 1) }),
+  ];
+  const live = await r.ledger.mint("pin-objects:h1", "write", () => 600);
+  assert.equal(live.expiresAt, r.clock.t + 600_000 + 67, "the reported expiry, as Artifacts gave it");
+  const edge = await r.ledger.mint("pin-objects:h2", "write", () => 600);
+  await assert.rejects(r.ledger.mint("pin-objects:h3", "write", () => 600), /later than the lifetime asked/);
+  // 1 ms past a check job's deadline passes the generic check with its allowance, and is still refused.
+  await assert.rejects(r.ledger.mint("job:j1_1", "read", ttl60, { notAfter: r.clock.t + 60_000 }), /after notAfter/);
+  assert.deepEqual(rows(r.sql).map((x) => [x["purpose"], x["state"]]), [["pin-objects:h1", "held"], ["pin-objects:h2", "held"], ["pin-objects:h3", "owed"], ["job:j1_1", "owed"]]);
+  await live.release();
+  await edge.release();
+  await alarm(r);
+  assert.deepEqual(r.repo.revokes, ["tok_1", "tok_2", "tok_3", "tok_4"]);
+  assert.equal(rows(r.sql).length, 0);
 });
 
 test("(4) no ID is unknown", async () => {

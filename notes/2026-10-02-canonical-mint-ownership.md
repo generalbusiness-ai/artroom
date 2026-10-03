@@ -131,7 +131,9 @@ and next due time). Counts change in the same transaction as each record.
   carry it past the request's `notAfter` bound (below).
 - **The answer.** It is classified once, whenever it arrives:
   - an ID and text, with the scope asked and a readable expiry no later
-    than the answer's arrival plus the lifetime asked (the generic check)
+    than the answer's arrival plus the lifetime asked plus 5 seconds for
+    Artifacts' clock (the generic check; the allowance was added by
+    request df6ff8d3, after the spike's expiries came 67 ms late)
     and no later than the request's absolute `notAfter` bound if it has
     one, while the caller still waits: the record becomes `held`, and the
     caller gets the token. A check job passes its deadline as `notAfter`
