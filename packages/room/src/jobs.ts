@@ -45,7 +45,7 @@ import { iso } from "./ids.ts";
 import { generationRow, laneRow } from "./model.ts";
 import { obligationsFor } from "./obligations.ts";
 import type { Sql } from "./ports.ts";
-import { getMeta, num, one, setMeta, str } from "./store.ts";
+import { getMeta, num, one, safeJobStatus, setMeta, str } from "./store.ts";
 
 /** Time a job has beyond the checker's own timeout, to start a runner, fetch, sign and submit. */
 export const JOB_MARGIN_S = 300;
@@ -240,7 +240,7 @@ export function jobTokenDuties(core: RoomCore): {
     expiresAt: num(r, "expires_at"),
     nextCheckAt: num(r, "next_ms")!,
     attempts: num(r, "attempts") ?? 0,
-    status: str(r, "last_error"),
+    status: safeJobStatus(str(r, "last_error")), // only safe metadata is shown (request d29c09fa)
   }));
 }
 

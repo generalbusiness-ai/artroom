@@ -137,7 +137,7 @@ const SITES: readonly Site[] = [
         r,
         run: () => inDO(r, (room) => room.core.landing.prepare(op)),
         // The operation keeps only safe metadata about the lost mint, never the provider's text.
-        lost: async () => expect(await inDO(r, (room) => room.core.landing.core.get(op)!.lastError)).toBe("token not minted (create failed: Error)"),
+        lost: async () => expect(await inDO(r, (room) => room.core.landing.core.get(op)!.lastError)).toBe("integration failed: Error"),
       };
     },
   },
@@ -942,54 +942,75 @@ describe("mint lane C: ended job tokens and due jobs are taken in bounded batche
     }));
 });
 
-describe("mint lane C: the due indexes reach a room stored before them (review 993dce7a)", () => {
+describe("mint lane C: the due indexes reach a room stored before them (review 993dce7a), as migration 3 after request d29c09fa's scrub at 2", () => {
   /** The query plan's steps for one of the production due queries. */
   const plan = (room: Room, q: string) => room.core.sql.all(`EXPLAIN QUERY PLAN ${q}`, clock.now, JOB_BATCH).map((x) => String(x["detail"]));
+  /** Text a stored error field held before request d29c09fa: not safe metadata. */
+  const LEGACY = "ArtifactsError: Bearer abcd1234 rejected";
 
-  it("a version-1 room reopened at version 2: both indexes installed, every row, owner, deadline and the history kept, and the due batches read by index with no sort", () =>
-    ahead(async () => {
-      const before = await makeRoom();
-      const due = clock.now + 3600_000;
-      const snapshot = (room: Room) => ({
-        tokens: room.core.sql.all("SELECT * FROM job_tokens ORDER BY token_id"),
-        jobs: room.core.sql.all("SELECT * FROM check_jobs ORDER BY id"),
-        ledger: room.core.mints.duties({ limit: 1000 }).records,
-        head: room.core.headSeq(),
-        meta: room.core.sql.all("SELECT k, v FROM meta WHERE k NOT IN ('loop_backoff') ORDER BY k"),
-      });
-      // As a room stored before this lane: schema version 1, no due indexes, a held job token, an owed job, an unknown mint.
-      const was = await inDO(before, async (room, state) => {
-        await room.core.idle();
-        expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 2 }]);
-        room.core.sql.all("DROP INDEX job_tokens_due");
-        room.core.sql.all("DROP INDEX check_jobs_due");
-        room.core.sql.all("UPDATE schema_version SET v = 1 WHERE id = 1");
-        room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tok_owned', ?, ?, 'held')", due, due);
-        room.core.sql.all(
-          "INSERT INTO check_jobs (id, owner, lane, generation, obligation, checker, config, integration, base, state, next_ms) VALUES ('job_old', 'op_x', 'lane_x', 1, 'obl_x', 'unit', ?, ?, ?, 'owed', ?)",
-          `sha256:${"1".repeat(64)}`,
-          "a".repeat(40),
-          "b".repeat(40),
-          due,
-        );
-        room.core.mints.adopt([{ purpose: "job:job_old_1", scope: "read", sentAt: clock.now, notAfter: due, note: "an unknown mint kept across the upgrade" }]);
-        expect(plan(room, JOB_TOKENS_DUE_SQL).join("; ")).toMatch(/SCAN job_tokens/);
-        await state.storage.deleteAlarm();
-        return snapshot(room);
-      });
-      const r = await restarted(before);
-      await inDO(r, (room) => {
-        expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 2 }]);
-        expect(room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('job_tokens_due', 'check_jobs_due') ORDER BY name")).toEqual([{ name: "check_jobs_due" }, { name: "job_tokens_due" }]);
-        expect(snapshot(room)).toEqual(was);
-        const tokens = plan(room, JOB_TOKENS_DUE_SQL);
-        const jobs = plan(room, JOBS_DUE_SQL);
-        // One indexed search each: no scan, and no temporary B-tree for the order.
-        expect(tokens).toEqual(["SEARCH job_tokens USING COVERING INDEX job_tokens_due (next_ms<?)"]);
-        expect(jobs).toEqual(["SEARCH check_jobs USING INDEX check_jobs_due (next_ms<?)"]);
-      });
-      // Reopened again: nothing runs twice.
-      const again = await restarted(r);
-      await inDO(again, (room) => expect(snapshot(room)).toEqual(was));
-    }));
+  for (const from of [1, 2] as const)
+    it(`a room stored at version ${from} reopened at version 3: ${from === 1 ? "the error scrub (2) starts and" : "the scrub (already applied) does not rerun, and"} both due indexes are installed; every row, owner, deadline and the history kept; the due batches read by index with no sort; a version-3 room reopened changes nothing`, () =>
+      ahead(async () => {
+        const before = await makeRoom();
+        const due = clock.now + 3600_000;
+        const snapshot = (room: Room) => ({
+          tokens: room.core.sql.all("SELECT * FROM job_tokens ORDER BY token_id"),
+          jobs: room.core.sql.all("SELECT * FROM check_jobs ORDER BY id"),
+          ledger: room.core.mints.duties({ limit: 1000 }).records,
+          head: room.core.headSeq(),
+          meta: room.core.sql.all("SELECT k, v FROM meta WHERE k NOT IN ('loop_backoff', 'error_scrub') ORDER BY k"),
+        });
+        // As a room stored at `from`: no due indexes, a held job token, a job token row with a legacy error, an owed job,
+        // an unknown mint, and no scrub in progress.
+        const was = await inDO(before, async (room, state) => {
+          await room.core.idle();
+          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 3 }]);
+          room.core.sql.all("DROP INDEX job_tokens_due");
+          room.core.sql.all("DROP INDEX check_jobs_due");
+          room.core.sql.all("DELETE FROM meta WHERE k = 'error_scrub'");
+          room.core.sql.all("UPDATE schema_version SET v = ? WHERE id = 1", from);
+          room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tok_owned', ?, ?, 'held')", due, due);
+          room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tok_legacy', ?, ?, ?)", due, due, LEGACY);
+          room.core.sql.all(
+            "INSERT INTO check_jobs (id, owner, lane, generation, obligation, checker, config, integration, base, state, next_ms) VALUES ('job_old', 'op_x', 'lane_x', 1, 'obl_x', 'unit', ?, ?, ?, 'owed', ?)",
+            `sha256:${"1".repeat(64)}`,
+            "a".repeat(40),
+            "b".repeat(40),
+            due,
+          );
+          room.core.mints.adopt([{ purpose: "job:job_old_1", scope: "read", sentAt: clock.now, notAfter: due, note: "an unknown mint kept across the upgrade" }]);
+          expect(plan(room, JOB_TOKENS_DUE_SQL).join("; ")).toMatch(/SCAN job_tokens/);
+          await state.storage.deleteAlarm();
+          return snapshot(room);
+        });
+        const r = await restarted(before);
+        await inDO(r, (room) => {
+          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 3 }]);
+          expect(room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('job_tokens_due', 'check_jobs_due') ORDER BY name")).toEqual([{ name: "check_jobs_due" }, { name: "job_tokens_due" }]);
+          expect(snapshot(room)).toEqual(was);
+          // Step 2's effect: from version 1 the scrub's cursor is stored; from version 2 it is not started again.
+          expect(room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'")).toEqual(from === 1 ? [{ k: "error_scrub" }] : []);
+          const tokens = plan(room, JOB_TOKENS_DUE_SQL);
+          const jobs = plan(room, JOBS_DUE_SQL);
+          // One indexed search each: no scan, and no temporary B-tree for the order.
+          expect(tokens).toEqual(["SEARCH job_tokens USING COVERING INDEX job_tokens_due (next_ms<?)"]);
+          expect(jobs).toEqual(["SEARCH check_jobs USING INDEX check_jobs_due (next_ms<?)"]);
+        });
+        // The scrub, when started, runs to its end through its own step, and leaves only safe metadata.
+        await inDO(r, async (room) => {
+          for (let i = 0; i < 10 && room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'").length > 0; i++) await room.core.steps.errors();
+          const legacy = room.core.sql.all("SELECT last_error FROM job_tokens WHERE token_id = 'tok_legacy'")[0]!["last_error"];
+          if (from === 1) expect(legacy).not.toBe(LEGACY);
+          else expect(legacy).toBe(LEGACY);
+          expect(room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'")).toEqual([]);
+        });
+        // Reopened at version 3: nothing runs again, and nothing changes.
+        const at3 = await inDO(r, (room) => ({ ...snapshot(room), legacy: room.core.sql.all("SELECT last_error FROM job_tokens WHERE token_id = 'tok_legacy'") }));
+        const again = await restarted(r);
+        await inDO(again, (room) => {
+          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 3 }]);
+          expect({ ...snapshot(room), legacy: room.core.sql.all("SELECT last_error FROM job_tokens WHERE token_id = 'tok_legacy'") }).toEqual(at3);
+          expect(room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'")).toEqual([]);
+        });
+      }));
 });

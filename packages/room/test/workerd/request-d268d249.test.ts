@@ -418,7 +418,7 @@ describe("request d268d249: credentials known by their syntax are redacted whate
     for (const f of ["horse", "battery", "abcd"]) expect(JSON.stringify(d)).not.toContain(f);
   });
 
-  it("retained job errors keep safe metadata only, at all three sinks: a lost mint, an unreadable inventory, a failed revocation (mint lane C: the mint ledger's errorNote)", async () => {
+  it("retained job errors keep safe metadata only (request d29c09fa), at all three sinks: a lost mint, an unreadable inventory, a failed revocation (since mint lane C, the mint ledger's)", async () => {
     const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: `sha256:${"0".repeat(64)}` };
     const r = await makeRoom({ policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })), files: { ".artroom/checkers/unit.json": JSON.stringify(whole), "package.json": "{}" } });
     // The canonical repository's methods named in `failing` throw an error with every case's credential, in its

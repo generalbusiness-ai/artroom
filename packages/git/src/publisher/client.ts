@@ -72,8 +72,6 @@ export interface PublisherClientOptions {
 import type { LogPushOutcome, LogPushRequest, LogStageRequest } from "./log-push.ts";
 import type { StageResult } from "./gitops.ts";
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
 /** Token lifetimes, in seconds. A token that expires during an upload refuses it (notes/2026-10-01-laneB-token-inflight.md). */
 export const TOKEN_TTL = {
   /** Staging an integration and publishing: the pushes carry one commit and its new trees. */
@@ -119,16 +117,14 @@ export class ContainerPublisher implements PublisherPort {
   }
 
   async integrate(req: Parameters<PublisherPort["integrate"]>[0]): Promise<IntegrateResult> {
-    let minted = false;
     try {
       const r = await withCanonicalToken(
         this.o.mints,
         `integrate:${req.op}:${req.attempt}`,
         "write",
         TOKEN_TTL.short,
-        (token) => {
-          minted = true;
-          return this.o.stub.integrate({
+        (token) =>
+          this.o.stub.integrate({
             canonical: { remote: this.o.canonical.remote, token },
             expectedMain: req.expectedMain,
             head: req.head,
@@ -136,13 +132,11 @@ export class ContainerPublisher implements PublisherPort {
             storeRef: integrationRef(req.op, req.attempt),
             lane: req.lane,
             generation: req.generation,
-          });
-        },
+          }),
       );
       return r.kind === "clean" ? { kind: "clean", integration: r.integration as Sha, ref: r.ref } : { kind: "conflict", paths: r.paths };
     } catch (e) {
-      // A failed mint is recorded as safe metadata only, never the provider's text (R-MINT-5, lane A's `errorNote`).
-      return { kind: "error", detail: minted ? message(e) : `token not minted (${errorNote("create failed", e)})` };
+      return { kind: "error", detail: errorNote("integration failed", e) }; // safe metadata only (request d29c09fa)
     }
   }
 

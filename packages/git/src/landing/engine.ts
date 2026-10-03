@@ -33,7 +33,7 @@ import type {
   Sha,
 } from "@generalbusiness/artroom-contract";
 import type { Sql } from "../sql.ts";
-import type { PushOutcome } from "../publisher/push-outcome.ts";
+import { type PushOutcome, outcomeNote } from "../publisher/push-outcome.ts";
 import { type RepoHandle, withRetry } from "../artifacts.ts";
 import { MINT_WAIT_MS, type MintLedger, errorNote } from "../mints.ts";
 import { type IntegrateResult, LandingCore, toView } from "./core.ts";
@@ -177,8 +177,6 @@ export class EngineStopped extends Error {
   }
 }
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
 export class Landing {
   readonly core: LandingCore;
   private readonly room: LandingRoom;
@@ -249,7 +247,7 @@ export class Landing {
       r = await this.room.readiness(op, due.integration);
     } catch (e) {
       this.alive();
-      this.core.readinessFailed(id, due.attempt, due.rev, message(e));
+      this.core.readinessFailed(id, due.attempt, due.rev, errorNote("readiness could not be computed", e));
       return;
     }
     this.alive();
@@ -309,7 +307,7 @@ export class Landing {
           expectedMain: start.expectedMain,
         });
       } catch (e) {
-        result = { kind: "error", detail: message(e) };
+        result = { kind: "error", detail: errorNote("integration failed", e) };
       }
       this.alive();
       this.core.prepared(id, start.attempt, result);
@@ -393,9 +391,11 @@ export class Landing {
     this.fault("push-in-flight", plan.op);
     let outcome: PushOutcome;
     try {
-      outcome = await pending;
+      // The record keeps the outcome and safe metadata, never the publisher's text (request d29c09fa).
+      const answer = await pending;
+      outcome = { ...answer, detail: outcomeNote(answer) };
     } catch (e) {
-      outcome = { outcome: "unknown", detail: `push did not answer: ${message(e)}` };
+      outcome = { outcome: "unknown", detail: errorNote("push did not answer", e) };
     }
     this.fault("push-returned", plan.op);
     this.alive();
@@ -523,7 +523,7 @@ export class Landing {
       main = await this.publisher.readMain();
     } catch (e) {
       this.alive();
-      if (mode === "after-push") this.core.readBackFailed(id, `main could not be read: ${message(e)}`);
+      if (mode === "after-push") this.core.readBackFailed(id, errorNote("main could not be read", e));
       return;
     }
     this.fault("read-back", id);

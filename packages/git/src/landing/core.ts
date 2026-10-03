@@ -41,6 +41,7 @@ import type {
   Sha,
 } from "@generalbusiness/artroom-contract";
 import { type Sql, text } from "../sql.ts";
+import { safeErrorText } from "../safe-errors.ts";
 import { definitelyNotApplied, type PushOutcome } from "../publisher/push-outcome.ts";
 import type {
   AcceptInput,
@@ -56,6 +57,7 @@ import type {
 export type IntegrateResult =
   | { readonly kind: "clean"; readonly integration: Sha; readonly ref: string }
   | { readonly kind: "conflict"; readonly paths: readonly string[] }
+  /** `detail` is safe metadata only (`errorNote`), never a provider's text: the record keeps it (request d29c09fa). */
   | { readonly kind: "error"; readonly detail: string };
 
 /** A push the driver should make now. */
@@ -289,7 +291,8 @@ export class LandingCore {
         tokenRevoked: p.tokenRevoked,
       })),
       nextAttemptAt: op.nextAt !== undefined ? iso(op.nextAt) : null,
-      lastError: op.lastError ?? null,
+      // Only safe metadata is shown, whatever a record written before request d29c09fa holds.
+      lastError: safeErrorText(op.lastError ?? null, "landing step failed"),
     };
   }
 
