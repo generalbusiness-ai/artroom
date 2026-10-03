@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/room/test/workerd/pin-delay.test.ts","body":{"commit":"58a2f0a09b582b03399aed3862e4234e1c7e12b8","path":"packages/room/test/workerd/pin-delay.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:025f5275a4b71d058705b8ecde73d0eaa7c23f0f","text":"Merge retired a covered predecessor; the successor is at packages/room/scripts/deploy-spike.sh."}
