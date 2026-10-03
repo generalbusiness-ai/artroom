@@ -292,8 +292,13 @@ export async function admit(core: RoomCore, input: unknown, path: AdmissionPath,
  * act (R-IDEM-2).
  */
 async function acceptedBefore(core: RoomCore, input: unknown): Promise<ActRecord | Refusal | null> {
-  const signed = input as { envelope?: unknown; sig?: unknown } | null;
-  if (typeof signed !== "object" || signed === null || typeof signed.sig !== "string") return null;
+  // The closed outer shape, as step 1 has it: exactly `envelope` and `sig`. An extra field is bad-request for a retry
+  // as for a new act.
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return null;
+  const outer = Object.keys(input);
+  if (outer.length !== 2 || !Object.hasOwn(input, "envelope") || !Object.hasOwn(input, "sig")) return null; // G2:retry-outer
+  const signed = input as { envelope?: unknown; sig?: unknown };
+  if (typeof signed.sig !== "string") return null;
   const env = signed.envelope as { actor?: unknown; idempotencyKey?: unknown; room?: unknown } | null;
   if (typeof env !== "object" || env === null || typeof env.actor !== "string" || typeof env.idempotencyKey !== "string" || env.room !== core.roomId) return null;
   let digest: string;
