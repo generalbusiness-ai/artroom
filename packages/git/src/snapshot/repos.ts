@@ -46,6 +46,7 @@
 import { type Sql, text } from "../sql.ts";
 import { type ArtifactsNamespace, type RepoHandle, artifactsCode, completeInventory, refusedUnchanged, withRetry } from "../artifacts.ts";
 import { MIN_TOKEN_TTL_S, RECHECK_MS, TOKEN_MARGIN_S } from "../workspace/workspaces.ts";
+import { errorNote } from "../mints.ts";
 
 /** The longest a snapshot repository is kept for reuse after its last job. */
 export const MAX_RETAIN_MS = 24 * 3600_000;
@@ -54,8 +55,6 @@ export const MAX_RETAIN_MS = 24 * 3600_000;
 export const PREPARE_WINDOW_MS = 15 * 60_000;
 
 const SHA = /^[0-9a-f]{40}$/;
-const TOKEN = /art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g;
-const redact = (s: string) => s.replace(TOKEN, "<token>");
 
 export interface SnapshotReposOptions {
   readonly sql: Sql;
@@ -202,7 +201,7 @@ export class SnapshotRepos {
     for (const id of ids) {
       const attempts = Number(this.sql.all("SELECT attempts FROM artroom_snap_duty WHERE id = ?", id)[0]?.["attempts"] ?? 0) + 1;
       const wait = Math.min(1000 * 2 ** Math.min(attempts, 9), 300_000);
-      this.sql.all("UPDATE artroom_snap_duty SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?", attempts, this.now() + wait, redact(String(error)).slice(0, 300), id);
+      this.sql.all("UPDATE artroom_snap_duty SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?", attempts, this.now() + wait, errorNote("snapshot cleanup failed", error), id);
     }
   }
 
@@ -210,7 +209,7 @@ export class SnapshotRepos {
   private recheck(id: number, error: unknown): void {
     const attempts = Number(this.sql.all("SELECT attempts FROM artroom_snap_duty WHERE id = ?", id)[0]?.["attempts"] ?? 0) + 1;
     const wait = Math.min(RECHECK_MS.first * 2 ** Math.min(attempts - 1, 4), RECHECK_MS.max);
-    this.sql.all("UPDATE artroom_snap_duty SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?", attempts, this.now() + wait, redact(String(error)).slice(0, 300), id);
+    this.sql.all("UPDATE artroom_snap_duty SET attempts = ?, next_at = ?, last_error = ? WHERE id = ?", attempts, this.now() + wait, errorNote("snapshot create not yet seen", error), id);
   }
 
   /** Persist the next wake-up before a remote effect. */
@@ -276,7 +275,7 @@ export class SnapshotRepos {
           if (refusedUnchanged(e)) {
             this.done([step], "refused");
             this.sql.all("DELETE FROM artroom_snap WHERE name = ?", name);
-          } else this.sql.all("UPDATE artroom_snap_duty SET last_error = ? WHERE id = ?", redact(String(e)).slice(0, 300), step);
+          } else this.sql.all("UPDATE artroom_snap_duty SET last_error = ? WHERE id = ?", errorNote("snapshot create failed", e), step);
         });
         throw e;
       }

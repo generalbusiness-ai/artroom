@@ -120,9 +120,9 @@ const RETRY = { attempts: 5, firstMs: 500 } as const;
 const PAGE_MAX = 1_000;
 
 /** Error names that may be stored. Any other name is not: it is the thrower's text. */
-const SAFE_NAMES: ReadonlySet<string> = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "AggregateError", "AbortError", "TimeoutError"]);
+export const SAFE_NAMES: ReadonlySet<string> = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "AggregateError", "AbortError", "TimeoutError"]);
 /** Artifacts codes that may be stored: those `artifacts.ts` classifies (`REFUSED_UNCHANGED`, `retriable`). */
-const SAFE_CODES: ReadonlySet<string> = new Set([
+export const SAFE_CODES: ReadonlySet<string> = new Set([
   "ALREADY_EXISTS",
   "INVALID_INPUT",
   "INVALID_REPO_NAME",
@@ -133,22 +133,41 @@ const SAFE_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /** The fixed phrase for where an error happened. */
-export type ErrorStage =
-  | "create failed"
-  | "revocation failed"
-  | "revocation answered, but the completion did not commit"
-  | "repository lookup failed"
-  | "no inventory: repository lookup failed"
-  | "no inventory: the listing failed";
+export const ERROR_STAGES = [
+  "create failed",
+  "revocation failed",
+  "revocation answered, but the completion did not commit",
+  "repository lookup failed",
+  "no inventory: repository lookup failed",
+  "no inventory: the listing failed",
+  // The landing engine and its publishers (request d29c09fa).
+  "integration failed",
+  "readiness could not be computed",
+  "push did not answer",
+  "main could not be read",
+  "landing step failed",
+  // Lane workspaces and snapshot repositories (request d29c09fa).
+  "could not provision the workspace",
+  "workspace step failed",
+  "workspace cleanup failed",
+  "snapshot create failed",
+  "snapshot create not yet seen",
+  "snapshot cleanup failed",
+  "snapshot step failed",
+  // The Room's job tokens (request d29c09fa).
+  "the token inventory could not be read",
+] as const;
+export type ErrorStage = (typeof ERROR_STAGES)[number];
 
 /**
  * All a record or the observation keeps about an error (review 0ab6dac3):
  * the stage's fixed phrase, the error's name if it is in `SAFE_NAMES`, an
  * Artifacts code if it is in `SAFE_CODES`, and an integer numeric code or
  * HTTP status. Never the error's message or any other provider text: no
- * token format in the contract lets a pattern find every credential. The
- * Room's shared safe-metadata boundary can replace this once the Git
- * package can depend on it.
+ * token format in the contract lets a pattern find every credential.
+ * Every durable or projected error field in the Git and Room packages keeps
+ * this and nothing more (request d29c09fa); only operator logs keep
+ * redacted text (the Room's `diag.ts`).
  */
 export function errorNote(stage: ErrorStage, e: unknown): string {
   const x = e as { name?: unknown; code?: unknown; numericCode?: unknown; status?: unknown } | null | undefined;
@@ -159,6 +178,12 @@ export function errorNote(stage: ErrorStage, e: unknown): string {
   const status = x?.status;
   if (typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599) parts.push(`status ${status}`);
   return `${stage}: ${parts.join(" ")}`; // bounded: every part comes from a fixed list or a bounded integer
+}
+
+/** The error's Artifacts code if it is one `SAFE_CODES` lists, else null. Never any other text. */
+export function knownArtifactsCode(e: unknown): string | null {
+  const code = (e as { code?: unknown } | null | undefined)?.code;
+  return typeof code === "string" && SAFE_CODES.has(code) ? code : null;
 }
 
 /** What a create's answer, or its failure, says. */

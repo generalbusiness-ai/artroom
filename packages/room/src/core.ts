@@ -57,13 +57,13 @@ import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, SnapshotPort, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, publicationTokens } from "@generalbusiness/artroom-git";
+import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, knownArtifactsCode, publicationTokens, scrubBatch, type ScrubCursor } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
 import { issueJobs, oweJobs } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
-import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
+import { PUBLICATION_CODES, ROOM_SCRUB_TABLES, createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
 import { report, toConsole } from "./diag.ts";
 import { matchGlob } from "./glob.ts";
@@ -161,6 +161,12 @@ const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints"]);
 let faultHook: ((point: string) => void) | null = null;
 
 /** Tests only: throw at a named point inside a write, as a crash would. */
+/** A failed publication's code: a known one, a known Artifacts code, or `transport`. Never other text (request d29c09fa). */
+function publicationCode(e: unknown): string {
+  const code = (e as { code?: unknown } | null | undefined)?.code;
+  return typeof code === "string" && PUBLICATION_CODES.has(code) ? code : (knownArtifactsCode(e) ?? "transport");
+}
+
 export function setFault(f: ((point: string) => void) | null): void {
   faultHook = f;
 }
@@ -568,6 +574,30 @@ export class RoomCore {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Before founding, the alarm's work: the error upgrade's next batch, if
+   * one is due, and the founding debt. One failing does not stop the other.
+   */
+  async workUnfounded(): Promise<void> {
+    try {
+      this.scrubErrors();
+    } catch (e) {
+      this.diagnose("step-failed", "errors", e);
+    }
+    await this.settleFounding();
+  }
+
+  /** Before founding, when the alarm is next due: the founding debt, or the error upgrade (due at once while it lasts). */
+  unfoundedDue(): number | null {
+    const times = [this.foundingDue(), this.scrubDue()].filter((t): t is number => t !== null);
+    return times.length ? Math.min(...times) : null;
+  }
+
+  /** When the error upgrade's next batch is due: now while its cursor is stored, else null (request d29c09fa). */
+  scrubDue(): number | null {
+    return getMeta(this.sql, "error_scrub") !== null ? this.now() : null;
   }
 
   /** Parse `.artroom/` files strictly and validate them (R-POL-1). `doc` is null when there is no policy file. */
@@ -1737,7 +1767,7 @@ export class RoomCore {
       } catch (e) {
         // Reopen from the ref next time: the read-back decides what happened.
         this.publisherCache = null;
-        const code = (e as { code?: string }).code ?? "transport";
+        const code = publicationCode(e);
         if (e !== unbound) this.diagnose("publication-failed", "publish", e);
         // A NOT_FOUND counts as gone only if the canonical repository itself is not found.
         const gone = code === "NOT_FOUND" && (await this.canonicalMissing());
@@ -1811,6 +1841,8 @@ export class RoomCore {
     mints: async (due: LoopDue = this.loopAllowed) => {
       if (due("mints")) await this.reconcileMints();
     },
+    // The one-time upgrade of error fields stored before request d29c09fa: one bounded batch per run.
+    errors: async () => this.scrubErrors(),
   } as const;
 
   /** Start one durable step now, in the background. A commit's own work is not held back by an earlier failure's backoff. */
@@ -1878,6 +1910,22 @@ export class RoomCore {
    */
   async reconcileMints(): Promise<void> {
     if (this.founded) await this.mints.reconcile();
+  }
+
+  /**
+   * One batch of the upgrade migration 2 started (request d29c09fa): at most
+   * `SCRUB_BATCH` rows of one table, in one transaction with its cursor. The
+   * last batch deletes the cursor; with none stored this reads one meta row
+   * and writes nothing.
+   */
+  scrubErrors(): void {
+    const stored = getMeta(this.sql, "error_scrub");
+    if (stored === null) return;
+    this.sql.transaction(() => {
+      const next = scrubBatch(this.sql, ROOM_SCRUB_TABLES, JSON.parse(stored) as ScrubCursor);
+      if (next) setMeta(this.sql, "error_scrub", JSON.stringify(next));
+      else this.sql.all("DELETE FROM meta WHERE k = 'error_scrub'");
+    });
   }
 
   /**
@@ -2000,6 +2048,9 @@ export class RoomCore {
     // The 5-second loop, while its work makes progress; each kind on its own backoff after a failure (budgets.ts `ALARM`).
     for (const kind of this.loopPendingKinds(pinDue)) if (this.loopAllowed(kind)) times.push(backoff[kind]?.next ?? now + ALARM.pendingIntervalMs);
     if (pinDue !== null && pinDue > now && this.loopAllowed("pins")) times.push(Math.max(pinDue, backoff.pins?.next ?? pinDue));
+    // The error upgrade (request d29c09fa), until its last batch.
+    const scrub = this.scrubDue();
+    if (scrub !== null) times.push(scrub);
     // Log publication: when due, never sooner than the loop's interval from now.
     const publication = this.publicationDueAt();
     if (publication !== null) times.push(Math.max(publication, now + ALARM.pendingIntervalMs));

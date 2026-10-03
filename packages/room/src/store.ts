@@ -10,6 +10,7 @@
 
 import type { Digest, Seq } from "@generalbusiness/artroom-contract";
 import type { Sql, SqlRow, SqlValue } from "./ports.ts";
+import { SCRUB_TABLES, isSafeErrorText, knownArtifactsCode, safeErrorText, type ScrubCursor, type ScrubTable } from "@generalbusiness/artroom-git";
 
 /**
  * Version 1: the base schema. The spike deployment's earlier versions (2 to
@@ -141,7 +142,62 @@ export function migrate(sql: Sql, steps: readonly Migration[]): number {
 }
 
 /** The Room's migrations. A new table, column or index is added only here, as a version after the base. */
-export const ROOM_MIGRATIONS: readonly Migration[] = [{ version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) }];
+export const ROOM_MIGRATIONS: readonly Migration[] = [
+  { version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) },
+  { version: 2, name: "safe error metadata at rest (request d29c09fa)", up: scrubErrors },
+];
+
+/** Codes a failed publication may store as `publication_error` and name to the caller: lane L's and the Room's own. */
+export const PUBLICATION_CODES: ReadonlySet<string> = new Set([
+  "would-rewrite",
+  "invalid-input",
+  "unexpected-writer",
+  "unresolved",
+  "cohort-too-large",
+  "object-too-large",
+  "refused",
+  "unknown-version",
+  "cohort-mismatch",
+]);
+
+/** A job token's `last_error` as it may be kept or shown: safe metadata, or a fixed phrase withholding the rest. */
+export function safeJobStatus(text: string | null): string | null {
+  if (text === null || isSafeErrorText(text)) return text;
+  if (text.startsWith("answer lost: ")) return `answer lost: ${safeErrorText(text.slice("answer lost: ".length), "create failed")}`;
+  if (text.startsWith("outcome unknown; ")) return `outcome unknown; ${safeErrorText(text.slice("outcome unknown; ".length), "the token inventory could not be read")}`;
+  return safeErrorText(text, "revocation failed");
+}
+
+/** The Room's tables the upgrade makes safe: the Git package's, then the job tokens (their state words, `held` and the rest, are safe and stay). */
+export const ROOM_SCRUB_TABLES: readonly ScrubTable[] = [
+  ...SCRUB_TABLES,
+  {
+    table: "job_tokens",
+    key: "token_id",
+    columns: ["last_error"],
+    fix: (r) => {
+      const was = str(r, "last_error");
+      const now = safeJobStatus(was);
+      return now !== was ? { last_error: now } : null;
+    },
+  },
+];
+
+/**
+ * Version 2 (request d29c09fa): error fields stored before the safe-metadata
+ * rule are upgraded. This step only starts it, in O(1): it stores the
+ * upgrade's cursor (`error_scrub`) when a table that could hold such a field
+ * has rows, and makes an unknown publication code `transport`. The alarm then
+ * runs one bounded batch at a time (`RoomCore.scrubErrors`, `SCRUB_BATCH`
+ * rows) and deletes the cursor when every table is done; nothing runs after
+ * that. Signed history (entries, records, acts) is never rewritten.
+ */
+function scrubErrors(sql: Sql): void {
+  const held = (t: string) => one(sql, "SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = ?", t) !== undefined && one(sql, `SELECT 1 AS x FROM ${t} LIMIT 1`) !== undefined;
+  if (ROOM_SCRUB_TABLES.some((t) => held(t.table))) setMeta(sql, "error_scrub", JSON.stringify({ table: 0, after: null } satisfies ScrubCursor));
+  const code = getMeta(sql, "publication_error");
+  if (code !== null && code !== "transport" && !PUBLICATION_CODES.has(code) && knownArtifactsCode({ code }) === null) setMeta(sql, "publication_error", "transport");
+}
 
 export function createSchema(sql: Sql): void {
   migrate(sql, ROOM_MIGRATIONS);
