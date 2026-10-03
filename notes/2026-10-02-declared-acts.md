@@ -1,6 +1,6 @@
 # Declared acts
 
-2026-10-02. Revision 2. Gitseq request `a2cbd459` (planner to builder),
+2026-10-02. Revision 3. Gitseq request `a2cbd459` (planner to builder),
 following hugh's assert `4e4134b4` as corrected by assert `b2cdc44a`.
 Branch `request/declared-acts`, cut from main `df22d771`.
 
@@ -35,6 +35,18 @@ after this note is approved.
 | Supersession inventory | Section 8.2 (new): every plan section, protocol rule and contract type that assumes the seven acts, with a disposition |
 | The role floor in the jam examples | Section 2.2 (`admin` is implicit), sections 6 and 7 |
 | A check cannot compare the act's `key` with `song.json` | Section 7.1: the field is removed, and why |
+
+**Revision 3** answers checker review `07915199`. It decides four shared
+rules once, in a new section 2.3, and both worked examples use them:
+
+| Finding | Where it is answered |
+|---|---|
+| P1: bind the grantor's signed grant | Section 2.3.2: delegations and room-custody invitations carry a signed map from kind to binding, checked at the grant's admission and at each use; no wildcard for declared kinds; `v1`-era grants never upgraded; cases for delayed explicit and expanded-wildcard grants, exact retries and legacy grants |
+| P2: an ordered, retained identity for step semantics | Sections 2.3.4 and 3.9: the document pins `steps`; only activation changes it; every version is kept; cases for a log across two versions, old retries, and a deploy with no activation |
+| P2: derive the required evaluation calls | Section 4.4 (new): the calls each entry must have made, contexts rebuilt from the fold and compared, `decision-missing`, `decision-extra`, `context-mismatch`; section 4.3: a published `prepared` event, because a check's own report cannot show that the room prepared its integration; section 4.7: the forged-log fixtures |
+| P2: scope changes on code-review take-over | Section 2.3.1: scope source versus current scope; section 2.1's `take`; section 6.1's cases; section 6's suite criterion now names the recovery rewrite |
+| P2: the jam's check path and how jobs choose an act | Section 2.3.3: each checker configuration names its act; section 7.1: `in-key-check`, its rule and its configuration; section 7.4: the end-to-end and mapping-failure cases |
+| P2: retirement and thread references | Section 2.3.1: historical opening kinds stay valid in `threads`; name reuse by name, on purpose; section 5.4 |
 
 **Citations.** Code is cited at main `df22d771` as `path@df22d771:line`.
 To keep lines short, paths under `packages/` drop that prefix and the
@@ -120,10 +132,10 @@ How each part of the request maps onto this shape:
 | How refusals are worded in the act's own terms | `refusals`: a reason and a fix per refusal code |
 
 **A thread belongs to the kind that opened it.** The room records that
-kind on the thread, with the hold settings of its declaration: scope,
-conflict mode, lease length and reservation length. These never change
-for that thread. An act on a thread, or on one of its versions, is refused
-with `wrong-thread` unless the thread's kind is in the act's `threads`.
+kind on the thread, with its opening act's hold settings, which never
+change. An act on a thread of a kind its `threads` does not name is
+refused with `wrong-thread`. The full rule, including how a thread's
+current scope differs from its fixed scope source, is in section 2.3.1.
 This is enforcement, not wording: in the jam it stops a `take-solo` on a
 released part thread, and a `change-key` on a part (section 7).
 
@@ -167,7 +179,7 @@ use these mechanisms:
 | Step | What the room enforces and does today | Fields it requires | Where |
 |---|---|---|---|
 | `open` | A new thread (today: lane), held by the signer at lease generation 1, over a scope; conservative overlap, refused when it may overlap a held or reserved thread and either side is `exclusive` | `scope` when the declaration says `body.scope` | `room/admission.ts@df22d771:608-660` |
-| `take` | On a held thread, the holder rescopes it at the same lease generation, but only if the thread's scope comes from the body (a fixed scope is refused with `scope-fixed`); on an unheld one, any qualified signer takes it over at the next lease generation, unless it is reserved for someone else (`reserved`); `expectedGeneration` must match | `scope` (rescope only), `expectedGeneration`, `lease` (rescope only) | `room/admission.ts@df22d771:662-726` |
+| `take` | On a held thread, the holder rescopes it at the same lease generation; on an unheld one, any qualified signer takes it over at the next lease generation, unless it is reserved for someone else (`reserved`); `expectedGeneration` must match. On a body-scoped thread both carry a new current scope, with overlap checked; on a thread with a fixed scope only a takeover is allowed, with no `scope`, and a rescope is refused `scope-fixed` (section 2.3.1) | `scope` (body-scoped threads only), `expectedGeneration`, `lease` (rescope only) | `room/admission.ts@df22d771:662-726` |
 | `version` | Holder only, current lease; head reachable in the fork; diff bounded; changed paths inside the scope; `.artroom/**` validated and given an admin obligation; `require` and `carry` rules; new generation, pin, preview, attention to reviewers and checkers; an unreserved landing is invalidated | `lease`, `expectedGeneration`, `head` | `room/admission.ts@df22d771:399-428, 730-893` |
 | `review` | Head equals the version's head; the signer qualifies for a review obligation and is not the author (with the two flagged exceptions); verdict recorded as evidence | `head`, `verdict`, `scope`, `dependsOn?` | `room/admission.ts@df22d771:992-1088`, `room/obligations.ts@df22d771:92-125` |
 | `check` | Bound to an open check obligation, the named checker, an integration the room prepared, the active configuration digest, its volatile flag and runner, and the exact tree or snapshot; never by the author | the nine `CheckBody` fields | `room/admission.ts@df22d771:1092-1228` |
@@ -263,6 +275,154 @@ admins can already change any member's role with a roster act.
 **Bounds proposed for holds:** a lease of 10 seconds to 24 hours, and a
 reservation of 1 second to 10 minutes. These are proposals, to be fixed in
 the protocol amendment.
+
+### 2.3 Rules every application shares
+
+Four rules are decided once here. The code-review declarations (section
+6) and the jam's (section 7) both use them.
+
+#### 2.3.1 Threads: kind, settings and scope
+
+- **Kind.** A thread's kind is the kind of the act that opened it, or
+  `room` for a thread the room opened (R-REV-6). The room records it with
+  the binding of that opening act (section 3.6), so readers can tell two
+  meanings of one name apart.
+- **Settings.** From the opening declaration's `hold`: the scope source,
+  conflict mode, lease length, reservation length and workspace. They are
+  fixed for the thread's life. A later document never changes them.
+- **Scope source and current scope.** These are different things. The
+  scope source is fixed: either `body.scope` or a template. The current
+  scope is what overlap checks and changed paths are judged against.
+  - With a template, the current scope is the template filled in at
+    `open`, and never changes. A `take` on such a thread has no `scope`
+    field (`invalid-body` if it has one) and may only take an unheld
+    thread over; a `take` that carries `lease`, which would be a rescope,
+    is refused with `scope-fixed`. The jam's parts and solo work this way.
+  - With `body.scope`, the current scope is set at `open` and replaced by
+    every `take`. A rescope by the holder (with `lease`, same lease
+    generation) and a takeover of an unheld thread (without `lease`, next
+    lease generation) both carry `scope`; both check `expectedGeneration`
+    and the overlap of the new scope. This is today's reclaim
+    (`room/admission.ts@df22d771:662-710`), and today's takeover tests
+    already send a scope (`packages/room/test/workerd/lanes.test.ts@df22d771:49-65`).
+    Code-review's `claim` works this way.
+- **Which acts may act on a thread.** An act on a thread, or on one of its
+  versions or lines, is refused with `wrong-thread` unless the thread's
+  kind is in the act's `threads`. Names match by name.
+- **Names a document may use in `threads`:** `room`; a kind declared in
+  the same document with step `open`; or a **historical opening kind**,
+  one that opened at least one thread in this room before the document is
+  validated. The room knows these from its thread table; verify
+  re-derives them from the log. Any other name is refused with
+  `policy-invalid`, which catches a misspelt kind. A retired kind cannot
+  open new threads (`kind-undeclared`), but the threads it opened stay
+  reachable by any declared act that names it.
+- **Reusing a name is allowed, deliberately.** If a later document
+  declares a retired name again with a different `hold`, its new threads
+  get the new settings and the old threads keep theirs. An act that lists
+  the name acts on both. An application that must tell them apart uses a
+  new name.
+
+Acceptance cases, in stage 2: a released `claim` taken over with a
+different scope is admitted, its current scope changes and the lease
+generation rises by one; a takeover whose new scope overlaps an
+exclusive held thread is refused `scope-overlap`; an opening kind retired
+while one of its threads is held with an open version can still be
+released and reviewed by declared acts that name it, and a new act of the
+retired kind is refused `kind-undeclared`; a document whose `threads`
+names a kind that never opened a thread here is refused `policy-invalid`.
+
+#### 2.3.2 Grants carry the bindings their grantor signed
+
+A grant lets another key act for a member. It must cover the meanings the
+grantor signed, not the meanings in force when the room happens to admit
+it.
+- **A `delegate` op** in a room with a `v2` document names its declared
+  kinds as a signed map from kind to binding. Today's body has a list of
+  kinds or `*` (`contract/roster.ts@df22d771:103-109`). The grantor's
+  client expands any wildcard before signing, so the signed map is the
+  catalogue boundary; `*` is not accepted for declared kinds. `renew`, a
+  platform kind, is still named plainly.
+- **At the grant's admission**, each pair must equal the active
+  declaration's binding. If any differs, the op is refused with
+  `binding-stale` and not recorded, and the grantor signs again. A kind
+  declared after the grant was signed is not covered.
+- **At each use**, an act under the delegation must carry the binding the
+  grant names for its kind. Otherwise it is refused with
+  `delegation-invalid`: "The delegation was granted for an earlier meaning
+  of {kind}."
+- **Invitations.** A room-custody invitation's `session.kinds` uses the
+  same signed map, checked when the `invite` is admitted as a grant is.
+  The room creates the session's delegation from it at
+  redemption (R-CRED-3, `room/requests.ts@df22d771:239-299`), and only if
+  every binding still equals the active one. Otherwise the redemption is
+  refused, unrecorded, with `binding-stale`; the invitation stays unused,
+  and an admin invites again. Today an invitation with no `session`
+  becomes a `*` delegation (`room/requests.ts@df22d771:258`); in a `v2`
+  room it covers `renew` only.
+- **Read sessions** (R-CRED-7) grant no acts, so they carry no bindings.
+- **Exact retries.** An exact retry of an admitted `delegate` returns its
+  original receipt (R-IDEM), even after a meaning changed. It does not
+  re-pin anything; acts under it are judged at their own admission.
+- **Grants from before declared acts.** A delegation or invitation
+  admitted under a `v1` document carries no bindings. After the room
+  activates a `v2` document, it covers no declared kind, only `renew`. It
+  is never upgraded silently. Acts under it are refused
+  `delegation-invalid`, with the fix "ask the grantor to delegate again".
+
+Acceptance cases, in stage 2: an explicit-kind grant signed before an
+activation that changes one of its kinds, and submitted after it, is
+refused `binding-stale`; a grant whose signed map was expanded before an
+activation that adds a kind is admitted, and does not cover the new kind;
+an exact retry of an admitted grant after a meaning change returns the
+original receipt, and acts under it are then refused
+`delegation-invalid`; an invitation signed before a meaning change and
+redeemed after it is refused; a `v1`-era delegation covers no declared
+kind after the first `v2` activation.
+
+#### 2.3.3 Check jobs choose their act from the checker's configuration
+
+- **Each checker configuration names its act.** A checker configuration
+  (`.artroom/checkers/<name>.json`, `contract/policy.ts@df22d771:133-154`)
+  gains, in a new format `artroom-checker-v2`, a field `act`: the declared
+  kind its checks are signed as. Checker configurations already activate
+  with the policy document (R-POL-9), so the act and the configuration are
+  always from the same version.
+- **Validation** (R-POL-1). In a `v2` room, every checker configuration
+  has `act`; it names a kind declared in the same activation whose only
+  step on its `version` target is `check`, whose `who.roles` includes
+  `checker`, and which declares no required body field, because the
+  checker service fills only the `check` step's fields. Otherwise the
+  proposal is refused with `policy-invalid`, naming the checker. Several
+  checkers may name one act. Because each configuration names exactly
+  one act, a job can never have none or several to choose from.
+- **The job.** A `CheckJob` carries that kind and its binding, from the
+  policy version that made the obligation, as it already carries that
+  version's configuration digest (`contract/checker.ts@df22d771:35-75`).
+  An activation that changes the binding ends every owed or sent job as no
+  longer needed, as a configuration change does today
+  (`room/jobs.ts@df22d771:1-33`), and the room issues new ones. A late
+  check signed under the old binding is refused `binding-stale`.
+- **Thread applicability.** Before issuing a job, the room checks that the
+  obligation's thread kind is in the act's `threads`. If not, it issues no
+  job, admins see `check-unroutable` in their attention, and a landing
+  that needs the check fails in preparation with code `check-unroutable`
+  and the fix "declare the check act for this kind of thread" (R-LAND-4
+  step 2).
+- **The legacy vocabulary** signs `check`, as today
+  (`checkers/checker.ts@df22d771:224-233`).
+
+Acceptance cases, in stage 4: a checker configuration with no `act`, or
+naming an undeclared kind, a kind whose step is not `check`, or a kind
+with a required body field, is refused `policy-invalid`; an obligation on
+a thread whose kind the act does not name issues no job and fails the
+landing `check-unroutable`.
+
+#### 2.3.4 Step semantics are pinned by the document
+
+A `v2` document names its step semantics version, in a required field
+`steps` (for example `"steps": "artroom-steps-v1"`). Section 3.9 says how
+it changes. The binding of section 3.6 includes it.
 
 ## 3. Where declarations live and how they take effect
 
@@ -368,8 +528,11 @@ also checks:
 - every target shape lists only allowed steps, and only `version` then
   `land` is combined;
 - an act with a `thread`, `version` or `line` target names `threads`, and
-  each name is `room` or a declared kind whose steps include `open`; an
-  act with step `open` has `hold`, and no other act has it;
+  each name is one section 2.3.1 allows; an act with step `open` has
+  `hold`, and no other act has it;
+- the document names a step semantics version this platform carries
+  (sections 2.3.4 and 3.9);
+- every checker configuration names an act that section 2.3.3 allows;
 - body field names do not reuse a step's field names or `because`;
 - every limit is inside the platform's bounds (invariant 14, section 2.2);
 - `who.roles` respects the platform floor and does not list `admin`
@@ -424,13 +587,13 @@ scopes and hold settings give more such cases. dap fences this with
   prepared under. Every act of a declared kind carries it.
 - **The identity is per kind.** It is the SHA-256 of the canonical JSON
   of `{ steps, kind, targets, threads, body, hold }` for that kind, where
-  `steps` is the platform's step semantics version (`artroom-steps-v1`)
-  and every default is resolved first (for example `conflict` from the
-  policy's `lanes`). It leaves out `label`, `help` and `refusals`, which
-  change only how the act is described, and `who`, which decides whether
-  this signer may act at all and is judged at admission against the
-  current roster (R-ADM-3). A platform release that changes what any step
-  does must change `artroom-steps-v1`, which makes every binding stale.
+  `steps` is the step semantics version the document names (section
+  2.3.4), and every default is resolved first (for example `conflict`
+  from the policy's `lanes`). It leaves out `label`, `help` and
+  `refusals`, which change only how the act is described, and `who`, which
+  decides whether this signer may act at all and is judged at admission
+  against the current roster (R-ADM-3). Activating a document that names
+  a new steps version changes every binding (section 3.9).
 - **Why per kind, not the whole document.** A whole-document binding goes
   stale on every policy change: a new kind, a changed `refuse` rule, a
   relabelled act. Every in-flight act and delegation in the room would be
@@ -440,7 +603,7 @@ scopes and hold settings give more such cases. dap fences this with
   everything that decides the act's meaning, which is why defaults are
   resolved and the steps version is included. The thread an act targets
   is not part of its identity: its settings were fixed when it was opened
-  (section 1), and the signer chose it by name.
+  (section 2.3.1), and the signer chose it by name.
 - **Admission.** A new step, between authority (step 4) and the body
   check (step 5): if `binding` differs from the identity of the active
   declaration of that kind, the act is refused with `binding-stale` and
@@ -453,26 +616,19 @@ scopes and hold settings give more such cases. dap fences this with
   binding, with the same idempotency key. The client library re-signs only
   when its caller asks, after showing what changed. It never re-signs on
   its own.
-- **Delegations pin bindings.** A `delegate` op records, for each kind it
-  covers, the binding in force when it is admitted; `*` is expanded to the
-  grantor's kinds at that point, as verify already does
-  (`log/roster.ts@df22d771:78-79`). An act under the delegation whose
-  kind's binding has changed is refused with `delegation-invalid`: "The
-  delegation was granted for an earlier meaning of {kind}." The grantor
-  delegates again to accept the new meaning. dap's rule is the same: "A
-  newer package never silently enlarges authority" (section 9).
+- **Grants carry the bindings their grantor signed** (section 2.3.2):
+  delegations and room-custody invitations name a signed map from kind to
+  binding, checked when the grant is admitted and again at each use.
+  dap's rule is the same: "A newer package never silently enlarges
+  authority" (section 9).
 - **Bearer sessions.** A bearer act (`room/requests.ts@df22d771:353-360`)
   is signed by the room with a session key, so the binding must come from
   the agent: the MCP `act` tool requires it, and the agent reads it from
   the `acts` tool. Each named code-review MCP tool carries the binding of
   the declaration it was built for, so a room whose declaration differs
   refuses it with `binding-stale`.
-- **Checker jobs.** A `CheckJob` gains the kind to sign and its binding
-  (section 8.1). An activation that changes that binding makes every owed
-  or sent job no longer needed, as a configuration change does today
-  (`room/jobs.ts@df22d771:1-33`), and the room issues new jobs under the
-  new binding. A late check signed under the old binding is refused with
-  `binding-stale`.
+- **Checker jobs** carry the act their checker's configuration names,
+  with its binding, and are reissued when it changes (section 2.3.3).
 
 **Acceptance cases** (stage 2 in section 8.5):
 1. A same-shape change: an act signed under `[version]` and submitted
@@ -483,11 +639,11 @@ scopes and hold settings give more such cases. dap fences this with
    or refusal wording) leaves the binding equal, and the act is admitted.
 4. An exact retry of an act accepted before the activation returns the
    original receipt after it.
-5. An act under a delegation granted before a meaning change is refused
-   `delegation-invalid`; one under a delegation granted after it is
-   admitted.
-6. A check job prepared before a change to the check kind is ended as not
-   needed, and a late check under the old binding is refused.
+5. The grant cases of section 2.3.2, including delayed explicit-kind and
+   expanded-wildcard grants across an activation.
+6. A check job prepared before a change to its act is ended as not
+   needed, and a late check under the old binding is refused (section
+   2.3.3).
 
 ### 3.7 Upgrading a declaration safely
 
@@ -541,6 +697,38 @@ asked, and a long-lived room will need an answer.
 
 This amends R-GEN-1, R-GEN-10 and R-EVAL-4. It is not needed for the
 first stages in section 8.
+
+### 3.9 Upgrading step semantics
+
+The step semantics are platform code, so a new engine could change what a
+room's existing document means without anyone activating anything. The
+rule prevents that, in the same way as for the evaluator (section 3.8):
+- **Pinned by the document.** A `v2` document names its steps version
+  (section 2.3.4). Admission uses the implementation that `D(s)` names,
+  and the binding of every kind includes it.
+- **Changed only by activation.** A platform release may add a steps
+  version. It never changes an existing one, and it never moves a room to
+  the new one. A room moves by landing a document that names it: an
+  admin-approved change (invariant 7) that takes effect at the exact seq
+  of its `policy-activated` event (R-POL-9). From that seq every binding is
+  new, so every act signed before is refused `binding-stale` and every
+  grant must be made again. That is intended, and visible in the log.
+- **Retained for ever.** The platform keeps every steps version it has
+  shipped, in the room and in verify, as it keeps the legacy vocabulary
+  (section 3.2). Verify picks the implementation for each entry from
+  `D(s)`. A verifier that lacks the version a document names stops at the
+  first such entry with `steps-unsupported`: a limit of that verifier, not
+  a finding against the log.
+- **A behaviour fix is a new version.** For example, implementing R-LANE-2
+  (section 8.2) changes what `take` does, so it ships as a new steps
+  version that rooms adopt by activation.
+
+Acceptance cases, in stage 6: a log spanning two steps versions verifies,
+each interval under its own; an exact retry of an act accepted under the
+old version returns its original receipt after the room has moved; a
+deployment that ships a new steps version, with no activation, leaves
+every binding and every receipt byte-identical; a verifier without the new
+version reports `steps-unsupported` at the first entry that needs it.
 
 ## 4. Deterministic evaluation and replay
 
@@ -598,26 +786,80 @@ entries: the envelopes, the receipts and the system events.
 | Guard | Steps | What verify reads | Today | Proposed |
 |---|---|---|---|---|
 | Signature, room, canonical bytes, idempotency | all | the entry | checked | unchanged |
-| Authority by case, role, delegation | all | the roster fold | checked | `who` from `D(s)`; delegation binding pins (3.6) |
+| Authority by case, role, delegation | all | the roster fold | checked | `who` from `D(s)`; the bindings a grant names (2.3.2) |
 | Kind declared; binding; body and target shape | all | `D(s)`, retained (R-LOG-7) | kinds against a fixed list of nine (`log/decode.ts@df22d771:96, 261`) | re-derived |
-| Thread exists; its kind; holder; lease generation; hold settings; scope | every step on a thread | fold: opening envelope and `D(s)` give kind, settings and scope; `opened`, `rescoped`, `taken-over`, `released`, `expired` effects and `lease-expired` events give holder and lease generation | not checked | re-derived |
+| Thread exists; its kind; holder; lease generation; hold settings; scope source and current scope | every step on a thread | fold: the opening envelope and `D(s)` give kind, settings, scope source and first scope; each `take`'s body and its `rescoped` or `taken-over` effect give the current scope; `opened`, `released` and `expired` effects and `lease-expired` events give holder and lease generation | not checked | re-derived (section 2.3.1) |
 | Reservation | `take`, `hand-over` | fold: a new `handed-over` effect (`to`, deadline) and the `reservation-ended` event | none | re-derived; order only |
 | `expectedGeneration`; a version's head | `take`, `version`, `review`, `check`, `land`, `comment` on a line | fold of `proposed` effects | not checked | re-derived |
 | Head reachable in the fork; diff bounded; base; changed paths | `version` | **new witness**: the version's base and changed paths, retained by digest and named in the receipt; and Git objects through the pinned refs, when fetched | not checked; changed paths appear only inside policy contexts, when rules ran | the scope guard and the admin obligation re-derived from the witness; the witness checked against Git when the objects are present, otherwise proof limit `git-unwitnessed` |
-| `require` obligations; carrying | `version`, recomputation | recorded decisions, their retained contexts and the rules in `D(s)` | decisions replayed | the obligation set re-derived from replayed outcomes and rule definitions |
+| `require` obligations; carrying | `version`, recomputation | the required calls (4.4), rebuilt contexts, and the rules in `D(s)` | only the decisions present are replayed | calls derived, contexts rebuilt and compared, outcomes replayed; then the obligation set derived from them |
 | Evidence qualifies | `review`, `check` | recorded authority, roster fold, the obligation set, the act's flags | authority only | re-derived by the shared qualification rule (`room/obligations.ts@df22d771:92-125`) |
-| Check binding: prepared integration, its owner, configuration, tree or snapshot | `check` | **new witness** per check: integration, owner (preview or landing operation), tree or snapshot digest; configuration digest from `D(s)` | not checked | obligation and configuration re-derived; integration and tree from the witness; checked against Git when the objects are present, otherwise `git-unwitnessed` |
+| Check binding: an integration prepared for this generation, its owner, configuration, tree or snapshot | `check` | **new system event** `prepared`: the room seals it when an integration is ready, before any job for it is issued, naming the owner (a preview of a lane and generation, or a landing operation), the integration, its base and tree, and for each scoped checker the snapshot commit and digest; configuration digest from `D(s)` | not checked | the guard requires a `prepared` event for this generation, and for `landOp` that operation, naming the check's integration and tree or snapshot; obligation and configuration re-derived |
 | Review obligations met; no blocked or pending recomputation; no landing in flight | `land` | fold of evidence, `obligations-recomputed`, `land-op` effects and `land-outcome` events | not checked | re-derived |
-| `refuse` and `land` rules | all, `land` | recorded decisions | replayed | unchanged |
+| `refuse` and `land` rules | all, `land` | the required calls (4.4) and rebuilt contexts | only the decisions present are replayed | calls derived, contexts rebuilt and compared, outcomes replayed |
 | Main exists | `land` | a room fact about Git | not checked | proof limit `git-unwitnessed` |
 | Lease expiry and reservation end | every holder step, `take` | the order of sealed events | not checked | order re-derived; timing is room-clock truth |
 | Secret scan | all | the body | unrecorded class | not proved; verify may scan again and warn |
 
-The two new witnesses are retained like replay contexts and carry facts
-the room already computes. This follows the existing pattern of
-`CarryFactsRecord` (R-EVAL-8).
+The version witness is retained like a replay context, following the
+pattern of `CarryFactsRecord` (R-EVAL-8). The `prepared` event is
+different in kind: a check witness that reported only an integration,
+owner and tree would show that a check ran on that tree, not that the
+room prepared that integration for that preview or landing, and matching
+trees cannot show it either. So preparation is itself published, as an
+ordered fact the check guard can require. Its cost is one entry per clean
+preview and per prepared landing, which stage 2 measures against the
+row-writes baseline. What remains a limit is that the integration is the
+correct merge of the head onto its base: that needs the Git objects and
+the publisher's merge, and is `git-unwitnessed` without them.
 
-### 4.4 Derived transitions, and named failures
+### 4.4 Required evaluation calls
+
+Recorded decisions alone do not show that the room asked every question it
+had to. Verify today groups the decisions present in a receipt and replays
+those (`log/verify.ts@df22d771:421-457`); a receipt with none replays
+nothing. So a room-signed log could leave out a whole `require` call and
+its context, record no obligations, and later land.
+
+Verify therefore derives, for each published entry, the calls the room
+had to make, in order:
+
+| Entry | Required calls, in order |
+|---|---|
+| Any act, except an act on a configuration-recovery thread and a roster act by an admin or the recovery key (R-ADMIN-3, R-ADMIN-5) | `refuse`: each rule in `D(s)` whose `on` names the kind, in document order, until the first refusal or error |
+| An act with step `version` | `refuse` as above, before the scope check (R-ADM-1 as amended by `66d6fb14`); then each `require` rule in document order; then `carry` for each earlier verdict the platform's carry conditions admit, which the fold gives |
+| An act with step `land` | `refuse`; then the `land` rules at stage `land` |
+| `obligations-recomputed` | `require` and `carry` for that proposal (R-POL-9) |
+| `land-evaluated` | the `land` rules at stage `reservation` (R-LAND-4) |
+| `notified` | the `notify` rules whose `on` names the kind (R-POL-5) |
+
+The order within each kind, and where it stops, is the evaluator's own
+(for `refuse`, `policy/rules.ts@df22d771:183-210`). Verify calls the same
+code, so the two cannot drift.
+
+For each required call, verify rebuilds the replay context (R-EVAL-8)
+from the fold, not from the retained copy: the act from the envelope; the
+actor's role, teams and delegation from the roster fold; the lane from the
+thread fold; the proposal from the version witness, with owners from
+`D(s)`; the room from the roster fold; the lane purpose and recovery-key
+flag; and the budget state, where the act's meter starts empty and each
+call starts with the usage the calls before it recorded (R-EVAL-9). Then
+it compares:
+- a required call with no recorded decision: `decision-missing`;
+- a recorded decision that no required call accounts for:
+  `decision-extra`;
+- a retained context whose digest is not the rebuilt one:
+  `context-mismatch`. A plausible but false context fails here, even
+  though it would replay consistently;
+- the outcome, as today (`policy-decision-mismatch`).
+
+Only after these does verify derive obligations and effects (4.5).
+
+**Remaining limit.** The rebuilt `proposal` input is only as good as the
+version witness, which is checked against Git when the objects are
+present and is `git-unwitnessed` otherwise.
+
+### 4.5 Derived transitions, and named failures
 
 For each accepted act, verify computes the expected effects from the fold,
 `D(s)` and the witnesses, and compares their canonical bytes with the
@@ -632,14 +874,16 @@ New verification failures, each naming the seq:
 - `effect-mismatch`: receipt effects that differ from the derived ones;
 - `refusal-mismatch`: a recorded refusal whose code is not the first
   failing guard's;
-- `witness-missing`: a required witness or retained document is absent;
+- `decision-missing`, `decision-extra`, `context-mismatch`: section 4.4;
+- `witness-missing`: a required witness, `prepared` event or retained
+  document is absent;
 - `git-mismatch`: a witness that disagrees with Git objects that are
   present.
 
 Proof limits, reported but not failures: `git-unwitnessed` (Git objects
 not fetched), room-clock timing, and the unrecorded refusals.
 
-### 4.5 Bounds
+### 4.6 Bounds
 
 - The fold holds one record per thread, generation, obligation and piece
   of evidence. It grows linearly with the log, and verify streams the
@@ -650,7 +894,7 @@ not fetched), room-clock timing, and the unrecorded refusals.
 - Replay contexts keep their existing bounds (R-EVAL-2: input at most
   256 KiB).
 
-### 4.6 Adversarial fixtures
+### 4.7 Adversarial fixtures
 
 Room-signed logs with valid signatures, to show that verify does not
 trust the room:
@@ -661,9 +905,19 @@ trust the room:
 - a `release` whose effect does not raise the lease generation:
   `effect-mismatch`;
 - a version whose witness is not published: `witness-missing`;
-- a witness that disagrees with the pinned Git objects: `git-mismatch`.
+- a witness that disagrees with the pinned Git objects: `git-mismatch`;
+- a version whose whole `require` call, decision and context, is deleted,
+  with no obligations recorded and a later `land`: `decision-missing`;
+- an act whose whole `refuse` call is deleted: `decision-missing`;
+- a `land` whose stage-`land` call is deleted: `decision-missing`;
+- a version whose `require` context is replaced by a plausible false one
+  (its `proposal.paths` leaves out `.artroom/policy.json`), with the
+  decision's digest recomputed to match: `context-mismatch`;
+- a decision added that no rule required: `decision-extra`;
+- a check bound to an integration with no `prepared` event for that
+  generation: `guard-failed`.
 
-### 4.7 No clock in replay
+### 4.8 No clock in replay
 
 Every time-based decision becomes a sealed event before it can affect an
 act: lease expiry today (R-LANE-8, `room/core.ts@df22d771:1399-1415`), and
@@ -721,7 +975,9 @@ rewritten.
 ### 5.4 State left by a kind that is no longer declared
 
 - **A hold** opened by a retired kind keeps its settings and ends by lease
-  expiry, or by any declared act whose `threads` names that kind.
+  expiry, or by any declared act whose `threads` names that kind. A
+  retired opening kind stays a valid name in `threads` (section 2.3.1), so
+  later documents can keep a release or review path to its threads.
 - **A reservation** keeps its deadline and ends by its sealed event.
 - **Evidence** keeps counting by the facts recorded at its admission
   (R-REV-1). Activation re-judges carrying, as it does today (R-POL-9).
@@ -765,9 +1021,13 @@ Three things apply to all seven:
 maps to a step (section 2.1), a declaration field, or a platform rule that
 applies to all acts. The executable proof is stage 2 in section 8.5: the
 room's whole existing suite passes unchanged against the legacy
-vocabulary, and the same suite, with only envelope bindings added, passes
-against the code-review `v2` declarations; a mutation of each declaration
-field turns a test red.
+vocabulary. Against the code-review `v2` declarations it passes with two
+kinds of change, and no others: envelopes carry bindings; and, under
+option (a) of section 3.5, the configuration-recovery tests are rewritten
+from `claim` with `purpose` to `recover` ops. Bindings alone cannot turn
+the one into the other, so that rewrite is an intended change of
+behaviour, and stage 2's report lists each rewritten test for review. A
+mutation of each declaration field turns a test red.
 
 ### 6.1 `claim`
 
@@ -776,9 +1036,9 @@ field turns a test red.
 | Target | `null` (new lane) or a lane | `schema.ts:166-168` | targets `none`, `thread` |
 | Body | `goal` ≤ 1,024 bytes (required for a new lane), `scope` 1 to 64 globs, `plan` ≤ 16 KiB, `expectedGeneration` and `lease?` on a lane, `purpose?`, `because?` | `schema.ts:221-239` | `goal`, `plan` declared; `scope`, `expectedGeneration`, `lease` from the steps; `purpose` stays in the legacy vocabulary and moves to `recover` under option (a) of section 3.5 |
 | Requires, new lane | recovery purpose admin-only and `.artroom/` only; under `exclusive`, no overlap with a held lane; `refuse` rules | `admission.ts:611-623` | `open` |
-| Requires, existing lane | lane exists; rescope needs the holder and current lease; take-over needs an unheld lane; `expectedGeneration` matches; overlap; `refuse` rules | `admission.ts:665-687` | `take` |
+| Requires, existing lane | lane exists; rescope needs the holder and current lease; take-over needs an unheld lane; `expectedGeneration` matches; the new `scope` is checked for overlap, for rescope and take-over alike; `refuse` rules | `admission.ts:665-687` | `take` on a body-scoped thread (section 2.3.1) |
 | Holds | new: holder is signer, lease generation 1; rescope: same generation; take-over: next generation; expiry is now plus the room lease | `admission.ts:624, 688-689` | `hold.scope: "body.scope"`, room lease, workspace |
-| Changes | inserts the lane, or updates scope, goal, plan, holder, lease; a take-over invalidates an unreserved landing | `admission.ts:637-646, 700-710` | `open`, `take` |
+| Changes | inserts the lane, or updates scope, goal, plan, holder, lease, for rescope and take-over alike; a take-over invalidates an unreserved landing | `admission.ts:637-646, 700-710` | `open`, `take`: the current scope from the body; goal and plan as below |
 | Files, checks, reviews | none | | |
 | Refusals | `admin-required`, `recovery-scope`, `scope-overlap` ("The scope may overlap {lane}, held by {holder}."), `lane-unknown`, `lease-fenced`, `not-holder`, `lane-held`, `generation-moved` | `admission.ts:614-620, 665-684, 516-522` | platform wording; no override |
 
@@ -796,7 +1056,18 @@ field turns a test red.
 }
 ```
 
-**Not captured.** The configuration-recovery purpose, which section 3.5
+Two cases, in stage 2, pin take-over with a new scope: a released `claim`
+taken over with a different scope is admitted, with the new current
+scope and the next lease generation; and a take-over whose new scope may
+overlap an exclusive held lane is refused `scope-overlap`.
+
+**Not captured.** One detail moves from admission to the code-review
+record view: today a take-over or rescope that omits `goal` or `plan`
+keeps the lane's previous value (`room/admission.ts@df22d771:703-704`).
+Admission no longer stores application fields on the thread, so the
+code-review module shows the latest `goal` and `plan` given by the
+thread's `open` and `take` acts. What is admitted is unchanged. Then: the
+configuration-recovery purpose, which section 3.5
 keeps out of the application's hands under either option, and which the
 legacy vocabulary keeps for `v1` rooms. Also, R-LANE-2 says a rescope
 recomputes obligations when paths change, but the code always records
@@ -899,11 +1170,13 @@ are platform invariants 4 and 7.
 }
 ```
 
+Each code-review checker configuration names it: `"act": "check"`
+(section 2.3.3).
+
 **Not captured.** Nothing at admission. One site outside admission names
 the kind: the checker service signs `kind: "check"`
-(`checkers/checker.ts@df22d771:224-233`). A room may declare its check act
-under another name, so the `CheckJob` should carry the kind to sign
-(section 8.1).
+(`checkers/checker.ts@df22d771:224-233`). With section 2.3.3 it signs the
+kind and binding its job names, which for code-review is `check`.
 
 ### 6.6 `land`
 
@@ -1064,9 +1337,39 @@ seconds. `admin` is implicit in every act (section 2.2), so an empty
     "targets": { "version": ["land"] },
     "threads": ["propose-rules"],
     "who": { "roles": ["member", "agent"] }
+  },
+  "in-key-check": {
+    "label": "In key",
+    "targets": { "version": ["check"] },
+    "threads": ["take-part"],
+    "who": { "roles": ["checker"] }
   }
 }
 ```
+
+**The check path.** Three pieces, using section 2.3.3. A `require` rule in
+the same document asks for the check on every pattern:
+
+```json
+{ "id": "in-key", "kind": "require", "paths": ["parts/**"],
+  "obligation": { "type": "check", "check": "in-key", "by": ["role:checker"] } }
+```
+
+The checker's configuration, `.artroom/checkers/in-key.json`, names the
+act its checks are signed as:
+
+```json
+{ "format": "artroom-checker-v2", "act": "in-key-check",
+  "inputs": ["parts/**", "song.json"], "volatile": false, "timeoutSeconds": 60 }
+```
+
+And `in-key-check`, above, is that act: its only step is `check`, it acts
+only on part threads, only the `checker` role signs it, and it has no
+required body field. So a job for `in-key` on a part thread has exactly
+one act to sign, and its binding. The validator rejects the
+configuration if `act` is missing or names anything else; the room issues
+no job, and the landing fails `check-unroutable`, if a pattern somehow
+needed the check on a thread kind that `in-key-check` does not name.
 
 "Only the leader" is one `refuse` rule in the same document, on the
 actor's teams. An admin passes it:
@@ -1097,7 +1400,7 @@ reads it from the landed file.
 | Take the solo | `open` the first time, then `take` on a solo thread only | One soloist at a time: refused while the solo is held or reserved for someone else, and a second solo thread cannot be opened while one is held or reserved; `wrong-thread` on any thread not opened by `take-solo`; the thread's 64-second lease catches a player who drops out | `claim` on `solo/**`; refusal is `scope-overlap` with platform wording |
 | Pass the solo | `hand-over` on a solo thread only | Ends the hold and reserves the solo for `to` for 8 seconds (4 bars); anyone else's `take-solo` is refused `reserved`; `to` must be an active member | `release` with a handover note naming the next player; nothing enforced |
 | Signal | `comment` | Typed: one of five signals, and an optional member; `count-in` with no anchor fixes bar 1 | `note` with a text convention |
-| Add a pattern | `version`, `land` on a part thread only | Holder of the part only; changed paths inside the part; the `in-key` check (a `require` rule on `parts/**`) is met during preparation, before the landing publishes (R-LAND-4) | `propose` then `land`: two acts |
+| Add a pattern | `version`, `land` on a part thread only | Holder of the part only; changed paths inside the part; the `in-key` obligation is met during preparation, before the landing publishes (R-LAND-4): the room prepares the integration and seals `prepared`, issues a job naming `in-key-check` and its binding, and admits the checker's signed `in-key-check` | `propose` then `land`: two acts |
 | Change key | `version`, `land` on the lead thread only | Only the leader (the `leader-only` rule) and only on the thread `lead` opened, so only `song.json` changes; a `notify` rule on `change-key` reaches every player; every open pattern's `in-key` check stops carrying, because `song.json` is a global input (R-CARRY-3) | `propose` and `land` of `song.json` |
 | Change the house rules | `propose-rules`, `approve-rules`, `adopt-rules` | Invariant 7: an admin must approve any change to `.artroom/**`, so this cannot be one act. A sole admin may approve their own, flagged (R-ADMIN-2). It activates at the next seq (R-POL-9) | `claim`, `propose`, `review`, `land` |
 
@@ -1111,7 +1414,8 @@ thread's kind and settings are fixed at its opening (section 1):
 - `pass-solo` acts only on solo threads, and `take` on a reserved solo is
   refused for everyone but the named member;
 - a `take-solo` with a lease on the held solo thread would be a rescope,
-  and the solo's scope is fixed, so it is refused `scope-fixed`.
+  and the solo's scope is fixed, so it is refused `scope-fixed`
+  (section 2.3.1).
 
 **Two notes on `version` then `land` in one act.** The landing part follows
 R-LAND-1: if the new version owes a review, the whole act is refused with
@@ -1152,6 +1456,16 @@ check dispatch, so that finding stays open as its own request.
 - **Leader only:** `change-key` by a player in the `@leader` team who does
   not hold the lead thread is refused `not-holder`; `lead` by a player
   outside the team is refused by `leader-only`.
+- **The check path, end to end:** `add-pattern` on a part thread; the
+  landing operation prepares the integration and seals `prepared`; the
+  room issues a job naming `in-key-check` and its binding; the checker's
+  signed `in-key-check` is admitted and meets the obligation; the landing
+  reserves, publishes, and ends `landed`. A fresh clone verifies every
+  step of it.
+- **Check mapping failures:** `in-key.json` with no `act`, naming
+  `signal`, or naming a check act with a required body field, is refused
+  `policy-invalid`; with `in-key-check`'s `threads` changed to `["lead"]`,
+  a pattern's landing fails `check-unroutable` and admins are told.
 - **Binding:** after the house rules change `take-solo`'s
   `leaseSeconds`, a `take-solo` signed before the change is refused
   `binding-stale`; a `signal` signed before it is admitted.
@@ -1180,9 +1494,9 @@ active declarations. The legacy vocabulary keeps one frozen copy.
 |---|---|
 | `packages/contract` | See section 8.2 for each type |
 | `docs/protocol.md` | A new section, R-DECL, for this design; each amended rule is in section 8.2 |
-| Room (`packages/room`) | The legacy path frozen; `schema.ts` body and target checks driven by the active declarations; the binding step; `authority.ts` and `roster.ts` roles from `who`, delegations pinning bindings; `admission.ts` `decide` dispatching by step, not by kind; thread kind and settings; `wrong-thread`, `scope-fixed`, `reserved`; refusal wording; `hand-over` and reservation; the two witnesses (section 4.3); check jobs carrying kind and binding; a Room migration adding `kind`, `lease_ms`, `conflict`, `reserve_ms`, `reserved_for` and `reserved_until` to lanes. It takes the next free number: 4 if mint lane C lands first with migration 3 |
+| Room (`packages/room`) | The legacy path frozen; `schema.ts` body and target checks driven by the active declarations; the binding step; `authority.ts` and `roster.ts` roles from `who`, delegations pinning bindings; `admission.ts` `decide` dispatching by step, not by kind; thread kind and settings; `wrong-thread`, `scope-fixed`, `reserved`; refusal wording; `hand-over` and reservation; the version witness and the `prepared` event (section 4.3); check jobs choosing their act (2.3.3); grants carrying bindings (2.3.2); the steps version from the document (3.9); check jobs carrying kind and binding; a Room migration adding `kind`, `lease_ms`, `conflict`, `reserve_ms`, `reserved_for` and `reserved_until` to lanes. It takes the next free number: 4 if mint lane C lands first with migration 3 |
 | Policy runtime (`packages/policy`) | Validation of `acts` (section 3.4); the binding identity; the code-review `v2` declarations as data; `refuse` and `notify` rules accept declared kinds; `PolicyLane` carries the thread's kind. The evaluator and profile do not change |
-| Log and verify (`packages/log`) | Decoding accepts any kind that fits the grammar; the legacy vocabulary for `v1`-era entries; kind, binding, body and `who` judged under `D(s)`; then the fold, the witnesses, derived transitions and the named failures of section 4 |
+| Log and verify (`packages/log`) | Decoding accepts any kind that fits the grammar; the legacy vocabulary for `v1`-era entries; kind, binding, body and `who` judged under `D(s)`; then the fold, required calls, rebuilt contexts, derived transitions and the named failures of section 4 |
 | Client (`packages/client`) | A generic `room.act(kind, target, body)` beside the existing `PreparedAct` path (`client/room.ts@df22d771:218-245`), which adds the binding; a read of the active declarations and bindings; the eight per-kind methods stay as the code-review module |
 | MCP (`packages/mcp`) | Two new tools: `act`, which requires a binding, and `acts`, which lists the declarations with their bindings. The ten named tools stay (R-API-9), each with the binding it was built for. MCP is turn-based, so the jam's players use the client, not MCP (jam note section 5) |
 | UI (`packages/ui`) | The feed and refusal text are generic from `label`, fields and refusal wording; a record of an unknown or retired kind shows its declaration at its seq (section 5.2). The Room, Proposal and Needs-you screens stay as the code-review application's |
@@ -1234,6 +1548,7 @@ Rules and types not listed do not assume the seven acts.
 | R-ADM-7 | Retained; section 5.2 applies it to kinds |
 | R-ADM-8 (unrecorded steps) | Amend: adds `binding-stale` and `kind-undeclared` to the unrecorded refusals |
 | R-IDEM-1 to R-IDEM-6 | Retained; they decide exact retries (3.6) |
+| R-CRED-3 (room-custody redemption makes the session's delegation) | Amend: the delegation copies the invitation's signed bindings, and redemption is refused if any is stale (2.3.2) |
 | R-CRED-5 ("as for propose") | Amend: "as for an act with step `version` on that thread" |
 | R-WS-1 to R-WS-5 | Retained; a workspace belongs to a thread whose hold says `workspace` |
 | R-LANE-1, R-LANE-4, R-LANE-6, R-LANE-8 to R-LANE-10 | Retained, as step semantics |
@@ -1246,11 +1561,12 @@ Rules and types not listed do not assume the seven acts.
 | R-OBL-3 (check binding) | Amend: the check's kind and binding come from the job |
 | R-CARRY-1 to R-CARRY-16 | Retained |
 | R-LAND-1 | Amend: `version` then `land` in one act |
+| R-LAND-4 (preparation requests checks) | Amend: seal `prepared`; fail `check-unroutable` when no job can be issued (2.3.3) |
 | R-LAND-2 to R-LAND-11, R-PUB-1 to R-PUB-10 | Retained |
 | R-REV-1 to R-REV-8 | Retained; R-REV-6's revert lanes have kind `room` |
 | R-ADMIN-1 to R-ADMIN-4, R-ADMIN-9 | Retained |
 | R-ADMIN-5 to R-ADMIN-8 (recovery through `claim`) | Amend under option (a): `recover`; retained in the legacy vocabulary |
-| R-POL-1 | Amend: validates `acts` (3.4) |
+| R-POL-1 | Amend: validates `acts`, `steps` and each checker's `act` (3.4) |
 | R-POL-2, R-POL-5 (`on` kinds) | Amend: declared kinds |
 | R-POL-3, R-POL-4, R-POL-6, R-POL-9, R-POL-11, R-POL-12 | Retained |
 | R-POL-7 (default policy) | Amend: a room with no policy file uses the legacy vocabulary |
@@ -1259,13 +1575,13 @@ Rules and types not listed do not assume the seven acts.
 | R-EVAL-3 (`RuleInput` per kind) | Amend: `act.kind` is a declared kind; `PolicyLane` gains the thread's kind |
 | R-EVAL-4 | Amend only if hugh accepts section 3.8 |
 | R-EXEC-8 to R-EXEC-10 (check jobs) | Amend: a job carries the kind and binding to sign |
-| R-LOG-5 (system events) | Amend: `reservation-ended` |
-| R-LOG-6 (receipts) | Amend: the `handed-over` effect and witness digests |
-| R-LOG-7, R-LOG-9 (retained inputs) | Amend: retain the two witnesses |
+| R-LOG-5 (system events) | Amend: `reservation-ended` and `prepared` |
+| R-LOG-6 (receipts) | Amend: the `handed-over` effect and the version witness's digest |
+| R-LOG-7, R-LOG-9 (retained inputs) | Amend: retain the version witness |
 | R-LOG-10 (what verify checks) | Amend: section 4's contract |
-| R-LOG-15 (what verify does not prove) | Superseded as a blanket limit; amend to the proof limits of section 4.4 |
+| R-LOG-15 (what verify does not prove) | Superseded as a blanket limit; amend to the proof limits of section 4.5 |
 | R-API-9 (ten MCP tools) | Amend: `act` and `acts` |
-| Section 23, acceptance cases | Retained for code-review; amend: add sections 3.2, 3.6, 4.6 and 7.4 |
+| Section 23, acceptance cases | Retained for code-review; amend: add the cases of sections 2.3, 3.2, 3.6, 3.9, 4.7 and 7.4 |
 
 **Contract types** (`contract/…@df22d771`)
 
@@ -1280,18 +1596,20 @@ Rules and types not listed do not assume the seven acts.
 | `ClaimInput` … `ReleaseInput` | `acts.ts:342-353` | Retained |
 | `LanePurpose`, `Flag`, `Authority`, `Verdict` | `acts.ts:49-62, 184-213` | Retained |
 | `LaneEffect` | `lanes.ts:107-124` | Amend: `handed-over`; the thread's kind in `opened` |
-| `Effect`, `Receipt` | `log.ts:43-65` | Amend: witness digests |
-| `SystemEvent` | `log.ts:76` onward | Amend: `reservation-ended` |
-| `PolicyDocument` | `policy.ts:117-130` | Retained as `v1`; amend: `artroom-policy-v2` with `acts` |
+| `Effect`, `Receipt` | `log.ts:43-65` | Amend: the version witness's digest |
+| `SystemEvent` | `log.ts:76` onward | Amend: `reservation-ended`, `prepared` |
+| `PolicyDocument` | `policy.ts:117-130` | Retained as `v1`; amend: `artroom-policy-v2` with `acts` and `steps` |
+| `CheckerConfig` | `policy.ts:133-154` | Retained as `v1`; amend: `artroom-checker-v2` with `act` (2.3.3) |
+| `RosterOp` `delegate`, `Invitation.session` | `roster.ts:77, 103-109` | Amend: a signed map from kind to binding (2.3.2) |
 | `RefuseRule.on`, `NotifyRule.on` | `policy.ts:51-96` | Amend: declared kinds |
 | `RuleInput`, `PolicyLane` | `policy.ts:167-217` | Amend: declared `act.kind`; the thread's kind |
-| `Delegation` | `roster.ts:52-60` | Amend: pinned bindings |
+| `Delegation` | `roster.ts:52-60` | Amend: the signed bindings it was granted with |
 | Refusal codes | `errors.ts:30-54` | Retained; amend: `kind-undeclared`, `binding-stale`, `wrong-thread`, `scope-fixed`, `reserved` |
 | `RoomApi` per-kind methods | `transports.ts:224-232` | Retained; amend: generic `act` |
 | `McpTools` | `transports.ts:451-506` | Retained; amend: `act`, `acts` |
 | `BearerAct` | `transports.ts:334` | Amend: `binding` |
 | `CheckJob` | `checker.ts:35-75` | Amend: `kind` and `binding` |
-| `AttentionWhy` | `pagination.ts:42-66` | Retained; declared acts reach attention through `notify` rules |
+| `AttentionWhy` | `pagination.ts:42-66` | Retained for existing reasons; amend: `check-unroutable`. Declared acts otherwise reach attention through `notify` rules |
 | `Genesis.profile` | `roster.ts:133` | Amend only if hugh accepts section 3.8 |
 
 ### 8.3 Lanes in flight
@@ -1302,7 +1620,7 @@ touches `acts.ts`, `docs/protocol.md` or `packages/policy`.
 | Lane | State at `df22d771` | What it means for declared acts | What declared acts mean for it |
 |---|---|---|---|
 | Mint lane C, request `5ff58c9a` (`request/mint-sites`) | Recut on this main; under re-review; adds Room migration 3 (due indexes) | No act-kind code. Declared acts take the next migration number. Both touch `room/core.ts` and `room/jobs.ts`, in different regions (lane C: loop kinds, mints, `nextAlarm`, how jobs mint tokens) | None. It finishes as reviewed |
-| Row-writes, request `8bd623cc` (`request/row-writes`) | Under review; touches `propose()` in `admission.ts` for the `PIN_DELAY_MS` switch | Its rows-per-act measurements are the baseline: the declared path must add no rows per act beyond the two witnesses, which are retained once per version or check. Its smoke driver sends literal `v: 1` act bodies, which stay valid in `v1` rooms | Stage 2 merges after it and keeps its switch inside the `version` step |
+| Row-writes, request `8bd623cc` (`request/row-writes`) | Under review; touches `propose()` in `admission.ts` for the `PIN_DELAY_MS` switch | Its rows-per-act measurements are the baseline: the declared path must add no rows per act beyond the version witness, retained once per version, and the `prepared` event, sealed once per clean preview or prepared landing. Its smoke driver sends literal `v: 1` act bodies, which stay valid in `v1` rooms | Stage 2 merges after it and keeps its switch inside the `version` step |
 | Fork-token mint lane F, request `02836f9a` | Not started; no branch | Independent: it changes how `pinObjects` mints its fork token | It does not wait for declared acts. If both compete for a slot, declared acts go first (assert `4e4134b4`) |
 | Orphan retirement (`request/orphans`) | Notes only; under review | None | None |
 | Jam room note, request `f4a626c8` (`request/jam-room-note`) | Not yet reviewed; cut from a main about 400 commits old | It is this note's second example | Its premise, "the same seven acts", and its zero-amendment criterion are superseded. **Recommendation:** revise it against this note before review: the jam's acts are declarations, and the criterion becomes "no platform code in the jam". Its timing model, live layer, sample library and spikes stand |
@@ -1342,12 +1660,12 @@ At most two implementation lanes run at once until the slice passes
 
 | # | Request | Depends on | Done when |
 |---|---|---|---|
-| 1 | **Protocol amendment and contract types.** R-DECL in `docs/protocol.md` and every "Amend" of section 8.2; the contract types; the legacy vocabulary's description and digest; the code-review `v2` declarations as data; the `acts` validator and the binding identity. No change in behaviour. Includes hugh's decisions on sections 3.5 and 3.8 | this note | the declarations validate; every existing test passes; checker approves the amendment |
-| 2 | **Room admission by declaration.** The legacy path frozen; `v2` declarations; the binding step, delegation pins and check-job bindings; thread kinds and `wrong-thread`; `kind-undeclared`; refusal wording | 1 | the room's whole existing suite passes unchanged against the legacy vocabulary, and with bindings added against the `v2` declarations; the six binding cases of section 3.6 pass; a mutation of each declaration field turns a test red; row-writes' measure shows no new rows per act |
+| 1 | **Protocol amendment and contract types.** R-DECL in `docs/protocol.md` and every "Amend" of section 8.2; the contract types; the legacy vocabulary's description and digest; the `steps` field and the signed grant maps; checker configurations naming their act; the code-review `v2` declarations as data; the `acts` validator and the binding identity. No change in behaviour. Includes hugh's decisions on sections 3.5 and 3.8 | this note | the declarations validate; every existing test passes; checker approves the amendment |
+| 2 | **Room admission by declaration.** The legacy path frozen; `v2` declarations; the binding step, delegation pins and check-job bindings; thread kinds and `wrong-thread`; `kind-undeclared`; refusal wording | 1 | the room's whole existing suite passes unchanged against the legacy vocabulary, and with bindings added against the `v2` declarations; the six binding cases of section 3.6 and the cases of sections 2.3.1 and 2.3.2 pass; a mutation of each declaration field turns a test red; row-writes' measure shows no new rows per act |
 | 3 | **Log and verify, first part.** Decoding by grammar; the legacy vocabulary for `v1`-era entries; kind, binding, body and `who` judged under `D(s)` | 1 | the legacy recovery fixture of section 3.2 passes on a fresh clone, and fails under the mutated verifier; verify passes on a log that activates a document adding a kind, and fails `kind-undeclared` and `binding-stale` on forged entries |
-| 4 | **New primitives.** Thread settings, the overlap rule, scope slots and `scope-fixed`, `hand-over` with `reservation-ended`, `version` then `land`, unanchored comments; the Room migration | 2 | acceptance cases for each, including a reservation that ends while a `take` is in flight |
+| 4 | **New primitives.** Thread settings, the overlap rule, scope slots and `scope-fixed`, `hand-over` with `reservation-ended`, `version` then `land`, unanchored comments, check jobs choosing their act and the `prepared` event; the Room migration | 2 | acceptance cases for each, including a reservation that ends while a `take` is in flight, and the check-mapping cases of section 2.3.3 |
 | 5 | **Client, MCP, CLI, UI.** Generic act with binding; declarations read; generic rendering | 2 | an agent performs a declared act it was not built for, over HTTPS and MCP |
-| 6 | **Verify's replay proof** (sections 4.3 to 4.6): the two witnesses in the room, the fold, derived transitions and the named failures | 3, 4 | every adversarial fixture of section 4.6 fails with its named failure, and an honest log passes |
+| 6 | **Verify's replay proof** (sections 4.3 to 4.8): the fold, required calls and rebuilt contexts, derived transitions, the named failures, and keeping every steps version (3.9) | 3, 4 | every adversarial fixture of section 4.7 fails with its named failure, an honest log passes, and the cases of section 3.9 pass |
 | 7 | **The jam's declarations as a fixture,** in `examples/`, with the cases of section 7.4 and no jam code | 4, 5 | builder can judge self-hostability on it (assert `b2cdc44a`) |
 
 Stages 2 and 3 can run in parallel, then stages 4 and 5. Stage 6 builds
@@ -1444,7 +1762,7 @@ Both sources were read, not changed. gitseq at `02090dc2d`
   that was wrong.
 - **Grants pin content.** "Grants pin exact capability content ids. A
   newer package never silently enlarges authority"
-  (`notes/2026-09-14-evolving-spaces-design.md:617-618`). Section 3.6's
+  (`notes/2026-09-14-evolving-spaces-design.md:617-618`). Section 2.3.2's
   delegations pin bindings for the same reason.
 - **Cautions.** Writing models cheaply was the spike's "negative result"
   (`spike/REPORT.md:34`). This is why declarations here are limited to
