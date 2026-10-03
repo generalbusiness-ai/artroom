@@ -1,0 +1,54 @@
+{
+  "commands.json": {
+    "sha256": "c455dd096bf3aa0a9f3a2aade3fdd8033406024a4863ef8663215c080ea46789",
+    "bytes": 796
+  },
+  "compile.log": {
+    "sha256": "a102d4a044fa5ec6aef465728bd0e9b458bd32d122649fb78d359f47fa905168",
+    "bytes": 1882
+  },
+  "fixture.test.ts": {
+    "sha256": "592f95f4c73c48a95dd3739ecef547b862232900fc5fb09576921a2b955f9ec6",
+    "bytes": 4857
+  },
+  "manifest-initial.json": {
+    "sha256": "8220d4e3e3b6bdd501b8b1fd3bd669f35cd648050377a3f7eefe2f5a58fff4ae",
+    "bytes": 1404
+  },
+  "named-results.json": {
+    "sha256": "c6eaaa4bb9141a35b739bd56038c87b62d4bdb87cc176eaef41b35d9eb0a2687",
+    "bytes": 3858
+  },
+  "planner-proof.json": {
+    "sha256": "0047ef39eb02947787131197ff264c4e0764d1ef8990a1696ff1bea66d071815",
+    "bytes": 6028
+  },
+  "restoration.json": {
+    "sha256": "0be543a575c94deb75228667da470e29fc3384cbc7895d5aa85d47b08b50cd22",
+    "bytes": 152
+  },
+  "runner.py": {
+    "sha256": "e8532e29e0b9f84bb4015ea223568fd7d6ffa9f1f6090772e931820ed518c807",
+    "bytes": 3601
+  },
+  "runtime.log": {
+    "sha256": "0348e40501299ade08881e991757ebcbe408d7a3111f041a5ea246e7144b0de1",
+    "bytes": 6926
+  },
+  "runtime.vitest.json": {
+    "sha256": "d6ceb91c8281afc7d536a23e40d8f7809b0fb315fa186d41ccb05cb5d4807b5f",
+    "bytes": 4051
+  },
+  "setup.json": {
+    "sha256": "dc740d7d88a4b082d96cdcd9d01cf0c76d8a77c9502f89ffe73353076f06e402",
+    "bytes": 349
+  },
+  "tracked-after.json": {
+    "sha256": "17e6e1a95603c65009c23b9d1895dd917fc32f5904fee27ed42bf92c08dc45ac",
+    "bytes": 80820
+  },
+  "tracked-before.json": {
+    "sha256": "17e6e1a95603c65009c23b9d1895dd917fc32f5904fee27ed42bf92c08dc45ac",
+    "bytes": 80820
+  }
+}

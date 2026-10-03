@@ -1,0 +1,71 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli
+
+stdout | test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=false, metadataUnavailable=false
+{"changedKind":false,"metadataUnavailable":false,"acceptedKind":"start-song","binding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"61555e2062fbb1cea48cb6e9755fd58c21570f2eaaf8aff3e33ca8ad6d881094","actual":"Done: Start a song (start-song), recorded as act_4_b6ed9057.\nThread: Start a song: Footprints (lane act_4_b6ed9057).","expectedDone":"Done: Start a song (start-song), recorded as act_4_b6ed9057.","expectedThread":"Thread: Start a song: Footprints (lane act_4_b6ed9057)."}
+
+ ✓ test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=false, metadataUnavailable=false 1506ms
+ × test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=false, metadataUnavailable=true 1455ms
+   → expected [ '?at=4', '?at=4' ] to deeply equal [ '?at=4' ]
+stdout | test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=true, metadataUnavailable=false
+{"changedKind":true,"metadataUnavailable":false,"acceptedKind":"start-song","binding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"139debcd718aa8f475f154a196e952e2d8cc3185e1ac5e4df08173f6d1b4772b","actual":"Done: Draft a poster (draft-poster), recorded as act_4_9a13b1c9.\nThread: Draft a poster: Footprints (lane act_4_9a13b1c9).","expectedDone":"Done: Start a song (start-song), recorded as act_4_9a13b1c9.","expectedThread":"Thread: Start a song: Footprints (lane act_4_9a13b1c9)."}
+
+ × test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=true, metadataUnavailable=false 1449ms
+   → receipt must identify the kind actually accepted, rather than a newer argument: expected 'Done: Draft a poster (draft-poster), …' to be 'Done: Start a song (start-song), reco…' // Object.is equality
+   → thread title must use the saved kind's historical meaning and saved body: expected 'Thread: Draft a poster: Footprints (l…' to be 'Thread: Start a song: Footprints (lan…' // Object.is equality
+ × test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=true, metadataUnavailable=true 1442ms
+   → expected [ '?at=4', '?at=4' ] to deeply equal [ '?at=4' ]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=false, metadataUnavailable=true
+ FAIL  test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=true, metadataUnavailable=true
+AssertionError: expected [ '?at=4', '?at=4' ] to deeply equal [ '?at=4' ]
+
+- Expected
++ Received
+
+  [
+    "?at=4",
++   "?at=4",
+  ]
+
+ ❯ test/planner-journal-kind.test.ts:54:21
+     52|       expect(recorded).toHaveLength(1); expect(h.room.lanes.size).toBe…
+     53|       const entry = recorded[0]!; const id = `act_${entry.seq}_${entry…
+     54|       expect(reads).toEqual([`?at=${entry.seq}`]);
+       |                     ^
+     55|       const expectedDone = metadataUnavailable ? `Done: start-song, re…
+     56|       const expectedThread = metadataUnavailable ? `Thread: ${id} (lan…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=true, metadataUnavailable=false
+AssertionError: receipt must identify the kind actually accepted, rather than a newer argument: expected 'Done: Draft a poster (draft-poster), …' to be 'Done: Start a song (start-song), reco…' // Object.is equality
+
+Expected: "Done: Start a song (start-song), recorded as act_4_9a13b1c9."
+Received: "Done: Draft a poster (draft-poster), recorded as act_4_9a13b1c9."
+
+ ❯ test/planner-journal-kind.test.ts:58:127
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/planner-journal-kind.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=true, metadataUnavailable=false
+AssertionError: thread title must use the saved kind's historical meaning and saved body: expected 'Thread: Draft a poster: Footprints (l…' to be 'Thread: Start a song: Footprints (lan…' // Object.is equality
+
+Expected: "Thread: Start a song: Footprints (lane act_4_9a13b1c9)."
+Received: "Thread: Draft a poster: Footprints (lane act_4_9a13b1c9)."
+
+ ❯ test/planner-journal-kind.test.ts:59:121
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed (4)
+   Start at  18:20:00
+   Duration  6.66s (transform 375ms, setup 0ms, import 599ms, tests 5.85s, environment 0ms)
+
+JSON report written to /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-c74-journal-kind-fu2do9k_/runtime.vitest.json

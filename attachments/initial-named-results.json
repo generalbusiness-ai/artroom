@@ -1,0 +1,63 @@
+{
+  "total": 4,
+  "passed": 1,
+  "failed": 3,
+  "pending": 0,
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "a saved receipt is shown as its saved kind, regardless of newer command arguments"
+      ],
+      "fullName": "a saved receipt is shown as its saved kind, regardless of newer command arguments original receipt identity, changedKind=false, metadataUnavailable=false",
+      "status": "passed",
+      "title": "original receipt identity, changedKind=false, metadataUnavailable=false",
+      "duration": 1506.25175,
+      "failureMessages": [],
+      "meta": {},
+      "tags": []
+    },
+    {
+      "ancestorTitles": [
+        "a saved receipt is shown as its saved kind, regardless of newer command arguments"
+      ],
+      "fullName": "a saved receipt is shown as its saved kind, regardless of newer command arguments original receipt identity, changedKind=false, metadataUnavailable=true",
+      "status": "failed",
+      "title": "original receipt identity, changedKind=false, metadataUnavailable=true",
+      "duration": 1455.4915410000003,
+      "failureMessages": [
+        "AssertionError: expected [ '?at=4', '?at=4' ] to deeply equal [ '?at=4' ]\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli/test/planner-journal-kind.test.ts:54:21\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "meta": {},
+      "tags": []
+    },
+    {
+      "ancestorTitles": [
+        "a saved receipt is shown as its saved kind, regardless of newer command arguments"
+      ],
+      "fullName": "a saved receipt is shown as its saved kind, regardless of newer command arguments original receipt identity, changedKind=true, metadataUnavailable=false",
+      "status": "failed",
+      "title": "original receipt identity, changedKind=true, metadataUnavailable=false",
+      "duration": 1449.4103329999998,
+      "failureMessages": [
+        "AssertionError: receipt must identify the kind actually accepted, rather than a newer argument: expected 'Done: Draft a poster (draft-poster), \u2026' to be 'Done: Start a song (start-song), reco\u2026' // Object.is equality\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli/test/planner-journal-kind.test.ts:58:127\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20",
+        "AssertionError: thread title must use the saved kind's historical meaning and saved body: expected 'Thread: Draft a poster: Footprints (l\u2026' to be 'Thread: Start a song: Footprints (lan\u2026' // Object.is equality\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli/test/planner-journal-kind.test.ts:59:121\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "meta": {},
+      "tags": []
+    },
+    {
+      "ancestorTitles": [
+        "a saved receipt is shown as its saved kind, regardless of newer command arguments"
+      ],
+      "fullName": "a saved receipt is shown as its saved kind, regardless of newer command arguments original receipt identity, changedKind=true, metadataUnavailable=true",
+      "status": "failed",
+      "title": "original receipt identity, changedKind=true, metadataUnavailable=true",
+      "duration": 1442.2103340000003,
+      "failureMessages": [
+        "AssertionError: expected [ '?at=4', '?at=4' ] to deeply equal [ '?at=4' ]\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli/test/planner-journal-kind.test.ts:54:21\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ],
+      "meta": {},
+      "tags": []
+    }
+  ]
+}

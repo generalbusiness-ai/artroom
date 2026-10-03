@@ -1,0 +1,9 @@
+{
+  "head": "c74f36965cc90049ad8fc44256a94974de5deb81",
+  "tree": "005530a5042fe92495896b58e11dc28677573459",
+  "fixtureSha256": "592f95f4c73c48a95dd3739ecef547b862232900fc5fb09576921a2b955f9ec6",
+  "fixtureBytes": 4857,
+  "fixtureLines": 63,
+  "trackedFiles": 715,
+  "runtimeScope": "four actual CLI/FakeRoom cases; no production Room authority"
+}
