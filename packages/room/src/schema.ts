@@ -189,10 +189,7 @@ export function checkSignedEnvelope(v: unknown, doc?: AnyPolicyDocument): void {
 function declaredTarget(c: Checker, d: ActDeclaration | null, t: unknown): void {
   const path = "envelope.target";
   const shapes = d ? TARGET_ORDER.filter((s) => d.targets[s] !== undefined) : TARGET_ORDER;
-  if (t === null) {
-    if (!shapes.includes("none")) c.error(path, "must name what the act acts on, not null");
-    return;
-  }
+  if (t === null && shapes.includes("none")) return;
   if (shapes.includes("entry") && isPlainObject(t) && "act" in t) return entryTarget(c, t, path);
   const named = shapeOf(t);
   const shape = shapes.find((s) => s === named && s !== "none" && s !== "entry") ?? shapes.find((s) => s !== "none" && s !== "entry");

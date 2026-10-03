@@ -11,7 +11,7 @@ import { isArtroomError } from "@generalbusiness/artroom-contract";
 import { policy, requireReview, rule } from "@generalbusiness/artroom-policy/helpers";
 import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
-import { addMember, advance, b64url, call, clock, day, digestBytes, expectRefusal, failure, iso, makeRoom, pushChange, randomBytes, tick, tokenLive, type TestRoom } from "./support.ts";
+import { addMember, advance, b64url, call, clock, configDigest, day, digestBytes, expectRefusal, failure, iso, makeRoom, pushChange, randomBytes, tick, tokenLive, type TestRoom } from "./support.ts";
 
 const entries = async (r: TestRoom): Promise<LogEntry[]> => [...(await r.admin.read({ q: "log", req: { limit: 500 } })).acts];
 const events = (log: LogEntry[], type: SystemEvent["type"]) => log.filter((e) => e.entry.type === "system" && e.entry.event.type === type).map((e) => ({ seq: e.seq, event: (e.entry as { event: SystemEvent }).event }));
@@ -103,8 +103,8 @@ describe("edit 9: policy-activated names the checkers (R-POL-9)", () => {
     const r = await makeRoom({ files: { ".artroom/checkers/zeta.json": JSON.stringify(zeta), ".artroom/checkers/alpha.json": JSON.stringify(alpha) } });
     const [, activated] = await entries(r);
     expect((activated!.entry as unknown as { event: { checkers: unknown } }).event.checkers).toEqual([
-      { name: "alpha", config: digestJson(alpha) },
-      { name: "zeta", config: digestJson(zeta) },
+      { name: "alpha", config: configDigest(digestJson(alpha)) },
+      { name: "zeta", config: configDigest(digestJson(zeta)) },
     ]);
   });
 });

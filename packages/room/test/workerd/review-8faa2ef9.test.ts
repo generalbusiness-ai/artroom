@@ -31,6 +31,7 @@ import {
   call,
   clock,
   Client,
+  coveredKinds,
   day,
   expectOk,
   expectRefusal,
@@ -465,9 +466,9 @@ describe("'*' is fixed at the grant (R-ADM-5, R-LOG-10)", () => {
       expiresAt: iso(clock.now + day),
     });
     expect(
-      (await r.admin.read({ q: "members" })).delegations.find(
+      coveredKinds((await r.admin.read({ q: "members" })).delegations.find(
         (d) => d.id === grant.id,
-      )!.kinds,
+      )!),
     ).toEqual(delegableBy("member"));
     await r.admin.ok("roster", null, {
       op: "set-role",

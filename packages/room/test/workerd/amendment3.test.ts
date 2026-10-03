@@ -18,7 +18,7 @@ import { digestJson } from "../../src/crypto.ts";
 import { obligationsFor } from "../../src/obligations.ts";
 import type { ActivePolicyFull } from "../../src/core.ts";
 import { snapshotCommit, snapshotMessage } from "../../src/snapshot.ts";
-import { addMember, call, Client, clock, expectOk, expectRefusal, iso, makeRoom, pushChange, tick, type TestRoom } from "./support.ts";
+import { addMember, call, Client, clock, configDigest, expectOk, expectRefusal, iso, makeRoom, pushChange, tick, type TestRoom } from "./support.ts";
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const op = async (r: TestRoom, id: string) => (await r.admin.read({ q: "op", op: id as never })) as LandOp & { integration?: string; waiting?: string[]; expectedMain: string };
@@ -381,7 +381,7 @@ describe("R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding", ()
       base: done.expectedMain,
       input: { kind: "tree", tree: r.world.artifacts.treeOf(done.integration as never) },
       readUrl: canonical.remote,
-      config: digestJson(whole),
+      config: configDigest(digestJson(whole)),
       volatile: false,
       advisory: false,
       runner: R,
