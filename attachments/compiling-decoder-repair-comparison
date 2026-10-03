@@ -1,0 +1,73 @@
+{
+  "head": "508c3257e71768d76a22aad6cd088e4c337bb0a2",
+  "purpose": "Local functional repair and prior-implementation comparison; not condition-4 mutation evidence",
+  "source": "/tmp/artroom-checker-stage2-508-tgi068h9/repo/packages/room/src/declared.ts",
+  "originalSHA256": "5a4bb1079ece79a35febdc442ea6ffba61c0118089214e4aa7228dba0336988d",
+  "variants": [
+    {
+      "label": "preserve-leading-BOM-v2",
+      "variantSHA256": "d331322f6d12ab85eb4e82e6d5e108e180a8489d2d458cfb7d275ba1e3261509",
+      "typecheck": {
+        "command": [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        "cwd": "/tmp/artroom-checker-stage2-508-tgi068h9/repo",
+        "exit": 0,
+        "log": "/tmp/artroom-checker-stage2-508-tgi068h9/clipping-preserve-leading-BOM-v2-typecheck.log",
+        "seconds": 5.714
+      },
+      "tests": {
+        "command": [
+          "npx",
+          "vitest",
+          "run",
+          "--config",
+          "vitest.workers.config.ts",
+          "test/workerd/checker-508-clipping-controls.test.ts",
+          "--reporter=verbose",
+          "--reporter=json",
+          "--outputFile=/tmp/artroom-checker-stage2-508-tgi068h9/clipping-preserve-leading-BOM-v2.json"
+        ],
+        "cwd": "/tmp/artroom-checker-stage2-508-tgi068h9/repo/packages/room",
+        "exit": 0,
+        "log": "/tmp/artroom-checker-stage2-508-tgi068h9/clipping-preserve-leading-BOM-v2.log",
+        "seconds": 1.902
+      },
+      "report": "/tmp/artroom-checker-stage2-508-tgi068h9/clipping-preserve-leading-BOM-v2.json",
+      "success": true,
+      "totals": {
+        "numTotalTests": 3,
+        "numPassedTests": 3,
+        "numFailedTests": 0,
+        "numRuntimeErrorTestSuites": null,
+        "wasInterrupted": null
+      },
+      "assertions": [
+        {
+          "title": "clipping control: ASCII and multibyte prefixes are preserved without splitting a character",
+          "status": "passed",
+          "messages": []
+        },
+        {
+          "title": "clipping control: legal leading U+FEFF survives when the filled text fits exactly",
+          "status": "passed",
+          "messages": []
+        },
+        {
+          "title": "R-DECL-13: cutting a longer recorded refusal preserves its legal leading U+FEFF",
+          "status": "passed",
+          "messages": []
+        }
+      ],
+      "restoredSHA256": "5a4bb1079ece79a35febdc442ea6ffba61c0118089214e4aa7228dba0336988d",
+      "sourceRestored": true
+    }
+  ],
+  "statusBefore": "?? packages/room/test/workerd/checker-508-bearer-retry-controls.test.ts\n?? packages/room/test/workerd/checker-508-cap-boundaries.test.ts\n?? packages/room/test/workerd/checker-508-clipping-controls.test.ts\n?? packages/room/test/workerd/checker-508-rebound-controls.test.ts\n?? packages/room/test/workerd/checker-57-document-path-controls.test.ts\n?? packages/room/test/workerd/checker-57-job-transition-controls.test.ts\n?? packages/room/test/workerd/checker-ba-job-activation.test.ts\n",
+  "restoredSHA256": "5a4bb1079ece79a35febdc442ea6ffba61c0118089214e4aa7228dba0336988d",
+  "statusAfter": "?? packages/room/test/workerd/checker-508-bearer-retry-controls.test.ts\n?? packages/room/test/workerd/checker-508-cap-boundaries.test.ts\n?? packages/room/test/workerd/checker-508-clipping-controls.test.ts\n?? packages/room/test/workerd/checker-508-rebound-controls.test.ts\n?? packages/room/test/workerd/checker-57-document-path-controls.test.ts\n?? packages/room/test/workerd/checker-57-job-transition-controls.test.ts\n?? packages/room/test/workerd/checker-ba-job-activation.test.ts\n",
+  "sourceRestored": true,
+  "statusRestored": true
+}
