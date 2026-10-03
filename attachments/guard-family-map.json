@@ -1,0 +1,322 @@
+{
+  "head": "9aa91f52f6cf4ba9a9068e1bf8cc112b7a1a0eab",
+  "navigationNotice": "Family source anchors are navigation ranges inherited from the prior source review; exact current marker lines/text are in source-index.json and complete source snapshots. Family assertions are static mappings, not per-mutant execution evidence. Unmarked checks remain explicit components.",
+  "testAbbreviations": {
+    "PE": "packages/policy/test/declared-guards-e.test.ts",
+    "NE": "packages/room/test/node/declared-guards-e.test.ts",
+    "NA": "packages/room/test/node/declared-guards-a.test.ts",
+    "NB": "packages/room/test/node/declared-guards-b.test.ts",
+    "GC": "packages/room/test/workerd/declared-guards-c-fd6f00b6.test.ts",
+    "GD": "packages/room/test/workerd/declared-guards-d-fd6f00b6.test.ts",
+    "GE": "packages/room/test/workerd/declared-guards-e-fd6f00b6.test.ts",
+    "GF": "packages/room/test/workerd/declared-guards-f-fd6f00b6.test.ts",
+    "CF": "packages/checkers/test/declared-guards-f.test.ts",
+    "V": "packages/policy/test/vocabulary.test.ts",
+    "E": "packages/room/test/node/declared-equivalence.test.ts",
+    "F": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "audit2": "packages/room/test/workerd/declared-audit2-fd6f00b6.test.ts"
+  },
+  "families": [
+    {
+      "id": "family-0",
+      "sourceBoundaryNavigation": "policy/acts.ts:213,241,250,355",
+      "components": "Reserved evaluator names for kinds and body fields; JSON conversion failure; canonical JSON byte measurement and exact upper bound, including legal constructor/prototype glob keys under owners and carry.dependsOn",
+      "retainedAssertions": "P:317 onward; B:364,378,397",
+      "addedAssertionsAndExposure": "Existing policy declared-acts / audit2 cap tests retained; no new A-F cap runtime credit"
+    },
+    {
+      "id": "family-1",
+      "sourceBoundaryNavigation": "policy/vocabulary.ts:85,90,96",
+      "components": "v1/v2 detection; own declaration key; missing/null declaration; declared-plus-platform kinds versus legacy kinds",
+      "retainedAssertions": "V:37,82,89; F:38,55,107",
+      "addedAssertionsAndExposure": "PE:38-61 (format, own declaration, exact kind lists)"
+    },
+    {
+      "id": "family-2",
+      "sourceBoundaryNavigation": "policy/vocabulary.ts:101,119",
+      "components": "Target null, nonobject and array rejection; entry precedence; path/line/head alternatives; generation and lane alternatives; unknown shape; declared lookup versus own legacy dispatch key; missing target/step",
+      "retainedAssertions": "V:53,108; E:164; A:58",
+      "addedAssertionsAndExposure": "PE:64-137 (fixed expected shape/step values, direct array named properties)"
+    },
+    {
+      "id": "family-3",
+      "sourceBoundaryNavigation": "policy/vocabulary.ts:134,147",
+      "components": "Legacy/renew/roster branch; missing declaration; implicit admin; each role entry; nondelegable flag and grantor role independently",
+      "retainedAssertions": "V:68,89,101; E:246; F:75,244,381",
+      "addedAssertionsAndExposure": "PE:139-193 (implicit admin, explicit roles, nondelegable independent); NE:19-39"
+    },
+    {
+      "id": "family-4",
+      "sourceBoundaryNavigation": "room/schema.ts:79,156",
+      "components": "Own required fields; closed outer and envelope shape; v1/v2 format selection; permitted binding field; each allowed version; kind string type and grammar; platform v1; v2 binding format; forbidden binding on v1",
+      "retainedAssertions": "E:186; F:38,55,89,121,188,723",
+      "addedAssertionsAndExposure": "NA:104-176; GC:53-88,382-441 (precise thrown errors)"
+    },
+    {
+      "id": "family-5",
+      "sourceBoundaryNavigation": "room/schema.ts:193,204,214",
+      "components": "Target checking after current binding; none permitted only on null; entry routing; actual named shape selection versus legacy-worded fallback; each thread/version/line/entry/null validator",
+      "retainedAssertions": "E:164,178; F:188; A:166,176",
+      "addedAssertionsAndExposure": "NA:179-245 explicit target errors + exhaustive shape oracle; explicit cases anchor shared shapeOf oracle"
+    },
+    {
+      "id": "family-6",
+      "sourceBoundaryNavigation": "room/schema.ts:233",
+      "components": "Recovery body plainness; op string/own target-map key; unknown-op fallback; none target; entry/line routing",
+      "retainedAssertions": "E:186; A:258",
+      "addedAssertionsAndExposure": "NA:136-176 (all op target shapes, inherited/unknown/nontext ops)"
+    },
+    {
+      "id": "family-7",
+      "sourceBoundaryNavigation": "room/schema.ts:322",
+      "components": "v1 versus declared body routing; renew exemption; roster and recover platform branches; declaration body branch",
+      "retainedAssertions": "E:90,186,209,224; F:38,863",
+      "addedAssertionsAndExposure": "NA:534-563 (v1, renew, roster, recover routing)"
+    },
+    {
+      "id": "family-8",
+      "sourceBoundaryNavigation": "room/schema.ts:434,441",
+      "components": "optional versus requiredFor versus default required; declared field and step defaults; required/optional union and closure; own-only field validation; every type branch; because presence/validation",
+      "retainedAssertions": "E:90,107; F:664,685,723; B:507",
+      "addedAssertionsAndExposure": "NA:251-270 (optional, required, because, closure); existing E:89-92 missing each field; audit2:507+ own fields"
+    },
+    {
+      "id": "family-9",
+      "sourceBoundaryNavigation": "room/schema.ts:455",
+      "components": "text type and UTF-8 max",
+      "retainedAssertions": "E:107; F:685",
+      "addedAssertionsAndExposure": "Existing E:107-158 text UTF8/type controls; independent full-table V:131"
+    },
+    {
+      "id": "family-10",
+      "sourceBoundaryNavigation": "room/schema.ts:458",
+      "components": "int type, safe-integer/fraction, min and max",
+      "retainedAssertions": "E:107; F:664,685",
+      "addedAssertionsAndExposure": "Existing E:107-158 int range/fraction controls"
+    },
+    {
+      "id": "family-11",
+      "sourceBoundaryNavigation": "room/schema.ts:461,464",
+      "components": "bool type; enum string type and membership",
+      "retainedAssertions": "E:107; F:685",
+      "addedAssertionsAndExposure": "NA:273-289 bool and enum exact errors / positive values"
+    },
+    {
+      "id": "family-12",
+      "sourceBoundaryNavigation": "room/schema.ts:467,468",
+      "components": "glob array type and declared count bound; primitive glob count/nonempty/grammar",
+      "retainedAssertions": "E:107",
+      "addedAssertionsAndExposure": "NA:290-308 glob list/type/bound/grammar"
+    },
+    {
+      "id": "family-13",
+      "sourceBoundaryNavigation": "room/schema.ts:471,474,477",
+      "components": "member and act fixed formats; segment string/UTF-8 bound; empty, dot, dot-dot and each prohibited character class; entropy fixed classification",
+      "retainedAssertions": "E:107",
+      "addedAssertionsAndExposure": "NA:309-331 segment per-character and legal-character controls; existing E member/act type controls"
+    },
+    {
+      "id": "family-14",
+      "sourceBoundaryNavigation": "room/schema.ts:489-523",
+      "components": "Each new platform-step field call site: open scope; take scope/generation/optional lease; version lease/generation/head; review head/verdict/scope/optional dependsOn; check fields; land lease/head; release lease/optional note; hand-over lease/to; comment optional replyTo",
+      "retainedAssertions": "E:90 (seven kinds),107; F:955; A:58",
+      "addedAssertionsAndExposure": "NA:334-482 + NB:47-77 all platform step fields; NA:503-528 hand-over helper-only"
+    },
+    {
+      "id": "family-15",
+      "sourceBoundaryNavigation": "room/schema.ts:530-548",
+      "components": "Check body obligation, checker, integration, config and runner formats; filtered plain input/tag/closed shape/snapshot/paths versus tree closed shape/tag/tree; volatile and ok bool separately; detail text bound; optional landOp format",
+      "retainedAssertions": "E:90; B:68,173; C:234",
+      "addedAssertionsAndExposure": "NA:421-480 + NB:47-77 check field types/formats/tag/closed objects/fixed entropy"
+    },
+    {
+      "id": "family-16",
+      "sourceBoundaryNavigation": "room/schema.ts:553-608",
+      "components": "Recovery plain body/op membership; each op's closed required/optional body; open goal/scope/plan/because; take scope/goal/plan/because/generation/lease; version lease/generation/head/summary/because; approve head/verdict/scope/dependsOn/text; land lease/head; release lease/note; note text/replyTo",
+      "retainedAssertions": "E:209; F:863,901; A:258; B:523",
+      "addedAssertionsAndExposure": "NB:83-417 each recover op body guard, optional-positive pairs, exact reason/rule"
+    },
+    {
+      "id": "family-17",
+      "sourceBoundaryNavigation": "room/schema.ts:616-628",
+      "components": "Platform kinds array/count/member/distinctness; grant map plain object/count/kind grammar/binding format; empty map accepted",
+      "retainedAssertions": "E:224; F:230,244,259,343",
+      "addedAssertionsAndExposure": "NB:419-469 grants; duplicate renew at 431 count-dominated, not separate distinctness red"
+    },
+    {
+      "id": "family-18",
+      "sourceBoundaryNavigation": "room/schema.ts:655,699,754",
+      "components": "v2 session/delegation closed body requires acts; platform-kind/map validation routing versus legacy; redemption passes active vocabulary into client-custody envelope check",
+      "retainedAssertions": "E:224; F:285,343,397; B:563",
+      "addedAssertionsAndExposure": "NB:471-503 sessions; GF:176-189 real client redemption active format"
+    },
+    {
+      "id": "family-19",
+      "sourceBoundaryNavigation": "room/admission.ts:225,297-313,359,361",
+      "components": "Retry shape-failure fallback versus ordinary replay; wrapper nonobject/null/array; key count and own envelope/sig; signature string; envelope object/null/actor/idempotency string/room equality; canonical profile/byte limit/digest success; prior exists/digest equality; valid signature; replay before active shape; repeated step 1 under decided policy",
+      "retainedAssertions": "F:89,175,188; A:243; B:550; independent earlier eight-test/repair controls retained by root",
+      "addedAssertionsAndExposure": "GC:373-449 exact retry/fallback wrappers/types/profile/digest/room/signature; imported original repair controls retained"
+    },
+    {
+      "id": "family-20",
+      "sourceBoundaryNavigation": "room/admission.ts:373-380",
+      "components": "Declared versus platform branch; current declaration exists; version 2 and signed binding equality independently; target only after current binding",
+      "retainedAssertions": "F:107,121,136,149,159; A:166,176",
+      "addedAssertionsAndExposure": "GC:53-88,71-78 exact target bad-request versus later lane refusal; GF:280-323 current own declaration/refusal details"
+    },
+    {
+      "id": "family-21",
+      "sourceBoundaryNavigation": "room/admission.ts:415-445,475",
+      "components": "Platform grant role; map kind exists; delegability and grantor role; binding equality; invitation session semantic routing versus delegation",
+      "retainedAssertions": "F:230,244,259,273,343; V:101",
+      "addedAssertionsAndExposure": "GC:346-356 delegated signed map meaning/role; GE:157-229 delegated map current role/meaning"
+    },
+    {
+      "id": "family-22",
+      "sourceBoundaryNavigation": "room/admission.ts:586,605,680-714",
+      "components": "renew/roster bypass; recovery op own string lookup; exactly one declared step; application purpose removed; each of goal/plan/summary/text retained only if string; recovery-only purpose; each step dispatch",
+      "retainedAssertions": "F:664,685,863,901; A:58; B:507,523",
+      "addedAssertionsAndExposure": "GC:94-113 recover dispatch; GC:137-203 prereads/multi-step fault; GD:209-220 review body; GD:235-263 text defaults"
+    },
+    {
+      "id": "family-23",
+      "sourceBoundaryNavigation": "room/admission.ts:620,628,634",
+      "components": "Refusal facts lane null/type/ID grammar; generation null/safe integer/positive; rule refusal identity tracked; declaration exists; refusal plan only; rule-owned wording preserved; slot absence/default and UTF-8 clipping",
+      "retainedAssertions": "F:739; B:406,418",
+      "addedAssertionsAndExposure": "GC:456-485 generation type/positive/integer profile; GD:47-147 per-step facts,156-194 rule-owned words,266-276 lane facts"
+    },
+    {
+      "id": "family-24",
+      "sourceBoundaryNavigation": "room/declared.ts:27-37",
+      "components": "Missing steps/hold skips; multi-step, hand-over, unanchored comment, scope template, conflict, reserve and workspace guards separately",
+      "retainedAssertions": "F:955 parser problem list and proposal outcomes",
+      "addedAssertionsAndExposure": "NA:94-101,508-513 staged valid hand-over; GF:370-394 unanchored-only and historical kinds; prior F staged cases retained"
+    },
+    {
+      "id": "family-25",
+      "sourceBoundaryNavigation": "room/declared.ts:55-78",
+      "components": "Eight allowed slots, absent fact; bound early return, code-point prefix loop preserving BOM and excluding next over-budget code point; no wording versus declared wording",
+      "retainedAssertions": "F:739; B:406,418",
+      "addedAssertionsAndExposure": "audit2:406-456 exact UTF8/BOM bounds; GD:156-194 policy-word ownership; finalBoundary audit2:460-496"
+    },
+    {
+      "id": "family-26",
+      "sourceBoundaryNavigation": "room/admission.ts:733,753-761",
+      "components": "Recorded versus current lease; v1/renew exemption; recover only on recovery threads including absent thread; declared acts barred on recovery; entry exempt from ordinary thread list; allowed/missing thread kind",
+      "retainedAssertions": "F:557,566,582,790,817,833; A:321",
+      "addedAssertionsAndExposure": "GC:284-343 task/recovery/entry/v1/renew; GD:198-233 recover+renew explicit cases"
+    },
+    {
+      "id": "family-27",
+      "sourceBoundaryNavigation": "room/admission.ts:934,1004,1232,1238,1279,1383,1524,1576",
+      "components": "Each take/version/entry comment/line comment/review/check/land/release call to threadCheck and its recorded refusal; helper coverage alone does not prove every invocation",
+      "retainedAssertions": "F:535,557,566; A:58",
+      "addedAssertionsAndExposure": "GC:205-298 SITES constructs all eight invocation cases, exact recorded wrong-thread + accepted counterpart"
+    },
+    {
+      "id": "family-28",
+      "sourceBoundaryNavigation": "room/admission.ts:843,865-917,1127,1265,1365,1705,1781",
+      "components": "Actual kind/recovery op and binding record; recorded default/specified lease; recovery/ordinary and declared/legacy conflict; opened effect; goal/summary/text defaults; invitation era and map persistence",
+      "retainedAssertions": "F:55,685,790,817,847,863,901; A:285; B:507,523",
+      "addedAssertionsAndExposure": "GC:497-538 kind/empty goal/lease/conflict; GD:235-263 summary/text defaults; GE:336-359 era; existing records retained"
+    },
+    {
+      "id": "family-29",
+      "sourceBoundaryNavigation": "room/authority.ts:65,119,151,187",
+      "components": "Kind class legacy/platform/recovery/declared/missing; effective kind/binding for workspace auth; declared current role versus legacy role; recovery legacy-role allowance; delegation era/map own coverage/binding/delegable; legacy map intersection and grantor current role",
+      "retainedAssertions": "F:75,244,381,503,1021,1045; A:258; B:210,231,239",
+      "addedAssertionsAndExposure": "GE:56-229 own key/platform/declared/delegation; GE:261-332 recovery role and refusal order; audit2:638-650 nontext op"
+    },
+    {
+      "id": "family-30",
+      "sourceBoundaryNavigation": "room/authority.ts:76-83",
+      "components": "No delegation; key exists/active; member exists/active; admin role separately",
+      "retainedAssertions": "B:322 direct SQL paired controls; B:295,311 reservation behavior",
+      "addedAssertionsAndExposure": "Existing audit2:322 direct SQL paired controls retained; no new automatic coverage claim"
+    },
+    {
+      "id": "family-31",
+      "sourceBoundaryNavigation": "room/roster.ts:46,141,172",
+      "components": "Shared vocabulary role routing except roster; map present/null stored distinction; invitation declared flag",
+      "retainedAssertions": "F:75,273,311,343,418,503; A:229",
+      "addedAssertionsAndExposure": "NE:19-39 direct module-export roster role semantics; GE:112-131 actual roster authority; GE:168-184 map reads"
+    },
+    {
+      "id": "family-32",
+      "sourceBoundaryNavigation": "room/requests.ts:120-134",
+      "components": "Legacy propose versus recovery versus declared version acts; version step and permitted thread independently; member/delegation authority and current binding; try another permitted kind; no candidate versus unknown lane",
+      "retainedAssertions": "F:989,1006,1021,1045; A:58",
+      "addedAssertionsAndExposure": "GF:47-124 workspace signer/lane ordering, two candidates both declaration orders, active binding, v1; GE:236-258 recover/workspace"
+    },
+    {
+      "id": "family-33",
+      "sourceBoundaryNavigation": "room/requests.ts:245-302,360",
+      "components": "v1 active with nonempty v2 map stale; invitation era/no-session prevents gain; role absent; v2 explicit map/current retired kind; legacy session wildcard/explicit intersection; empty v1 grants refused; grant calculation inside serial queue",
+      "retainedAssertions": "F:285,311,363,397,418; A:203,214,229; B:563",
+      "addedAssertionsAndExposure": "GF:128-189 session era/intersection/client join; GE:336-359 admission-era read and bearer grants"
+    },
+    {
+      "id": "family-34",
+      "sourceBoundaryNavigation": "room/requests.ts:459-515",
+      "components": "Bearer input plain/closed; explicit binding versus inferred named-tool binding; retained original envelope only on exact digest; prior idempotency/kind strings, prior entry, non-system and same-kind; code-review own kind/platform/v1 exclusions",
+      "retainedAssertions": "F:434,476; A:243; B:550; functional probes owned by formalism agent",
+      "addedAssertionsAndExposure": "GF:192-278 real bearer envelope fields/types/retry before-after vocab; original root functional controls retained"
+    },
+    {
+      "id": "family-35",
+      "sourceBoundaryNavigation": "room/core.ts:184,661-750",
+      "components": "Deep freeze nonobject/null/already-frozen recursion; v2 parser dispatch; checker config validation; historical opening kinds; validator and staged errors; binding existence/cache version/miss; policy cache hit/missing row/freeze/at most four versions",
+      "retainedAssertions": "F:66,939,955; B:448,475,490",
+      "addedAssertionsAndExposure": "GF:325-394 malformed JSON/policy/checker files, historical opener names; existing cache/freeze controls retained"
+    },
+    {
+      "id": "family-36",
+      "sourceBoundaryNavigation": "room/core.ts:945,1117-1135,1476",
+      "components": "v1 lane input omits kind; v2 kind/null input; recovery admin-own reservation; ordinary current kind/role; delegation binding only if declared active; own-key operation keeps accepted meaning; declared/legacy revert lease and conflict",
+      "retainedAssertions": "F:610,629,847; A:97,123,142; B:210,219,225,231,239,246,269,277,295,311",
+      "addedAssertionsAndExposure": "Existing original reservation/mint controls retained; formalism agent owns fresh actual cap/mint probes"
+    },
+    {
+      "id": "family-37",
+      "sourceBoundaryNavigation": "room/jobs.ts:342-382,459-518",
+      "components": "v2 config-selected kind/binding versus v1 neither; needed-now job decision; re-read after awaited token and serial fence; current policy/config used in sent job; reissue only non-null refusal/binding-stale plus actual room rebind and still-needed job",
+      "retainedAssertions": "B:68,78,92,119,144,157,173; earlier independent held-mint controls retained by root",
+      "addedAssertionsAndExposure": "GF:396-460 stale-only retry versus other refusal; existing audit2 job dispatch controls retained; stage4 full sent-job ending remains owed"
+    },
+    {
+      "id": "family-38",
+      "sourceBoundaryNavigation": "checkers/job.ts:113,133-136; checker.ts:229",
+      "components": "kind or binding present enters v2 job validation; both string types; kind grammar and binding digest; signedAs both-string selection; signed envelope v/kind/optional binding from validated job",
+      "retainedAssertions": "C:30,66,234",
+      "addedAssertionsAndExposure": "CF:23-47 exact NOT_BOTH boxed/null/list/number and owned copy; existing checkers:234-265 producer signed envelope + Ledger exposure"
+    },
+    {
+      "id": "family-39",
+      "sourceBoundaryNavigation": "room/reads.ts:278,309",
+      "components": "Version evidence by stored version rather than name; target lane shape/presence; opened effect identifies thread versus no opened effect",
+      "retainedAssertions": "A:23,43,58",
+      "addedAssertionsAndExposure": "Existing audit:23,43,58 stored-version evidence controls retained"
+    },
+    {
+      "id": "family-40",
+      "sourceBoundaryNavigation": "room/store.ts:181-184",
+      "components": "Each column absence adds once; old null kind backfill; room revert versus ordinary claim; already populated values retained",
+      "retainedAssertions": "F:1065,1098",
+      "addedAssertionsAndExposure": "GF:463-480 nonempty kind-preserving rerun; original F:1063-1115 stored 1/2/3, actual abort/reopen, 4 rerun, exact SQL rows retained"
+    },
+    {
+      "id": "family-final-boundary-wording",
+      "sourceBoundaryNavigation": "room/admission.ts:335-340",
+      "components": "final judge refusal uses declaration wording/facts; existing authority equality / lane lease movement guards remain",
+      "retainedAssertions": "audit2:460-496",
+      "addedAssertionsAndExposure": "audit2:476-481 exact late/early reason+fix, no recorded act; :495 default platform wording; real Room gated policy"
+    },
+    {
+      "id": "family-recover-op-text",
+      "sourceBoundaryNavigation": "room/authority.ts:159-163",
+      "components": "do not coerce a nontext op into legacy role-table authorization; known string op judged before invalid-body; unknown/nontext op left to step5",
+      "retainedAssertions": "GE:261-332",
+      "addedAssertionsAndExposure": "audit2:646-650 checker known string role-forbids, array all three roles invalid-body, unknown string invalid-body, no log growth; real Room"
+    }
+  ]
+}

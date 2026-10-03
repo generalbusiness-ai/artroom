@@ -1,0 +1,57 @@
+diff --git a/docs/protocol.md b/docs/protocol.md
+index ba091d33..1f346391 100644
+--- a/docs/protocol.md
++++ b/docs/protocol.md
+@@ -3769,7 +3769,8 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
+   `[a-z0-9][a-z0-9-]{0,63}`), `globs` (with `max`, 1 to 64 patterns, in
+   the restricted syntax of R-PATH-1), `member` (a member handle), `act`
+   (an entry ID) and `segment` (one path segment: 1 to 255 bytes, not `.`
+-  or `..`, with no `/` and no glob metacharacter).
++  or `..`, with no `/` and none of the characters R-PATH-1 keeps out of a
++  pattern: `*`, `?`, `[`, `]`, `{`, `}`, `!` and `\`).
+ - A field is required for every target of the act unless it says
+   `optional: true`, or `requiredFor` lists the target shapes where it is
+   required (a non-empty, distinct subset of the act's targets). A field
+diff --git a/packages/room/src/admission.ts b/packages/room/src/admission.ts
+index 85cb5b08..88e8255a 100644
+--- a/packages/room/src/admission.ts
++++ b/packages/room/src/admission.ts
+@@ -335,7 +335,8 @@ function stepOne(input: unknown, doc: AnyPolicyDocument | undefined): void {
+ export function finalBoundary(core: RoomCore, plan: Extract<Plan, { t: "refused" | "accept" }>): Refusal | null {
+   const ctx = plan.ctx;
+   const j = judge(core.sql, ctx.env, ctx.path, core.now(), core.activePolicy().doc);
+-  if (!j.ok) return j.refusal;
++  // A refusal decided here is a platform refusal of the act like any other: in its declaration's words (R-DECL-13).
++  if (!j.ok) return worded(j.refusal, ctx.decl, ctx.facts); // G2:boundary-wording
+   if (canonicalize(j.authority) !== canonicalize(ctx.authority)) throw new Moved();
+   const lane = laneOf(ctx.env);
+   if (lane) {
+diff --git a/packages/room/src/authority.ts b/packages/room/src/authority.ts
+index c4dfa617..00111c45 100644
+--- a/packages/room/src/authority.ts
++++ b/packages/room/src/authority.ts
+@@ -155,7 +155,9 @@ export function judge(
+   } else if (cls === "recover") {
+     // R-DECL-21: exactly as a legacy configuration-recovery lane. A role that could not sign the legacy act an op
+     // stands for is refused here, unrecorded; any other signer is judged admin-required at step 7, as it was.
+-    const legacy = as ? "propose" : RECOVER_LEGACY[String((env.body as { op?: unknown } | null)?.op)];
++    // The op is read only as text: a list holding the name is not the name.
++    const op = (env.body as { op?: unknown } | null)?.op;
++    const legacy = as ? "propose" : typeof op === "string" ? RECOVER_LEGACY[op] : undefined; // G2:recover-op-text
+     if (legacy !== undefined && !roleMaySign(member.role, legacy))
+       return no("role-forbids", `The role ${member.role} may not sign recover.`, "Configuration recovery needs an active admin's own key."); // G2:recover-role
+   }
+diff --git a/packages/room/src/schema.ts b/packages/room/src/schema.ts
+index c5d1d851..e888bb7b 100644
+--- a/packages/room/src/schema.ts
++++ b/packages/room/src/schema.ts
+@@ -475,7 +475,8 @@ function declaredField(c: Checker, f: DeclaredField, v: unknown, path: string):
+       return;
+     case "segment": {
+       const s = c.string(v, path, 255);
+-      if (s === "" || s === "." || s === ".." || /[/*?[\]{}!]/.test(s)) c.error(path, "must be one path segment, with no slash or glob character"); // G2:field-segment
++      // The characters R-PATH-1 keeps out of a pattern, and the slash: a segment may fill a slot of a scope template.
++      if (s === "" || s === "." || s === ".." || /[/*?[\]{}!\\]/.test(s)) c.error(path, "must be one path segment, with no slash or glob character"); // G2:field-segment
+       c.fixed.add(path); // G2:field-fixed
+       return;
+     }

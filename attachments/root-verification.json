@@ -1,0 +1,15 @@
+{
+  "manifestCount": 306,
+  "manifestSha256": "edf9f9ba235d7eee181803bfbd6378fdc84afa5355b1151bcc21df9e29db32af",
+  "manifestBad": [],
+  "snapshotCount": 288,
+  "snapshotBad": [],
+  "trackedCount": 700,
+  "trackedBad": [],
+  "headAndTree": [
+    "9aa91f52f6cf4ba9a9068e1bf8cc112b7a1a0eab",
+    "1a71e5eb861dbb92e70567d7c93f9ec8d5695b0f"
+  ],
+  "status": "",
+  "operations": "Read-only immutable snapshot/blob and checkout byte verification; no runtime, install, source edit or mutation."
+}

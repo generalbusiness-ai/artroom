@@ -1,0 +1,309 @@
+{
+  "head": "9aa91f52f6cf4ba9a9068e1bf8cc112b7a1a0eab",
+  "base": "815e3383a80dafa5a4ab4891cc5450993e07e904",
+  "declarationLeaves": [
+    {
+      "path": "claim.label",
+      "value": "Claim"
+    },
+    {
+      "path": "claim.targets.none.0",
+      "value": "open"
+    },
+    {
+      "path": "claim.targets.thread.0",
+      "value": "take"
+    },
+    {
+      "path": "claim.threads.0",
+      "value": "claim"
+    },
+    {
+      "path": "claim.threads.1",
+      "value": "room"
+    },
+    {
+      "path": "claim.body.goal.type",
+      "value": "text"
+    },
+    {
+      "path": "claim.body.goal.max",
+      "value": 1024
+    },
+    {
+      "path": "claim.body.goal.requiredFor.0",
+      "value": "none"
+    },
+    {
+      "path": "claim.body.plan.type",
+      "value": "text"
+    },
+    {
+      "path": "claim.body.plan.max",
+      "value": 16384
+    },
+    {
+      "path": "claim.body.plan.optional",
+      "value": true
+    },
+    {
+      "path": "claim.who.roles.0",
+      "value": "maintainer"
+    },
+    {
+      "path": "claim.who.roles.1",
+      "value": "member"
+    },
+    {
+      "path": "claim.who.roles.2",
+      "value": "agent"
+    },
+    {
+      "path": "claim.hold.scope",
+      "value": "body.scope"
+    },
+    {
+      "path": "claim.hold.workspace",
+      "value": true
+    },
+    {
+      "path": "propose.label",
+      "value": "Propose"
+    },
+    {
+      "path": "propose.targets.thread.0",
+      "value": "version"
+    },
+    {
+      "path": "propose.threads.0",
+      "value": "claim"
+    },
+    {
+      "path": "propose.threads.1",
+      "value": "room"
+    },
+    {
+      "path": "propose.body.summary.type",
+      "value": "text"
+    },
+    {
+      "path": "propose.body.summary.max",
+      "value": 8192
+    },
+    {
+      "path": "propose.who.roles.0",
+      "value": "maintainer"
+    },
+    {
+      "path": "propose.who.roles.1",
+      "value": "member"
+    },
+    {
+      "path": "propose.who.roles.2",
+      "value": "agent"
+    },
+    {
+      "path": "note.label",
+      "value": "Note"
+    },
+    {
+      "path": "note.targets.entry.0",
+      "value": "comment"
+    },
+    {
+      "path": "note.targets.line.0",
+      "value": "comment"
+    },
+    {
+      "path": "note.threads.0",
+      "value": "claim"
+    },
+    {
+      "path": "note.threads.1",
+      "value": "room"
+    },
+    {
+      "path": "note.body.text.type",
+      "value": "text"
+    },
+    {
+      "path": "note.body.text.max",
+      "value": 16384
+    },
+    {
+      "path": "note.who.roles.0",
+      "value": "maintainer"
+    },
+    {
+      "path": "note.who.roles.1",
+      "value": "member"
+    },
+    {
+      "path": "note.who.roles.2",
+      "value": "agent"
+    },
+    {
+      "path": "note.who.roles.3",
+      "value": "checker"
+    },
+    {
+      "path": "review.label",
+      "value": "Review"
+    },
+    {
+      "path": "review.targets.version.0",
+      "value": "review"
+    },
+    {
+      "path": "review.threads.0",
+      "value": "claim"
+    },
+    {
+      "path": "review.threads.1",
+      "value": "room"
+    },
+    {
+      "path": "review.body.text.type",
+      "value": "text"
+    },
+    {
+      "path": "review.body.text.max",
+      "value": 16384
+    },
+    {
+      "path": "review.who.roles.0",
+      "value": "maintainer"
+    },
+    {
+      "path": "review.who.roles.1",
+      "value": "member"
+    },
+    {
+      "path": "review.who.roles.2",
+      "value": "agent"
+    },
+    {
+      "path": "check.label",
+      "value": "Check"
+    },
+    {
+      "path": "check.targets.version.0",
+      "value": "check"
+    },
+    {
+      "path": "check.threads.0",
+      "value": "claim"
+    },
+    {
+      "path": "check.threads.1",
+      "value": "room"
+    },
+    {
+      "path": "check.who.roles.0",
+      "value": "checker"
+    },
+    {
+      "path": "land.label",
+      "value": "Land"
+    },
+    {
+      "path": "land.targets.version.0",
+      "value": "land"
+    },
+    {
+      "path": "land.threads.0",
+      "value": "claim"
+    },
+    {
+      "path": "land.threads.1",
+      "value": "room"
+    },
+    {
+      "path": "land.who.roles.0",
+      "value": "maintainer"
+    },
+    {
+      "path": "land.who.roles.1",
+      "value": "member"
+    },
+    {
+      "path": "land.who.roles.2",
+      "value": "agent"
+    },
+    {
+      "path": "release.label",
+      "value": "Release"
+    },
+    {
+      "path": "release.targets.thread.0",
+      "value": "release"
+    },
+    {
+      "path": "release.threads.0",
+      "value": "claim"
+    },
+    {
+      "path": "release.threads.1",
+      "value": "room"
+    },
+    {
+      "path": "release.who.roles.0",
+      "value": "maintainer"
+    },
+    {
+      "path": "release.who.roles.1",
+      "value": "member"
+    },
+    {
+      "path": "release.who.roles.2",
+      "value": "agent"
+    }
+  ],
+  "defaultRequiredness": [
+    [
+      "claim.body.goal.optional",
+      "absent => required on none through requiredFor; not required on thread",
+      "packages/room/test/node/declared-equivalence.test.ts:47,65-68,77,89-92; packages/room/test/node/declared-guards-a.test.ts:251-258",
+      "goal removed on none; goal present; thread missing goal remains legal"
+    ],
+    [
+      "propose.body.summary.optional",
+      "absent => required",
+      "packages/room/test/node/declared-equivalence.test.ts:49,65-68,78,89-92",
+      "summary removed from otherwise valid propose body; summary present"
+    ],
+    [
+      "note.body.text.optional",
+      "absent => required on entry and line",
+      "packages/room/test/node/declared-equivalence.test.ts:65-68,79,89-92",
+      "text removed from valid entry and line bodies; text present"
+    ],
+    [
+      "review.body.text.optional",
+      "absent => required",
+      "packages/room/test/node/declared-equivalence.test.ts:50,65-68,80,89-92",
+      "text removed from otherwise valid review body; text present"
+    ]
+  ],
+  "markerCount": 130,
+  "navigationCandidateCount": 485,
+  "assertionIndexFiles": [
+    "packages/checkers/test/declared-guards-f.test.ts",
+    "packages/policy/test/declared-guards-e.test.ts",
+    "packages/room/test/node/declared-guards-a.test.ts",
+    "packages/room/test/node/declared-guards-b.test.ts",
+    "packages/room/test/node/declared-guards-e.test.ts",
+    "packages/room/test/workerd/declared-guards-c-fd6f00b6.test.ts",
+    "packages/room/test/workerd/declared-guards-d-fd6f00b6.test.ts",
+    "packages/room/test/workerd/declared-guards-e-fd6f00b6.test.ts",
+    "packages/room/test/workerd/declared-guards-f-fd6f00b6.test.ts",
+    "packages/room/test/workerd/declared-audit2-fd6f00b6.test.ts",
+    "packages/policy/test/vocabulary.test.ts",
+    "packages/room/test/node/declared-equivalence.test.ts",
+    "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "packages/room/test/workerd/declared-audit-fd6f00b6.test.ts",
+    "packages/policy/test/declared-acts.test.ts",
+    "packages/checkers/test/checkers.test.ts"
+  ],
+  "limit": "Static source index; loop-generated test titles remain expressions; an assertion line is not a mutant red."
+}

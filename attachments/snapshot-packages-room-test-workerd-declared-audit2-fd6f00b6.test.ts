@@ -1,0 +1,652 @@
+/**
+ * Declared acts stage 2 (request fd6f00b6): the cases of the second audit of
+ * 15fa7f4c. Each test names the rule it holds the Room to. Envelopes are
+ * signed by the test itself (declared-support.ts), so the harness converts
+ * nothing here, and the file runs in the legacy run only.
+ */
+import { describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
+import type { ActDeclaration, ActRecord, CheckerService, CheckJob, Claim, PolicyDocument, PolicyDocumentV2, Redeemed, Refusal, Review, RosterRecord } from "@generalbusiness/artroom-contract";
+import { policy, requireCheck, requireReview, validatePolicyV2 } from "@generalbusiness/artroom-policy";
+import { canonicalize } from "../../src/canonical.ts";
+import { WORDING_FILLED_BYTES } from "../../src/declared.ts";
+import { adminOwnKey } from "../../src/authority.ts";
+import { JOB_RETRY_MS } from "../../src/jobs.ts";
+import { redeem } from "../../src/requests.ts";
+import { activate, act, bindingIn, declaredRoom, inDO, ok, signed, v2 } from "./declared-support.ts";
+import { addMember, advance, b64url, call, Client, clock, day, DECLARED, digestBytes, expectOk, expectRefusal, iso, makeRoom, newKeyPair, pushChange, randomBytes, sign, tick, until, type TestRoom } from "./support.ts";
+
+const R = `sha256:${"0".repeat(64)}` as const;
+const reviewed = () => policy(requireReview({ paths: "src/**", from: "role:admin", id: "rv" }));
+const landing = (r: TestRoom, op: string) =>
+  inDO(r, (room) => {
+    const v = room.core.landing.view(op as never) as unknown as { state: string; reason?: string; fix?: string };
+    return { state: v.state, reason: v.reason, fix: v.fix };
+  });
+const jobs = (r: TestRoom) => inDO(r, (room) => room.core.sql.all("SELECT state, outcome, attempt FROM check_jobs ORDER BY rowid") as unknown as { state: string; outcome: string | null; attempt: number }[]);
+
+// ------------------------------------------------------------ check jobs (R-DECL-18)
+
+describe.skipIf(DECLARED)("check jobs in a v2 room name the kind and binding to sign (R-DECL-18, R-EXEC-8)", () => {
+  type Sent = { job: CheckJob & { kind?: string; binding?: string }; out: unknown };
+
+  /** A v2 room whose `src/**` needs the check `unit`, and a checker that signs exactly what its job names, as packages/checkers does. */
+  async function checked(before: (job: Sent["job"], n: number) => Promise<void> | undefined = async () => {}, signAs?: (job: Sent["job"]) => { v: number; kind: string; binding?: string }, settle = true, prepare: (r: TestRoom) => void = () => {}, fake?: (job: Sent["job"]) => unknown) {
+    const base = () => policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
+    const doc = v2(() => {}, base());
+    const cfg = { format: "artroom-checker-v2", act: "check", volatile: false, timeoutSeconds: 60, runner: R };
+    const r = await makeRoom({ policy: doc as unknown as PolicyDocument, files: { ".artroom/checkers/unit.json": JSON.stringify(cfg) } });
+    const alice = await addMember(r, "@alice", "member");
+    const ci = await addMember(r, "@ci", "checker");
+    const seen: Sent[] = [];
+    const service: CheckerService = {
+      async handle(job) {
+        const j = job as Sent["job"];
+        const n = seen.length;
+        seen.push({ job: j, out: undefined });
+        await before(j, n);
+        if (fake) return (seen[n]!.out = fake(j)) as never;
+        const as = signAs ? signAs(j) : { v: j.binding ? 2 : 1, kind: j.kind ?? "check", ...(j.binding ? { binding: j.binding } : {}) };
+        const body = { obligation: job.obligation, check: job.check, integration: job.integration, input: job.input, config: job.config, runner: job.runner ?? R, volatile: job.volatile, ok: true, detail: "Machine-run check", ...(job.landOp ? { landOp: job.landOp } : {}) };
+        const stub = env.ROOMS.get(env.ROOMS.idFromName(r.id)) as never as TestRoom["stub"];
+        const envelope = { v: as.v, room: r.id, actor: ci.key, kind: as.kind, ...(as.binding ? { binding: as.binding } : {}), target: { lane: job.lane, generation: job.generation }, body, idempotencyKey: `chk-${job.id}`.slice(0, 64) };
+        const out = await call(stub.submit({ envelope, sig: sign(ci.keys.seed, "artroom-envelope-v1", envelope) } as never));
+        seen[n]!.out = out;
+        return out as never;
+      },
+    };
+    r.world.checkers["unit"] = service;
+    const c = await ok<Claim>(r, alice, "claim", null, { goal: "work", scope: ["src/**"] });
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    prepare(r);
+    await ok(r, alice, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "change" });
+    // A test that holds the checker's answer cannot wait for the room to be idle.
+    if (settle) await inDO(r, (room) => room.core.idle());
+    return { r, alice, c, head, seen, base, ci };
+  }
+
+  it("the job carries the check act's kind and its active binding; a check signed with them is admitted, and the landing lands", async () => {
+    const { r, alice, c, head, seen } = await checked();
+    const l = (await ok(r, alice, "land", { lane: c.lane, generation: 1 }, { lease: 1, head })) as unknown as { op: { id: string } };
+    await tick(r, 6);
+    expect(seen.length).toBeGreaterThan(0);
+    for (const s of seen) expect(s.job).toMatchObject({ kind: "check", binding: await bindingIn(r, "check") });
+    expect(seen.every((s) => (s.out as ActRecord).kind === "check" && !("refused" in (s.out as object)))).toBe(true);
+    expect((await landing(r, l.op.id)).state).toBe("landed");
+  });
+
+  it("a v1 room's job names neither", async () => {
+    const r = await makeRoom({ policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })), files: { ".artroom/checkers/unit.json": JSON.stringify({ format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: R }) } });
+    const alice = await addMember(r, "@alice", "member");
+    const got: CheckJob[] = [];
+    r.world.checkers["unit"] = { handle: async (job) => (got.push(job), { refused: true, rule: "invalid-body", reason: "not run" }) as never };
+    const c = await alice.ok<Claim>("claim", null, { goal: "work", scope: ["src/**"] });
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    await alice.ok("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "change" });
+    await inDO(r, (room) => room.core.idle());
+    await tick(r, 3);
+    expect(got.length).toBeGreaterThan(0);
+    expect("kind" in got[0]! || "binding" in got[0]!).toBe(false);
+  });
+
+  it("a check signed under a binding an activation has replaced is binding-stale; the job is due again and its next attempt names the binding in force", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    // The first job's check is signed only after the test has changed the meaning of `check`.
+    const s = await checked(async (_job, n) => (n === 0 ? gate : undefined), undefined, false);
+    await until(async () => s.seen.length > 0);
+    const old = s.seen[0]!.job.binding!;
+    await activate(s.r, v2((a) => void (a["check"] = { ...a["check"]!, body: { remark: { type: "text", max: 10, optional: true } } }), s.base()));
+    const now = (await bindingIn(s.r, "check"))!;
+    expect(now).not.toBe(old);
+    release();
+    await until(async () => s.seen[0]!.out !== undefined);
+    await inDO(s.r, (room) => room.core.idle());
+    expectRefusal(s.seen[0]!.out, "binding-stale");
+    // Not ended as refused: every job the stale check answered is owed again.
+    const after = await jobs(s.r);
+    expect(after.some((j) => j.outcome === "refused: binding-stale")).toBe(false);
+    expect(after.some((j) => j.state === "owed")).toBe(true);
+    advance(JOB_RETRY_MS + 1000);
+    await tick(s.r, 3);
+    await inDO(s.r, (room) => room.core.idle());
+    const later = s.seen.filter((x) => x.job.binding === now);
+    expect(later.length).toBeGreaterThan(0);
+    expect((later[later.length - 1]!.out as ActRecord).kind).toBe("check");
+    expect((await jobs(s.r)).every((j) => j.state === "done")).toBe(true);
+  });
+
+  it("a job prepared while an activation replaced the binding names the binding in force when it is sent", async () => {
+    // The job's read token is held at Artifacts, so the job is being prepared when the meaning of `check` changes.
+    let calls = 0;
+    const s = await checked(undefined, undefined, false, (r) => {
+      const a = r.world.artifacts;
+      calls = a.remoteCalls.get("createToken") ?? 0;
+      a.holdToken = (repo, scope) => scope === "read" && repo === a.canonical;
+    });
+    const a = s.r.world.artifacts;
+    await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls);
+    expect(s.seen.length).toBe(0);
+    const old = (await bindingIn(s.r, "check"))!;
+    await activate(s.r, v2((x) => void (x["check"] = { ...x["check"]!, body: { remark: { type: "text", max: 10, optional: true } } }), s.base()));
+    const now = (await bindingIn(s.r, "check"))!;
+    expect(now).not.toBe(old);
+    a.holdToken = null;
+    await until(async () => s.seen.length > 0 && s.seen[0]!.out !== undefined);
+    await inDO(s.r, (room) => room.core.idle());
+    // The same attempt, sent once, with the binding of the document now in force; its check is admitted.
+    expect(s.seen[0]!.job.binding).toBe(now);
+    expect((s.seen[0]!.out as ActRecord).kind).toBe("check");
+    expect(s.seen.length).toBe(1);
+    expect(await jobs(s.r)).toMatchObject([{ state: "done", attempt: 1 }]);
+  });
+
+  it("the Room judges the change of binding itself: a service that answers binding-stale and names another binding as current is not asked again", async () => {
+    // The answer is not the Room's own refusal: nothing was submitted, and the binding in force is the one the job named.
+    const made = { refused: true, rule: "binding-stale", reason: "made up", current: { binding: `sha256:${"f".repeat(64)}`, policy: "act_1_00000000" } };
+    const { r, seen } = await checked(undefined, undefined, true, undefined, () => made);
+    await tick(r, 3);
+    expect(seen.length).toBe(1);
+    expect(seen[0]!.job.binding).toBe(await bindingIn(r, "check"));
+    expect(await jobs(r)).toEqual([{ state: "done", outcome: "refused: binding-stale", attempt: 1 }]);
+    advance(JOB_RETRY_MS + 1000);
+    await tick(r, 3);
+    expect(seen.length).toBe(1);
+  });
+
+  it("a job whose binding was replaced and that is no longer needed ends as refused, and is not sent again", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const s = await checked(async (_job, n) => (n === 0 ? gate : undefined), undefined, false);
+    await until(async () => s.seen.length > 0);
+    // While the first job runs: the meaning of `check` changes, and a second version makes the first one's check unneeded.
+    await activate(s.r, v2((a) => void (a["check"] = { ...a["check"]!, body: { remark: { type: "text", max: 10, optional: true } } }), s.base()));
+    const head2 = pushChange(s.r, s.c.lane, { "src/app.ts": "v3" }, s.head);
+    await ok(s.r, s.alice, "propose", { lane: s.c.lane }, { lease: 1, expectedGeneration: 1, head: head2, summary: "again" });
+    release();
+    await until(async () => s.seen[0]!.out !== undefined);
+    await inDO(s.r, (room) => room.core.idle());
+    expectRefusal(s.seen[0]!.out, "binding-stale");
+    expect((await jobs(s.r))[0]).toEqual({ state: "done", outcome: "refused: binding-stale", attempt: 1 });
+  });
+
+  it("a checker that was given the binding in force and is still refused binding-stale is not asked again", async () => {
+    // It signs `v: 1` with no binding, whatever its job says.
+    const { r, seen } = await checked(async () => {}, () => ({ v: 1, kind: "check" }));
+    await tick(r, 3);
+    expect(seen.length).toBe(1);
+    expectRefusal(seen[0]!.out, "binding-stale");
+    expect(await jobs(r)).toEqual([{ state: "done", outcome: "refused: binding-stale", attempt: 1 }]);
+    advance(JOB_RETRY_MS + 1000);
+    await tick(r, 3);
+    expect(seen.length).toBe(1);
+  });
+});
+
+// ------------------------------------------------------------ reservation (R-LAND-7)
+
+describe.skipIf(DECLARED)("reservation judges authority as for a new admission (R-LAND-7, R-DECL-17, R-DECL-21)", () => {
+  async function flight(delegated: boolean, change: (a: Record<string, ActDeclaration>) => void) {
+    const r = await declaredRoom(v2(() => {}, reviewed()));
+    const bob = await addMember(r, "@bob", "member");
+    const k = newKeyPair();
+    const acts: Record<string, string> = {};
+    for (const kind of ["claim", "propose", "land", "release"]) acts[kind] = (await bindingIn(r, kind))!;
+    const g = await ok<RosterRecord>(r, bob, "roster", null, { op: "delegate", to: k.key, kinds: ["renew"], acts, lanes: "*", expiresAt: iso(clock.now + day) }, { binding: null });
+    const who = delegated ? new Client(r, k, g.id) : bob;
+    const c = await ok<Claim>(r, who, "claim", null, { goal: "g", scope: ["src/a.ts"] });
+    const head = pushChange(r, c.lane, { "src/a.ts": "a" });
+    await ok(r, who, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" });
+    await ok(r, r.admin, "review", { lane: c.lane, generation: 1 }, { head, verdict: "approve", scope: ["src/**"], text: "ok" });
+    const oldLand = (await bindingIn(r, "land"))!;
+    const l = (await ok(r, who, "land", { lane: c.lane, generation: 1 }, { lease: 1, head })) as unknown as { op: { id: string } };
+    await activate(r, v2(change, reviewed()));
+    const changed = (await bindingIn(r, "land")) !== oldLand;
+    await tick(r, 8);
+    return { r, who, c, head, out: await landing(r, l.op.id), changed };
+  }
+  const reworded = (a: Record<string, ActDeclaration>) => void (a["land"] = { ...a["land"]!, body: { why: { type: "text", max: 10, optional: true } } });
+
+  it("a landing under a delegation whose binding of land is no longer the active one loses its authority, as a new land under that grant would", async () => {
+    const { r, who, c, head, out, changed } = await flight(true, reworded);
+    expect(changed).toBe(true);
+    expect(out).toMatchObject({ state: "retryable", reason: "authority-lost" });
+    expect(out.fix).toContain("earlier meaning of land");
+    // What a new admission says of the same grant now.
+    expectRefusal(await act(r, who, "land", { lane: c.lane, generation: 1 }, { lease: 1, head }), "delegation-invalid");
+  });
+
+  it("the same landing under a delegation lands when the activation leaves the binding of land as it was", async () => {
+    const { out, changed } = await flight(true, (a) => void (a["note"] = { ...a["note"]!, label: "Remark" }));
+    expect(changed).toBe(false);
+    expect(out.state).toBe("landed");
+  });
+
+  it("a landing by the member's own key completes under the declaration it was admitted in, though the binding of land has changed (R-DECL-23)", async () => {
+    const { out, changed } = await flight(false, reworded);
+    expect(changed).toBe(true);
+    expect(out.state).toBe("landed");
+  });
+
+  it("a landing by the member's own key whose role the active declaration no longer lets sign land loses its authority, whatever the binding", async () => {
+    const { out, changed } = await flight(false, (a) => void (a["land"] = { ...a["land"]!, who: { roles: ["maintainer"] } }));
+    // `who` is not part of the binding (R-DECL-15): the meaning is the same, and the signer's current role decides.
+    expect(changed).toBe(false);
+    expect(out).toMatchObject({ state: "retryable", reason: "authority-lost" });
+    expect(out.fix).toContain("role-forbids");
+  });
+
+  it("a landing under a delegation whose grantor's role the active declaration no longer lets sign land loses its authority", async () => {
+    const { out, changed } = await flight(true, (a) => void (a["land"] = { ...a["land"]!, who: { roles: ["maintainer"] } }));
+    expect(changed).toBe(false);
+    expect(out).toMatchObject({ state: "retryable", reason: "authority-lost" });
+    expect(out.fix).toContain("delegation-invalid");
+  });
+
+  it("under a v1 document there is no binding to compare: a landing under a delegation lands as it did", async () => {
+    const r = await makeRoom({ policy: reviewed() });
+    const bob = await addMember(r, "@bob", "member");
+    const k = newKeyPair();
+    const g = await bob.ok<RosterRecord>("roster", null, { op: "delegate", to: k.key, kinds: ["claim", "propose", "land", "release"], lanes: "*", expiresAt: iso(clock.now + day) });
+    const who = new Client(r, k, g.id);
+    const c = await who.ok<Claim>("claim", null, { goal: "g", scope: ["src/a.ts"] });
+    const head = pushChange(r, c.lane, { "src/a.ts": "a" });
+    await who.ok("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" });
+    await r.admin.ok("review", { lane: c.lane, generation: 1 }, { head, verdict: "approve", scope: ["src/**"], text: "ok" });
+    const l = (await who.ok("land", { lane: c.lane, generation: 1 }, { lease: 1, head })) as unknown as { op: { id: string } };
+    await tick(r, 8);
+    expect((await landing(r, l.op.id)).state).toBe("landed");
+  });
+
+  async function recovery(r: TestRoom, approver: Client = r.admin) {
+    const c = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "g", scope: [".artroom/**"] }, { binding: null });
+    const head = pushChange(r, c.lane, { ".artroom/note.txt": "x" });
+    await ok(r, r.admin, "recover", { lane: c.lane }, { op: "version", lease: 1, expectedGeneration: 0, head, summary: "s" }, { binding: null });
+    await ok(r, approver, "recover", { lane: c.lane, generation: 1 }, { op: "approve", head, verdict: "approve", scope: [".artroom/**"], text: "ok" }, { binding: null });
+    return (await ok(r, r.admin, "recover", { lane: c.lane, generation: 1 }, { op: "land", lease: 1, head }, { binding: null })) as unknown as { op: { id: string } };
+  }
+
+  it("a recover land in flight when the room returns to a v1 document keeps the admin's authority, and lands", async () => {
+    const r = await declaredRoom();
+    const l = await recovery(r);
+    await activate(r, policy());
+    await tick(r, 8);
+    expect((await landing(r, l.op.id)).state).toBe("landed");
+  });
+
+  it("a legacy recovery landing in flight at a v2 activation that declares no kind named land keeps the admin's authority, and lands", async () => {
+    const r = await makeRoom();
+    const c = await r.admin.ok<Claim>("claim", null, { goal: "repair", scope: [".artroom/**"], purpose: "config-recovery" });
+    const head = pushChange(r, c.lane, { ".artroom/note.txt": "x" });
+    await r.admin.ok("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" });
+    await r.admin.ok("review", { lane: c.lane, generation: 1 }, { head, verdict: "approve", scope: [".artroom/**"], text: "ok" });
+    const l = (await r.admin.ok("land", { lane: c.lane, generation: 1 }, { lease: 1, head })) as unknown as { op: { id: string } };
+    await activate(
+      r,
+      v2((a) => {
+        a["ship"] = { ...a["land"]!, label: "Ship" };
+        delete a["land"];
+      }),
+    );
+    await tick(r, 8);
+    expect((await landing(r, l.op.id)).state).toBe("landed");
+  });
+
+  it("a recovery landing whose signer is no longer an admin when it is reserved loses its authority (R-ADMIN-8)", async () => {
+    const r = await declaredRoom();
+    const second = await addMember(r, "@root2", "admin");
+    const l = await recovery(r, second);
+    // The landing's signer loses the admin role before the landing is reserved.
+    await ok(r, second, "roster", null, { op: "set-role", member: "@admin", role: "member" }, { binding: null });
+    await tick(r, 8);
+    const out = await landing(r, l.op.id);
+    expect(out).toMatchObject({ reason: "authority-lost" });
+    expect(out.state).not.toBe("landed");
+  });
+
+  for (const [what, op] of [
+    ["whose signing key is revoked", (r: TestRoom) => ({ op: "revoke-key", key: r.admin.key, reason: "retired" })],
+    ["whose signer is removed", (_r: TestRoom) => ({ op: "remove", member: "@admin" })],
+  ] as const)
+    it(`a recovery landing ${what} before it is reserved loses its authority (R-ADMIN-8)`, async () => {
+      const r = await declaredRoom();
+      const second = await addMember(r, "@root2", "admin");
+      const l = await recovery(r, second);
+      await ok(r, second, "roster", null, op(r), { binding: null });
+      await tick(r, 8);
+      const out = await landing(r, l.op.id);
+      expect(out).toMatchObject({ reason: "authority-lost" });
+      expect(out.state).not.toBe("landed");
+    });
+
+  it("an active admin's own key: each condition of the rule decides (adminOwnKey; R-ADM-3 case (a), R-ADMIN-8)", async () => {
+    const r = await declaredRoom();
+    const second = await addMember(r, "@root2", "admin");
+    const third = await addMember(r, "@root3", "admin");
+    const bob = await addMember(r, "@bob", "member");
+    const ask = (actor: string, delegation?: string) => inDO(r, (room) => adminOwnKey(room.core.sql, { actor: actor as never, ...(delegation ? { delegation: delegation as never } : {}) }));
+    const write = (q: string, ...v: string[]) => inDO(r, (room) => void room.core.sql.all(q, ...v));
+    expect(await ask(second.key)).toBe(true);
+    // The same key, naming a delegation: never under a delegation.
+    expect(await ask(second.key, "act_1_00000000")).toBe(false);
+    // A key the room does not know.
+    expect(await ask(newKeyPair().key)).toBe(false);
+    // An active member's active key, whose role is not admin.
+    expect(await ask(bob.key)).toBe(false);
+    // The states below cannot be reached by acts, since removing a member revokes its keys: they are written directly,
+    // so that each condition is shown to decide alone.
+    await write("UPDATE members SET state = 'removed' WHERE handle = ?", "@root2");
+    expect(await ask(second.key)).toBe(false);
+    await write("UPDATE members SET state = 'active' WHERE handle = ?", "@root2");
+    expect(await ask(second.key)).toBe(true);
+    await write("DELETE FROM members WHERE handle = ?", "@root3");
+    expect(await ask(third.key)).toBe(false);
+    // A revoked key of an active admin.
+    await ok(r, r.admin, "roster", null, { op: "revoke-key", key: second.key, reason: "retired" }, { binding: null });
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT state FROM members WHERE handle = '@root2'")[0]!["state"])).toBe("active");
+    expect(await ask(second.key)).toBe(false);
+  });
+});
+
+// ------------------------------------------------------------ bounds (R-DECL-26, R-DECL-13)
+
+describe.skipIf(DECLARED)("a document too large to store is refused before it can activate (R-DECL-26)", () => {
+  const CODES = ["invalid-body", "body-too-large", "not-member", "key-revoked", "delegation-invalid", "role-forbids", "idempotency-mismatch", "secret-detected", "lane-unknown", "lane-held", "not-holder", "lease-fenced", "generation-moved", "scope-overlap", "glob-invalid", "head-unknown", "head-mismatch", "outside-claim"];
+  function sized(kinds: number): PolicyDocumentV2 {
+    const words = "w".repeat(512);
+    const refusals = Object.fromEntries(CODES.map((c) => [c, { reason: words, fix: words }]));
+    return v2((a) => {
+      for (let i = 0; i < kinds; i++)
+        a[`say${i}`] = { label: `Say ${i}`, help: "h".repeat(4096), targets: { thread: ["version"] }, threads: ["claim"], body: { summary: { type: "text", max: 10 } }, who: { roles: ["member"] }, refusals } as unknown as ActDeclaration;
+    });
+  }
+
+  it("a document inside every other bound whose canonical JSON is over 1,048,576 bytes is policy-invalid at propose time; the same shape under the bound is admitted", async () => {
+    const big = sized(57);
+    const small = sized(20);
+    expect(JSON.stringify(big).length).toBeGreaterThan(1048576);
+    expect(JSON.stringify(small).length).toBeLessThan(1048576);
+    const r = await declaredRoom();
+    const c = await ok<Claim>(r, r.admin, "claim", null, { goal: "policy", scope: [".artroom/**"] });
+    const head = pushChange(r, c.lane, { ".artroom/policy.json": JSON.stringify(big) });
+    const refused = expectRefusal(await act(r, r.admin, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "big" }), "policy-invalid");
+    expect(refused.reason).toContain("1048576 bytes");
+    const head2 = pushChange(r, c.lane, { ".artroom/policy.json": JSON.stringify(small) });
+    expectOk(await act(r, r.admin, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head: head2, summary: "small" }));
+  });
+
+  it("an owner path named constructor, a legal glob, does not hide a document over the bound from the Room (checker finding 23766004)", async () => {
+    const doc = (path: string, description: string) => ({
+      ...v2(),
+      owners: { [path]: ["role:admin"] },
+      rules: [{ id: "describe", kind: "notify", on: ["claim"], to: ["role:admin"], why: "A change.", description }],
+    });
+    const r = await declaredRoom();
+    const parse = (d: object) => inDO(r, (room) => room.core.parseConfig(JSON.stringify(d), {}));
+    for (const path of ["src/**", "constructor", "prototype"]) {
+      const big = doc(path, "x".repeat(1048576));
+      // The Room's own canonical form, which is what it stores, is over the bound.
+      expect(new TextEncoder().encode(canonicalize(big as never)).length).toBeGreaterThan(1048576);
+      const refused = await parse(big);
+      expect(refused.ok, path).toBe(false);
+      expect(!refused.ok && refused.problems, path).toEqual(["policy: the document's canonical JSON must be at most 1048576 bytes"]);
+      expect((await parse(doc(path, "x"))).ok, path).toBe(true);
+    }
+  });
+
+  it("the validator names the bound, and only when the document is over it", () => {
+    const over = validatePolicyV2(sized(57), { historicalOpeningKinds: [], checkers: {} });
+    expect(over.ok).toBe(false);
+    expect(!over.ok && over.problems).toEqual(["policy: the document's canonical JSON must be at most 1048576 bytes"]);
+    expect(validatePolicyV2(sized(20), { historicalOpeningKinds: [], checkers: {} }).ok).toBe(true);
+  });
+});
+
+describe.skipIf(DECLARED)("refusal wording is filled only with facts in the room's own form, and is bounded (R-DECL-13)", () => {
+  it("an unrecorded refusal's {lane} and {generation} are filled only by a lane ID and a positive integer", async () => {
+    const r = await declaredRoom(v2((a) => void (a["release"] = { ...a["release"]!, who: { roles: ["maintainer"] }, refusals: { "role-forbids": { reason: "lane [{lane}] generation [{generation}]", fix: "{lane}".repeat(80) } } })));
+    const bob = await addMember(r, "@bob", "member");
+    const text = expectRefusal(await act(r, bob, "release", { lane: "A".repeat(60_000), generation: 0 }, { lease: 1 }), "role-forbids");
+    expect(text.reason).toBe("lane [] generation []");
+    expect(text.fix).toBe("");
+    const c = await ok<Claim>(r, bob, "claim", null, { goal: "g", scope: ["src/**"] });
+    const formed = expectRefusal(await act(r, bob, "release", { lane: c.lane, generation: 3 }, { lease: 1 }), "role-forbids");
+    expect(formed.reason).toBe(`lane [${c.lane}] generation [3]`);
+    expect(formed.fix).toBe(c.lane.repeat(80));
+  });
+
+  it("a recorded refusal whose template repeats {path} is cut to 8,192 bytes, never inside a character", async () => {
+    // The reason is 85 paths of 813 bytes. The fix is one byte, ten paths, then two-byte characters: the 8,192nd byte
+    // would be the first half of one of them.
+    const r = await declaredRoom(v2((a) => void (a["propose"] = { ...a["propose"]!, refusals: { "outside-claim": { reason: "{path}".repeat(85), fix: `a${"{path}".repeat(10)}${"é".repeat(40)}` } } })));
+    const c = await ok<Claim>(r, r.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    const long = `docs/${"d".repeat(200)}/${"e".repeat(200)}/${"f".repeat(200)}/${"g".repeat(200)}/x.md`;
+    expect(long.length).toBe(813);
+    const head = pushChange(r, c.lane, { [long]: "x" });
+    const out = expectRefusal(await act(r, r.admin, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" }), "outside-claim");
+    const bytes = (t: string) => new TextEncoder().encode(t).length;
+    expect(WORDING_FILLED_BYTES).toBe(8192);
+    expect(out.reason).toBe(long.repeat(85).slice(0, 8192));
+    expect(out.fix).toBe(`a${long.repeat(10)}${"é".repeat(30)}`);
+    expect(bytes(out.fix!)).toBe(8191);
+    // A text of exactly 8,192 bytes is not cut.
+    const fit = `${"p".repeat(8192 - 8130)}${"{path}".repeat(10)}`;
+    const exact = await declaredRoom(v2((a) => void (a["propose"] = { ...a["propose"]!, refusals: { "outside-claim": { reason: fit, fix: fit } } })));
+    const c2 = await ok<Claim>(exact, exact.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    const head2 = pushChange(exact, c2.lane, { [long]: "x" });
+    const whole = expectRefusal(await act(exact, exact.admin, "propose", { lane: c2.lane }, { lease: 1, expectedGeneration: 0, head: head2, summary: "s" }), "outside-claim");
+    expect(whole.reason).toBe(`${"p".repeat(62)}${long.repeat(10)}`);
+    expect(bytes(whole.reason)).toBe(8192);
+    // A cut text is a prefix of the filled text itself: a leading U+FEFF, a legal character of a template, stays
+    // (checker finding 7ccec93c). The cut still falls on a character boundary: U+FEFF is three bytes.
+    const marked = `\uFEFF${"{path}".repeat(11)}`;
+    const bom = await declaredRoom(v2((a) => void (a["propose"] = { ...a["propose"]!, refusals: { "outside-claim": { reason: marked, fix: `${"{path}".repeat(10)}${"q".repeat(60)}\uFEFF\uFEFF` } } })));
+    const c3 = await ok<Claim>(bom, bom.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    const head3 = pushChange(bom, c3.lane, { [long]: "x" });
+    const kept = expectRefusal(await act(bom, bom.admin, "propose", { lane: c3.lane }, { lease: 1, expectedGeneration: 0, head: head3, summary: "s" }), "outside-claim");
+    expect(kept.reason).toBe(`\uFEFF${long.repeat(11)}`.slice(0, 1 + 8189));
+    expect(kept.reason.charCodeAt(0)).toBe(0xfeff);
+    expect(bytes(kept.reason)).toBe(8192);
+    // 8,130 bytes of paths and 60 of padding leave two bytes: the three-byte character that follows does not fit.
+    expect(kept.fix).toBe(`${long.repeat(10)}${"q".repeat(60)}`);
+    expect(bytes(kept.fix!)).toBe(8190);
+    // The recorded entry holds the same bounded text.
+    const sealed = await inDO(r, (room) => String(room.core.sql.all("SELECT body FROM entries WHERE id = ?", out.act!)[0]!["body"]));
+    expect(sealed).toContain(out.fix!);
+    expect(sealed.length).toBeLessThan(4 * 8192);
+  });
+});
+
+describe.skipIf(DECLARED)("a refusal decided at the final boundary is in the declaration's words (R-DECL-13, R-ADM-6)", () => {
+  it("a delegation that expires while the act's policy is evaluated is refused in the same words as the same act sent afterwards", async () => {
+    const r = await declaredRoom(v2((a) => void (a["claim"] = { ...a["claim"]!, refusals: { "delegation-invalid": { reason: "Declared reason for {kind}.", fix: "Declared fix." } } })));
+    const bob = await addMember(r, "@bob", "member");
+    const k = newKeyPair();
+    const grant = await ok<RosterRecord>(r, bob, "roster", null, { op: "delegate", to: k.key, kinds: [], acts: { claim: (await bindingIn(r, "claim"))! }, lanes: "*", expiresAt: iso(clock.now + 60_000) }, { binding: null });
+    const d = new Client(r, k, grant.id);
+    // The claim waits in policy evaluation; the delegation expires meanwhile, so the last check before sealing refuses.
+    let open = () => {};
+    const before = r.world.policy.calls.refuse;
+    r.world.policy.gate = new Promise<void>((resolve) => (open = resolve));
+    const pending = act(r, d, "claim", null, { goal: "g", scope: ["src/**"] });
+    await until(async () => r.world.policy.calls.refuse > before);
+    advance(61_000);
+    r.world.policy.gate = null;
+    open();
+    const late = expectRefusal(await pending, "delegation-invalid");
+    expect(late).toMatchObject({ reason: "Declared reason for claim.", fix: "Declared fix." });
+    expect(late.act).toBeUndefined();
+    // The same act, decided at step 4, has the same words.
+    const after = expectRefusal(await act(r, d, "claim", null, { goal: "g", scope: ["src/**"] }), "delegation-invalid");
+    expect(after).toMatchObject({ reason: "Declared reason for claim.", fix: "Declared fix." });
+    // A declaration with no wording for the code keeps the room's own words at the final boundary too.
+    const plain = await declaredRoom();
+    const amy = await addMember(plain, "@amy", "member");
+    const k2 = newKeyPair();
+    const g2 = await ok<RosterRecord>(plain, amy, "roster", null, { op: "delegate", to: k2.key, kinds: [], acts: { claim: (await bindingIn(plain, "claim"))! }, lanes: "*", expiresAt: iso(clock.now + 60_000) }, { binding: null });
+    let open2 = () => {};
+    const before2 = plain.world.policy.calls.refuse;
+    plain.world.policy.gate = new Promise<void>((resolve) => (open2 = resolve));
+    const pending2 = act(plain, new Client(plain, k2, g2.id), "claim", null, { goal: "g", scope: ["src/**"] });
+    await until(async () => plain.world.policy.calls.refuse > before2);
+    advance(61_000);
+    plain.world.policy.gate = null;
+    open2();
+    expect(expectRefusal(await pending2, "delegation-invalid").reason).toMatch(/^Delegation act_\d+_[0-9a-f]{8} expired at /);
+  });
+});
+
+describe.skipIf(DECLARED)("the active document is parsed once per version, not once per kind", () => {
+  it("a grant that names every kind of a 58-kind document reads the policy row at most once", async () => {
+    const doc = v2((a) => {
+      for (let i = 0; i < 50; i++) a[`k${i}`] = { label: `K${i}`, targets: { thread: ["version"] }, threads: ["claim"], body: { summary: { type: "text", max: 10 } }, who: { roles: ["member"] } };
+    });
+    const r = await declaredRoom(doc);
+    const acts: Record<string, string> = {};
+    for (const k of Object.keys(doc.acts)) if (k !== "check") acts[k] = (await bindingIn(r, k))!;
+    const k = newKeyPair();
+    const grant = await signed(r, r.admin, "roster", null, { op: "delegate", to: k.key, kinds: ["renew"], acts, lanes: "*", expiresAt: iso(clock.now + day) }, { binding: null });
+    await inDO(r, (room) => {
+      const sql = room.core.sql as unknown as { all: (q: string, ...v: unknown[]) => unknown; __reads?: number; __all?: (q: string, ...v: unknown[]) => unknown };
+      sql.__all = sql.all.bind(sql);
+      sql.__reads = 0;
+      sql.all = (q: string, ...v: unknown[]) => {
+        if (q.includes("FROM policies WHERE version")) sql.__reads = (sql.__reads ?? 0) + 1;
+        return sql.__all!(q, ...v);
+      };
+    });
+    expectOk(await call<ActRecord | Refusal>(r.stub.submit(grant)));
+    const reads = await inDO(r, (room) => {
+      const sql = room.core.sql as unknown as { all: unknown; __reads: number; __all: unknown };
+      sql.all = sql.__all;
+      return sql.__reads;
+    });
+    expect(reads).toBeLessThanOrEqual(1);
+  });
+
+  it("at most four versions are kept, and a version no longer kept is read again as it was", async () => {
+    const r = await declaredRoom();
+    const first = await inDO(r, (room) => room.core.activePolicy().version);
+    for (let i = 0; i < 6; i++) {
+      await activate(r, v2((a) => void (a["note"] = { ...a["note"]!, label: `Note ${i}` })));
+      await inDO(r, (room) => room.core.activePolicy());
+    }
+    const kept = await inDO(r, (room) => (room.core as unknown as { policyCache: Map<string, unknown> }).policyCache);
+    expect(kept.size).toBe(4);
+    expect(kept.has(first)).toBe(false);
+    const again = await inDO(r, (room) => (room.core.policyAt(first)!.doc as unknown as PolicyDocumentV2).acts["note"]!.label);
+    expect(again).toBe("Note");
+    expect(await inDO(r, (room) => (room.core.activePolicy().doc as unknown as PolicyDocumentV2).acts["note"]!.label)).toBe("Note 5");
+  });
+
+  it("a kept policy cannot be changed by its reader, and a new activation is read at once", async () => {
+    const r = await declaredRoom();
+    const frozen = await inDO(r, (room) => {
+      const p = room.core.activePolicy();
+      return Object.isFrozen(p) && Object.isFrozen(p.doc) && Object.isFrozen((p.doc as unknown as PolicyDocumentV2).acts["claim"]!.targets) && room.core.activePolicy() === p;
+    });
+    expect(frozen).toBe(true);
+    const before = await bindingIn(r, "note");
+    await activate(r, v2((a) => void (a["note"] = { ...a["note"]!, body: { ...a["note"]!.body, mood: { type: "text", max: 10, optional: true } } })));
+    expect(await bindingIn(r, "note")).not.toBe(before);
+    expect(await inDO(r, (room) => Object.hasOwn((room.core.activePolicy().doc as unknown as PolicyDocumentV2).acts["note"]!.body!, "mood"))).toBe(true);
+  });
+});
+
+// ------------------------------------------------------------ records
+
+describe.skipIf(DECLARED)("records of declared and recover acts keep the contract's fields", () => {
+  it("an opening act with no goal field and a review act with no text field return records whose goal and text are empty strings", async () => {
+    const doc = v2((a) => {
+      a["start"] = { label: "Start", targets: { none: ["open"], thread: ["take"] }, threads: ["start"], who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
+      a["propose"] = { ...a["propose"]!, threads: ["start", "claim", "room"] };
+      a["ack"] = { label: "Ack", targets: { version: ["review"] }, threads: ["start"], who: { roles: ["member"] } };
+    }, reviewed());
+    const r = await declaredRoom(doc);
+    const bob = await addMember(r, "@bob", "member");
+    const c = await ok<Claim>(r, bob, "start", null, { scope: ["src/**"] });
+    expect(c.goal).toBe("");
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    await ok(r, bob, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" });
+    const rv = await ok<Review>(r, r.admin, "ack", { lane: c.lane, generation: 1 }, { head, verdict: "approve", scope: ["src/**"] });
+    expect(rv.text).toBe("");
+  });
+
+  it("every recover record names its op as `recover`; a landing's `op` stays its landing operation (R-DECL-21)", async () => {
+    const r = await declaredRoom();
+    const c = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "g", scope: [".artroom/**"] }, { binding: null });
+    const head = pushChange(r, c.lane, { ".artroom/note.txt": "x" });
+    const v = await ok(r, r.admin, "recover", { lane: c.lane }, { op: "version", lease: 1, expectedGeneration: 0, head, summary: "s" }, { binding: null });
+    const a = await ok(r, r.admin, "recover", { lane: c.lane, generation: 1 }, { op: "approve", head, verdict: "approve", scope: [".artroom/**"], text: "ok" }, { binding: null });
+    const l = await ok(r, r.admin, "recover", { lane: c.lane, generation: 1 }, { op: "land", lease: 1, head }, { binding: null });
+    const records = [c, v, a, l] as unknown as { kind: string; recover: string; op?: { id?: string } }[];
+    expect(records.map((x) => [x.kind, x.recover])).toEqual([["recover", "open"], ["recover", "version"], ["recover", "approve"], ["recover", "land"]]);
+    expect(records.slice(0, 3).every((x) => !("op" in x))).toBe(true);
+    expect(records[3]!.op!.id).toMatch(/^op_/);
+    // A declared act's record has no such field.
+    const plain = await ok<Claim>(r, r.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    expect("recover" in plain).toBe(false);
+  });
+});
+
+// ------------------------------------------------------------ bearer sessions
+
+describe.skipIf(DECLARED)("bearer sessions across a change of document (R-IDEM-3, R-DECL-17)", () => {
+  async function session(d: TestRoom, acts: Record<string, string>) {
+    const bytes = randomBytes(32);
+    const op = { op: "invite", member: "@agent", role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(bytes), session: { kinds: ["renew"], acts, lanes: "*", ttlSeconds: 3600 } };
+    const inv = await ok<RosterRecord>(d, d.admin, "roster", null, op, { binding: null });
+    return { inv, secret: b64url(bytes) };
+  }
+
+  it("a session that uses a key again for another act after the room returned to v1 is idempotency-mismatch, naming the original entry", async () => {
+    const d = await declaredRoom();
+    const { inv, secret } = await session(d, { claim: (await bindingIn(d, "claim"))! });
+    const b = await call<Redeemed>(d.stub.redeem({ custody: "room", invitation: inv.id, secret }, "x"));
+    const claim = { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "k-1" };
+    const first = expectOk(await call<Claim | Refusal>(d.stub.bearerAct(b.bearer, claim as never)));
+    await activate(d, policy());
+    const other = expectRefusal(await call(d.stub.bearerAct(b.bearer, { ...claim, body: { goal: "other", scope: ["docs/**"] } } as never)), "idempotency-mismatch");
+    expect(other.reason).toContain(first.id);
+    // The same act under the same key is still a retry, and gets its original record.
+    expect(await call(d.stub.bearerAct(b.bearer, claim as never))).toEqual(first);
+  });
+
+  it("a redemption that waited in the queue behind an activation is granted under the document then in force", async () => {
+    const d = await declaredRoom();
+    const { inv, secret } = await session(d, { claim: (await bindingIn(d, "claim"))! });
+    // The redemption arrives while an activation holds the queue: the room returns to a v1 document first.
+    const out = await inDO(d, async (room) => {
+      let go = () => {};
+      const gate = new Promise<void>((resolve) => (go = resolve));
+      const first = room.core.serial(async () => {
+        await gate;
+        room.core.sql.transaction(() => room.core.activate(policy() as never, room.core.activePolicy().checkers, null, iso(clock.now)));
+      });
+      const redeemed = redeem(room.core, { custody: "room", invitation: inv.id, secret }, "x", "https://artroom.test");
+      go();
+      await first;
+      return redeemed;
+    });
+    // Under v1 a session with a grant map is refused binding-stale, and the invitation stays unused (R-DECL-17).
+    const refused = expectRefusal(out, "binding-stale");
+    expect(refused.reason).not.toContain("invalid");
+    expect(await inDO(d, (room) => room.core.sql.all("SELECT used FROM invitations WHERE id = ?", inv.id)[0]!["used"])).toBeNull();
+  });
+});
+
+describe.skipIf(DECLARED)("a recover op is read only as text (R-DECL-21)", () => {
+  it("a list that holds an op's name is an invalid body for every signer, a checker included; the name itself is judged by the role table", async () => {
+    const r = await declaredRoom();
+    const ci = await addMember(r, "@ci", "checker");
+    const bob = await addMember(r, "@bob", "member");
+    const body = (op: unknown) => ({ op, goal: "g", scope: [".artroom/x"] });
+    const before = await inDO(r, (room) => room.core.headSeq());
+    // The role table of the legacy act an op stands for refuses a checker's `open`, unrecorded.
+    expectRefusal(await act(r, ci, "recover", null, body("open"), { binding: null }), "role-forbids");
+    // `["open"]` is not that op: it has no role table entry, and step 5 refuses the body, whoever signs.
+    for (const who of [ci, bob, r.admin]) expectRefusal(await act(r, who, "recover", null, body(["open"]), { binding: null }), "invalid-body");
+    expectRefusal(await act(r, ci, "recover", null, body("nope"), { binding: null }), "invalid-body");
+    expect(await inDO(r, (room) => room.core.headSeq())).toBe(before);
+  });
+});
