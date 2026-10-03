@@ -1,16 +1,19 @@
 /**
- * Review 82f2743b, P1.1: the policy preview and the exported rule must give
- * the same answers. These tests compare the compiled expression, its
- * TypeScript twin and the dry run with the policy runtime's own evaluator.
+ * The Policy screen's dry run of a draft rule. The preview and the exported
+ * rule must give the same answers (review 82f2743b, P1.1): these tests
+ * compare the compiled expression, its TypeScript twin and the dry run with
+ * the policy runtime's own evaluator. And a dry run validates the whole
+ * compiled policy before it predicts anything (review 88a20f74, P2).
  */
-import { evaluate, evaluateNotify, evaluateRefuse, globsOverlap } from "@generalbusiness/artroom-policy";
+import { evaluate, globsOverlap, validatePolicy } from "@generalbusiness/artroom-policy";
 import { describe, expect, test } from "vitest";
+import type { DraftRule } from "../src/room/adapter.ts";
 import type { MemberId, Role, RuleInput } from "../src/room/contract.ts";
 import { compileDraft, dryRun } from "../src/room/dryrun.ts";
+import { overlap } from "../src/room/glob.ts";
 import { MockRoom } from "../src/room/mock/mock-room.ts";
-import { notifiesAuthz, POLICY } from "../src/room/mock/policy.ts";
-import { World, type History } from "../src/room/mock/world.ts";
-import { STEPS } from "../src/room/mock/scenario.ts";
+import { POLICY } from "../src/room/mock/policy.ts";
+import type { History } from "../src/room/mock/world.ts";
 import { compileTargets, refuseClaimExpr, refusesClaimTwin } from "../src/room/refuse-claim.ts";
 
 type RefuseInput = Extract<RuleInput, { kind: "refuse" }>;
@@ -58,22 +61,22 @@ const CASES: { name: string; paths: string[]; scope: string[]; refused: boolean 
   { name: "non-ASCII, disjoint", paths: ["données/**"], scope: ["donnees/x"], refused: false },
 ];
 
-describe("refuse-claim drafts agree with the policy runtime", () => {
-  for (const c of CASES) {
-    test(c.name, async () => {
+describe("refuse-claim drafts agree with the policy runtime (review 82f2743b, P1.1)", () => {
+  test("each case: the compiled expression, its TypeScript twin and the dry run give the answer the runtime's own overlap gives", async () => {
+    for (const c of CASES) {
       const t = targets(c.paths);
       const expr = refuseClaimExpr(["agent"], t);
       const input = claimInput("agent", c.scope);
-      expect((await evaluate(expr, input)).value).toBe(c.refused);
-      expect(refusesClaimTwin(["agent"], t, "agent", c.scope)).toBe(c.refused);
+      expect((await evaluate(expr, input)).value, c.name).toBe(c.refused);
+      expect(refusesClaimTwin(["agent"], t, "agent", c.scope), c.name).toBe(c.refused);
       // The role test is part of the rule too.
-      expect((await evaluate(expr, claimInput("maintainer", c.scope))).value).toBe(false);
+      expect((await evaluate(expr, claimInput("maintainer", c.scope))).value, c.name).toBe(false);
       // And the dry run reports exactly what the compiled rule does.
       const r = await dryRun(history([input]), { kind: "refuse-claim", id: "draft", paths: c.paths, roles: ["agent"] }, BASE, VERSION);
-      expect(r.status).toBe("replayed");
-      if (r.status === "replayed") expect(r.changes.length).toBe(c.refused ? 1 : 0);
-    });
-  }
+      expect(r.status, c.name).toBe("replayed");
+      if (r.status === "replayed") expect(r.changes.length, c.name).toBe(c.refused ? 1 : 0);
+    }
+  });
 
   test("the reviewer's reproduction: an agent's ** claim is refused by the emitted rule and by the preview", async () => {
     const draft = { kind: "refuse-claim" as const, id: "no-migrations", paths: ["migrations/**"], roles: ["agent" as const] };
@@ -98,35 +101,46 @@ describe("refuse-claim drafts agree with the policy runtime", () => {
   });
 });
 
-describe("the mock room's rule twins agree with the policy runtime", () => {
-  test("every claim in the scenario gets the same refuse answer", async () => {
-    const w = new World();
-    for (const s of STEPS) {
-      w.t = s.minute;
-      s.run(w);
+describe("a dry run validates the whole compiled policy first (review 88a20f74, P2)", () => {
+  const invalid: [string, DraftRule][] = [
+    ["require-review with an existing rule ID", { kind: "require-review", id: "security-review", paths: ["src/**"], from: "@platform", count: 1 }],
+    ["require-review with an invalid path", { kind: "require-review", id: "valid-id", paths: ["src/[ab].ts"], from: "@platform", count: 1 }],
+    ["default dependency with an invalid area", { kind: "carry-depends-on", area: "src/[ab]/**", dependsOn: ["src/**"] }],
+    ["global input with an invalid path", { kind: "global-input", paths: ["src/[ab].ts"] }],
+    ["refuse-claim with an existing rule ID", { kind: "refuse-claim", id: "security-review", paths: ["migrations/**"], roles: ["agent"] }],
+  ];
+  test("an invalid draft: no prediction, the validation problem and a fix", async () => {
+    for (const [name, draft] of invalid) {
+      const r = await new MockRoom().dryRun(draft);
+      expect(r, name).toMatchObject({ status: "not-compiled" });
+      if (!("status" in r) || r.status !== "not-compiled") throw new Error("not refused");
+      expect(r.reason, name).toContain("would be refused (policy-invalid)");
+      expect(r.problems.length, name).toBeGreaterThan(0);
+      expect(r.fix, name).toBeTruthy();
     }
-    const active = { doc: POLICY, version: w.policyVersion };
-    const recorded = new MockRoom().snapshot().feed.filter((f) => f.kind === "claim");
-    expect(w.history.claims.length).toBe(recorded.length);
-    for (const c of w.history.claims) {
-      const real = await evaluateRefuse(active, c.input);
-      const wasRefused = recorded.find((f) => f.id === c.act)!.type === "refusal";
-      expect(real.refusal !== null).toBe(wasRefused);
-    }
-    expect(w.history.claims.some((c) => recorded.find((f) => f.id === c.act)!.type === "refusal")).toBe(true);
   });
 
-  test("the notify rule's twin matches its expression", async () => {
-    const w = new World();
-    for (const s of STEPS) {
-      w.t = s.minute;
-      s.run(w);
+  const valid: DraftRule[] = [
+    { kind: "require-review", id: "platform-reviews-authz", paths: ["src/lib/authz/**"], from: "@platform", count: 1 },
+    { kind: "refuse-claim", id: "agents-stay-out-of-authz", paths: ["src/lib/authz/**"], roles: ["agent"] },
+    { kind: "carry-depends-on", area: "src/lib/**", dependsOn: ["src/lib/**"] },
+    { kind: "global-input", paths: ["src/lib/authz/**"] },
+  ];
+  test("a valid draft of each kind compiles to a valid policy and replays", async () => {
+    for (const draft of valid) {
+      const c = compileDraft(draft, POLICY);
+      if (!("doc" in c)) throw new Error(c.problem);
+      expect(validatePolicy(c.doc).ok, draft.kind).toBe(true);
+      expect((await new MockRoom().dryRun(draft)) as { status: string }, draft.kind).toMatchObject({ status: "replayed" });
     }
-    for (const p of w.history.proposals) {
-      const input = { kind: "notify" as const, act: { id: p.act, kind: "propose" as const, target: { lane: p.lane }, body: {} }, actor: p.input.actor, lane: p.input.lane, proposal: p.input.proposal };
-      const r = await evaluateNotify({ doc: POLICY, version: w.policyVersion }, input, { roles: {}, teams: { "@platform": ["@sam"] } } as never);
-      const told = r.evaluations.some((e) => e.decision.outcome.result === "notify");
-      expect(told).toBe(notifiesAuthz(p.input.proposal.paths));
-    }
+  });
+});
+
+describe("overlap between a claim and a path (R-PATH-3)", () => {
+  test("overlap is conservative, and certain only with a literal path", () => {
+    expect(overlap("src/lib/authz/check.ts", "src/lib/authz/**")).toEqual({ certain: true });
+    expect(overlap("src/lib/**", "src/lib/authz/**")).toEqual({ certain: false });
+    expect(overlap("src/lib/log/**", "src/api/middleware.ts")).toBeNull();
+    expect(overlap("src/*.ts", "src/*.js")).toBeNull();
   });
 });

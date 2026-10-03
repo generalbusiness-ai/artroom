@@ -9,5 +9,11 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     include: ["test/**/*.test.{ts,tsx}"],
+    // The files share two worker threads, and with them one browser environment and one copy of the page's modules
+    // per thread. Setting those up again for every file cost more than the tests. Each test file cleans up the
+    // page and the address after each test, and restores what it spied on.
+    pool: "threads",
+    isolate: false,
+    maxWorkers: 2,
   },
 });

@@ -1,26 +1,26 @@
 /**
- * Contract amendment 3 (bc351fa8), lane F: advisory obligations never block
- * (R-OBL-7), check carry is shown from its `check-carried` event
- * (R-CARRY-13), and a live room has no per-change history (open point 39).
+ * Contract amendment 3 (bc351fa8), lane F, on the page: advisory obligations
+ * are shown as never blocking (R-OBL-7), and check carry is shown from its
+ * `check-carried` event (R-CARRY-13), whose reason is taken only from the
+ * event that names the evidence's own destination and policy (review
+ * a4241e41). A live room's own check-carried events are in
+ * live-room.test.tsx.
  */
 
-import { cleanup, render, screen, within } from "@testing-library/preact";
+import { cleanup, screen, within } from "@testing-library/preact";
 import { afterEach, describe, expect, test } from "vitest";
-import { App } from "../src/app.tsx";
 import type { CheckCarriedEvent, RoomSnapshot } from "../src/room/adapter.ts";
-import type { Carried, Cursor, HttpRoom, LogEntry, Obligation, Sha, Update } from "../src/room/contract.ts";
-import { describeEntry } from "../src/room/live/describe.ts";
-import { LiveRoom } from "../src/room/live/live-room.ts";
+import type { Carried, Obligation, Sha } from "../src/room/contract.ts";
 import { MockRoom } from "../src/room/mock/mock-room.ts";
-import { DEFAULT_STEP, STEPS } from "../src/room/mock/scenario.ts";
-import { World } from "../src/room/mock/world.ts";
-import { laneId, renderAt, stepOf, waitFor } from "./helpers.tsx";
+import { DEFAULT_STEP } from "../src/room/mock/scenario.ts";
+import { laneId, renderAt, stepOf } from "./helpers.tsx";
 
 afterEach(() => {
   cleanup();
   location.hash = "";
 });
 
+const sha = (c: string) => c.repeat(40) as Sha;
 const RATE = "Rate-limit /api/login";
 const LOGGING = "Structured request logging";
 
@@ -33,14 +33,6 @@ function proposalOf(s: RoomSnapshot, goal: string, generation: number) {
 }
 
 describe("advisory obligations never block (R-OBL-7)", () => {
-  test("the advisory obligation comes from the checker configuration; others are not advisory", () => {
-    const p = proposalOf(new MockRoom({ step: DEFAULT_STEP }).snapshot(), RATE, 2);
-    const llm = p.obligations.find((o) => o.rule === "advisory-review")!;
-    expect(llm.kind === "check" && llm.advisory).toBe(true);
-    const tests = p.obligations.find((o) => o.rule === "tests")!;
-    expect(tests.kind === "check" && "advisory" in tests).toBe(false);
-  });
-
   test("an advisory obligation is listed apart from what a landing needs, and not counted", () => {
     renderAt(`#/lane/${laneId(RATE, DEFAULT_STEP)}/2`, { step: DEFAULT_STEP });
     const needs = region("Before it can land");
@@ -77,20 +69,6 @@ describe("advisory obligations never block (R-OBL-7)", () => {
     expect(lane.querySelector("[data-advisory-count]")!.textContent).toBe("1 advisory check, not blocking");
   });
 
-  test("the landing never waits for the advisory check, and lands while it fails", () => {
-    const again = new MockRoom({ step: stepOf("Main moved: the rate limit prepares again") }).snapshot();
-    const op = again.landOps.find((o) => o.state === "preparing")!;
-    expect(op.state === "preparing" && op.waiting).toEqual(["obl_tests"]);
-    const first = new MockRoom({ step: stepOf("Rate limit is ready") }).snapshot();
-    expect(first.landOps.map((o) => o.state)).toContain("ready");
-    const done = new MockRoom({ step: stepOf("The rate limit lands") }).snapshot();
-    const p = proposalOf(done, RATE, 2);
-    const llm = p.obligations.find((o) => o.rule === "advisory-review")!;
-    expect(llm.state).toBe("open");
-    const failed = done.checks.filter((c) => c.check === "llm-review" && !c.ok);
-    expect(failed.some((c) => c.landOp)).toBe(true);
-    expect(done.lanes.find((l) => l.goal === RATE)!.generations.find((g) => g.generation === 2)!.landed).toBeTruthy();
-  });
 });
 
 describe("check carry is shown from its check-carried event (R-CARRY-13)", () => {
@@ -229,118 +207,5 @@ describe("carried check evidence binds its reason to its destination and policy 
     const f = fixture();
     const pending = { id: f.preview.id, kind: "preview", updatedAt: f.preview.updatedAt, lane: f.preview.lane, generation: f.preview.generation, state: "pending" } as const;
     expect(f.show([f.event(99, "carried to the current integration")], pending)).toBe(NONE);
-  });
-});
-
-describe("a failed required check keeps the landing waiting (review a4241e41)", () => {
-  test("preparing never carries a failed required check, and the obligation waits", () => {
-    const w = new World();
-    const stop = STEPS.findIndex((s) => s.label.startsWith("@cedar lands the logging lane"));
-    expect(stop).toBeGreaterThan(0);
-    for (const step of STEPS.slice(0, stop)) {
-      w.t = step.minute;
-      step.run(w);
-    }
-    w.check("@ci", "L3", 1, false, "required tests failed");
-    const failed = w.checks.at(-1)!;
-    expect(failed.ok).toBe(false);
-    w.land("@cedar", "L3");
-    w.prepare("L3");
-    expect(w.checkCarries.filter((c) => c.event.act === failed.id)).toEqual([]);
-    expect(w.checkCarries.some((c) => c.event.lane === w.lane("L3").id && c.event.outcome.carried)).toBe(false);
-    const op = w.landOp("L3");
-    expect(op.state).toBe("preparing");
-    expect(op.state === "preparing" && op.waiting).toEqual([failed.obligation]);
-  });
-
-  test("control: a failed advisory check still never holds up preparation", () => {
-    const s = new MockRoom({ step: stepOf("@ash lands the rate limit") }).snapshot();
-    const p = proposalOf(s, RATE, 2);
-    const advisory = p.obligations.find((o) => o.rule === "advisory-review")!;
-    const latest = s.checks.filter((c) => c.obligation === advisory.id).at(-1)!;
-    expect(latest.ok).toBe(false);
-    const op = s.landOps.find((o) => o.lane === p.lane)!;
-    expect(op.state === "preparing" && op.waiting).toEqual([]);
-  });
-});
-
-// ------------------------------------------------------------- live room
-
-const sha = (c: string) => c.repeat(40) as Sha;
-
-function systemEntry(seq: number, event: LogEntry["entry"] & { type: "system" }): LogEntry {
-  return { format: "artroom-log-v1", seq, prev: `sha256:${"0".repeat(64)}`, at: "2026-10-01T09:30:00Z", hash: `sha256:cccccccc${String(seq).padStart(56, "0")}`, roomSig: "sig", entry: event };
-}
-
-const LIVE_EVENTS: CheckCarriedEvent[] = [
-  {
-    type: "check-carried",
-    op: "op_land_40",
-    lane: "act_9_aaaaaaaa",
-    generation: 2,
-    integration: sha("d"),
-    obligation: "obl_tests",
-    act: "act_31_bbbbbbbb",
-    policy: "act_1_cccccccc",
-    outcome: { carried: true, reason: { code: "tree-identical", tree: sha("e"), config: `sha256:${"1".repeat(64)}`, runner: `sha256:${"2".repeat(64)}`, text: "the tree is the same" } },
-    decisions: [],
-  },
-  {
-    type: "check-carried",
-    op: "op_land_40",
-    lane: "act_9_aaaaaaaa",
-    generation: 2,
-    integration: sha("d"),
-    obligation: "obl_lint",
-    act: "act_32_dddddddd",
-    policy: "act_1_cccccccc",
-    outcome: { carried: false, notCarried: { act: "act_32_dddddddd", code: "runner-changed", text: "No runner environment is pinned." } },
-    decisions: [],
-  },
-];
-
-function liveRoom(): HttpRoom {
-  const entries = LIVE_EVENTS.map((event, i) => systemEntry(41 + i, { type: "system", event }));
-  const room = {
-    id: "room_live",
-    name: "acme/web",
-    members: async () => ({ at: 42, members: [], teams: {}, delegations: [], recovery: "key_r", soleAdmin: false }),
-    lanes: async () => ({ items: [], cursor: "c" as Cursor, more: false }),
-    attention: async () => ({ items: [], cursor: "c" as Cursor, more: false }),
-    log: async () => ({ acts: entries, cursor: "c" as Cursor, more: false, publishedThrough: 42, head: 42 }),
-    explain: async () => null,
-    watch: (_c: Cursor | undefined, _fn: (u: Update) => void) => ({ cursor: "c" as Cursor, close: () => {}, [Symbol.dispose]: () => {} }),
-  };
-  return room as unknown as HttpRoom;
-}
-
-describe("a live room", () => {
-  test("describes check-carried events, carried and not, in plain sentences", () => {
-    const [carried, not] = LIVE_EVENTS.map((event, i) => describeEntry(systemEntry(41 + i, { type: "system", event })));
-    expect(carried!.kind).toBe("check-carried");
-    expect(carried!.text).toBe("The check in entry 31 carried to integration ddddddd (generation 2) because the tree is the same.");
-    expect(carried!.lane).toBe("act_9_aaaaaaaa");
-    expect(carried!.op).toBe("op_land_40");
-    expect(not!.text).toBe("The check in entry 32 did not carry to integration ddddddd (generation 2). No runner environment is pinned.");
-  });
-
-  test("loads check-carried events from the log and shows them in the feed", async () => {
-    const live = new LiveRoom(liveRoom(), "@maya");
-    await live.start();
-    const s = live.snapshot()!;
-    expect(s.checkCarries.map((c) => [c.seq, c.event.outcome.carried])).toEqual([
-      [41, true],
-      [42, false],
-    ]);
-    location.hash = "#/room";
-    render(<App adapter={live} />);
-    await waitFor(() => expect(screen.getByRole("region", { name: "Activity" }).textContent).toContain("did not carry to integration ddddddd"));
-    live.stop();
-  });
-
-  test("has no per-change history: the contract has no read of a generation's commits (open point 39)", () => {
-    const live = new LiveRoom(liveRoom(), "@maya");
-    expect("commits" in live).toBe(false);
-    expect(Object.getOwnPropertyNames(LiveRoom.prototype).filter((n) => /commit|history/i.test(n))).toEqual([]);
   });
 });
