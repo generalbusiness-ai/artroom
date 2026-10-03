@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Builder: I will write the declared-acts design note notes/2026-10-02-declared-acts.md under request a2cbd459, covering its nine points, adopting nothing beyond assert 4e4134b4 and commissioning no build, and publish it for review."}
+{"kind":"assert","text":"Hugh's correction to assert 4e4134b4, 2026-10-02: builder, not Hugh, judges whether Artroom is self-hostable, that is, whether Artroom with declared acts is a viable platform for building the artroom-jam as its proof and as a basis for iteration. The rest of 4e4134b4 stands."}
