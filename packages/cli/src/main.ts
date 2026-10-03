@@ -1179,15 +1179,21 @@ const COMMANDS: Record<string, Command> = {
           return api.act(kind, target, body, { binding: given as Binding, ...opts }); // G5:cli-binding-given
         },
       });
+      // A run that finishes an act from the journal finishes the act that was saved, whatever kind this command line
+      // names: the saved bytes go back unchanged (R-IDEM-2). So the act is named from what was saved and recorded,
+      // never from this run's arguments, and a run that named another kind is told which act it finished.
+      const saved = prepared?.kind ?? kind; // G5:cli-saved-kind
+      if (saved !== kind) ctx.io.err(`This idempotency key belongs to a saved ${saved} act. That act was sent again as it was saved; no ${kind} act was made.`); // G5:cli-saved-kind-told
       if (isRefusal(out)) {
         const code = refused(ctx, out);
-        if (!ctx.json && out.rule === "binding-stale") for (const l of await staleText(ctx, reader, kind, given)) ctx.io.err(l);
+        if (!ctx.json && out.rule === "binding-stale") for (const l of await staleText(ctx, reader, saved, prepared?.binding ?? given)) ctx.io.err(l);
         return code;
       }
-      // The words are those of the act as recorded, under the declarations of its own seq. They are read after the
-      // answer, for a new act and for one finished from the journal alike, and only when words are printed.
-      const meaning = ctx.json ? undefined : await recordedMeaning(ctx, out.seq, kind); // G5:cli-recorded-json
-      const lines = [`Done: ${meaning !== undefined ? `${meaning.label} (${kind})` : kind}, recorded as ${out.id}.`]; // G5:cli-label
+      // The words are those of the act as recorded: its own kind (`DeclaredRecord.kind`), under the declarations of its
+      // own seq. They are read after the answer, for a new act and for one finished from the journal alike, and only
+      // when words are printed.
+      const meaning = ctx.json ? undefined : await recordedMeaning(ctx, out.seq, out.kind); // G5:cli-recorded-json
+      const lines = [`Done: ${meaning !== undefined ? `${meaning.label} (${out.kind})` : out.kind}, recorded as ${out.id}.`]; // G5:cli-label
       // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and its
       // first text field by name, from the body that was sent. Without the declaration it is named by its ID.
       const opened = out as { lane?: unknown; goal?: unknown; effect?: { type?: unknown } };

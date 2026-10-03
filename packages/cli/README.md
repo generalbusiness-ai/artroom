@@ -114,6 +114,14 @@ field). The field values are those of the act as it was sent.
 A command finished from the journal prints the same two lines, from the
 act the journal kept. Finishing reads nothing to prepare the act again.
 
+The journal finds a saved act by its idempotency key, not by its kind. If
+you run `artroom act` with that key and name another kind, the saved act is
+what is finished: its saved bytes go back unchanged, and no act of the kind
+you named is made. The receipt names the saved act, and a line on the error
+stream says so: "This idempotency key belongs to a saved start-song act."
+If the room refuses the saved act, the refusal is explained for the saved
+kind and the binding it was prepared under.
+
 The read for these words needs a session. If it fails, the act is still
 done and nothing is sent again: the first line names the kind in place of
 its label, and the thread is named by its goal or its ID.
