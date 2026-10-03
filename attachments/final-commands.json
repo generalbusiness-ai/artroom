@@ -1,0 +1,82 @@
+[
+  {
+    "label": "root-typecheck-final",
+    "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+    "cwd": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo",
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "start": 1791061624.6098292,
+    "start_utc": "2026-10-03T21:07:04.609829+00:00",
+    "end": 1791061633.861824,
+    "exit": 0,
+    "log": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/root-typecheck-final.log"
+  },
+  {
+    "label": "root-typecheck",
+    "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+    "cwd": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo",
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "start": 1791061470.357596,
+    "start_utc": "2026-10-03T21:04:30.357596+00:00",
+    "end": 1791061483.6954,
+    "exit": 0,
+    "log": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/root-typecheck.log"
+  },
+  {
+    "label": "ui-build",
+    "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+    "cwd": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo",
+    "command": [
+      "npm",
+      "run",
+      "build",
+      "--workspace=@generalbusiness/artroom-ui"
+    ],
+    "start": 1791061707.284715,
+    "start_utc": "2026-10-03T21:08:27.284715+00:00",
+    "end": 1791061708.624473,
+    "exit": 0,
+    "log": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/ui-build.log"
+  },
+  {
+    "label": "ui-e2e",
+    "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+    "cwd": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo",
+    "command": [
+      "npm",
+      "run",
+      "e2e",
+      "--workspace=@generalbusiness/artroom-ui"
+    ],
+    "start": 1791061751.646065,
+    "start_utc": "2026-10-03T21:09:11.646065+00:00",
+    "end": 1791061761.473431,
+    "exit": 0,
+    "log": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/ui-e2e.log"
+  },
+  {
+    "label": "ui-tests",
+    "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+    "cwd": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo/packages/ui",
+    "command": [
+      "npx",
+      "vitest",
+      "run",
+      "--reporter=verbose",
+      "--reporter=json",
+      "--outputFile=/tmp/artroom-checker-ui-624d-x3tfvfj8/ui-tests.vitest.json"
+    ],
+    "start": 1791061707.2878442,
+    "start_utc": "2026-10-03T21:08:27.287844+00:00",
+    "end": 1791061710.6931741,
+    "exit": 1,
+    "log": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/ui-tests.log"
+  }
+]
