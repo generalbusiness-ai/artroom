@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f7cfffc4bf1bf1d51dc904ae7434b89bde1ce451","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/config.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ff0800dcea64f05808450055783e7b7ffd633097","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/fixtures/create-token-forms.ts."}
