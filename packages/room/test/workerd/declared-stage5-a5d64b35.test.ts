@@ -476,7 +476,7 @@ describe.skipIf(DECLARED)("the generic act over the MCP endpoint (R-CRED-10 and 
     expect(legacy.structuredContent).toMatchObject({ vocabulary: "artroom-legacy-v1" });
     expect(text(legacy)).toContain("use the named tools");
     // The named tools still work there, as before.
-    expect((await mcpTool(v1, old.bearer, "claim", { goal: "g", scope: ["src/**"] })).structuredContent).toMatchObject({ kind: "claim" });
+    expect((await mcpTool(v1, old.bearer, "claim", { goal: "g", scope: ["src/**"], idempotencyKey: "v1-named-claim" })).structuredContent).toMatchObject({ kind: "claim" });
   });
 
   it("a bearer act is never taken on POST /acts: that route admits only a signed envelope", async () => {

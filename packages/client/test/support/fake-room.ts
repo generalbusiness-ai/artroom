@@ -338,7 +338,8 @@ export class FakeRoom {
     if (!keyState) return refusal("not-member", "The signing key belongs to no member.");
     const m = this.members.get(keyState.member);
     if (!m || m.state !== "active") return refusal("not-member", "The member was removed.");
-    if (m.role === "checker" && !["check", "note"].includes(env.kind)) return refusal("role-forbids", `A checker may not sign ${env.kind}.`);
+    // R-GEN-5: a checker signs `check`, `note` and its own `roster` ops (a delegation), as the Room's table says.
+    if (m.role === "checker" && !["check", "note", "roster"].includes(env.kind)) return refusal("role-forbids", `A checker may not sign ${env.kind}.`);
     if (env.kind === "roster" && !["delegate", "undelegate"].includes(body["op"] as string) && m.role !== "admin") {
       return refusal("admin-required", "Only an admin may do that.");
     }
@@ -974,6 +975,8 @@ export class FakeRoom {
         let all = [...this.lanes.values()].map((l) => this.#held(l));
         if (query.filter?.state) all = all.filter((l) => l.state === query.filter!.state);
         if (query.filter?.holder) all = all.filter((l) => l.lease?.holder === query.filter!.holder);
+        // `touches`: lanes whose scope may overlap the pattern, by the fake's crude overlap test.
+        if (query.filter?.touches) all = all.filter((l) => l.scope.some((g) => overlap(g, query.filter!.touches!)));
         return page(all, query.filter?.cursor, query.filter?.limit, "n");
       }
       case "proposal":
