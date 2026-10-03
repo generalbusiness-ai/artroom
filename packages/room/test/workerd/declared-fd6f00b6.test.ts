@@ -450,6 +450,27 @@ describe.skipIf(DECLARED)("threads (R-DECL-6, R-DECL-8, R-DECL-23)", () => {
   });
 });
 
+describe.skipIf(DECLARED)("what policy sees of a thread (R-EVAL-3 as amended)", () => {
+  it("under a v2 document the lane input carries the thread's kind, and null where there is no thread; under a v1 document it carries no kind", async () => {
+    const rules = policy(
+      rule({ id: "no-notes-on-claims", on: ["note"], refuse: "lane.kind = 'claim'", reason: "No notes on claim threads.", fix: "None." }),
+      rule({ id: "lane-has-kind", on: ["claim"], refuse: "$exists(lane.kind) and act.body.goal = 'probe'", reason: "The lane input has a kind.", fix: "None." }),
+    );
+    const r = await declaredRoom(v2(() => {}, rules));
+    const bob = await addMember(r, "@bob", "member");
+    const c = await ok<Claim>(r, bob, "claim", null, { goal: "g", scope: ["src/**"] });
+    expect(expectRefusal(await act(r, bob, "note", { act: c.id }, { text: "hello" }), "no-notes-on-claims").reason).toBe("No notes on claim threads.");
+    // With no thread, the kind is null: present in the input, so `$exists` sees it.
+    expect(expectRefusal(await act(r, bob, "claim", null, { goal: "probe", scope: ["docs/**"] }), "lane-has-kind").reason).toBe("The lane input has a kind.");
+    // The same rules under a v1 document: the input has no kind, so neither rule refuses.
+    const legacy = await makeRoom({ policy: rules });
+    const al = await addMember(legacy, "@al", "member");
+    const lc = await al.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    expectOk(await al.act("note", { act: lc.id }, { text: "hello" }));
+    expectOk(await al.act("claim", null, { goal: "probe", scope: ["docs/**"] }));
+  });
+});
+
 describe.skipIf(DECLARED)("refusal wording from the declaration (R-DECL-13)", () => {
   it("a platform refusal of a declared act takes the declaration's reason and fix, slots filled; the code is the room's; a rule's refusal keeps its own", async () => {
     const doc = v2(
