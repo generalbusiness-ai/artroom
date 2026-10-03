@@ -387,7 +387,7 @@ describe.skipIf(DECLARED)("the generic act over the MCP endpoint (R-CRED-10 and 
     expect(list.isError).toBe(false);
     expect(list.structuredContent).toEqual(await r.admin.read({ q: "acts" }));
     expect(text(list)).toContain("ask (Ask)");
-    const claim = (await mcpTool(r, b.bearer, "claim", { goal: "g", scope: ["src/**"] })).structuredContent as Claim;
+    const claim = (await mcpTool(r, b.bearer, "claim", { goal: "g", scope: ["src/**"], idempotencyKey: "claim-1" })).structuredContent as Claim;
     const binding = list.structuredContent.acts.ask.binding as string;
     const args = { kind: "ask", target: { act: claim.id }, body: { text: "Which part?" }, binding, idempotencyKey: "ask-1" };
     const done = await mcpTool(r, b.bearer, "act", args);
@@ -439,7 +439,7 @@ describe.skipIf(DECLARED)("the generic act over the MCP endpoint (R-CRED-10 and 
   it("platform kinds, acts without a binding, and every act in a v1 room are refused on the generic path; nothing is recorded", async () => {
     const r = await declaredRoom(withAsk());
     const b = await bearer(r, "@agent", "agent", { kinds: ["renew"], acts: { claim: (await bindingIn(r, "claim"))!, ask: (await bindingIn(r, "ask"))! } });
-    const claim = (await mcpTool(r, b.bearer, "claim", { goal: "g", scope: ["src/**"] })).structuredContent as Claim;
+    const claim = (await mcpTool(r, b.bearer, "claim", { goal: "g", scope: ["src/**"], idempotencyKey: "claim-1" })).structuredContent as Claim;
     const seq = await headSeq(r);
     const binding = (await bindingIn(r, "ask"))!;
     for (const kind of ["roster", "renew", "recover"]) {
@@ -476,7 +476,7 @@ describe.skipIf(DECLARED)("the generic act over the MCP endpoint (R-CRED-10 and 
     expect(legacy.structuredContent).toMatchObject({ vocabulary: "artroom-legacy-v1" });
     expect(text(legacy)).toContain("use the named tools");
     // The named tools still work there, as before.
-    expect((await mcpTool(v1, old.bearer, "claim", { goal: "g", scope: ["src/**"] })).structuredContent).toMatchObject({ kind: "claim" });
+    expect((await mcpTool(v1, old.bearer, "claim", { goal: "g", scope: ["src/**"], idempotencyKey: "v1-named-claim" })).structuredContent).toMatchObject({ kind: "claim" });
   });
 
   it("a bearer act is never taken on POST /acts: that route admits only a signed envelope", async () => {
@@ -559,9 +559,9 @@ describe.skipIf(DECLARED)("a declared check step under another name (fa120186: j
     const verify = (await bindingIn(r, "verify"))!;
     const dev = await bearer(r, "@dev", "agent", { kinds: ["renew"], acts: { claim: (await bindingIn(r, "claim"))!, propose: (await bindingIn(r, "propose"))!, verify } });
     // @dev claims and proposes with the named tools, then tries to check its own proposal.
-    const claim = (await mcpTool(r, dev.bearer, "claim", { goal: "work", scope: ["src/**"] })).structuredContent as Claim;
+    const claim = (await mcpTool(r, dev.bearer, "claim", { goal: "work", scope: ["src/**"], idempotencyKey: "claim-1" })).structuredContent as Claim;
     const head = pushChange(r, claim.lane, { "src/app.ts": "v2" });
-    expect((await mcpTool(r, dev.bearer, "propose", { lane: claim.lane, lease: 1, head, expectedGeneration: 0, summary: "s" })).structuredContent).toMatchObject({ kind: "propose" });
+    expect((await mcpTool(r, dev.bearer, "propose", { lane: claim.lane, lease: 1, head, expectedGeneration: 0, summary: "s", idempotencyKey: "propose-1" })).structuredContent).toMatchObject({ kind: "propose" });
     await tick(r);
     const body = await checkBody(r, claim.lane);
     const own = await mcpTool(r, dev.bearer, "act", { kind: "verify", target: { lane: claim.lane, generation: 1 }, body, binding: verify, idempotencyKey: "own-1" });

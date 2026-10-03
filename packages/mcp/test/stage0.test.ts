@@ -75,7 +75,8 @@ describe.each([
       else expect(c.getNegotiatedProtocolVersion()).toBe("2026-07-28");
       expect(c.getInstructions()).toBe(INSTRUCTIONS);
       const { tools } = await c.listTools();
-      expect(tools.map((t) => t.name)).toEqual(Object.keys(TOOLS));
+      // An agent's bearer gets the builder toolset (R-API-14). The room's document is `v1`, so `act` is not listed.
+      expect(tools.map((t) => t.name)).toEqual(["claim", "workspace", "propose", "note", "land", "renew", "release", "attention", "explain", "lane", "proposal", "operation", "acts"]);
       for (const t of tools) expect(t.outputSchema).toEqual(TOOLS[t.name as keyof typeof TOOLS].outputSchema);
     } finally {
       await c.close();
@@ -94,11 +95,11 @@ describe.each([
       expect(claim).toMatchObject({ kind: "claim", lease: { generation: 1 } });
       const held = { lane: claim.lane, lease: claim.lease.generation };
 
-      const proposed = await c.callTool({ name: "propose", arguments: { ...held, head: head("a"), expectedGeneration: 0, summary: "one" } });
+      const proposed = await c.callTool({ name: "propose", arguments: { ...held, head: head("a"), expectedGeneration: 0, summary: "one", idempotencyKey: "p1" } });
       expect(proposed.structuredContent).toMatchObject({ kind: "propose", generation: 1 });
 
       // A refusal is structured content the client accepts, never wrapped in `{ result }`.
-      const refused = await c.callTool({ name: "propose", arguments: { ...held, head: head("b"), expectedGeneration: 0, summary: "two" } });
+      const refused = await c.callTool({ name: "propose", arguments: { ...held, head: head("b"), expectedGeneration: 0, summary: "two", idempotencyKey: "p2" } });
       expect(refused.isError).toBe(false);
       expect(refused.structuredContent).toMatchObject({ refused: true, rule: "generation-moved" });
       expect((refused.content as { text: string }[])[0]!.text).toMatch(/^Refused \(generation-moved\): .+ Fix: /);

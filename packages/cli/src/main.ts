@@ -122,7 +122,7 @@ Acts this room declares
 
 Agents
   artroom agents-md [--mcp]             Print the block that teaches an agent the loop, for AGENTS.md.
-  artroom mcp                           Run the MCP tools over stdio, signing with your key.
+  artroom mcp [--toolset NAME]          Run the MCP tools over stdio, signing with your key.
 
 Options: --json for JSON output; --room ROOM and --lane LANE to choose; --idempotency-key KEY to
 finish an act that did not get an answer; --verbose to show each request.
@@ -725,7 +725,7 @@ const COMMANDS: Record<string, Command> = {
       );
       const path = ctx.store.bearerPath(inv.room);
       const config = ctx.store.read();
-      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, mcp: shown.mcp, invitation: inv.invitation };
+      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, delegation: shown.delegation, mcp: shown.mcp, invitation: inv.invitation };
       config.current = inv.room;
       ctx.store.write(config);
       ctx.step("config-written");
@@ -1216,11 +1216,21 @@ const COMMANDS: Record<string, Command> = {
   },
 
   mcp: {
-    options: {},
+    options: { toolset: { type: "string" } },
     async run(ctx) {
-      const { api } = await open(ctx);
-      const { serveArtroomStdio } = await import("@generalbusiness/artroom-mcp/stdio");
-      const handle = serveArtroomStdio(api);
+      const { callerFromRoster, serveArtroomStdio, toolsetOf } = await import("@generalbusiness/artroom-mcp/stdio");
+      // `--toolset` is the stdio form of the MCP URL's `?toolset=`: builder, reviewer, observer or all. An unknown name
+      // is bad-request, before anything is asked of the room.
+      const toolset = toolsetOf(str(ctx.values, "toolset"));
+      const { api, room } = await open(ctx);
+      // The tool list follows this credential's authorization, read from the roster at each `tools/list` (R-API-14):
+      // a key file is the member's own key; a bearer file acts under the session's delegation, the one its redemption
+      // recorded. (A credential saved before that ID was kept names none: then it is the key's latest delegation.)
+      const session = room.delegation !== undefined ? { key: room.key, session: true, delegation: room.delegation } : { key: room.key, session: true }; // GM:cli-delegation
+      const who = room.custody === "room" ? session : { key: room.key }; // GM:cli-caller
+      const caller = async () => callerFromRoster(await api.members(), who);
+      const asked = toolset !== undefined ? { toolset } : {}; // GM:cli-toolset
+      const handle = serveArtroomStdio(api, { caller, ...asked });
       await new Promise<void>((resolve) => process.stdin.once("end", resolve));
       await handle.close();
       return EXIT.ok;

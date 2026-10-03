@@ -338,7 +338,8 @@ export class FakeRoom {
     if (!keyState) return refusal("not-member", "The signing key belongs to no member.");
     const m = this.members.get(keyState.member);
     if (!m || m.state !== "active") return refusal("not-member", "The member was removed.");
-    if (m.role === "checker" && !["check", "note"].includes(env.kind)) return refusal("role-forbids", `A checker may not sign ${env.kind}.`);
+    // R-GEN-5: a checker signs `check`, `note` and its own `roster` ops (a delegation), as the Room's table says.
+    if (m.role === "checker" && !["check", "note", "roster"].includes(env.kind)) return refusal("role-forbids", `A checker may not sign ${env.kind}.`);
     if (env.kind === "roster" && !["delegate", "undelegate"].includes(body["op"] as string) && m.role !== "admin") {
       return refusal("admin-required", "Only an admin may do that.");
     }
@@ -904,6 +905,19 @@ export class FakeRoom {
     return b;
   }
 
+  /**
+   * The authorization behind a bearer, as the Room gives it to its MCP
+   * endpoint for `tools/list` (R-API-14): the member's roster role now, and
+   * the session delegation's `kinds` and signed map `acts`, unchanged.
+   */
+  async bearerCaller(token: string): Promise<{ role: Role; delegation: { kinds: Delegation["kinds"]; acts?: NonNullable<Delegation["acts"]> } }> {
+    const b = await this.bearerSession(token);
+    const m = b ? this.members.get(b.member) : undefined;
+    if (!b || !m || m.state !== "active") throw artroomError("unauthenticated", "The bearer token is not valid.");
+    const d = this.delegations.get(b.delegation)!;
+    return { role: m.role, delegation: { kinds: d.kinds, ...(d.acts !== undefined ? { acts: d.acts } : {}) } };
+  }
+
   // ---------------------------------------------------------------- reads
 
   async reader(token: string | undefined): Promise<MemberId> {
@@ -961,6 +975,8 @@ export class FakeRoom {
         let all = [...this.lanes.values()].map((l) => this.#held(l));
         if (query.filter?.state) all = all.filter((l) => l.state === query.filter!.state);
         if (query.filter?.holder) all = all.filter((l) => l.lease?.holder === query.filter!.holder);
+        // `touches`: lanes whose scope may overlap the pattern, by the fake's crude overlap test.
+        if (query.filter?.touches) all = all.filter((l) => l.scope.some((g) => overlap(g, query.filter!.touches!)));
         return page(all, query.filter?.cursor, query.filter?.limit, "n");
       }
       case "proposal":

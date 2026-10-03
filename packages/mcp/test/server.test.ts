@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { connect, generateSigner, isArtroomError, isRefusal, join } from "@generalbusiness/artroom-client";
 import type { Claim, HttpRoom, Proposal, Redeemed } from "@generalbusiness/artroom-contract";
 import { listedTools } from "../src/index.ts";
-import { agent, roomWithMcp, rpc, type FakeRoom, type Url } from "./support.ts";
+import { agent, keyed, roomWithMcp, rpc, type FakeRoom, type Url } from "./support.ts";
 
 let room: FakeRoom;
 let url: Url;
@@ -18,7 +18,8 @@ beforeEach(async () => {
 });
 afterEach(() => room.stop());
 
-const call = (a: Redeemed, name: string, args: unknown) => rpc(a.mcp, a.bearer, "tools/call", { name, arguments: args });
+// Every act tool requires an idempotency key (R-API-9, amendment 7): `keyed` gives a fresh one where a test names none.
+const call = (a: Redeemed, name: string, args: unknown) => rpc(a.mcp, a.bearer, "tools/call", { name, arguments: keyed(name, args) });
 const head = (c: string) => c.repeat(40);
 
 async function human(handle: `@${string}`): Promise<HttpRoom> {
@@ -40,11 +41,15 @@ describe("the endpoint", () => {
     expect(wrong.body.error.message).toMatch(/new MCP invitation/);
   });
 
-  test("lists exactly the ten tools with the descriptors' schemas", async () => {
+  test("lists the agent's tools with the descriptors' schemas", async () => {
     const a = await agent(room, url);
     const list = await rpc(a.mcp, a.bearer, "tools/list");
     expect(list.status).toBe(200);
-    expect(list.body.result.tools).toEqual(listedTools());
+    // An agent gets the builder toolset (R-API-14), each tool exactly as its descriptor gives it. The room's
+    // document is `v1`, so the generic `act` is not listed.
+    const builder = ["claim", "workspace", "propose", "note", "land", "renew", "release", "attention", "explain", "lane", "proposal", "operation", "acts"];
+    expect(list.body.result.tools.map((t: { name: string }) => t.name)).toEqual(builder);
+    expect(list.body.result.tools).toEqual(listedTools().filter((t) => builder.includes(t.name)));
   });
 });
 

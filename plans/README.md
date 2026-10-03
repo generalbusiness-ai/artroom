@@ -2889,3 +2889,240 @@ Not run at the present head: root `npm ci`, root `npm test`, the Room suites, an
 8. **The Acts form offers every thread to an act whose declaration names no `threads`.** The room refuses such an act on any thread (`wrong-thread`). This is the UI lane's choice and is left as it was.
 9. **Stage 2 has moved since this branch was composed on `15fa7f4c`.** It is not landed. This branch is composed again on main after it lands. Among stage 2's later changes, a `recover` record now names its op in `recover`, not `op`, and check jobs name their kind and binding; neither is read by this stage's code, by inspection only.
 10. **The MCP core runtime** (request `9ca1d290`) was built from `b7b9d8df` on its own branch and does not have the commits since.
+
+## MCP core runtime (request 9ca1d290)
+
+### State at `8b46e825` (written after the section below)
+
+The rest of this section describes `b359e278` and is no longer current. It is kept until the head for review exists. This note says what changed since, and what was stopped.
+
+**Done at this head**
+
+- **Recomposed on stage 5's head `bdc35c53`.** Two merges of `request/decl-stage5`: `575caa60` (at `624dbb9f`) and `3a33b1c6` (at `bdc35c53`). One conflict, in `docs/protocol.md` at the end of section 33.10: stage 5's open point 52 is kept as it now reads, and section 34 follows it unchanged. No rule is renumbered.
+- **The planner's five decisions (`3d8a74a9`)**, in `ca9cd4c1`:
+  1. The caller seam is kept and written down in R-API-14, section 34.2 and the MCP README. It is not a `RoomApi` or `RoomWire` method. `artroom redeem` now keeps the redemption's delegation ID, and `artroom mcp` reads the list under exactly that delegation. `callerFromRoster` refuses a session that names a delegation another key granted, and a key that names a delegation not granted to it. A credential saved before the ID was kept still uses its key's latest delegation.
+  2. R-API-14 says a caller may select another named toolset, any of the four. The override decides the default only, and every selected list has the same filter.
+  3. Section 34.2's command-line item names the caller wiring and `--toolset` as required work.
+  4. Section 23's row "MCP descriptors" gives both vectors: sixteen tools for an admin under a `v2` document, fifteen, with no generic `act`, under `v1`.
+  5. No provisional head closes the runtime scope `9ca1d290` or the contract scope `a9788a59`.
+- **Checker finding `48765af0`** (P2, condition 5), in `dbcf3a7f` and `8b46e825`: an attention wait cancelled a native update stream while its own reader held the lock, which the stream refuses, so the source was never cancelled. The wait now cancels a native stream through its reader and releases the lock. The client's decoded stream is cancelled as before.
+- **Checker caveat `18438fd0`**, in `dbcf3a7f`: the stdio revocation test now asks one server for a second list after the revocation, with the command line's own callback and no fallback to an earlier roster.
+- **Controls the decision lists as owed**, added against the real Room in `ca9cd4c1` and `acd6917a`: adapter parity for a `v2` bearer, a `v1` bearer and a member's own key; revocation by undelegate, by revoke-key and by removing the member; a checker's own key; the admin list under both documents; selecting a larger toolset with no gain.
+
+**Checked at this head**
+
+- Root `npm run typecheck`: exit 0.
+- MCP package tests: 149 node and 5 workerd passed. The command line's `mcp-core` and `cli` test files: 14 passed. The Room's `mcp-core` and `mcp` test files, legacy run: 31 passed. The client's AGENTS.md test: 3 passed.
+
+**Stopped, and owed**
+
+- **The mutation run is partial.** The inventory is now 76 mutants: the 61 of `b359e278`, of which nine did not pass the workspace typecheck and were rewritten as compiling faults, and fifteen new ones. A run of all 76 at `8b46e825` was stopped after 39, on the planner's request `ecbc722a`. All 39 pass the root typecheck with the mutant applied, are red by a named assertion, and were restored. The other 37 have no result at this head. An earlier complete run of the then 71 at `acd6917a` had the same outcome for all 71; that head is two source commits and one merge behind this one. Runner, inventory and results are in the session scratch directory `mutmcp` (`run2.py`, `mutants.py`, `results2.json`, `results2-acd6917a.json`).
+- **Root `npm ci` and `npm test` were not run at this head.** They last passed at `09651d3e`, before the stream repair and the second merge.
+- **The mutation table and gates below are those of `b359e278`.** They are not evidence for this head.
+- **The guard-by-guard audit** of this lane's source diff against the inventory has not been done.
+- **Not shown by any test here:** the real `artroom mcp` binary against the real Room, and an expired bearer over stdio.
+- The final integration still follows reviewed stage 5 on main.
+
+Status: implemented, provisional, not yet for review. Gitseq request `9ca1d290` (planner to builder): the runtime of the adopted MCP core, composed with the planner's contract (`request/mcp-core-current`, `1d9ac5ad`) and with stage 5's generic surfaces. Branch `request/mcp-core-runtime`. Code head `217f01f6`; the commit that adds this section changes only this file. Nothing was pushed or deployed, and no Cloudflare credential was used.
+
+Two things are true of this head and must change before review:
+
+- **It is provisional.** It stands on stage 5's composed head `b7b9d8df` and on the stage 2 code head `15fa7f4c`. Neither has landed. The final integration follows reviewed stage 5 on main: this work is composed again there, and every gate and test is run again at that head.
+- **Main is not merged.** Main is five planning notes ahead of this head, all under `notes/`. No source file differs.
+
+This runtime is not needed by the first jam development task and is not a jam-readiness gate.
+
+### What was built
+
+- **Sixteen tools.** The fourteen named tools and the generic `acts` and `act`, in one fixed order: `claim`, `workspace`, `propose`, `note`, `review`, `land`, `renew`, `release`, `attention`, `explain`, `lanes`, `lane`, `proposal`, `operation`, `acts`, `act`. In [packages/mcp/src/tools.ts](../packages/mcp/src/tools.ts).
+- **Four reads through `RoomApi`.** `lanes`, `lane`, `proposal` and `operation`, in [packages/mcp/src/run.ts](../packages/mcp/src/run.ts). An unknown lane, proposal or operation is `{ outcome: "not-found", what }`. For `operation`, only the lookup's `not-found` becomes that result. Every other failure stays an error.
+- **Descriptors.** Each tool has a title, an advertised output schema, fixed annotations and its toolsets. `tools/list` sends name, title, description, input schema, output schema and annotations. `method` and `toolsets` stay on the server. The longest description is 730 characters. The instructions are 480.
+- **Toolsets.** [packages/mcp/src/toolsets.ts](../packages/mcp/src/toolsets.ts): the one eligibility predicate (`eligible`), the default (`defaultToolset`), the list (`toolsFor`) and the name check (`toolsetOf`). The Worker handler reads `?toolset=`. `artroom mcp` takes `--toolset`.
+- **The caller's authorization.** `tools/list` needs the caller's role and its delegation's signed grant. `RoomApi` has no method that says who is calling, so the host supplies it (`McpCaller`). The Room reads it for a bearer token (`callerOf` in [packages/room/src/requests.ts](../packages/room/src/requests.ts)). The command line builds it from the roster (`callerFromRoster`). See choice 1.
+- **Required keys.** Every act tool's schema requires `idempotencyKey`: `claim`, `propose`, `note`, `review`, `land`, `renew`, `release` and `act`. The input is checked against the schema before any runner is called. A call without a key is `bad-request`, and its message says to add any unique string and to reuse it to retry.
+- **Waits.** `waitMs` is a whole number from 0 to 45,000 on `attention`, `workspace`, `land` and `operation`. `attention` waits on the handle's subscription for an item for the caller. `operation` waits for `until`, by default the kind's finished states. At the limit each returns what is true now.
+- **AGENTS.md.** The MCP form of the generated block says that every act needs an `idempotencyKey` and that a retry reuses it. [packages/client/src/agents-md.ts](../packages/client/src/agents-md.ts).
+- **READMEs.** [packages/mcp/README.md](../packages/mcp/README.md) and one paragraph of [packages/cli/README.md](../packages/cli/README.md).
+
+### Conditions
+
+| Condition of `9ca1d290` | State | Where and how shown |
+|---|---|---|
+| (1) R-API-9, 13, 14 and 15 and every section 34.2 edit: fourteen named tools plus `act` and `acts`; the four reads through `RoomApi`, with structured results for unknown IDs | Met at this head | "Section 34.2 edits" below. MCP: "lanes, lane, proposal and operation read through RoomApi" (3 tests). Room: "the four reads answer from the room; unknown IDs are structured not-found results; …" |
+| (2) Titles, conforming output schemas for success and refusal, fixed annotations, descriptions of at most 1,000 characters, instructions of at most 512; conservative fixed hints for `act`; `acts` read-only | Met | MCP: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations" (5 tests). One of them makes a success and a refusal of every act tool and of `workspace` and checks each against the tool's own advertised schema. Room: a `propose` refused `outside-claim` fits the schema `tools/list` sent |
+| (3) Toolsets, defaults from authorization, filtering, the `toolset` query, `bad-request` for an unknown name; a deterministic list that does not depend on earlier calls; unlisted calls still judged by the room; `acts` in every set, `act` in builder, reviewer and all; no act tool in observer; a checker covered without review or claim authority; no grant expanded, no intent rebound | Met, with one seam to decide: choice 1 | MCP: "toolsets: what tools/list shows follows the caller's authorization" (12 tests), "listing is not permission" (2). Room: "tools/list at the Worker's MCP endpoint" (6), "the Room gives its MCP endpoint the caller's authorization" (2), "a call the list does not show is still the room's to judge" (2). CLI: "artroom mcp --toolset" (3) |
+| (4) Required `idempotencyKey` in schema and at run time for every act tool, `act` included; missing-key refusal; lost-result retries with one effect and the original result; revocation and receipt rules kept; AGENTS.md updated | Met | MCP: "every act tool requires idempotencyKey" (13 tests). Room: "every act tool requires idempotencyKey; a retry gives one effect and the original result" (2), which also shows `unauthenticated` for a retry after revocation. Client: "the MCP block says that every act needs an idempotencyKey and that a retry reuses it" |
+| (5) `waitMs` a finite integer from 0 to 45,000 on four tools; defaults kept; caller-specific attention waits; `operation`'s `until` and default finished states; fresh current state on timeout; nothing held while waiting | Met | MCP: "waitMs is a whole number from 0 to 45,000" (10 tests), "attention with waitMs waits for an item for the caller" (7). Room: "waiting is a bounded read that holds nothing in the room" (3): the log's head and the lane's row are equal before and after each wait |
+| (6) Stage 5's binding and history behaviour, custody, the `v1` controls and the `fa120186` guards and tests are kept; stage 4's check-service jobs stay separate | Met | Every existing test passes at this head; see "Gates". No stage 5 or stage 2 guard was edited. "Existing tests changed" lists each change. Nothing here touches check-service jobs |
+| (7) Main, the four contract paths, section 34 and amendment 7, and stage 5's section 33 reconciled; changed paths and one exact head reported; independent review; tests, named red mutations and gates | Part met | Reconciled at this head: see "Reconciliation" and "Edits to the planner's four paths". Mutations and gates below. **Open:** main's five notes are not merged; the one exact head for review needs stage 5 landed on main; independent review has not started; the planner republishes its artifacts at the final head |
+
+### Section 34.2 edits
+
+| Edit of section 34.2 | Where |
+|---|---|
+| Lane E 1: `title`, `annotations` and `toolsets` on each descriptor; `idempotencyKey` required on every act tool; `maximum: 45000` on every `waitMs` | `packages/mcp/src/tools.ts`: the constants `READ`, `WRITE` and `CHANGES`, each descriptor, `MAX_WAIT_MS` and `waitMs()` |
+| Lane E 2: descriptors and runners for `lanes`, `lane`, `proposal` and `operation`; `McpNotFound`; `operation` uses `op`, then `wait`, and reads again on a timeout | `tools.ts` (descriptors) and `run.ts` (`RUN.lanes`, `RUN.lane`, `RUN.proposal`, `RUN.operation`) |
+| Lane E 3: `tools/list` sends `title`, `outputSchema` and `annotations`; `oneOf` result and `Refusal`; a test that validates a success and a refusal | `packages/mcp/src/server.ts` (`listedTools`). The test is in `packages/mcp/test/mcp-core-9ca1d290.test.ts` |
+| Lane E 4: `attention` with `waitMs` | `run.ts`: `RUN.attention` and `watchAttention` |
+| Lane E 5: the shared predicate and default in HTTPS and stdio; `?toolset=`; ineligible act tools dropped from discovery; every tool still callable; exact retries kept | `toolsets.ts`; `server.ts` (`tools/list` reads the caller and the declarations for each request, and `tools/call` never consults the list); `worker.ts` (the query); `stdio.ts`; `packages/cli/src/main.ts` (`artroom mcp`) |
+| Lane E 6: instructions of at most 512 characters; descriptions of at most 1,000 | `tools.ts`: `INSTRUCTIONS` is 480; the longest description, `act`, is 730 |
+| Lane E 7: the generated AGENTS.md block | `packages/client/src/agents-md.ts` |
+| Lane E 8: `act` and `acts` composed with all of the above; conservative hints for `act`; `acts` read-only; no grant or intent rebound | `tools.ts` (`act` uses `CHANGES`, `acts` uses `READ`, and both carry toolsets); `toolsets.ts` (the generic act is listed by existence, and the signed map is only read) |
+| CLI 1: rebuild against the amended MCP package | Done. One source change was also needed, against the section's "no source change": choice 2 |
+| The MCP endpoint's deployment: the adapter serves `lane`, `lanes`, `proposal`, `op` and `wait` over `RoomWire.read`, and the attention wait over `RoomWire.subscribe` | `packages/room/src/mcp.ts` already builds the client's bearer handle on the Worker's own `RoomWire`. The new Room tests run the four tools and the attention wait through it. The endpoint also gives the server the caller's authorization (`McpWire.caller`) |
+| Other lanes: no change for the four reads | None was made for the reads. The Room gained one read for toolsets: choice 1 |
+
+### Choices where the design left room
+
+1. **The host says who is calling.** `RoomApi` has no method for the caller's own role or grant, and the contract was not widened here. `createArtroomServer` takes `caller()`, and calls it for each `tools/list`. The Room has a new method `caller(token)`, which judges the token exactly as a read does and returns the member's role and the delegation's `kinds` and signed `acts` as recorded. It is not part of `RoomWire`: only the Worker's own MCP endpoint reaches it (`McpRoomWire` in `packages/room/src/worker.ts`). The command line builds the same value from the `members` read: a key file is the member's own key; a bearer file acts under the delegation its room-held key granted. One MCP test shows the two give equal values.
+2. **`artroom mcp` changed.** Section 34.2 says the command line needs no source change. It needed six lines: the stdio server must be told the caller, and `--toolset` is the stdio form of `?toolset=`. An unknown name is refused before the room is asked for anything.
+3. **Under a delegation, the role is the grantor's member's.** Admission judges a delegated act by the grantor's role, so discovery does too.
+4. **A caller may name any of the four toolsets.** R-API-14 says a caller "may ask for fewer" and that the query "selects another toolset". The named set is filtered by the same eligibility, so asking for `all` shows no act tool the caller could not use. The observer override applies to the default only.
+5. **An unknown toolset is HTTP 400.** The body is a JSON-RPC error with code -32602 and the `ArtroomError` `bad-request` in `data`. It is checked after the bearer. Every method on that URL is refused, `tools/call` too, so a mistyped URL never half works. An empty value and a repeated parameter are unknown names.
+6. **The order.** The ten tools keep their order. The four reads follow them, then `acts` and `act`.
+7. **The message for a missing key** is the input check's own message with one sentence added: "Add any unique string as idempotencyKey, and reuse the same one to retry this call." Stage 5's assertion on "input.idempotencyKey: is required" still holds.
+8. **A named act tool is listed only while its built-in binding is the active one.** In a room whose `claim` means something else, `claim` is not listed and `act` is. `renew` is listed by the legacy role table and a plain grant, in every room.
+9. **`workspace` and the reads are never filtered.** `workspace` is a request. The room's own checks judge it.
+10. **`operation`'s finished states.** `landed`, `aborted`, `retryable` and `failed` for a landing; `ready` and `failed` for a workspace; `clean`, `conflict` and `failed` for a preview. An empty `until` means the default. `land` still waits for a terminal or slot-holding state, as before.
+11. **The attention wait opens its watch before it reads the page**, so an item that arrives between the two is seen. With `waitMs` of 0 the tool makes one read and no subscription, as before. A handle with no subscription waits out the time and reads again.
+12. **The wait limit is the schema's.** The input is copied through JSON and checked against the schema before any runner runs. JSON has no NaN or Infinity; an in-process caller that passes one gets `bad-request`.
+13. **The HTTPS bearer client is unchanged.** It always sent a key, and it sends `waitMs: 0`.
+14. **In a `v1` room an admin is shown fifteen tools.** R-API-14 says the generic `act` is not listed under a `v1` document. Section 23's row "MCP descriptors" says sixteen for an admin; that holds in a `v2` room.
+
+### Reconciliation with stage 5's text
+
+Section 34 and stage 5's section 33.10 do not contradict each other on any point of meaning. Two sentences of section 33.10 spoke of things section 34 now settles, and were changed to agree:
+
+- The R-API-9 row said `acts` returns `ActsNotFound` "because MCP structured content must be an object". R-API-9 now says the object shape is Artroom's own choice, not a limit of MCP. The row now says so.
+- The same row said "The ten named tools are unchanged. The descriptor shape (titles, annotations, toolsets) and any further read tools are the MCP core's". It now says the ten are unchanged, that section 34 adds four named reads, and that the descriptor shape, the toolsets that list `act` and `acts`, their fixed hints, the required key and the wait limit are section 34's.
+
+Nothing else in section 33.10 or in R-CRED-10 was edited. R-API-9's own text already says there is no named `check` or `roster` tool and sends a generic declared check to R-CRED-10 as stage 5 amended it. No rule was renumbered.
+
+### Edits to the planner's four paths
+
+The merge is `b9e959cd`. No later commit touches these paths.
+
+| Path | Edit |
+|---|---|
+| `docs/protocol.md` | One conflict: both branches append a section. Both are kept, section 33.10 first, then section 34. Then the two sentences above, in section 33.10's R-API-9 row. Section 34 and R-API-13 to R-API-15 are as the planner wrote them |
+| `packages/contract/src/transports.ts` | One conflict, in `McpTools`: both branches add members at its end. Both are kept: `lanes`, `lane`, `proposal`, `operation`, then `acts`, `act`. `ActsNotFound`, `McpNotFound`, `McpToolsets` and `McpToolAnnotations` follow. One comment line changed: stage 5's "the two generic tools, beside the ten named ones" now says fourteen and cites both sections. No type was changed |
+| `packages/contract/src/index.ts` | None. It merged without conflict |
+| `packages/contract/examples/demo-loop.ts` | None. It merged without conflict |
+
+### Existing tests changed
+
+No assertion was weakened. Each change follows from a required key, the 45,000 limit or a toolset.
+
+| File | Change |
+|---|---|
+| `packages/mcp/test/support.ts` | `roomWithMcp` gives the handler the bearer's caller. New helper `keyed`, which adds a fresh key to an act tool's arguments when a test names none |
+| `packages/mcp/test/schema.test.ts` | `operation` calls `op`. `tools/list` entries have six fields. The seven named act tools' required lists include `idempotencyKey`. The demo-loop inputs carry keys, and the `land` input waits 45,000, not 60,000. `NAMED_TOOLS` is fourteen. Four compile-time checks added for the new tools |
+| `packages/mcp/test/server.test.ts` | `call` uses `keyed`. "lists exactly the ten tools …" is now "lists the agent's tools …": the builder list, each tool equal to its descriptor |
+| `packages/mcp/test/stage0.test.ts` | The listed names are the builder list. Two `propose` calls carry keys |
+| `packages/mcp/test/stdio.test.ts` | The server is given a caller. The list is the builder list. The `claim` call carries a key |
+| `packages/mcp/test/amendment-2.test.ts` | `call` uses `keyed`. The `renew` after revocation carries a key |
+| `packages/mcp/test/review-f47a509c.test.ts` | Three `claim` inputs carry keys |
+| `packages/mcp/test/workerd/worker.test.ts` | The handler is given a caller, and its stub room answers `acts`. The list is every tool but `act`. The `claim` call carries a key |
+| `packages/mcp/test/workerd/body-cap.test.ts` | The handler is given a caller |
+| `packages/cli/test/harness.ts` | The handler is given the bearer's caller |
+| `packages/cli/test/cli.test.ts` | "artroom mcp serves the ten tools over stdio …": the list is the builder list, a call of the unlisted `lanes` is added, and the `claim` carries a key |
+| `packages/room/test/workerd/mcp.test.ts` | `LISTED` is the builder list without `act`, since the suite runs under both vocabularies. `tool` adds a key where a test names none. Two official-client calls carry keys |
+| `packages/room/test/workerd/declared-stage5-a5d64b35.test.ts` | Five named-tool calls carry keys: four `claim` and one `propose` |
+| `packages/client/test/support/fake-room.ts` (a test double) | `bearerCaller`, as the Room's `caller`. `lanes` filters by `touches`. A checker may sign its own `roster` ops, as the Room's role table says, so a checker's invitation can be redeemed |
+
+New test files: `packages/mcp/test/mcp-core-9ca1d290.test.ts` (52 tests), `packages/room/test/workerd/mcp-core-9ca1d290.test.ts` (16 tests, in the legacy run; they found their own `v1` and `v2` rooms, as stage 2's and stage 5's do), `packages/cli/test/mcp-core-9ca1d290.test.ts` (3 tests), and one test added to `packages/client/test/agents-md.test.ts`.
+
+### Mutation table
+
+Each new guard is one statement marked `// GM:<id>`. The runner and results are in the session scratch directory `mutmcp` (`run.py`, `mutants.py`, `results.json`). For each mutant the runner applies one text edit, runs the suites that cover the file's package, and writes the file's bytes back. A red counts only when a test fails by an assertion. A test that times out or fails by another thrown error is counted apart.
+
+61 mutants over 48 marked guards. 61 turn at least one named test red by an assertion. Survivors: none. The first run left one survivor, `readonly-direct`: no test had an own-key caller with nothing eligible. A test was added ("the default comes from the roster role …" now checks a checker's own key in a room that declares nothing for it), and the mutant was run again and is red. 4 mutants also made one test fail by a thrown error or a timeout; those failures are not counted as reds, and each of those mutants has assertion reds besides.
+
+| Mutant | What it does | Reds | One test that goes red |
+|---|---|---|---|
+| `key-claim` (`mcp/tools.ts`) | Claim no longer requires a key | 5 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-renew` (`mcp/tools.ts`) | Renew no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-release` (`mcp/tools.ts`) | Release no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-propose` (`mcp/tools.ts`) | Propose no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-note` (`mcp/tools.ts`) | Note no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-review` (`mcp/tools.ts`) | Review no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-land` (`mcp/tools.ts`) | Land no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-act` (`mcp/tools.ts`) | Act no longer requires a key | 4 | mcp: "act: any declared act, with the binding the agent read the schema refuses a call without a binding or a key before the room is asked; a platform ki…" |
+| `key-advice` (`mcp/run.ts`) | A missing key is not told how to add one | 9 | mcp: "every act tool requires idempotencyKey (R-API-9) claim without a key is bad-request, says how to add one, and the room is never asked" |
+| `wait-max` (`mcp/tools.ts`) | Waits up to 300,000 ms are accepted | 5 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) exactly four tools take waitMs, each with the same bounds" Also 1 test failed by a thrown error or a timeout, not counted. |
+| `wait-whole` (`mcp/tools.ts`) | `waitMs` need not be a whole number | 6 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) exactly four tools take waitMs, each with the same bounds" |
+| `wait-from-zero` (`mcp/tools.ts`) | A negative waitMs is accepted | 6 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) exactly four tools take waitMs, each with the same bounds" |
+| `attention-default` (`mcp/run.ts`) | Attention with no waitMs opens a watch and reads twice | 1 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) with no waitMs, or 0, it is one read and no subscription" |
+| `attention-nonempty` (`mcp/run.ts`) | Attention waits although the page has items | 1 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) a page that already has items returns at once, without waiting" |
+| `attention-reread` (`mcp/run.ts`) | Attention returns the first, empty page after the wait | 6 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) over the long poll: updates without attention items do not end the wait; the one …" |
+| `attention-items` (`mcp/run.ts`) | Any update ends the attention wait on a stream, not only one with items for the caller | 1 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) through the endpoint: an empty page, then a note notifies the caller: the page wi…" |
+| `attention-items-poll` (`mcp/run.ts`) | Any update ends the attention wait on the long poll | 1 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) over the long poll: updates without attention items do not end the wait; the one …" |
+| `op-not-found-all` (`mcp/run.ts`) | Every failure of the operation read becomes not-found | 1 | mcp: "lanes, lane, proposal and operation read through RoomApi (R-API-9) operation: only the lookup's not-found becomes a result; unauthenticated, forbid…" |
+| `op-not-found-none` (`mcp/run.ts`) | An unknown operation is an error, not a result | 4 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) a success and a refusal of every act tool and of w…" |
+| `op-until-ignored` (`mcp/run.ts`) | Operation ignores the caller's until | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation reads once with no waitMs; with one it waits for until, by default the kind's finish…" |
+| `op-until-default` (`mcp/run.ts`) | Operation's default until is not the kind's finished states | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation reads once with no waitMs; with one it waits for until, by default the kind's finish…" |
+| `op-wait-zero` (`mcp/run.ts`) | Operation waits although waitMs is 0 | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation reads once with no waitMs; with one it waits for until, by default the kind's finish…" |
+| `op-wait-reached` (`mcp/run.ts`) | Operation waits although the state is already reached | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation reads once with no waitMs; with one it waits for until, by default the kind's finish…" |
+| `op-timeout-swallow` (`mcp/run.ts`) | Every failure of the operation wait is answered with the current state | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation at waitMs returns the operation's current state, read afresh, and not an error; anot…" |
+| `op-timeout-error` (`mcp/run.ts`) | An operation wait that times out is an error | 3 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation at waitMs returns the operation's current state, read afresh, and not an error; anot…" |
+| `lane-not-found` (`mcp/run.ts`) | An unknown lane is null, not a structured result | 4 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) a success and a refusal of every act tool and of w…" |
+| `proposal-not-found` (`mcp/run.ts`) | An unknown proposal says what: lane | 4 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) a success and a refusal of every act tool and of w…" |
+| `hint-conservative` (`mcp/tools.ts`) | Act, land and release are advertised as not destructive | 2 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) the annotations are the rule's table, and act's ar…" |
+| `list-annotations` (`mcp/server.ts`) | Tools/list sends no annotations | 5 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `list-title` (`mcp/server.ts`) | Tools/list sends no title | 3 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `list-server-fields` (`mcp/server.ts`) | Tools/list sends the server-side toolsets | 2 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `act-toolsets` (`mcp/tools.ts`) | The observer toolset lists act | 3 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) each descriptor's toolsets are the rule's table: a…" |
+| `list-fresh` (`mcp/server.ts`) | A server keeps the first caller and declarations it read | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the list is the same before and after other calls, and it is read afr…" |
+| `toolset-unknown` (`mcp/toolsets.ts`) | An unknown toolset name is accepted | 2 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) an unknown toolset name is bad-request, over HTTPS and for stdio, and…" Also 1 test failed by a thrown error or a timeout, not counted. |
+| `toolset-query` (`mcp/worker.ts`) | The toolset query is ignored | 8 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) an unknown toolset name is bad-request, over HTTPS and for stdio, and…" Also 1 test failed by a thrown error or a timeout, not counted. |
+| `toolset-one` (`mcp/worker.ts`) | Two toolset parameters are accepted | 2 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) an unknown toolset name is bad-request, over HTTPS and for stdio, and…" |
+| `platform-grant` (`mcp/toolsets.ts`) | Renew is listed without a grant for it | 7 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the generic act is listed by existence: platform-only grants and an a…" |
+| `platform-role` (`mcp/toolsets.ts`) | Renew is listed for a role that may not sign it | 3 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) a caller may ask for another toolset; the list is that set, filtered …" |
+| `legacy-grant` (`mcp/toolsets.ts`) | A v1 delegation's kinds do not filter the named tools | 4 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) tools/list as an agent; with ?toolset=reviewer; as a bearer whose del…" |
+| `legacy-role` (`mcp/toolsets.ts`) | The v1 role table does not filter the named tools | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the generic act is listed by existence: platform-only grants and an a…" |
+| `generic-v1` (`mcp/toolsets.ts`) | The generic act is listed under a v1 document | 10 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) tools/list as an agent; with ?toolset=reviewer; as a bearer whose del…" |
+| `who` (`mcp/toolsets.ts`) | Who.roles does not decide eligibility | 5 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `who-admin` (`mcp/toolsets.ts`) | Admin is not implicit | 3 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `delegable` (`mcp/toolsets.ts`) | A kind that may not be delegated is eligible for a delegated caller | 2 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) discovery follows a changed role, a changed who and a declaration tha…" |
+| `map-binding` (`mcp/toolsets.ts`) | A stale signed binding counts as current | 6 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the generic act is listed by existence: platform-only grants and an a…" |
+| `map-entry` (`mcp/toolsets.ts`) | A kind the signed map does not name is eligible | 13 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) tools/list as an agent; with ?toolset=reviewer; as a bearer whose del…" |
+| `built-for` (`mcp/toolsets.ts`) | A named tool is listed although its built-in binding is not the active one | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) a named act tool is shown only while the room's declaration of its ki…" |
+| `readonly-override` (`mcp/toolsets.ts`) | A delegation with no eligible act kind keeps its role's toolset | 8 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) a checker: its own key; delegated with one eligible declared check ki…" |
+| `readonly-direct` (`mcp/toolsets.ts`) | An own-key caller with no eligible act kind gets observer | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `checker-default` (`mcp/toolsets.ts`) | A checker's default is builder | 5 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `default-all` (`mcp/toolsets.ts`) | An admin's default is builder | 4 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `set-member` (`mcp/toolsets.ts`) | Every toolset lists every tool | 25 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `act-filter` (`mcp/toolsets.ts`) | Act tools are listed whatever the caller may sign | 22 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `act-existence` (`mcp/toolsets.ts`) | The generic act is listed with no eligible kind | 14 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) tools/list as an agent; with ?toolset=reviewer; as a bearer whose del…" |
+| `roster-revoked` (`mcp/toolsets.ts`) | A revoked delegation named by ID is a caller | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) HTTPS and stdio give the same list for the same authorization" |
+| `agents-key` (`client/agents-md.ts`) | The MCP block keeps the old retry advice | 1 | client: "the MCP block says that every act needs an idempotencyKey and that a retry reuses it (R-API-9, amendment 7)" |
+| `cli-toolset` (`cli/main.ts`) | Artroom mcp ignores --toolset | 1 | cli: "artroom mcp --toolset (R-API-14) a member's key: the builder list by default, the reviewer list with --toolset reviewer, and a tool the list omits …" |
+| `cli-caller` (`cli/main.ts`) | A bearer file is treated as the member's own key | 1 | cli: "artroom mcp --toolset (R-API-14) a redeemed bearer: the list follows the session's delegation, as it does at the MCP URL" |
+| `caller-judged` (`room/requests.ts`) | The caller read does not judge the token | 1 | room: "the Room gives its MCP endpoint the caller's authorization (R-API-14) an unknown token, and a bearer whose key was revoked, are unauthenticated; to…" |
+| `caller-grant` (`room/requests.ts`) | The caller read drops the signed map | 5 | room: "the Room gives its MCP endpoint the caller's authorization (R-API-14) a bearer: its member's role now, and its delegation's signed grant unchanged;…" Also 1 test failed by a thrown error or a timeout, not counted. |
+| `caller-delegation` (`room/requests.ts`) | The caller read presents a bearer as the member's own key | 7 | room: "the Room gives its MCP endpoint the caller's authorization (R-API-14) a bearer: its member's role now, and its delegation's signed grant unchanged;…" |
+
+### Gates
+
+Run one after another in this worktree at the code head, each as its own command, with its exit code checked. The commit that adds this section changes no file a test or the compiler reads; the typecheck and the whitespace check were run again after it.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm ci` | 0 | Installed from the lockfile, which is unchanged |
+| `npm run typecheck` | 0 | All eleven workspaces |
+| `npm test` | 0 | 3,167 vitest tests passed and 127 skipped, in these runs: checkers 43; cli 185; client 122 and 2; log 198 and 193; mcp 139 and 5; policy 313, and 311 with 2 skipped; room node 270, room legacy run 658, room declared run 533 with 125 skipped; ui 195. `packages/git` runs under the Node test runner: 340 passed. No test failed |
+| `git diff --check b7b9d8df` | 0 | No whitespace error |
+
+The declared run's skips are the tests that found their own rooms (stage 2's, stage 5's and this request's 16) and the seven that need stage 3's `artroom verify`. Policy's 2 skips are as before.
+
+### Not changed here
+
+`packages/log`, `packages/policy`, `packages/git`, `packages/ui`, `packages/checkers` and the Room's admission are unchanged. The Room's only source changes are the caller read (`requests.ts`, `room.ts`) and its use by the MCP endpoint (`mcp.ts`, `worker.ts`). No migration. The contract is as the merge left it.
+
+### For the planner or hugh
+
+1. **The caller read.** Choice 1 adds a Room read that the contract does not name. The planner may want it in the contract instead, for example as a read query a session or bearer token may make about itself. That would let every host use one source, and would remove the command line's rule for finding a bearer's delegation in the roster.
+2. **Asking for a larger toolset.** Choice 4 lets an agent name `all`. If "fewer" was meant strictly, the name check is the place to refuse it.
+3. **Section 34.2's CLI line** says no source change is required. One was: choice 2.
+4. **Section 23's "MCP descriptors" row** holds only in a `v2` room: choice 14.
+5. **The planner's artifacts.** The planner republishes them at the final head. That head does not exist yet: it needs stage 5 reviewed and landed, then this branch composed on main.

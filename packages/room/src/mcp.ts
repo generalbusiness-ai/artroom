@@ -14,10 +14,17 @@
 
 import { connect } from "@generalbusiness/artroom-client";
 import { isArtroomError, type ArtroomService, type Room, type RoomName, type RoomWire } from "@generalbusiness/artroom-contract";
-import { createMcpFetch } from "@generalbusiness/artroom-mcp/worker";
+import { createMcpFetch, type McpCaller } from "@generalbusiness/artroom-mcp/worker";
 import type { RoomEnv } from "./config.ts";
 import { report, toConsole, type DiagnosisSink } from "./diag.ts";
 import { artroomError, HTTP_STATUS, toArtroomError } from "./errors.ts";
+
+export type { McpCaller };
+
+/** The wire the MCP endpoint needs: `RoomWire`, and the authorization behind a bearer, as the room judges it now. */
+export interface McpWire extends RoomWire {
+  caller(bearer: string): Promise<McpCaller>;
+}
 
 /** The MCP route. `:room` is a room ID or a percent-encoded room name (R-API-3). */
 const ROUTE = /^\/v1\/rooms\/([^/]+)\/mcp$/;
@@ -53,14 +60,16 @@ export async function bearerRoom(wire: (room: string) => Promise<RoomWire>, room
 }
 
 /**
- * The Worker's MCP endpoint. `wire` gives this Worker's `RoomWire` for a
- * room ID or name. A failure outside a tool call (an unknown room, a bad
- * URL) is an `ArtroomError` body with its HTTPS status (R-API-1), never a
- * token.
+ * The Worker's MCP endpoint. `wire` gives this Worker's `McpWire` for a
+ * room ID or name: `RoomWire`, and the authorization behind a bearer, which
+ * `tools/list` uses to choose what to show (R-API-14). A failure outside a
+ * tool call (an unknown room, a bad URL) is an `ArtroomError` body with its
+ * HTTPS status (R-API-1), never a token.
  */
-export function mcpEndpoint(wire: (env: RoomEnv, room: string) => Promise<RoomWire>, log: DiagnosisSink = toConsole): (request: Request, env: RoomEnv) => Promise<Response> {
+export function mcpEndpoint(wire: (env: RoomEnv, room: string) => Promise<McpWire>, log: DiagnosisSink = toConsole): (request: Request, env: RoomEnv) => Promise<Response> {
   const serve = createMcpFetch<RoomEnv>({
     room: (request, env, bearer) => bearerRoom((r) => wire(env, r), roomOf(request), bearer),
+    caller: async (request, env, bearer) => (await wire(env, roomOf(request))).caller(bearer),
   });
   return async (request, env) => {
     try {

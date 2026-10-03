@@ -5,7 +5,8 @@
  * - `RoomApi`: the methods every typed handle has.
  * - `Room`: the handle over a Workers service binding (RPC). Disposable.
  * - `HttpRoom`: the handle over HTTPS, for browsers, the CLI and scripts.
- * - `McpTools`: the ten MCP tools, mapped one to one to `RoomApi` methods.
+ * - `McpTools`: the fourteen named MCP tools, each calling one `RoomApi` method, and
+ *   `McpToolsets`, which of them a caller is shown (R-API-9, R-API-14).
  * - `ArtroomService`, `RoomWire`, `HttpRoutes`: the wire beneath the handles.
  * - `ArtroomFounder`, `RoomDraft`, `Founding`, `RoomRef`: founding a room and
  *   finding its ID from its name (R-GEN-10, R-GEN-11, R-API-11).
@@ -55,7 +56,7 @@ import type {
   RosterRecord,
 } from "./acts.ts";
 import type { Held, Lane, LaneFilter } from "./lanes.ts";
-import type { OpByKind, OpKind, OpRef, OpState, Reached, WaitOptions, WorkspaceGrant, WorkspaceOp } from "./landing.ts";
+import type { Op, OpByKind, OpKind, OpRef, OpState, Reached, WaitOptions, WorkspaceGrant, WorkspaceOp } from "./landing.ts";
 import type { AttentionPage, LogPage, LogRequest, Page, PageRequest, Update } from "./pagination.ts";
 import type { Genesis, Role, Roster, RosterOp, SignedOnboardingGrant } from "./roster.ts";
 import type { Result } from "./errors.ts";
@@ -495,14 +496,26 @@ export interface McpHeld {
   readonly lease: LeaseGeneration;
 }
 
+/**
+ * Every MCP act tool takes an idempotency key, and over MCP it is required
+ * (R-API-9, amendment 7): reusing it retries the same call, so an act is
+ * never recorded twice after a lost response.
+ */
 interface McpCommon {
-  readonly idempotencyKey?: IdempotencyKey;
+  readonly idempotencyKey: IdempotencyKey;
 }
 
+/** The longest any MCP tool waits, in milliseconds (R-API-15). */
+export type McpMaxWaitMs = 45_000;
+
 /**
- * The ten MCP tools. Each maps to the `RoomApi` method of the same name; the
- * MCP server rebuilds `Held` from `McpHeld` using the room's current lease
- * expiry, and fences on `lease` exactly as the method does (R-API-9).
+ * The fourteen named MCP tools (R-API-9). Each calls one `RoomApi` method: the ten
+ * of amendment 2 by the same name, and `lanes`, `lane`, `proposal` and
+ * `operation` (which calls `op` and `wait`). The MCP server rebuilds `Held`
+ * from `McpHeld` using the room's current lease expiry, and fences on `lease`
+ * exactly as the method does. A `waitMs` is at most `McpMaxWaitMs`.
+ * Declared-acts stage 5 composes generic `act` and `acts` with this core;
+ * adding those tools does not remove any named tool or its toolset.
  */
 export interface McpTools {
   readonly claim: {
@@ -522,7 +535,7 @@ export interface McpTools {
     readonly output: Result<Claim>;
   };
   /**
-   * Waits up to `waitMs` (default 20 000) for ready or failed. `grant` is
+   * Waits up to `waitMs` (default 20 000, at most 45 000) for ready or failed. `grant` is
    * present only when ready, and only for the current holder and lease (R-WS-2).
    */
   readonly workspace: {
@@ -550,16 +563,39 @@ export interface McpTools {
       };
     readonly output: Result<Review>;
   };
-  /** Waits up to `waitMs` (default 0) for a terminal or slot-holding state. */
+  /** Waits up to `waitMs` (default 0, at most 45 000) for a terminal or slot-holding state. */
   readonly land: {
     readonly input: McpHeld & McpCommon & { readonly generation: Generation; readonly head: Sha; readonly waitMs?: number };
     readonly output: Result<Landing>;
   };
-  /** Also the MCP form of `subscribe`: call again with the returned cursor. The page is `RoomApi.attention`'s, unchanged. */
-  readonly attention: { readonly input: PageRequest; readonly output: AttentionPage };
-  /** An unknown act is `ExplainNotFound`, because MCP structured content must be an object (R-API-9). */
+  /**
+   * Also the MCP form of `subscribe`: call again with the returned cursor. The
+   * page is `RoomApi.attention`'s, unchanged. With `waitMs` (default 0, at most
+   * 45 000), when the page after `cursor` would be empty, the server waits for
+   * the next update that carries attention items for the caller, then reads
+   * the page again; at `waitMs` it returns the empty page (R-API-15).
+   */
+  readonly attention: { readonly input: PageRequest & { readonly waitMs?: number }; readonly output: AttentionPage };
+  /** Artroom represents an unknown act with the object-shaped `ExplainNotFound` (R-API-9). */
   readonly explain: { readonly input: { readonly act: ActId }; readonly output: Explanation | ExplainNotFound };
-  // Declared acts stage 5 (R-API-9 as amended, section 33.10): the two generic tools, beside the ten named ones.
+  /** `RoomApi.lanes`. */
+  readonly lanes: { readonly input: LaneFilter & PageRequest; readonly output: Page<Lane> };
+  /** `RoomApi.lane`. An unknown lane is `McpNotFound`. */
+  readonly lane: { readonly input: { readonly lane: LaneId }; readonly output: Lane | McpNotFound<"lane"> };
+  /** `RoomApi.proposal`. An unknown generation is `McpNotFound`. */
+  readonly proposal: { readonly input: ProposalRef; readonly output: Proposal | McpNotFound<"proposal"> };
+  /**
+   * `RoomApi.op`, and with `waitMs` (default 0, at most 45 000) `RoomApi.wait`
+   * until one of `until` (default: the kind's terminal states). On expiry it
+   * returns the operation's current state, not an error (R-API-15). The
+   * adapter maps only `RoomApi.op`'s lookup `not-found` exception to
+   * `McpNotFound`; other errors retain their existing behavior.
+   */
+  readonly operation: {
+    readonly input: OpRef & { readonly until?: readonly string[]; readonly waitMs?: number };
+    readonly output: Op | McpNotFound<"operation">;
+  };
+  // Declared acts stage 5 (R-API-9 as amended, sections 33.10 and 34): the two generic tools, beside the fourteen named ones.
   /**
    * The declarations of a policy version with their bindings: the active
    * one, or the one in force at entry `at`, or version `policy`. An agent
@@ -588,6 +624,39 @@ export interface ActsNotFound {
   readonly outcome: "not-found";
 }
 
+/** Artroom's object-shaped MCP not-found result; its output schema defines this chosen shape (R-API-9). */
+export interface McpNotFound<W extends "lane" | "proposal" | "operation"> {
+  readonly outcome: "not-found";
+  readonly what: W;
+}
+
+/**
+ * Which tools each MCP toolset lists (R-API-14). The generic names are kept
+ * here for composition with declared-acts stage 5. A toolset decides only what
+ * `tools/list` shows; a listed or unlisted tool, once called, is judged by the
+ * room like any other call.
+ */
+export interface McpToolsets {
+  readonly builder:
+    | "attention" | "claim" | "workspace" | "propose" | "note" | "land" | "release" | "renew"
+    | "lane" | "proposal" | "explain" | "operation" | "act" | "acts";
+  readonly reviewer: "attention" | "lanes" | "lane" | "proposal" | "note" | "review" | "explain" | "act" | "acts";
+  readonly observer: "attention" | "lanes" | "lane" | "proposal" | "explain" | "operation" | "acts";
+  readonly all: McpToolName | "act" | "acts";
+}
+export type McpToolset = keyof McpToolsets;
+
+/**
+ * MCP tool annotations, as the MCP specification 2026-07-28 defines them.
+ * Hints for hosts, never authority (R-API-13).
+ */
+export interface McpToolAnnotations {
+  readonly readOnlyHint: boolean;
+  readonly destructiveHint: boolean;
+  readonly idempotentHint: boolean;
+  readonly openWorldHint: boolean;
+}
+
 /** The MCP `explain` result for an act the room does not have. `outcome` tells it apart from an `Explanation`. */
 export interface ExplainNotFound {
   readonly act: ActId;
@@ -613,12 +682,23 @@ export interface JsonSchema {
   readonly additionalProperties?: boolean;
 }
 
-/** The descriptor the MCP server publishes per tool. Lane E writes these and tests them against `McpTools`. */
+/**
+ * The descriptor the MCP server publishes per tool (R-API-13). Lane E writes
+ * these and tests them against `McpTools` and `McpToolsets`. `tools/list`
+ * advertises `name`, `title`, `description`, `inputSchema`, `outputSchema`
+ * and `annotations`; `method` and `toolsets` stay on the server.
+ */
 export interface McpToolDescriptor<T extends McpToolName = McpToolName> {
   readonly name: T;
+  readonly title: string;
+  /** At most 1 000 characters: when to use the tool, and its likely refusals with their fixes. */
   readonly description: string;
   readonly inputSchema: JsonSchema & { readonly type: "object" };
+  /** For act tools, `oneOf` the tool's result and `Refusal`, so every result's structured content conforms. */
   readonly outputSchema: JsonSchema;
-  /** The `RoomApi` method this tool calls. */
-  readonly method: T;
+  readonly annotations: McpToolAnnotations;
+  /** The `RoomApi` method this tool calls (`operation` calls `op` and `wait`). */
+  readonly method: T extends "operation" ? "op" : T;
+  /** The toolsets that list this tool. */
+  readonly toolsets: readonly { [S in McpToolset]: T extends McpToolsets[S] ? S : never }[McpToolset][];
 }

@@ -30,6 +30,8 @@ export async function roomWithMcp(): Promise<{ room: FakeRoom; url: Url; reads: 
     async room(_request, _env, bearer) {
       return connect(service, room.id, { kind: "bearer", token: bearer }).catch(() => null);
     },
+    // What the Room gives its endpoint for `tools/list`: the bearer's role and signed grant, read now (R-API-14).
+    caller: (_request, _env, bearer) => room.bearerCaller(bearer),
   });
   room.mcp = (request) => fetchMcp(request, {});
   return { room, url, reads };
@@ -40,6 +42,18 @@ export async function agent(room: FakeRoom, url: Url, handle: `@${string}` = "@b
   const out = await redeem({ url }, room.id, { invitation, secret });
   if (isRefusal(out)) throw new Error(out.rule);
   return out;
+}
+
+const ACT_TOOL_NAMES = ["claim", "propose", "note", "review", "land", "renew", "release", "act"];
+let keys = 0;
+/**
+ * The arguments of a tool call, with an idempotency key where the tool is
+ * an act tool and the test gave none: every act tool requires one (R-API-9,
+ * amendment 7). A test about the key itself gives its own, or uses `rpc`.
+ */
+export function keyed(name: string, args: unknown): unknown {
+  if (!ACT_TOOL_NAMES.includes(name) || typeof args !== "object" || args === null || "idempotencyKey" in args) return args;
+  return { ...args, idempotencyKey: `test-key-${++keys}` };
 }
 
 let rpcId = 0;

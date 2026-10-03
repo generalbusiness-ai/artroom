@@ -12,6 +12,7 @@ import type {
   AnyPolicyDocument,
   DelegationId,
   Envelope,
+  GrantMap,
   InvitationId,
   Joined,
   KeyId,
@@ -19,6 +20,7 @@ import type {
   MemberId,
   Redeemed,
   Refusal,
+  Role,
   RosterRecord,
   Session,
   SessionToken,
@@ -193,6 +195,35 @@ export function authenticateHash(core: RoomCore, h: string): MemberId {
   const m = memberRow(sql, str(s, "member")!);
   if (!m || m.state !== "active") throw fail();
   return m.handle;
+}
+
+/** A caller's authorization, as the MCP endpoint's `tools/list` asks for it (R-API-14). */
+export interface CallerView {
+  /** The current roster role of the member behind the token: under a delegation, the grantor's member. */
+  readonly role: Role;
+  /** The delegation the token's key acts under, with `kinds` and the signed map `acts` exactly as recorded. */
+  readonly delegation?: { readonly kinds: readonly string[] | "*"; readonly acts?: GrantMap };
+}
+
+/**
+ * The authorization behind a session or bearer token, judged now exactly as
+ * a read judges the token (R-CRED-7, R-CRED-10). A read: it records nothing
+ * and changes no grant. The signed map is returned as it was signed, stale
+ * entries included; choosing what to list from it is the MCP server's.
+ */
+export function callerOf(core: RoomCore, token: string): CallerView {
+  const h = tokenHash(token);
+  const member = authenticateHash(core, h); // GM:caller-judged
+  const sql = core.sql;
+  const s = one(sql, "SELECT delegation FROM sessions WHERE hash = ?", h) ?? one(sql, "SELECT delegation FROM bearers WHERE hash = ?", h);
+  const id = s ? str(s, "delegation") : null;
+  const d = id ? delegation(sql, id) : null;
+  if (!d) return { role: memberRow(sql, member)!.role };
+  // Under a delegation the grantor's role decides, as it does at admission (R-ADM-5).
+  const grantor = keyRow(sql, d.grantor);
+  const m = grantor ? memberRow(sql, grantor.member) : null;
+  if (!m || m.state !== "active") throw artroomError("unauthenticated", "The session or bearer token is not valid.");
+  return { role: m.role, delegation: { kinds: d.kinds, ...(d.acts !== undefined ? { acts: d.acts } : {}) } }; // GM:caller-grant
 }
 
 // ------------------------------------------------------------ redemption (R-CRED-9)

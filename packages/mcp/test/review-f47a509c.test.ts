@@ -70,10 +70,10 @@ describe("through the MCP endpoint", () => {
 
   test("values smuggled in through __proto__ are never used: the claim opens a new lane", async () => {
     const owner = await agent(room, url, "@owner");
-    const theirs = (await rpc(owner.mcp, owner.bearer, "tools/call", { name: "claim", arguments: { goal: "mine", scope: ["src/**"] } })).body.result.structuredContent;
+    const theirs = (await rpc(owner.mcp, owner.bearer, "tools/call", { name: "claim", arguments: { goal: "mine", scope: ["src/**"], idempotencyKey: "owner-claim" } })).body.result.structuredContent;
     room.expire(theirs.lane); // unheld, so a take-over would succeed if the smuggled lane were read
     const a = await agent(room, url);
-    const body = `{"name":"claim","arguments":{"goal":"g","scope":["lib/**"],"__proto__":{"lane":"${theirs.lane}","expectedGeneration":0}}}`;
+    const body = `{"name":"claim","arguments":{"goal":"g","scope":["lib/**"],"idempotencyKey":"smuggle-claim","__proto__":{"lane":"${theirs.lane}","expectedGeneration":0}}}`;
     const res = await rpc(a.mcp, a.bearer, "tools/call", JSON.parse(body));
     const out = res.body.result.structuredContent;
     expect(out.refused === true || (out.effect?.type === "opened" && out.lane !== theirs.lane)).toBe(true);
@@ -91,7 +91,7 @@ describe("the runner ignores inherited input", () => {
       },
       lane: async () => null,
     } as unknown as RoomApi;
-    const args = Object.assign(Object.create({ lane: "act_1_00000000", expectedGeneration: 0, lease: 1 }), { goal: "g", scope: ["src/**"] });
+    const args = Object.assign(Object.create({ lane: "act_1_00000000", expectedGeneration: 0, lease: 1 }), { goal: "g", scope: ["src/**"], idempotencyKey: "own-claim" });
     await callTool(room, "claim", args);
     expect(calls).toEqual([{ goal: "g", scope: ["src/**"] }]);
   });
