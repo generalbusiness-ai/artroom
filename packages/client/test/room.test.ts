@@ -264,19 +264,19 @@ describe("resumable cursors (R-API-6, R-API-7, R-API-8)", () => {
   });
 
   test("closing a watch that is waiting to reconnect stops all further attempts; disposing the handle closes its watches", async () => {
-    // A 10 ms backoff, so the watch is waiting when it is closed.
-    const alice = await joinAs(room, "@alice", "member", { backoff: () => 10 });
+    // The watch asks for its backoff when it starts to wait, so the test knows the moment. It waits 30 ms.
+    const waits: number[] = [];
+    const alice = await joinAs(room, "@alice", "member", { backoff: (ms) => (waits.push(ms), 30) });
     const sub = alice.api.watch(undefined, () => {}) as Watch;
     await until(() => room.socketCount === 1);
-    room.rejectUpgrades = true; // an outage: every reconnect fails
-    room.dropSockets();
-    const before = room.upgrades;
-    await until(() => room.upgrades > before);
-    sub.close();
+    waits.length = 0;
     const attempts = room.upgrades;
-    await idle(35);
+    room.dropSockets();
+    await until(() => waits.length === 1);
+    expect(waits).toEqual([250]);
+    sub.close();
+    await idle(60);
     expect(room.upgrades).toBe(attempts);
-    room.rejectUpgrades = false;
 
     const other = alice.api.watch(undefined, () => {}) as Watch;
     await until(() => room.socketCount === 1);
