@@ -311,6 +311,16 @@ lane L's sources (`.types/log`), as the UI does for the policy runtime,
 because lane L's sources assume a lib whose `TextDecoder` options differ
 from the Workers runtime types.
 
+A workerd test file costs about a second to load the Room before its first
+test runs. So some test files are only a list of case files
+(`test/workerd/*.cases.ts`) that share one worker:
+`jobs-and-snapshots`, `obligations-and-carry`, `roster-and-redemption`,
+`publication-and-workspaces` and `alarms-and-diagnoses`. A case file is
+written like any test file, and each test still makes its own room. The
+sections below were written when each review landed. They name the tests as
+they were then; request ecbc722a later removed tests that another test
+already decided, and its report maps each invariant to its witness.
+
 ## Acceptance cases and their evidence
 
 Four kinds of evidence, from weakest to strongest:
@@ -493,7 +503,7 @@ change. Every mutation made at least one named test fail.
 
 The checker's review of `315a8576` requested changes. The eight
 reproductions now assert the correct outcomes in
-[test/workerd/review-aabda1ed.test.ts](test/workerd/review-aabda1ed.test.ts).
+[test/workerd/review-aabda1ed.cases.ts](test/workerd/review-aabda1ed.cases.ts).
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
@@ -543,7 +553,7 @@ stream is UTF-8 with one `Update` per line.
 
 The checker's review of `a5a3406a` requested changes. Its reproductions now
 assert the correct outcomes in
-[test/workerd/review-8faa2ef9.test.ts](test/workerd/review-8faa2ef9.test.ts).
+[test/workerd/review-8faa2ef9.cases.ts](test/workerd/review-8faa2ef9.cases.ts).
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
@@ -569,7 +579,7 @@ reached (comparing the pending commit again when sealing) was removed.
 The checker's review of `909a3e3f` confirmed the five 8faa2ef9 findings and
 the 13 amendment 2 edits, and found two more. Its reproductions now assert
 the correct outcomes in
-[test/workerd/review-1249097f.test.ts](test/workerd/review-1249097f.test.ts).
+[test/workerd/review-1249097f.cases.ts](test/workerd/review-1249097f.cases.ts).
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
@@ -643,7 +653,7 @@ on its own integration).
 The checker's review of revision 5 (`45c7946f`) requested changes. The fixes
 are on top of `80d2351`, which adopted lane B's follow-up. Its
 reproductions now fail; the correct outcomes are asserted in
-[test/workerd/review-a711f7b6.test.ts](test/workerd/review-a711f7b6.test.ts).
+[test/workerd/review-a711f7b6.cases.ts](test/workerd/review-a711f7b6.cases.ts).
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
@@ -791,7 +801,7 @@ The checker's review of revision 6 (`d0b09ca2`) found one P2, and
 revision 7 had the same defect. This revision merges main `fb2bd41`
 (contract amendment 3) and fixes it. The checker's reproduction now fails;
 the correct outcomes are asserted in
-[test/workerd/review-95323c2b.test.ts](test/workerd/review-95323c2b.test.ts).
+[test/workerd/review-95323c2b.cases.ts](test/workerd/review-95323c2b.cases.ts).
 
 **The finding.** Two integrations can share one filtered snapshot commit,
 because its ID depends only on the files, the checker and the digest
@@ -848,9 +858,9 @@ the snapshot (R-CARRY-15 steps 3 and 5). The rest of amendment 3's lane A
 edits (sealed carry events, the runner pin, one repository per snapshot,
 the new job fields, advisory obligations) are a separate request. The
 merge only adds amendment 3's new `CheckJob` fields to the contract-shaped
-fixture in `review-a711f7b6.test.ts`, which the type check requires.
+fixture in `review-a711f7b6.cases.ts`, which the type check requires.
 
-**Tests**, all in `review-95323c2b.test.ts`, use the reviewer's layout: two
+**Tests**, all in `review-95323c2b.cases.ts`, use the reviewer's layout: two
 active landings both change `src/app.ts` to v2, and the second also
 changes `docs/a.md`, outside the checker's inputs. The two canonical
 integrations differ and their snapshot commits are the same.
@@ -962,8 +972,8 @@ this package (section 29.8, lane A). This request makes all seven. Edits 1,
 `packages/git`, together with the fixes of review 0f9739dc (see that
 section). The tests are in
 [test/workerd/amendment3.test.ts](test/workerd/amendment3.test.ts),
-[test/workerd/review-0f9739dc.test.ts](test/workerd/review-0f9739dc.test.ts)
-and [test/workerd/snapshot-repos.test.ts](test/workerd/snapshot-repos.test.ts);
+[test/workerd/review-0f9739dc.cases.ts](test/workerd/review-0f9739dc.cases.ts)
+and [test/workerd/snapshot-repos.cases.ts](test/workerd/snapshot-repos.cases.ts);
 each test name starts with its rule or finding.
 
 | Edit | What the Room does | Tests (in that file unless named) |
@@ -1046,7 +1056,7 @@ the suite.
 The checker's review of `8931f596` accepted the sealed carry, the runner
 pin and the advisory work, and found two P2s in job delivery. Its
 diagnostic asserted both defects; the tests in
-[test/workerd/review-0f9739dc.test.ts](test/workerd/review-0f9739dc.test.ts)
+[test/workerd/review-0f9739dc.cases.ts](test/workerd/review-0f9739dc.cases.ts)
 assert the correct outcomes. This revision also merges main `6f8cacbe`
 (lane F's carry UI and jj history) and `5acf29ad` (lane G, with
 `SnapshotRepos`), and makes amendment 3's edit 4 (see "Amendment 3").
@@ -1145,7 +1155,7 @@ main `9bb700b6` (contract amendment 4, bounded-memory log publication, lane
 E, the deploy and pi-durable spikes); the one conflict was in `core.ts`'s
 imports, where main's `RetainedRef` replaces `RetainedFile`.
 
-| Finding | Fix | Tests (in [test/workerd/review-786e9606.test.ts](test/workerd/review-786e9606.test.ts) unless named) |
+| Finding | Fix | Tests (in [test/workerd/review-786e9606.cases.ts](test/workerd/review-786e9606.cases.ts) unless named) |
 |---|---|---|
 | P2 1. Two jobs steps both read one owed row and used one attempt's ID before either claimed it; the step that lost then ended the winner's token and retired its snapshot repository | A step claims the attempt in the job's row (`owed` to `sent`, the next attempt number, its deadline) before it reads a snapshot or a tree or mints a token. A step that loses the claim prepares nothing. Every credential belongs to one attempt, and its ID is written to the row as soon as it exists, so an expiry or a restart still ends it. A canonical token is minted to expire by the deadline claimed with the attempt. | "filtered / whole-tree: two jobs steps at once on two owed jobs send one attempt each, whose tokens and repositories stay usable until they answer"; "whole-tree: a step held past the attempt's deadline, while the next step issues attempt 2, ends its own token and sends nothing"; "filtered: a job token that cannot be minted leaves the job due again later; the retry reuses the repository written for it"; review-0f9739dc "two jobs steps at once …", "restart …" |
 | P2 2. Owner, configuration, generation and obligation were judged only before the asynchronous preparation | After preparation the step checks that the row still holds its attempt, and judges the work again with the same synchronous check it used before (`current`: the owner current on the integration, the lane's latest generation, the same configuration, the obligation open), with no await before the dispatch. Work that changed is marked not needed, and its credentials are ended: the canonical token revoked, or the snapshot job ended, which retires its repository. | eight controls: "whole-tree / filtered preparation, owner / generation / configuration / obligation changed while a read token was being minted" |
@@ -1215,7 +1225,7 @@ repository through the Room's namespace-aware binding (`core.artifacts`).
   revocations with backoff (5 seconds, doubling, at most 5 minutes), and the
   alarm is set from them, so a restart keeps the duty.
 
-Tests, in [test/workerd/review-90f30a3b.test.ts](test/workerd/review-90f30a3b.test.ts),
+Tests, in [test/workerd/review-90f30a3b.cases.ts](test/workerd/review-90f30a3b.cases.ts),
 on the real Room Durable Object and SQLite with no other jobs step running.
 The fake's `createToken` can hold the request before minting
 (`holdToken`: the expiry then runs from the late mint) or hold the answer
@@ -1373,7 +1383,7 @@ a canonical token is owned by its own `job_tokens` row:
   token's real expiry, an unknown mint's as unknown (null), and when each
   record is next checked (`nextCheckAt`).
 
-Controls in [test/workerd/review-271dbd53.test.ts](test/workerd/review-271dbd53.test.ts),
+Controls in [test/workerd/review-271dbd53.cases.ts](test/workerd/review-271dbd53.cases.ts),
 on the real Room Durable Object and SQLite. Each injects one failure of the
 Room's own SQLite write at a handoff, then aborts the object and checks
 that a fresh one still owns the token and revokes it.
@@ -1746,7 +1756,7 @@ separate change.
 
 From simplification review 55563589 (SEC-01, SEC-02, SEC-07). Each
 behaviour was wrong on main `a6330262`; the tests in
-`test/workerd/request-c657d4ba.test.ts` fail there (12 of 13; the 13th is
+`test/workerd/request-c657d4ba.cases.ts` fail there (12 of 13; the 13th is
 the control that other refusals are still recorded) and pass here.
 
 | Finding or condition | Fix | Tests |
@@ -1777,7 +1787,7 @@ test red:
 | `admit` never reports a replay | (1), all three |
 | a refused join is recorded | (2), `/acts` and RPC |
 | joins on `/acts` are not counted | (3), the three that mix or use `/acts` |
-| a room-custody redemption is not counted | (3) room-custody; `roster.test.ts` per-invitation limit |
+| a room-custody redemption is not counted | (3) room-custody; `roster.cases.ts` per-invitation limit |
 | any string invitation is keyed | (3) unissued invitation; HTTPS address |
 | a null address is counted | (3) RPC |
 | the Worker passes a shared address | (3) RPC |
@@ -1804,7 +1814,7 @@ refuses the replayed redemption.
 | Test | What it pins |
 |---|---|
 | `test/workerd/checker-join-recovery.test.ts` (the checker's fixture, unchanged) | Recovery over RPC after an eviction and over HTTPS; "checker: join recovery honors the supplied client clock for its signed session request", which failed at 812fb907 |
-| `request-c657d4ba.test.ts`, "virtual clock: a lost join reply is recovered, and a session request retried after the clock moves is signed again at the moved time" | Against the real Room: the first session request fails retryably after the clock moves ten minutes; the retry's `notAfter` is ten minutes later and is accepted; the log holds one join |
+| `request-c657d4ba.cases.ts`, "virtual clock: a lost join reply is recovered, and a session request retried after the clock moves is signed again at the moved time" | Against the real Room: the first session request fails retryably after the clock moves ten minutes; the retry's `notAfter` is ten minutes later and is accepted; the log holds one join |
 | `packages/client/test/redeem.test.ts`, the two virtual-clock tests | The same two cases against the fake room |
 
 | Mutant in `connect.ts` | Red |
@@ -1938,7 +1948,7 @@ both fixed; the checker's two controls pass.
    While the repository is gone, workspace setup waits too.
 
 One existing test changed with the second fix:
-`review-a711f7b6.test.ts`, "Artifacts is down: … the next alarm completes
+`review-a711f7b6.cases.ts`, "Artifacts is down: … the next alarm completes
 it", ticked again at the same instant after the failed read of the
 canonical remote. That read now backs the landing step off for 5 s, so the
 test moves the clock to the next alarm the room asks for, and the
@@ -1954,7 +1964,7 @@ operation lands there, as the test's name says.
 
 **Mutations**, made one at a time on the code at the head that adds this
 review's fixes; 31 of 31 turned a test red. They were run against this
-request's tests and `phase2b.test.ts` (for the engine's own failures):
+request's tests and `phase2b.cases.ts` (for the engine's own failures):
 
 | Mutant | Red |
 |---|---|
@@ -1984,7 +1994,7 @@ request's tests and `phase2b.test.ts` (for the engine's own failures):
 | a not-bound answer is logged as a failure | cold publication, not bound |
 | the landing step returns quietly when not bound | cold landing, not bound |
 | a landing failure before the engine is not counted | both cold landing tests |
-| the engine's own failures back the landing step off | `phase2b.test.ts`: the instance stops while the push is in flight |
+| the engine's own failures back the landing step off | `phase2b.cases.ts`: the instance stops while the push is in flight |
 | the alarm runs loop work inside its backoff | lease expiry, notification and job deadline cases; cold landing, throws |
 | the next alarm ignores a kind's backoff | pin step; lease expiry and job deadline cases |
 | the next alarm ignores the landing backoff | both cold landing tests |
@@ -2117,7 +2127,7 @@ Left unchanged, with the reason:
 | `foundingDue`, `nextAlarm`, `simulate`, founding's `refreshMain` after the seal | Scheduling reads, control flow, or background work retried by the alarm |
 | `src/worker.ts` RPC entry (`RoomWireTarget`, `Artroom`) | No catch: `unwire` rethrows the Room's `ArtroomError` to the caller |
 
-**Tests.** `test/workerd/request-d268d249.test.ts` (38 tests) and
+**Tests.** `test/workerd/request-d268d249.cases.ts` (38 tests) and
 `test/node/diag.test.ts` (59 tests).
 
 - One test per pre-admission step (10). Each fails the step once at the

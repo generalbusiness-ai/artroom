@@ -62,7 +62,9 @@ describe("1. recovery accepts only the confirmed parent or the exact pending com
     return r.world.log.ref!;
   }
 
-  for (const changed of ["checkpoint", "retained", "parent"] as const) {
+  // The room compares the whole commit. A changed checkpoint is another tree; a changed parent is the same tree
+  // in another commit.
+  for (const changed of ["checkpoint", "parent"] as const) {
     it(`a foreign commit with identical entry lines but a different ${changed} is refused; nothing advances; the ref is never forced`, async () => {
       const r = await makeRoom();
       const own = await lostReplies(r);
@@ -77,8 +79,6 @@ describe("1. recovery accepts only the confirmed parent or the exact pending com
           sig: "invalid-signature",
         });
       }
-      if (changed === "retained")
-        files[`artroom-log/v1/inputs/${"0".repeat(64)}.json`] = "{}";
       const foreign = r.world.log.write(files, changed === "parent" ? ("e".repeat(40) as never) : parent);
       r.world.log.ref = foreign;
       expect((await failure(r.stub.publishLog())).code).toBe("unavailable");

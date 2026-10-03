@@ -407,7 +407,7 @@ Hugh approved this as a spike-only switch (assert 66a41558).
   the pin, because a proposal read must find its pinned ref (R-PROP-1).
   Whenever a pin is written, its due time is deleted, even after the switch
   is unset.
-- **Its tests**, in `test/workerd/pin-delay.test.ts` against the real
+- **Its tests**, in `test/workerd/pin-delay.cases.ts` against the real
   Durable Object:
   - unset, the pin is written by the commit, with no tick and no due time;
   - set, it is not written before its due time, the next alarm is exactly
@@ -440,9 +440,11 @@ Hugh approved this as a spike-only switch (assert 66a41558).
   pending pin.
 
   Tests:
-  - `test/workerd/pin-backlog.test.ts` uses only main's interfaces, so it
-    runs on main (one full scan) and on this lane (bounded).
-  - `test/workerd/pin-delay.test.ts` covers:
+  - `test/workerd/pin-backlog.test.ts` used only main's interfaces, so it
+    ran on main (one full scan) and on this lane (bounded). Request
+    ecbc722a removed it: `pin-delay.cases.ts` holds the bounded-read cases,
+    which also stand for the 150,000-pin case named below.
+  - `test/workerd/pin-delay.cases.ts` covers:
     - the reads, with the switch unset and set;
     - 150,000 pending pins;
     - dating at start, and that a start with the switch off writes nothing;
