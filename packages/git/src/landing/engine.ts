@@ -5,6 +5,11 @@
  * work between its transactions: building integrations, minting and revoking
  * the 60 s publication token, pushing, and reading main back.
  *
+ * The publication token is minted through the canonical mint ledger
+ * (`publicationTokens`; protocol section 32, mint lane B). The ledger owns
+ * the token from before its create request is sent until `pushToken`
+ * claims it, in the transaction that records its ID on the push attempt.
+ *
  * The Room calls:
  * - `accept`, `laneChanged`, `policyActivated`, `abort`, `evaluate` and
  *   `after` synchronously, inside its own admission transactions;
@@ -29,6 +34,8 @@ import type {
 } from "@generalbusiness/artroom-contract";
 import type { Sql } from "../sql.ts";
 import type { PushOutcome } from "../publisher/push-outcome.ts";
+import { type RepoHandle, withRetry } from "../artifacts.ts";
+import { MINT_WAIT_MS, type MintLedger, errorNote } from "../mints.ts";
 import { type IntegrateResult, LandingCore, toView } from "./core.ts";
 import type { AcceptInput, LandRecord, LandingRoom, PublicationStatus, Readiness, ReserveResult } from "./types.ts";
 
@@ -57,16 +64,91 @@ export interface PublisherPort {
   readMain(): Promise<Sha>;
 }
 
-/** Canonical write tokens for one publication attempt each (R-PUB-3). */
+/** A publication token, as the mint ledger gives it to the engine: still the ledger's until `claim`. */
+export interface PublicationToken {
+  readonly id: string;
+  readonly plaintext: string;
+  /** Artifacts' reported expiry (ms), recorded with the landing's token row. */
+  readonly expiresAt: number | null;
+  /** Hand the token to the landing operation. Synchronous: `pushToken` calls it inside its transaction (R-MINT-4). */
+  claim(): void;
+  /** Revoke the token while the ledger still owns it (the claim did not commit). */
+  release(): Promise<void>;
+}
+
+/** Canonical write tokens for one publication attempt each (R-PUB-3, R-MINT-1). */
 export interface PublicationTokens {
-  /** A write token on the canonical repo with the shortest lifetime Artifacts allows (60 s). */
-  mint(): Promise<{ readonly id: string; readonly plaintext: string }>;
+  /** A write token on the canonical repo with the shortest lifetime Artifacts allows (60 s), recorded under `owner`. */
+  mint(owner: string): Promise<PublicationToken>;
   revoke(id: string): Promise<boolean>;
+}
+
+/** The publication token's lifetime, in seconds (R-PUB-3): unchanged by the mint ledger. */
+export const PUBLICATION_TTL_S = 60;
+
+/**
+ * Publication tokens through the canonical mint ledger (R-MINT-1 to
+ * R-MINT-4). Each mint is the ledger's: one durable record and a stored
+ * wake-up before each create request, any retry a new record, and a 30 s
+ * bounded wait. The engine never retries a mint itself. A revocation is by
+ * the token's ID: the repository lookup and the revocation, with
+ * `withRetry`'s retries of a transient error, share one bounded wait. Once
+ * it has run out, nothing more is sent: the wait's end is checked when each
+ * attempt starts (after a retry's sleep) and again after each lookup,
+ * immediately before the revocation is sent (review d4a4c681). A later
+ * answer is dropped, and the caller's record keeps the debt.
+ */
+export function publicationTokens(o: {
+  readonly mints: MintLedger;
+  readonly repo: () => Promise<Pick<RepoHandle, "revokeToken">>;
+  readonly waitMs?: number;
+  readonly sleep?: (ms: number) => Promise<void>;
+}): PublicationTokens {
+  const waitMs = o.waitMs ?? MINT_WAIT_MS;
+  return {
+    mint: (owner) => o.mints.mint(owner, "write", () => PUBLICATION_TTL_S),
+    revoke: async (id) => {
+      let over = false;
+      const gaveUp = () => new Error("the revocation was given up when its bounded wait ran out");
+      const answer = withRetry(
+        async () => {
+          if (over) throw gaveUp(); // after a retry's sleep
+          const repo = await o.repo();
+          if (over) throw gaveUp(); // after the lookup, immediately before the send
+          return repo.revokeToken(id);
+        },
+        o.sleep ? { sleep: o.sleep } : {},
+      );
+      try {
+        const r = await bounded(answer, waitMs);
+        if (r === TIMED_OUT) throw new Error(`Artifacts did not answer the revocation within ${waitMs} ms`);
+        return r;
+      } finally {
+        over = true;
+      }
+    },
+  };
+}
+
+const TIMED_OUT = Symbol("timed out");
+
+/** `p`'s answer, or `TIMED_OUT` after `ms`. A later answer, or a later failure, is dropped. */
+function bounded<T>(p: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  p.catch(() => undefined);
+  const late = new Promise<typeof TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(TIMED_OUT), ms);
+    (timer as { unref?: () => void }).unref?.();
+  });
+  return Promise.race([p, late]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
 }
 
 /** Points between transactions where a test may stop the driver, as a crash would. */
 export type FaultPoint =
   | "attempt-recorded" //  the attempt is durable; no token yet
+  | "token-answered" //    the mint answered; the ledger holds the token, and its ID is not on the attempt yet
   | "token-minted" //      the token ID is durable; nothing pushed
   | "push-in-flight" //    the push has started and is still running
   | "push-returned" //     the push answered; its outcome is not recorded
@@ -107,6 +189,8 @@ export class Landing {
   private chain: Promise<unknown> = Promise.resolve();
   /** The cleanup pass in progress, if any. Never on `chain`. */
   private cleaning: Promise<void> | null = null;
+  /** Revocations of tokens the ledger kept because `pushToken` did not commit. Never on `chain`. */
+  private readonly releasing = new Set<Promise<void>>();
   /** When the current attempt of that pass times out at the latest. */
   private cleaningUntil = 0;
   private readonly revokeTimeoutMs: number;
@@ -266,17 +350,28 @@ export class Landing {
     if (!plan) return aborting;
     this.fault("attempt-recorded", plan.op);
 
-    let token: { readonly id: string; readonly plaintext: string };
+    let token: PublicationToken;
     try {
-      token = await this.tokens.mint();
+      // One call: any retry is the ledger's, each under its own record (R-MINT-2).
+      token = await this.tokens.mint(`publish:${plan.op}:${plan.n}`);
     } catch (e) {
       this.alive();
-      this.core.pushResult(plan.op, plan.n, { outcome: "error", detail: `token not minted: ${message(e)}` });
+      // Safe metadata only: the provider's text never reaches the operation's record (R-MINT-5).
+      this.core.pushResult(plan.op, plan.n, { outcome: "error", detail: `token not minted (${errorNote("create failed", e)})` });
       await this.readBackAndApply(plan.op, "after-push");
       return true;
     }
     this.alive();
-    this.core.pushToken(plan.op, plan.n, token.id);
+    // A host that stops here leaves the token with the ledger, which revokes it by its ID after the takeover.
+    this.fault("token-answered", plan.op);
+    try {
+      // The ID is recorded, the landing's token row written and the ledger's record claimed in one transaction.
+      this.core.pushToken(plan.op, plan.n, token.id, token.claim, token.expiresAt);
+    } catch (e) {
+      // Rolled back: the ledger still owns the token. It revokes it, off the publication queue (R-MINT-4).
+      this.release(token);
+      throw e;
+    }
     this.fault("token-minted", plan.op);
 
     // R-LAND-3: an abort attempt may have arrived while the token was minted.
@@ -360,9 +455,18 @@ export class Landing {
       });
   }
 
-  /** Resolves when the cleanup pass in progress, if any, has ended. */
+  /** Resolves when the cleanup pass in progress, if any, and every release of a token `pushToken` did not take, have ended. */
   async cleanupDone(): Promise<void> {
-    await this.cleaning;
+    while (this.cleaning || this.releasing.size > 0) await Promise.all([this.cleaning, ...this.releasing]);
+  }
+
+  /** Revoke a token the ledger still owns, in the background: not awaited by the publication queue. */
+  private release(token: PublicationToken): void {
+    const p: Promise<void> = token
+      .release()
+      .catch(() => undefined) // the ledger keeps the debt: `held` until its revocation is answered or a takeover makes it owed
+      .finally(() => this.releasing.delete(p));
+    this.releasing.add(p);
   }
 
   /**

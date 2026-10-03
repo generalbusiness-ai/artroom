@@ -18,6 +18,12 @@
  *   ends (R-PUB-3). That duty has its own records and due time, so it never
  *   holds the slot or delays a receipt, and its answer decides nothing about
  *   whether a push landed (R-PUB-2).
+ * - Every publication token ID has a row keyed by that ID
+ *   (`artroom_land_token`, R-MINT-7) from the transaction that records it on
+ *   its push attempt (`pushToken`, which also claims it from the mint
+ *   ledger) to the one that marks it revoked (`tokenRevoked`). Nothing else
+ *   writes or deletes those rows, so the mint ledger's observation knows a
+ *   publication token by one point lookup (`knownToken`).
  */
 
 import type {
@@ -119,7 +125,10 @@ export class LandingCore {
       "CREATE TABLE IF NOT EXISTS artroom_land_token_cleanup (op TEXT NOT NULL, n INTEGER NOT NULL, token TEXT NOT NULL, due INTEGER NOT NULL, backoff INTEGER NOT NULL, PRIMARY KEY (op, n))",
     );
     sql.all("CREATE INDEX IF NOT EXISTS artroom_land_token_cleanup_due ON artroom_land_token_cleanup (due)");
+    // Every publication token not yet confirmed revoked, active or ended, by its ID (R-MINT-7). `expires_at` is Artifacts' reported expiry, if known.
+    sql.all("CREATE TABLE IF NOT EXISTS artroom_land_token (token TEXT PRIMARY KEY, op TEXT NOT NULL, n INTEGER NOT NULL, expires_at INTEGER)");
     this.adoptEndedTokens();
+    this.indexTokens();
   }
 
   // ------------------------------------------------------------ storage
@@ -176,6 +185,33 @@ export class LandingCore {
       }
       this.setMeta("token-cleanup", "1");
     });
+  }
+
+  /**
+   * Once per room: a room stored before the token rows existed gains one for
+   * each unrevoked token of its active operations, and one for each owed
+   * revocation of an ended operation's token. Every ended operation's
+   * unrevoked token is in the cleanup records (`adoptEndedTokens` runs
+   * first), so no operation body of an ended operation is read.
+   */
+  private indexTokens(): void {
+    this.tx(() => {
+      if (this.meta("token-index") !== null) return;
+      for (const op of this.active()) {
+        for (const p of op.pushes ?? []) {
+          if (p.tokenId && !p.tokenRevoked) {
+            this.sql.all("INSERT INTO artroom_land_token (token, op, n, expires_at) VALUES (?, ?, ?, NULL) ON CONFLICT (token) DO NOTHING", p.tokenId, op.id, p.n);
+          }
+        }
+      }
+      this.sql.all("INSERT INTO artroom_land_token (token, op, n, expires_at) SELECT token, op, n, NULL FROM artroom_land_token_cleanup WHERE true ON CONFLICT (token) DO NOTHING");
+      this.setMeta("token-index", "1");
+    });
+  }
+
+  /** Does a landing record hold this token ID, revoked or not yet confirmed? One point lookup; no operation is read. */
+  knownToken(tokenId: string): boolean {
+    return this.sql.all("SELECT 1 AS x FROM artroom_land_token WHERE token = ?", tokenId).length > 0;
   }
 
   private slotRaw(): Slot {
@@ -700,12 +736,19 @@ export class LandingCore {
     return need(op.pushes?.find((p) => p.n === n), `push attempt ${n}`);
   }
 
-  /** The attempt's token ID, recorded before the token leaves the room. */
-  pushToken(id: OpId, n: number, tokenId: string): void {
+  /**
+   * The attempt's token ID, recorded before the token leaves the room. In
+   * the same transaction the mint ledger's record is claimed (`claim`
+   * deletes it) and the token's row is written, so a rollback leaves the
+   * ledger owning the token, and no landing row (R-MINT-4, R-MINT-7).
+   */
+  pushToken(id: OpId, n: number, tokenId: string, claim: () => void, expiresAt: number | null = null): void {
     this.tx(() => {
       const op = need(this.get(id), id);
       this.attempt(op, n).tokenId = tokenId;
       this.save(op);
+      this.sql.all("INSERT INTO artroom_land_token (token, op, n, expires_at) VALUES (?, ?, ?, ?)", tokenId, id, n, expiresAt);
+      claim();
     });
   }
 
@@ -726,9 +769,12 @@ export class LandingCore {
   tokenRevoked(id: OpId, n: number): void {
     this.tx(() => {
       const op = need(this.get(id), id);
-      this.attempt(op, n).tokenRevoked = true;
+      const a = this.attempt(op, n);
+      a.tokenRevoked = true;
       this.save(op);
       this.sql.all("DELETE FROM artroom_land_token_cleanup WHERE op = ? AND n = ?", id, n);
+      // Its keyed row ends with it (R-MINT-7), by the token's own ID.
+      if (a.tokenId) this.sql.all("DELETE FROM artroom_land_token WHERE token = ? AND op = ? AND n = ?", a.tokenId, id, n);
     });
   }
 

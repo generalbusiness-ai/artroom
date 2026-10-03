@@ -14,8 +14,8 @@
  * The Room Worker hosts them.
  */
 
-export { Landing, EngineStopped } from "./landing/engine.ts";
-export type { FaultPoint, LandingOptions, PublicationTokens, PublisherPort } from "./landing/engine.ts";
+export { Landing, EngineStopped, PUBLICATION_TTL_S, publicationTokens } from "./landing/engine.ts";
+export type { FaultPoint, LandingOptions, PublicationToken, PublicationTokens, PublisherPort } from "./landing/engine.ts";
 export { LandingCore, retryFix, toView, FORWARD_BACKOFF, UNEXPECTED_READBACK_MS } from "./landing/core.ts";
 export type { IntegrateResult, PushPlan } from "./landing/core.ts";
 export type {
@@ -53,7 +53,7 @@ export { GitPublisher, landMessage } from "./publisher/git-publisher.ts";
 export { ARTIFACTS_REFUSALS, artifactsRefusal, classifyGitPush, definitelyNotApplied } from "./publisher/push-outcome.ts";
 export type { PushOutcome } from "./publisher/push-outcome.ts";
 export { checkUpdates, readCommands, FenceError } from "./publisher/ref-fence.ts";
-export { canonicalTokens, completeInventory, readMainVia, withRetry } from "./artifacts.ts";
+export { completeInventory, readMainVia, withRetry } from "./artifacts.ts";
 export {
   MINT_LISTING_MAX,
   MINT_REVOKE_BACKOFF,

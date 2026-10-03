@@ -130,26 +130,6 @@ export async function withRetry<T>(
   }
 }
 
-/** Publication and staging tokens on the canonical repo (R-PUB-3): write, 60 s, revoked after use. */
-export function canonicalTokens(repo: () => Promise<RepoHandle>, opts: { readonly sleep?: (ms: number) => Promise<void> } = {}) {
-  return {
-    async mint(): Promise<{ readonly id: string; readonly plaintext: string }> {
-      const r = await repo();
-      const t = await withRetry(() => r.createToken("write", 60), opts);
-      return { id: t.id, plaintext: t.plaintext };
-    },
-    async mintRead(): Promise<{ readonly id: string; readonly plaintext: string }> {
-      const r = await repo();
-      const t = await withRetry(() => r.createToken("read", 60), opts);
-      return { id: t.id, plaintext: t.plaintext };
-    },
-    async revoke(id: string): Promise<boolean> {
-      const r = await repo();
-      return withRetry(() => r.revokeToken(id), opts);
-    },
-  };
-}
-
 /** Main on a repo, read through the binding. */
 export async function readMainVia(repo: RepoHandle): Promise<string> {
   // The binding's `log` takes a branch name; a full ref name is tried as well.

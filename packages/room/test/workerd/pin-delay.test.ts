@@ -113,6 +113,35 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     expect(r.world.artifacts.refs.get(p.pinnedRef)).toBe(head);
   });
 
+  it("set, with the mint ledger (main 574568b2): the earliest of the delayed pin and the ledger's due time wins, and each keeps its own fence and backoff", async () => {
+    setPinDelay(DELAY);
+    const r = await makeRoom();
+    await proposed(r);
+    const due = clock.now + DELAY;
+    await inDO(r, (room) => room.core.idle());
+    await tick(r, 2);
+    // The ledger's due time is set directly on this object's ledger: only nextAlarm's composition is under test here.
+    const withMints = (at: number | null) => inDO(r, (room) => {
+      (room.core.mints as unknown as { nextDue: () => number | null }).nextDue = () => at;
+      return room.core.nextAlarm();
+    });
+    const setBackoff = (v: Record<string, unknown>) => inDO(r, (room) => room.core.sql.all("INSERT INTO meta (k, v) VALUES ('loop_backoff', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", JSON.stringify(v)));
+    expect(await withMints(due - 5_000)).toBe(due - 5_000);
+    expect(await withMints(due + 5_000)).toBe(due);
+    expect(await withMints(null)).toBe(due);
+    // Each kind's backoff moves only its own due time.
+    await setBackoff({ mints: { attempts: 1, next: due + 20_000 } });
+    expect(await withMints(due - 5_000)).toBe(due);
+    await setBackoff({ pins: { attempts: 1, next: due + 20_000 } });
+    expect(await withMints(due + 5_000)).toBe(due + 5_000);
+    await inDO(r, (room) => room.core.sql.all("DELETE FROM meta WHERE k = 'loop_backoff'"));
+    // The repository gone fences both: neither due time wakes the room.
+    await inDO(r, (room) => room.core.sql.all("INSERT INTO meta (k, v) VALUES ('canonical_gone', ?)", JSON.stringify({ since: new Date(clock.now).toISOString(), head: room.core.headSeq() })));
+    const fenced = await withMints(due - 5_000);
+    expect(fenced).not.toBe(due - 5_000);
+    expect(fenced).not.toBe(due);
+  });
+
   it("set: a read of the proposal still finds its pinned ref (R-PROP-1)", async () => {
     setPinDelay(DELAY);
     const r = await makeRoom();

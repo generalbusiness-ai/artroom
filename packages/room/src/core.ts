@@ -57,7 +57,7 @@ import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, SnapshotPort, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, SnapshotRepos, Workspaces, canonicalTokens } from "@generalbusiness/artroom-git";
+import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, publicationTokens } from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
@@ -145,12 +145,18 @@ export interface Recomputation {
  * durable backoff after a failure (request 3da1d82b): an alarm that fires
  * early for other work skips a kind whose backoff has not ended.
  */
-export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing"] as const;
+export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing", "mints"] as const;
 export type LoopKind = (typeof LOOP_KINDS)[number];
 /** Whether a kind of loop work may run now. */
 export type LoopDue = (kind: LoopKind) => boolean;
 /** Loop work that needs the canonical repository. */
-const NEEDS_REPOSITORY: ReadonlySet<LoopKind> = new Set(["pins", "previews", "provision", "landing"]);
+const NEEDS_REPOSITORY: ReadonlySet<LoopKind> = new Set(["pins", "previews", "provision", "landing", "mints"]);
+/**
+ * Loop work timed by its own durable due times (`nextAlarm`), never pending
+ * by the 5-second loop: the landing engine and the canonical mint ledger.
+ * Its backoff, after a failure of the step itself, ends only when it runs.
+ */
+const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints"]);
 
 let faultHook: ((point: string) => void) | null = null;
 
@@ -235,6 +241,15 @@ export class RoomCore {
   };
   /** Lane B's landing engine, on this room's SQLite. */
   readonly landing: Landing;
+  /**
+   * The canonical mint ledger (protocol section 32): it owns each token the
+   * Room creates on its canonical repository, from before the request is
+   * sent until the token's revocation is answered or another owner claims
+   * it. Built once per object start, with the core: its constructor takes
+   * over what a stopped object left (R-MINT-7). The alarm runs it
+   * (`steps.mints`, `nextAlarm`).
+   */
+  readonly mints: MintLedger;
   private wsCache: Workspaces | null = null;
   /** The Artifacts binding for the room's repository namespace (`binding()`), resolved per call. */
   readonly artifacts: ArtifactsBinding;
@@ -301,11 +316,22 @@ export class RoomCore {
         return remote;
       },
     };
+    const canonicalRepo = () => this.artifacts.get(this.location().name);
+    this.mints = new MintLedger({
+      sql: this.sql,
+      repo: canonicalRepo,
+      now: () => this.now(),
+      // The persisted alarm: resolves only once storage has it, before any create is sent (R-MINT-2).
+      wake: this.wake ?? (async () => this.committed()),
+      // Point lookups in the Room's other records of token IDs: job tokens, and the landing's token rows (R-MINT-7).
+      known: (id) => !!one(this.sql, "SELECT 1 AS x FROM job_tokens WHERE token_id = ?", id) || this.landing.core.knownToken(id),
+      ...sleep,
+    });
     this.landing = new Landing({
       sql: this.sql,
       room: this.host(),
       publisher: new ContainerPublisher({ stub: r.publisher, artifacts: this.artifacts, canonical, ...sleep }),
-      tokens: canonicalTokens(() => this.artifacts.get(this.location().name), sleep),
+      tokens: publicationTokens({ mints: this.mints, repo: canonicalRepo, ...sleep }),
       now: () => this.now(),
       ...(r.landingFault ? { fault: r.landingFault } : {}),
     });
@@ -1761,6 +1787,11 @@ export class RoomCore {
     },
     abort: () => this.landing.enforceAbort().then(() => undefined),
     publication: () => this.publish().then(() => undefined),
+    // Its own kind of loop work: `due` is that kind's fence after a failure of the step itself (request 3da1d82b);
+    // the ledger's own durable due times are checked inside, at execution.
+    mints: async (due: LoopDue = this.loopAllowed) => {
+      if (due("mints")) await this.reconcileMints();
+    },
   } as const;
 
   /** Start one durable step now, in the background. A commit's own work is not held back by an earlier failure's backoff. */
@@ -1820,9 +1851,21 @@ export class RoomCore {
   }
 
   /**
+   * The canonical mint ledger's alarm work (R-MINT-7): move the takeover
+   * time ahead while a request or token is in flight, start a revocation
+   * pass if one is due (not awaited), and observe if due (bounded). Each
+   * honours its own durable due time, so an alarm that runs early for other
+   * work does nothing here, and an idle room writes nothing.
+   */
+  async reconcileMints(): Promise<void> {
+    if (this.founded) await this.mints.reconcile();
+  }
+
+  /**
    * May this kind of loop work run at all? Work that needs the canonical
-   * repository (pins, previews, provisioning, landing and its evaluations)
-   * waits, kept, while it is gone: it cannot succeed (request 3da1d82b).
+   * repository (pins, previews, provisioning, landing and its evaluations,
+   * the mint ledger's revocations and observations) waits, kept, while it is
+   * gone: it cannot succeed (request 3da1d82b).
    */
   readonly loopAllowed: LoopDue = (kind) => !(NEEDS_REPOSITORY.has(kind) && this.canonicalGone() !== null);
 
@@ -1839,7 +1882,7 @@ export class RoomCore {
     return parsed !== null && typeof parsed === "object" ? (parsed as Partial<Record<LoopKind, { attempts: number; next: number }>>) : {};
   }
 
-  /** The kinds of loop work that are pending now. Landing's own work is timed by the engine (`nextAlarm`). */
+  /** The kinds of loop work that are pending now. Landing's own work is timed by the engine, and the mint ledger's by the ledger (`nextAlarm`). */
   loopPendingKinds(): Set<LoopKind> {
     const kinds = new Set<LoopKind>();
     if (this.endedWorkspaces().length > 0) kinds.add("tokens");
@@ -1876,9 +1919,9 @@ export class RoomCore {
         const attempts = (backoff[kind]?.attempts ?? 0) + 1;
         backoff[kind] = { attempts, next: now + Math.min(ALARM.pendingIntervalMs * 2 ** (attempts - 1), ALARM.retryBackoffMaxMs) };
         changed = true;
-      } else if (backoff[kind] && (attempted.has(kind) || (kind !== "landing" && !pending.has(kind)))) {
+      } else if (backoff[kind] && (attempted.has(kind) || (!SELF_TIMED.has(kind) && !pending.has(kind)))) {
         // Run and succeeded, or its work was done meanwhile (a commit's own run). Landing's due time is the engine's,
-        // so its backoff ends only when it runs.
+        // and the mint ledger's its own, so their backoff ends only when they run.
         delete backoff[kind];
         changed = true;
       }
@@ -1902,6 +1945,11 @@ export class RoomCore {
     const backoff = this.loopBackoff();
     const landing = gone ? null : this.landing.nextDue();
     if (landing !== null) times.push(Math.max(landing, backoff.landing?.next ?? landing));
+    // The canonical mint ledger: the takeover time while anything is in flight, owed revocations and the next
+    // observation; a still-future time as it is, overdue work 1 s ahead, never sooner (R-MINT-7). It too needs the
+    // canonical repository, and after a failure of its step waits for that step's backoff.
+    const mints = gone ? null : this.mints.nextDue();
+    if (mints !== null) times.push(Math.max(mints, backoff.mints?.next ?? mints));
     // Lane B's workspace duties: cleanup owed, and checks on unanswered remote steps, on their capped backoff.
     let ws: Workspaces | null = null;
     try {
