@@ -13,7 +13,7 @@ The improve skill supplied the handoff format. Four verified fixes were selected
 
 Plans 001 and 002 touch the same workspace cleanup function; serialize their edits or explicitly reconcile the second head. Plan 004 also touches workspaces.ts and should follow that reconciliation. Plan 003 can proceed independently. Every executor must use a gitseq request/promise, preserve unrelated work, run the stated gates and deliver all artifacts at one exact head for checker review.
 
-Design note for review under request `a2cbd459`, following assert `4e4134b4` (acts are declared by each application): [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md).
+Design note for review under request `a2cbd459`, following assert `4e4134b4` as corrected by `b2cdc44a` (acts are declared by each application): [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md).
 
 ## Evidence and limits
 
