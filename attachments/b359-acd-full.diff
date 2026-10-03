@@ -1,0 +1,2847 @@
+diff --git a/docs/protocol.md b/docs/protocol.md
+index c9dcae52..7f52604c 100644
+--- a/docs/protocol.md
++++ b/docs/protocol.md
+@@ -2033,11 +2033,23 @@ intent under R-DECL-16.
+   `member` or `agent`, and `reviewer` for `checker`. That last choice is a
+   presentation set, not review authority: a checker still cannot sign a
+   review or claim, and only eligible act tools are listed.
+-- **A caller may ask for fewer.** The query parameter `toolset` on the MCP
+-  URL (for example `?toolset=reviewer`) selects another toolset. An
+-  unknown name is `bad-request`.
++- **A caller may select another named toolset.** The query parameter
++  `toolset` on the MCP URL (for example `?toolset=reviewer`), or
++  `--toolset` on `artroom mcp`, selects any one of `builder`, `reviewer`,
++  `observer` and `all`, whatever the caller's default is. The
++  read-only-delegation override decides the default only. Every selected
++  list is filtered by the same eligibility predicate, so selecting `all`
++  shows no act tool the caller could not make a new call of, and grants no
++  act and no signed binding. An unknown name is `bad-request`.
+ - **One eligibility predicate governs HTTPS and stdio.** Authenticate the
+-  request and use the active document and current roster role. For a `v2`
++  request and use the active document and current roster role. The host
++  that authenticated the request supplies the caller's facts
++  (`McpCaller`): the credential's current role and, under a delegation,
++  the delegation's `kinds` and signed map exactly as recorded. The Room's
++  own endpoint reads them from the token, by a method of the Room that is
++  not part of `RoomApi` or `RoomWire`. `artroom mcp` reads them from the
++  current roster and the credential's own recorded delegation. Both read
++  them again for every `tools/list`. For a `v2`
+   document, a declared kind is eligible for a new generic call exactly
+   when its `who` admits that role under R-DECL-11, including the implicit
+   admin and narrow checker floor. With delegated credentials it must also
+@@ -2306,7 +2318,7 @@ Cases added for amendment 2 (section 27). Each is normative.
+ | **MCP keys.** `claim` with no `idempotencyKey`; `claim` with a key, its response lost, then the same call again | `bad-request` and nothing recorded; then one claim, and the retry returns its receipt | R-API-9, R-CRED-10 |
+ | **MCP reads.** `lane` and `proposal` of unknown IDs; `lanes` with `touches` | `{ outcome: "not-found", what }` for each; the overlapping lanes | R-API-9 |
+ | **MCP operation errors.** `RoomApi.op` throws lookup `not-found`; separately it throws `unauthenticated`, `forbidden` or `unavailable` | Only the lookup becomes `{ outcome: "not-found", what: "operation" }`; each other failure keeps its error | R-API-9 |
+-| **MCP descriptors.** `tools/list` as an admin | Fourteen named tools plus `act` and `acts` in a fixed order, each with title, output schema and annotations; instructions of at most 512 characters | R-API-13, R-DECL-16 |
++| **MCP descriptors.** `tools/list` as an admin, under an active `v2` document and under an active `v1` document | Under `v2`: the fourteen named tools, then `acts` and `act`, in a fixed order, the act tools subject to binding and authorization. Under `v1`: the fourteen named tools and `acts`, with the generic `act` absent. In both, each tool has a title, an output schema and annotations, and the instructions are at most 512 characters | R-API-13, R-API-14, R-DECL-16 |
+ | **MCP refusal conforms.** A `propose` refused `outside-claim` | Structured content validates against the tool's `outputSchema`; the text gives rule, reason and fix | R-API-13, R-API-1 |
+ | **MCP toolsets.** `tools/list` as an `agent`; as an `agent` with `?toolset=reviewer`; with `?toolset=nope`; as a bearer whose delegation lacks `land` | The builder twelve and reviewer seven named tools, each composed with the generic tools and filtered by authorization; `bad-request`; the builder list without `land` | R-API-14, R-DECL-16 |
+ | **MCP checker default.** A direct checker; a delegated checker with one eligible declared check kind; a delegated checker with no eligible new MCP act kind | The reviewer presentation filtered by authority for the first two; observer for the third; no review or claim authority in any case | R-API-14, R-DECL-11 |
+@@ -4641,9 +4653,20 @@ Readers are the UI, the client, the CLI and the MCP tools.
+ - Every reader names a thread by one rule, `threadTitle`:
+   1. its `goal`, when that is not empty;
+   2. else the title of its opening act, `titleOf`: the label in force at
+-     that act's seq, then `: ` and the value of the act's first body field
+-     other than `scope` and `because`, when it has one;
++     that act's seq, then `: ` and the value of one body field, when the
++     body has one other than `scope` and `because`;
+   3. else the thread's ID, when the opening act is not at hand.
++- The field is the first present by name that the opening act's own
++  declaration types as `text`. That declaration is the one of `D(s)`, the
++  document in force at the opening act's seq, never the active one
++  (R-DECL-23). "Text" is the declared type, not the type of the value: an
++  enum's value, a member handle and an entry ID are strings too. `open`,
++  the step an opening act runs, brings only `scope`, so no step field is
++  considered.
++- When no such field is present, the field is the first present by name,
++  of any type. The same holds when the reader has no declared field types
++  for the act: a kind of the legacy vocabulary, a platform kind, a kind
++  the document does not declare, or a label alone.
+ - "First" is by field name. The room keeps a body as canonical JSON, whose
+   keys are sorted, so the order a caller typed is not recorded. Sorting
+   gives one title from the typed body and from the record.
+@@ -4691,7 +4714,7 @@ Each is normative, and each has a test in the stage 5 report
+ | **Dropped twice.** A kind declared, dropped, declared again and dropped again | Each version that declared it is marked with the first later version that did not | R-DECL-23 |
+ | **Retired after the read.** A handle keeps an ended version; a later activation drops one of its kinds; the handle then sees that activation | The next `actsAt` answer carries the mark. With no sign of the activation the kept answer is given, and `fresh` reads again | R-DECL-23 |
+ | **Thread kind.** A thread opened by `claim` and one opened by an application's own act | The lane reads give `claim` and the opening kind; an act whose `threads` omits that kind is `wrong-thread` | R-DECL-6, R-DECL-8 |
+-| **Thread name.** A thread with no goal, read after its opening kind's label changed | Named by the label of the opening act's seq and its first field by name; the CLI and the MCP tool `act` print the same name | R-DECL-23 |
++| **Thread name.** A thread with no goal, read after its opening kind's label or field types changed | Named by the label of the opening act's seq and its first text field by name under that seq's declaration, or its first field by name when none is text; the CLI and the MCP tool `act` print the same name | R-DECL-23 |
+ 
+ #### Types
+ 
+@@ -4730,12 +4753,14 @@ These continue section 33.9's list.
+     envelope as `AnyEnvelope` without a cast of their own. The type should
+     widen when stage 3's decoder lands.
+ 52. **Which field names a thread.** The name of a thread with no goal
+-    uses the opening act's first body field by name, because the room
+-    does not record the order a caller typed or the order a declaration
+-    lists its fields: both are kept as canonical JSON. An application that
+-    wants a chosen field in the name has no way to say so. A declaration
+-    could name that field. That would be a new member of the declaration,
+-    and this stage does not add one.
++    uses the opening act's first text field by name, and its first field
++    by name when it has no text field (planner's decision `c37653e1`). It
++    goes by name because the room does not record the order a caller
++    typed or the order a declaration lists its fields: both are kept as
++    canonical JSON. So an application with two text fields gets the
++    earlier name, and cannot choose the other. A declaration could name
++    the field. That would be a new member of the declaration, and this
++    stage does not add one.
+ 
+ ## 34. Contract amendment 7 (a9788a59): the MCP core
+ 
+@@ -4817,13 +4842,22 @@ and pass the relevant gates before landing.
+    Toolsets filter authority without rebinding a signed grant or intent.
+ 
+ **Lane E (`packages/cli`)**
+-1. Rebuild against the amended `packages/mcp`; no source change is
+-   required. (type, through the import)
++1. Rebuild against the amended `packages/mcp`. (type, through the import)
++   When this contract was first checked, the command line needed no
++   source change to typecheck. The runtime does need two: `artroom mcp`
++   gives the server the caller's authorization (the R-API-14 seam: the
++   member's own key, or a bearer's recorded delegation, read from the
++   current roster for each `tools/list`), and it takes `--toolset NAME`,
++   the stdio form of `?toolset=`.
+ 
+ **The MCP endpoint's deployment (request `8ae3b2dc`)**
+ 1. The `RoomApi`-per-bearer adapter must serve `lane`, `lanes`,
+    `proposal`, `op` and `wait` over `RoomWire.read`, and the attention wait
+    over `RoomWire.subscribe`.
++2. The endpoint's host gives the server the caller's authorization for
++   each `tools/list` (R-API-14). Inside the Room's own Worker that is the
++   Room's reading of the token. It is not a method of `RoomApi` or
++   `RoomWire`, and no service binding returns it.
+ 
+ **Other lanes**
+ 1. Stage 2 continues to own Room admission and shared policy vocabulary.
+diff --git a/packages/cli/README.md b/packages/cli/README.md
+index 86ad9cad..db2d0818 100644
+--- a/packages/cli/README.md
++++ b/packages/cli/README.md
+@@ -101,7 +101,8 @@ artroom act take-part --binding sha256:… --set part=bass
+ 
+ When an act opens a thread, `artroom act` prints a second line that names
+ the thread as every reader does: by its goal, or by the act's label and its
+-first field by name.
++first text field by name (its first field by name when it has no text
++field).
+ 
+ `artroom log` and `artroom explain` show a declared act with the label its
+ kind had at that entry's own seq, and say where a kind was retired.
+@@ -148,9 +149,12 @@ finish, run the same command again:
+   that teaches an agent the loop in under 30 lines. Add `--mcp` after a
+   `redeem` to describe the MCP tools instead.
+ - `artroom mcp` runs the MCP tools over stdio, signing with your key,
+-  for an agent on this machine. It shows the tools your role may use.
+-  `--toolset builder`, `reviewer`, `observer` or `all` chooses another
+-  list; a tool that is not listed can still be called.
++  for an agent on this machine. It shows the tools your role may use,
++  read from the room's roster each time the agent asks for the list. With
++  a redeemed bearer it shows what that session's own delegation allows.
++  `--toolset builder`, `reviewer`, `observer` or `all` selects another
++  list, with the same filter; a tool that is not listed can still be
++  called, and the room judges the call.
+ 
+ ## Where things are kept
+ 
+diff --git a/packages/cli/src/config.ts b/packages/cli/src/config.ts
+index 48eeee2b..8a6d39be 100644
+--- a/packages/cli/src/config.ts
++++ b/packages/cli/src/config.ts
+@@ -8,7 +8,7 @@
+ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+ import { homedir } from "node:os";
+ import { join } from "node:path";
+-import type { KeyId, LaneId, MemberId, OpId, Redeemed, RoomId, Role } from "@generalbusiness/artroom-contract";
++import type { DelegationId, KeyId, LaneId, MemberId, OpId, Redeemed, RoomId, Role } from "@generalbusiness/artroom-contract";
+ import type { PreparedAct, PrivateJwk } from "@generalbusiness/artroom-client";
+ 
+ export interface RoomConfig {
+@@ -19,6 +19,8 @@ export interface RoomConfig {
+   /** `client`: a key file here signs. `room`: a bearer file here reads, and the room signs. */
+   readonly custody: "client" | "room";
+   readonly key: KeyId;
++  /** Custody `room`: the delegation the bearer session acts under, as its redemption recorded it. */
++  readonly delegation?: DelegationId;
+   readonly mcp?: string;
+   /** The lane the next command acts on, from the last `claim`. Change it only with `setLane` in main.ts. */
+   lane?: LaneId;
+diff --git a/packages/cli/src/main.ts b/packages/cli/src/main.ts
+index c9c542c9..2996a600 100644
+--- a/packages/cli/src/main.ts
++++ b/packages/cli/src/main.ts
+@@ -703,7 +703,7 @@ const COMMANDS: Record<string, Command> = {
+       );
+       const path = ctx.store.bearerPath(inv.room);
+       const config = ctx.store.read();
+-      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, mcp: shown.mcp, invitation: inv.invitation };
++      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, delegation: shown.delegation, mcp: shown.mcp, invitation: inv.invitation };
+       config.current = inv.room;
+       ctx.store.write(config);
+       ctx.step("config-written");
+@@ -1168,7 +1168,7 @@ const COMMANDS: Record<string, Command> = {
+       }
+       const label = active?.acts[kind]?.declaration.label;
+       const lines = [`Done: ${label !== undefined ? `${label} (${kind})` : kind}, recorded as ${out.id}.`];
+-      // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and first field.
++      // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and its first text field by name.
+       const opened = out as { lane?: unknown; goal?: unknown; effect?: { type?: unknown } };
+       if (active !== undefined && opened.effect?.type === "opened" && typeof opened.lane === "string") {
+         const title = threadTitle({ lane: opened.lane, goal: typeof opened.goal === "string" ? opened.goal : "" }, { meaning: meaningOf(active, kind), body: sent }); // G5:cli-thread
+@@ -1196,8 +1196,10 @@ const COMMANDS: Record<string, Command> = {
+       const toolset = toolsetOf(str(ctx.values, "toolset"));
+       const { api, room } = await open(ctx);
+       // The tool list follows this credential's authorization, read from the roster at each `tools/list` (R-API-14):
+-      // a key file is the member's own key; a bearer file acts under the session's delegation.
+-      const who = room.custody === "room" ? { key: room.key, session: true } : { key: room.key }; // GM:cli-caller
++      // a key file is the member's own key; a bearer file acts under the session's delegation, the one its redemption
++      // recorded. (A credential saved before that ID was kept names none: then it is the key's latest delegation.)
++      const session = room.delegation !== undefined ? { key: room.key, session: true, delegation: room.delegation } : { key: room.key, session: true }; // GM:cli-delegation
++      const who = room.custody === "room" ? session : { key: room.key }; // GM:cli-caller
+       const caller = async () => callerFromRoster(await api.members(), who);
+       const asked = toolset !== undefined ? { toolset } : {}; // GM:cli-toolset
+       const handle = serveArtroomStdio(api, { caller, ...asked });
+diff --git a/packages/cli/test/declared-a5d64b35.test.ts b/packages/cli/test/declared-a5d64b35.test.ts
+index 85adf7d4..24701da6 100644
+--- a/packages/cli/test/declared-a5d64b35.test.ts
++++ b/packages/cli/test/declared-a5d64b35.test.ts
+@@ -109,15 +109,18 @@ describe("artroom act: any declared act, under the binding the user read", () =>
+     expect(JSON.parse(json.out)).toMatchObject({ kind: "ask", text: "again" });
+   });
+ 
+-  test("an act that opens a thread names it as every reader does: its goal, or the act's label and first field", async () => {
++  test("an act that opens a thread names it as every reader does: its goal, or the act's label and first text field by name", async () => {
+     const alice = join(h.tmp, "alice");
+     await login(alice, "@alice");
+-    const song: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { title: { type: "text", max: 80 }, year: { type: "text", max: 4, optional: true } }, who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
++    const song: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { key: { type: "enum", values: ["c", "d"], optional: true }, title: { type: "text", max: 80 }, year: { type: "text", max: 4, optional: true } }, who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
+     await h.room.activate({ ...CODE_REVIEW_ACTS, "start-song": song });
+     const res = await cli(alice, ["act", "start-song", "--binding", (await h.room.bindingOf("start-song"))!, "--set", "year=1963", "--set", "title=Blue Bossa", "--set", "scope=songs/blue-bossa/**"]);
+     expect(res.code).toBe(0);
+     const id = /recorded as (act_\d+_[0-9a-f]{8})\.$/m.exec(res.out)![1]!;
+     expect(res.out.split("\n")).toEqual([`Done: Start a song (start-song), recorded as ${id}.`, `Thread: Start a song: Blue Bossa (lane ${id}).`]);
++    // `key` comes first by name, but it is an enum: the thread is named by its first text field, the title.
++    const keyed = await cli(alice, ["act", "start-song", "--binding", (await h.room.bindingOf("start-song"))!, "--set", "key=d", "--set", "title=So What", "--set", "scope=songs/so-what/**"]);
++    expect(keyed.out.split("\n")[1]).toMatch(/^Thread: Start a song: So What \(lane act_\d+_[0-9a-f]{8}\)\.$/);
+     // A thread that has a goal is named by it.
+     const claim = await cli(alice, ["act", "claim", "--binding", (await h.room.bindingOf("claim"))!, "--set", "goal=Rate-limit login", "--set", "scope=src/**"]);
+     expect(claim.out.split("\n")[1]).toMatch(/^Thread: Rate-limit login \(lane act_\d+_[0-9a-f]{8}\)\.$/);
+diff --git a/packages/cli/test/mcp-core-9ca1d290.test.ts b/packages/cli/test/mcp-core-9ca1d290.test.ts
+index 823e1a88..482d9ac2 100644
+--- a/packages/cli/test/mcp-core-9ca1d290.test.ts
++++ b/packages/cli/test/mcp-core-9ca1d290.test.ts
+@@ -5,6 +5,7 @@
+  */
+ 
+ import { spawn } from "node:child_process";
++import { readFileSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { describe, expect, test } from "vitest";
+ import { EXIT } from "../src/main.ts";
+@@ -13,8 +14,8 @@ import { useHarness } from "./harness.ts";
+ 
+ const { h, cli, login } = useHarness();
+ 
+-/** `tools/list`, and optionally one call, from the real bin over stdio. */
+-async function stdio(home: string, args: string[], call?: { name: string; arguments: unknown }): Promise<{ listed: string[]; called?: any; code: number | null }> {
++/** The raw replies to `tools/list`, and optionally one call, from the real bin over stdio. */
++async function stdioRaw(home: string, args: string[], call?: { name: string; arguments: unknown }): Promise<{ list: any; called?: any; code: number | null }> {
+   const child = spawn(process.execPath, [join(import.meta.dirname, "..", "bin", "artroom.js"), "mcp", ...args], { env: { ...process.env, ARTROOM_HOME: home }, stdio: ["pipe", "pipe", "pipe"] });
+   let buffer = "";
+   const replies = new Map<number, any>();
+@@ -37,6 +38,12 @@ async function stdio(home: string, args: string[], call?: { name: string; argume
+   const called = call ? await send(3, "tools/call", call) : undefined;
+   child.stdin.end();
+   const code = await new Promise<number | null>((resolve) => child.on("exit", resolve));
++  return { list, called, code };
++}
++
++/** `tools/list`, and optionally one call, from the real bin over stdio. */
++async function stdio(home: string, args: string[], call?: { name: string; arguments: unknown }): Promise<{ listed: string[]; called?: any; code: number | null }> {
++  const { list, called, code } = await stdioRaw(home, args, call);
+   return { listed: list.result.tools.map((t: { name: string }) => t.name), called, code };
+ }
+ 
+@@ -73,5 +80,25 @@ describe("artroom mcp --toolset (R-API-14)", () => {
+     expect((await cli(agent, ["redeem", invitationLink(h.room.url, h.room.id, invitation, secret)])).code).toBe(EXIT.ok);
+     const out = await stdio(agent, []);
+     expect(out.listed).toEqual(["claim", "workspace", "note", "attention", "explain", "lane", "proposal", "operation", "acts"]);
++    // The redemption's own delegation is kept with the credential, and the list is read under exactly that one.
++    const file = join(agent, "config.json");
++    const config = JSON.parse(readFileSync(file, "utf8"));
++    const mine = [...h.room.delegations.values()].at(-1)!;
++    expect(config.rooms[h.room.id]).toMatchObject({ custody: "room", delegation: mine.id });
++    // Naming another current delegation there, one this session's key did not grant, shows nothing: the credential
++    // is not that delegation's.
++    const other = join(h.tmp, "other");
++    const second = await h.room.invite("@other", { role: "agent", custody: "room", kinds: "*" as never });
++    expect((await cli(other, ["redeem", invitationLink(h.room.url, h.room.id, second.invitation, second.secret)])).code).toBe(EXIT.ok);
++    const theirs = [...h.room.delegations.values()].at(-1)!;
++    expect(theirs.id).not.toBe(mine.id);
++    writeFileSync(file, JSON.stringify({ ...config, rooms: { ...config.rooms, [h.room.id]: { ...config.rooms[h.room.id], delegation: theirs.id } } }));
++    const wrong = await stdioRaw(agent, []);
++    expect(wrong.list.error ?? wrong.list.result).toMatchObject({ message: expect.stringContaining("belongs to no active member") });
++    // A credential saved before the ID was kept names none: the session key's own latest delegation is used.
++    const { delegation: _dropped, ...legacy } = config.rooms[h.room.id];
++    void _dropped;
++    writeFileSync(file, JSON.stringify({ ...config, rooms: { ...config.rooms, [h.room.id]: legacy } }));
++    expect((await stdio(agent, [])).listed).toEqual(out.listed);
+   });
+ });
+diff --git a/packages/client/README.md b/packages/client/README.md
+index 77a013b9..3562aa6c 100644
+--- a/packages/client/README.md
++++ b/packages/client/README.md
+@@ -118,8 +118,11 @@ An ended version's declarations never change, but its `retired` marks can:
+ a later activation may drop one of its kinds. The handle drops the versions
+ it kept when it sees a later activation, in `acts()`, another `actsAt()`
+ answer, a `log()` page, an update, or a refusal that names the active
+-policy version. A handle that has seen nothing since may answer the marks
+-it read. `actsAt(at, { fresh: true })` always reads the room.
++policy version. An answer that arrives after the handle learnt of a later
++activation from another answer is returned to its caller but not kept: it
++may have been read before that activation. A handle that has seen nothing
++since may answer the marks it read. `actsAt(at, { fresh: true })` always
++reads the room.
+ 
+ `envelopeOf(entry)` gives a log entry's envelope in either version, with a
+ declared act's `binding`, or null for a system entry.
+@@ -128,9 +131,13 @@ A `Lane` has `kind`: the kind of the act that opened the thread. The acts
+ that may act on it are those whose declaration's `threads` names that kind.
+ A thread opened by an application's own act may have no goal.
+ `threadTitle(lane, { meaning, body })` gives the name every reader uses:
+-the goal, or else the opening act's label and its first field by name
+-(`titleOf`). The opening act's ID is the lane's ID, so one `explain(lane.lane)`
+-gives both the `meaning` and, through `envelopeOf`, the body.
++the goal, or else the opening act's label and its first text field by name
++(`titleOf`). "Text" is the type the act's own declaration gave the field
++when the thread opened, so pass the `meaning` of the opening act's own seq.
++With no text field present, or with only a label at hand, it is the first
++field by name. The opening act's ID is the lane's ID, so one
++`explain(lane.lane)` gives both the `meaning` and, through `envelopeOf`,
++the body.
+ 
+ To grant in a `v2` room, build the op with `delegateOp(room, role, { to,
+ kinds, lanes, expiresAt })` or the session with `invitationSession(room,
+@@ -146,7 +153,11 @@ With a bearer token, `act()` goes to the MCP tool `act` over HTTPS, and to
+ ## Finishing an act after a restart
+ 
+ Act methods also take `onPrepared`, which receives the act once it is
+-resolved and, for a key, signed. Save it. Later, `resubmit({ url }, roomId,
++resolved and, for a key, signed. Save it. The prepared act holds the
++handle's own frozen copy of the target and body, taken before signing: you
++may change or reuse the objects you passed in, and the saved act stays the
++bytes that were signed. A target or body that is not plain data is
++`bad-request`. Later, `resubmit({ url }, roomId,
+ signed)` sends the signed envelope straight back to the room, unchanged.
+ It needs no handle, read session or new signature, so it works even after
+ the key is retired or revoked, and the room returns the original result
+diff --git a/packages/client/src/room.ts b/packages/client/src/room.ts
+index 2456211d..77c0f9b1 100644
+--- a/packages/client/src/room.ts
++++ b/packages/client/src/room.ts
+@@ -140,6 +140,32 @@ export interface PreparedAct {
+   readonly signed?: AnySignedEnvelope;
+ }
+ 
++/** `value` and everything inside it, frozen. */
++function frozen<T>(value: T): T {
++  if (typeof value === "object" && value !== null) {
++    Object.freeze(value);
++    for (const inner of Object.values(value)) frozen(inner); // G5:intent-frozen-deep
++  }
++  return value;
++}
++
++/**
++ * The handle's own copy of an act's target and body, deeply frozen. A
++ * prepared act must stay the bytes that were signed, or for a bearer the
++ * call that was made, whatever the caller does afterwards with the objects
++ * it passed in: the envelope and the prepared act hold these copies, never
++ * the caller's objects (R-IDEM-2).
++ */
++function ownedIntent<T, B>(target: T, body: B): { readonly target: T; readonly body: B } {
++  let copy: { target: T; body: B };
++  try {
++    copy = { target: structuredClone(target), body: structuredClone(body) };
++  } catch {
++    throw artroomError("bad-request", "An act's target and body must be plain data: the handle keeps them, to send the act again unchanged."); // G5:intent-plain
++  }
++  return frozen(copy); // G5:intent-frozen
++}
++
+ /** `ActOptions`, plus a hook to persist the prepared act before it is first sent. */
+ export interface ClientActOptions extends ActOptions {
+   readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
+@@ -315,8 +341,9 @@ abstract class RoomCore {
+   }
+ 
+   /** One of the named methods' acts: built, signed for a key, and sent. */
+-  protected async named<T>(kind: EnvelopeKind, target: unknown, body: unknown, opts?: ClientActOptions): Promise<Result<T>> {
++  protected async named<T>(kind: EnvelopeKind, givenTarget: unknown, givenBody: unknown, opts?: ClientActOptions): Promise<Result<T>> {
+     const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
++    const { target, body } = ownedIntent(givenTarget, givenBody); // G5:named-owned
+     const kept = this.#unanswered.get(idempotencyKey);
+     let prepared: PreparedAct;
+     if (kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)) {
+@@ -369,11 +396,17 @@ abstract class RoomCore {
+    * key and bytes, by `replay`) of an act the room accepted returns the
+    * original record, also after an activation (R-IDEM-2).
+    */
+-  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: GenericActOptions & Pick<ClientGenericActOptions, "onPrepared">): Promise<Result<DeclaredRecord>> {
++  async act(
++    kind: KindName,
++    givenTarget: DeclaredTarget,
++    givenBody: { readonly [field: string]: Json },
++    opts: GenericActOptions & Pick<ClientGenericActOptions, "onPrepared">,
++  ): Promise<Result<DeclaredRecord>> {
+     const binding = checkBinding(opts?.binding);
+     if (typeof kind !== "string" || isPlatformKind(kind))
+       throw artroomError("bad-request", `${String(kind)} is a platform kind, signed in envelope v: 1 with no binding. Use its own method.`); // G5:generic-platform
+     const idempotencyKey = checkIdempotencyKey(opts.idempotencyKey ?? newIdempotencyKey());
++    const { target, body } = ownedIntent(givenTarget, givenBody); // G5:act-owned
+     const prepared: PreparedAct =
+       this.bearer !== undefined
+         ? { kind, target, body, idempotencyKey, binding }
+@@ -560,16 +593,24 @@ abstract class RoomCore {
+    * the handle sees a later activation: in a read of the active catalogue,
+    * a log page, an update, or a refusal that names the active policy
+    * version. A reader that follows the room therefore sees current marks.
++   * An answer that arrives after the handle has learnt of a later activation
++   * from another answer is returned to its caller but not kept, since it
++   * may have been read before that activation.
+    * `{ fresh: true }` reads from the room whatever the handle kept.
+    */
+   async actsAt(at: CatalogueAt, opts: { readonly fresh?: boolean } = {}): Promise<Catalogue | null> {
+     const kept = opts.fresh === true ? undefined : this.#ended.find((c) => (at.seq !== undefined ? governs(c, at.seq) : c.policy === at.policy)); // G5:catalogue-cache
+     if (kept) return kept;
++    const known = this.#activation;
+     const c = await this.read(at.seq !== undefined ? { q: "acts", at: at.seq } : { q: "acts", policy: at.policy });
+     if (c === null) return null;
++    // An answer is kept only if nothing else told the handle of a later activation while it was on its way. If
++    // something did, this answer may have been read before that activation, and its `retired` marks are then older
++    // than what the handle already knows: keeping it would bring them back.
++    const overtaken = this.#activation !== known; // G5:cache-overtaken
+     // What this answer says about activations: its own, and the one that ended it.
+     this.#sawActivation(c.until ?? c.since); // G5:cache-read
+-    if (c.until !== null) {
++    if (c.until !== null && !overtaken) {
+       const i = this.#ended.findIndex((k) => k.policy === c.policy);
+       if (i >= 0) this.#ended[i] = c; // G5:cache-replace
+       else this.#ended.push(c);
+diff --git a/packages/client/test/declared-a5d64b35.test.ts b/packages/client/test/declared-a5d64b35.test.ts
+index 8e9c1e2f..bf45d041 100644
+--- a/packages/client/test/declared-a5d64b35.test.ts
++++ b/packages/client/test/declared-a5d64b35.test.ts
+@@ -304,14 +304,15 @@ describe("an ended version is not final: a later activation can retire its kinds
+ });
+ 
+ describe("what readers call a record and a thread (R-DECL-23)", () => {
+-  test("titleOf: the label at the record's seq and its first field by name, the order the room records, other than scope and because", async () => {
++  test("titleOf: the label at the record's seq and, where no declared text field is present, its first field by name, the order the room records, other than scope and because", async () => {
+     await room.activate(withAsk());
+     const alice = await joinAs(room, "@alice");
+     const c = (await alice.api.acts()) as ActsCatalogue;
+     const ask = meaningOf(c, "ask");
+     expect(titleOf(ask, { text: "Which key?", urgency: "high" })).toBe("Ask: Which key?");
+     expect(titleOf(ask, { scope: ["songs/**"], because: [{ act: "act_1_00000000" }], title: "Blue Bossa" })).toBe("Ask: Blue Bossa");
+-    // The body a caller typed and the record the room keeps (keys sorted) give one title: the first field by name.
++    // `ask` declares one field, `text`. With it absent there is no text field to prefer, and the title falls back to
++    // the first field by name. The body a caller typed and the record the room keeps (keys sorted) give one title.
+     expect(titleOf(ask, { title: "Blue Bossa", key: "c" })).toBe("Ask: c");
+     expect(titleOf(ask, { key: "c", title: "Blue Bossa" })).toBe("Ask: c");
+     expect(titleOf(ask, { scope: ["songs/**"], because: [] })).toBe("Ask");
+diff --git a/packages/client/test/review-43e8fe3b.test.ts b/packages/client/test/review-43e8fe3b.test.ts
+new file mode 100644
+index 00000000..7f8dd3eb
+--- /dev/null
++++ b/packages/client/test/review-43e8fe3b.test.ts
+@@ -0,0 +1,255 @@
++/**
++ * The checker's two client findings at b7b9d8df (act 43e8fe3b, request
++ * a5d64b35):
++ *
++ * 1. A prepared act is the handle's own. The envelope and the prepared act
++ *    hold copies of the target and body, taken before signing and before
++ *    `onPrepared`, so nothing the caller does to its own objects afterwards
++ *    changes the signed bytes or a bearer's call (R-IDEM-2).
++ * 2. An answer about an ended policy version is kept only if no later
++ *    activation was learnt of while it was on its way (R-DECL-23).
++ *
++ * The fake room runs in its declared mode. The real Room is driven with
++ * this client in packages/room/test/workerd.
++ */
++
++import { afterEach, beforeEach, describe, expect, test } from "vitest";
++import type { ActDeclaration, ActsCatalogue, Claim, RoomApi, RoomWire } from "@generalbusiness/artroom-contract";
++import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
++import { connect, isRefusal, redeem, verifyValue, type HttpRoomClient, type PreparedAct } from "../src/index.ts";
++import { FakeRoom } from "./support/fake-room.ts";
++import { joinAs, startRoom, type Url } from "./support/setup.ts";
++
++let room: FakeRoom;
++let url: Url;
++beforeEach(async () => {
++  ({ room, url } = await startRoom());
++});
++afterEach(() => room.stop());
++
++const ASK: ActDeclaration = { label: "Ask", targets: { entry: ["comment"] }, body: { text: { type: "text", max: 200 } }, who: { roles: ["member", "agent"] } };
++const withAsk = (ask: ActDeclaration = ASK) => ({ ...CODE_REVIEW_ACTS, ask });
++const posts = (route: string) => room.requests.filter((r) => r.method === "POST" && r.route === route).length;
++const gets = (route: string) => room.requests.filter((r) => r.method === "GET" && r.route === route).length;
++const verifies = (p: PreparedAct, key: string) => verifyValue("artroom-envelope-v1", p.signed!.envelope, p.signed!.sig, key as never);
++
++describe("a prepared act is the handle's own copy of what the caller intended (R-IDEM-2)", () => {
++  async function ready() {
++    const alice = await joinAs(room, "@alice");
++    await room.activate(withAsk());
++    const api = alice.api as HttpRoomClient;
++    const claim = (await api.claim({ goal: "g", scope: ["src/**"] })) as Claim;
++    const other = (await api.claim({ goal: "other", scope: ["docs/**"] })) as Claim;
++    return { alice, api, claim, other, binding: (await room.bindingOf("ask"))! };
++  }
++
++  for (const change of ["nothing", "its body", "its target", "its body, with a structured clone saved"] as const)
++    test(`a generic act signed by a key: after the caller changes ${change}, the kept envelope still verifies and replay returns the original record`, async () => {
++      const { alice, api, claim, other, binding } = await ready();
++      const body = { text: "original" };
++      const target = { act: claim.id };
++      let kept: PreparedAct | undefined;
++      const first = await api.act("ask", target, body, { binding, idempotencyKey: "kept", onPrepared: (p) => void (kept = change.endsWith("saved") ? structuredClone(p) : p) });
++      expect(first).toMatchObject({ kind: "ask", text: "original" });
++      // The handle leaves the caller's own objects as they were: it neither keeps nor freezes them.
++      expect([Object.isFrozen(body), Object.isFrozen(target)]).toEqual([false, false]);
++      if (change.startsWith("its body")) body.text = "second question";
++      if (change === "its target") target.act = other.id;
++      expect(kept).toMatchObject({ kind: "ask", binding, target: { act: claim.id }, body: { text: "original" } });
++      expect(kept!.signed!.envelope).toMatchObject({ target: { act: claim.id }, body: { text: "original" } });
++      expect(await verifies(kept!, alice.signer.key)).toBe(true);
++      const sent = posts("/acts");
++      expect(await api.replay(kept!)).toEqual(first);
++      expect(posts("/acts")).toBe(sent + 1);
++      expect(room.entries.filter((e) => e.entry.type === "act" && (e.entry.act.envelope.kind as string) === "ask")).toHaveLength(1);
++    });
++
++  test("a named act signed by a key: after the caller changes an array it passed in, the kept envelope still verifies and replay returns the original record", async () => {
++    const alice = await joinAs(room, "@alice");
++    await room.activate(withAsk());
++    const api = alice.api as HttpRoomClient;
++    const input = { goal: "g", scope: ["src/**"] };
++    let kept: PreparedAct | undefined;
++    const first = (await api.claim(input, { idempotencyKey: "named", onPrepared: (p) => void (kept = p) })) as Claim;
++    expect(Object.isFrozen(input.scope)).toBe(false);
++    input.scope.push("docs/**");
++    input.goal = "another goal";
++    expect(kept!.body).toEqual({ goal: "g", scope: ["src/**"] });
++    expect((kept!.signed!.envelope as { body: unknown }).body).toEqual({ goal: "g", scope: ["src/**"] });
++    expect(await verifies(kept!, alice.signer.key)).toBe(true);
++    expect(await api.replay(kept!)).toEqual(first);
++  });
++
++  test("a bearer session, where the room signs: a generic and a named act are each sent again as first prepared, whatever the caller changed", async () => {
++    await room.activate(withAsk());
++    const binding = (await room.bindingOf("ask"))!;
++    const { invitation, secret } = await room.invite("@agent", { role: "agent", custody: "room", kinds: [], acts: { ask: binding, claim: (await room.bindingOf("claim"))! } });
++    const b = await redeem({ url }, room.id, { invitation, secret });
++    if (isRefusal(b)) throw new Error(b.rule);
++    const seen: { body?: unknown; target?: unknown }[] = [];
++    const wire = room.wire();
++    const rpc = (await connect({ room: async (): Promise<RoomWire> => ({ ...wire, bearerAct: (t, a) => (seen.push(structuredClone(a) as never), wire.bearerAct(t, a)) }) }, room.id, { kind: "bearer", token: b.bearer })) as unknown as HttpRoomClient;
++    const input = { goal: "g", scope: ["src/**"] };
++    let named: PreparedAct | undefined;
++    const claim = (await rpc.claim(input, { idempotencyKey: "n1", onPrepared: (p) => void (named = p) })) as Claim;
++    input.scope.push("docs/**");
++    expect(named).toEqual({ kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "n1" });
++    expect(await rpc.replay(named!)).toEqual(claim);
++    const body = { text: "q" };
++    const target = { act: claim.id };
++    let generic: PreparedAct | undefined;
++    const first = await rpc.act("ask", target, body, { binding, idempotencyKey: "g1", onPrepared: (p) => void (generic = p) });
++    body.text = "another";
++    target.act = "act_999_00000000";
++    expect(generic).toEqual({ kind: "ask", target: { act: claim.id }, body: { text: "q" }, idempotencyKey: "g1", binding });
++    expect(await rpc.replay(generic!)).toEqual(first);
++    // Each replay made the same call as its first sending.
++    expect(seen.map((a) => [a.target, a.body])).toEqual([
++      [null, { goal: "g", scope: ["src/**"] }],
++      [null, { goal: "g", scope: ["src/**"] }],
++      [{ act: claim.id }, { text: "q" }],
++      [{ act: claim.id }, { text: "q" }],
++    ]);
++  });
++
++  test("the copies are frozen all the way down, so the hook that is handed the prepared act cannot change what is sent", async () => {
++    const { api, claim, binding } = await ready();
++    let kept: PreparedAct | undefined;
++    await api.claim({ goal: "h", scope: ["lib/**"] }, { onPrepared: (p) => void (kept = p) });
++    const named = kept!.body as { scope: string[] };
++    expect([Object.isFrozen(named), Object.isFrozen(named.scope)]).toEqual([true, true]);
++    await api.act("ask", { act: claim.id }, { text: "x" }, { binding, onPrepared: (p) => void (kept = p) });
++    expect([Object.isFrozen(kept!.target), Object.isFrozen(kept!.body)]).toEqual([true, true]);
++    const sent = posts("/acts");
++    const tried = api.act("ask", { act: claim.id }, { text: "x" }, { binding, onPrepared: (p) => void ((p.body as { text: string }).text = "changed in the hook") });
++    await expect(tried).rejects.toBeInstanceOf(TypeError);
++    expect(posts("/acts")).toBe(sent);
++  });
++
++  test("a target or body that is not plain data is bad-request before anything is signed or sent", async () => {
++    const { api, claim, binding } = await ready();
++    const sent = room.requests.length;
++    let hooked = false;
++    const onPrepared = () => void (hooked = true);
++    await expect(api.act("ask", { act: claim.id }, { text: (() => "x") as never }, { binding, onPrepared })).rejects.toMatchObject({ name: "ArtroomError", code: "bad-request" });
++    await expect(api.act("ask", { act: claim.id, extra: Symbol("s") } as never, { text: "x" }, { binding, onPrepared })).rejects.toMatchObject({ name: "ArtroomError", code: "bad-request" });
++    await expect(api.claim({ goal: "g", scope: [(() => "src/**") as never] }, { onPrepared })).rejects.toMatchObject({ name: "ArtroomError", code: "bad-request" });
++    expect(hooked).toBe(false);
++    expect(room.requests.length).toBe(sent);
++  });
++});
++
++describe("an answer about an ended version is kept only if no later activation was learnt of meanwhile (R-DECL-23)", () => {
++  const TELL: ActDeclaration = { label: "Tell", targets: { entry: ["comment"] }, body: { text: { type: "text", max: 200 } }, who: { roles: ["member", "agent"] } };
++  const OLD = { ...withAsk(), tell: TELL };
++
++  /** Version A, ended by a second version that still declares `tell`. `retire` activates a third without it. */
++  async function ended() {
++    const a = await room.activate(OLD);
++    await room.activate({ ...OLD, more: TELL });
++    const retire = async () => {
++      await room.activate(withAsk());
++      return room.entries.at(-1)!.seq;
++    };
++    return { a, retire };
++  }
++
++  /** A handle whose first read of version A is held after the room answered it, until `release`. */
++  async function held(over: "https" | "rpc", a: string) {
++    let arrived = () => {};
++    let release = () => {};
++    const seen = new Promise<void>((resolve) => (arrived = resolve));
++    const gate = new Promise<void>((resolve) => (release = resolve));
++    let holding = false;
++    const hold = async () => {
++      if (holding) return;
++      holding = true;
++      arrived();
++      await gate;
++    };
++    let api: RoomApi;
++    if (over === "https") {
++      const delayed: typeof fetch = async (input, init) => {
++        const response = await fetch(input, init);
++        if (new URL(input instanceof Request ? input.url : String(input)).searchParams.get("policy") === a) await hold();
++        return response;
++      };
++      api = (await joinAs(room, "@alice", "member", { fetch: delayed })).api;
++    } else {
++      const alice = await joinAs(room, "@alice");
++      const wire = room.wire();
++      const read: RoomWire["read"] = async (auth, query) => {
++        const out = await wire.read(auth, query);
++        if ((query as { policy?: string }).policy === a) await hold();
++        return out;
++      };
++      api = await connect({ room: async (): Promise<RoomWire> => ({ ...wire, read }) }, room.id, { kind: "key", signer: alice.signer });
++    }
++    return { api, seen, release };
++  }
++
++  for (const over of ["https", "rpc"] as const)
++    test(`over ${over}: an answer read before a retirement, arriving after the handle saw that activation, is not kept; the next read asks the room and gets the retired mark`, async () => {
++      const { a, retire } = await ended();
++      const { api, seen, release } = await held(over, a);
++      const oldRead = api.actsAt({ policy: a });
++      await seen;
++      const dropped = await retire();
++      const current = await api.acts();
++      expect(current.since).toBe(dropped);
++      release();
++      const old = (await oldRead) as ActsCatalogue;
++      // The held answer is what the room said before the retirement, and its caller gets it as it is.
++      expect(old.acts["tell"]).not.toHaveProperty("retired");
++      const next = (await api.actsAt({ policy: a })) as ActsCatalogue;
++      expect(next.acts["tell"]!.retired).toBe(dropped);
++      expect(next).not.toBe(old);
++      // That answer is kept: the same question is now answered without a read, as in the sequential case.
++      const reads = gets("/declarations");
++      expect(await api.actsAt({ policy: a })).toBe(next);
++      if (over === "https") expect(gets("/declarations")).toBe(reads);
++      expect(((await api.actsAt({ policy: a }, { fresh: true })) as ActsCatalogue).acts["tell"]!.retired).toBe(dropped);
++    });
++
++  test("a held answer that no activation overtook is kept as before: the next question about its interval is answered without a read", async () => {
++    const { a } = await ended();
++    const { api, seen, release } = await held("https", a);
++    // The handle already knows the latest activation when it asks.
++    await api.acts();
++    const oldRead = api.actsAt({ policy: a });
++    await seen;
++    // Reading the active catalogue again while the answer is held tells the handle nothing new.
++    await api.acts();
++    release();
++    const first = (await oldRead) as ActsCatalogue;
++    const reads = gets("/declarations");
++    expect(await api.actsAt({ policy: a })).toBe(first);
++    expect(await api.actsAt({ seq: first.since })).toBe(first);
++    expect(gets("/declarations")).toBe(reads);
++  });
++
++  test("a handle that learns of any activation while an answer is held does not keep that answer, since it cannot tell which came first", async () => {
++    const { a } = await ended();
++    const { api, seen, release } = await held("https", a);
++    // This handle has seen no activation yet. It learns the latest one while the answer is held; none happened meanwhile.
++    const oldRead = api.actsAt({ policy: a });
++    await seen;
++    await api.acts();
++    release();
++    const first = (await oldRead) as ActsCatalogue;
++    const reads = gets("/declarations");
++    const next = await api.actsAt({ policy: a });
++    expect(next).toEqual(first);
++    expect(next).not.toBe(first);
++    expect(gets("/declarations")).toBe(reads + 1);
++  });
++
++  test("in sequence, with no answer held: a retirement the handle saw is in the next read of the ended version", async () => {
++    const { a, retire } = await ended();
++    const api = (await joinAs(room, "@alice")).api;
++    expect(((await api.actsAt({ policy: a })) as ActsCatalogue).acts["tell"]).not.toHaveProperty("retired");
++    const dropped = await retire();
++    await api.acts();
++    expect(((await api.actsAt({ policy: a })) as ActsCatalogue).acts["tell"]!.retired).toBe(dropped);
++  });
++});
+diff --git a/packages/client/test/thread-names-c37653e1.test.ts b/packages/client/test/thread-names-c37653e1.test.ts
+new file mode 100644
+index 00000000..d1bf9720
+--- /dev/null
++++ b/packages/client/test/thread-names-c37653e1.test.ts
+@@ -0,0 +1,131 @@
++/**
++ * What readers call a thread that has no goal (docs/protocol.md section
++ * 33.10, R-DECL-23; the planner's decision c37653e1): the opening act's
++ * label at its own seq, then its first text field by name, as that act's
++ * own declaration typed its fields at that seq. The helper is the one every
++ * reader shares: the client, the CLI, the MCP tool `act` and the UI.
++ */
++import { afterEach, beforeEach, describe, expect, test } from "vitest";
++import { envelopeOf, type ActDeclaration, type ActsCatalogue, type DeclaredRecord, type RecordMeaning } from "@generalbusiness/artroom-contract";
++import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
++import { meaningOf, threadTitle, titleOf } from "../src/index.ts";
++import { FakeRoom } from "./support/fake-room.ts";
++import { joinAs, startRoom } from "./support/setup.ts";
++
++const KEYS = ["c", "d", "blue", "bossa"] as const;
++/** An opening act whose first field by name, `key`, is an enum, and whose `title` is text. */
++const SONG: ActDeclaration = {
++  label: "Start a song",
++  targets: { none: ["open"] },
++  body: { key: { type: "enum", values: KEYS, optional: true }, title: { type: "text", max: 80, optional: true }, tempo: { type: "int", min: 40, max: 240, optional: true } },
++  who: { roles: ["member", "agent"] },
++  hold: { scope: "body.scope", workspace: true },
++};
++/** The same names with the two types exchanged: `key` is text and `title` an enum. */
++const SWAPPED: ActDeclaration = { ...SONG, body: { ...SONG.body, key: { type: "text", max: 80, optional: true }, title: { type: "enum", values: KEYS, optional: true } } };
++const declared = (declaration: ActDeclaration, label = declaration.label) => ({ label, declaration });
++
++describe("titleOf prefers the first text field by name (section 33.10)", () => {
++  test("a text field names the record though an enum field comes first by name", () => {
++    expect(titleOf(declared(SONG), { key: "c", title: "Footprints", tempo: 96 })).toBe("Start a song: Footprints");
++    // The control: with the declaration not at hand, the same body is named by its first field by name.
++    expect(titleOf({ label: "Start a song" }, { key: "c", title: "Footprints", tempo: 96 })).toBe("Start a song: c");
++  });
++
++  test("the declared type decides, not the type of the value: one body under two declarations", () => {
++    const body = { key: "blue", title: "bossa" };
++    // Both values are strings. Under SONG `title` is the text field; under SWAPPED `key` is.
++    expect(titleOf(declared(SONG), body)).toBe("Start a song: bossa");
++    expect(titleOf(declared(SWAPPED), body)).toBe("Start a song: blue");
++    // An enum field and a text field that hold the same string give that string either way.
++    expect(titleOf(declared(SONG), { key: "c", title: "c" })).toBe("Start a song: c");
++    expect(titleOf(declared(SWAPPED), { key: "c", title: "c" })).toBe("Start a song: c");
++  });
++
++  test("the order a body was typed in does not matter: the typed body and the canonical record give one title", () => {
++    const typed = { title: "So What", tempo: 136, key: "d", scope: ["songs/so-what/**"] };
++    const canonical = { key: "d", scope: ["songs/so-what/**"], tempo: 136, title: "So What" };
++    expect(Object.keys(typed)).not.toEqual(Object.keys(canonical));
++    expect(titleOf(declared(SONG), typed)).toBe("Start a song: So What");
++    expect(titleOf(declared(SONG), canonical)).toBe("Start a song: So What");
++    // Among several text fields the first by name is taken, in either order.
++    const two: ActDeclaration = { ...SONG, body: { ...SONG.body, composer: { type: "text", max: 80, optional: true } } };
++    expect(titleOf(declared(two), { title: "Footprints", composer: "Shorter", key: "c" })).toBe("Start a song: Shorter");
++    expect(titleOf(declared(two), { composer: "Shorter", key: "c", title: "Footprints" })).toBe("Start a song: Shorter");
++  });
++
++  test("an optional text field that is absent is passed over: the next text field, or else the first field by name", () => {
++    const two: ActDeclaration = { ...SONG, body: { ...SONG.body, composer: { type: "text", max: 80, optional: true } } };
++    expect(titleOf(declared(two), { key: "c", title: "Footprints" })).toBe("Start a song: Footprints");
++    expect(titleOf(declared(two), { key: "c", tempo: 96 })).toBe("Start a song: c");
++    expect(titleOf(declared(two), { tempo: 96 })).toBe("Start a song: 96");
++    expect(titleOf(declared(two), { scope: ["songs/**"], because: [] })).toBe("Start a song");
++  });
++
++  test("an act that declares no text field is named by its first field by name, as before", () => {
++    const plain: ActDeclaration = { ...SONG, body: { key: { type: "enum", values: KEYS }, tempo: { type: "int", min: 40, max: 240 } } };
++    expect(titleOf(declared(plain), { tempo: 132, key: "c" })).toBe("Start a song: c");
++    const none: ActDeclaration = { label: "Start a jam", targets: { none: ["open"] }, who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
++    expect(titleOf(declared(none), { scope: ["jams/**"] })).toBe("Start a jam");
++  });
++
++  test("scope and because never name a record, even when nothing else is present, and a text field is read as the body's own", () => {
++    expect(titleOf(declared(SONG), { scope: ["songs/**"], because: [{ act: "act_1_00000000" }], title: "Blue Bossa" })).toBe("Start a song: Blue Bossa");
++    // A field may be named like an inherited property. It is text only if the declaration says so, by its own name.
++    const odd: ActDeclaration = { ...SONG, body: { key: { type: "enum", values: KEYS, optional: true }, valueOf: { type: "text" as const, max: 80, optional: true as const } } as NonNullable<ActDeclaration["body"]> };
++    expect(titleOf(declared(odd), { key: "c", valueOf: "Nardis" })).toBe("Start a song: Nardis");
++    expect(titleOf(declared(SONG), { key: "c", valueOf: "Nardis" })).toBe("Start a song: c");
++    expect(titleOf(declared(SONG), { key: "c" })).toBe("Start a song: c");
++  });
++
++  test("legacy, platform and unknown kinds, and a caller with only a label, keep the first field by name", () => {
++    const legacy: RecordMeaning = { vocabulary: "artroom-legacy-v1", policy: "act_1_aaaaaaaa", kind: "claim", label: "Claim" };
++    const platform: RecordMeaning = { vocabulary: "platform", policy: "act_1_aaaaaaaa", kind: "recover", label: "Recover" };
++    const unknown: RecordMeaning = { vocabulary: "unknown", policy: "act_1_aaaaaaaa", kind: "shout", label: "shout" };
++    expect(titleOf(legacy, { plan: "p", goal: "Rate-limit login", scope: ["src/**"] })).toBe("Claim: Rate-limit login");
++    expect(titleOf(platform, { op: "open", goal: "Repair the policy", scope: [".artroom/**"] })).toBe("Recover: Repair the policy");
++    expect(titleOf(unknown, { text: "x", count: 3 })).toBe("shout: 3");
++    expect(titleOf({ label: "Start a song" }, { title: "Blue Bossa", key: "c" })).toBe("Start a song: c");
++  });
++});
++
++describe("a thread is named in the words and field types in force when it opened (R-DECL-23)", () => {
++  let room: FakeRoom;
++  beforeEach(async () => {
++    ({ room } = await startRoom());
++  });
++  afterEach(() => room.stop());
++
++  test("after a later document relabels the act and exchanges its field types, the earlier thread keeps its name; a new thread is named under the new document", async () => {
++    await room.activate({ ...CODE_REVIEW_ACTS, "start-song": SONG });
++    const alice = await joinAs(room, "@alice");
++    const before = ((await alice.api.acts()) as ActsCatalogue).acts["start-song"]!.binding;
++    const first = (await alice.api.act("start-song", null, { key: "blue", title: "bossa", scope: ["songs/one/**"] }, { binding: before })) as DeclaredRecord;
++    // The later document: another label, and `key` is now the text field.
++    await room.activate({ ...CODE_REVIEW_ACTS, "start-song": { ...SWAPPED, label: "Begin a tune" } });
++    const after = ((await alice.api.acts()) as ActsCatalogue).acts["start-song"]!.binding;
++    expect(after).not.toBe(before);
++    const second = (await alice.api.act("start-song", null, { key: "blue", title: "bossa", scope: ["songs/two/**"] }, { binding: after })) as DeclaredRecord;
++
++    const title = async (id: string) => {
++      const lane = (await alice.api.lane(id as never))!;
++      const opening = (await alice.api.explain(lane.lane))!;
++      const at = (await alice.api.actsAt({ seq: opening.entry.seq }))!;
++      return threadTitle(lane, { meaning: meaningOf(at, "start-song"), body: envelopeOf(opening.entry)!.body });
++    };
++    expect(await title(first.id)).toBe("Start a song: bossa");
++    expect(await title(second.id)).toBe("Begin a tune: blue");
++    // Read under the active document instead, the earlier thread would be misnamed: that is why D(s) is used.
++    const active = (await alice.api.acts()) as ActsCatalogue;
++    const lane = (await alice.api.lane(first.id as never))!;
++    const opening = (await alice.api.explain(lane.lane))!;
++    expect(threadTitle(lane, { meaning: meaningOf(active, "start-song"), body: envelopeOf(opening.entry)!.body })).toBe("Begin a tune: blue");
++  });
++
++  test("a goal still comes first, and the thread's ID names it when the opening act is not at hand", () => {
++    const opening = { meaning: declared(SONG), body: { key: "c", title: "Footprints" } };
++    expect(threadTitle({ lane: "act_7_00000000", goal: "Rate-limit login" }, opening)).toBe("Rate-limit login");
++    expect(threadTitle({ lane: "act_7_00000000", goal: "" }, opening)).toBe("Start a song: Footprints");
++    expect(threadTitle({ lane: "act_7_00000000", goal: "" })).toBe("act_7_00000000");
++  });
++});
+diff --git a/packages/mcp/README.md b/packages/mcp/README.md
+index 9dd525b6..a535e21c 100644
+--- a/packages/mcp/README.md
++++ b/packages/mcp/README.md
+@@ -68,8 +68,15 @@ with `{ outcome: "not-found", what }`, `acts` with `{ outcome: "not-found" }`.
+ A caller that asks for none gets the default for its authorization: `all`
+ for an admin or maintainer, `builder` for a member or agent, `reviewer`
+ for a checker, and `observer` for a delegation that may sign no act this
+-server offers. A caller asks for another with `?toolset=NAME` on the MCP
+-URL, or `artroom mcp --toolset NAME`. An unknown name is `bad-request`.
++server offers. A caller may select any of the four by name, whatever its
++default is, with `?toolset=NAME` on the MCP URL or `artroom mcp --toolset
++NAME`. The selected list has the same filter as the default one, so
++selecting `all` shows no act tool the caller could not use, and grants
++nothing. An unknown name is `bad-request`.
++
++Under a `v1` policy document the generic `act` is never shown, because the
++room refuses a `v: 2` envelope there. An admin then sees the fourteen named
++tools and `acts`; under a `v2` document, all sixteen.
+ 
+ Within the chosen set, an act tool is shown only if the caller could make
+ a new call of it: its role and the declaration's `who` allow the kind, and
+@@ -82,10 +89,22 @@ still be called, and the room judges that call like any other. Listing
+ changes no grant: a stale signed binding is never replaced, and a kind the
+ grant does not name is never added.
+ 
+-The host supplies the caller's authorization (`McpCaller`: its role, and
+-its delegation's signed grant). The room's Worker reads it from the Room
+-for a bearer token. The command line builds it from the roster with
+-`callerFromRoster`. It is read again for every `tools/list`.
++The host that authenticated the request supplies the caller's
++authorization (`McpCaller`): the credential's current roster role and,
++under a delegation, that delegation's `kinds` and signed map exactly as
++the room recorded them. This is a seam between the server and its host,
++not a method of `RoomApi` or `RoomWire`:
++
++- The room's Worker asks the Room, which judges the bearer token as a read
++  does and reads its member's role and its session's delegation.
++- The command line builds it from the current roster with
++  `callerFromRoster`: a member's own key, or, for a redeemed bearer, the
++  delegation its redemption recorded, which the room-held key must have
++  granted. A key that names a delegation must be the key it was granted to.
++
++Both read it again for every `tools/list`, so the list follows a changed
++role, a revoked delegation or a changed declaration, and never an earlier
++call.
+ 
+ ## Keys and waits (R-API-9, R-API-15)
+ 
+@@ -123,8 +142,8 @@ acts again. The tool does not act again by itself.
+ `explain` shows an act with the label its kind had at the act's own seq.
+ 
+ When `act` opens a thread, the first line of its text names the thread as
+-every reader does: by its goal, or by the act's label and its first field
+-by name. `acts` with `at` or `policy` reads the room each time, so a kind
++every reader does: by its goal, or by the act's label and its first text
++field by name (its first field by name when it has no text field). `acts` with `at` or `policy` reads the room each time, so a kind
+ retired since the last call is shown as retired.
+ 
+ `acts` and `act` carry the same descriptor shape as the named tools:
+diff --git a/packages/mcp/src/run.ts b/packages/mcp/src/run.ts
+index b725487f..cea33685 100644
+--- a/packages/mcp/src/run.ts
++++ b/packages/mcp/src/run.ts
+@@ -339,7 +339,7 @@ function headline(name: McpToolName, out: unknown): string {
+ /**
+  * When an act opened a thread: one sentence that names the thread as every
+  * reader does, by its goal, or by the act's label at its own seq and its
+- * first field (R-DECL-23). The declarations are read only when the thread
++ * first text field by name (R-DECL-23, section 33.10). The declarations are read only when the thread
+  * has no goal; if that read fails the thread is named by its ID alone.
+  */
+ async function openedThread(room: RoomApi, input: McpInput<"act">, out: unknown): Promise<string | undefined> {
+diff --git a/packages/mcp/src/toolsets.ts b/packages/mcp/src/toolsets.ts
+index f8edf255..c93388df 100644
+--- a/packages/mcp/src/toolsets.ts
++++ b/packages/mcp/src/toolsets.ts
+@@ -141,10 +141,14 @@ export async function toolsFor(caller: McpCaller, catalogue: Catalogue, asked?:
+  * A caller's authorization, from the roster (R-API-14), for a host that
+  * knows the caller's key: the command line. Three forms:
+  * - `{ key }`: a member's own key. No grant map is needed.
+- * - `{ key, delegation }`: that key acts under the named delegation.
++ * - `{ key, delegation }`: that key acts under the named delegation, which
++ *   must have been granted to it.
+  * - `{ key, session: true }`: `key` is a member key the room holds for a
+  *   bearer session, and the caller acts under the delegation that key
+- *   granted to the session.
++ *   granted to the session. With `delegation` too, it is exactly that
++ *   delegation, as the redemption recorded it, and `key` must be its
++ *   grantor. With none (a credential saved before the command line kept the
++ *   ID), it is the latest unrevoked delegation the key granted.
+  * Under a delegation the role is the grantor's member's, as at admission.
+  * A key or delegation the roster does not hold as current throws
+  * `unauthenticated`.
+@@ -162,6 +166,10 @@ export function callerFromRoster(roster: Roster, who: { readonly key: KeyId; rea
+       ? roster.delegations.find((x) => x.id === who.delegation)
+       : roster.delegations.filter((x) => x.grantor === who.key && x.revoked === undefined).at(-1);
+   if (d === undefined || d.revoked !== undefined) throw fail(); // GM:roster-revoked
++  // A session's delegation is one its own room-held key granted: another key's delegation is not this credential's.
++  if (who.session === true && d.grantor !== who.key) throw fail(); // GM:roster-session-grantor
++  // A key that names a delegation must be the key it was granted to.
++  if (who.session !== true && d.grantee !== who.key) throw fail(); // GM:roster-grantee
+   const member = memberOf(d.grantor);
+   if (member === undefined) throw fail();
+   return { role: member.role, delegation: { kinds: d.kinds, ...(d.acts !== undefined ? { acts: d.acts } : {}) } };
+diff --git a/packages/mcp/test/declared-a5d64b35.test.ts b/packages/mcp/test/declared-a5d64b35.test.ts
+index 58daf138..730b5d94 100644
+--- a/packages/mcp/test/declared-a5d64b35.test.ts
++++ b/packages/mcp/test/declared-a5d64b35.test.ts
+@@ -140,15 +140,18 @@ describe("act: any declared act, with the binding the agent read", () => {
+ });
+ 
+ describe("act: a thread it opened is named as every reader names it", () => {
+-  const SONG: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { title: { type: "text", max: 80 }, year: { type: "text", max: 4, optional: true } }, who: { roles: ["member", "agent"] }, hold: { scope: "body.scope", workspace: true } };
++  const SONG: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { key: { type: "enum", values: ["c", "d"], optional: true }, title: { type: "text", max: 80 }, year: { type: "text", max: 4, optional: true } }, who: { roles: ["member", "agent"] }, hold: { scope: "body.scope", workspace: true } };
+ 
+-  test("by its goal; with no goal, by the act's label at its own seq and its first field; by its ID alone if the declarations cannot be read", async () => {
++  test("by its goal; with no goal, by the act's label at its own seq and its first text field by name; by its ID alone if the declarations cannot be read", async () => {
+     await room.activate({ ...CODE_REVIEW_ACTS, "start-song": SONG });
+     const binding = (await room.bindingOf("start-song"))!;
+     const b = await agent({ "start-song": binding, claim: (await room.bindingOf("claim"))!, note: (await room.bindingOf("note"))! });
+     const song = await tool(b, "act", { kind: "start-song", target: null, body: { year: "1963", title: "Blue Bossa", scope: ["songs/blue-bossa/**"] }, binding, idempotencyKey: "s1" });
+     const id = song.structuredContent.id as string;
+     expect(first(song)).toBe(`Done: ${id}. It opened thread ${id}: Start a song: Blue Bossa.`);
++    // `key` comes first by name, but it is an enum: the thread is named by its first text field, the title.
++    const keyed = await tool(b, "act", { kind: "start-song", target: null, body: { key: "d", title: "So What", scope: ["songs/so-what/**"] }, binding, idempotencyKey: "s3" });
++    expect(first(keyed)).toBe(`Done: ${String(keyed.structuredContent.id)}. It opened thread ${String(keyed.structuredContent.id)}: Start a song: So What.`);
+     const claim = await tool(b, "act", { kind: "claim", target: null, body: { goal: "Rate-limit login", scope: ["src/**"] }, binding: (await room.bindingOf("claim"))!, idempotencyKey: "c1" });
+     expect(first(claim)).toBe(`Done: ${claim.structuredContent.id}. It opened thread ${claim.structuredContent.id}: Rate-limit login.`);
+     const note = await tool(b, "act", { kind: "note", target: { act: id }, body: { text: "Nice" }, binding: (await room.bindingOf("note"))!, idempotencyKey: "n1" });
+diff --git a/packages/mcp/test/mcp-core-9ca1d290.test.ts b/packages/mcp/test/mcp-core-9ca1d290.test.ts
+index d673c001..a9b7ab3c 100644
+--- a/packages/mcp/test/mcp-core-9ca1d290.test.ts
++++ b/packages/mcp/test/mcp-core-9ca1d290.test.ts
+@@ -157,6 +157,22 @@ describe("descriptors: sixteen tools, each with a title, an output schema and fi
+     expect(new Set(tools.map((t) => t.title)).size).toBe(16);
+   });
+ 
++  test("under an active v1 document an admin's list is the fourteen named tools and acts: the generic act is absent, and the rest is as under v2", async () => {
++    // No document was activated: the room is under the legacy vocabulary.
++    expect((await active()).vocabulary).not.toBe("declared");
++    const api = await connect({ url }, room.id, { kind: "key", signer: room.admin.signer });
++    const legacy = await stdioList(api, async () => ({ role: "admin" }));
++    expect(names(legacy)).toEqual(without(ORDER, "act"));
++    expect(legacy).toHaveLength(15);
++    // Asking for `all` by name shows no generic act either: a v: 2 envelope is bad-request under a v1 document.
++    expect(names(await stdioList(api, async () => ({ role: "admin" }), "all"))).toEqual(without(ORDER, "act"));
++    for (const t of legacy) expect(Object.keys(t).sort(), t.name).toEqual(["annotations", "description", "inputSchema", "name", "outputSchema", "title"]);
++    expect(legacy).toEqual(JSON.parse(JSON.stringify(listedTools())).filter((t: { name: string }) => t.name !== "act"));
++    // The same admin, once a v2 document is active, sees all sixteen.
++    await room.activate(DECLARED);
++    expect(names(await stdioList(api, async () => ({ role: "admin" })))).toEqual(ORDER);
++  });
++
+   test("the annotations are the rule's table, and act's are conservative whatever an earlier call did", async () => {
+     const hints = (readOnlyHint: boolean, destructiveHint: boolean) => ({ readOnlyHint, destructiveHint, idempotentHint: true, openWorldHint: false });
+     const table: Record<string, ReturnType<typeof hints>> = {};
+@@ -758,6 +774,36 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
+     for (const name of ["builder", "reviewer", "observer", "all"]) expect(toolsetOf(name)).toBe(name);
+   });
+ 
++  test("a caller may select any named toolset: the read-only-delegation override decides the default only, and every selected list has the same filter", async () => {
++    await room.activate(DECLARED);
++    const c = await active();
++    // A member's default is builder. It may select a larger set by name, and gets no act tool beyond its authority.
++    expect(await shown({ role: "member" }, c)).toEqual(inOrder(SETS.builder));
++    expect(await shown({ role: "member" }, c, "all")).toEqual(ORDER);
++    // A delegation that may newly sign nothing: observer by default, and by name any set, each without act tools.
++    const idle: McpCaller = { role: "agent", delegation: { kinds: [], acts: {} } };
++    expect(defaultToolset(idle, await eligible(idle, c))).toBe("observer");
++    expect(await shown(idle, c)).toEqual(inOrder(SETS.observer));
++    const acts = (set: McpToolset) => SETS[set].filter((n) => (ACT_TOOLS as readonly string[]).includes(n));
++    for (const set of ["builder", "reviewer", "observer", "all"] as const) expect(await shown(idle, c, set), set).toEqual(without(SETS[set], ...acts(set)));
++    // Selecting `all` grants nothing: over the endpoint the list has no act tool, and the room refuses the call itself.
++    const b = await bearer("@idle", "agent", { kinds: [], acts: {} });
++    expect(await listed(b)).toEqual(inOrder(SETS.observer));
++    expect(await listed(b, "?toolset=all")).toEqual(without(ORDER, ...acts("all")));
++    expect(await listed(b, "?toolset=builder")).toEqual(without(SETS.builder, ...acts("builder")));
++    const signed = JSON.stringify(room.delegations.get(b.delegation));
++    const claim = await call(b, "claim", { goal: "g", scope: ["src/**"] }, "?toolset=all");
++    expect(claim.isError).toBe(false);
++    expect(claim.structuredContent).toMatchObject({ refused: true, rule: "delegation-invalid" });
++    expect(room.lanes.size).toBe(0);
++    expect(JSON.stringify(room.delegations.get(b.delegation))).toBe(signed);
++    // A delegation with one current kind keeps that kind in every set that has its tool, and gains none by asking.
++    const one = await bearer("@one", "agent", { kinds: [], acts: await bindings("note") });
++    expect(await listed(one)).toEqual(without(SETS.builder, "claim", "propose", "land", "release", "renew"));
++    expect(await listed(one, "?toolset=all")).toEqual(without(ORDER, "claim", "propose", "review", "land", "release", "renew"));
++    expect(await listed(one, "?toolset=observer")).toEqual(inOrder(SETS.observer));
++  });
++
+   test("an unknown toolset name is bad-request, over HTTPS and for stdio, and nothing runs", async () => {
+     const b = await bearer("@agent", "agent");
+     for (const query of ["?toolset=nope", "?toolset=", "?toolset=Builder", "?toolset=builder&toolset=all", "?toolset=__proto__"]) {
+@@ -908,7 +954,7 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
+     // What the command line builds from the roster is what the room gives its own endpoint.
+     const roster = await api.members();
+     expect(callerFromRoster(roster, { key: b.key, session: true })).toEqual(await room.bearerCaller(b.bearer));
+-    expect(callerFromRoster(roster, { key: b.key, delegation: b.delegation })).toEqual(await room.bearerCaller(b.bearer));
++    expect(callerFromRoster(roster, { key: b.key, session: true, delegation: b.delegation })).toEqual(await room.bearerCaller(b.bearer));
+     const alice = await member("@alice", "maintainer");
+     expect(callerFromRoster(await alice.api.members(), { key: alice.key as never })).toEqual({ role: "maintainer" });
+     expect(await stdioList(alice.api, async () => callerFromRoster(await alice.api.members(), { key: alice.key as never }))).toEqual(JSON.parse(JSON.stringify(listedTools())));
+@@ -916,10 +962,54 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
+     expect(() => callerFromRoster(roster, { key: "key_unknown" as never })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+     room.revokeDelegation(b.delegation);
+     const after = await alice.api.members();
+-    expect(() => callerFromRoster(after, { key: b.key, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
++    expect(() => callerFromRoster(after, { key: b.key, session: true, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+     expect(() => callerFromRoster(after, { key: b.key, session: true })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+   });
+ 
++  test("the command line's adapter gives a session exactly the delegation its redemption recorded: not a later one of the same key, and never another key's", async () => {
++    await room.activate(DECLARED);
++    const b = await bearer("@agent", "agent", { kinds: ["renew"], acts: await bindings("claim") });
++    const other = await bearer("@other", "agent", { kinds: [], acts: await bindings("note") });
++    const api = await connect({ url }, room.id, { kind: "bearer", token: b.bearer });
++    const roster = await api.members();
++    // What the adapter answers: the caller, or the code it refuses with. So a wrong refusal fails as an assertion.
++    const read = (r: typeof roster, who: Parameters<typeof callerFromRoster>[1]) => {
++      try {
++        return callerFromRoster(r, who);
++      } catch (e) {
++        return { refused: (e as { code?: string }).code };
++      }
++    };
++    const exact = read(roster, { key: b.key, session: true, delegation: b.delegation });
++    expect(exact).toEqual(await room.bearerCaller(b.bearer));
++    expect(exact).toEqual({ role: "agent", delegation: { kinds: ["renew"], acts: await bindings("claim") } });
++    // The same room-held key with a later delegation in the roster: the session's own recorded one is still used.
++    const mine = roster.delegations.find((d) => d.id === b.delegation)!;
++    const later = { ...mine, id: "act_999_00000000" as never, kinds: "*" as const, acts: await bindings("claim", "propose", "land") };
++    const grown = { ...roster, delegations: [...roster.delegations, later] };
++    expect(read(grown, { key: b.key, session: true, delegation: b.delegation })).toEqual(exact);
++    // With no recorded ID (a credential saved before it was kept), the latest unrevoked one the key granted is used.
++    expect(read(grown, { key: b.key, session: true })).toEqual({ role: "agent", delegation: { kinds: "*", acts: later.acts } });
++    // A session cannot name a delegation another key granted, though that delegation is current.
++    expect(roster.delegations.some((d) => d.id === other.delegation && d.revoked === undefined)).toBe(true);
++    expect(read(roster, { key: b.key, session: true, delegation: other.delegation })).toEqual({ refused: "unauthenticated" });
++    // A client-held key that names a delegation must be the key it was granted to: the grantee is accepted, and the
++    // grantor's key or any other key in that form is not.
++    const granted = roster.delegations.find((d) => d.id === other.delegation)!;
++    expect(read(roster, { key: granted.grantee, delegation: other.delegation })).toEqual(await room.bearerCaller(other.bearer));
++    expect(read(roster, { key: other.key, delegation: other.delegation })).toEqual({ refused: "unauthenticated" });
++    expect(read(roster, { key: b.key, delegation: other.delegation })).toEqual({ refused: "unauthenticated" });
++    // The session form of the same delegation, by its own room-held key, is accepted: the two forms do not mix.
++    expect(read(roster, { key: other.key, session: true, delegation: other.delegation })).toEqual(await room.bearerCaller(other.bearer));
++    // Read for each list: once the delegation is revoked, the next list over stdio fails, and shows nothing.
++    const caller = async () => callerFromRoster(await api.members().catch(() => roster), { key: b.key, session: true, delegation: b.delegation });
++    expect(names(await stdioList(api, caller))).toEqual(await listed(b));
++    room.revokeDelegation(b.delegation);
++    const after = { ...roster, delegations: roster.delegations.map((d) => (d.id === b.delegation ? { ...d, revoked: 1 } : d)) };
++    expect(() => callerFromRoster(after, { key: b.key, session: true, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
++    expect((await list(b)).status).toBe(401);
++  });
++
+   test("the list is the same before and after other calls, and it is read afresh for each request", async () => {
+     await room.activate(DECLARED);
+     const b = await bearer("@agent", "agent", { kinds: ["renew"], acts: await bindings("claim", "propose", "note", "ask") });
+diff --git a/packages/policy/README.md b/packages/policy/README.md
+index a10ab7d5..a62c6940 100644
+--- a/packages/policy/README.md
++++ b/packages/policy/README.md
+@@ -268,7 +268,8 @@ engine:
+   an act), `builtForBinding` (the binding a named code-review method
+   carries in a room), `expandGrant` (a grant as the signed map its
+   grantor signs), and `titleOf` and `threadTitle` (what readers call a
+-  record and a thread).
++  thread: its goal, or its opening act's label and first text field by
++  name, under the declaration of that act's own seq).
+ 
+ These decide nothing. The room judges every act again at admission.
+ 
+diff --git a/packages/policy/src/catalogue.ts b/packages/policy/src/catalogue.ts
+index 4256bd1b..79cce93b 100644
+--- a/packages/policy/src/catalogue.ts
++++ b/packages/policy/src/catalogue.ts
+@@ -80,31 +80,50 @@ function valueText(v: unknown): string {
+   return JSON.stringify(v);
+ }
+ 
++/** The names of the body fields a declaration types as text. Own names only: a field may be named `toString`. */
++function textFields(declaration: ActDeclaration): ReadonlySet<string> {
++  const out = new Set<string>();
++  for (const [name, field] of Object.entries(declaration.body ?? {})) if (field.type === "text") out.add(name); // G5:title-text-type
++  return out;
++}
++
+ /**
+- * A short title for a record: its label at its own seq, then the value of
+- * its first body field other than `scope` and `because`, when it has one.
++ * A short title for the record of an act that opened a thread: its label at
++ * its own seq, then the value of one body field, when it has one.
+  * `Start a song: Blue Bossa`.
+  *
++ * Which field: the first by name that the act's own declaration, as it was
++ * at the record's seq, types as text. A text field is what a person wrote
++ * to be read; an enum, a number or an ID seldom names anything. "Text" is
++ * the declared type, not the type of the value: an enum's value is a string
++ * too. With no such field present, or with no declaration at hand (a legacy,
++ * platform or unknown kind, or a caller that has only the label), it is the
++ * first field by name. `scope` and `because` never name a thread, and
++ * `scope` is all that the `open` step itself brings, so no step field is
++ * considered.
++ *
+  * "First" is by name, which is the order the room records a body in: the
+  * log keeps canonical JSON, whose keys are sorted. Sorting here gives the
+  * same title from the body a caller typed and from the record a reader
+  * reads back.
+  */
+-export function titleOf(meaning: { readonly label: string }, body: unknown): string {
++export function titleOf(meaning: { readonly label: string; readonly declaration?: ActDeclaration }, body: unknown): string {
+   if (typeof body !== "object" || body === null || Array.isArray(body)) return meaning.label;
+-  const names = Object.keys(body).sort(); // G5:title-order
+-  const name = names.find((n) => n !== "scope" && n !== "because"); // G5:title-first
+-  const first = name === undefined ? undefined : ([name, (body as Record<string, unknown>)[name]] as const);
+-  return first ? `${meaning.label}: ${valueText(first[1])}` : meaning.label;
++  const names = Object.keys(body)
++    .sort() // G5:title-order
++    .filter((n) => n !== "scope" && n !== "because"); // G5:title-first
++  const text = meaning.declaration ? textFields(meaning.declaration) : null;
++  const name = names.find((n) => text?.has(n)) ?? names[0]; // G5:title-text
++  return name === undefined ? meaning.label : `${meaning.label}: ${valueText((body as Record<string, unknown>)[name])}`;
+ }
+ 
+ /**
+  * What a reader calls a thread. A thread a `claim` opened has a goal. A
+  * thread an application opened with its own act may have none: it is then
+- * named by that act, in the words in force when it opened (`titleOf`), and
+- * by its ID when the opening act is not at hand.
++ * named by that act, in the words and field types in force when it opened
++ * (`titleOf`), and by its ID when the opening act is not at hand.
+  */
+-export function threadTitle(lane: { readonly lane: string; readonly goal: string }, opening?: { readonly meaning: { readonly label: string }; readonly body: unknown }): string {
++export function threadTitle(lane: { readonly lane: string; readonly goal: string }, opening?: { readonly meaning: { readonly label: string; readonly declaration?: ActDeclaration }; readonly body: unknown }): string {
+   if (lane.goal !== "") return lane.goal; // G5:title-goal
+   return opening ? titleOf(opening.meaning, opening.body) : lane.lane;
+ }
+diff --git a/packages/room/test/workerd/mcp-core-9ca1d290.test.ts b/packages/room/test/workerd/mcp-core-9ca1d290.test.ts
+index 2b1cbed6..bd469349 100644
+--- a/packages/room/test/workerd/mcp-core-9ca1d290.test.ts
++++ b/packages/room/test/workerd/mcp-core-9ca1d290.test.ts
+@@ -16,12 +16,12 @@
+ import { describe, expect, it } from "vitest";
+ import { exports } from "cloudflare:workers";
+ import type { ActDeclaration, Claim, DeclaredRecord, Landing, Proposal, Redeemed, Roster, RosterRecord } from "@generalbusiness/artroom-contract";
+-import { validate } from "@generalbusiness/artroom-mcp";
+-import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy";
++import { callerFromRoster, validate } from "@generalbusiness/artroom-mcp";
++import { CODE_REVIEW_ACTS, policy } from "@generalbusiness/artroom-policy";
+ import type { CallerView } from "../../src/requests.ts";
+ import { activate, bindingIn, declaredRoom, headSeq, laneRowOf, ok, v2 } from "./declared-support.ts";
+ import { ASK, ORIGIN, bearer } from "./declared-stage5-support.ts";
+-import { addMember, b64url, call, clock, day, DECLARED, digestBytes, iso, makeRoom, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
++import { addMember, b64url, call, Client, clock, day, DECLARED, digestBytes, iso, makeRoom, newKeyPair, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
+ 
+ /** The fixed order of `tools/list` (R-API-13). */
+ const ORDER = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release", "attention", "explain", "lanes", "lane", "proposal", "operation", "acts", "act"];
+@@ -113,7 +113,108 @@ describe.skipIf(DECLARED)("the Room gives its MCP endpoint the caller's authoriz
+   });
+ });
+ 
++describe.skipIf(DECLARED)("the Room's reading of a credential and the command line's reading of the roster agree (R-API-14)", () => {
++  it("a v2 bearer, a v1 bearer and a member's own key: the same caller from the Room's token adapter and from the current roster, before and after a role change", async () => {
++    const r = await declaredRoom(doc());
++    const map = await bindings(r, "claim", "ask");
++    const b = await bearer(r, "@agent", "agent", { kinds: ["renew"], acts: map });
++    const fromRoster = async () => callerFromRoster(await roster(r), { key: b.key, session: true, delegation: b.delegation });
++    expect(await fromRoster()).toEqual(await callerOf(r, b.bearer));
++    expect(await fromRoster()).toEqual({ role: "agent", delegation: { kinds: ["renew"], acts: map } });
++    // A credential saved before the delegation's ID was kept: the room-held key granted one delegation, the same one.
++    expect(callerFromRoster(await roster(r), { key: b.key, session: true })).toEqual(await callerOf(r, b.bearer));
++    await r.admin.ok("roster", null, { op: "set-role", member: "@agent", role: "member" });
++    expect(await fromRoster()).toEqual(await callerOf(r, b.bearer));
++    expect((await fromRoster()).role).toBe("member");
++    // A member's own key (custody client) has no delegation on either side.
++    const bob = await addMember(r, "@bob", "maintainer");
++    expect(callerFromRoster(await roster(r), { key: bob.key })).toEqual(await callerOf(r, await bob.session()));
++    expect(callerFromRoster(await roster(r), { key: bob.key })).toEqual({ role: "maintainer" });
++    // A session cannot be read under a delegation another key granted, and the grantor's key is not its grantee.
++    const other = await bearer(r, "@other", "agent", { kinds: [], acts: await bindings(r, "note") });
++    const now = await roster(r);
++    expect(() => callerFromRoster(now, { key: b.key, session: true, delegation: other.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
++    expect(() => callerFromRoster(now, { key: b.key, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
++    // The legacy session of a v1 room: kinds as signed, and no map, on both sides.
++    const v1 = await makeRoom();
++    const legacy = await legacyBearer(v1, "@agent", ["claim", "note"]);
++    const legacyCaller = callerFromRoster(await roster(v1), { key: legacy.key, session: true, delegation: legacy.delegation });
++    expect(legacyCaller).toEqual(await callerOf(v1, legacy.bearer));
++    expect(legacyCaller).toEqual({ role: "agent", delegation: { kinds: ["claim", "note"] } });
++  });
++
++  it("revocation: after a delegation is revoked by its grantor, or a session's key by an admin, neither adapter gives a caller", async () => {
++    const r = await declaredRoom(doc());
++    const refusedAs = async (token: string) => ((await r.stub.caller(token)) as { error?: { code: string } }).error?.code;
++    // A client-held key acting under a member's delegation, with a read session of its own.
++    const bob = await addMember(r, "@bob", "member");
++    const k = newKeyPair();
++    const map = await bindings(r, "claim", "note");
++    const g = await ok<RosterRecord>(r, bob, "roster", null, { op: "delegate", to: k.key, kinds: ["renew"], acts: map, lanes: "*", expiresAt: iso(clock.now + day) }, { binding: null });
++    const delegate = new Client(r, k, g.id);
++    const token = await delegate.session();
++    const who = { key: k.key, delegation: g.id } as const;
++    expect(callerFromRoster(await roster(r), who)).toEqual(await callerOf(r, token));
++    expect(await callerOf(r, token)).toEqual({ role: "member", delegation: { kinds: ["renew"], acts: map } });
++    expect(await listed(r, token)).toEqual(["claim", "workspace", "note", "renew", "attention", "explain", "lane", "proposal", "operation", "acts", "act"]);
++    // Its grantor revokes the delegation: the Room refuses the token, and the roster no longer gives a caller.
++    await ok(r, bob, "roster", null, { op: "undelegate", delegation: g.id }, { binding: null });
++    expect(await refusedAs(token)).toBe("unauthenticated");
++    const afterUndelegate = await roster(r);
++    expect(() => callerFromRoster(afterUndelegate, who)).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
++    expect((await rpc(r, token, "tools/list")).status).toBe(401);
++    // Another session: its key is revoked. The Room refuses the token, and the roster no longer holds the key as current.
++    const c = await bearer(r, "@second", "agent", { kinds: ["renew"], acts: {} });
++    await r.admin.ok("roster", null, { op: "revoke-key", key: c.key, reason: "retired" });
++    expect(await refusedAs(c.bearer)).toBe("unauthenticated");
++    const afterRevoke = await roster(r);
++    expect(() => callerFromRoster(afterRevoke, { key: c.key, session: true, delegation: c.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
++    // A third session: its member is removed from the room.
++    const e = await bearer(r, "@third", "agent", { kinds: ["renew"], acts: {} });
++    expect(callerFromRoster(await roster(r), { key: e.key, session: true, delegation: e.delegation })).toEqual(await callerOf(r, e.bearer));
++    await r.admin.ok("roster", null, { op: "remove", member: "@third" });
++    expect(await refusedAs(e.bearer)).toBe("unauthenticated");
++    const afterRemove = await roster(r);
++    expect(() => callerFromRoster(afterRemove, { key: e.key, session: true, delegation: e.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
++    expect((await rpc(r, e.bearer, "tools/list")).status).toBe(401);
++  });
++});
++
+ describe.skipIf(DECLARED)("tools/list at the Worker's MCP endpoint (R-API-13, R-API-14)", () => {
++  it("an admin's list: under a v1 document the fourteen named tools and acts, with no generic act; under a v2 document all sixteen", async () => {
++    const v1 = await makeRoom();
++    const legacy = await listed(v1, await v1.admin.session());
++    expect(legacy).toEqual(without(ORDER, "act"));
++    expect(legacy).toHaveLength(15);
++    expect(await listed(v1, await v1.admin.session(), "?toolset=all")).toEqual(without(ORDER, "act"));
++    const r = await declaredRoom(doc());
++    expect(await listed(r, await r.admin.session())).toEqual(ORDER);
++    // The same room once it returns to a v1 document: the generic act is gone again, and nothing else moves.
++    await activate(r, policy());
++    expect(await listed(r, await r.admin.session())).toEqual(without(ORDER, "act"));
++  });
++
++  it("a caller may select any named toolset: a delegation that may newly sign nothing gets observer by default, and no act tool in any set it names; the room refuses its call", async () => {
++    const r = await declaredRoom(doc());
++    const idle = await bearer(r, "@idle", "agent", { kinds: [], acts: {} });
++    const ACTS = ["claim", "propose", "note", "review", "land", "renew", "release", "act"];
++    expect(await listed(r, idle.bearer)).toEqual(OBSERVER);
++    expect(await listed(r, idle.bearer, "?toolset=all")).toEqual(without(ORDER, ...ACTS));
++    expect(await listed(r, idle.bearer, "?toolset=builder")).toEqual(without(BUILDER, ...ACTS));
++    expect(await listed(r, idle.bearer, "?toolset=reviewer")).toEqual(without(REVIEWER, ...ACTS));
++    const seq = await headSeq(r);
++    const before = await callerOf(r, idle.bearer);
++    const claim = await tool(r, idle.bearer, "claim", { goal: "g", scope: ["src/**"] }, "?toolset=all");
++    expect(claim.structuredContent).toMatchObject({ refused: true, rule: "delegation-invalid" });
++    expect(await headSeq(r)).toBe(seq);
++    expect(await callerOf(r, idle.bearer)).toEqual(before);
++    // A member's bearer with a full map: builder by default, and all sixteen when it names `all`.
++    const agent = await bearer(r, "@agent", "agent", { kinds: ["renew"], acts: await bindings(r, "claim", "propose", "note", "review", "land", "release", "ask") });
++    expect(await listed(r, agent.bearer)).toEqual(BUILDER);
++    expect(await listed(r, agent.bearer, "?toolset=all")).toEqual(ORDER);
++  });
++
++
+   it("a v1 room: an agent's builder list; ?toolset=reviewer; ?toolset=nope is bad-request; a delegation without land", async () => {
+     const r = await makeRoom();
+     const b = await legacyBearer(r, "@agent", ["claim", "propose", "note", "review", "land", "release", "renew"]);
+@@ -150,6 +251,29 @@ describe.skipIf(DECLARED)("tools/list at the Worker's MCP endpoint (R-API-13, R-
+     expect(await listed(r, noLand.bearer)).toEqual(without(BUILDER, "land"));
+   });
+ 
++  it("a checker's own key: the reviewer presentation by default, with note and the generic act and never review or claim; the stdio adapter reads the same caller", async () => {
++    const r = await declaredRoom(doc());
++    const ci = await addMember(r, "@ci", "checker");
++    const token = await ci.session();
++    expect(await callerOf(r, token)).toEqual({ role: "checker" });
++    expect(callerFromRoster(await roster(r), { key: ci.key })).toEqual({ role: "checker" });
++    // Its role may sign `note` and the renamed check kind, so the reviewer set keeps `note` and `act`, and drops `review`.
++    expect(await listed(r, token)).toEqual(without(REVIEWER, "review"));
++    expect(await listed(r, token, "?toolset=all")).toEqual(["workspace", "note", "attention", "explain", "lanes", "lane", "proposal", "operation", "acts", "act"]);
++    expect(await listed(r, token, "?toolset=observer")).toEqual(OBSERVER);
++    // Under a document that declares nothing a checker may sign, its own key keeps the reviewer presentation, with no
++    // act tool: the observer override is for delegations only.
++    await activate(
++      r,
++      v2((a) => {
++        for (const kind of Object.keys(a)) delete a[kind];
++        a["ask"] = ASK;
++      }),
++    );
++    expect(await listed(r, token)).toEqual(without(REVIEWER, "note", "review", "act"));
++    expect(await callerOf(r, token)).toEqual({ role: "checker" });
++  });
++
+   it("a checker's bearer: with one eligible declared check kind, the reviewer presentation; with none, observer; never review or claim", async () => {
+     const r = await declaredRoom(doc());
+     const withVerify = await bearer(r, "@ci", "checker", { kinds: [], acts: await bindings(r, "verify") });
+diff --git a/packages/ui/README.md b/packages/ui/README.md
+index f74a3c29..38ede515 100644
+--- a/packages/ui/README.md
++++ b/packages/ui/README.md
+@@ -266,6 +266,12 @@ A refresh of the snapshot behind an open form does not change the form.
+   declarations again, lists what changed, and sends again only when the
+   person presses "Send it with the new meaning". If the new meaning needs a
+   field the form does not have yet, nothing is sent until it is filled in.
++- When the room's answer does not arrive, and the error says the act may
++  have been recorded, the form says the outcome is unresolved. It never
++  says the act was not taken. "Ask again, the same act" sends exactly
++  what was sent, with the same idempotency key: the room returns the
++  record it made, or records the act once (R-IDEM-2). Until then the form
++  sends no other act.
+ - On `kind-undeclared` it says the room no longer has that act and returns
+   to the list.
+ - Any other refusal shows the room's rule with the reason and fix as given,
+@@ -279,17 +285,21 @@ policy declares five acts for a band's setlist (`setlist.ts`): start a
+ song, add a part, cue, sign off, wrap up. A second policy version renames
+ one, reshapes another and drops a third, so the feed shows each case
+ above. The in-memory room is a stand-in: it has no signatures, expiring
+-leases, policy rules, landing or idempotency.
++leases, policy rules or landing. It answers a generic act's idempotency
++key as the Room does (R-IDEM-2 to R-IDEM-4).
+ 
+ **Not done here.**
+ 
+ - The form has no input for `because` (the reasons an act rests on).
+ - The form does not send `recover` or the platform kinds.
+-- A lost answer is not retried with the same idempotency key from the
+-  form. The client handle owns retries.
++- After a lost answer the form asks again only when the person says so.
++  It keeps the act and its idempotency key for as long as the form stays
++  open: it does not store them, so closing the page loses them, and the
++  act's outcome is then read from the feed.
+ - The Room, Proposal and Needs-you screens keep the review application's
+   wording ("lane", "claim", "generation"). A thread opened by another
+-  application's act is named by that act's label and first field.
++  application's act is named by that act's label and its first text field
++  by name, read with the declaration in force when the thread opened.
+ - Steps and hold settings the Room does not run until stage 4 (hand-over,
+   scope templates, reservations, comments with no anchor, two steps in one
+   act) are described by `fieldsOf` already, so the form needs no change
+diff --git a/packages/ui/src/room/acts.ts b/packages/ui/src/room/acts.ts
+index 736c5f88..0f9ae7e2 100644
+--- a/packages/ui/src/room/acts.ts
++++ b/packages/ui/src/room/acts.ts
+@@ -173,6 +173,16 @@ export type BodyRead = { readonly ok: true; readonly body: { readonly [field: st
+  */
+ export const own = <T>(o: Readonly<Record<string, T>>, name: string): T | undefined => (Object.hasOwn(o, name) ? o[name] : undefined); // G5U:own-name
+ 
++/**
++ * A new idempotency key for one act a person sends: 1 to 64 characters of
++ * `A-Z`, `a-z`, `0-9`, `_` and `-` (R-IDEM-1). The form keeps it with the
++ * act, so that asking again after a lost answer is the same act.
++ */
++export function newIdempotencyKey(): string {
++  const bytes = crypto.getRandomValues(new Uint8Array(16));
++  return `ui-${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
++}
++
+ /** Read every field of a form. One problem per field; the body is built only when there are none. */
+ export function readBody(fields: readonly ActField[], raw: Readonly<Record<string, string>>): BodyRead {
+   const body: Record<string, Json> = {};
+@@ -335,7 +345,7 @@ export function entryMeaning(env: { readonly kind: string; readonly target: unkn
+     kind: meaning.kind,
+     label: meaning.label, // G5U:record-label
+     policy: meaning.policy,
+-    ...(meaning.vocabulary === "declared" ? { binding: meaning.binding, ...(meaning.declaration.help !== undefined ? { help: meaning.declaration.help } : {}) } : {}),
++    ...(meaning.vocabulary === "declared" ? { binding: meaning.binding, declaration: meaning.declaration, ...(meaning.declaration.help !== undefined ? { help: meaning.declaration.help } : {}) } : {}), // G5U:record-declaration
+     ...("retired" in meaning && meaning.retired !== undefined ? { retired: meaning.retired } : {}), // G5U:record-retired
+     target: targetText(env.target),
+     fields,
+diff --git a/packages/ui/src/room/adapter.ts b/packages/ui/src/room/adapter.ts
+index 394014d7..2c76ea3a 100644
+--- a/packages/ui/src/room/adapter.ts
++++ b/packages/ui/src/room/adapter.ts
+@@ -14,6 +14,7 @@
+ 
+ import type { ChangeHistory } from "./changes.ts";
+ import type {
++  ActDeclaration,
+   ActId,
+   AttentionItem,
+   Binding,
+@@ -80,6 +81,8 @@ export interface EntryMeaning {
+   readonly policy: PolicyVersion;
+   /** For a declared kind: the binding of that meaning. Two meanings of one name differ here. */
+   readonly binding?: Binding;
++  /** For a declared kind: its declaration at the record's seq. A thread's name is read with its field types. */
++  readonly declaration?: ActDeclaration;
+   readonly help?: string;
+   /** The seq at which a later document dropped the kind, or replaced the legacy vocabulary. */
+   readonly retired?: Seq;
+@@ -350,8 +353,13 @@ export interface RoomAdapter {
+    * at (R-DECL-16). The adapter sends exactly this kind, target, body and
+    * binding, once. It never reads the catalogue, replaces the binding or
+    * sends again by itself.
++   *
++   * With `idempotencyKey`, the same call made again is the same act: if the
++   * room recorded it the first time, it returns that result and records
++   * nothing new (R-IDEM-2). A caller whose answer was lost uses it to ask
++   * again. An error that says `maybeRecorded` is such a lost answer.
+    */
+-  act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding): Promise<Result<DeclaredRecord>>;
++  act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding, idempotencyKey?: string): Promise<Result<DeclaredRecord>>;
+ 
+   /** Members the viewer may switch to. The mock lets a demo view any queue; live has one identity. */
+   readonly viewers: readonly MemberId[];
+diff --git a/packages/ui/src/room/live/live-room.ts b/packages/ui/src/room/live/live-room.ts
+index badf1c4a..85212f28 100644
+--- a/packages/ui/src/room/live/live-room.ts
++++ b/packages/ui/src/room/live/live-room.ts
+@@ -59,6 +59,11 @@ export interface LiveOptions {
+   readonly onViewer?: (member: MemberId) => void;
+ }
+ 
++/** The snapshot with this active catalogue and the policy version it names. */
++function withCatalogue(snap: RoomSnapshot, catalogue: Catalogue | null): RoomSnapshot {
++  return { ...snap, catalogue, policy: { ...snap.policy, version: catalogue?.policy ?? null, activatedAt: catalogue?.since ?? null } };
++}
++
+ export class LiveRoom implements RoomAdapter {
+   readonly kind: "mock" | "live";
+   readonly viewers: readonly MemberId[];
+@@ -69,6 +74,12 @@ export class LiveRoom implements RoomAdapter {
+    * that activation may retire one of their kinds. This adapter keeps no earlier version of its own.
+    */
+   private active: Catalogue | null = null;
++  /**
++   * The newest activation this adapter has confirmed: the `since` of the newest catalogue it has read, or -1 before
++   * any. It only grows. A read that fails leaves the page without a catalogue; it does not undo what was confirmed,
++   * so an older answer that arrives afterwards still cannot bring an earlier catalogue back.
++   */
++  private confirmed = -1;
+   /** The code-review bindings under each policy version, by kind. A version's steps and lanes never change. */
+   private readonly builtFor = new Map<string, Promise<ReadonlyMap<string, Binding>>>();
+   private readonly listeners = new Set<() => void>();
+@@ -106,7 +117,7 @@ export class LiveRoom implements RoomAdapter {
+     }
+     this.refreshing = this.load()
+       .then((snap) => {
+-        this.snap = snap;
++        this.snap = this.current(snap);
+       })
+       .catch((err: unknown) => {
+         const note = typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : "The room did not answer.";
+@@ -132,6 +143,36 @@ export class LiveRoom implements RoomAdapter {
+     }
+   }
+ 
++  /**
++   * Take one completed read of the active catalogue, and return the catalogue this adapter now holds. Reads can
++   * complete out of order: a load and an explicit read each ask the room, and the older question may be answered
++   * last. An answer never replaces a later activation this adapter has already confirmed, as the room's handle
++   * never keeps an overtaken answer (`actsAt`). `known` is the catalogue held when the question was asked.
++   */
++  private confirm(read: Catalogue | null, known: Catalogue | null): Catalogue | null {
++    if (read === null) {
++      // "Not available" says nothing of its own age: it stands only if no other answer was taken while it was on its way.
++      if (this.active !== known) return this.active; // G5U:catalogue-overtaken
++      this.active = null;
++      return null;
++    }
++    // An answer from before an activation confirmed here. `since` only grows, and what was confirmed outlasts a
++    // failed read: the page then stays without a catalogue rather than go back to an earlier one.
++    if (read.since < this.confirmed) return this.active; // G5U:catalogue-older
++    this.confirmed = read.since; // G5U:catalogue-confirmed
++    this.active = read;
++    return read;
++  }
++
++  /**
++   * A loaded snapshot under the catalogue held now, or with none when the newest read failed. An explicit read may
++   * have confirmed a later activation, or failed, after this load read the catalogue and before it finished; the
++   * page must not go back to the catalogue the load read.
++   */
++  private current(snap: RoomSnapshot): RoomSnapshot {
++    return withCatalogue(snap, this.active); // G5U:refresh-current
++  }
++
+   /** `D(s)`: the catalogue that governs the entry at `seq`. */
+   private async governing(seq: Seq): Promise<Catalogue | null> {
+     const active = this.active;
+@@ -174,16 +215,18 @@ export class LiveRoom implements RoomAdapter {
+   }
+ 
+   private async load(): Promise<RoomSnapshot> {
+-    const [roster, lanePage, attention, log, catalogue] = await Promise.all([
++    const known = this.active;
++    const [roster, lanePage, attention, log, read] = await Promise.all([
+       this.room.members(),
+       readAll((cursor) => this.room.lanes({ limit: 500, ...(cursor ? { cursor } : {}) })),
+       readAll((cursor) => this.room.attention({ limit: 200, ...(cursor ? { cursor } : {}) })),
+       this.readLog(),
+       this.activeCatalogue(),
+     ]);
+-    // The active catalogue of this load. Reading it also tells the handle of any new activation, so that it drops
+-    // the earlier versions it kept: one of their kinds may have been retired.
+-    this.active = catalogue; // G5U:catalogue-refresh
++    // The active catalogue of this load, unless a later one was confirmed while it ran. Reading it also tells the
++    // handle of any new activation, so that it drops the earlier versions it kept: one of their kinds may have been
++    // retired.
++    const catalogue = this.confirm(read, known); // G5U:catalogue-refresh
+     const lanes: Lane[] = [...lanePage.items];
+     const proposals: Proposal[] = [];
+     for (const lane of lanes) {
+@@ -318,10 +361,13 @@ export class LiveRoom implements RoomAdapter {
+   }
+ 
+   async readCatalogue(): Promise<Catalogue | null> {
+-    const catalogue = await this.activeCatalogue();
+-    this.active = catalogue;
++    const known = this.active;
++    // What was just read is what `governing` answers from: an activation this read learned of ends the earlier
++    // catalogue's interval, and may have retired one of its kinds (R-DECL-23). An answer older than what is already
++    // confirmed changes nothing, and the caller gets the catalogue held now.
++    const catalogue = this.confirm(await this.activeCatalogue(), known); // G5U:catalogue-read
+     if (this.snap) {
+-      this.snap = { ...this.snap, catalogue, policy: { ...this.snap.policy, version: catalogue?.policy ?? null, activatedAt: catalogue?.since ?? null } };
++      this.snap = withCatalogue(this.snap, catalogue);
+       for (const l of this.listeners) l();
+     }
+     return catalogue;
+@@ -331,11 +377,15 @@ export class LiveRoom implements RoomAdapter {
+     return this.governing(seq);
+   }
+ 
+-  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding): Promise<Result<DeclaredRecord>> {
+-    // Exactly this kind, target, body and binding, once (R-DECL-16).
+-    const r = await this.room.act(kind, target, body, { binding }); // G5U:act-binding
+-    void this.refresh();
+-    return r;
++  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, binding: Binding, idempotencyKey?: string): Promise<Result<DeclaredRecord>> {
++    try {
++      // Exactly this kind, target, body and binding, once (R-DECL-16), under the caller's idempotency key if it gave one.
++      const key = idempotencyKey !== undefined ? { idempotencyKey } : {}; // G5U:act-key
++      return await this.room.act(kind, target, body, { binding, ...key }); // G5U:act-binding
++    } finally {
++      // Also when the answer was lost: the act may be in the log, and the page should show it.
++      void this.refresh(); // G5U:act-refresh
++    }
+   }
+ 
+   async review(at: ProposalAt, draft: ReviewDraft): Promise<Result<Review>> {
+diff --git a/packages/ui/src/room/mock/memory-room.ts b/packages/ui/src/room/mock/memory-room.ts
+index c4f03791..4dc5d5b2 100644
+--- a/packages/ui/src/room/mock/memory-room.ts
++++ b/packages/ui/src/room/mock/memory-room.ts
+@@ -10,7 +10,8 @@
+  * in the Room's order, as far as a demo needs: role, then kind and binding
+  * (never recorded), then body (never recorded), then the thread (recorded).
+  * It is a stand-in, not the Room: it has no signatures, no leases that
+- * expire, no policy rules, no landing and no idempotency.
++ * expire, no policy rules and no landing. A generic act sent with an
++ * idempotency key is answered as R-IDEM-2 to R-IDEM-4 say.
+  */
+ 
+ import { bindingsOf, fieldsOf, governs, meaningOf, PLATFORM_KIND_LIST } from "@generalbusiness/artroom-policy/declared";
+@@ -87,6 +88,10 @@ export class MemoryRoom {
+   publishedThrough = 0;
+   /** Every generic act this room was sent, in order: the tests read it to show what was and was not resubmitted. */
+   readonly sent: { readonly kind: string; readonly binding: string; readonly body: unknown; readonly target: unknown }[] = [];
++  /** The idempotency key each of those acts came with, in the same order; undefined where it came with none. */
++  readonly keys: (string | undefined)[] = [];
++  /** What the room recorded under each idempotency key: the act's own text and its answer. */
++  private readonly answered: Record<string, { readonly act: string; readonly result: Result<DeclaredRecord> }> = Object.create(null) as Record<string, never>;
+   private readonly entries: LogEntry[] = [];
+   private readonly versions: Version[] = [];
+   private readonly threads = new Map<ActId, Thread>();
+@@ -195,8 +200,23 @@ export class MemoryRoom {
+    * One act of a declared kind, with the binding its caller read (R-DECL-16).
+    * The room compares that binding with the active one and never replaces it.
+    */
+-  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: { readonly binding: Binding }): Promise<Result<DeclaredRecord>> {
++  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: { readonly binding: Binding; readonly idempotencyKey?: string }): Promise<Result<DeclaredRecord>> {
+     this.sent.push({ kind, binding: opts.binding, body, target });
++    this.keys.push(opts.idempotencyKey);
++    const key = opts.idempotencyKey;
++    if (key === undefined) return this.admit(kind, target, body, opts);
++    // R-IDEM-2 and R-IDEM-3: the same key with the same act returns what was recorded; with another act it is refused.
++    const text = JSON.stringify([kind, opts.binding, target, body]);
++    const prior = own(this.answered, key);
++    if (prior) return prior.act === text ? prior.result : refuse("idempotency-mismatch", "This idempotency key was already used for a different act.", "Use a new idempotency key for a new act."); // G5U:mock-same-act
++    const result = await this.admit(kind, target, body, opts);
++    // R-IDEM-4: only what the room recorded is kept, an accepted act or a recorded refusal.
++    if (!("refused" in result) || result.act !== undefined) this.answered[key] = { act: text, result }; // G5U:mock-recorded-only
++    return result;
++  }
++
++  /** One generic act, decided once. */
++  private async admit(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: { readonly binding: Binding }): Promise<Result<DeclaredRecord>> {
+     const v = this.active();
+     if (v.doc === "legacy") throw badRequest("envelope.v must be 1."); // a v1 room refuses a v: 2 envelope at step 1
+     if ((PLATFORM_KIND_LIST as readonly string[]).includes(kind)) throw badRequest(`${kind} is a platform kind; it has its own method.`);
+diff --git a/packages/ui/src/screens/Acts.tsx b/packages/ui/src/screens/Acts.tsx
+index 60128f66..dc3c71ca 100644
+--- a/packages/ui/src/screens/Acts.tsx
++++ b/packages/ui/src/screens/Acts.tsx
+@@ -19,8 +19,8 @@
+  */
+ 
+ import { useRef, useState } from "preact/hooks";
+-import { SHAPE_TAG, SHAPE_TEXT, TARGET_INPUTS, declarationChanges, fieldsOf, own, readBody, readTarget, targetsOf, typeText, type ActField } from "../room/acts.ts";
+-import type { ActDeclaration, ActsCatalogue, DeclaredRecord, Refusal, TargetShape } from "../room/contract.ts";
++import { SHAPE_TAG, SHAPE_TEXT, TARGET_INPUTS, declarationChanges, fieldsOf, newIdempotencyKey, own, readBody, readTarget, targetsOf, typeText, type ActField } from "../room/acts.ts";
++import type { ActDeclaration, ActsCatalogue, Binding, DeclaredRecord, DeclaredTarget, Json, Refusal, TargetShape } from "../room/contract.ts";
+ import { isRefusal } from "../room/contract.ts";
+ import { Badge, RefusalNotice, WhyLink } from "../ui/bits.tsx";
+ import { useApp } from "../ui/context.ts";
+@@ -31,6 +31,19 @@ import { href } from "../ui/router.ts";
+ const orList = (items: readonly string[]) => (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} or ${items.at(-1)}`);
+ const whoText = (d: ActDeclaration) => (d.who.roles.length ? `Admins, and anyone with the role ${orList(d.who.roles.map(String))}.` : "Admins only.");
+ 
++/**
++ * One act as it was sent: the declarations it was read under, its target,
++ * body and binding, and its idempotency key. If the room's answer is lost,
++ * exactly this is sent again, so the room can tell it is the same act.
++ */
++interface Intent {
++  readonly under: ActsCatalogue;
++  readonly target: DeclaredTarget;
++  readonly body: { readonly [field: string]: Json };
++  readonly binding: Binding;
++  readonly key: string;
++}
++
+ type Status =
+   | { readonly state: "editing" }
+   | { readonly state: "sending" }
+@@ -39,6 +52,8 @@ type Status =
+   /** The meaning changed. `fresh` is what the room declares now; nothing is sent until the person confirms. */
+   | { readonly state: "stale"; readonly fresh: ActsCatalogue; readonly changes: readonly string[] }
+   | { readonly state: "gone" }
++  /** The answer was lost: the room may have recorded the act. `intent` is what was sent, kept to ask again unchanged. */
++  | { readonly state: "unresolved"; readonly intent: Intent; readonly message: string }
+   | { readonly state: "failed"; readonly message: string };
+ 
+ function FieldInput({ f, value, problem, onInput }: { f: ActField; value: string; problem: string | undefined; onInput: (v: string) => void }) {
+@@ -178,12 +193,21 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind:
+       return; // G5U:no-send-on-problems
+     }
+     setProblems({ target: {}, body: {} });
++    await deliver({ under, target: t.target, body: b.body, binding: under.acts[kind]!.binding, key: newIdempotencyKey() }); // G5U:send-binding
++  };
++
++  /** Send one intent, exactly as it is. Asking again after a lost answer calls this with the same intent and key. */
++  const deliver = async (intent: Intent) => {
++    const under = intent.under;
+     setStatus({ state: "sending" });
+     let r;
+     try {
+-      r = await adapter.act(kind, t.target, b.body, under.acts[kind]!.binding); // G5U:send-binding
++      r = await adapter.act(kind, intent.target, intent.body, intent.binding, intent.key); // G5U:same-intent
+     } catch (err) {
+-      setStatus({ state: "failed", message: typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : "The room did not answer." });
++      const message = typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : "The room did not answer.";
++      // An error that says the act may have been recorded is a lost answer, not a rejection (R-IDEM-2).
++      if (typeof err === "object" && err !== null && (err as { maybeRecorded?: unknown }).maybeRecorded === true) setStatus({ state: "unresolved", intent, message }); // G5U:unresolved
++      else setStatus({ state: "failed", message });
+       return;
+     }
+     if (!isRefusal(r)) {
+@@ -241,7 +265,8 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind:
+       data-act-form={kind}
+       onSubmit={(e) => {
+         e.preventDefault();
+-        if (status.state !== "sending" && status.state !== "stale") void send(held);
++        // While an answer is unresolved, the form sends no new act: only the same one can be asked again.
++        if (status.state !== "sending" && status.state !== "stale" && status.state !== "unresolved") void send(held); // G5U:unresolved-no-new
+       }}
+     >
+       <div class="stack-sm">
+@@ -299,6 +324,25 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind:
+           </div>
+         </div>
+       )}
++      {status.state === "unresolved" && (
++        <div class="notice warn stack-sm" role="alert" data-unresolved={kind}>
++          <div class="notice-title">
++            <Icon name="alert" /> The room's answer did not arrive
++          </div>
++          <p>“{d.label}” may have been recorded, or it may not: {status.message}</p>
++          <p class="small">
++            Asking again sends exactly the same act, with the same idempotency key (<code>{status.intent.key}</code>). If the room recorded it the first time, it answers with that record and records nothing new.
++          </p>
++          <div class="row">
++            <button class="btn primary" type="button" onClick={() => void deliver(status.intent)}>
++              Ask again, the same act
++            </button>
++            <button class="btn" type="button" onClick={onBack}>
++              Leave it
++            </button>
++          </div>
++        </div>
++      )}
+       {status.state === "refused" && <RefusalNotice refusal={status.refusal} />}
+       {status.state === "failed" && (
+         <div class="notice warn" role="alert">
+@@ -316,7 +360,7 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind:
+         </div>
+       )}
+ 
+-      {status.state !== "stale" && (
++      {status.state !== "stale" && status.state !== "unresolved" && (
+         <div class="row">
+           <button class="btn primary" type="submit" disabled={status.state === "sending"}>
+             {status.state === "sending" ? "Sending…" : `Send “${d.label}”`}
+diff --git a/packages/ui/src/ui/format.ts b/packages/ui/src/ui/format.ts
+index 31c01014..a7458143 100644
+--- a/packages/ui/src/ui/format.ts
++++ b/packages/ui/src/ui/format.ts
+@@ -24,7 +24,8 @@ export function laneGoal(snap: RoomSnapshot, lane: ActId | undefined): string {
+   const l = snap.lanes.find((x) => x.lane === lane);
+   if (!l) return "an unknown lane";
+   // The one rule every reader uses (docs/protocol.md section 33.10): the goal; for a thread an application opened
+-  // with its own act, that act's label in force when it opened and its first field by name; else the thread's ID.
++  // with its own act, that act's label in force when it opened and its first text field by name, as the act's
++  // declaration typed its fields then; else the thread's ID.
+   const m = snap.feed.find((f) => f.id === l.lane)?.meaning;
+   return threadTitle(l, m ? { meaning: m, body: Object.fromEntries(m.fields.map((f) => [f.name, f.value])) } : undefined); // G5U:thread-name
+ }
+diff --git a/packages/ui/test/acts-fields.test.ts b/packages/ui/test/acts-fields.test.ts
+index 32e2db3d..e836bbd3 100644
+--- a/packages/ui/test/acts-fields.test.ts
++++ b/packages/ui/test/acts-fields.test.ts
+@@ -153,7 +153,7 @@ describe("reading a whole body and a target", () => {
+ describe("a record under the meaning in force at its own seq (R-DECL-23)", () => {
+   const meaning: RecordMeaning = { vocabulary: "declared", policy: "act_1_aaaaaaaa", kind: "cue", label: "Cue", declaration: SETLIST_ACTS["cue"]!, binding: `sha256:${"1".repeat(64)}`, retired: 14 };
+ 
+-  test("the label, the retirement, the target in words and every field by name; because is left to the reasons", () => {
++  test("the label, the retirement, the declaration at that seq, the target in words and every field by name; because is left to the reasons", () => {
+     const m = entryMeaning({ kind: "cue", target: { act: "act_4_0a1b2c3d" }, body: { signal: "head", to: "@noor", because: [{ act: "act_2_00000000" }] } }, meaning);
+     expect(m).toEqual({
+       vocabulary: "declared",
+@@ -161,6 +161,7 @@ describe("a record under the meaning in force at its own seq (R-DECL-23)", () =>
+       label: "Cue",
+       policy: "act_1_aaaaaaaa",
+       binding: `sha256:${"1".repeat(64)}`,
++      declaration: SETLIST_ACTS["cue"],
+       help: "A short signal to the band, attached to an entry.",
+       retired: 14,
+       target: "Entry act_4_0a1b2c3d",
+diff --git a/packages/ui/test/acts-screen.test.tsx b/packages/ui/test/acts-screen.test.tsx
+index fc5aa3c8..f8f703f1 100644
+--- a/packages/ui/test/acts-screen.test.tsx
++++ b/packages/ui/test/acts-screen.test.tsx
+@@ -115,7 +115,7 @@ describe("the form is built from the declaration: one input per field, by type",
+     expect(field("charts").textContent).toContain("path patterns, one per line, up to 8");
+     expect(field("head").textContent).toContain("a commit, 40 hex digits");
+     const thread = screen.getByLabelText(/^Thread/) as HTMLSelectElement;
+-    expect([...thread.options].map((o) => o.textContent)).toEqual(["Choose a thread", "Start a song: c"]);
++    expect([...thread.options].map((o) => o.textContent)).toEqual(["Choose a thread", "Start a song: Blue Bossa"]);
+     expect([...thread.options][1]!.value).toBe("id" in song ? song.id : "");
+   });
+ 
+@@ -137,7 +137,7 @@ describe("the form is built from the declaration: one input per field, by type",
+     await waitFor(() => expect(adapter.snapshot()!.lanes).toHaveLength(2));
+     renderAt("#/acts", adapter);
+     await prepare("Add a part");
+-    expect([...(screen.getByLabelText(/^Thread/) as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(["Choose a thread", "Start a song: c"]);
++    expect([...(screen.getByLabelText(/^Thread/) as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(["Choose a thread", "Start a song: Blue Bossa"]);
+   });
+ });
+ 
+diff --git a/packages/ui/test/declared-rendering.test.tsx b/packages/ui/test/declared-rendering.test.tsx
+index cc3a61c8..d8a861eb 100644
+--- a/packages/ui/test/declared-rendering.test.tsx
++++ b/packages/ui/test/declared-rendering.test.tsx
+@@ -102,8 +102,9 @@ describe("activation: a declared record shows its label, its target and its fiel
+     expect(within(cue).getByText("On").nextElementSibling!.textContent).toBe(`Entry ${s1.id}`);
+     expect(screen.getByText("@keys-bot: Cue.")).toBeTruthy();
+     // A thread with no goal is named by its opening act, in that act's own words.
+-    // Named by the one rule every reader uses: the opening act's label and its first field by name, which here is `key`.
+-    expect(screen.getByRole("link", { name: "Start a song: c" }).getAttribute("href")).toBe(`#/lane/${s1.id}`);
++    // Named by the one rule every reader uses: the opening act's label and its first text field by name. `key` comes
++    // first by name, but it is an enum; `title` is the text a person wrote.
++    expect(screen.getByRole("link", { name: "Start a song: Blue Bossa" }).getAttribute("href")).toBe(`#/lane/${s1.id}`);
+   });
+ 
+   test("a review or a comment under an application's own name is still evidence for the review screens, by its step", async () => {
+@@ -347,8 +348,10 @@ describe("the demo room: an application that is not code review, end to end", ()
+     const { container } = renderAt("#/room", adapter);
+     const text = container.querySelector("ol.feed")!.parentElement!.textContent!;
+     for (const verb of ["claimed", "proposed", "approved generation", "wrote a note", "asked to land"]) expect(text).not.toContain(verb);
+-    // Both songs are in the key of c, and a thread with no goal is named by its opening act's first field by name.
+-    expect(screen.getAllByRole("link", { name: "Start a song: c" })).toHaveLength(2);
++    // Both songs are in the key of c. A thread with no goal is named by its opening act's first text field, its title.
++    expect(screen.queryAllByRole("link", { name: "Start a song: c" })).toHaveLength(0);
++    expect(screen.getAllByRole("link", { name: "Start a song: Blue Bossa" })).toHaveLength(1);
++    expect(screen.getAllByRole("link", { name: "Start a song: Footprints" })).toHaveLength(1);
+     expect(document.querySelector("[data-record='wrap-up']")!.textContent).toContain("Retired at seq");
+     // The viewer can be switched, as in the scripted demo.
+     expect(adapter.viewers).toEqual(["@noor", "@ivo", "@keys-bot", "@sam"]);
+diff --git a/packages/ui/test/review-0fd98c41.test.ts b/packages/ui/test/review-0fd98c41.test.ts
+new file mode 100644
+index 00000000..b88acd6c
+--- /dev/null
++++ b/packages/ui/test/review-0fd98c41.test.ts
+@@ -0,0 +1,212 @@
++/**
++ * Declared acts stage 5, the UI (request a5d64b35): the planner's review of
++ * the repair 4567a490, act 0fd98c41.
++ *
++ * What the page has confirmed outlasts a read that fails. After a failed
++ * read the page honestly holds no catalogue; an older answer that arrives
++ * later still cannot bring back a catalogue from before an activation the
++ * page had confirmed, and a load that read such a catalogue is not
++ * published with it (R-DECL-23). The controls stand beside each case: an
++ * old answer of the same age is still good, and a newer answer restores
++ * the catalogue.
++ *
++ * The room here is the in-memory stand-in, with its change notices held
++ * back so that each test decides the order of answers itself. Nothing here
++ * shows a real Room's admission or replay.
++ */
++
++import { waitFor } from "@testing-library/preact";
++import { afterEach, describe, expect, test } from "vitest";
++import type { ActDeclaration, ActsCatalogue, DeclaredRecord, HttpRoom } from "../src/room/contract.ts";
++import { LiveRoom } from "../src/room/live/live-room.ts";
++import { BAND } from "../src/room/mock/declared-room.ts";
++import { MemoryRoom } from "../src/room/mock/memory-room.ts";
++import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
++
++const adapters: LiveRoom[] = [];
++afterEach(() => {
++  for (const a of adapters.splice(0)) a.stop();
++});
++
++type Acts = Readonly<Record<string, ActDeclaration>>;
++const relabelled = (label: string): Acts => ({ ...SETLIST_ACTS, "start-song": { ...SETLIST_ACTS["start-song"]!, label } });
++
++function gate() {
++  let open!: () => void;
++  const opened = new Promise<void>((resolve) => (open = resolve));
++  return { opened, open };
++}
++
++/** A room and its adapter, loaded once. The room's change notices do not reach the adapter. */
++async function quiet() {
++  const room = await MemoryRoom.found("the-band/setlist", BAND, { acts: SETLIST_ACTS });
++  room.me = "@noor";
++  const watch = room.watch.bind(room);
++  room.watch = (cursor, _onUpdate) => watch(cursor, () => {});
++  const adapter = new LiveRoom(room as unknown as HttpRoom, "@noor");
++  adapters.push(adapter);
++  await adapter.start();
++  return { room, adapter };
++}
++
++async function song(room: MemoryRoom, under: ActsCatalogue, name: string): Promise<DeclaredRecord> {
++  const r = await room.act("start-song", null, { scope: [`songs/${name}/**`], title: name, key: "c", tempo: 120 }, { binding: under.acts["start-song"]!.binding });
++  expect("refused" in r).toBe(false);
++  return r as DeclaredRecord;
++}
++
++/**
++ * The room's answers to "which catalogue is active", in the order asked: the first is read at once and handed over
++ * only when `release` opens; the third fails, as a transport that lost it would; every other is given as it is.
++ */
++function firstHeldThirdLost(room: MemoryRoom) {
++  const read = room.acts.bind(room);
++  const asked = gate();
++  const release = gate();
++  let n = 0;
++  room.acts = async () => {
++    const i = ++n;
++    if (i === 3) throw new Error("the later answer was lost");
++    const value = await read();
++    if (i === 1) {
++      asked.open();
++      await release.opened;
++    }
++    return value;
++  };
++  return { asked: asked.opened, release: release.open };
++}
++
++describe("an older answer that arrives after a newer read failed (R-DECL-23)", () => {
++  test("with a later activation confirmed in between, it does not bring the earlier catalogue back, and a record accepted since is still read under its own policy", async () => {
++    const { room, adapter } = await quiet();
++    const answers = firstHeldThirdLost(room);
++    const old = adapter.readCatalogue();
++    await answers.asked;
++    await room.activate({ acts: relabelled("A later meaning") });
++    const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
++    expect(fresh.acts["start-song"]!.declaration.label).toBe("A later meaning");
++    const accepted = await song(room, fresh, "after");
++    // The newest read fails: the page holds no catalogue, and says so.
++    expect(await adapter.readCatalogue()).toBeNull();
++    expect(adapter.snapshot()!.catalogue).toBeNull();
++    answers.release();
++    // The late caller gets what the page holds, and the page does not go back to the catalogue from before the activation.
++    expect(await old).toBeNull();
++    expect(adapter.snapshot()!.catalogue).toBeNull();
++    expect(adapter.snapshot()!.policy.version).toBeNull();
++    const governing = await adapter.catalogueAt(accepted.seq);
++    expect(governing?.policy).toBe(fresh.policy);
++    expect(governing?.since).toBe(fresh.since);
++  });
++
++  test("with no activation in between, the older answer is as new as anything confirmed, and gives the catalogue back", async () => {
++    const { room, adapter } = await quiet();
++    const answers = firstHeldThirdLost(room);
++    const old = adapter.readCatalogue();
++    await answers.asked;
++    const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
++    expect(await adapter.readCatalogue()).toBeNull();
++    expect(adapter.snapshot()!.catalogue).toBeNull();
++    answers.release();
++    expect(((await old) as ActsCatalogue).policy).toBe(fresh.policy);
++    expect(adapter.snapshot()!.catalogue?.since).toBe(fresh.since);
++    expect(adapter.snapshot()!.policy.version).toBe(fresh.policy);
++  });
++
++  test("a failed read does not blank a catalogue that another read of the same version gave while it was on its way", async () => {
++    const { room, adapter } = await quiet();
++    const read = room.acts.bind(room);
++    const asked = gate();
++    const release = gate();
++    let n = 0;
++    room.acts = async () => {
++      if (++n === 1) {
++        asked.open();
++        await release.opened;
++        throw new Error("the first answer was lost");
++      }
++      return read();
++    };
++    const lost = adapter.readCatalogue();
++    await asked.opened;
++    const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
++    release.open();
++    // No activation happened, so nothing newer was confirmed; but another answer was taken, and the lost one is older.
++    expect(((await lost) as ActsCatalogue).policy).toBe(fresh.policy);
++    expect(adapter.snapshot()!.catalogue?.policy).toBe(fresh.policy);
++  });
++
++  test("a newer answer restores the catalogue after a failed read", async () => {
++    const { room, adapter } = await quiet();
++    const read = room.acts.bind(room);
++    let n = 0;
++    room.acts = async () => {
++      if (++n === 1) throw new Error("the answer was lost");
++      return read();
++    };
++    expect(await adapter.readCatalogue()).toBeNull();
++    expect(adapter.snapshot()!.catalogue).toBeNull();
++    await room.activate({ acts: relabelled("Available again") });
++    const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
++    expect(fresh.acts["start-song"]!.declaration.label).toBe("Available again");
++    expect(adapter.snapshot()!.catalogue?.policy).toBe(fresh.policy);
++  });
++});
++
++describe("a load that finishes after the newest read failed (R-DECL-23)", () => {
++  /** A load that has read the second catalogue and waits on an earlier version's declarations; the third is then confirmed. */
++  async function loadHeldAcrossActivation() {
++    const { room, adapter } = await quiet();
++    const first = (await room.acts()) as ActsCatalogue;
++    await song(room, first, "one");
++    await room.activate({ acts: relabelled("Second catalogue") });
++    const second = (await adapter.readCatalogue()) as ActsCatalogue;
++    const history = room.actsAt.bind(room);
++    const asked = gate();
++    const release = gate();
++    let n = 0;
++    room.actsAt = async (at) => {
++      const answer = await history(at);
++      if (++n === 1) {
++        asked.open();
++        await release.opened;
++      }
++      return answer;
++    };
++    let seen = 0;
++    const off = adapter.subscribe(() => void (seen += 1));
++    await adapter.act("start-song", null, { scope: ["songs/two/**"], title: "Two", key: "c", tempo: 120 }, second.acts["start-song"]!.binding);
++    await asked.opened;
++    await room.activate({ acts: relabelled("Third catalogue") });
++    const third = (await adapter.readCatalogue()) as ActsCatalogue;
++    expect(third.since).toBeGreaterThan(second.since);
++    const published = async () => {
++      const before = seen;
++      release.open();
++      await waitFor(() => expect(seen).toBeGreaterThan(before));
++      off();
++      return adapter.snapshot()!;
++    };
++    return { room, adapter, second, third, published };
++  }
++
++  test("it is not published with the earlier catalogue it read: the page still holds none", async () => {
++    const { room, adapter, published } = await loadHeldAcrossActivation();
++    room.acts = async () => {
++      throw new Error("the newest answer was lost");
++    };
++    expect(await adapter.readCatalogue()).toBeNull();
++    const snap = await published();
++    expect(snap.catalogue).toBeNull();
++    expect(snap.policy.version).toBeNull();
++    expect(snap.policy.activatedAt).toBeNull();
++  });
++
++  test("with no failed read, the same load is published under the later catalogue that was confirmed", async () => {
++    const { third, published } = await loadHeldAcrossActivation();
++    const snap = await published();
++    expect(snap.catalogue?.policy).toBe(third.policy);
++    expect(snap.policy.version).toBe(third.policy);
++  });
++});
+diff --git a/packages/ui/test/review-fb27de86.test.tsx b/packages/ui/test/review-fb27de86.test.tsx
+new file mode 100644
+index 00000000..ef51515d
+--- /dev/null
++++ b/packages/ui/test/review-fb27de86.test.tsx
+@@ -0,0 +1,369 @@
++/**
++ * Declared acts stage 5, the UI (request a5d64b35): the checker's three
++ * preliminary findings, act fb27de86.
++ *
++ * 1. A field may be named `toString` or `valueOf` (R-DECL-12). The form and
++ *    the body it reads keep such a field by its own name only.
++ * 2. An answer that was lost is not a rejection (R-IDEM-2). The form says
++ *    the outcome is unresolved, keeps the act and its idempotency key, and
++ *    asks again with exactly those.
++ * 3. An explicit read of the declarations is what later reads of `D(s)` are
++ *    answered from (R-DECL-23).
++ *
++ * Each finding has its baselines beside it: the ordinary case that already
++ * worked.
++ */
++
++import { cleanup, fireEvent, screen, waitFor } from "@testing-library/preact";
++import { afterEach, describe, expect, test } from "vitest";
++import { codeReviewPolicy, defaultPolicy, validatePolicyV2 } from "@generalbusiness/artroom-policy";
++import { fieldsOf, newIdempotencyKey, readBody } from "../src/room/acts.ts";
++import type { ActDeclaration, ActsCatalogue, Catalogue, DeclaredRecord, HttpRoom, Refusal } from "../src/room/contract.ts";
++import { LiveRoom } from "../src/room/live/live-room.ts";
++import { BAND } from "../src/room/mock/declared-room.ts";
++import { MemoryRoom } from "../src/room/mock/memory-room.ts";
++import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
++import { renderAt } from "./helpers.tsx";
++
++const adapters: LiveRoom[] = [];
++afterEach(() => {
++  cleanup();
++  for (const a of adapters.splice(0)) a.stop();
++  location.hash = "";
++});
++
++type Acts = Readonly<Record<string, ActDeclaration>>;
++
++/** The setlist's acts, with one more text field on `start-song`. */
++const withField = (name: string, optional: boolean): Acts => ({
++  ...SETLIST_ACTS,
++  "start-song": { ...SETLIST_ACTS["start-song"]!, body: { ...SETLIST_ACTS["start-song"]!.body, [name]: { type: "text", max: 80, ...(optional ? { optional: true } : {}) } } },
++});
++
++/** The fields of `start-song` with that field, from a document the policy validator accepts. */
++function fieldsWith(name: string, optional: boolean) {
++  const acts = withField(name, optional);
++  const v = validatePolicyV2({ ...codeReviewPolicy(defaultPolicy()), acts });
++  expect(v.ok ? [] : v.problems).toEqual([]);
++  return fieldsOf(acts["start-song"]!, "none")!;
++}
++
++const song = { scope: "songs/local/**", title: "Local", key: "c", tempo: "120" };
++const sent = { scope: ["songs/local/**"], title: "Local", key: "c", tempo: 120 };
++const form = () => document.querySelector<HTMLFormElement>("form[data-act-form]")!;
++const acts = (a: LiveRoom) => a.snapshot()!.feed.filter((e) => e.type === "act");
++
++/** A room, its adapter, and the `start-song` form filled in. `paused` holds back the room's change notices. */
++async function opened(declared: Acts = SETLIST_ACTS, paused = false) {
++  const room = await MemoryRoom.found("the-band/setlist", BAND, { acts: declared });
++  room.me = "@noor";
++  if (paused) {
++    const watch = room.watch.bind(room);
++    room.watch = (cursor, _onUpdate) => watch(cursor, () => {});
++  }
++  const adapter = new LiveRoom(room as unknown as HttpRoom, "@noor", () => new Date("2026-10-03T10:00:00Z"));
++  adapters.push(adapter);
++  await adapter.start();
++  renderAt("#/acts", adapter);
++  fireEvent.click(screen.getByRole("button", { name: "Prepare “Start a song”" }));
++  await waitFor(() => expect(form()).not.toBeNull());
++  fireEvent.input(screen.getByLabelText(/^scope/), { target: { value: song.scope } });
++  fireEvent.input(screen.getByLabelText(/^title/), { target: { value: song.title } });
++  fireEvent.change(screen.getByLabelText(/^key/), { target: { value: song.key } });
++  fireEvent.input(screen.getByLabelText(/^tempo/), { target: { value: song.tempo } });
++  return { room, adapter };
++}
++
++// ------------------------------------------------------------ 1. fields named like inherited properties
++
++describe("fb27de86 finding 1: a field named toString or valueOf (R-DECL-12)", () => {
++  test("baseline: an ordinary optional field left out gives a valid body without it", () => {
++    expect(readBody(fieldsWith("caption", true), song)).toEqual({ ok: true, body: sent });
++  });
++
++  test.each(["toString", "valueOf"])("baseline: a value typed into the field %s is read as any field's is", (name) => {
++    expect(readBody(fieldsWith(name, true), { ...song, [name]: "own value" })).toEqual({ ok: true, body: { ...sent, [name]: "own value" } });
++  });
++
++  test.each(["toString", "valueOf"])("an optional field %s left out is absent from the body: nothing is read from the prototype", (name) => {
++    const fields = fieldsWith(name, true);
++    const read = readBody(fields, song);
++    expect(read).toEqual({ ok: true, body: sent });
++    expect(read.ok && Object.hasOwn(read.body, name)).toBe(false);
++  });
++
++  test.each(["toString", "valueOf"])("a required field %s left out is one named problem, and no body", (name) => {
++    expect(readBody(fieldsWith(name, false), song)).toEqual({ ok: false, problems: { [name]: `${name} is required.` } });
++  });
++
++  test("baseline: an ordinary optional field's control starts empty, with no problem shown", async () => {
++    await opened(withField("caption", true));
++    expect((screen.getByLabelText(/^caption/) as HTMLTextAreaElement).value).toBe("");
++    expect(document.querySelector("[data-field='caption'] [role='alert']")).toBeNull();
++  });
++
++  test.each(["toString", "valueOf"])("the control of an optional field %s starts empty, with no problem shown, and the act is sent without it", async (name) => {
++    const { room } = await opened(withField(name, true));
++    expect((screen.getByLabelText(new RegExp(`^${name}`)) as HTMLTextAreaElement).value).toBe("");
++    expect(document.querySelector(`[data-field='${name}'] [role='alert']`)).toBeNull();
++    fireEvent.submit(form());
++    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
++    expect(room.sent.map((s) => s.body)).toEqual([sent]);
++  });
++
++  test.each(["toString", "valueOf"])("a required field %s left empty shows its own problem and sends nothing; once filled in, it is sent under its own name", async (name) => {
++    const { room } = await opened(withField(name, false));
++    fireEvent.submit(form());
++    await waitFor(() => expect(document.querySelector(`[data-field='${name}'] [role='alert']`)?.textContent).toBe(`${name} is required.`));
++    // No other field shows a problem, and nothing was sent.
++    expect(document.querySelectorAll("[data-field] [role='alert']")).toHaveLength(1);
++    expect(room.sent).toEqual([]);
++    fireEvent.input(screen.getByLabelText(new RegExp(`^${name}`)), { target: { value: "said" } });
++    fireEvent.submit(form());
++    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
++    expect(room.sent.map((s) => s.body)).toEqual([{ ...sent, [name]: "said" }]);
++  });
++});
++
++// ------------------------------------------------------------ 2. an answer that was lost
++
++/** The error a transport throws when it cannot say whether the room recorded the act. */
++const lost = () => ({ name: "ArtroomError", code: "timeout", retryable: true, maybeRecorded: true, message: "The room's reply did not arrive." });
++const NOT_TAKEN = "The room did not take the act";
++const unresolved = () => document.querySelector<HTMLElement>("[data-unresolved]");
++const again = () => fireEvent.click(screen.getByRole("button", { name: "Ask again, the same act" }));
++
++/** Make the room lose its next `times` answers. With `recorded`, it admits the act first; without, it does not see it at all. */
++function loseAnswers(room: MemoryRoom, times: number, recorded: boolean) {
++  const act = room.act.bind(room);
++  const count = { lost: 0 };
++  room.act = async (...args) => {
++    if (count.lost < times) {
++      if (recorded) expect("refused" in (await act(...args))).toBe(false);
++      count.lost += 1;
++      throw lost();
++    }
++    return act(...args);
++  };
++  return count;
++}
++
++describe("fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2)", () => {
++  test("baseline: an answer that arrives is shown as recorded, with no alert", async () => {
++    const { room, adapter } = await opened();
++    fireEvent.submit(form());
++    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
++    expect(room.sent).toHaveLength(1);
++    await waitFor(() => expect(acts(adapter)).toHaveLength(1));
++    expect(screen.queryByRole("alert")).toBeNull();
++    // Every act the form sends carries an idempotency key of the room's form.
++    expect(room.keys[0]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
++  });
++
++  test("baseline: a failure that says nothing of a record keeps its wording: the room did not take the act", async () => {
++    const { room } = await opened();
++    room.act = async () => {
++      throw { name: "ArtroomError", code: "bad-request", retryable: false, message: "The envelope is malformed." };
++    };
++    fireEvent.submit(form());
++    const alert = await screen.findByRole("alert");
++    expect(alert.textContent).toBe(`${NOT_TAKEN}: The envelope is malformed.`);
++    expect(unresolved()).toBeNull();
++    // The form can still be sent.
++    expect(screen.getByRole("button", { name: "Send “Start a song”" })).not.toBeNull();
++  });
++
++  test("an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken", async () => {
++    const { room, adapter } = await opened();
++    loseAnswers(room, 1, true);
++    fireEvent.submit(form());
++    const alert = await screen.findByRole("alert");
++    expect(unresolved()).toBe(alert);
++    expect(alert.textContent).toContain("The room's answer did not arrive");
++    expect(alert.textContent).toContain("may have been recorded, or it may not: The room's reply did not arrive.");
++    expect(alert.textContent).not.toContain(NOT_TAKEN);
++    expect(document.querySelector("[data-recorded]")).toBeNull();
++    // The room did record it, and the page's own feed shows it.
++    await waitFor(() => expect(acts(adapter)).toHaveLength(1));
++    // The notice names the key the act was sent with.
++    expect(alert.querySelector("code")!.textContent).toBe(room.keys[0]);
++  });
++
++  test("the page reads the room again after a lost answer, also when the room sends it no notice of the change", async () => {
++    const { room, adapter } = await opened(SETLIST_ACTS, true);
++    loseAnswers(room, 1, true);
++    fireEvent.submit(form());
++    await screen.findByRole("alert");
++    await waitFor(() => expect(acts(adapter)).toHaveLength(1));
++  });
++
++  test("asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing new", async () => {
++    const { room, adapter } = await opened();
++    loseAnswers(room, 1, true);
++    fireEvent.submit(form());
++    await screen.findByRole("alert");
++    again();
++    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
++    expect(room.sent).toHaveLength(2);
++    expect(room.sent[1]).toEqual(room.sent[0]);
++    expect(room.keys[1]).toBe(room.keys[0]);
++    expect(room.keys[0]).toBeDefined();
++    // One entry, and the notice names it.
++    await waitFor(() => expect(acts(adapter)).toHaveLength(1));
++    expect(document.querySelector<HTMLElement>("[data-recorded]")!.dataset["recorded"]).toBe((acts(adapter)[0] as { id: string }).id);
++    expect(screen.queryByRole("alert")).toBeNull();
++  });
++
++  test("asking again when the room never saw the act records it once", async () => {
++    const { room, adapter } = await opened();
++    const count = loseAnswers(room, 2, false);
++    fireEvent.submit(form());
++    await screen.findByRole("alert");
++    again();
++    // Lost a second time: unresolved again, with the same act kept.
++    await waitFor(() => expect(count.lost).toBe(2));
++    await waitFor(() => expect(unresolved()).not.toBeNull());
++    again();
++    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
++    await waitFor(() => expect(acts(adapter)).toHaveLength(1));
++    expect(room.sent).toHaveLength(1);
++    expect(room.keys).toHaveLength(1);
++  });
++
++  test("while the answer is unresolved the form sends no new act", async () => {
++    const { room } = await opened();
++    loseAnswers(room, 1, true);
++    fireEvent.submit(form());
++    await screen.findByRole("alert");
++    expect(screen.queryByRole("button", { name: "Send “Start a song”" })).toBeNull();
++    // Editing a field and submitting the form by the keyboard sends nothing: the only act that can go is the one kept.
++    fireEvent.input(screen.getByLabelText(/^title/), { target: { value: "Another" } });
++    fireEvent.submit(form());
++    await new Promise((r) => setTimeout(r, 20));
++    expect(room.sent).toHaveLength(1);
++    expect(unresolved()).not.toBeNull();
++    again();
++    await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
++    expect(room.sent.map((s) => (s.body as { title: string }).title)).toEqual(["Local", "Local"]);
++  });
++
++  test("asking again after the meaning changed is answered binding-stale: the form shows the new meaning and sends nothing by itself", async () => {
++    const { room } = await opened();
++    loseAnswers(room, 1, false);
++    fireEvent.submit(form());
++    await screen.findByRole("alert");
++    await room.activate({ acts: { ...SETLIST_ACTS, "start-song": { ...SETLIST_ACTS["start-song"]!, body: { ...SETLIST_ACTS["start-song"]!.body, feel: { type: "text", max: 20, optional: true } } } } });
++    again();
++    await waitFor(() => expect(document.querySelector("[data-stale]")).not.toBeNull());
++    expect(unresolved()).toBeNull();
++    // The one act the room saw was the kept one, under the binding the person had read.
++    expect(room.sent).toHaveLength(1);
++    expect(document.querySelector("[data-recorded]")).toBeNull();
++  });
++});
++
++describe("fb27de86 finding 2: the stand-in room answers an idempotency key as the Room does (R-IDEM-2 to R-IDEM-4)", () => {
++  const body = { scope: ["songs/local/**"], title: "Local", key: "c", tempo: 120 };
++  async function room() {
++    const r = await MemoryRoom.found("the-band/setlist", BAND, { acts: SETLIST_ACTS });
++    r.me = "@noor";
++    const binding = ((await r.acts()) as ActsCatalogue).acts["start-song"]!.binding;
++    return { r, binding };
++  }
++  /** The log's head: it moves by one for every entry the room records. */
++  const entries = (r: MemoryRoom) => r.log({ limit: 1 }).then((p) => p.head);
++
++  test("the same act under the same key returns the record made the first time, and makes no second entry", async () => {
++    const { r, binding } = await room();
++    const key = newIdempotencyKey();
++    const first = (await r.act("start-song", null, body, { binding, idempotencyKey: key })) as DeclaredRecord;
++    const n = await entries(r);
++    expect(await r.act("start-song", null, body, { binding, idempotencyKey: key })).toEqual(first);
++    expect(await entries(r)).toBe(n);
++  });
++
++  test("another act under a used key is idempotency-mismatch, and records nothing", async () => {
++    const { r, binding } = await room();
++    const key = newIdempotencyKey();
++    await r.act("start-song", null, body, { binding, idempotencyKey: key });
++    const n = await entries(r);
++    const other = (await r.act("start-song", null, { ...body, title: "Other", scope: ["songs/other/**"] }, { binding, idempotencyKey: key })) as Refusal;
++    expect(other).toMatchObject({ refused: true, rule: "idempotency-mismatch" });
++    expect(await entries(r)).toBe(n);
++  });
++
++  test("a refusal the room did not record leaves the key free: the corrected act under it is admitted", async () => {
++    const { r, binding } = await room();
++    const key = newIdempotencyKey();
++    const stale = (await r.act("start-song", null, body, { binding: `sha256:${"0".repeat(64)}` as never, idempotencyKey: key })) as Refusal;
++    expect(stale).toMatchObject({ refused: true, rule: "binding-stale" });
++    expect(stale.act).toBeUndefined();
++    const ok = await r.act("start-song", null, body, { binding, idempotencyKey: key });
++    expect("refused" in ok).toBe(false);
++  });
++
++  test("two keys are two acts", () => {
++    const a = newIdempotencyKey();
++    expect(a).toMatch(/^ui-[0-9a-f]{32}$/);
++    expect(newIdempotencyKey()).not.toBe(a);
++  });
++});
++
++// ------------------------------------------------------------ 3. an explicit read of the declarations
++
++describe("fb27de86 finding 3: an explicit read of the declarations is what D(s) is answered from (R-DECL-23)", () => {
++  /** An adapter that hears nothing from the room after it starts, and a count of its historical reads. */
++  async function quiet() {
++    const room = await MemoryRoom.found("the-band/setlist", BAND, { acts: SETLIST_ACTS });
++    room.me = "@noor";
++    const watch = room.watch.bind(room);
++    room.watch = (cursor, _onUpdate) => watch(cursor, () => {});
++    const historical: unknown[] = [];
++    const actsAt = room.actsAt.bind(room);
++    room.actsAt = async (at) => (historical.push(at), actsAt(at));
++    const adapter = new LiveRoom(room as unknown as HttpRoom, "@noor");
++    adapters.push(adapter);
++    await adapter.start();
++    const old = (await room.acts()) as Catalogue;
++    expect(await adapter.catalogueAt(old.since)).toEqual(old);
++    historical.length = 0;
++    return { room, adapter, old, historical };
++  }
++
++  test("baseline: with no activation, an explicit read keeps the catalogue, and D(s) is answered from it without asking the room", async () => {
++    const { adapter, old, historical } = await quiet();
++    expect(await adapter.readCatalogue()).toEqual(old);
++    expect(await adapter.catalogueAt(old.since)).toEqual(old);
++    expect(historical).toEqual([]);
++  });
++
++  test("after an activation and an explicit read, an act accepted later is read under the new policy, and an earlier entry under the old one", async () => {
++    const { room, adapter, old } = await quiet();
++    const next = await room.activate({ acts: { ...SETLIST_ACTS, "start-song": { ...SETLIST_ACTS["start-song"]!, label: "Begin a tune", help: "New help for this version." } } });
++    const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
++    expect(fresh.policy).toBe(next);
++    expect(fresh.policy).not.toBe(old.policy);
++    expect(adapter.snapshot()!.catalogue!.policy).toBe(next);
++    const entry = (await room.act("start-song", null, { scope: ["songs/after/**"], title: "After", key: "c", tempo: 120 }, { binding: fresh.acts["start-song"]!.binding })) as DeclaredRecord;
++    expect(entry.seq).toBeGreaterThan(fresh.since);
++    const at = (await adapter.catalogueAt(entry.seq)) as ActsCatalogue;
++    expect(at.policy).toBe(next);
++    expect(at.acts["start-song"]!.declaration.label).toBe("Begin a tune");
++    // The entry from before the activation keeps the label of its own time, and its interval now has an end.
++    const before = (await adapter.catalogueAt(old.since)) as ActsCatalogue;
++    expect(before.policy).toBe(old.policy);
++    expect(before.until).toBe(fresh.since);
++    expect(before.acts["start-song"]!.declaration.label).toBe("Start a song");
++  });
++
++  test("after a kind is retired and an explicit read, the old catalogue is read with its end and the kind's retired mark", async () => {
++    const { room, adapter, old } = await quiet();
++    const { cue: _retired, ...withoutCue } = SETLIST_ACTS;
++    await room.activate({ acts: withoutCue });
++    const fresh = (await adapter.readCatalogue())!;
++    const expected = (await room.actsAt({ seq: old.since })) as ActsCatalogue;
++    expect(expected.until).toBe(fresh.since);
++    expect(expected.acts["cue"]!.retired).toBe(fresh.since);
++    expect(await adapter.catalogueAt(old.since)).toEqual(expected);
++  });
++});
+diff --git a/packages/ui/test/review-fcd7391d.test.ts b/packages/ui/test/review-fcd7391d.test.ts
+new file mode 100644
+index 00000000..571d91b0
+--- /dev/null
++++ b/packages/ui/test/review-fcd7391d.test.ts
+@@ -0,0 +1,322 @@
++/**
++ * Declared acts stage 5, the UI (request a5d64b35): the checker's review of
++ * f606dd89, act fcd7391d.
++ *
++ * A load and an explicit read each ask the room for its active catalogue,
++ * and the older question may be answered last. An answer never takes the
++ * page back from an activation it has already confirmed (R-DECL-23): not
++ * the snapshot's catalogue, and not the catalogue under which later
++ * records are read. The cases without a later activation, where the
++ * delayed answer is still good, stand beside each regression.
++ *
++ * The room here is the in-memory stand-in, with its change notices held
++ * back so that each test decides the order of answers itself.
++ */
++
++import { waitFor } from "@testing-library/preact";
++import { afterEach, describe, expect, test } from "vitest";
++import type { ActDeclaration, ActsCatalogue, Catalogue, DeclaredRecord, HttpRoom } from "../src/room/contract.ts";
++import { LiveRoom } from "../src/room/live/live-room.ts";
++import { BAND } from "../src/room/mock/declared-room.ts";
++import { MemoryRoom } from "../src/room/mock/memory-room.ts";
++import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
++
++const adapters: LiveRoom[] = [];
++afterEach(() => {
++  for (const a of adapters.splice(0)) a.stop();
++});
++
++type Acts = Readonly<Record<string, ActDeclaration>>;
++/** The setlist's acts with another label on `start-song`: a new policy version with the same kinds. */
++const relabelled = (label: string): Acts => ({ ...SETLIST_ACTS, "start-song": { ...SETLIST_ACTS["start-song"]!, label } });
++
++/** A catalogue's policy version; null for no catalogue, so that a missing one fails an expectation, not a property read. */
++const policyOf = (c: Catalogue | null) => (c === null ? null : c.policy);
++
++/** The label a catalogue gives `start-song`. */
++const labelOf = (c: Catalogue | null) => (c !== null && c.vocabulary === "declared" ? c.acts["start-song"]!.declaration.label : null);
++
++function gate<T = void>() {
++  let open!: (v: T) => void;
++  const opened = new Promise<T>((resolve) => (open = resolve));
++  return { opened, open };
++}
++
++/** A room and its adapter, loaded once. The room's change notices do not reach the adapter. */
++async function quiet() {
++  const room = await MemoryRoom.found("the-band/setlist", BAND, { acts: SETLIST_ACTS });
++  room.me = "@noor";
++  const watch = room.watch.bind(room);
++  room.watch = (cursor, _onUpdate) => watch(cursor, () => {});
++  const adapter = new LiveRoom(room as unknown as HttpRoom, "@noor");
++  adapters.push(adapter);
++  await adapter.start();
++  const first = (await room.acts()) as ActsCatalogue;
++  return { room, adapter, first };
++}
++
++/**
++ * Hold the room's next answer to "which catalogue is active": it is read from the room at once, and handed over
++ * only when `release` opens. `fail` makes that one answer an error instead, as a transport that lost it would.
++ */
++function holdNextCurrent(room: MemoryRoom, fail = false) {
++  const read = room.acts.bind(room);
++  const asked = gate<Catalogue>();
++  const release = gate();
++  let n = 0;
++  room.acts = async () => {
++    const value = await read();
++    if (++n === 1) {
++      asked.open(value);
++      await release.opened;
++      if (fail) throw new Error("the answer was lost");
++    }
++    return value;
++  };
++  return { asked: asked.opened, release: release.open };
++}
++
++/** Hold the room's next answer about an earlier version, the same way. */
++function holdNextHistorical(room: MemoryRoom) {
++  const read = room.actsAt.bind(room);
++  const asked = gate<Catalogue | null>();
++  const release = gate();
++  let n = 0;
++  room.actsAt = async (at) => {
++    const value = await read(at);
++    if (++n === 1) {
++      asked.open(value);
++      await release.opened;
++    }
++    return value;
++  };
++  return { asked: asked.opened, release: release.open, count: () => n };
++}
++
++async function song(room: MemoryRoom, under: ActsCatalogue, name: string): Promise<DeclaredRecord> {
++  const r = await room.act("start-song", null, { scope: [`songs/${name}/**`], title: name, key: "c", tempo: 120 }, { binding: under.acts["start-song"]!.binding });
++  expect("refused" in r).toBe(false);
++  return r as DeclaredRecord;
++}
++
++/** Count the adapter's notices, to wait for a load to be published. */
++function notices(adapter: LiveRoom) {
++  let n = 0;
++  const off = adapter.subscribe(() => void (n += 1));
++  return { count: () => n, off };
++}
++
++describe("an explicit read of the declarations that is answered late (R-DECL-23)", () => {
++  test("with no activation in between, two reads answered out of order leave the same catalogue", async () => {
++    const { room, adapter, first } = await quiet();
++    const held = holdNextCurrent(room);
++    const early = adapter.readCatalogue();
++    expect(await held.asked).toEqual(first);
++    expect(await adapter.readCatalogue()).toEqual(first);
++    held.release();
++    expect(await early).toEqual(first);
++    expect(adapter.snapshot()!.catalogue).toEqual(first);
++    expect(await adapter.catalogueAt(first.since)).toEqual(first);
++  });
++
++  test("an answer from before an activation the page has confirmed does not bring the earlier catalogue back", async () => {
++    const { room, adapter, first } = await quiet();
++    const held = holdNextCurrent(room);
++    const early = adapter.readCatalogue();
++    expect((await held.asked).policy).toBe(first.policy);
++    const version = await room.activate({ acts: relabelled("Begin a tune") });
++    const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
++    expect(fresh.policy).toBe(version);
++    const later = await song(room, fresh, "after");
++    expect(later.seq).toBeGreaterThan(fresh.since);
++    held.release();
++    // The late caller is given the catalogue the page holds, not the one its own question read.
++    expect(policyOf(await early)).toBe(version);
++    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
++    expect(adapter.snapshot()!.policy).toMatchObject({ version, activatedAt: fresh.since });
++    // A record accepted after the activation is read under the policy that governs it.
++    expect(policyOf(await adapter.catalogueAt(later.seq))).toBe(version);
++    expect(labelOf(await adapter.catalogueAt(later.seq))).toBe("Begin a tune");
++  });
++
++  test("an answer that names a later activation than the one held is taken, in whatever order it was asked", async () => {
++    const { room, adapter, first } = await quiet();
++    // The earlier question is answered by the room only after the activation: its answer is the newer one.
++    const read = room.acts.bind(room);
++    const wait = gate();
++    let n = 0;
++    room.acts = async () => {
++      if (++n === 1) await wait.opened;
++      return read();
++    };
++    const early = adapter.readCatalogue();
++    expect(policyOf(await adapter.readCatalogue())).toBe(first.policy);
++    const version = await room.activate({ acts: relabelled("Begin a tune") });
++    wait.open();
++    expect(policyOf(await early)).toBe(version);
++    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
++  });
++
++  test("a lost answer that arrives after a later activation was confirmed does not blank the catalogue", async () => {
++    const { room, adapter } = await quiet();
++    const held = holdNextCurrent(room, true);
++    const early = adapter.readCatalogue();
++    await held.asked;
++    const version = await room.activate({ acts: relabelled("Begin a tune") });
++    expect(policyOf(await adapter.readCatalogue())).toBe(version);
++    held.release();
++    expect(policyOf(await early)).toBe(version);
++    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
++  });
++
++  test("a lost answer with nothing confirmed in between still means the declarations are not available", async () => {
++    const { room, adapter, first } = await quiet();
++    expect(adapter.snapshot()!.catalogue).toEqual(first);
++    const held = holdNextCurrent(room, true);
++    const early = adapter.readCatalogue();
++    await held.asked;
++    held.release();
++    expect(await early).toBeNull();
++    expect(adapter.snapshot()!.catalogue).toBeNull();
++    expect(adapter.snapshot()!.policy).toMatchObject({ version: null, activatedAt: null });
++  });
++});
++
++describe("a load of the room whose catalogue is answered late (R-DECL-23)", () => {
++  test("with no activation in between, the load finishes under the catalogue it read", async () => {
++    const { room, adapter, first } = await quiet();
++    const held = holdNextCurrent(room);
++    const seen = notices(adapter);
++    // An act through the adapter starts a load, whose catalogue read is the one held.
++    await adapter.act("start-song", null, { scope: ["songs/one/**"], title: "One", key: "c", tempo: 120 }, first.acts["start-song"]!.binding);
++    expect(await held.asked).toEqual(first);
++    held.release();
++    await waitFor(() => expect(seen.count()).toBeGreaterThan(0));
++    seen.off();
++    expect(adapter.snapshot()!.catalogue).toEqual(first);
++    expect(adapter.snapshot()!.feed.filter((e) => e.type === "act")).toHaveLength(1);
++  });
++
++  test("a load begun before an activation does not replace the later catalogue an explicit read confirmed", async () => {
++    const { room, adapter, first } = await quiet();
++    const held = holdNextCurrent(room);
++    const seen = notices(adapter);
++    await adapter.act("start-song", null, { scope: ["songs/one/**"], title: "One", key: "c", tempo: 120 }, first.acts["start-song"]!.binding);
++    expect((await held.asked).policy).toBe(first.policy);
++    const version = await room.activate({ acts: relabelled("Begin a tune") });
++    const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
++    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
++    const later = await song(room, fresh, "two");
++    const before = seen.count();
++    held.release();
++    await waitFor(() => expect(seen.count()).toBeGreaterThan(before));
++    seen.off();
++    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
++    expect(adapter.snapshot()!.policy).toMatchObject({ version, activatedAt: fresh.since });
++    expect(policyOf(await adapter.catalogueAt(later.seq))).toBe(version);
++    // The record from before the activation is still read under its own version.
++    const one = adapter.snapshot()!.feed.find((e) => e.type === "act")!;
++    expect(one.meaning!.label).toBe("Start a song");
++  });
++
++  test("a load whose catalogue answer is lost after a later activation was confirmed keeps that catalogue", async () => {
++    const { room, adapter, first } = await quiet();
++    const held = holdNextCurrent(room, true);
++    const seen = notices(adapter);
++    await adapter.act("start-song", null, { scope: ["songs/one/**"], title: "One", key: "c", tempo: 120 }, first.acts["start-song"]!.binding);
++    await held.asked;
++    const version = await room.activate({ acts: relabelled("Begin a tune") });
++    await adapter.readCatalogue();
++    const before = seen.count();
++    held.release();
++    await waitFor(() => expect(seen.count()).toBeGreaterThan(before));
++    seen.off();
++    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
++    expect(adapter.snapshot()!.source.status).toBe("live");
++  });
++
++  test("a load that has read its catalogue, and is still reading when a later activation is confirmed, is published under the later one", async () => {
++    const { room, adapter, first } = await quiet();
++    // A record under the first version, then a second version: reading that record needs a question about the first.
++    await song(room, first, "one");
++    const second = await room.activate({ acts: relabelled("Begin a tune") });
++    await adapter.readCatalogue();
++    const tail = holdNextHistorical(room);
++    const seen = notices(adapter);
++    const mid = (await room.acts()) as ActsCatalogue;
++    // This act starts a load. It reads the second version as active, then waits on the held question.
++    await adapter.act("start-song", null, { scope: ["songs/two/**"], title: "Two", key: "c", tempo: 120 }, mid.acts["start-song"]!.binding);
++    await tail.asked;
++    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(second);
++    const third = await room.activate({ acts: relabelled("Call a tune") });
++    expect(policyOf(await adapter.readCatalogue())).toBe(third);
++    const before = seen.count();
++    tail.release();
++    await waitFor(() => expect(seen.count()).toBeGreaterThan(before));
++    await waitFor(() => expect(adapter.snapshot()!.feed.filter((e) => e.type === "act")).toHaveLength(2));
++    seen.off();
++    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(third);
++    expect(adapter.snapshot()!.policy.version).toBe(third);
++    expect(labelOf(adapter.snapshot()!.catalogue)).toBe("Call a tune");
++  });
++
++  test("a load that could not read the catalogue is published with the one an explicit read confirmed while it ran", async () => {
++    const { room, adapter, first } = await quiet();
++    await song(room, first, "one");
++    // The load's own question fails at once, so it holds no catalogue and asks about each record's version.
++    const read = room.acts.bind(room);
++    let n = 0;
++    room.acts = async () => {
++      if (++n === 1) throw new Error("the answer was lost");
++      return read();
++    };
++    const tail = holdNextHistorical(room);
++    const seen = notices(adapter);
++    await adapter.act("start-song", null, { scope: ["songs/two/**"], title: "Two", key: "c", tempo: 120 }, first.acts["start-song"]!.binding);
++    await tail.asked;
++    expect(policyOf(await adapter.readCatalogue())).toBe(first.policy);
++    const before = seen.count();
++    tail.release();
++    await waitFor(() => expect(seen.count()).toBeGreaterThan(before));
++    await waitFor(() => expect(adapter.snapshot()!.feed.filter((e) => e.type === "act")).toHaveLength(2));
++    seen.off();
++    expect(adapter.snapshot()!.catalogue).toEqual(first);
++    expect(adapter.snapshot()!.policy).toMatchObject({ version: first.policy, activatedAt: first.since });
++  });
++});
++
++describe("an earlier version's declarations answered late: the page keeps none of its own (R-DECL-23)", () => {
++  test("with no later activation, a delayed answer about an ended version is good, and is asked for again", async () => {
++    const { room, adapter, first } = await quiet();
++    await room.activate({ acts: relabelled("Begin a tune") });
++    const current = (await adapter.readCatalogue()) as ActsCatalogue;
++    const held = holdNextHistorical(room);
++    const pending = adapter.catalogueAt(first.since);
++    const ended = await held.asked;
++    expect(ended!.until).toBe(current.since);
++    held.release();
++    expect(await pending).toEqual(ended);
++    expect(await adapter.catalogueAt(first.since)).toEqual(ended);
++    expect(held.count()).toBe(2);
++  });
++
++  test("an answer read before a kind was retired goes to its caller only: the next reads show the retirement and the current policy", async () => {
++    const { room, adapter, first } = await quiet();
++    await room.activate({ acts: relabelled("Begin a tune") });
++    await adapter.readCatalogue();
++    const held = holdNextHistorical(room);
++    const pending = adapter.catalogueAt(first.since);
++    const ended = (await held.asked) as ActsCatalogue;
++    expect(ended.acts["cue"]!.retired).toBeUndefined();
++    const { cue: _retired, ...withoutCue } = relabelled("Begin a tune");
++    await room.activate({ acts: withoutCue });
++    const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
++    const later = await song(room, fresh, "after");
++    held.release();
++    expect(await pending).toEqual(ended);
++    expect(policyOf(await adapter.catalogueAt(later.seq))).toBe(fresh.policy);
++    const again = (await adapter.catalogueAt(first.since)) as ActsCatalogue;
++    expect(again.acts["cue"]!.retired).toBe(fresh.since);
++    expect(held.count()).toBe(2);
++  });
++});
+diff --git a/packages/ui/test/thread-names-c37653e1.test.ts b/packages/ui/test/thread-names-c37653e1.test.ts
+new file mode 100644
+index 00000000..189987c6
+--- /dev/null
++++ b/packages/ui/test/thread-names-c37653e1.test.ts
+@@ -0,0 +1,75 @@
++/**
++ * Declared acts stage 5, the UI (request a5d64b35): thread names under the
++ * planner's decision c37653e1 (docs/protocol.md section 33.10).
++ *
++ * A thread with no goal is named by its opening act's label and its first
++ * text field by name, read with the declaration in force when the thread
++ * opened. The page gets that declaration with each feed entry's meaning and
++ * gives it to the helper every reader shares.
++ */
++
++import { waitFor } from "@testing-library/preact";
++import { afterEach, describe, expect, test } from "vitest";
++import type { ActDeclaration, ActsCatalogue, DeclaredRecord, HttpRoom } from "../src/room/contract.ts";
++import { LiveRoom } from "../src/room/live/live-room.ts";
++import { BAND } from "../src/room/mock/declared-room.ts";
++import { MemoryRoom } from "../src/room/mock/memory-room.ts";
++import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
++import { laneGoal } from "../src/ui/format.ts";
++
++const adapters: LiveRoom[] = [];
++afterEach(() => {
++  for (const a of adapters.splice(0)) a.stop();
++});
++
++const SONG = SETLIST_ACTS["start-song"]!;
++
++async function open(acts: Readonly<Record<string, ActDeclaration>> = SETLIST_ACTS) {
++  const room = await MemoryRoom.found("the-band/setlist", BAND, { acts });
++  room.me = "@noor";
++  const adapter = new LiveRoom(room as unknown as HttpRoom, "@noor");
++  adapters.push(adapter);
++  await adapter.start();
++  return { room, adapter };
++}
++
++async function start(room: MemoryRoom, body: Parameters<MemoryRoom["act"]>[2]): Promise<DeclaredRecord> {
++  const binding = ((await room.acts()) as ActsCatalogue).acts["start-song"]!.binding;
++  const r = await room.act("start-song", null, body, { binding });
++  expect("refused" in r).toBe(false);
++  return r as DeclaredRecord;
++}
++
++describe("the page names a thread by its opening act's first text field (section 33.10)", () => {
++  test("the title names the song, though the enum field key comes first by name", async () => {
++    const { room, adapter } = await open();
++    const song = await start(room, { title: "Footprints", key: "c", tempo: 96, scope: ["songs/footprints/**"] });
++    await waitFor(() => expect(adapter.snapshot()!.lanes).toHaveLength(1));
++    const snap = adapter.snapshot()!;
++    expect(laneGoal(snap, song.id)).toBe("Start a song: Footprints");
++    // The entry's meaning carries the declaration of its own seq, which is where the field types come from.
++    expect(snap.feed.find((f) => f.id === song.id)!.meaning!.declaration).toEqual(SONG);
++  });
++
++  test("a thread keeps the name its own declaration gave it after a later document relabels the act and makes another field the text one", async () => {
++    const { room, adapter } = await open();
++    const first = await start(room, { title: "Footprints", key: "c", tempo: 96, scope: ["songs/footprints/**"] });
++    // The later document: `key` is now text, and `title` is one of a fixed list.
++    const later: ActDeclaration = { ...SONG, label: "Begin a tune", body: { ...SONG.body, key: { type: "text", max: 8 }, title: { type: "enum", values: ["so-what", "nardis"] } } };
++    await room.activate({ acts: { ...SETLIST_ACTS, "start-song": later } });
++    const second = await start(room, { title: "so-what", key: "d", tempo: 136, scope: ["songs/so-what/**"] });
++    await waitFor(() => expect(adapter.snapshot()!.lanes).toHaveLength(2));
++    const snap = adapter.snapshot()!;
++    expect(laneGoal(snap, first.id)).toBe("Start a song: Footprints");
++    expect(laneGoal(snap, second.id)).toBe("Begin a tune: d");
++  });
++
++  test("an act with no text field is still named by its first field by name, and a thread with a goal by its goal", async () => {
++    const plain: ActDeclaration = { ...SONG, body: { key: SONG.body!["key"]!, tempo: SONG.body!["tempo"]! } };
++    const { room, adapter } = await open({ ...SETLIST_ACTS, "start-song": plain });
++    const song = await start(room, { key: "c", tempo: 96, scope: ["songs/untitled/**"] });
++    await waitFor(() => expect(adapter.snapshot()!.lanes).toHaveLength(1));
++    expect(laneGoal(adapter.snapshot()!, song.id)).toBe("Start a song: c");
++    expect(laneGoal(adapter.snapshot()!, "act_999_00000000" as never)).toBe("an unknown lane");
++  });
++});

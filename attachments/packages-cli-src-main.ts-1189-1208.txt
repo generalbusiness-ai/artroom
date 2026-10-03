@@ -1,0 +1,20 @@
+1189: 
+1190:   mcp: {
+1191:     options: { toolset: { type: "string" } },
+1192:     async run(ctx) {
+1193:       const { callerFromRoster, serveArtroomStdio, toolsetOf } = await import("@generalbusiness/artroom-mcp/stdio");
+1194:       // `--toolset` is the stdio form of the MCP URL's `?toolset=`: builder, reviewer, observer or all. An unknown name
+1195:       // is bad-request, before anything is asked of the room.
+1196:       const toolset = toolsetOf(str(ctx.values, "toolset"));
+1197:       const { api, room } = await open(ctx);
+1198:       // The tool list follows this credential's authorization, read from the roster at each `tools/list` (R-API-14):
+1199:       // a key file is the member's own key; a bearer file acts under the session's delegation, the one its redemption
+1200:       // recorded. (A credential saved before that ID was kept names none: then it is the key's latest delegation.)
+1201:       const session = room.delegation !== undefined ? { key: room.key, session: true, delegation: room.delegation } : { key: room.key, session: true }; // GM:cli-delegation
+1202:       const who = room.custody === "room" ? session : { key: room.key }; // GM:cli-caller
+1203:       const caller = async () => callerFromRoster(await api.members(), who);
+1204:       const asked = toolset !== undefined ? { toolset } : {}; // GM:cli-toolset
+1205:       const handle = serveArtroomStdio(api, { caller, ...asked });
+1206:       await new Promise<void>((resolve) => process.stdin.once("end", resolve));
+1207:       await handle.close();
+1208:       return EXIT.ok;

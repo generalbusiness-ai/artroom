@@ -1,0 +1,17 @@
+695:       ctx.secrets.add(bearer);
+696:       // The bearer is saved to a file and the MCP URL printed in a shell command: both checked first (request 55be0661).
+697:       checkRedeemed(shown.mcp, bearer);
+698:       ctx.store.saveBearer(inv.room, bearer);
+699:       ctx.step("bearer-saved");
+700:       const name = await connect({ url: entry.url }, inv.room, { kind: "bearer", token: bearer }, clientOptions(ctx)).then(
+701:         (a) => a.name,
+702:         () => inv.room,
+703:       );
+704:       const path = ctx.store.bearerPath(inv.room);
+705:       const config = ctx.store.read();
+706:       config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, delegation: shown.delegation, mcp: shown.mcp, invitation: inv.invitation };
+707:       config.current = inv.room;
+708:       ctx.store.write(config);
+709:       ctx.step("config-written");
+710:       ctx.store.finish(inv.room, "redeem", inv.invitation);
+711:       return print(ctx, { ...shown, bearerFile: path }, () => [
