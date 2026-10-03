@@ -120,8 +120,8 @@ is inferred. The complete gate/name/clock outcome waits for owner D1.
 Historical `room/room.ts:79` and Wrangler supplied a placeholder hostname;
 a CLI command could send a bearer to that configured host. This showed
 misconfiguration risk, not evidence of host ownership or token theft.
-Current `room/config.ts:62-72` requires a configured HTTPS origin and rejects
-the placeholder/default path under 55be.
+Current `room/config.ts:62-72` rejects missing or malformed HTTPS origins;
+`55be0661` removes the placeholder fallback; no hostname blacklist is added.
 
 **SEC-05 — git config injection (historical, fixed).** Historical
 `cli/src/git.ts:61` inserted server remote/token strings into included git
