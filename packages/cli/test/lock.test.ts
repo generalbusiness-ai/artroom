@@ -103,7 +103,7 @@ describe("two commands at one destination", () => {
     otherPid = other.pid!;
     const killer = setTimeout(() => other.kill("SIGKILL"), 15_000);
     try {
-      for (let i = 0; i < 2_000 && !existsSync(reported); i++) await new Promise((r) => setTimeout(r, 5));
+      for (let i = 0; i < 800 && !existsSync(reported); i++) await new Promise((r) => setTimeout(r, 5));
       if (!existsSync(reported)) throw new Error("The other command did not stop waiting on a lock it could not take.");
       said = JSON.parse(readFileSync(reported, "utf8")) as Record<string, string>;
       // It is now waiting on the recovery in progress. This command takes the contended lock, and only then lets
@@ -112,7 +112,7 @@ describe("two commands at one destination", () => {
       mine = withDestination(contended, (o) => {
         utimesSync(lockOf(contended), past, past); // older than any expiry: age must not matter
         for (const f of [breakOf(recovering), lockOf(recovering)]) rmSync(f);
-        for (let i = 0; i < 1_000 && !existsSync(recovered); i++) sleepSync(5);
+        for (let i = 0; i < 600 && !existsSync(recovered); i++) sleepSync(5);
         if (!existsSync(recovered)) throw new Error("The other command did not take the lock after its recovery completed.");
         acquired = readFileSync(recovered, "utf8");
         sleepSync(60); // the other command is running, and must be waiting for this lock
@@ -124,7 +124,7 @@ describe("two commands at one destination", () => {
       clearTimeout(killer);
       other.kill("SIGKILL");
     }
-  });
+  }, 20_000);
 
   test("whatever is in the way is waited on within the deadline, then named, and never removed", () => {
     for (const [name, b] of Object.entries(BLOCKED)) {
