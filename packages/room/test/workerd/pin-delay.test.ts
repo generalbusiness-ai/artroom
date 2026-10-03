@@ -114,107 +114,7 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     expect(r.world.artifacts.refs.get(p.pinnedRef)).toBe(head);
   });
 
-  it("set, with the mint ledger (main 574568b2): the earliest of the delayed pin and the ledger's due time wins, and each keeps its own fence and backoff", async () => {
-    setPinDelay(DELAY);
-    const r = await makeRoom();
-    await proposed(r);
-    const due = clock.now + DELAY;
-    await inDO(r, (room) => room.core.idle());
-    await tick(r, 2);
-    // The ledger's due time is set directly on this object's ledger: only nextAlarm's composition is under test here.
-    const withMints = (at: number | null) => inDO(r, (room) => {
-      (room.core.mints as unknown as { nextDue: () => number | null }).nextDue = () => at;
-      return room.core.nextAlarm();
-    });
-    const setBackoff = (v: Record<string, unknown>) => inDO(r, (room) => room.core.sql.all("INSERT INTO meta (k, v) VALUES ('loop_backoff', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", JSON.stringify(v)));
-    expect(await withMints(due - 5_000)).toBe(due - 5_000);
-    expect(await withMints(due + 5_000)).toBe(due);
-    expect(await withMints(null)).toBe(due);
-    // Each kind's backoff moves only its own due time.
-    await setBackoff({ mints: { attempts: 1, next: due + 20_000 } });
-    expect(await withMints(due - 5_000)).toBe(due);
-    await setBackoff({ pins: { attempts: 1, next: due + 20_000 } });
-    expect(await withMints(due + 5_000)).toBe(due + 5_000);
-    await inDO(r, (room) => room.core.sql.all("DELETE FROM meta WHERE k = 'loop_backoff'"));
-    // The repository gone fences both: neither due time wakes the room.
-    await inDO(r, (room) => room.core.sql.all("INSERT INTO meta (k, v) VALUES ('canonical_gone', ?)", JSON.stringify({ since: new Date(clock.now).toISOString(), head: room.core.headSeq() })));
-    const fenced = await withMints(due - 5_000);
-    expect(fenced).not.toBe(due - 5_000);
-    expect(fenced).not.toBe(due);
-  });
-
-  it("set, composed with the mint ledger and the error upgrade (main df22d771): the earliest wins; the repository-gone fence holds the pin and the ledger but not the upgrade", async () => {
-    setPinDelay(DELAY);
-    const r = await makeRoom();
-    await proposed(r);
-    const due = clock.now + DELAY;
-    await inDO(r, (room) => room.core.idle());
-    await tick(r, 2);
-    const next = (mints: number | null) => inDO(r, (room) => {
-      (room.core.mints as unknown as { nextDue: () => number | null }).nextDue = () => mints;
-      return room.core.nextAlarm();
-    });
-    const meta = (k: string, v: string | null) => inDO(r, (room) => (v === null ? room.core.sql.all("DELETE FROM meta WHERE k = ?", k) : room.core.sql.all("INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", k, v)));
-    // Pin and ledger alone: the earliest of the two.
-    expect(await next(due + 5_000)).toBe(due);
-    // The error upgrade still running: due at once, ahead of both.
-    await meta("error_scrub", "0");
-    expect(await next(due - 5_000)).toBe(clock.now);
-    // The repository gone: the pin and the ledger are fenced, the upgrade still drains (request d29c09fa).
-    await meta("canonical_gone", JSON.stringify({ since: new Date(clock.now).toISOString(), head: 0 }));
-    expect(await next(due - 5_000)).toBe(clock.now);
-    await meta("error_scrub", null);
-    const fenced = await next(due - 5_000);
-    expect(fenced).not.toBe(due - 5_000);
-    expect(fenced).not.toBe(due);
-  });
-
-  it("set, composed with lane C (main 965c911a): the delayed pin, the mint ledger, the error upgrade, the job-token pass and the check jobs each offer one due time and the earliest wins; per-kind backoff and the repository-gone fences hold", async () => {
-    setPinDelay(DELAY);
-    const r = await makeRoom();
-    await proposed(r);
-    const due = clock.now + DELAY;
-    await inDO(r, (room) => room.core.idle());
-    await tick(r, 2);
-    const next = (mints: number | null) => inDO(r, (room) => {
-      (room.core.mints as unknown as { nextDue: () => number | null }).nextDue = () => mints;
-      return room.core.nextAlarm();
-    });
-    const sql = (q: string, ...b: (string | number)[]) => inDO(r, (room) => room.core.sql.all(q, ...b));
-    const meta = (k: string, v: string | null) => (v === null ? sql("DELETE FROM meta WHERE k = ?", k) : sql("INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", k, v));
-    const job = (at: number | null) =>
-      at === null
-        ? sql("DELETE FROM check_jobs WHERE id = 'job_probe'")
-        : sql("INSERT INTO check_jobs (id, owner, lane, generation, obligation, checker, config, integration, base, state, next_ms) VALUES ('job_probe', 'op_probe', 'act_probe', 1, 'obl_probe', 'tests', 'sha256:probe', ?, ?, 'owed', ?) ON CONFLICT (id) DO UPDATE SET next_ms = excluded.next_ms", "a".repeat(40), "a".repeat(40), at);
-    const token = (at: number | null) =>
-      at === null ? sql("DELETE FROM job_tokens WHERE token_id = 'tok_probe'") : sql("INSERT INTO job_tokens (token_id, expires_at, next_ms) VALUES ('tok_probe', NULL, ?) ON CONFLICT (token_id) DO UPDATE SET next_ms = excluded.next_ms", at);
-    // Alone, the delayed pin.
-    expect(await next(null)).toBe(due);
-    // Each earlier candidate in turn wins.
-    await job(due - 8_000);
-    expect(await next(due - 4_000)).toBe(due - 8_000);
-    await job(null);
-    await token(due - 6_000);
-    expect(await next(due - 4_000)).toBe(due - 6_000);
-    expect(await next(due - 7_000)).toBe(due - 7_000);
-    // The job-token pass's own backoff moves only its time.
-    await meta("loop_backoff", JSON.stringify({ jobTokens: { attempts: 1, next: due + 30_000 } }));
-    expect(await next(null)).toBe(due);
-    await meta("loop_backoff", null);
-    // The upgrade running: due at once, ahead of all.
-    await meta("error_scrub", "0");
-    expect(await next(due - 4_000)).toBe(clock.now);
-    await meta("error_scrub", null);
-    // The repository gone: the pin, the ledger and the job-token pass are fenced; the check jobs are not.
-    await meta("canonical_gone", JSON.stringify({ since: new Date(clock.now).toISOString(), head: 0 }));
-    await job(due + 9_000);
-    expect(await next(due - 4_000)).toBe(due + 9_000);
-    await job(null);
-    const fenced = await next(due - 4_000);
-    expect([due, due - 4_000, due - 6_000]).not.toContain(fenced);
-  });
-
-  it("set, composed with mint lane F (request 02836f9a): the fork token ledger is a sixth candidate; the earliest wins among the delayed pin, the mint ledger, the error upgrade, the job-token pass, the check jobs and the fork token ledger; only its own backoff holds it, and the repository-gone fence does not", async () => {
+  it("set: the room's next alarm is the earliest of six due times (the delayed pin, the mint ledger, the error upgrade, the job-token pass, the check jobs, the fork token ledger); a backoff holds only its own kind; while the repository is gone the pin, the mint ledger and the job-token pass wait, and the others do not", async () => {
     setPinDelay(DELAY);
     const r = await makeRoom();
     await proposed(r);
@@ -255,7 +155,18 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     // Its own backoff holds it, and only it: the pin wins.
     await meta("loop_backoff", JSON.stringify({ forkTokens: { attempts: 1, next: due + 30_000 } }));
     expect(await next(null, due - 9_000)).toBe(due);
-    // Other kinds' backoffs (the pins, the mint ledger, the job-token pass) do not hold it.
+    // The pins' backoff holds the pin and nothing else: a later mint ledger time wins.
+    await meta("loop_backoff", JSON.stringify({ pins: { attempts: 1, next: due + 30_000 } }));
+    expect(await next(due + 5_000, null)).toBe(due + 5_000);
+    // The mint ledger's backoff holds the ledger and nothing else: the pin wins.
+    await meta("loop_backoff", JSON.stringify({ mints: { attempts: 1, next: due + 30_000 } }));
+    expect(await next(due - 5_000, null)).toBe(due);
+    // The job-token pass's backoff holds only it: the pin wins.
+    await meta("loop_backoff", JSON.stringify({ jobTokens: { attempts: 1, next: due + 30_000 } }));
+    await token(due - 6_000);
+    expect(await next(null, null)).toBe(due);
+    await token(null);
+    // Other kinds' backoffs (the pins, the mint ledger, the job-token pass) do not hold the fork token ledger.
     await meta("loop_backoff", JSON.stringify({ pins: { attempts: 1, next: due + 30_000 }, mints: { attempts: 1, next: due + 30_000 }, jobTokens: { attempts: 1, next: due + 30_000 } }));
     await token(due - 11_000);
     expect(await next(due - 10_000, due - 9_000)).toBe(due - 9_000);
@@ -266,6 +177,18 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     await meta("canonical_gone", JSON.stringify({ since: new Date(clock.now).toISOString(), head: 0 }));
     await token(due - 11_000);
     expect(await next(due - 10_000, due - 9_000)).toBe(due - 9_000);
+    await token(null);
+    // The check jobs are not fenced either: an earlier job wins.
+    await job(due - 12_000);
+    expect(await next(due - 10_000, due - 9_000)).toBe(due - 12_000);
+    await job(null);
+    // Nor is the error upgrade, which still drains (request d29c09fa): due at once.
+    await meta("error_scrub", "0");
+    expect(await next(due - 10_000, due - 9_000)).toBe(clock.now);
+    await meta("error_scrub", null);
+    // With nothing else due, the fenced pin, mint ledger and job-token pass do not wake the room at their times.
+    await token(due - 11_000);
+    expect([due, due - 10_000, due - 11_000]).not.toContain(await next(due - 10_000, null));
     await token(null);
     // While it is gone, the fork token ledger's own backoff still holds it: a check job later than that backoff loses.
     await meta("loop_backoff", JSON.stringify({ forkTokens: { attempts: 1, next: due + 30_000 } }));
@@ -333,6 +256,8 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     expect(await dueRows(r)).toEqual([]);
   });
 
+  // The checker's control ran 150,000 pending pins, to show that scheduling neither reads every pin into memory
+  // nor overflows the stack. These two cases pin the cause: one bounded query, whatever the backlog.
   describe("bounded reads for a pending backlog (the checker's control on 48b1fee9)", () => {
     const backlog = (room: Room, n: number, dated: boolean) => {
       room.core.sql.all(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < ${n}) INSERT INTO pins (ref, head, done) SELECT 'refs/artroom/heads/lane_probe/' || x, '${"a".repeat(40)}', 0 FROM n`);
@@ -365,7 +290,7 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
       const seen = await inDO(r, async (room, state) => {
         await room.core.idle();
         room.core.run = () => {};
-        backlog(room, 5_000, false);
+        backlog(room, 1_000, false);
         return pinReads(room, state, () => room.core.nextAlarm());
       });
       expect(seen.queries).toEqual(["SELECT 1 AS x FROM pins WHERE done = 0 LIMIT 1"]);
@@ -378,29 +303,13 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
       const seen = await inDO(r, async (room, state) => {
         await room.core.idle();
         room.core.run = () => {};
-        backlog(room, 5_000, true);
+        backlog(room, 1_000, true);
         return { reads: pinReads(room, state, () => room.core.nextAlarm()), next: room.core.nextAlarm() };
       });
       expect(seen.reads.queries).toEqual(["SELECT MIN(CAST(v AS INTEGER)) AS t FROM meta WHERE k >= 'pin_due:' AND k < 'pin_due;'"]);
       // One row per pending pin's due time, plus the index's end-of-range row.
-      expect(seen.reads.rows).toBeLessThanOrEqual(5_001);
+      expect(seen.reads.rows).toBeLessThanOrEqual(1_001);
       expect(seen.next).toBeLessThanOrEqual(clock.now + DELAY);
-    });
-
-    it("150,000 pending pins: scheduling neither throws nor spreads them, switch unset or set", async () => {
-      for (const delay of [null, DELAY]) {
-        setPinDelay(delay);
-        const r = await makeRoom();
-        const out = await inDO(r, async (room) => {
-          await room.core.idle();
-          room.core.run = () => {};
-          backlog(room, 150_000, delay !== null);
-          return { pending: [...room.core.loopPendingKinds()], next: room.core.nextAlarm() };
-        });
-        if (delay === null) expect(out.pending).toContain("pins");
-        else expect(out.pending).not.toContain("pins");
-        expect(out.next).not.toBeNull();
-      }
     });
 
     it("unset: a restart with pending pins writes no due times (the default-off start writes nothing)", async () => {

@@ -3,6 +3,8 @@
  * make the production Room ask for an immediate alarm over and over. Adapted
  * from the checker's diagnostic: the unchanged Room and Landing, Durable
  * Object SQLite, real `Room.alarm` runs and the Room's own alarm scheduling.
+ * The backoff times pass on the room clock, which the test moves; only the
+ * engine's own revocation timeout (set to 20 ms) is a real wait.
  */
 
 import { expect, it } from "vitest";
@@ -11,7 +13,7 @@ import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Claim, DraftedRoom, Genesis, Landing, LandOp, RoomId } from "@generalbusiness/artroom-contract";
 import { roomIdOf } from "../../src/ids.ts";
 import { hex } from "../../src/crypto.ts";
-import { FakeArtifactsHost, setAlarmDelay, setClock, type Room } from "../../src/index.ts";
+import { FakeArtifactsHost, setAlarmDelay, type Room } from "../../src/index.ts";
 import { Client, clock, newKeyPair, randomBytes, sign, tick, worldFor, type TestRoom, type World } from "./support.ts";
 
 const worker = exports.default as unknown as {
@@ -72,8 +74,10 @@ const pending = (r: Room) => {
 };
 
 it("review f060871b: a pending cleanup pass gives the Room a bounded future wake, not an immediate one; completion clears it; a timeout puts the debt on its backoff", async () => {
+  // The room clock starts at the real time and is moved by the test: a stored alarm's time is then at or after the
+  // room's due time on both clocks, and no wait here is a real one.
+  const clockBefore = clock.now;
   clock.now = Date.now();
-  setClock(() => Date.now());
   const f = await draftPublic();
   const id = await worker.found(f.drafted.genesis, f.sig, f.drafted.draft);
   const room = testRoom(f, id);
@@ -84,7 +88,7 @@ it("review f060871b: a pending cleanup pass gives the Room a bounded future wake
     expect((await landLane(room, f.world.artifacts, "docs/a/**", { "docs/a/one.md": "one" })).state).toBe("landed");
     const owed = await runInDurableObject(stub, (r: Room) => r.core.landing.core.tokenCleanup());
     expect(owed).toHaveLength(1);
-    await new Promise((r) => setTimeout(r, Math.max(0, owed[0]!.dueAt - Date.now()) + 20));
+    clock.now = Math.max(clock.now, owed[0]!.dueAt + 20);
 
     // 1. Pending: Artifacts never answers. Real alarms, with the Room's real alarm times.
     await runInDurableObject(stub, pending);
@@ -95,7 +99,7 @@ it("review f060871b: a pending cleanup pass gives the Room a bounded future wake
       seen.push(
         await runInDurableObject(stub, async (r: Room, state: DurableObjectState) => {
           const alarm = await state.storage.getAlarm();
-          return { delay: alarm === null ? null : alarm - Date.now(), calls: probe(r).calls, owed: r.core.landing.core.tokenCleanup().length, landingDue: r.core.landing.nextDue(), now: Date.now() };
+          return { delay: alarm === null ? null : alarm - Date.now(), calls: probe(r).calls, owed: r.core.landing.core.tokenCleanup().length, landingDue: r.core.landing.nextDue(), now: clock.now };
         }),
       );
     }
@@ -123,17 +127,17 @@ it("review f060871b: a pending cleanup pass gives the Room a bounded future wake
     expect((await landLane(room, f.world.artifacts, "docs/b/**", { "docs/b/two.md": "two" })).state).toBe("landed");
     const owed2 = await runInDurableObject(stub, (r: Room) => r.core.landing.core.tokenCleanup());
     expect(owed2.map((c) => c.backoffMs)).toEqual([1_000]);
-    await new Promise((r) => setTimeout(r, Math.max(0, owed2[0]!.dueAt - Date.now()) + 20));
+    clock.now = Math.max(clock.now, owed2[0]!.dueAt + 20);
     await runInDurableObject(stub, (r: Room) => {
       pending(r);
-      hooks(r).revokeTimeoutMs = 200;
+      hooks(r).revokeTimeoutMs = 20;
     });
     await runDurableObjectAlarm(stub);
-    const waiting = await runInDurableObject(stub, (r: Room) => ({ due: r.core.landing.nextDue(), now: Date.now(), calls: probe(r).calls }));
+    const waiting = await runInDurableObject(stub, (r: Room) => ({ due: r.core.landing.nextDue(), now: clock.now, calls: probe(r).calls }));
     expect(waiting.calls).toBe(1);
-    expect(waiting.due! - waiting.now).toBeLessThanOrEqual(200);
+    expect(waiting.due! - waiting.now).toBeLessThanOrEqual(20);
     await runInDurableObject(stub, (r: Room) => r.core.landing.cleanupDone());
-    const after = await runInDurableObject(stub, (r: Room) => ({ owed: r.core.landing.core.tokenCleanup(), due: r.core.landing.nextDue(), now: Date.now(), calls: probe(r).calls }));
+    const after = await runInDurableObject(stub, (r: Room) => ({ owed: r.core.landing.core.tokenCleanup(), due: r.core.landing.nextDue(), now: clock.now, calls: probe(r).calls }));
     expect(after.calls).toBe(1);
     expect(after.owed.map((c) => c.backoffMs)).toEqual([2_000]); // a failure, never a success
     expect(after.due).toBe(after.owed[0]!.dueAt);
@@ -143,11 +147,11 @@ it("review f060871b: a pending cleanup pass gives the Room a bounded future wake
     expect(await runInDurableObject(stub, (r: Room) => probe(r).calls)).toBe(1);
   } finally {
     setAlarmDelay(3600_000);
-    setClock(() => clock.now);
     await runInDurableObject(stub, async (r: Room, state: DurableObjectState) => {
       probe(r).release?.(true);
       await r.core.landing.cleanupDone();
       await state.storage.deleteAlarm();
     });
+    clock.now = clockBefore;
   }
 });
