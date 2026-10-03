@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will independently review exact d24e5a468d3d5c08581dedaa0ed77408064812a8, all 28 artifacts, authority and contracts, deadline and handoff guards, bounded cleanup, cost and simplification choices; verify gates and runtime guard failures before filing a verdict."}
+{"kind":"artifact","text":"packages/git/src/index.ts at exact 18d69cda91e7bde0ca5533c5c7edb7e0e73ac190 on request/land-errors, under promise git:sha1…10d1d0f on request git:sha1…2d38177","body":{"commit":"18d69cda91e7bde0ca5533c5c7edb7e0e73ac190","path":"packages/git/src/index.ts"}}
