@@ -947,4 +947,21 @@ test("F22 expiry is checked again before each revocation: a record already past 
   assert.equal(f.revokes.length, before, "no revocation sent for an expired token");
   assert.equal(rows(r.sql).length, 0);
   assert.equal(summary(r.sql)["owed"], 0);
+  // An expired record never waits on another record's revocation: the pass that finds it settles only it, at once.
+  await owe(1);
+  r.clock.advance(TTL * 1000 - 5_000);
+  const [fresh] = await owe(1);
+  r.clock.advance(5_000); // the first has expired; the second is due
+  f.holdRevokes = true;
+  await r.ledger.reconcile();
+  assert.deepEqual(
+    rows(r.sql).map((x) => x["token"]),
+    [fresh],
+    "the expired record is settled while no revocation is out",
+  );
+  assert.equal(f.heldRevokes.length, 0);
+  f.holdRevokes = false;
+  r.clock.advance(OVERDUE_STEP_MS);
+  await alarm(r);
+  assert.equal(rows(r.sql).length, 0);
 });
