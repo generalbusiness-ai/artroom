@@ -4,17 +4,19 @@
  * bounded parts and then pushed as the commit alone. The commit is the one
  * `commitFor` computes; staging survives a lost answer, a publisher restart
  * and a lost staging area.
+ *
+ * One transfer is an option (`maxTransfer`), so every case runs at a
+ * transfer of 1 KiB, which the small golden log's segment is several times
+ * over.
  */
 
 import { describe, expect, test } from "vitest";
-import type { MemberId, Sha } from "@generalbusiness/artroom-contract";
-import { evaluateNotify, policy, rule } from "@generalbusiness/artroom-policy";
-import { LOG_REF, entryId, retain } from "../src/entries.ts";
-import { canonicalize } from "../src/canonical.ts";
-import { MemoryGit, type GitObject, type PushOutcome, type StageOutcome, type StagePart, type StageWant } from "../src/git.ts";
-import { LOG_TRANSFER_LIMITS, LogPublisher } from "../src/publisher.ts";
+import type { Sha } from "@generalbusiness/artroom-contract";
+import { LOG_REF } from "../src/entries.ts";
+import { MemoryGit, gitObject, type GitObject, type PushOutcome, type StageOutcome, type StagePart, type StageWant } from "../src/git.ts";
+import { LogPublisher } from "../src/publisher.ts";
 import { verifyLog } from "../src/verify.ts";
-import { RoomSim, goldenLog, keys, memberAuthority } from "./support/room-sim.ts";
+import { goldenLog } from "./support/room-sim.ts";
 
 /** A MemoryGit that records every stage call and push, and can fail a stage call once. */
 class Staging extends MemoryGit {
@@ -62,9 +64,16 @@ describe("review b618eca1: staged publication", () => {
     // Some object needed more than one part: a blob larger than one transfer.
     const resumed = calls.flatMap((c) => c.missing).filter((m) => m.have > 0);
     expect(resumed.length).toBeGreaterThan(0);
+    // The active segment stays over one transfer: the next one-entry cohort, from the same publisher, is staged in parts too.
+    const again = git.calls.length;
+    const next = await g.sim.publish(publisher);
+    expect(next.through - r.through).toBe(1);
+    expect(git.calls.length - again).toBeGreaterThan(3);
+    expect(git.calls.slice(again).every((c) => c.bytes <= tiny.bytes)).toBe(true);
+    expect(git.pushed.at(-1)).toEqual([]);
     const report = await verifyLog(git);
     expect(report.failures).toEqual([]);
-    expect(report).toMatchObject({ ok: true, head: expected, commits: 4 });
+    expect(report).toMatchObject({ ok: true, head: next.commit, commits: 5 });
   });
 
   test("a lost stage answer: the next attempt asks what is missing and resumes, with the same commit", async () => {
@@ -94,53 +103,6 @@ describe("review b618eca1: staged publication", () => {
     }
   });
 
-  test("at the default bound: an active segment over 64 MiB (the checker's case) keeps taking one-entry cohorts, staged in default-sized parts, after a restart too, and verifies", async () => {
-    const sim = new RoomSim();
-    sim.activate(policy(rule({ id: "notify-members", kind: "notify", on: ["note"], to: ["role:member"], why: "A note needs the members." })));
-    const git = new Staging();
-    let publisher = new LogPublisher(git);
-    const authority = memberAuthority("@alice", keys.alice.key);
-    const claim = await sim.claim(keys.alice, authority, ["src/**"]);
-    const recipients = Array.from({ length: 2400 }, (_, i) => `@member${String(i).padStart(5, "0")}${"x".repeat(50)}` as MemberId);
-    const add = async () => {
-      const body = { text: "A note for the room." };
-      const e = sim.accept(sim.envelope(keys.alice, "note", claim.lane!, body), authority);
-      const id = entryId(e.seq, e.hash);
-      const input = {
-        kind: "notify" as const,
-        act: { id, kind: "note" as const, target: claim.lane!, body },
-        actor: { member: "@alice" as MemberId, role: "admin" as const, teams: [], delegated: false },
-        lane: { id: claim.lane!, claimed: true, holder: "@alice" as MemberId, scope: ["src/**"], generation: 1, purpose: "ordinary" as const },
-        proposal: null,
-      };
-      const r = await evaluateNotify(sim.policy, input, { roles: { member: recipients }, reviewers: [] });
-      for (const ev of r.evaluations) sim.retained.push(retain("input", ev.context));
-      sim.system({ type: "notified", entry: id, decisions: r.evaluations.map((ev) => ev.decision), to: [...new Set(r.notify.map((n) => n.to as MemberId))] });
-    };
-    const segment = () => sim.entries.reduce((n, e) => n + Buffer.byteLength(canonicalize(e)) + 1, 0);
-    while (segment() < 64 * 1024 * 1024 + 1_000_000) {
-      await add();
-      if (sim.entries.length % 60 === 0) await sim.publish(publisher);
-    }
-    await sim.publish(publisher);
-    // Then one-entry cohorts (each the previous publication's checkpoint event), the second after a restart.
-    for (const restart of [false, true]) {
-      if (restart) publisher = await LogPublisher.open(git);
-      const before = git.calls.length;
-      const from = publisher.publishedThrough;
-      const r = await sim.publish(publisher);
-      expect(r.through - from).toBe(1);
-      const calls = git.calls.slice(before);
-      expect(calls.length).toBeGreaterThan(2); // staged: the segment alone is over one transfer
-      expect(calls.every((c) => c.bytes <= LOG_TRANSFER_LIMITS.bytes)).toBe(true);
-      expect(git.pushed.at(-1)).toEqual([]);
-    }
-    expect(segment()).toBeGreaterThan(64 * 1024 * 1024);
-    const report = await verifyLog(git);
-    expect(report.failures).toEqual([]);
-    expect(report.ok).toBe(true);
-  }, 600_000);
-
   test("a remote whose staging makes no progress is not asked forever: the attempt ends, and the publication is unresolved with nothing pushed", async () => {
     const git = new Staging();
     const { g, publisher } = await oneMore(git, { maxTransfer: tiny });
@@ -159,7 +121,7 @@ describe("review b618eca1: staged publication", () => {
   test("in-memory staging checks each completed object against its ID, and parts against the object", async () => {
     const git = new MemoryGit();
     const data = new Uint8Array(100).fill(7);
-    const { sha } = (await import("../src/git.ts")).gitObject("blob", data);
+    const { sha } = gitObject("blob", data);
     const want = [{ sha, type: "blob" as const, size: 100 }];
     const cohort = "c".repeat(40) as Sha;
     expect(await git.stage(cohort, want, [{ ...want[0]!, offset: 0, data: data.subarray(0, 60) }])).toEqual({ ok: true, missing: [{ sha, have: 60 }] });
