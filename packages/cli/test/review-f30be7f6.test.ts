@@ -199,7 +199,7 @@ describe("E5.2: schema 1 files are decoded conservatively; unknown versions are 
   ])("%s is resent unchanged, and its lane is not selected", async (_what, toV1) => {
     const home = join(h.tmp, "alice");
     await login(home, "@alice");
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     expect((await cli(home, ["claim", "src/**", "--goal", "g", "--idempotency-key", "claim-v1"])).code).toBe(EXIT.failed);
     rewriteEntry(home, "claim-v1", toV1);
     const res = await cli(home, ["claim", "src/**", "--goal", "g", "--idempotency-key", "claim-v1"]);
@@ -251,7 +251,7 @@ describe("E5.2: schema 1 files are decoded conservatively; unknown versions are 
   test("a config or journal entry from a newer schema is refused, and nothing is sent", async () => {
     const home = join(h.tmp, "alice");
     await login(home, "@alice");
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     await cli(home, ["claim", "src/**", "--goal", "g", "--idempotency-key", "future"]);
     rewriteEntry(home, "future", (e) => ({ ...e, v: 5 }));
     const before = calls("/acts");

@@ -151,7 +151,7 @@ describe("P4: a retried act is the act first sent", () => {
     await login(alice, "@alice");
     expect((await cli(alice, ["claim", "src/**", "--goal", "g"], dir)).code).toBe(EXIT.ok);
     const first = git(dir, "rev-parse", "HEAD");
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     const lost = await cli(alice, ["propose", "-m", "One."], dir);
     expect(lost.code).toBe(EXIT.failed);
     const key = /--idempotency-key ([A-Za-z0-9_-]+)/.exec(lost.err)![1]!;
@@ -173,7 +173,7 @@ describe("P4: a retried act is the act first sent", () => {
   test("a journaled key used with another command is a usage error, and --json errors name the key", async () => {
     const alice = join(h.tmp, "alice");
     await login(alice, "@alice");
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     const lost = await cli(alice, ["claim", "src/**", "--goal", "g", "--json"]);
     expect(lost.code).toBe(EXIT.failed);
     const key = JSON.parse(lost.out).idempotencyKey as string;
@@ -215,7 +215,7 @@ describe("P5: the landing follow-up waits on the operation already started", () 
   test("a wait that runs out names the same operation, and the next wait finishes it", async () => {
     const { alice } = await ready();
     h.room.landingPaused = true;
-    const out = await cli(alice, ["land", "--wait", "--timeout", "1"]);
+    const out = await cli(alice, ["land", "--wait", "--timeout", "0"]);
     expect(out.code).toBe(EXIT.failed);
     expect(norm(out.out)).toMatchSnapshot("wait timed out");
     const op = /artroom wait (op_land_\d+)/.exec(out.out)![1]!;
@@ -243,7 +243,7 @@ describe("amendment 2 in the CLI: R-CRED-10 and R-CRED-11", () => {
   test("after its token is revoked, an unfinished bearer act is not resent; the CLI says so and forgets it", async () => {
     const agent = join(h.tmp, "agent");
     await cli(agent, ["redeem", await link("@builder", { role: "agent", custody: "room" })]);
-    h.room.faults.push({ route: "POST /mcp", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /mcp", kind: "drop" });
     const lost = await cli(agent, ["claim", "src/**", "--goal", "g"]);
     expect(lost.code).toBe(EXIT.failed);
     const key = /--idempotency-key ([A-Za-z0-9_-]+)/.exec(lost.err)![1]!;

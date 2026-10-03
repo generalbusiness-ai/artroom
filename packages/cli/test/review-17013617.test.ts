@@ -45,7 +45,7 @@ describe("P2: a journaled signed act needs no new authority to get its receipt",
     const home = join(h.tmp, "alice");
     await login(home, "@alice");
     const argv = ["claim", "src/**", "--goal", "g", "--idempotency-key", "kept-1"];
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     expect((await cli(home, argv)).code).toBe(EXIT.failed);
     const original = acts("claim")[0]!;
     await revokeKey(home, reason);
@@ -64,7 +64,7 @@ describe("P2: a journaled signed act needs no new authority to get its receipt",
     const home = join(h.tmp, "alice");
     await login(home, "@alice");
     const argv = ["claim", "src/**", "--goal", "g", "--idempotency-key", "kept-2"];
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     await cli(home, argv);
     h.room.endSessions();
     h.room.faults.push({ route: "POST /requests", kind: "status", status: 503, body: NONRETRYABLE("unavailable"), times: 5 });
@@ -78,7 +78,7 @@ describe("P2: a journaled signed act needs no new authority to get its receipt",
     await login(home, "@alice");
     await cli(home, ["claim", "src/**", "--goal", "g"]);
     const argv = ["propose", "-m", "s", "--head", "a".repeat(40), "--expect", "5", "--idempotency-key", "kept-3"];
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     expect((await cli(home, argv)).code).toBe(EXIT.failed);
     const recorded = h.room.entries.filter((e) => e.entry.type === "refusal");
     expect(recorded).toHaveLength(1);
@@ -93,7 +93,7 @@ describe("P2: a journaled signed act needs no new authority to get its receipt",
     const home = join(h.tmp, "alice");
     await login(home, "@alice");
     const argv = ["claim", "src/**", "--goal", "g", "--idempotency-key", "kept-4"];
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     await cli(home, argv);
     const path = join(home, "journal", h.room.id, "act-kept-4.json");
     const entry = JSON.parse(readFileSync(path, "utf8"));

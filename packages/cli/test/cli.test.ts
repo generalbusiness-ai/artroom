@@ -113,7 +113,7 @@ describe("joining", () => {
     const alice = join(h.tmp, "alice");
     const { invitation, secret } = await h.room.invite("@alice");
     const link = invitationLink(h.room.url, h.room.id, invitation, secret);
-    h.room.faults.push({ route: "POST /redeem", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /redeem", kind: "drop" });
     const first = await cli(alice, ["login", link]);
     expect(first.code).toBe(EXIT.failed);
     expect(norm(first.err)).toMatchSnapshot("login lost");

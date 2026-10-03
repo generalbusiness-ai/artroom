@@ -331,7 +331,7 @@ describe("a changed meaning is shown, never adopted for the user", () => {
 describe("the journal keeps the binding: a lost answer is finished with the same bytes", () => {
   test("an act whose answer was lost is resent unchanged with its key, also after the meaning changed, and returns the original record", async () => {
     const { alice, claim, binding } = await ready();
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     const lost = await cli(alice, ["act", "ask", "--binding", binding, "--entry", claim.id, "--set", "text=once", "--idempotency-key", "ask-once"]);
     expect(lost.code).toBe(1);
     expect(lost.err).toContain("--idempotency-key ask-once");

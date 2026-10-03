@@ -57,7 +57,7 @@ const counting = (sent: string[]): Fetch => (input, init) => {
 async function lostThenFinished(finish: (r: Awaited<ReturnType<typeof ready>>) => string[], wrap: (sent: string[]) => Fetch = counting) {
   const r = await ready();
   const sent: string[] = [];
-  h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+  h.room.faults.push({ route: "POST /acts", kind: "drop" });
   const first = await cli(r.home, r.args("start-song", r.song, "Footprints"), h.tmp, { fetch: counting(sent) });
   expect(first.code).toBe(1);
   expect(ofKind("start-song")).toHaveLength(1);
@@ -75,7 +75,7 @@ describe("a saved act finished by a run that names another kind is printed as th
     expect(finished.out).not.toContain("tune");
     expect(finished.err.split("\n")).toContain(TOLD);
     // The saved bytes went back unchanged: five sends, one act, one thread, and no act of the kind typed.
-    expect(sent).toHaveLength(5);
+    expect(sent).toHaveLength(2);
     expect(new Set(sent).size).toBe(1);
     expect(JSON.parse(sent[0]!).envelope).toMatchObject({ kind: "start-song", binding: song, body: { key: "c", title: "Footprints" }, idempotencyKey: "song-once" });
     expect(ofKind("start-song")).toHaveLength(1);

@@ -85,6 +85,12 @@ export interface Io {
   readonly fetch?: typeof fetch;
   /** For tests: called after each durable local step, by name. Throwing here simulates an interruption. */
   readonly step?: (name: string) => void;
+  /**
+   * For tests: how many times the client sends a request again within one
+   * run after a retryable failure (`ClientOptions.retries`). Default: the
+   * client's own, with its waits between attempts.
+   */
+  readonly retries?: number;
 }
 
 export const EXIT = { ok: 0, failed: 1, usage: 2, refused: 3 } as const;
@@ -210,6 +216,7 @@ function roomOf(ctx: Ctx): { config: Config; id: RoomId; room: RoomConfig } {
 function clientOptions(ctx: Ctx): ClientOptions {
   return {
     ...(ctx.io.fetch ? { fetch: ctx.io.fetch } : {}),
+    ...(ctx.io.retries !== undefined ? { retries: ctx.io.retries } : {}),
     ...(ctx.values["verbose"] === true ? { log: (l: string) => ctx.io.err(`  ${l}`) } : {}),
   };
 }

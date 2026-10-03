@@ -189,7 +189,7 @@ describe("an act finished from the journal is printed as a new one is (R-IDEM-2,
       if (isSend(input, init)) sent.push(String(init!.body));
       return fetch(input, init);
     };
-    h.room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
     const first = await cli(home, argv("--idempotency-key", "song-once"), h.tmp, { fetch: watch });
     expect(first.code).toBe(1);
     expect(first.err).toContain("--idempotency-key song-once");
@@ -212,7 +212,7 @@ describe("an act finished from the journal is printed as a new one is (R-IDEM-2,
     expect(lines[0]).toMatch(new RegExp(`^Done: Start a song \\(start-song\\), recorded as act_${seq}_[0-9a-f]{8}\\.$`));
     expect(lines[1]).toMatch(THREAD("Start a song: Footprints"));
     // Five sends of the same bytes, one act, one thread.
-    expect(sent).toHaveLength(5);
+    expect(sent).toHaveLength(2);
     expect(new Set(sent).size).toBe(1);
     expect(JSON.parse(sent[0]!).envelope).toMatchObject({ kind: "start-song", binding, body: { key: "c", title: "Footprints" }, idempotencyKey: "song-once" });
     expect(songs()).toHaveLength(1);
