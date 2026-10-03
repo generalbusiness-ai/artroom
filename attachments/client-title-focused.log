@@ -1,0 +1,15 @@
+
+> @generalbusiness/artroom-client@0.0.0 test:node
+> vitest run --config vitest.config.ts test/checker-title-624.test.ts --reporter=default --reporter=json --outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/client-title-focused.vitest.json
+
+
+ RUN  v4.1.11 /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/repo/packages/client
+
+ ✓ test/checker-title-624.test.ts (8 tests) 4ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  18:20:59
+   Duration  479ms (transform 170ms, setup 0ms, import 246ms, tests 4ms, environment 0ms)
+
+JSON report written to /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/client-title-focused.vitest.json

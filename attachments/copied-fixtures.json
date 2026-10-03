@@ -1,0 +1,65 @@
+[
+  {
+    "oldSource": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/fixtures/packages/cli/test/checker-title-era-624.test.ts",
+    "copiedTo": "packages/cli/test/checker-title-era-624.test.ts",
+    "bytes": 4668,
+    "sha256": "006783aaae16bfa6da24cd41bf9fc34568d692a47015058d908441591c9942ff",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/fixtures/packages/client/test/checker-title-624.test.ts",
+    "copiedTo": "packages/client/test/checker-title-624.test.ts",
+    "bytes": 6898,
+    "sha256": "6ab2f6825358a22af460aaecc0cc2b30991cd9d284946457c443ee211114de9c",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-cli-retry-era-_eylsugl/planner-title-retry-era.test.ts",
+    "copiedTo": "packages/cli/test/planner-title-retry-era.test.ts",
+    "bytes": 3753,
+    "sha256": "6169736fb97d47357bc9d18a52b74e8e2d2e80496e5c82a56cff524284fec95d",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/tmp/artroom-checker-ui-624d-x3tfvfj8/probes/checker-ui-624-observations.test.ts",
+    "copiedTo": "packages/ui/test/checker-ui-624-observations.test.ts",
+    "bytes": 3611,
+    "sha256": "cd588f8b138c8c9aafe9dc3ba683a6e7711b1ea957fce8ac54bfec4c762cb705",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/tmp/artroom-checker-ui-624d-x3tfvfj8/probes/checker-ui-catalogue-cache.test.ts",
+    "copiedTo": "packages/ui/test/checker-ui-catalogue-cache.test.ts",
+    "bytes": 3236,
+    "sha256": "0a3cf3b77c9e3a0ba392910ad95ed57a80ecee8451dfe3ee360bb5973bae58e8",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/tmp/artroom-checker-ui-624d-x3tfvfj8/probes/checker-ui-f606-intents.test.tsx",
+    "copiedTo": "packages/ui/test/checker-ui-f606-intents.test.tsx",
+    "bytes": 6023,
+    "sha256": "724cc4a15a6ce70b403fc4836dcf3fc3ffc049c9fdb57c5a2f680c95b47cb7df",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/tmp/artroom-checker-ui-624d-x3tfvfj8/probes/checker-ui-f606-races.test.ts",
+    "copiedTo": "packages/ui/test/checker-ui-f606-races.test.ts",
+    "bytes": 8188,
+    "sha256": "b58e94872c699b49fa48a108e34b26ac7c723211783509c9de41cc14a9caed57",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/tmp/artroom-checker-ui-624d-x3tfvfj8/probes/checker-ui-preflight.test.tsx",
+    "copiedTo": "packages/ui/test/checker-ui-preflight.test.tsx",
+    "bytes": 6355,
+    "sha256": "27b74170c93db4e135c5e364bd79d03d8570ed4d55ed671dc873eb51131c490a",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/tmp/artroom-checker-ui-624d-x3tfvfj8/probes/planner-ui-unavailable.test.ts",
+    "copiedTo": "packages/ui/test/planner-ui-unavailable.test.ts",
+    "bytes": 5624,
+    "sha256": "8cf82744551421b1cb72887f273009f84316aa56cd4d75b26fd4bd05c03717d8",
+    "byteIdentical": true
+  }
+]
