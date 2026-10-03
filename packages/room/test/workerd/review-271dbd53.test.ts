@@ -170,6 +170,11 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     await failOnce(r, END);
     await inDO(r, (room) => room.core.steps.jobs().catch(() => undefined));
     await inDO(r, (room) => room.core.idle());
+    // The job token pass (its own alarm step since mint lane C) takes the row, now due.
+    await inDO(r, async (room) => {
+      await room.core.steps.jobTokens();
+      await room.core.idle();
+    });
     // Past the deadline the token has expired (it expires by the deadline): its record is settled, with no revocation needed.
     expect(r.world.artifacts.canonicalRepo().admits(token!.plaintext, "read")).toBe(false);
     expect((await ledger(r)).filter((x) => x["token_id"] === token!.id)).toEqual([]);

@@ -61,7 +61,7 @@ import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, pub
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
-import { issueJobs, moveJobMints, oweJobs } from "./jobs.ts";
+import { issueJobs, jobsDue, jobTokensDue, moveJobMints, oweJobs, revokeJobTokens } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
 import { judge } from "./authority.ts";
@@ -143,18 +143,19 @@ export interface Recomputation {
  * durable backoff after a failure (request 3da1d82b): an alarm that fires
  * early for other work skips a kind whose backoff has not ended.
  */
-export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing", "mints"] as const;
+export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing", "mints", "jobTokens"] as const;
 export type LoopKind = (typeof LOOP_KINDS)[number];
 /** Whether a kind of loop work may run now. */
 export type LoopDue = (kind: LoopKind) => boolean;
 /** Loop work that needs the canonical repository. */
-const NEEDS_REPOSITORY: ReadonlySet<LoopKind> = new Set(["pins", "previews", "provision", "landing", "mints"]);
+const NEEDS_REPOSITORY: ReadonlySet<LoopKind> = new Set(["pins", "previews", "provision", "landing", "mints", "jobTokens"]);
 /**
  * Loop work timed by its own durable due times (`nextAlarm`), never pending
- * by the 5-second loop: the landing engine and the canonical mint ledger.
+ * by the 5-second loop: the landing engine, the canonical mint ledger and
+ * ended job tokens' revocations.
  * Its backoff, after a failure of the step itself, ends only when it runs.
  */
-const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints"]);
+const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints", "jobTokens"]);
 
 let faultHook: ((point: string) => void) | null = null;
 
@@ -1757,6 +1758,10 @@ export class RoomCore {
       if (due("landing")) await this.resumeLanding();
     },
     jobs: () => issueJobs(this),
+    // Ended check job tokens owed revocation (mint lane C): a bounded pass, started and never awaited.
+    jobTokens: async (due: LoopDue = this.loopAllowed) => {
+      if (due("jobTokens")) revokeJobTokens(this);
+    },
     snapshots: async () => {
       if (this.founded) await this.snapshotRepos.reconcile();
     },
@@ -1839,8 +1844,9 @@ export class RoomCore {
   /**
    * May this kind of loop work run at all? Work that needs the canonical
    * repository (pins, previews, provisioning, landing and its evaluations,
-   * the mint ledger's revocations and observations) waits, kept, while it is
-   * gone: it cannot succeed (request 3da1d82b).
+   * the mint ledger's revocations and observations, ended job tokens'
+   * revocations) waits, kept, while it is gone: it cannot succeed (request
+   * 3da1d82b).
    */
   readonly loopAllowed: LoopDue = (kind) => !(NEEDS_REPOSITORY.has(kind) && this.canonicalGone() !== null);
 
@@ -1940,12 +1946,13 @@ export class RoomCore {
       snap = null;
     }
     if (snap !== null) times.push(snap);
-    // Check jobs owed, and jobs sent whose deadline passed with no answer.
-    const job = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM check_jobs WHERE state != 'done'"), "t");
+    // Check jobs owed, and jobs sent whose deadline passed with no answer; a batch left over 1 s ahead.
+    const job = jobsDue(this);
     if (job !== null) times.push(job);
-    // Ended job tokens whose revocation Artifacts has not confirmed yet.
-    const revoke = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM job_tokens"), "t");
-    if (revoke !== null) times.push(revoke);
+    // Ended job tokens whose revocation Artifacts has not confirmed yet: their own kind, which needs the canonical
+    // repository and waits for its backoff after a failure of its step (mint lane C); a backlog 1 s ahead.
+    const revoke = gone ? null : jobTokensDue(this);
+    if (revoke !== null) times.push(Math.max(revoke, backoff.jobTokens?.next ?? revoke));
     // The 5-second loop, while its work makes progress; each kind on its own backoff after a failure (budgets.ts `ALARM`).
     for (const kind of this.loopPendingKinds()) if (this.loopAllowed(kind)) times.push(backoff[kind]?.next ?? now + ALARM.pendingIntervalMs);
     // Log publication: when due, never sooner than the loop's interval from now.

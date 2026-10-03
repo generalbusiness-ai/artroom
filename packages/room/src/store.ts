@@ -111,6 +111,9 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS evidence_lane ON evidence (lane, generation)`,
   `CREATE INDEX IF NOT EXISTS keys_member ON keys (member)`,
   `CREATE INDEX IF NOT EXISTS check_snapshots_commit ON check_snapshots (commit_sha)`,
+  // Bounded batches of due work, earliest due first (mint lane C, R-MINT-7): job tokens owed revocation, and jobs not done.
+  `CREATE INDEX IF NOT EXISTS job_tokens_due ON job_tokens (next_ms, token_id)`,
+  `CREATE INDEX IF NOT EXISTS check_jobs_due ON check_jobs (next_ms) WHERE state != 'done'`,
 ];
 
 /** One schema step: idempotent, so a step that ran without recording its version runs again harmlessly. */

@@ -38,7 +38,7 @@
 import type { CheckInput, CheckJob, Digest, Glob, LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { checkerInputs } from "@generalbusiness/artroom-policy";
-import { MINT_WAIT_MS, errorNote, within, type MintLedger } from "@generalbusiness/artroom-git";
+import { MINT_WAIT_MS, OVERDUE_STEP_MS, errorNote, within, type MintLedger } from "@generalbusiness/artroom-git";
 import type { ActivePolicyFull, RoomCore } from "./core.ts";
 import { hex, randomBytes } from "./crypto.ts";
 import { iso } from "./ids.ts";
@@ -55,6 +55,8 @@ export const JOB_RETRY_MS = 30_000;
 export const JOB_IDLE_MS = 300_000;
 /** A canonical token is asked to expire this long before the job's deadline, as `SnapshotRepos.mint` does. */
 export const TOKEN_MARGIN_S = 5;
+/** Most jobs one jobs step issues, and most ended job tokens one revocation pass tries, earliest due first (R-MINT-7). */
+export const JOB_BATCH = 20;
 
 interface JobRow {
   readonly id: `job_${string}`;
@@ -153,17 +155,21 @@ function move(core: RoomCore, j: JobRow, set: string, ...values: (string | numbe
   return core.sql.all(`UPDATE check_jobs SET ${set} WHERE id = ? AND attempt = ? AND state = ? RETURNING id`, ...values, j.id, j.attempt, j.state).length > 0;
 }
 
-/** Issue every job that is due; an attempt past its deadline is due again. Ended tokens not yet revoked are tried first. */
+/**
+ * Issue the jobs that are due, at most `JOB_BATCH`, earliest due first; an
+ * attempt past its deadline is due again. The rest are due at once, and the
+ * alarm takes them up 1 s later (`jobsDue`). Ended job tokens are revoked by
+ * their own pass (`revokeJobTokens`).
+ */
 export async function issueJobs(core: RoomCore): Promise<void> {
   if (!core.founded) return;
-  for (const r of core.sql.all("SELECT token_id FROM job_tokens WHERE next_ms <= ?", core.now())) await settleToken(core, str(r, "token_id")!);
   const now = core.now();
   // A room the registry does not bind issues nothing (R-PUB-10); its debt waits, never past due.
   if (!(await core.isBound())) {
     core.sql.all("UPDATE check_jobs SET next_ms = ? WHERE state != 'done' AND next_ms <= ?", now + JOB_IDLE_MS, now);
     return;
   }
-  for (const r of core.sql.all("SELECT * FROM check_jobs WHERE state != 'done' AND next_ms <= ? ORDER BY rowid", now)) {
+  for (const r of core.sql.all("SELECT * FROM check_jobs WHERE state != 'done' AND next_ms <= ? ORDER BY next_ms, rowid LIMIT ?", now, JOB_BATCH)) {
     const j: JobRow = {
       id: str(r, "id") as JobRow["id"],
       owner: str(r, "owner") as OpId,
@@ -233,6 +239,57 @@ export function jobTokenDuties(core: RoomCore): {
     attempts: num(r, "attempts") ?? 0,
     status: str(r, "last_error"),
   }));
+}
+
+/** Each room's job token revocation pass while it runs: when its current attempt times out (room clock). */
+const tokenPasses = new WeakMap<RoomCore, { until: number }>();
+
+/**
+ * The job token revocation pass (R-MINT-4, R-MINT-7): at most `JOB_BATCH`
+ * rows due now, earliest due first, read by index. The pass runs in the
+ * background, one at a time, and the alarm never awaits it: later alarm
+ * steps are not held by a revocation's wait. A failure to read the batch
+ * is the step's own, and takes its kind's backoff (`jobTokens`).
+ */
+export function revokeJobTokens(core: RoomCore): void {
+  if (!core.founded || tokenPasses.has(core)) return;
+  const batch = core.sql.all("SELECT token_id FROM job_tokens WHERE next_ms <= ? ORDER BY next_ms, token_id LIMIT ?", core.now(), JOB_BATCH).map((r) => str(r, "token_id")!);
+  if (batch.length === 0) return;
+  const pass = { until: core.now() + (tokenWaits.get(core) ?? MINT_WAIT_MS) };
+  tokenPasses.set(core, pass);
+  core.kick("job-tokens", async () => {
+    try {
+      for (const token of batch) {
+        pass.until = core.now() + (tokenWaits.get(core) ?? MINT_WAIT_MS);
+        await settleToken(core, token);
+      }
+    } finally {
+      tokenPasses.delete(core);
+    }
+  });
+}
+
+/**
+ * When the job token pass should next run, or null: the earliest due row,
+ * not before the running pass's current attempt times out. A time already
+ * passed (a backlog larger than one pass) is now plus 1 s, never sooner; a
+ * still-future time is itself.
+ */
+export function jobTokensDue(core: RoomCore): number | null {
+  const t = num(one(core.sql, "SELECT MIN(next_ms) AS t FROM job_tokens"), "t");
+  if (t === null) return null;
+  const pass = tokenPasses.get(core);
+  const eligible = pass ? Math.max(t, pass.until) : t;
+  const now = core.now();
+  return eligible <= now ? now + OVERDUE_STEP_MS : eligible;
+}
+
+/** When the jobs step should next run, or null: the earliest job not done; overdue (a batch left over) is now plus 1 s. */
+export function jobsDue(core: RoomCore): number | null {
+  const t = num(one(core.sql, "SELECT MIN(next_ms) AS t FROM check_jobs WHERE state != 'done'"), "t");
+  if (t === null) return null;
+  const now = core.now();
+  return t <= now ? now + OVERDUE_STEP_MS : t;
 }
 
 /**

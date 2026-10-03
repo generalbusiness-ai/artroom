@@ -19,7 +19,7 @@ import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Check, CheckerConfig, CheckJob, Claim, Landing, OpId, Proposal, Refusal, Result } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import { setAlarmDelay, type Room } from "../../src/index.ts";
-import { setJobTokenWait } from "../../src/jobs.ts";
+import { jobTokensDue, setJobTokenWait } from "../../src/jobs.ts";
 import { artifactsErrors, type FakeRepo } from "../../src/memory/artifacts.ts";
 import { addMember, Client, clock, day, makeRoom, pushChange, type TestRoom } from "./support.ts";
 
@@ -613,7 +613,10 @@ describe("mint lane C (5): settlement at a known expiry", () => {
         for (let i = 0; i < 40 && (await jobTokens(r)).length > 0; i++) {
           const due = (await jobTokens(r))[0]!["next_ms"] as number;
           clock.now = Math.max(clock.now + 1_000, due);
-          await inDO(r, (room) => room.core.steps.jobs());
+          await inDO(r, async (room) => {
+            await room.core.steps.jobTokens();
+            await room.core.idle();
+          });
         }
         expect(await jobTokens(r)).toEqual([]);
         expect(t.revoked).toBe(false);
@@ -621,7 +624,10 @@ describe("mint lane C (5): settlement at a known expiry", () => {
         expect(clock.now).toBeGreaterThanOrEqual(t.expiresAt);
         const tried = asked.asked.length;
         clock.now += 600_000;
-        await inDO(r, (room) => room.core.steps.jobs());
+        await inDO(r, async (room) => {
+            await room.core.steps.jobTokens();
+            await room.core.idle();
+          });
         expect(asked.asked).toHaveLength(tried);
       } finally {
         asked.restore();
@@ -709,7 +715,10 @@ describe("mint lane C (5): an ended job token's revocation is bounded, and its e
           };
         });
         clock.now = row!["next_ms"] as number;
-        await inDO(e.r, (room) => room.core.steps.jobs());
+        await inDO(e.r, async (room) => {
+          await room.core.steps.jobTokens();
+          await room.core.idle();
+        });
         expect(await jobTokens(e.r)).toEqual([expect.objectContaining({ token_id: row!["token_id"], last_error: "the repository was not reached in time" })]);
         await inDO(e.r, () => release());
         await new Promise((resolve) => setTimeout(resolve, 20));
@@ -738,11 +747,158 @@ describe("mint lane C (5): an ended job token's revocation is bounded, and its e
         });
         clock.now = row!["next_ms"] as number;
         expect(clock.now).toBeLessThan(row!["expires_at"] as number);
-        await inDO(e.r, (room) => room.core.steps.jobs());
+        await inDO(e.r, async (room) => {
+          await room.core.steps.jobTokens();
+          await room.core.idle();
+        });
         expect(await jobTokens(e.r)).toEqual([]);
         expect(e.asked.length).toBe(before);
       } finally {
         e.restore();
       }
+    }));
+});
+
+// ------------------------------------------------------------------ bounded passes over due rows (R-MINT-7)
+
+describe("mint lane C: ended job tokens and due jobs are taken in bounded batches, earliest due first", () => {
+  /** `n` canonical read tokens, live for an hour, each in an ended job token row; row i is due at `t0 - n + i`. */
+  async function endedRows(r: TestRoom, n: number) {
+    const repo = r.world.artifacts.canonicalRepo() as Repo;
+    const t0 = clock.now;
+    const ids = Array.from({ length: n }, () => repo.mint("read", 3600).id);
+    await inDO(r, (room) => {
+      ids.forEach((id, i) => room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, 'ended')", id, t0 + 3600_000, t0 - n + i));
+    });
+    return ids;
+  }
+
+  it("45 ended job tokens due at once, the first revocation held: the first pass sends at most 20, earliest due first; the alarm's later steps still run; the backlog continues 1 s after each pass, and all 45 are revoked", () =>
+    ahead(async () => {
+      const r = await makeRoom();
+      const repo = r.world.artifacts.canonicalRepo() as Repo;
+      // An act not yet published: the alarm's publication step, which runs after the job token step, publishes it.
+      const claim = await r.admin.ok<Claim>("claim", null, { goal: "a lane", scope: ["docs/g/**"] });
+      clock.now += 10 * 60_000;
+      const ids = await endedRows(r, 45);
+      await inDO(r, (room) => setJobTokenWait(room.core, 5_000));
+      const real = repo.revokeToken.bind(repo);
+      const asked: string[] = [];
+      const hold = { on: true, until: Date.now() + 3_000 };
+      const mine = new Set(ids);
+      repo.revokeToken = async (id) => {
+        if (mine.has(id)) asked.push(id); // the log's own tokens are revoked here too
+        if (id === ids[0]) while (hold.on && Date.now() < hold.until) await new Promise((res) => setTimeout(res, 5));
+        return real(id);
+      };
+      try {
+        const before = (await r.admin.read({ q: "log" })).publishedThrough;
+        expect(await alarm(r)).toBe(true);
+        // The alarm returned while the first revocation was still held: the pass is not awaited.
+        const atReturn = { held: hold.on && Date.now() < hold.until, asked: [...asked] };
+        expect(atReturn).toEqual({ held: true, asked: [ids[0]] });
+        expect((await r.admin.read({ q: "log" })).publishedThrough).toBeGreaterThan(before);
+        expect(claim.lane).toBeDefined();
+        // While it is held, its rows are not eligible before the attempt's timeout; no alarm under 1 s ahead, none later.
+        expect(await inDO(r, (room) => jobTokensDue(room.core))).toBe(clock.now + 5_000);
+        const held = await stored(r);
+        expect(held! - clock.now).toBeGreaterThanOrEqual(1_000);
+        expect(held!).toBeLessThanOrEqual(clock.now + 5_000);
+        hold.on = false;
+        await settle(r);
+        expect(asked).toEqual(ids.slice(0, 20));
+        expect(await jobTokens(r)).toHaveLength(25);
+        // The backlog continues 1 s after the pass, through alarms alone: the next 20, then the last 5.
+        expect(await stored(r)).toBe(clock.now + 1_000);
+        clock.now += 1_000;
+        expect(await alarm(r)).toBe(true);
+        await settle(r);
+        expect(asked).toEqual(ids.slice(0, 40));
+        expect(await stored(r)).toBe(clock.now + 1_000);
+        clock.now += 1_000;
+        expect(await alarm(r)).toBe(true);
+        await settle(r);
+        expect(asked).toEqual(ids);
+        expect(ids.every((id) => token(r, id).revoked)).toBe(true);
+        expect(await jobTokens(r)).toEqual([]);
+        expect(await inDO(r, (room) => room.core.loopBackoff().jobTokens)).toBeUndefined();
+      } finally {
+        hold.on = false;
+        repo.revokeToken = real;
+      }
+    }));
+
+  it("the job token pass is its own kind of loop work: a failure of its step takes that kind's backoff; an earlier alarm skips it; its next time waits for the backoff; then it runs and clears it; while the canonical repository is gone it is neither run nor scheduled", () =>
+    ahead(async () => {
+      const r = await makeRoom();
+      await inDO(r, (room) => room.core.publish(true));
+      const ids = await endedRows(r, 3);
+      const asked = revocations(r);
+      try {
+        // The step fails once, reading its batch: as a storage failure would.
+        await inDO(r, (room) => {
+          const sql = room.core.sql as { all: (q: string, ...b: unknown[]) => unknown[] };
+          const real = sql.all;
+          let armed = true;
+          sql.all = (q: string, ...b: unknown[]) => {
+            if (armed && q.includes("FROM job_tokens WHERE next_ms <= ? ORDER BY next_ms")) {
+              armed = false;
+              throw new Error("storage failed");
+            }
+            return real(q, ...b);
+          };
+        });
+        await inDO(r, (room) => room.core.runAll());
+        const failed = await inDO(r, (room) => ({ fence: room.core.loopBackoff().jobTokens, next: room.core.nextAlarm(), now: clock.now }));
+        expect(asked.asked).toEqual([]);
+        expect(failed.fence).toEqual({ attempts: 1, next: failed.now + 5_000 });
+        expect(failed.next).toBe(failed.fence!.next); // its own time (now plus 1 s) waits for the backoff
+        clock.now += 1_000;
+        await inDO(r, (room) => room.core.runAll());
+        await settle(r);
+        expect(asked.asked).toEqual([]); // skipped, the backoff kept
+        expect(await inDO(r, (room) => room.core.loopBackoff().jobTokens)).toEqual(failed.fence);
+        clock.now = failed.fence!.next;
+        await inDO(r, (room) => room.core.runAll());
+        await settle(r);
+        expect(asked.asked.filter((x) => ids.includes(x))).toEqual(ids);
+        expect(await inDO(r, (room) => room.core.loopBackoff().jobTokens)).toBeUndefined();
+        // While the canonical repository is gone, a row is kept, and neither run nor scheduled.
+        const [later] = await endedRows(r, 1);
+        await inDO(r, (room) => room.core.sql.all("INSERT INTO meta (k, v) VALUES ('canonical_gone', ?)", JSON.stringify({ since: new Date(clock.now).toISOString(), head: room.core.headSeq() })));
+        await inDO(r, (room) => room.core.runAll());
+        await settle(r);
+        expect(asked.asked).not.toContain(later);
+        expect((await jobTokens(r)).map((x) => x["token_id"])).toEqual([later]);
+        expect(await inDO(r, (room) => room.core.nextAlarm())).toBeNull();
+      } finally {
+        asked.restore();
+      }
+    }));
+
+  it("25 jobs due at once: one jobs step takes the 20 due earliest; the rest are due 1 s later, and the next step takes them", () =>
+    ahead(async () => {
+      const r = await makeRoom();
+      const t0 = clock.now;
+      // Jobs whose lane no longer exists: each is closed as not needed, with no credential; due in reverse row order.
+      await inDO(r, (room) => {
+        for (let i = 0; i < 25; i++)
+          room.core.sql.all(
+            "INSERT INTO check_jobs (id, owner, lane, generation, obligation, checker, config, integration, base, state, next_ms) VALUES (?, 'op_x', 'lane_gone', 1, 'obl_x', 'unit', ?, ?, ?, 'owed', ?)",
+            `job_${String(i).padStart(2, "0")}`,
+            `sha256:${String(i).padStart(64, "0")}`,
+            "a".repeat(40),
+            "b".repeat(40),
+            t0 - i,
+          );
+      });
+      const done = async () => (await inDO(r, (room) => room.core.sql.all("SELECT id FROM check_jobs WHERE state = 'done' ORDER BY id"))).map((x) => String(x["id"]));
+      await inDO(r, (room) => room.core.steps.jobs());
+      // The earliest due are the last inserted: jobs 05 to 24.
+      expect(await done()).toEqual(Array.from({ length: 20 }, (_, i) => `job_${String(i + 5).padStart(2, "0")}`));
+      expect(await inDO(r, (room) => room.core.nextAlarm())).toBe(clock.now + 1_000);
+      clock.now += 1_000;
+      await inDO(r, (room) => room.core.steps.jobs());
+      expect(await done()).toHaveLength(25);
     }));
 });
