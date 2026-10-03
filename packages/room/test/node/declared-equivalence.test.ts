@@ -15,7 +15,7 @@
 import { describe, expect, it } from "vitest";
 import type { ActDeclaration, EnvelopeKind, PolicyDocumentV2, Role } from "@generalbusiness/artroom-contract";
 import { CODE_REVIEW_ACTS, codeReviewPolicy, defaultPolicy, delegableBy as vocabularyGrants } from "@generalbusiness/artroom-policy";
-import { checkBody, checkSignedEnvelope, ShapeError } from "../../src/schema.ts";
+import { checkBody, checkDeclaredTarget, checkSignedEnvelope, ShapeError } from "../../src/schema.ts";
 import { delegableBy, roleMaySign } from "../../src/roster.ts";
 
 const legacy = defaultPolicy();
@@ -146,9 +146,23 @@ describe("the code-review declarations judge envelopes and targets as the legacy
       for (const target of targets) {
         const v1 = { envelope: { v: 1, room, actor: key, kind, target, body: {}, idempotencyKey: "k1" }, sig };
         const v2 = { envelope: { v: 2, room, actor: key, kind, binding, target, body: {}, idempotencyKey: "k1" }, sig };
-        expect(outcome(() => checkSignedEnvelope(v2, declared)), JSON.stringify(target)).toBe(outcome(() => checkSignedEnvelope(v1)));
+        // As admission judges a declared act's target: any well-formed target at step 1, then, once step 4a has shown
+        // the binding is the active declaration's, the shapes that declaration accepts (`checkDeclaredTarget`).
+        const asAdmitted = outcome(() => {
+          checkSignedEnvelope(v2, declared);
+          checkDeclaredTarget(declared, kind, target);
+        });
+        expect(asAdmitted, JSON.stringify(target)).toBe(outcome(() => checkSignedEnvelope(v1)));
       }
     });
+
+  it("step 1 does not judge a declared kind's target: the declaration's shapes are judged after step 4a, in the legacy words", () => {
+    const at = (target: unknown) => outcome(() => checkSignedEnvelope({ envelope: { v: 2, room, actor: key, kind: "propose", binding, target, body: {}, idempotencyKey: "k1" }, sig }, declared));
+    for (const target of [null, { lane }, { lane, generation: 0 }, { act: lane }, "thread"]) expect(at(target), JSON.stringify(target)).toBe("ok");
+    expect(outcome(() => checkDeclaredTarget(declared, "propose", { lane }))).toBe("ok");
+    expect(outcome(() => checkDeclaredTarget(declared, "propose", null))).toBe("bad-request: envelope.target must be an object.");
+    expect(outcome(() => checkDeclaredTarget(declared, "propose", { lane, generation: 1 }))).toBe("bad-request: envelope.target.generation is not a field of this type.");
+  });
 
   it("a v2 room: a kind of the grammar passes step 1 whatever it is; v: 2 needs a binding; a platform kind is v: 1; recover targets follow the op", () => {
     const e = (over: Record<string, unknown>) => ({ envelope: { v: 2, room, actor: key, kind: "merge", binding, target: null, body: {}, idempotencyKey: "k1", ...over }, sig });

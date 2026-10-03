@@ -114,7 +114,7 @@ import {
 } from "./obligations.ts";
 import type { ArtroomConfig, DiffResult, Evaluation, ObligationSpec } from "./ports.ts";
 import { activeAdmins, activeKeys, delegableBy, delegation, invitation, keyRow, memberRow, recoveryKey, revocationOf, teamsOf } from "./roster.ts";
-import { checkBody, checkEnvelopeSize, checkSignedEnvelope, ShapeError } from "./schema.ts";
+import { checkBody, checkEnvelopeSize, checkSignedEnvelope, ShapeError, checkDeclaredTarget } from "./schema.ts";
 import { limitInvitation } from "./ratelimit.ts";
 import { scanValue } from "./secrets.ts";
 import { one, num, setMeta, str } from "./store.ts";
@@ -370,6 +370,13 @@ export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: Admissi
     if (current === null) return { t: "unrecorded", refusal: kindUndeclared(env.kind, policy.version) }; // G2:undeclared
     const signedFor = (env as Signer).binding;
     if ((env.v as number) !== 2 || signedFor !== current) return { t: "unrecorded", refusal: bindingStale(env.kind, signedFor, current, policy.version) }; // G2:stale
+    // The target, against the declaration the binding names (R-DECL-4): bad-request, thrown, as step 1's is.
+    try {
+      checkDeclaredTarget(policy.doc, env.kind, env.target); // G2:target-after-4a
+    } catch (e) {
+      if (e instanceof ShapeError) throw artroomError("bad-request", e.message);
+      throw e;
+    }
   }
   // Step 5: body schema and sizes (R-SIG-4, R-SIG-6, R-PATH-1).
   let fixed: ReadonlySet<string>;
@@ -851,6 +858,9 @@ async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
   const leaseSeconds = ctx.decl?.hold?.leaseSeconds;
   const recordedLease = declared ? (leaseSeconds !== undefined ? leaseSeconds * 1000 : core.leaseMs) : null; // G2:lease-record
   const leaseMs = recordedLease ?? core.leaseMs;
+  // R-DECL-6: the conflict mode is fixed at open too: the hold's, else the policy's `lanes` now; a recovery thread is
+  // by-scope to others. It is recorded here and judged from stage 4 (the either-side rule of R-DECL-9).
+  const conflict = declared ? (ctx.recover ? "by-scope" : (ctx.decl?.hold?.conflict ?? (ctx.policy.doc as AnyPolicyDocument).lanes)) : null; // G2:conflict-record
   if (purpose === "config-recovery") {
     ctx.flags.push("config-recovery");
     if (ctx.authority.via !== "member" || ctx.authority.role !== "admin")
@@ -866,7 +876,8 @@ async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
   const r = purpose === "config-recovery" ? null : await policyRefuse(ctx, lane);
   if (r) return refused(ctx, r);
   const lease = { holder: ctx.authority.member!, generation: 1, expiresAt: iso(ctx.now + leaseMs) };
-  const effect = { type: "opened" as const, purpose, lease };
+  // R-LOG-6 as amended: in a v2 room the opened effect names the thread's kind and the opening act's binding.
+  const effect = { type: "opened" as const, purpose, lease, ...(declared ? { kind, binding } : {}) }; // G2:opened-kind
   return {
     t: "accept",
     ctx,
@@ -876,7 +887,7 @@ async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
     apply: (entry, id) => {
       const overlaps = overlapsFor(core.sql, id, body.scope);
       core.sql.all(
-        "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, kind, binding, lease_ms) VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, 'held', ?, ?, ?)",
+        "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, kind, binding, lease_ms, conflict) VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, 'held', ?, ?, ?, ?)",
         id,
         entry.seq,
         purpose,
@@ -888,6 +899,7 @@ async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
         kind,
         binding,
         recordedLease,
+        conflict,
       );
       const rec: Claim = {
         ...recordBase(ctx, entry, id, "claim", receiptOf(entry)),

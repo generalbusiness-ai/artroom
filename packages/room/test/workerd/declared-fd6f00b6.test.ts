@@ -196,10 +196,10 @@ describe.skipIf(DECLARED)("step 4a: kind-undeclared and binding-stale, unrecorde
     // A new note on an entry is not in this vocabulary: bad-request at step 1, as before.
     const fresh = await signed(r, r.admin, "note", { act: c.id }, { text: "again" });
     expect((await failure(r.stub.submit(fresh))).code).toBe("bad-request");
-    // Only the exact envelope with its own signature is answered: not another body under the same key, nor another signature.
+    // Another body under the same key is another act, as ever; another signature on the same envelope is not authentic.
     const sameKey = await signed(r, r.admin, "note", { act: c.id }, { text: "other" }, { ikey: (note.envelope as unknown as { idempotencyKey: string }).idempotencyKey });
-    expect((await failure(r.stub.submit(sameKey))).code).toBe("bad-request");
-    expect((await failure(r.stub.submit({ envelope: note.envelope, sig: fresh.sig } as never))).code).toBe("bad-request");
+    expectRefusal(await call(r.stub.submit(sameKey)), "idempotency-mismatch");
+    expect((await failure(r.stub.submit({ envelope: note.envelope, sig: fresh.sig } as never))).code).toBe("unauthenticated");
     // The room returns to a v1 document: a v: 2 envelope is bad-request there, but the accepted one keeps its receipt.
     const binding = (await bindingIn(r, "claim"))!;
     const claim = await signed(r, r.admin, "claim", null, { goal: "h", scope: ["docs/**"] });
@@ -209,6 +209,11 @@ describe.skipIf(DECLARED)("step 4a: kind-undeclared and binding-stale, unrecorde
     expect(await call(r.stub.submit(claim))).toEqual(accepted);
     const late = await signed(r, r.admin, "claim", null, { goal: "i", scope: ["lib/**"] }, { binding });
     expect(await failure(r.stub.submit(late))).toMatchObject({ code: "bad-request", message: "envelope.binding is not a field of this type." });
+    // Here step 1 fails before idempotency is asked, so the room looks the retry up itself: only the exact envelope,
+    // with its own signature, is answered. Another body under the same key, and another signature, stay bad-request.
+    const other = await signed(r, r.admin, "claim", null, { goal: "other", scope: ["docs/**"] }, { binding, ikey: (claim.envelope as unknown as { idempotencyKey: string }).idempotencyKey });
+    expect((await failure(r.stub.submit(other))).code).toBe("bad-request");
+    expect((await failure(r.stub.submit({ envelope: claim.envelope, sig: late.sig } as never))).code).toBe("bad-request");
     expect(seq1).toBeGreaterThan(seq);
     expect(await headSeq(r)).toBe(seq1);
   });
@@ -648,8 +653,21 @@ describe.skipIf(DECLARED)("refusal wording from the declaration (R-DECL-13)", ()
     const t = await ok<Claim>(typed, typed.admin, "claim", null, { goal: "g", scope: ["src/**"] });
     const err = expectRefusal(await act(typed, typed.admin, "note", { act: t.id }, { text: "hi" }), "policy-type-error");
     expect(err.reason).not.toContain("Declared");
-    // An unrecorded refusal is worded too, and an act without wording keeps the platform's.
-    expectRefusal(await act(r, bob, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head: "a".repeat(40), summary: "s" }), "not-holder");
+    // An act without wording keeps the platform's.
+    expect(expectRefusal(await act(r, bob, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head: "a".repeat(40), summary: "s" }), "not-holder").reason).not.toContain("to let go");
+    // Unrecorded refusals are worded too: at step 4, step 4a and step 5.
+    const worded = await declaredRoom(
+      v2((a) => {
+        const refusals = { "role-forbids": { reason: "Declared: {kind} is not for you.", fix: "Declared fix." }, "invalid-body": { reason: "Declared invalid {kind}.", fix: "Declared fix." }, "binding-stale": { reason: "Declared stale {kind}.", fix: "Declared fix." } };
+        a["claim"] = { ...a["claim"]!, refusals };
+      }),
+    );
+    const ci = await addMember(worded, "@ci", "checker");
+    expect(expectRefusal(await act(worded, ci, "claim", null, { goal: "g", scope: ["src/**"] }), "role-forbids")).toMatchObject({ reason: "Declared: claim is not for you.", fix: "Declared fix." });
+    expect(expectRefusal(await act(worded, worded.admin, "claim", null, { scope: ["src/**"] }), "invalid-body").reason).toBe("Declared invalid claim.");
+    const staleOut = expectRefusal(await act(worded, worded.admin, "claim", null, { goal: "g", scope: ["src/**"] }, { binding: `sha256:${"2".repeat(64)}` }), "binding-stale");
+    expect(staleOut.reason).toBe("Declared stale claim.");
+    expect(staleOut.current?.binding).toBe(await bindingIn(worded, "claim"));
   });
 });
 
@@ -714,18 +732,18 @@ describe.skipIf(DECLARED)("the lease rule (R-DECL-6, R-DECL-9, R-DECL-15)", () =
     expect(again.lease.expiresAt).toBe(iso(clock.now + 900_000));
   });
 
-  it("a revert thread opened under a v2 document records the room's lease; under a v1 document it records none", async () => {
-    const rows = async (r: TestRoom) => inDO(r, (room) => room.core.sql.all("SELECT kind, lease_ms FROM lanes WHERE revert_of IS NOT NULL"));
+  it("a revert thread opened under a v2 document records the room's lease and the policy's conflict mode; under a v1 document it records neither", async () => {
+    const rows = async (r: TestRoom) => inDO(r, (room) => room.core.sql.all("SELECT kind, lease_ms, conflict FROM lanes WHERE revert_of IS NOT NULL"));
     const open = (r: TestRoom) =>
       inDO(r, (room) =>
         room.core.sql.transaction(() => room.core.host().record({ type: "revert-lane", of: "op_land_1" as never, scope: ["src/**"], reason: "abort-after-landing" } as never)),
       );
     const d = await declaredRoom();
     await open(d);
-    expect(await rows(d)).toEqual([{ kind: "room", lease_ms: LEASE }]);
+    expect(await rows(d)).toEqual([{ kind: "room", lease_ms: LEASE, conflict: v2().lanes }]);
     const l = await makeRoom();
     await open(l);
-    expect(await rows(l)).toEqual([{ kind: "room", lease_ms: null }]);
+    expect(await rows(l)).toEqual([{ kind: "room", lease_ms: null, conflict: null }]);
   });
 });
 
@@ -828,8 +846,8 @@ describe.skipIf(DECLARED)("migration 4 (thread kind, binding and lease; grant ma
       await inDO(r, (room) => {
         const sql = room.core.sql;
         sql.all("INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, why, handover, revert_of, kind) VALUES ('act_99_aaaaaaaa', 99, 'ordinary', 'r', NULL, '[\"**\"]', 0, 0, NULL, NULL, 'unheld', 'opened-by-room', NULL, 'op_land_1', 'room')");
-        // The store as version `from` had it: without the five columns.
-        for (const [table, column] of [["lanes", "kind"], ["lanes", "binding"], ["lanes", "lease_ms"], ["delegations", "acts"], ["invitations", "declared"]]) sql.all(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+        // The store as version `from` had it: without the six columns.
+        for (const [table, column] of [["lanes", "kind"], ["lanes", "binding"], ["lanes", "lease_ms"], ["lanes", "conflict"], ["delegations", "acts"], ["invitations", "declared"]]) sql.all(`ALTER TABLE ${table} DROP COLUMN ${column}`);
         sql.all("UPDATE schema_version SET v = ? WHERE id = 1", from);
       });
       const r2 = await restarted(r);

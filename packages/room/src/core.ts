@@ -50,7 +50,7 @@ import type {
   Sha,
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
-import { bindingSubject, checkerInputs, isDeclared, ownersFor, validatePolicyV2 } from "@generalbusiness/artroom-policy";
+import { bindingSubject, checkerInputs, declarationOf, isDeclared, isPlatformKind, ownersFor, validatePolicyV2 } from "@generalbusiness/artroom-policy";
 import { stagedProblems } from "./declared.ts";
 import { canonicalize, parseStrict, utf8 } from "./canonical.ts";
 import { b64url, digestJson, keyPairFromSeed, sha256Hex, unb64url, verify } from "./crypto.ts";
@@ -1091,7 +1091,12 @@ export class RoomCore {
     const entry = this.landEnvelope(op);
     if (!entry || entry.type !== "act") return { reason: "authority-lost", fix: "Land again." };
     const env = entry.act.envelope;
-    const j = judge(this.sql, env, "submitted", this.now(), this.activePolicy().doc);
+    const doc = this.activePolicy().doc as AnyPolicyDocument;
+    // Admission refuses an undeclared kind at step 4a; here there is no step 4a, and `judge` leaves that kind's role
+    // and coverage unjudged. So a landing whose kind the active document no longer declares has lost its authority.
+    if (isDeclared(doc) && !isPlatformKind(env.kind) && declarationOf(doc, env.kind) === null)
+      return { reason: "authority-lost", fix: `The room's active policy no longer declares ${env.kind}, so the landing's authority cannot be judged. Land again with an act the room declares.` }; // G2:revalidate-undeclared
+    const j = judge(this.sql, env, "submitted", this.now(), doc);
     if (!j.ok) return { reason: "authority-lost", fix: `The land initiator's authority is no longer current (${j.refusal.rule}). Land again with current authority.` };
     const lane = laneRow(this.sql, op.lane);
     if (lane?.purpose === "config-recovery" && !(j.authority.via === "member" && j.authority.role === "admin"))
@@ -1436,14 +1441,17 @@ export class RoomCore {
       const scope = event.scope.length ? [...event.scope] : ["**"];
       // R-DECL-6: a thread of kind `room`. Under a v2 document the room's lease is resolved and recorded now.
       const leaseMs = isDeclared(this.activePolicy().doc) ? this.leaseMs : null; // G2:revert-lease
+      // R-DECL-6: a room thread has the conflict mode of the policy in force when it opened.
+      const conflict = isDeclared(this.activePolicy().doc) ? this.activePolicy().doc.lanes : null; // G2:revert-conflict
       this.sql.all(
-        "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, why, handover, revert_of, kind, binding, lease_ms) VALUES (?, ?, 'ordinary', ?, NULL, ?, 0, 0, NULL, NULL, 'unheld', 'opened-by-room', NULL, ?, 'room', NULL, ?)",
+        "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, why, handover, revert_of, kind, binding, lease_ms, conflict) VALUES (?, ?, 'ordinary', ?, NULL, ?, 0, 0, NULL, NULL, 'unheld', 'opened-by-room', NULL, ?, 'room', NULL, ?, ?)",
         act,
         seq,
         `Revert the landing of ${event.of}`,
         JSON.stringify(scope),
         event.of,
         leaseMs,
+        conflict,
       );
       this.attendAdmins(seq, act, { why: "revert-lane", lane: act, of: event.of }, `The room opened revert lane ${act} for ${event.of}. Any member may take it over.`);
     } else if (event.type === "publication-unresolved") {

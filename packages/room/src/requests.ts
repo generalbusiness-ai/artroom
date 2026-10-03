@@ -260,15 +260,47 @@ function sessionGrant(core: RoomCore, inv: NonNullable<ReturnType<typeof invitat
     // granted the delegable platform kinds of its role, and it still grants only those.
     if (inv.declared && session === undefined) { // G2:invitation-no-gain
       const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
-      return { kinds: role ? DELEGABLE_PLATFORM.filter((k) => (delegableBy(role) as readonly string[]).includes(k)) : [] };
+      return emptyUnderV1({ kinds: role ? DELEGABLE_PLATFORM.filter((k) => (delegableBy(role) as readonly string[]).includes(k)) : [] }, policy.version);
     }
-    return { kinds: session?.kinds ?? "*" };
+    return emptyUnderV1({ kinds: session?.kinds ?? "*" }, policy.version);
   }
-  if (session?.acts !== undefined) return { kinds: session.kinds as readonly string[], acts: session.acts }; // G2:session-map
+  if (session?.acts !== undefined) {
+    // A kind the session's map names that the active document no longer declares: no binding of it is the active one,
+    // so the redemption is binding-stale, as R-DECL-17 words it for a redemption, not the grant's kind-undeclared.
+    const gone = Object.keys(session.acts).find((k) => core.declaredBinding(k) === null);
+    if (gone !== undefined)
+      return {
+        refusal: refusal(
+          "binding-stale",
+          `The invitation's session was prepared for ${gone} as ${session.acts[gone]}; the room's active policy, version ${policy.version}, no longer declares ${gone}.`,
+          "Ask an admin to invite again.",
+          { current: { policy: policy.version } },
+        ), // G2:session-retired
+      };
+    return { kinds: session.kinds as readonly string[], acts: session.acts }; // G2:session-map
+  }
   const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
   if (!role) return { kinds: [], acts: {} };
   const covered: readonly string[] = session === undefined || session.kinds === "*" ? delegableBy(role) : session.kinds;
   return { kinds: grantable(doc, role).platform.filter((k) => covered.includes(k)), acts: {} }; // G2:session-intersection
+}
+
+/**
+ * Under a `v1` document a session's delegation must name at least one kind
+ * (R-ADM-5). A session from a `v2` document may grant none there: a role
+ * that may not sign `renew`, or a map with no kinds. It is refused with a
+ * reason that says so, and the invitation stays unused, instead of failing
+ * on the delegate's shape.
+ */
+function emptyUnderV1(grant: { kinds: readonly string[] | "*" }, version: string): { kinds: readonly string[] | "*" } | { refusal: Refusal } {
+  if (grant.kinds === "*" || grant.kinds.length > 0) return grant;
+  return {
+    refusal: refusal(
+      "delegation-invalid",
+      `This invitation's session grants no kind under the room's active policy, version ${version}.`,
+      "Ask an admin to invite again.",
+    ), // G2:session-empty
+  };
 }
 
 class Abort extends Error {
@@ -450,7 +482,7 @@ function builtBefore(core: RoomCore, key: string, ikey: unknown, kind: unknown):
   if (typeof ikey !== "string" || typeof kind !== "string") return null;
   const prior = one(core.sql, "SELECT seq FROM idem WHERE actor = ? AND ikey = ?", key, ikey);
   const entry = prior ? entryAt(core.sql, num(prior, "seq")! as never) : null;
-  if (!entry || entry.entry.type !== "act") return null;
+  if (!entry || entry.entry.type === "system") return null; // G2:bearer-refusal: an accepted act or a recorded refusal, both hold the envelope the room signed
   const env = entry.entry.act.envelope as unknown as { v: 1 | 2; kind: string; binding?: string };
   return env.kind === kind ? { v: env.v, binding: env.binding } : null;
 }

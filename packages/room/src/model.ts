@@ -57,6 +57,8 @@ export interface LaneRow {
   readonly binding: string | null;
   /** The lease length recorded when it opened (R-DECL-9); null: the room's current lease, as a legacy thread keeps. */
   readonly leaseMs: number | null;
+  /** The conflict mode recorded when it opened (R-DECL-6); null for a thread opened under the legacy vocabulary. */
+  readonly conflict: "exclusive" | "by-scope" | null;
 }
 
 export function laneRow(sql: Sql, id: string): LaneRow | null {
@@ -80,6 +82,7 @@ export function laneRow(sql: Sql, id: string): LaneRow | null {
     kind: str(r, "kind")!,
     binding: str(r, "binding"),
     leaseMs: num(r, "lease_ms"),
+    conflict: str(r, "conflict") as "exclusive" | "by-scope" | null,
   };
 }
 

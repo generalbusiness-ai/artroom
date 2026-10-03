@@ -272,10 +272,11 @@ function explain(core: RoomCore, act: ActId): Explanation | null {
   const e = entry.entry;
   const decisions = e.type === "system" ? (e.event.type === "notified" ? e.event.decisions : []) : e.receipt.decisions;
   let evidence: Explanation["evidence"];
-  if (e.type === "act" && e.act.envelope.kind === "propose") {
-    const t = e.act.envelope.target as { lane: LaneId };
-    const g = one(core.sql, "SELECT generation FROM generations WHERE act = ?", act);
-    if (g) {
+  // An act with step `version`, whatever its kind is called: the version row names the act that made it.
+  if (e.type === "act") {
+    const t = e.act.envelope.target as { lane: LaneId } | null;
+    const g = t && typeof t.lane === "string" ? one(core.sql, "SELECT generation FROM generations WHERE act = ?", act) : undefined; // G2:explain-version
+    if (g && t) {
       const gen = generationRow(core.sql, t.lane, num(g, "generation")!)!;
       evidence = obligationsFor(core.sql, t.lane, gen.generation, { doc: core.activePolicy().doc })
         .map(publicObligation)
@@ -304,7 +305,8 @@ export function summary(e: LogEntry): EntrySummary {
   }
   const env = x.act.envelope;
   const t = env.target as { lane?: LaneId } | null;
-  const lane = t?.lane ?? (env.kind === "claim" && env.target === null && x.type === "act" ? idOf(e) : undefined);
+  // An act that opened a thread, whatever its kind is called: its receipt has the `opened` effect, and the thread's ID is its own.
+  const lane = t?.lane ?? (x.type === "act" && x.receipt.effects.some((f) => f.type === "opened") ? idOf(e) : undefined); // G2:summary-opened
   return { id: idOf(e), seq: e.seq, type: x.type, kind: env.kind, ...(lane ? { lane } : {}), by: x.receipt.authority.member, at: e.at };
 }
 
