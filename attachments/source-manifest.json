@@ -1,0 +1,208 @@
+{
+  "head": "5449d19c5681a9b2af1593d519399b187defea0e",
+  "tree": "d3a638c31c45af6cb6d36b7377c3dd554429eb90",
+  "sources": [
+    {
+      "path": "packages/room/src/core.ts",
+      "snapshot": "source-snapshot/packages/room/src/core.ts",
+      "sha256": "81ea96a1ca62db937a6c8f2b93bddc432692f5ee268ba260b20ae898432e6323",
+      "git_blob": "b6563a2b55095322c0a777e70f299f27e82a9cf4",
+      "bytes": 104898
+    },
+    {
+      "path": "packages/room/src/obligations.ts",
+      "snapshot": "source-snapshot/packages/room/src/obligations.ts",
+      "sha256": "62ae71ecfab37d1ab5aa9154b821284878bf53844866a9c874437d135cf37628",
+      "git_blob": "425c83a582c54ea4d8a3148853e3297d6c115610",
+      "bytes": 13220
+    },
+    {
+      "path": "packages/log/src/verify.ts",
+      "snapshot": "source-snapshot/packages/log/src/verify.ts",
+      "sha256": "9d45d45ebd6c7b8a45589826664202456b7de48b58c713a1aa495a0e7fb0a987",
+      "git_blob": "faf72d6c2bec89f7410266856374c589ba0cc55d",
+      "bytes": 78762
+    },
+    {
+      "path": "packages/log/src/fold.ts",
+      "snapshot": "source-snapshot/packages/log/src/fold.ts",
+      "sha256": "9f09db7b4dff59806a39377aace4d39be64c4672f9caa52fc8a57de0e539432f",
+      "git_blob": "63f25d7c1752c73ed7f96dab6e7c2d2631995eae",
+      "bytes": 21925
+    },
+    {
+      "path": "packages/log/src/obligations.ts",
+      "snapshot": "source-snapshot/packages/log/src/obligations.ts",
+      "sha256": "92a42269e9dd7a797dfff181c86588bb725111b3cec159a99a937e4faebdd972",
+      "git_blob": "6454d25b1175676209fef4ae859641fc9f4e185a",
+      "bytes": 20289
+    },
+    {
+      "path": "packages/log/src/calls.ts",
+      "snapshot": "source-snapshot/packages/log/src/calls.ts",
+      "sha256": "b13b1f73920e58950ce27584ad48fdd5e8ff4c416d148698b5a33a9d025aff3f",
+      "git_blob": "a881d4b76675d38a59e0f5f63831d8a404054bfa",
+      "bytes": 18305
+    },
+    {
+      "path": "packages/log/src/roster.ts",
+      "snapshot": "source-snapshot/packages/log/src/roster.ts",
+      "sha256": "880a4c358a06b423824075127dbf40f7cf225aa8382ecfb9ec88052214fd72fc",
+      "git_blob": "b79139d34cbc6be158c4fb9e2f4c728d8411af62",
+      "bytes": 19792
+    },
+    {
+      "path": "packages/log/src/decode.ts",
+      "snapshot": "source-snapshot/packages/log/src/decode.ts",
+      "sha256": "52efce451b408466ccc377caaec646a23bd0b5d8d039812327041afbaf537c64",
+      "git_blob": "acf0884bafae04fdeeef896ad3dfd9d3c8c173b9",
+      "bytes": 23286
+    },
+    {
+      "path": "packages/log/src/declared.ts",
+      "snapshot": "source-snapshot/packages/log/src/declared.ts",
+      "sha256": "4fb57fa4c219fd3534ea6480eaac8d8662eec814265cbd2cef3e5b4a4c285ae1",
+      "git_blob": "d66833dafe88648320953a40601fe2719f291647",
+      "bytes": 21358
+    },
+    {
+      "path": "packages/policy/src/carry.ts",
+      "snapshot": "source-snapshot/packages/policy/src/carry.ts",
+      "sha256": "7874bcf63a89f725304058547552a224bcee88b0a5f191df86a365c927405757",
+      "git_blob": "9dffa77d54c32086310dae65b91d6b2b1501308b",
+      "bytes": 9662
+    },
+    {
+      "path": "packages/policy/src/rules.ts",
+      "snapshot": "source-snapshot/packages/policy/src/rules.ts",
+      "sha256": "593083757aade254679de326ef008cb6231356330450e10322fa22125f9545aa",
+      "git_blob": "039b07b16b3886e2a13c2d4a64442741d1df649b",
+      "bytes": 26725
+    },
+    {
+      "path": "packages/policy/src/evaluator.ts",
+      "snapshot": "source-snapshot/packages/policy/src/evaluator.ts",
+      "sha256": "046295fe0d96f1f1b0ba1f7fda2eeba6baddaf6d22123edf19c7bbe8c9d082af",
+      "git_blob": "74e3e1e175819df4cbf23e0b2ce2a81c48cc2f19",
+      "bytes": 14649
+    },
+    {
+      "path": "packages/policy/src/context.ts",
+      "snapshot": "source-snapshot/packages/policy/src/context.ts",
+      "sha256": "36e69a4aebb37471f60cd4e371d96a46e2e4f119152a939cbe82f203cc5512db",
+      "git_blob": "8168366fbe4ba5611d5ff74b36eafce8f88fb11c",
+      "bytes": 2696
+    },
+    {
+      "path": "packages/policy/src/activation.ts",
+      "snapshot": "source-snapshot/packages/policy/src/activation.ts",
+      "sha256": "f79aa80ff62b1c357e8ee97229d63c3f0c3fc23b5f76185c2ef057e49cb6c74c",
+      "git_blob": "073cf11799a8d15d975514302a8f4b7189bdf5b8",
+      "bytes": 4344
+    },
+    {
+      "path": "packages/git/src/landing/engine.ts",
+      "snapshot": "source-snapshot/packages/git/src/landing/engine.ts",
+      "sha256": "8d7f2baf249ac8f4fe6622a980c2f4fd550088e8f3619e614b798917e7b1b4be",
+      "git_blob": "a7893101ddf1b900df91a8917e42f03a95eb1d6f",
+      "bytes": 22941
+    },
+    {
+      "path": "packages/git/src/landing/core.ts",
+      "snapshot": "source-snapshot/packages/git/src/landing/core.ts",
+      "sha256": "bccde7c464eaa5569d266f78c7716afd27c5f5f83fe4891f4fd04be00df4d071",
+      "git_blob": "4a5050e909a9f8e14fb9e9ac4b78048e6a4aa6f2",
+      "bytes": 41162
+    },
+    {
+      "path": "packages/git/src/landing/types.ts",
+      "snapshot": "source-snapshot/packages/git/src/landing/types.ts",
+      "sha256": "a60f0664780dfc408baf97c2f5277be547483f87331a5e1d50567badf6878ad8",
+      "git_blob": "710952d9ad9179cd6bda9fb672cea2c78d2e7d9f",
+      "bytes": 7334
+    },
+    {
+      "path": "packages/log/test/support/declared-room.ts",
+      "snapshot": "source-snapshot/packages/log/test/support/declared-room.ts",
+      "sha256": "edf8da4e0e3d4fd71ae5706304b57513d37c41b4181cc7758dbb09debfac29bc",
+      "git_blob": "34ee3c7b5457ea61f86d0c65a60bf5159a49f0cd",
+      "bytes": 51247
+    },
+    {
+      "path": "packages/log/test/support/room-obligations.ts",
+      "snapshot": "source-snapshot/packages/log/test/support/room-obligations.ts",
+      "sha256": "91a4d073886eedec3ae4ae0cdb4755adb30f601daaa55e900bf1cf5434aa40ec",
+      "git_blob": "73d47b7a8db3eda2fedc07c3af4a3feb3f35ca08",
+      "bytes": 10150
+    },
+    {
+      "path": "packages/log/test/support/fixtures.ts",
+      "snapshot": "source-snapshot/packages/log/test/support/fixtures.ts",
+      "sha256": "c79ac01d7e30b462736c114fa28a785477003392faf3db6faac240fe13d14e26",
+      "git_blob": "0959a71d8eddc9bf244e4e20598a372b5a751095",
+      "bytes": 7723
+    },
+    {
+      "path": "packages/log/test/declared-obligations.test.ts",
+      "snapshot": "source-snapshot/packages/log/test/declared-obligations.test.ts",
+      "sha256": "758d925b9b54910fa2a428e0dce4514e7062e37dde393136270c6526aa2863a6",
+      "git_blob": "23fa1f0790b3963e0289d34a2660ac2818d131f7",
+      "bytes": 40050
+    },
+    {
+      "path": "packages/log/test/declared-stage3.test.ts",
+      "snapshot": "source-snapshot/packages/log/test/declared-stage3.test.ts",
+      "sha256": "87849bedbcfaac91150ef987ffe54d077ad82d31e6a0459db5df979ba128dd27",
+      "git_blob": "4285cbeb3c97077e1ff55f854f79425344fc6df0",
+      "bytes": 48871
+    },
+    {
+      "path": "packages/log/test/fixtures/declared-carry.json",
+      "snapshot": "source-snapshot/packages/log/test/fixtures/declared-carry.json",
+      "sha256": "d295addbae018de0f93500261689627c9d51c99e4e47c84dcf2b823ba38d9fcb",
+      "git_blob": "44b8f22ef0319d06a44b91c651d014036561543b",
+      "bytes": 285968
+    },
+    {
+      "path": "notes/2026-10-02-declared-acts.md",
+      "snapshot": "source-snapshot/notes/2026-10-02-declared-acts.md",
+      "sha256": "cc6b94a10b1a55c9aa8cc97a7faa51d2fb4ae2ad9cad07082afd70a63355c8ba",
+      "git_blob": "2f72c52469b31bd5e4e7d6ab0fc5059048038fa5",
+      "bytes": 117003
+    },
+    {
+      "path": "docs/protocol.md",
+      "snapshot": "source-snapshot/docs/protocol.md",
+      "sha256": "3beab7c6e1a2d1507de0b008b8e0c86ea3e8ab670d995aa62007c39fb76b8620",
+      "git_blob": "ca4514c2e76aa025b2252acbc3639bd73b769f57",
+      "bytes": 270528
+    }
+  ],
+  "prior_evidence": [
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage3-5449-q7b396fi/review-5449.md",
+      "snapshot": "prior-evidence/review-5449.md",
+      "sha256": "8d448cec33a372f103c1be3d94fcad7d801b5fc5bdac34bb11b8f14a9cd0f534"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage3-5449-q7b396fi/independent-condition2.test.ts",
+      "snapshot": "prior-evidence/independent-condition2.test.ts",
+      "sha256": "b7df546e633a95fc61735d46dc6d74b1572c3f5acdb6bcad32c3211a6306c33b"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage3-5449-q7b396fi/request.json",
+      "snapshot": "prior-evidence/request.json",
+      "sha256": "2f8a7342067d47239bd5ce86a8cb926b2966ae3ed30739aece78a65f06acf329"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage3-5449-q7b396fi/promise.json",
+      "snapshot": "prior-evidence/promise.json",
+      "sha256": "c8fdcb2e9ab5d117c7588ed576dac67d11560e1b20bee140a580667fdedf1c7f"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage3-5449-q7b396fi/clarification-869d9aad.json",
+      "snapshot": "prior-evidence/clarification-869d9aad.json",
+      "sha256": "30e035551c22d4fb4c34ab24ac06823ee4c25b0a4da04d661db15e08091b2db3"
+    }
+  ]
+}
