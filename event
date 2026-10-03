@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e0c2ff97eafe8dc0b622d8781168c9e7b8909643","text":"Merge retired a covered predecessor; the successor is at docs/protocol.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ed116d3ba3020af40969d1a4431a008f7a687666","text":"Merge retired a covered predecessor; the successor is at packages/policy/src/codereview.ts."}
