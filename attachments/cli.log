@@ -1,0 +1,241 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli
+
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > accepts the room's remotes and Artifacts tokens, with or without the expiry 28ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a quote and newline that open a [core] section 9ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a newline alone 27ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with the ext:: transport, which runs a command 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with plain http 2ms
+stdout | test/planner-title-era.test.ts > planner CLI thread title under the policy of its actual admission > a label-only activation after preparation uses the admitted record's words, activateDuringSend=false
+{"activateDuringSend":false,"prepared":"act_3_33b4a9fe","governing":"act_3_33b4a9fe","seq":4,"expectedLabel":"Start a song","actualOutput":"Done: Start a song (start-song), recorded as act_4_261934a0.\nThread: Start a song: Footprints (lane act_4_261934a0)."}
+
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with credentials 45ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a query 27ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a fragment 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a space 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a backslash 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a dot segment, which the URL parser rewrites 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a percent-encoded dot segment 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with an upper-case host, not in normal form 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with a leading dash, read as an option 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a remote with an array, which a pattern test would coerce to its string 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with a newline that opens a [core] section 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with a quote 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with a backslash 3ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with a space 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with a comment character # 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with a comment character ; 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with a carriage return 4ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with nothing 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with more than 4096 characters 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > refuses a token with an array, which a pattern test would coerce to its string 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkGrant > the refusal does not repeat the token 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > accepts a canonical lane, a whole-number lease and an idempotency key 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lane with a newline that opens a [core] section 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lane with a space 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lane with upper-case hex 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lane with a leading zero in its number 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lane with another ID's form 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lane with nothing 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lane with an array, which a pattern test would coerce to its string 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lease that is a newline that opens a [core] section 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lease that is a number as a string 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lease that is a negative number 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lease that is a fraction 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lease that is NaN 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses a lease that is more than a safe integer 1ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses an installation ID with a newline that opens a [core] section 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses an installation ID with a dot 2ms
+stdout | test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > control: label-only activation before the CLI read prints the new historical title
+CHECKER_TITLE_OBSERVATION {"name":"before-read-control","value":{"out":{"code":0,"out":"Done: Begin a tune (score), recorded as act_5_5cf9c8e9.\nThread: Begin a tune: Nardis (lane act_5_5cf9c8e9).","err":""},"historical":{"id":"act_5_5cf9c8e9","seq":5,"policy":"act_4_fc45eaba","label":"Begin a tune","binding":"sha256:d116745a9144eb892a65c21acab4ed441c979c5fe7f3a2a1869b94c019f84058"},"bindingUnchanged":true}}
+
+ ✓ test/declared-a5d64b35.test.ts > artroom acts: what the room declares > a v1 room says it declares none, and names the commands to use 52ms
+ ✓ test/review-0b9119de.test.ts > artroom act prints the act as recorded, in the words of its own seq (R-DECL-23) > with no activation in between, the words are those the user read 63ms
+stdout | test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=false, activateAfterRecord=false
+{"retry":false,"activateAfterRecord":false,"governing":"act_3_94ad7a8f","current":"act_3_94ad7a8f","seq":4,"posts":1,"uniqueSignedBodies":1,"signedBodySHA256":"053ec9dac00371b5b94b0fc82f0a1b7d8d341b58d51fbe1f9fe4920ae231ec22","actualOutput":"Done: Start a song (start-song), recorded as act_4_ba962d5e.\nThread: Start a song: Footprints (lane act_4_ba962d5e)."}
+
+ ✓ test/planner-title-era.test.ts > planner CLI thread title under the policy of its actual admission > a label-only activation after preparation uses the admitted record's words, activateDuringSend=false 164ms
+stdout | test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > label-only activation between preparation and admission must print the accepted record's new historical title
+CHECKER_TITLE_OBSERVATION {"name":"before-admission-era","value":{"out":{"code":0,"out":"Done: Begin a tune (score), recorded as act_5_83c30b65.\nThread: Begin a tune: Nardis (lane act_5_83c30b65).","err":""},"changed":true,"historical":{"id":"act_5_83c30b65","seq":5,"policy":"act_4_371c1335","label":"Begin a tune","binding":"sha256:d116745a9144eb892a65c21acab4ed441c979c5fe7f3a2a1869b94c019f84058"},"bindingUnchanged":true}}
+
+ ✓ test/review-f47a509c.test.ts > P1: credentials never reach the output > a bearer echoed in an error, at connection or later, is redacted 224ms
+ ✓ test/review-f47a509c.test.ts > P1: credentials never reach the output > a room that echoes the bearer inside an ordinary answer is scrubbed by the CLI itself 59ms
+ ✓ test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=false, activateAfterRecord=false 265ms
+stdout | test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > paired timing control: a label-only activation after admission must keep the record's old historical title
+CHECKER_TITLE_OBSERVATION {"name":"after-admission-control","value":{"out":{"code":0,"out":"Done: Open a score (score), recorded as act_4_69d62bf4.\nThread: Open a score: Nardis (lane act_4_69d62bf4).","err":""},"changed":true,"historical":{"id":"act_4_69d62bf4","seq":4,"policy":"act_3_771b22cb","label":"Open a score","binding":"sha256:d116745a9144eb892a65c21acab4ed441c979c5fe7f3a2a1869b94c019f84058"},"bindingUnchanged":true}}
+
+ ✓ test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > control: label-only activation before the CLI read prints the new historical title 259ms
+ ✓ test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > label-only activation between preparation and admission must print the accepted record's new historical title 84ms
+stdout | test/planner-title-era.test.ts > planner CLI thread title under the policy of its actual admission > a label-only activation after preparation uses the admitted record's words, activateDuringSend=true
+{"activateDuringSend":true,"prepared":"act_3_bab8b06f","governing":"act_4_b812d9de","seq":5,"expectedLabel":"Begin a tune","actualOutput":"Done: Begin a tune (start-song), recorded as act_5_37ade5a6.\nThread: Begin a tune: Footprints (lane act_5_37ade5a6)."}
+
+ ✓ test/planner-title-era.test.ts > planner CLI thread title under the policy of its actual admission > a label-only activation after preparation uses the admitted record's words, activateDuringSend=true 165ms
+stdout | test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=false, activateAfterRecord=true
+{"retry":false,"activateAfterRecord":true,"governing":"act_3_40bb9701","current":"act_5_656a8e6a","seq":4,"posts":1,"uniqueSignedBodies":1,"signedBodySHA256":"b47dc8796726ae30a7c6dc15383e27e74f9125c303a88e87befbe5e2b2f85484","actualOutput":"Done: Start a song (start-song), recorded as act_4_63307229.\nThread: Start a song: Footprints (lane act_4_63307229)."}
+
+ ✓ test/review-0b9119de.test.ts > artroom act prints the act as recorded, in the words of its own seq (R-DECL-23) > a label changed after the act was prepared and before it was admitted: the act is printed under the new label, which governs it 209ms
+stdout | test/checker-hygiene-marker.test.ts > checker: a room-supplied lane cannot inject settings through the credential marker
+CHECKER_MARKER {"claimCode":1,"workspaceCode":2,"hasRealLane":true}
+
+ ✓ test/checker-title-era-624.test.ts > CLI title comes from the accepted opening record's D(s) > paired timing control: a label-only activation after admission must keep the record's old historical title 98ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > a failure after the join keeps the journal; the same command finishes with the same key and one join 56ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > login interrupted after login-journaled is finished by the same command, with one key and one join 12ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > login interrupted after joined is finished by the same command, with one key and one join 57ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > login interrupted after key-saved is finished by the same command, with one key and one join 18ms
+ ✓ test/checker-hygiene-marker.test.ts > checker: a room-supplied lane cannot inject settings through the credential marker 409ms
+ ✓ test/declared-a5d64b35.test.ts > artroom acts: what the room declares > a v2 room lists each kind with its label and steps; acts KIND prints its fields, who may sign it, its binding and the command 246ms
+ ✓ test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=false, activateAfterRecord=true 82ms
+ ✓ test/review-0b9119de.test.ts > artroom act prints the act as recorded, in the words of its own seq (R-DECL-23) > a label changed after the act was admitted: the act keeps the label it was admitted under, not the latest 81ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses an installation ID with nothing 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses an installation ID with more than 64 characters 2ms
+ ✓ test/hygiene-55be0661.test.ts > checkMarker > refuses an installation ID with an array 1ms
+ ✓ test/declared-a5d64b35.test.ts > artroom acts: what the room declares > --at and --policy read an earlier version; an unknown one fails; both together are a usage error 215ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > login interrupted after config-written is finished by the same command, with one key and one join 120ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > redeem interrupted after redeemed is finished without a second redemption 44ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > redeem interrupted after bearer-saved is finished without a second redemption 16ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > redeem interrupted after config-written is finished without a second redemption 21ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > a redemption that may have reached the room is never sent again, whatever happened after 13ms
+ ✓ test/review-0b9119de.test.ts > artroom act prints the act as recorded, in the words of its own seq (R-DECL-23) > the words are read once, after the answer, at the record's seq; --json prints the record and reads no words 188ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > it sends the kind, target, typed fields and binding as given, and prints the label 47ms
+ ✓ test/review-0b9119de.test.ts > the words cannot be read: the receipt is still given (R-DECL-23, R-IDEM-2) > a failed read after the answer leaves the act done: the kind and the thread's ID are printed, and nothing is sent again 83ms
+ ✓ test/hygiene-55be0661.test.ts > configureWorkspace refuses at its own boundary > an injecting lane in the mark adds no git setting, remote or credential file 353ms
+ ✓ test/review-4758945b.test.ts > P2: the installed credential's record is separate from reservations > failed before the token: a later lane's failed reservation does not stop the release of the installed lane 560ms
+ ✓ test/review-c033fb54.test.ts > an unreadable mark keeps the cleanup duty > unmapped pending: the release names the manual step and keeps the pending entry; the file is untouched 610ms
+ ✓ test/review-744a018a.test.ts > the reservation is made before the first await > an older workspace delayed at the read session does not overwrite a newer workspace for another lane 652ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > an act that opens a thread names it as every reader does: its goal, or the act's label and first text field by name 160ms
+ ✓ test/review-0b9119de.test.ts > the words cannot be read: the receipt is still given (R-DECL-23, R-IDEM-2) > a room that has no declarations to give for that seq: the kind is printed, never the latest label 159ms
+ ✓ test/review-f30be7f6.test.ts > E5.1: a workspace installs only while its reservation still owns the workspace > same lane: a lease-1 response that arrives after release, reclaim and a lease-2 workspace installs nothing 708ms
+ ✓ test/review-0b9119de.test.ts > the words cannot be read: the receipt is still given (R-DECL-23, R-IDEM-2) > a thread that has a goal is named by it, with or without the words 82ms
+ ✓ test/hygiene-55be0661.test.ts > configureWorkspace refuses at its own boundary > an injecting lease in the mark adds no git setting, remote or credential file 215ms
+ ✓ test/review-7040317d.test.ts > P2: unsettled installations stay plural until the file proves them settled > lanes: Y writes but is never mapped, then Z stops before writing; releasing Y removes Y's credential 767ms
+ ✓ test/review-f47a509c.test.ts > P3: login and redeem finish locally before forgetting how to resume > a redemption the room refused is forgotten, so a corrected link can be redeemed 16ms
+ ✓ test/cli.test.ts > the loop, as a person types it > login, claim, workspace, propose, land refused, review, land --wait, attention, explain, log, release 953ms
+ ✓ test/review-80d3710c.test.ts > a release is bound to the lease it released > repro 1: an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both (recovery interrupted at [] first) 877ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > without --binding, or with a malformed one, nothing is read or sent: the CLI never chooses the meaning 272ms
+ ✓ test/review-f7c79158.test.ts > release recovers its receipt without touching newer work > repro 1: an older release, recovered after a newer lane's workspace replaced its credential, keeps that credential and selection 850ms
+ ✓ test/cli.test.ts > the loop, as a person types it > --json prints the record, and a refusal as JSON with exit code 3 218ms
+ ✓ test/hygiene-55be0661.test.ts > configureWorkspace refuses at its own boundary > an injecting installation ID in the mark adds no git setting, remote or credential file 237ms
+ ✓ test/cli.test.ts > the loop, as a person types it > a refusal prints rule, reason and fix on stderr with exit code 3 54ms
+ ✓ test/review-c033fb54.test.ts > an unreadable mark keeps the cleanup duty > installed and mapped: the release keeps both the installed record and the mapping 602ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > fields are read by their declared types; an unknown field, a bad value, a missing field or a wrong target is a usage error and nothing is sent 313ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > a yes-or-no field takes true or false and nothing else 24ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > a field named like an inherited property is the body's own or it is missing; a change of such a field is listed as one 18ms
+ ✓ test/hygiene-55be0661.test.ts > configureWorkspace refuses at its own boundary > an injecting remote adds no git setting, remote or credential file 221ms
+ ✓ test/cli.test.ts > joining > a refused login leaves no key behind 130ms
+ ✓ test/review-4758945b.test.ts > P2: the installed credential's record is separate from reservations > failed install: a reservation that recorded its installation and stopped before writing leaves the installed lane removable 707ms
+ ✓ test/review-744a018a.test.ts > the reservation is made before the first await > an older workspace delayed at the held-lane read does not overwrite a newer workspace for another lane 720ms
+ ✓ test/review-f7c79158.test.ts > release recovers its receipt without touching newer work > recovery from another directory removes the released lane's own credential, and only that 628ms
+ ✓ test/review-f30be7f6.test.ts > E5.1: a workspace installs only while its reservation still owns the workspace > different lanes: an older response for lane X does not replace lane Y's newer workspace in the same repository 731ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > only a step's own field is read from the room: a field the declaration names expectedGeneration is the application's and is left alone 75ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > a kind the room does not declare is refused, and a v1 room has no generic act 26ms
+ ✓ test/review-f7c79158.test.ts > claim and land recover their receipts without replacing newer selections > repro 2: an older claim, recovered after a newer claim finished, keeps the newer lane selected and says so 65ms
+ ✓ test/review-7040317d.test.ts > P2: unsettled installations stay plural until the file proves them settled > Rooms: Y in Room A writes but is never mapped, then Room B's Z stops before writing; Room A's release removes Y 706ms
+ ✓ test/review-f7c79158.test.ts > claim and land recover their receipts without replacing newer selections > an older landing, recovered after a newer one is followed, keeps following the newer one 157ms
+ ✓ test/review-17013617.test.ts > P2: a journaled signed act needs no new authority to get its receipt > after the key is retired and sessions end, the same command returns the original claim 1662ms
+ ✓ test/hygiene-55be0661.test.ts > configureWorkspace refuses at its own boundary > an injecting token adds no git setting, remote or credential file 226ms
+ ✓ test/review-80d3710c.test.ts > a release is bound to the lease it released > repro 1: an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both (recovery interrupted at ["credential-removed"] first) 751ms
+ ✓ test/review-c033fb54.test.ts > an unreadable mark keeps the cleanup duty > interrupted and retried: the duty is kept until the user removes the file, and then settled 431ms
+stdout | test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=true, activateAfterRecord=false
+{"retry":true,"activateAfterRecord":false,"governing":"act_3_123088c3","current":"act_3_123088c3","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"a80a15c152f2d7560f10a304289d0d2207db93c7ecac42a916b3a4b4745bc38d","actualOutput":"Done: Start a song (start-song), recorded as act_4_8c7d10e0.\nThread: Start a song: Footprints (lane act_4_8c7d10e0)."}
+
+ ✓ test/review-7040317d.test.ts > P2: unsettled installations stay plural until the file proves them settled > an owner record written with the single installing slot of version 2 keeps that party as pending 236ms
+ ✓ test/declared-a5d64b35.test.ts > artroom act: any declared act, under the binding the user read > the lease, the generation and a version's head are read from the room when left out, as the named commands read them 322ms
+ ✓ test/hygiene-55be0661.test.ts > configureWorkspace refuses at its own boundary > every character the patterns admit, in every field, reads back through git as the whole file: one mark and exactly one setting 328ms
+ ✓ test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=true, activateAfterRecord=false 1499ms
+ ✓ test/review-f30be7f6.test.ts > E5.1: a workspace installs only while its reservation still owns the workspace > two overlapping workspaces: the one started last owns the installation, whichever answer arrives first 444ms
+ ✓ test/declared-a5d64b35.test.ts > a changed meaning is shown, never adopted for the user > the binding the user read is no longer active: nothing is signed; the CLI prints the active meaning, what changed, and the command to act under it 164ms
+ ✓ test/review-4758945b.test.ts > P2: the installed credential's record is separate from reservations > delayed retry: a release of lane X while lane Y's workspace waits for its token lets Y install afterwards 692ms
+ ✓ test/review-f30be7f6.test.ts > E5.1: a workspace installs only while its reservation still owns the workspace > a release while the workspace is being prepared: the revoked token is never installed 248ms
+ ✓ test/review-744a018a.test.ts > the reservation is made before the first await > an older workspace delayed at the token response does not overwrite a newer workspace for another lane 515ms
+ ✓ test/declared-a5d64b35.test.ts > a changed meaning is shown, never adopted for the user > what changed is listed against the version that held the binding the user gave, not merely the one before; with none, the CLI says it cannot list it 130ms
+ ✓ test/review-c033fb54.test.ts > an unreadable mark keeps the cleanup duty > the reservation is cancelled independently, and a successor's completed installation settles the kept duty 612ms
+ ✓ test/declared-a5d64b35.test.ts > a changed meaning is shown, never adopted for the user > the meaning changes between the read and the send: the room refuses, the act is not sent again, and the same help is printed 91ms
+ ✓ test/declared-a5d64b35.test.ts > a changed meaning is shown, never adopted for the user > a label-only edit is not a change of meaning: the act prepared before it is done, and nothing is listed as changed 33ms
+ ✓ test/hygiene-55be0661.test.ts > artroom workspace refuses a malformed grant before touching the repository > an injecting remote: exit 1, no remote, no credential, no setting, nothing pending 359ms
+ ✓ test/review-80d3710c.test.ts > a release is bound to the lease it released > repro 1: an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both (recovery interrupted at ["config-written"] first) 578ms
+ ✓ test/review-7040317d.test.ts > P2: unsettled installations stay plural until the file proves them settled > a completed later installation settles the earlier ones; the successor's file is then left by Y's release 562ms
+ ✓ test/review-0b9119de.test.ts > an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) > the saved act goes back unchanged, and the receipt has the label and the thread's name from the body the journal kept 1466ms
+ ✓ test/hygiene-55be0661.test.ts > artroom workspace refuses a malformed grant before touching the repository > an injecting token: exit 1, no remote, no credential, no setting, nothing pending 302ms
+ ✓ test/review-4758945b.test.ts > P2: the installed credential's record is separate from reservations > a recovered release does not cancel a newer reservation for the same lane 523ms
+ ✓ test/review-744a018a.test.ts > the reservation is made before the first await > workspaces in unrelated repositories do not supersede each other 636ms
+ ✓ test/review-80d3710c.test.ts > a release is bound to the lease it released > the released lease's own credential is still removed when nothing newer replaced it 363ms
+ ✓ test/review-80d3710c.test.ts > selections are fenced by revision, not by value > repro 2: X, then an interrupted claim of Y, then Z, then X again: recovering Y keeps X 41ms
+ ✓ test/review-80d3710c.test.ts > selections are fenced by revision, not by value > a recovery interrupted after its own config write does not treat its own change as newer work 24ms
+ ✓ test/review-80d3710c.test.ts > selections are fenced by revision, not by value > a wait that finishes the followed landing is a local change too: a landing recovered after it is not followed 86ms
+ ✓ test/review-f47a509c.test.ts > P4: a retried act is the act first sent > a lost success response, then a separate run after HEAD, the lane and the lease changed, returns the original proposal 1993ms
+ ✓ test/review-f30be7f6.test.ts > E5.1: a workspace installs only while its reservation still owns the workspace > a failed installation leaves nothing a later workspace or release mistakes for its own 541ms
+ ✓ test/hygiene-55be0661.test.ts > a malicious room's mark metadata never reaches the repository > a claim answered with an injecting lane: exit 1, the lane is not selected, and workspace has no lane to install 242ms
+ ✓ test/cli.test.ts > joining > a lost login response is finished by running the same command again, joining once 1455ms
+ ✓ test/cli.test.ts > joining > a link with a missing secret is a usage error 2ms
+ ✓ test/cli.test.ts > joining > redeem saves the bearer 0600, never prints it, and the agent can then act through MCP 34ms
+ ✓ test/cli.test.ts > joining > a lost redemption says what to do, and saves no token 7ms
+ ✓ test/cli.test.ts > usage and agents > usage errors exit 2 and say what to do 2ms
+ ✓ test/cli.test.ts > usage and agents > agents-md prints a block under 30 lines that teaches the loop 12ms
+ ✓ test/review-4758945b.test.ts > P2: schema-2 installed workspaces are upgraded with their evidence > a fresh release after the upgrade removes the mapped credential, proved by its installation mark, and says so 342ms
+ ✓ test/hygiene-55be0661.test.ts > a malicious room's mark metadata never reaches the repository > an injecting --lane is a usage error before the destination is reserved 215ms
+ ✓ test/review-f30be7f6.test.ts > E5.2: schema 1 files are decoded conservatively; unknown versions are refused > the exact revision-4 answered release-lane entry returns its kept receipt, changes nothing local, and names the manual steps 348ms
+ ✓ test/review-744a018a.test.ts > ownership is shared by every Room that writes the repository > a workspace for Room A delayed at the read session does not overwrite Room B's newer installation in the same repository 450ms
+ ✓ test/review-17013617.test.ts > P2: a journaled signed act needs no new authority to get its receipt > after the key is compromised and sessions end, the same command returns the original claim 1447ms
+stdout | test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=true, activateAfterRecord=true
+{"retry":true,"activateAfterRecord":true,"governing":"act_3_ce55e02b","current":"act_5_97d9149a","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"9d4d7fff2eed1e90779f9280f44a8f1400c4de747a23d31e698675687341099e","actualOutput":"Done: Start a song (start-song), recorded as act_4_6dae22f4.\nThread: Start a song: Footprints (lane act_4_6dae22f4)."}
+
+ ✓ test/planner-title-retry-era.test.ts > planner CLI historical presentation of a journaled receipt > a known original receipt keeps its label and thread name, retry=true, activateAfterRecord=true 1445ms
+ ✓ test/review-4758945b.test.ts > P2: schema-2 installed workspaces are upgraded with their evidence > a schema-2 mapping whose file has no installation mark keeps the file and the mapping, and names the manual step 379ms
+ ✓ test/hygiene-55be0661.test.ts > a malicious room's mark metadata never reaches the repository > an injecting lease, in both the lane and the grant: exit 1 before anything is pending, and a valid workspace still installs and releases 475ms
+ ✓ test/hygiene-55be0661.test.ts > a redemption's MCP URL and bearer token are checked before they are saved or printed > checkRedeemed accepts an http or https URL in normal form and a token, and refuses the rest 3ms
+ ✓ test/hygiene-55be0661.test.ts > a redemption's MCP URL and bearer token are checked before they are saved or printed > an injecting MCP URL: exit 1, nothing saved, and no command printed 7ms
+ ✓ test/hygiene-55be0661.test.ts > a redemption's MCP URL and bearer token are checked before they are saved or printed > an injecting bearer token: exit 1, nothing saved, and no command printed 8ms
+ ✓ test/cli.test.ts > usage and agents > artroom mcp serves the ten tools over stdio from the real bin 537ms
+ ✓ test/review-744a018a.test.ts > ownership is shared by every Room that writes the repository > a workspace for Room A delayed at the token response does not overwrite Room B's newer installation in the same repository 466ms
+ ✓ test/declared-a5d64b35.test.ts > the journal keeps the binding: a lost answer is finished with the same bytes > an act whose answer was lost is resent unchanged with its key, also after the meaning changed, and returns the original record 1525ms
+ ✓ test/declared-a5d64b35.test.ts > a bearer session: the generic act goes to the MCP endpoint > artroom act under a room-custody token calls the act tool with the binding given; the room signs under the session's grant 67ms
+ ✓ test/review-4758945b.test.ts > P2: schema-2 installed workspaces are upgraded with their evidence > a schema-2 mapping whose file another Room has since replaced: the newer credential is left, and the duty is done 530ms
+ ✓ test/declared-a5d64b35.test.ts > the log and explain show the label a kind had at the record's own seq > legacy records print as before; a declared record prints its label; a retired kind says where; a reused name keeps the old label on old records 68ms
+ ✓ test/declared-a5d64b35.test.ts > the log and explain show the label a kind had at the record's own seq > explain prints the meaning the room gives for the record's seq; a refusal of a stale binding names the active one 3ms
+ ✓ test/review-0b9119de.test.ts > an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) > after a later label-only activation the finished act still has the label it was admitted under 1441ms
+ ✓ test/review-744a018a.test.ts > ownership is shared by every Room that writes the repository > a release in Room A leaves Room B's newer installation in the same repository alone 574ms
+ ✓ test/review-f47a509c.test.ts > P4: a retried act is the act first sent > a journaled key used with another command is a usage error, and --json errors name the key 1429ms
+ ✓ test/review-f47a509c.test.ts > P5: the landing follow-up waits on the operation already started > land without --wait starts once; artroom wait follows that operation to the end 135ms
+ ✓ test/review-f30be7f6.test.ts > E5.2: schema 1 files are decoded conservatively; unknown versions are refused > a revision-2 prepared claim with no state or intent is resent unchanged, and its lane is not selected 1431ms
+ ✓ test/review-17013617.test.ts > P2: a journaled signed act needs no new authority to get its receipt > a failing session request and a failing genesis read do not block the receipt 1432ms
+ ✓ test/review-4758945b.test.ts > P2: schema-2 installed workspaces are upgraded with their evidence > an older journal's release, recovered after another Room replaced the credential, changes nothing and names the manual steps 563ms
+ ✓ test/review-0b9119de.test.ts > an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) > when no session can be opened to read the words, the saved act is still finished and its receipt given 1456ms
+ ✓ test/review-f47a509c.test.ts > P5: the landing follow-up waits on the operation already started > a wait that runs out names the same operation, and the next wait finishes it 1126ms
+ ✓ test/review-f47a509c.test.ts > P5: the landing follow-up waits on the operation already started > a retryable landing ends the wait with exit 1, and only then suggests a new land 65ms
+ ✓ test/review-4758945b.test.ts > P2: the destination lock > an old lock held by a live command is never taken: the other process waits, then writes after it 1001ms
+ ✓ test/review-f47a509c.test.ts > P5: the landing follow-up waits on the operation already started > a failed landing ends the wait with exit 1, and only then suggests a new land 49ms
+ ✓ test/review-7040317d.test.ts > P2: waiting for the destination lock is bounded on every path > a recovery file held by a live recoverer is waited on, then named, and nothing is removed 3291ms
+ ✓ test/review-4758945b.test.ts > P2: the destination lock > a holder that crashed is recovered: its process is gone on this host 449ms
+ ✓ test/review-f30be7f6.test.ts > E5.2: schema 1 files are decoded conservatively; unknown versions are refused > a revision-4 prepared claim with a value-based intent is resent unchanged, and its lane is not selected 1428ms
+ ✓ test/review-17013617.test.ts > P2: a journaled signed act needs no new authority to get its receipt > a recorded refusal whose answer was lost is returned again, with its entry 1471ms
+ ✓ test/review-7040317d.test.ts > P2: waiting for the destination lock is bounded on every path > a recovery file from another host is named for manual action, not removed 566ms
+ ✓ test/review-f30be7f6.test.ts > E5.2: schema 1 files are decoded conservatively; unknown versions are refused > a schema-1 config with a path-only mapping and an old marker: release removes nothing it cannot prove, and says so 334ms
+ ✓ test/review-f30be7f6.test.ts > E5.2: schema 1 files are decoded conservatively; unknown versions are refused > an interruption after act-answered while migrating a schema-1 config is finished by the same command 21ms
+ ✓ test/review-f30be7f6.test.ts > E5.2: schema 1 files are decoded conservatively; unknown versions are refused > an interruption after config-written while migrating a schema-1 config is finished by the same command 34ms
+ ✓ test/review-7040317d.test.ts > P2: waiting for the destination lock is bounded on every path > an empty recovery file (a crash between creating and writing it) is named, not removed 545ms
+ ✓ test/review-f47a509c.test.ts > amendment 2 in the CLI: R-CRED-10 and R-CRED-11 > after its token is revoked, an unfinished bearer act is not resent; the CLI says so and forgets it 1508ms
+ ✓ test/review-f47a509c.test.ts > amendment 2 in the CLI: R-CRED-10 and R-CRED-11 > a link with the secret in the query instead of the fragment is refused (R-CRED-11) 3ms
+ ✓ test/review-f47a509c.test.ts > amendment 2 in the CLI: R-CRED-10 and R-CRED-11 > a link with a path prefix uses the origin and the prefix as the endpoint (R-CRED-11) 2ms
+ ✓ test/review-7040317d.test.ts > P2: waiting for the destination lock is bounded on every path > an empty lock file is waited on, then named, not removed 591ms
+ ✓ test/review-17013617.test.ts > P2: a journaled signed act needs no new authority to get its receipt > an envelope signed for another room is refused before anything is sent 1426ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > land interrupted after act-answered is finished by the same command; wait then follows it 120ms
+ ✓ test/review-f30be7f6.test.ts > E5.2: schema 1 files are decoded conservatively; unknown versions are refused > a config or journal entry from a newer schema is refused, and nothing is sent 1434ms
+ ✓ test/review-4758945b.test.ts > P2: the destination lock > a live holder in another process is waited for, and named, never removed 1869ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > land interrupted after config-written is finished by the same command; wait then follows it 171ms
+ ✓ test/review-7040317d.test.ts > P2: waiting for the destination lock is bounded on every path > a recoverer that completes while this command waits lets it acquire the lock 632ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > a failed config write after the land was admitted keeps the answer; the same command finishes it 157ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > a claim interrupted after the answer records its lane when finished, with one claim 19ms
+ ✓ test/review-4758945b.test.ts > P2: the destination lock > a holder that lost its lock writes nothing, and never removes the lock that replaced it 148ms
+ ✓ test/review-4758945b.test.ts > P2: the destination lock > a lock from another host, or a recovery left by a crashed recoverer, is named for the user, not removed 401ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > release interrupted after act-answered finishes: credential gone, lane forgotten, one release 468ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > release interrupted after credential-removed finishes: credential gone, lane forgotten, one release 494ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > release interrupted after config-written finishes: credential gone, lane forgotten, one release 442ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > release whose credential removal fails keeps the answer until removal succeeds 450ms
+ ✓ test/review-17013617.test.ts > P2: the act journal outlives the local steps after the room's answer > a bearer act whose answer was kept finishes from it, even after the token is revoked 77ms
+
+ Test Files  17 passed (17)
+      Tests  201 passed (201)
+   Start at  18:07:22
+   Duration  11.69s (transform 6.78s, setup 0ms, import 15.38s, tests 71.65s, environment 1ms)
+
+JSON report written to /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-stage5-c74-88tei6eo/cli.vitest.json

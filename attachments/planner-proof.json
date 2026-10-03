@@ -1,17 +1,95 @@
 {
   "verifiedBy": "planner",
-  "head": "acd6917a8f9a1b8fbbbf48886e28f367dae96554",
-  "base": "b359e2787da33937809bb52d3c65441eb8983e9b",
-  "tree": "768f6b32a2e7fab77c18ead7dbb2a54645931024",
-  "manifestCount": 97,
-  "manifestSha256": "ae4d5c2876c8dc411e7277b926fd8a7a395e2054452ac0b2475aa97e98cfc436",
-  "currentSnapshots": 44,
-  "baseSnapshots": 38,
-  "allManifestBytesAndImmutableSnapshotsMatch": true,
-  "currentSnapshotCheckoutBytesMatch": true,
-  "status": "",
-  "nativeWatcherAndActualDecoderBlocksIdenticalToBase": true,
-  "readScope": "full report, full unchanged boundary blocks and current source/test/authentication increments; no new full 2847-line delta read claim",
-  "noCompileRuntimeMutationCredit": true,
-  "notInitialWholeTrackedHashInventory": true
+  "recorded": "2026-10-03T22:12:00.199286+00:00",
+  "head": "c74f36965cc90049ad8fc44256a94974de5deb81",
+  "tree": "005530a5042fe92495896b58e11dc28677573459",
+  "base": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+  "sixPathDeltaFullRead": [
+    "packages/cli/README.md",
+    "packages/cli/src/main.ts",
+    "packages/cli/test/declared-a5d64b35.test.ts",
+    "packages/cli/test/review-0b9119de.test.ts",
+    "packages/ui/src/room/live/live-room.ts",
+    "packages/ui/test/review-8df737b8.test.ts"
+  ],
+  "compilerExit": 0,
+  "compilerEnd": "2026-10-03T22:07:21.543550+00:00",
+  "actualScopes": [
+    {
+      "group": "ui",
+      "files": 22,
+      "total": 262,
+      "supplied": 249,
+      "private": 13,
+      "passed": 262,
+      "failed": 0,
+      "skipped": 0,
+      "allNamedAssertionObjectsMatchRawReport": true
+    },
+    {
+      "group": "cli",
+      "files": 17,
+      "total": 201,
+      "supplied": 192,
+      "private": 9,
+      "passed": 201,
+      "failed": 0,
+      "skipped": 0,
+      "allNamedAssertionObjectsMatchRawReport": true
+    }
+  ],
+  "wholeSuiteTotal": 463,
+  "suppliedTotal": 441,
+  "privateTotal": 22,
+  "privateFixtures": [
+    {
+      "source": "/tmp/artroom-planner-ui-4567-ajquzk40/checker-ui-f606-races.test.ts",
+      "destination": "packages/ui/test/checker-ui-f606-races.test.ts",
+      "sha256": "b58e94872c699b49fa48a108e34b26ac7c723211783509c9de41cc14a9caed57",
+      "bytes": 8188,
+      "lines": 158
+    },
+    {
+      "source": "/tmp/artroom-planner-ui-4567-ajquzk40/planner-ui-unavailable.test.ts",
+      "destination": "packages/ui/test/planner-ui-unavailable.test.ts",
+      "sha256": "8cf82744551421b1cb72887f273009f84316aa56cd4d75b26fd4bd05c03717d8",
+      "bytes": 5624,
+      "lines": 68
+    },
+    {
+      "source": "/tmp/artroom-checker-ui-624d-x3tfvfj8/probes/checker-ui-624-observations.test.ts",
+      "destination": "packages/ui/test/checker-ui-624-observations.test.ts",
+      "sha256": "cd588f8b138c8c9aafe9dc3ba683a6e7711b1ea957fce8ac54bfec4c762cb705",
+      "bytes": 3611,
+      "lines": 61
+    },
+    {
+      "source": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-cli-era-flomo622/planner-title-era.test.ts",
+      "destination": "packages/cli/test/planner-title-era.test.ts",
+      "sha256": "4b2f84801bfa082b9b6a4bb70369d005c5af8f3577f38b0b744ec675a0021e25",
+      "bytes": 2665,
+      "lines": 46
+    },
+    {
+      "source": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-cli-retry-era-_eylsugl/planner-title-retry-era.test.ts",
+      "destination": "packages/cli/test/planner-title-retry-era.test.ts",
+      "sha256": "6169736fb97d47357bc9d18a52b74e8e2d2e80496e5c82a56cff524284fec95d",
+      "bytes": 3753,
+      "lines": 51
+    },
+    {
+      "source": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/fixtures/packages/cli/test/checker-title-era-624.test.ts",
+      "destination": "packages/cli/test/checker-title-era-624.test.ts",
+      "sha256": "006783aaae16bfa6da24cd41bf9fc34568d692a47015058d908441591c9942ff",
+      "bytes": 4668,
+      "lines": 89
+    }
+  ],
+  "all715InitialAndFinalTrackedHashesMatchImmutableHead": true,
+  "trackedFileCount": 715,
+  "restoredCloneStatus": "",
+  "privateFixturesRemoved": 6,
+  "completeCompilerAndRuntimeLogsRetained": true,
+  "initial19ManifestSha256": "55b9710120b895927f2b308ad66489baba8b9a70c2392c2c2267737b38d6b048",
+  "noNewRuntimeClaim": "No fresh client/MCP/Room/provider/browser/mutation execution; this closes only CLI label/journal presentation and UI equal-object availability findings at this head."
 }

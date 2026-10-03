@@ -1,0 +1,288 @@
+
+ RUN  v5.0.3 /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui
+
+ ✓ test/review-0fd98c41.test.ts > an older answer that arrives after a newer read failed (R-DECL-23) > with a later activation confirmed in between, it does not bring the earlier catalogue back, and a record accepted since is still read under its own policy 8ms
+ ✓ test/review-0fd98c41.test.ts > an older answer that arrives after a newer read failed (R-DECL-23) > with no activation in between, the older answer is as new as anything confirmed, and gives the catalogue back 1ms
+ ✓ test/review-0fd98c41.test.ts > an older answer that arrives after a newer read failed (R-DECL-23) > a failed read does not blank a catalogue that another read of the same version gave while it was on its way 1ms
+ ✓ test/review-0fd98c41.test.ts > an older answer that arrives after a newer read failed (R-DECL-23) > a newer answer restores the catalogue after a failed read 2ms
+ ✓ test/review-0fd98c41.test.ts > a load that finishes after the newest read failed (R-DECL-23) > it is not published with the earlier catalogue it read: the page still holds none 55ms
+ ✓ test/checker-ui-f606-races.test.ts > checker f606 current catalogue completion order > control: two delayed current reads without activation retain the same catalogue 7ms
+ ✓ test/checker-ui-f606-races.test.ts > checker f606 current catalogue completion order > regression: a delayed older current read cannot replace a newer activation already confirmed by the UI 3ms
+ ✓ test/checker-ui-f606-races.test.ts > checker f606 current catalogue completion order > control: a refresh whose delayed catalogue has no later activation finishes with its governing policy 56ms
+ ✓ test/review-fcd7391d.test.ts > an explicit read of the declarations that is answered late (R-DECL-23) > with no activation in between, two reads answered out of order leave the same catalogue 7ms
+ ✓ test/review-fcd7391d.test.ts > an explicit read of the declarations that is answered late (R-DECL-23) > an answer from before an activation the page has confirmed does not bring the earlier catalogue back 3ms
+ ✓ test/review-fcd7391d.test.ts > an explicit read of the declarations that is answered late (R-DECL-23) > an answer that names a later activation than the one held is taken, in whatever order it was asked 2ms
+ ✓ test/review-fcd7391d.test.ts > an explicit read of the declarations that is answered late (R-DECL-23) > a lost answer that arrives after a later activation was confirmed does not blank the catalogue 2ms
+ ✓ test/review-fcd7391d.test.ts > an explicit read of the declarations that is answered late (R-DECL-23) > a lost answer with nothing confirmed in between still means the declarations are not available 1ms
+ ✓ test/review-fcd7391d.test.ts > a load of the room whose catalogue is answered late (R-DECL-23) > with no activation in between, the load finishes under the catalogue it read 53ms
+ ✓ test/review-0fd98c41.test.ts > a load that finishes after the newest read failed (R-DECL-23) > with no failed read, the same load is published under the later catalogue that was confirmed 67ms
+ ✓ test/checker-ui-f606-races.test.ts > checker f606 current catalogue completion order > regression: a refresh begun earlier cannot replace a newer activation confirmed by an explicit read 59ms
+ ✓ test/checker-ui-f606-races.test.ts > checker f606 delayed historical reads are not retained by UI > control: a delayed ended-version response with no later activation remains valid 3ms
+ ✓ test/checker-ui-f606-races.test.ts > checker f606 delayed historical reads are not retained by UI > control: a historical response started before retirement does not poison subsequent current or historical reads 4ms
+ ✓ test/review-fcd7391d.test.ts > a load of the room whose catalogue is answered late (R-DECL-23) > a load begun before an activation does not replace the later catalogue an explicit read confirmed 72ms
+ ✓ test/review-fcd7391d.test.ts > a load of the room whose catalogue is answered late (R-DECL-23) > a load whose catalogue answer is lost after a later activation was confirmed keeps that catalogue 59ms
+stdout | test/planner-ui-unavailable.test.ts > planner confirmed activation through an unavailable read > an older held answer stays behind a confirmed activation after a newer read fails, laterActivation=true
+{"probe":"explicit after unavailable","confirmed":2,"restored":null,"expectedPolicy":"act_2_2eeb2724","governingPolicy":"act_2_2eeb2724"}
+
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > broad ** 19ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > broad * 4ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > wildcard prefix 12ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > intersecting file 5ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > the directory itself 4ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > the same pattern 2ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > disjoint 5ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > sibling prefix 3ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > literal target 7ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > literal target, disjoint 21ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > quoted path 5ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > quoted path, disjoint 7ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > non-ASCII path 5ms
+stdout | test/planner-ui-unavailable.test.ts > planner confirmed activation through an unavailable read > an older completed load cannot be published after the newest confirmed catalogue becomes unavailable
+{"probe":"load after unavailable","loaded":3,"confirmed":5,"published":null}
+
+ ✓ test/planner-ui-unavailable.test.ts > planner confirmed activation through an unavailable read > an older held answer stays behind a confirmed activation after a newer read fails, laterActivation=false 17ms
+ ✓ test/planner-ui-unavailable.test.ts > planner confirmed activation through an unavailable read > an older held answer stays behind a confirmed activation after a newer read fails, laterActivation=true 9ms
+ ✓ test/planner-ui-unavailable.test.ts > planner confirmed activation through an unavailable read > an older completed load cannot be published after the newest confirmed catalogue becomes unavailable 61ms
+ ✓ test/planner-ui-unavailable.test.ts > planner confirmed activation through an unavailable read > a successful newer answer can restore a catalogue after unavailability 5ms
+ ✓ test/review-125ee638.test.tsx > P2: tree-change metadata is compared > a different rename destination is a difference 3ms
+ ✓ test/review-125ee638.test.tsx > P2: tree-change metadata is compared > a different rename source is a difference 0ms
+ ✓ test/review-125ee638.test.tsx > P2: tree-change metadata is compared > setting the executable bit in one version only is a difference 1ms
+ ✓ test/review-125ee638.test.tsx > P2: tree-change metadata is compared > the same text edit, with the executable bit set only in the new version, is a difference 0ms
+ ✓ test/review-125ee638.test.tsx > P2: tree-change metadata is compared > control: the same rename and the same mode change, rebased, are not a difference 0ms
+ ✓ test/review-125ee638.test.tsx > P2: hunks keep their context, so edits at different places differ > denying in first() and denying in second() are different edits 0ms
+ ✓ test/review-125ee638.test.tsx > P2: hunks keep their context, so edits at different places differ > control: the same edit, moved down by a rebase that changed lines far from it, is not a difference 0ms
+ ✓ test/review-125ee638.test.tsx > Security: bytes per line and the work of a whole comparison are bounded > a line over the byte bound is too large, counted in UTF-8 bytes 1ms
+ ✓ test/review-125ee638.test.tsx > Security: bytes per line and the work of a whole comparison are bounded > one file's line comparison over the work bound is too large 1ms
+ ✓ test/review-125ee638.test.tsx > Security: bytes per line and the work of a whole comparison are bounded > reading counts as work, even when the line comparison is trivial 1ms
+ ✓ test/review-125ee638.test.tsx > Security: bytes per line and the work of a whole comparison are bounded > the work bound covers all the changes of a comparison together 2ms
+ ✓ test/review-125ee638.test.tsx > Security: bytes per line and the work of a whole comparison are bounded > once the work is spent, a later change that needs no reading is still too large 0ms
+ ✓ test/review-125ee638.test.tsx > the interdiff on screen > a metadata-only difference is shown in words 7ms
+ ✓ test/review-125ee638.test.tsx > the interdiff on screen > each hunk shows where it is, with its context 3ms
+ ✓ test/review-125ee638.test.tsx > the interdiff on screen > too large: this view's own bounds are not said to bound the proposal's diff 31ms
+ ✓ test/thread-names-c37653e1.test.ts > the page names a thread by its opening act's first text field (section 33.10) > the title names the song, though the enum field key comes first by name 71ms
+ ✓ test/review-fcd7391d.test.ts > a load of the room whose catalogue is answered late (R-DECL-23) > a load that has read its catalogue, and is still reading when a later activation is confirmed, is published under the later one 75ms
+ ✓ test/review-fcd7391d.test.ts > a load of the room whose catalogue is answered late (R-DECL-23) > a load that could not read the catalogue is published with the one an explicit read confirmed while it ran 55ms
+ ✓ test/review-fcd7391d.test.ts > an earlier version's declarations answered late: the page keeps none of its own (R-DECL-23) > with no later activation, a delayed answer about an ended version is good, and is asked for again 3ms
+ ✓ test/thread-names-c37653e1.test.ts > the page names a thread by its opening act's first text field (section 33.10) > a thread keeps the name its own declaration gave it after a later document relabels the act and makes another field the text one 60ms
+ ✓ test/thread-names-c37653e1.test.ts > the page names a thread by its opening act's first text field (section 33.10) > an act with no text field is still named by its first field by name, and a thread with a goal by its goal 55ms
+ ✓ test/mock-room.test.ts > mock room > replay is deterministic 10ms
+ ✓ test/mock-room.test.ts > mock room > overlap is shown from claims, before any code 1ms
+ ✓ test/mock-room.test.ts > mock room > a policy refusal names its rule and fix 0ms
+ ✓ test/mock-room.test.ts > mock room > generation 2 carries one verdict and not the other 1ms
+ ✓ test/mock-room.test.ts > mock room > an unresolved publication holds the slot; the next landing waits ready 3ms
+ ✓ test/mock-room.test.ts > mock room > lease expiry hands the lane to another agent, who recuts it 2ms
+ ✓ test/mock-room.test.ts > mock room > the viewer's review is refused when they are not a reviewer this generation needs 3ms
+ ✓ test/mock-room.test.ts > mock room > the viewer's approval meets the obligation and survives replay 2ms
+ ✓ test/mock-room.test.ts > mock room > no snapshot carries a token 48ms
+ ✓ test/review-fcd7391d.test.ts > an earlier version's declarations answered late: the page keeps none of its own (R-DECL-23) > an answer read before a kind was retired goes to its caller only: the next reads show the retirement and the current policy 10ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > non-ASCII, disjoint 7ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > the reviewer's reproduction: an agent's ** claim is refused by the emitted rule and by the preview 67ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > where literal text and path overlap differ, the dry run says so 7ms
+ ✓ test/policy-runtime.test.ts > refuse-claim drafts agree with the policy runtime > a pattern the language cannot express is not compiled, and nothing is replayed 0ms
+ ✓ test/policy-runtime.test.ts > the mock room's rule twins agree with the policy runtime > every claim in the scenario gets the same refuse answer 181ms
+ ✓ test/policy-runtime.test.ts > the mock room's rule twins agree with the policy runtime > the notify rule's twin matches its expression 9ms
+ ✓ test/declared-rendering.test.tsx > activation: a declared record shows its label, its target and its fields > an act of an application's own kind is a sentence with the label, and its typed fields by name 10ms
+ ✓ test/acts-screen.test.tsx > the list of acts > every declaration is listed with its label, help, who may sign and what it acts on, in the room's words 30ms
+ ✓ test/screens.test.tsx > Needs you > each open item says what to do, why it is yours, and offers one action 100ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > baseline: an ordinary optional field left out gives a valid body without it 8ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > baseline: a value typed into the field toString is read as any field's is 1ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > baseline: a value typed into the field valueOf is read as any field's is 1ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > an optional field toString left out is absent from the body: nothing is read from the prototype 1ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > an optional field valueOf left out is absent from the body: nothing is read from the prototype 1ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > a required field toString left out is one named problem, and no body 0ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > a required field valueOf left out is one named problem, and no body 0ms
+ ✓ test/review-88a20f74.test.tsx > P1 live sentences about unresolved publications > the event alone states only what was read back, for both read-backs 9ms
+ ✓ test/review-88a20f74.test.tsx > P1 live sentences about unresolved publications > abort before the first unresolved event: the feed says forward pushes stopped 4ms
+ ✓ test/review-88a20f74.test.tsx > P1 live sentences about unresolved publications > truncated history with a loaded abort: the abort still governs the sentence 3ms
+ ✓ test/review-88a20f74.test.tsx > P1 live sentences about unresolved publications > with no loaded operation, the sentence does not assume there was no abort 2ms
+ ✓ test/review-88a20f74.test.tsx > P1 live sentences about unresolved publications > ordinary unresolved publication with no abort: complete forward is described from the loaded operation 12ms
+ ✓ test/review-88a20f74.test.tsx > P1 live sentences about unresolved publications > unexpected main: the room stopped pushing 2ms
+ ✓ test/live-room.test.tsx > live adapter (stub over HttpRoom) > loads a snapshot from the contract's reads and follows the WebSocket 71ms
+ ✓ test/live-room.test.tsx > live adapter (stub over HttpRoom) > what the contract cannot serve yet is reported, not guessed 3ms
+ ✓ test/declared-rendering.test.tsx > activation: a declared record shows its label, its target and its fields > the feed shows the record's label, target and fields, and the thread is named by the act that opened it 117ms
+ ✓ test/declared-rendering.test.tsx > activation: a declared record shows its label, its target and its fields > a review or a comment under an application's own name is still evidence for the review screens, by its step 63ms
+ ✓ test/acts-screen.test.tsx > the list of acts > a room on the built-in review acts says so, and offers no form 115ms
+ ✓ test/acts-screen.test.tsx > the list of acts > an address that names an act the room does not declare says so 47ms
+ ✓ test/acts-screen.test.tsx > the form is built from the declaration: one input per field, by type > text, enum, int, bool and the step's globs, with required and optional marked and the limits stated 19ms
+ ✓ test/screens.test.tsx > Needs you > an admin sees the unresolved publication and what waits behind it 13ms
+ ✓ test/screens.test.tsx > Needs you > switching the viewer switches the queue 46ms
+ ✓ test/change-history.test.tsx > change history from change-id headers > rewritten, added and dropped changes, in the new generation's order 3ms
+ ✓ test/change-history.test.tsx > change history from change-id headers > a rewritten change's interdiff shows only how its own edits differ 1ms
+ ✓ test/change-history.test.tsx > change history from change-id headers > header-less commits: nothing to show 0ms
+ ✓ test/change-history.test.tsx > change history from change-id headers > header-less commits beside headed ones are counted, not followed 0ms
+ ✓ test/change-history.test.tsx > change history from change-id headers > the same change ID twice in a generation is divergent, not matched 0ms
+ ✓ test/change-history.test.tsx > change history from change-id headers > each commit's diff stays within lane B's bounds 2ms
+ ✓ test/amendment-3.test.tsx > advisory obligations never block (R-OBL-7) > the advisory obligation comes from the checker configuration; others are not advisory 8ms
+ ✓ test/review-82f2743b.test.tsx > P1.2 publication recovery follows the recorded read-back and abort facts > expected main, no abort: the room completes the same reserved commit forward 138ms
+ ✓ test/review-88a20f74.test.tsx > P1 live sentences about unresolved publications > explain titles follow the same rule 149ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > require-review with an existing rule ID: no prediction, the validation problem and a fix 21ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > require-review with an invalid path: no prediction, the validation problem and a fix 3ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > default dependency with an invalid area: no prediction, the validation problem and a fix 2ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > global input with an invalid path: no prediction, the validation problem and a fix 2ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > refuse-claim with an existing rule ID: no prediction, the validation problem and a fix 3ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > an unsupported refuse-claim target shape is still refused before validation 1ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > a valid require-review draft compiles to a valid policy and replays 59ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > baseline: an ordinary optional field's control starts empty, with no problem shown 159ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > the control of an optional field toString starts empty, with no problem shown, and the act is sent without it 34ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > the control of an optional field valueOf starts empty, with no problem shown, and the act is sent without it 38ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > a required field toString left empty shows its own problem and sends nothing; once filled in, it is sent under its own name 17ms
+ ✓ test/declared-rendering.test.tsx > old records keep the meaning they had > label-only change: the old record shows the old label, a new one the new label, under one binding 25ms
+ ✓ test/declared-rendering.test.tsx > old records keep the meaning they had > retirement: a record of a kind a later policy dropped says where it was retired, and still shows its label and fields 78ms
+ ✓ test/acts-screen.test.tsx > the form is built from the declaration: one input per field, by type > segment, globs, a thread to act on, and the version step's own fields 138ms
+ ✓ test/live-room.test.tsx > live adapter (stub over HttpRoom) > the UI renders a live room and never asks for or shows a workspace token 233ms
+ ✓ test/screens.test.tsx > Room > overlap is visible from the claims, before any code 58ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 1: a field named toString or valueOf (R-DECL-12) > a required field valueOf left empty shows its own problem and sends nothing; once filled in, it is sent under its own name 55ms
+ ✓ test/change-history.test.tsx > the Proposal screen > shows the per-change view, labelled author-supplied, when headers are present 230ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > a valid refuse-claim draft compiles to a valid policy and replays 177ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > a valid carry-depends-on draft compiles to a valid policy and replays 3ms
+ ✓ test/review-88a20f74.test.tsx > P2 a dry run validates the whole compiled policy first > a valid global-input draft compiles to a valid policy and replays 3ms
+ ✓ test/review-82f2743b.test.tsx > P1.2 publication recovery follows the recorded read-back and abort facts > unexpected main: the room stops pushing and the slot waits for an admin to reconcile 113ms
+ ✓ test/review-82f2743b.test.tsx > P1.2 publication recovery follows the recorded read-back and abort facts > compromised evidence: forward retries stop; abort, read-back and revert outcomes are shown 12ms
+ ✓ test/review-82f2743b.test.tsx > P1.2 publication recovery follows the recorded read-back and abort facts > compromised evidence with main still as expected: no forward push is promised 10ms
+ ✓ test/review-82f2743b.test.tsx > P1.2 publication recovery follows the recorded read-back and abort facts > landed despite an abort attempt: the revert lane is linked 56ms
+ ✓ test/declared-rendering.test.tsx > old records keep the meaning they had > name reuse with a changed shape: the old record keeps the old meaning and its retirement; the new record has the new one 25ms
+ ✓ test/declared-rendering.test.tsx > old records keep the meaning they had > a legacy record keeps the sentence it always had, after the room moves to declared acts 76ms
+ ✓ test/declared-rendering.test.tsx > old records keep the meaning they had > a platform act reads the same in every room 6ms
+ ✓ test/declared-rendering.test.tsx > a record whose kind had no meaning is shown plainly, never dropped > a kind the policy in force did not declare: its kind, its fields, and a plain statement 8ms
+ ✓ test/declared-rendering.test.tsx > a record whose kind had no meaning is shown plainly, never dropped > when the room cannot give its declarations, only a v: 1 record of a legacy kind is read as one 3ms
+ ✓ test/declared-rendering.test.tsx > the sentence table is only for the kinds it was written for > a kind it has no sentence for falls back to the plain statement, whatever vocabulary it is read under 0ms
+ ✓ test/declared-rendering.test.tsx > the code-review sentences belong to the code-review declarations, by binding and not by name > a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not 7ms
+ ✓ test/screens.test.tsx > Room > the landing queue shows a held, unresolved slot and a ready landing waiting 121ms
+ ✓ test/screens.test.tsx > Room > every refusal in the activity feed shows its rule and fix 28ms
+ ✓ test/acts-screen.test.tsx > the form is built from the declaration: one input per field, by type > member, an entry to act on, and an optional entry field 14ms
+ ✓ test/acts-screen.test.tsx > the form is built from the declaration: one input per field, by type > the thread list offers only threads the act may act on 74ms
+ ✓ test/acts-screen.test.tsx > sending an act > the declared limits are checked first: a wrong field is named and nothing is sent 17ms
+ ✓ test/amendment-3.test.tsx > advisory obligations never block (R-OBL-7) > an advisory obligation is listed apart from what a landing needs, and not counted 223ms
+ ✓ test/amendment-3.test.tsx > advisory obligations never block (R-OBL-7) > a failing advisory check reads as advisory, not as a blocked change 52ms
+ ✓ test/amendment-3.test.tsx > advisory obligations never block (R-OBL-7) > the room's lane card counts only what blocks, and names the advisory check as not blocking 12ms
+ ✓ test/declared-rendering.test.tsx > the why panel reads a record under its own entry's policy > it shows what the kind meant at that entry, its fields, and that a later policy dropped it 53ms
+ ✓ test/declared-rendering.test.tsx > the why panel reads a record under its own entry's policy > the meaning the room computed is the one shown 34ms
+ ✓ test/declared-rendering.test.tsx > the demo room: an application that is not code review, end to end > its feed, threads and acts are in its own words, and none of the review verbs appears 44ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2) > baseline: an answer that arrives is shown as recorded, with no alert 142ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2) > baseline: a failure that says nothing of a record keeps its wording: the room did not take the act 17ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2) > an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken 15ms
+ ✓ test/review-82f2743b.test.tsx > P1.2 publication recovery follows the recorded read-back and abort facts > aborted: established that it did not and cannot land 106ms
+ ✓ test/review-82f2743b.test.tsx > P1.2 publication recovery follows the recorded read-back and abort facts > the after-reservation note names the compromise exception 39ms
+ ✓ test/review-82f2743b.test.tsx > P1.2 publication recovery follows the recorded read-back and abort facts > an admin's queue item describes the read-back it has 39ms
+ ✓ test/change-history.test.tsx > the Proposal screen > the interdiff opens and closes from the keyboard 186ms
+ ✓ test/acts-screen.test.tsx > sending an act > a target that is missing is named and nothing is sent 84ms
+ ✓ test/acts-screen.test.tsx > sending an act > a good act is sent once, with exactly the binding of the declarations the person was looking at, and is then in the feed 15ms
+ ✓ test/change-history.test.tsx > the Proposal screen > shows nothing extra when the commits have no headers 134ms
+ ✓ test/change-history.test.tsx > the Proposal screen > shows nothing on a first generation 47ms
+ ✓ test/change-history.test.tsx > the Proposal screen > change IDs never reach obligations, evidence or carrying 2ms
+ ✓ test/amendment-3.test.tsx > advisory obligations never block (R-OBL-7) > the landing never waits for the advisory check, and lands while it fails 186ms
+ ✓ test/amendment-3.test.tsx > check carry is shown from its check-carried event (R-CARRY-13) > check-carried events appear in the activity feed 60ms
+ ✓ test/screens.test.tsx > Room > the publication lag is shown 79ms
+ ✓ test/screens.test.tsx > Proposal > evidence is marked reviewed here, carried with its reason, or stale with its reason 40ms
+ ✓ test/review-82f2743b.test.tsx > P2.3 terminal landing cards say why > a refused failure shows its rule, reason and fix 24ms
+ ✓ test/review-82f2743b.test.tsx > P2.3 terminal landing cards say why > a retryable outcome shows its reason and recorded fix 39ms
+ ✓ test/review-82f2743b.test.tsx > P2.3 terminal landing cards say why > a conflict names its paths; a failed check links to the check 10ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2) > the page reads the room again after a lost answer, also when the room sends it no notice of the change 129ms
+ ✓ test/acts-screen.test.tsx > sending an act > a refusal shows the room's rule with the reason and fix as the declaration worded them 76ms
+ ✓ test/acts-screen.test.tsx > sending an act > an act the viewer's role may not sign is refused by the room, and the refusal is shown 38ms
+ ✓ test/review-82f2743b.test.tsx > P2.4 note threads stay bound to their recorded head > with every interdiff known and the file unchanged, the thread is placed on the line and says why 67ms
+ ✓ test/amendment-3.test.tsx > check carry is shown from its check-carried event (R-CARRY-13) > a carried check shows the reason from its event 55ms
+ ✓ test/amendment-3.test.tsx > check carry is shown from its check-carried event (R-CARRY-13) > a check judged and not carried is shown with why; a failed check is never judged 86ms
+ ✓ test/screens.test.tsx > Proposal > the viewer's approval is recorded and meets the obligation 157ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2) > asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing new 107ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2) > asking again when the room never saw the act records it once 18ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2) > while the answer is unresolved the form sends no new act 41ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: an answer that was lost is not a rejection (R-IDEM-2) > asking again after the meaning changed is answered binding-stale: the form shows the new meaning and sends nothing by itself 105ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: the stand-in room answers an idempotency key as the Room does (R-IDEM-2 to R-IDEM-4) > the same act under the same key returns the record made the first time, and makes no second entry 3ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: the stand-in room answers an idempotency key as the Room does (R-IDEM-2 to R-IDEM-4) > another act under a used key is idempotency-mismatch, and records nothing 2ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: the stand-in room answers an idempotency key as the Room does (R-IDEM-2 to R-IDEM-4) > a refusal the room did not record leaves the key free: the corrected act under it is admitted 7ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 2: the stand-in room answers an idempotency key as the Room does (R-IDEM-2 to R-IDEM-4) > two keys are two acts 0ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 3: an explicit read of the declarations is what D(s) is answered from (R-DECL-23) > baseline: with no activation, an explicit read keeps the catalogue, and D(s) is answered from it without asking the room 2ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 3: an explicit read of the declarations is what D(s) is answered from (R-DECL-23) > after an activation and an explicit read, an act accepted later is read under the new policy, and an earlier entry under the old one 6ms
+ ✓ test/review-fb27de86.test.tsx > fb27de86 finding 3: an explicit read of the declarations is what D(s) is answered from (R-DECL-23) > after a kind is retired and an explicit read, the old catalogue is read with its end and the kind's retired mark 10ms
+ ✓ test/review-82f2743b.test.tsx > P2.4 note threads stay bound to their recorded head > with the interdiff unavailable, the thread stays on its own head and the relation is unknown 123ms
+ ✓ test/acts-screen.test.tsx > a meaning that changed behind the form (binding-stale) > nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend 186ms
+ ✓ test/acts-screen.test.tsx > a meaning that changed behind the form (binding-stale) > confirming sends once more, with the new binding, when the form still fits the new meaning 23ms
+ ✓ test/amendment-3.test.tsx > carried check evidence binds its reason to its destination and policy (review a4241e41) > the event naming the preview, its integration and the obligation's policy gives the reason 139ms
+ ✓ test/acts-fields.test.ts > a field may be named like an inherited property (R-DECL-12) > its value is the form's own or it is empty: a required one is asked for, an optional one is left out, a given one is sent 2ms
+ ✓ test/acts-fields.test.ts > the setlist application is a valid set of declarations, and none of them is a code-review act > both policy versions validate with no problem 8ms
+ ✓ test/acts-fields.test.ts > the setlist application is a valid set of declarations, and none of them is a code-review act > it shares no kind with the code-review seven, and uses every declared field type 0ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > a required field left empty is a problem; an optional one is left out of the body 1ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > text: the limit is in bytes, and the text is sent as typed 0ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > int: whole numbers only, inside the declared range 13ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > a step's int has a minimum and no maximum 3ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > bool: yes or no, nothing else 0ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > enum: one of the declared values 0ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > globs: one per line, blank lines dropped, no more than the declared count 0ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > member, act and segment are fixed formats 0ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > a step's commit is 40 hex digits 0ms
+ ✓ test/acts-fields.test.ts > reading one field: each type, with its declared limits > a field type this page does not know is refused, never guessed 0ms
+ ✓ test/acts-fields.test.ts > reading a whole body and a target > the form's fields are the step's, then the declaration's own, with required marked 0ms
+ ✓ test/acts-fields.test.ts > reading a whole body and a target > a body is built only when every field reads; each problem is named by its field 0ms
+ ✓ test/acts-fields.test.ts > reading a whole body and a target > targets by shape 1ms
+ ✓ test/acts-fields.test.ts > a record under the meaning in force at its own seq (R-DECL-23) > the label, the retirement, the declaration at that seq, the target in words and every field by name; because is left to the reasons 0ms
+ ✓ test/acts-fields.test.ts > a record under the meaning in force at its own seq (R-DECL-23) > a kind with no meaning keeps its kind and its fields 0ms
+ ✓ test/acts-fields.test.ts > a record under the meaning in force at its own seq (R-DECL-23) > target shapes and words 0ms
+ ✓ test/acts-fields.test.ts > what changed between two meanings of one kind > a new required field, a changed limit and a removed field are each named 0ms
+ ✓ test/acts-fields.test.ts > what changed between two meanings of one kind > changed steps, a new and a lost target, the threads and the hold 1ms
+ ✓ test/acts-fields.test.ts > what changed between two meanings of one kind > nothing a person fills in changed: the list is empty 0ms
+ ✓ test/screens.test.tsx > Proposal > a refused review shows its rule, reason and fix 157ms
+ ✓ test/screens.test.tsx > Proposal > a conflicting head says it cannot land 17ms
+ ✓ test/screens.test.tsx > Policy > rules show in plain English, refusals with their fix 66ms
+ ✓ test/review-82f2743b.test.tsx > P2.4 note threads stay bound to their recorded head > a file changed in an earlier generation and unchanged in the latest is not projected 109ms
+ ✓ test/review-82f2743b.test.tsx > P2.5 the why dialog shows the explanation of the act it was asked for > a late answer for an earlier request does not replace the current one 79ms
+ ✓ test/review-82f2743b.test.tsx > P2.5 the why dialog shows the explanation of the act it was asked for > a failed explain shows a recoverable error, and trying again works 6ms
+ ✓ test/review-82f2743b.test.tsx > P2.6 partial live reads are shown as partial > cursors are followed until they stop advancing, and the snapshot says what is missing 3ms
+ ✓ test/review-82f2743b.test.tsx > P2.6 partial live reads are shown as partial > the screens claim nothing beyond what was read 12ms
+ ✓ test/review-82f2743b.test.tsx > P2.6 partial live reads are shown as partial > a complete read with no held landing still does not claim the slot is free 34ms
+ ✓ test/glob-diff.test.ts > globs (R-PATH) > ** matches zero or more segments; * stays within one 1ms
+ ✓ test/glob-diff.test.ts > globs (R-PATH) > overlap is conservative and certain only with a literal path 1ms
+ ✓ test/glob-diff.test.ts > scenario diffs > the note's anchor line is the rate-limit check 0ms
+ ✓ test/glob-diff.test.ts > scenario diffs > files and statuses parse 0ms
+stdout | test/checker-ui-624-observations.test.ts > checker624 availability after a completed equal-catalogue read > an earlier error cannot blank a successful later answer, reuseEqualResult=false
+{"probe":"completed equal catalogue before earlier error","reuse":false,"confirmed":2,"lateAnswer":2,"snapshot":2}
+
+stdout | test/checker-ui-624-observations.test.ts > checker624 availability after a completed equal-catalogue read > an earlier error cannot blank a successful later answer, reuseEqualResult=true
+{"probe":"completed equal catalogue before earlier error","reuse":true,"confirmed":2,"lateAnswer":2,"snapshot":2}
+
+ ✓ test/checker-ui-624-observations.test.ts > checker624 availability after a completed equal-catalogue read > an earlier error cannot blank a successful later answer, reuseEqualResult=false 9ms
+ ✓ test/checker-ui-624-observations.test.ts > checker624 availability after a completed equal-catalogue read > an earlier error cannot blank a successful later answer, reuseEqualResult=true 2ms
+ ✓ test/checker-ui-624-observations.test.ts > checker624 availability after a completed equal-catalogue read > with no intervening successful answer, an error still honestly makes the catalogue unavailable 2ms
+ ✓ test/screens.test.tsx > Policy > a dry run of a default dependency finds the verdict that would not have carried 71ms
+ ✓ test/acts-screen.test.tsx > a meaning that changed behind the form (binding-stale) > the person can decline: nothing more is sent and the list returns 95ms
+ ✓ test/acts-screen.test.tsx > a meaning that changed behind the form (binding-stale) > the kind is gone (kind-undeclared): the form says so, reads the acts again and sends nothing more 72ms
+ ✓ test/acts-screen.test.tsx > the demo room, acted on end to end > a person prepares and sends an act of an application that is not code review, and sees it recorded 108ms
+ ✓ test/amendment-3.test.tsx > carried check evidence binds its reason to its destination and policy (review a4241e41) > successive integrations: only the event for the current integration counts, earlier or later 114ms
+ ✓ test/review-f3fff92c.test.tsx > an edit moved between places with the same surrounding lines > same parent: denying in first() and denying in second() are different edits, at their own places 11ms
+ ✓ test/review-f3fff92c.test.tsx > an edit moved between places with the same surrounding lines > different parents: the move is still found, through the rebase 1ms
+ ✓ test/review-f3fff92c.test.tsx > an edit moved between places with the same surrounding lines > control: the same edit, rebased onto lines added above it, is the same edit 0ms
+ ✓ test/review-f3fff92c.test.tsx > an edit moved between places with the same surrounding lines > control: the same edit, rebased onto an unrelated change in the other function, is the same edit 0ms
+ ✓ test/review-f3fff92c.test.tsx > an edit moved between places with the same surrounding lines > ambiguous: when the old edit's place is gone from the new parent, it says it could not tell 0ms
+ ✓ test/review-f3fff92c.test.tsx > an edit moved between places with the same surrounding lines > ambiguous: a rebase that repeats a line inside the old edit's surroundings is not claimed as a move 0ms
+ ✓ test/review-f3fff92c.test.tsx > bounds > diffing the two parents counts as work 1ms
+ ✓ test/review-f3fff92c.test.tsx > on screen > an unsure match says it could not tell whether the edit moved, and shows the hunk 18ms
+ ✓ test/screens.test.tsx > Policy > a draft refuse rule shows which claims it would have refused 209ms
+ ✓ test/screens.test.tsx > Shell > the theme button cycles system, light and dark 45ms
+ ✓ test/screens.test.tsx > Shell > number keys switch screens and j moves to the next item 22ms
+ ✓ test/screens.test.tsx > Shell > the demo timeline steps the room and the screen follows 8ms
+ ✓ test/amendment-3.test.tsx > carried check evidence binds its reason to its destination and policy (review a4241e41) > policy activation: an event under an earlier policy is history, not the current reason 193ms
+ ✓ test/amendment-3.test.tsx > carried check evidence binds its reason to its destination and policy (review a4241e41) > the reviewer's case: an older-policy event for another integration is not shown as the reason 32ms
+ ✓ test/review-8df737b8.test.ts > a failed read and an answer taken while it was on its way (R-DECL-23) > an explicit read that fails late does not blank the catalogue a later read gave, when the handle gives the same object again 42ms
+ ✓ test/review-8df737b8.test.ts > a failed read and an answer taken while it was on its way (R-DECL-23) > an explicit read that fails late does not blank the catalogue a later read gave, when the handle gives a new object 10ms
+ ✓ test/review-8df737b8.test.ts > a failed read and an answer taken while it was on its way (R-DECL-23) > with no answer taken meanwhile, a failed read honestly leaves the page without a catalogue, also for a handle that reuses objects 13ms
+ ✓ test/amendment-3.test.tsx > carried check evidence binds its reason to its destination and policy (review a4241e41) > only historical events loaded, or none: no reason is shown 118ms
+ ✓ test/amendment-3.test.tsx > carried check evidence binds its reason to its destination and policy (review a4241e41) > a preview without an integration cannot identify the destination, so no event is matched 20ms
+ ✓ test/amendment-3.test.tsx > a failed required check keeps the landing waiting (review a4241e41) > preparing never carries a failed required check, and the obligation waits 1ms
+ ✓ test/amendment-3.test.tsx > a failed required check keeps the landing waiting (review a4241e41) > control: a failed advisory check still never holds up preparation 1ms
+ ✓ test/amendment-3.test.tsx > a live room > describes check-carried events, carried and not, in plain sentences 0ms
+ ✓ test/amendment-3.test.tsx > a live room > loads check-carried events from the log and shows them in the feed 22ms
+ ✓ test/amendment-3.test.tsx > a live room > has no per-change history: the contract has no read of a generation's commits (open point 39) 0ms
+ ✓ test/review-8df737b8.test.ts > a load whose read of the catalogue fails late (R-DECL-23) > it is published under the catalogue an explicit read gave meanwhile, when the handle gives the same object again 62ms
+ ✓ test/review-8df737b8.test.ts > a load whose read of the catalogue fails late (R-DECL-23) > it is published under the catalogue an explicit read gave meanwhile, when the handle gives a new object 61ms
+ ✓ test/review-8df737b8.test.ts > a load whose read of the catalogue fails late (R-DECL-23) > with no answer taken meanwhile, the load is published with no catalogue 58ms
+
+ Test Files  22 passed (22)
+      Tests  262 passed (262)
+   Start at  18:07:22
+   Duration  4.34s (transform 39%, environment 30%, tests 19%, import 11%)
+
+  Transform  transforming modules took 18.66s · 39% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+JSON report written to /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-stage5-c74-88tei6eo/ui.vitest.json
