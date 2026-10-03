@@ -24,12 +24,13 @@ const value = (f: ActField, raw: string) => {
 
 describe("a field may be named like an inherited property (R-DECL-12)", () => {
   test("its value is the form's own or it is empty: a required one is asked for, an optional one is left out, a given one is sent", () => {
+    expect(own({ a: "1" }, "a")).toBe("1");
+    expect(own({ a: "1" }, "hasOwnProperty")).toBeUndefined();
+    expect(own({ a: "1" }, "constructor")).toBeUndefined();
     const fields = [declared("constructor", { type: "text", max: 20 }), declared("toString", { type: "text", max: 20 }, false), declared("title", { type: "text", max: 20 })];
     expect(readBody(fields, { title: "X" })).toEqual({ ok: false, problems: { constructor: "constructor is required." } });
     expect(readBody(fields, { title: "X", constructor: "built" })).toEqual({ ok: true, body: { title: "X", constructor: "built" } });
     expect(readBody(fields, { title: "X", constructor: "built", toString: "said" })).toEqual({ ok: true, body: { title: "X", constructor: "built", toString: "said" } });
-    expect(own({ a: "1" }, "a")).toBe("1");
-    expect(own({ a: "1" }, "hasOwnProperty")).toBeUndefined();
   });
 });
 
