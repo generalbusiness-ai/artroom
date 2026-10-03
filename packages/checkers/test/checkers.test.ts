@@ -51,11 +51,22 @@ test("every malformed or misdirected job is refused check-binding before any san
     ["a passed deadline", { deadline: new Date(Date.now() - 1000).toISOString() }],
     ["a bad generation", { generation: 0 }],
     ["filtered input with a bad glob", { input: { kind: "filtered", snapshot: CONFIG, paths: ["src/[ab].js"] } }],
+    // R-DECL-18: a v2 room's job names the kind and the binding to sign, both or neither, each well formed.
+    ["a kind with no binding", { kind: "check" } as never],
+    ["a binding with no kind", { binding: CONFIG } as never],
+    ["a malformed kind", { kind: "Check", binding: CONFIG } as never],
+    ["a malformed binding", { kind: "check", binding: "sha256:zz" } as never],
   ];
   for (const [what, over] of bad) {
     const r = checkJob(job(sha, tree, over), expect());
     assert.ok(isRefusal(r) && r.rule === "check-binding", what);
   }
+});
+
+test("a job that names a kind and a binding binds, as one that names neither does (R-DECL-18)", () => {
+  const sha = "a".repeat(40) as Sha;
+  const r = checkJob(job(sha, { kind: "tree", tree: sha }, { kind: "attest", binding: CONFIG } as never), expect());
+  assert.ok(!isRefusal(r), JSON.stringify(r));
 });
 
 // ------------------------------------------------------------------ signing
@@ -218,6 +229,40 @@ test("tests checker: npm ci then npm test; a signed, machine-labelled check boun
   // The same job again is an idempotent replay, not a second check.
   assert.equal(((await checker.handle(j2)) as Check).id, fail.id);
   assert.equal(ledger.records.length, 2);
+});
+
+test("the check is signed as its job says: a v2 room's job names the kind and binding, and the envelope is v: 2 with them; a v1 room's job gives v: 1 and check (R-DECL-18)", async () => {
+  const { f, signer, ledger } = await world();
+  onTestFinished(() => f.dispose());
+  const c1 = await f.init();
+  const sent: { v: number; kind: string; binding?: string }[] = [];
+  const submit = ledger.submit.bind(ledger);
+  ledger.submit = async (signed) => {
+    assert.equal(await verifyEnvelope(signed), true);
+    sent.push(signed.envelope as never);
+    return submit(signed);
+  };
+  const checker = new Tests({ waitUntil: () => {} }, { s: () => services(signer, ledger, f, "tests", f.canonical) });
+  const tree = await f.tree(c1);
+  const declared = job(c1, { kind: "tree", tree }, { kind: "check", binding: CONFIG } as never);
+  ledger.issue(declared);
+  assert.ok(!isRefusal(await checker.handle(declared)));
+  // Another declared kind: the room stand-in knows only `check`, and what matters here is the envelope it was sent.
+  const renamed = job(c1, { kind: "tree", tree }, { kind: "attest", binding: CONFIG } as never);
+  ledger.issue(renamed);
+  await checker.handle(renamed);
+  const legacy = job(c1, { kind: "tree", tree });
+  ledger.issue(legacy);
+  await checker.handle(legacy);
+  assert.deepEqual(
+    sent.map((e) => [e.v, e.kind, e.binding]),
+    [
+      [2, "check", CONFIG],
+      [2, "attest", CONFIG],
+      [1, "check", undefined],
+    ],
+  );
+  assert.equal("binding" in sent[2]!, false);
 });
 
 test("a changed test with unchanged source changes the tree, so the check reruns, and its result follows the new test (R-CARRY-6)", async () => {

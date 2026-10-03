@@ -42,9 +42,33 @@ export function stagedProblems(doc: PolicyDocumentV2): string[] {
 /** The facts a refusal template may use (R-DECL-13). A slot with no fact is filled with nothing. */
 export type RefusalFacts = Partial<Record<RefusalSlot, string>>;
 
+/**
+ * The most bytes a filled `reason` or `fix` has (R-DECL-13): a template of
+ * 512 bytes with one path of the greatest length fits. A longer text is cut
+ * at a character boundary, so a template that repeats a slot cannot make a
+ * refusal, or the entry that records it, larger than this.
+ */
+export const WORDING_FILLED_BYTES = 8192;
+
 /** Fill a template's slots. Only the eight slots are interpolated; validation refused any other brace. */
 export function fill(template: string, facts: RefusalFacts): string {
-  return template.replace(/\{(holder|lane|generation|obligation|path|reservedFor|until|kind)\}/g, (_, slot: RefusalSlot) => facts[slot] ?? ""); // G2:fill
+  const text = template.replace(/\{(holder|lane|generation|obligation|path|reservedFor|until|kind)\}/g, (_, slot: RefusalSlot) => facts[slot] ?? ""); // G2:fill
+  return clipBytes(text, WORDING_FILLED_BYTES); // G2:fill-bound
+}
+
+const encoder = new TextEncoder();
+
+/** `text` cut to at most `max` UTF-8 bytes, never inside a character. */
+export function clipBytes(text: string, max: number): string {
+  if (text.length <= max / 3 || encoder.encode(text).length <= max) return text;
+  let bytes = 0;
+  let out = "";
+  for (const ch of text) {
+    bytes += encoder.encode(ch).length;
+    if (bytes > max) break;
+    out += ch;
+  }
+  return out;
 }
 
 /**

@@ -333,8 +333,9 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
       "This invitation is for a key the client holds; it can be redeemed only with a join the client signs.",
       "Make a key, sign a join, and send it to redeem with custody client.",
     );
-  const granted = sessionGrant(core, inv);
-  if ("refusal" in granted) return granted.refusal;
+  // Decided here so that a redemption refused for its session makes no key. It is decided again inside the queue.
+  const first = sessionGrant(core, inv);
+  if ("refusal" in first) return first.refusal;
   const memberKey = newKeyPair();
   const sessionKey = newKeyPair();
   const ttl = inv.session?.ttlSeconds ?? 24 * 3600;
@@ -349,20 +350,26 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
     body: { op: "join", invitation: inv.id, secret: secretText },
     idempotencyKey: `redeem-${randomToken().slice(0, 32)}`,
   });
-  const grant = signed({
-    v: 1,
-    room: core.roomId,
-    actor: memberKey.key,
-    kind: "roster",
-    target: null,
-    body: { op: "delegate", to: sessionKey.key, ...granted, lanes: "*", expiresAt: iso(expiresMs) } as never,
-    idempotencyKey: `session-${randomToken().slice(0, 32)}`,
-  });
+  const grantKey = `session-${randomToken().slice(0, 32)}`;
 
   return core.serial(async () => {
     for (let attempt = 0; attempt < 6; attempt++) {
       core.expireDueSync();
       const snap = core.headSeq();
+      // The session's grant, under the document in force at `snap`: an activation while this redemption waited in the
+      // queue changes what the session may grant, and its shape. An activation after this moves the head, and the
+      // attempt is made again.
+      const granted = sessionGrant(core, inv); // G2:session-in-queue
+      if ("refusal" in granted) return granted.refusal;
+      const grant = signed({
+        v: 1,
+        room: core.roomId,
+        actor: memberKey.key,
+        kind: "roster",
+        target: null,
+        body: { op: "delegate", to: sessionKey.key, ...granted, lanes: "*", expiresAt: iso(expiresMs) } as never,
+        idempotencyKey: grantKey,
+      });
       const joinPlan = await decide(core, join, "room-redemption", {});
       if (joinPlan.t === "replay") throw artroomError("internal", "A fresh redemption key was already used.");
       if (joinPlan.t !== "accept") return joinPlan.refusal;
@@ -394,10 +401,10 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
           fault("redemption:after-join");
           const late2 = finalBoundary(core, grantPlan);
           if (late2) throw new Abort(late2);
-          const granted = commit(core, grantPlan, { heldKeys: [{ key: sessionKey.key, seed: sessionKey.seed, purpose: "session" }] });
+          const delegated = commit(core, grantPlan, { heldKeys: [{ key: sessionKey.key, seed: sessionKey.seed, purpose: "session" }] });
           fault("redemption:after-delegate");
-          core.sql.all("INSERT INTO bearers (hash, member, key, delegation, expires_ms) VALUES (?, ?, ?, ?, ?)", tokenHash(bearer), (joined.result as RosterRecord).by.member, sessionKey.key, granted.id, expiresMs);
-          return { joined: joined.result as RosterRecord, delegation: granted.id };
+          core.sql.all("INSERT INTO bearers (hash, member, key, delegation, expires_ms) VALUES (?, ?, ?, ?, ?)", tokenHash(bearer), (joined.result as RosterRecord).by.member, sessionKey.key, delegated.id, expiresMs);
+          return { joined: joined.result as RosterRecord, delegation: delegated.id };
         });
         core.committed();
         const by = out.joined.by as Extract<RosterRecord["by"], { via: "join" }>;
@@ -457,20 +464,37 @@ export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): 
   const a = act as Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey"> & { binding?: unknown };
   // A retry of an act this session already made is built as it was built then, so the same act and key give the same
   // bytes and the original result, whatever the room's document is now (R-IDEM-2, R-DECL-16).
+  const build = (v: 1 | 2 | null, binding: unknown): Envelope =>
+    ({
+      v: v ?? (binding === undefined ? 1 : 2),
+      room: core.roomId,
+      actor: b.key,
+      kind: a.kind,
+      ...(binding !== undefined ? { binding } : {}),
+      target: a.target,
+      body: a.body,
+      idempotencyKey: a.idempotencyKey,
+      delegation: b.delegation,
+    }) as unknown as Envelope;
   const earlier = a.binding === undefined ? builtBefore(core, b.key, a.idempotencyKey, a.kind) : null; // G2:bearer-retry
-  const binding = a.binding !== undefined ? a.binding : earlier ? earlier.binding : builtFor(core, a.kind); // G2:bearer-binding
-  const env = {
-    v: earlier ? earlier.v : binding === undefined ? 1 : 2,
-    room: core.roomId,
-    actor: b.key,
-    kind: a.kind,
-    ...(binding !== undefined ? { binding } : {}),
-    target: a.target,
-    body: a.body,
-    idempotencyKey: a.idempotencyKey,
-    delegation: b.delegation,
-  } as unknown as Envelope;
+  let env = build(null, a.binding !== undefined ? a.binding : builtFor(core, a.kind)); // G2:bearer-binding
+  if (earlier) {
+    // Built as it was then, it is a retry only if that gives the same bytes. If it does not, this is another act
+    // under a used key: it stays built for the document in force, and admission answers idempotency-mismatch,
+    // naming the original entry (R-IDEM-3), not a field the caller never sent.
+    const again = build(earlier.v, earlier.binding);
+    if (sameDigest(again, earlier.digest)) env = again; // G2:bearer-same-act
+  }
   return submit(core, { envelope: env, sig: sign(b.seed, "artroom-envelope-v1", env) }, "submitted");
+}
+
+/** Is this envelope the one whose digest the room recorded? An envelope outside the signed JSON profile is no one's retry. */
+function sameDigest(env: Envelope, digest: string): boolean {
+  try {
+    return digestJson(env) === digest;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -478,13 +502,13 @@ export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): 
  * under the same idempotency key and kind, or null when there is none. The
  * recorded entry holds the envelope the room signed then.
  */
-function builtBefore(core: RoomCore, key: string, ikey: unknown, kind: unknown): { readonly v: 1 | 2; readonly binding: string | undefined } | null {
+function builtBefore(core: RoomCore, key: string, ikey: unknown, kind: unknown): { readonly v: 1 | 2; readonly binding: string | undefined; readonly digest: string } | null {
   if (typeof ikey !== "string" || typeof kind !== "string") return null;
-  const prior = one(core.sql, "SELECT seq FROM idem WHERE actor = ? AND ikey = ?", key, ikey);
+  const prior = one(core.sql, "SELECT seq, digest FROM idem WHERE actor = ? AND ikey = ?", key, ikey);
   const entry = prior ? entryAt(core.sql, num(prior, "seq")! as never) : null;
   if (!entry || entry.entry.type === "system") return null; // G2:bearer-refusal: an accepted act or a recorded refusal, both hold the envelope the room signed
   const env = entry.entry.act.envelope as unknown as { v: 1 | 2; kind: string; binding?: string };
-  return env.kind === kind ? { v: env.v, binding: env.binding } : null;
+  return env.kind === kind ? { v: env.v, binding: env.binding, digest: str(prior!, "digest")! } : null;
 }
 
 /**
@@ -492,8 +516,10 @@ function builtBefore(core: RoomCore, key: string, ikey: unknown, kind: unknown):
  * room (R-API-9 as amended): bearer acts come from the named MCP tools,
  * each built for one code-review declaration, so it is that declaration's
  * binding under this room's steps version and `lanes`. A room whose
- * declaration of the kind differs refuses the act `binding-stale`; the room
- * never gives an act the meaning its own declaration has.
+ * declaration of the kind differs refuses the act: `delegation-invalid` at
+ * step 4 when the session's grant names the room's own binding, and
+ * `binding-stale` at step 4a when the grant names the code-review binding.
+ * The room never gives an act the meaning its own declaration has.
  */
 function builtFor(core: RoomCore, kind: unknown): string | undefined {
   const doc = core.activePolicy().doc as AnyPolicyDocument;

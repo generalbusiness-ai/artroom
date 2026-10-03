@@ -12,8 +12,10 @@
  */
 
 import type { CheckerConfigV2, PlatformRule, PolicyDocumentV2, Step, TargetShape } from "@generalbusiness/artroom-contract";
+import { PolicyEvalError } from "./errors.ts";
 import { globProblem } from "./glob.ts";
 import { Problems, checkerFields, documentFields, isObj, result, type Obj, type Validation } from "./validate.ts";
+import { canonicalJson, safeName } from "./values.ts";
 
 /** The platform's bounds on declarations (R-DECL-26). */
 export const DECLARATION_BOUNDS = {
@@ -30,6 +32,8 @@ export const DECLARATION_BOUNDS = {
   templateChars: 256,
   leaseSeconds: { min: 10, max: 86400 },
   reserveSeconds: { min: 1, max: 600 },
+  /** The whole document's canonical JSON, in bytes: what a room stores in one row, with room to spare. */
+  documentBytes: 1048576,
 } as const;
 
 /** The steps versions this platform carries (R-DECL-14). */
@@ -205,6 +209,8 @@ export function validatePolicyV2(doc: unknown, ctx: PolicyV2Context = {}): Polic
     const at = `acts.${kind}`;
     if (!KIND.test(kind)) p.add(at, "a kind must match [a-z][a-z0-9-]{0,31}"); // G:kind-grammar
     if (RESERVED_KINDS.includes(kind)) p.add(at, `${kind} is reserved by the platform`); // G:kind-reserved
+    // A kind is a key of the document and of every grant map, and the signed JSON profile has no key so named.
+    if (!safeName(kind)) p.add(at, `${kind} is a name the JSON profile reserves`); // G2:kind-profile
     const d = raw![kind];
     if (!isObj(d)) {
       p.add(at, "must be an object"); // G:decl-object
@@ -230,7 +236,19 @@ export function validatePolicyV2(doc: unknown, ctx: PolicyV2Context = {}): Polic
 
   soundness(p, acts, warnings, openers);
   checkers(p, ctx.checkers ?? {}, acts);
+  // R-DECL-26: the bounds above still allow a document of several megabytes, more than a room can store in one row.
+  if (canonicalBytesExceed(doc, DECLARATION_BOUNDS.documentBytes)) p.add("policy", `the document's canonical JSON must be at most ${DECLARATION_BOUNDS.documentBytes} bytes`); // G2:doc-bytes
   return done();
+}
+
+/** Is the value's canonical JSON longer than `max` bytes? The walk stops at the first byte over. A value outside the profile is not judged here. */
+function canonicalBytesExceed(value: unknown, max: number): boolean {
+  try {
+    canonicalJson(value, max, Number.MAX_SAFE_INTEGER);
+    return false;
+  } catch (error) {
+    return error instanceof PolicyEvalError && error.code === "value_bytes";
+  }
 }
 
 function declaration(p: Problems, kind: string, at: string, d: Obj): Act {
@@ -323,6 +341,8 @@ function declaration(p: Problems, kind: string, at: string, d: Obj): Act {
 function field(p: Problems, at: string, name: string, f: unknown, taken: ReadonlySet<string>, targets: readonly TargetShape[]): void {
   if (!FIELD.test(name)) p.add(at, "a field name must match [a-z][A-Za-z0-9]{0,31}"); // G:field-name
   if (taken.has(name)) p.add(at, `${name} is a field of this act's steps, or because`); // G:field-reserved
+  // A field is a key of the binding subject and of every rule input, and the signed JSON profile has no key so named.
+  if (!safeName(name)) p.add(at, `${name} is a name the JSON profile reserves`); // G2:field-profile
   if (!isObj(f)) return p.add(at, "must be an object"); // G:field-object
   const type = f["type"];
   if (!isString(type) || !Object.hasOwn(FIELD_KEYS, type)) return p.add(at, "type must be text, int, bool, enum, globs, member, act or segment"); // G:field-type

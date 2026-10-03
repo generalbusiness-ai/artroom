@@ -86,7 +86,7 @@ import { bindingStale, kindUndeclared, worded, type RefusalFacts } from "./decla
 import { canonicalize, utf8 } from "./canonical.ts";
 import { b64url, digestJson, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
-import { iso, opIds, parseTime, pinnedRef } from "./ids.ts";
+import { iso, opIds, parseTime, pinnedRef, RE } from "./ids.ts";
 import { idOf } from "./log.ts";
 import { judge, laneOf, refusal, type Signer } from "./authority.ts";
 import { matchesAny } from "./glob.ts";
@@ -611,11 +611,14 @@ function handlerBody(body: Readonly<Record<string, unknown>>): Record<string, un
 
 /** Facts every refusal of this envelope may report (R-DECL-13): its kind, and the lane and generation it names. */
 function envelopeFacts(env: Envelope): RefusalFacts {
+  // A declared kind's target is judged only after step 4a (`checkDeclaredTarget`), and refusals decided before that
+  // are worded too. So a fact is taken from the target only if it has the form the room itself reports: a lane ID,
+  // a generation number. Anything else fills its slot with nothing.
   const t = env.target as { lane?: unknown; generation?: unknown } | null;
   return {
     kind: env.kind,
-    ...(t && typeof t.lane === "string" ? { lane: t.lane } : {}),
-    ...(t && typeof t.generation === "number" ? { generation: String(t.generation) } : {}),
+    ...(t && typeof t.lane === "string" && RE.actId.test(t.lane) ? { lane: t.lane } : {}), // G2:fact-lane
+    ...(t && Number.isSafeInteger(t.generation) && (t.generation as number) >= 1 ? { generation: String(t.generation) } : {}), // G2:fact-generation
   };
 }
 
@@ -826,8 +829,9 @@ function renewLease(ctx: Ctx, lane: LaneId): void {
 
 /**
  * The fields every record shares. Its kind is the act's own: a legacy kind,
- * a declared kind, or `recover` with its `op` (R-DECL-21); `kind` names the
- * record shape the step produces.
+ * a declared kind, or `recover` (R-DECL-21); `kind` names the record shape
+ * the step produces. A `recover` record names its op as `recover`, a field
+ * no step's record has: a landing's own `op` is its landing operation.
  */
 function recordBase<K extends ActRecord["kind"]>(ctx: Ctx, entry: LogEntry, id: ActId, kind: K, receipt: Receipt) {
   const because = (ctx.env.body as { because?: Claim["because"] }).because;
@@ -836,7 +840,7 @@ function recordBase<K extends ActRecord["kind"]>(ctx: Ctx, entry: LogEntry, id: 
     id,
     seq: entry.seq,
     kind: ctx.env.kind as K,
-    ...(ctx.recover ? { op: ctx.recover } : {}),
+    ...(ctx.recover ? { recover: ctx.recover } : {}), // G2:recover-record
     by: receipt.authority,
     at: entry.at,
     ...(receipt.after ? { after: receipt.after } : {}),
@@ -910,7 +914,7 @@ async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
         ...recordBase(ctx, entry, id, "claim", receiptOf(entry)),
         lane: id,
         purpose,
-        goal: body.goal,
+        goal: body.goal ?? "", // G2:record-goal
         ...(body.plan !== undefined ? { plan: body.plan } : {}),
         scope: body.scope,
         lease,
@@ -1358,7 +1362,7 @@ async function review(ctx: Ctx, laneId: LaneId, generation: Generation, body: Re
         verdict: body.verdict,
         scope: body.scope,
         dependsOn: body.dependsOn ?? [],
-        text: body.text,
+        text: body.text ?? "", // G2:record-text
         fulfils:
           body.verdict === "approve"
             ? qualifiesIds.map((o) => ({ obligation: o, evidence: { basis: "here" as const, act: id, kind: "review" as const, generation, head: body.head } }))

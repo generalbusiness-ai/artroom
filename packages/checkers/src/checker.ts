@@ -35,6 +35,7 @@ import type {
   CheckOutcome,
   CheckerContext,
   DelegationId,
+  Envelope,
   Note,
   RoomId,
   NoteAnchor,
@@ -43,7 +44,7 @@ import type {
   Runner,
   SignedEnvelope,
 } from "@generalbusiness/artroom-contract";
-import { checkJob, isRefusal, ownJob, type BoundJob, type JobExpectations } from "./job.ts";
+import { checkJob, isRefusal, ownJob, signedAs, type BoundJob, type JobExpectations } from "./job.ts";
 import { checkout, type CheckoutOptions, type Workspace } from "./runner.ts";
 import { isOutputLimit } from "./sandbox.ts";
 import { signEnvelope, type Signer } from "./signing.ts";
@@ -221,16 +222,20 @@ export abstract class Checker<Env = unknown, Outcome extends CheckOutcome = Chec
       detail: clip(`Machine-run check "${this.name}": ${outcome.ok ? "passed" : "failed"}. ${this.label}\nRunner environment: ${digest}\n\n${outcome.detail}`),
       ...(job.landOp ? { landOp: job.landOp } : {}),
     };
+    // R-DECL-18: a job from a v2 room names the kind its check is signed as and that kind's binding (`CheckJobV2`);
+    // the check is then a `v: 2` envelope with them. A job from a v1 room names neither, and the check is `check`.
+    const as = signedAs(job);
     const signed = await signEnvelope(s.signer, {
-      v: 1,
+      v: as ? 2 : 1,
       room: job.room,
       actor: s.signer.key,
-      kind: "check",
+      kind: as ? as.kind : "check",
+      ...(as ? { binding: as.binding } : {}),
       target: { lane: job.lane, generation: job.generation },
       body,
       idempotencyKey: `chk-${job.id}`.slice(0, 64),
       ...(s.delegation ? { delegation: s.delegation } : {}),
-    });
+    } as unknown as Envelope);
     const recorded = await room.submit(signed);
     if (isRefusal(recorded)) return recorded as Refusal;
     const check = recorded as Check;

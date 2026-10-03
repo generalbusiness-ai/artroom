@@ -129,9 +129,28 @@ describe("the code-review declarations judge bodies as the legacy vocabulary doe
     expect(at({ n: 1, s: ".." })).toBe("invalid-body: body.s must be one path segment, with no slash or glob character.");
     expect(at({ n: 1, s: "x*" })).toBe("invalid-body: body.s must be one path segment, with no slash or glob character.");
     expect(at({ n: 1, s: "part-1" })).toBe("ok");
+    // A segment is 1 to 255 bytes, and not `.`.
+    expect(at({ n: 1, s: "" })).toBe("invalid-body: body.s must be one path segment, with no slash or glob character.");
+    expect(at({ n: 1, s: "." })).toBe("invalid-body: body.s must be one path segment, with no slash or glob character.");
+    expect(at({ n: 1, s: "s".repeat(255) })).toBe("ok");
+    expect(at({ n: 1, s: "s".repeat(256) })).toBe("body-too-large: body.s is longer than 255 bytes.");
+    // Bytes, not characters: 128 two-byte characters are 256 bytes.
+    expect(at({ n: 1, s: "é".repeat(127) })).toBe("ok");
+    expect(at({ n: 1, s: "é".repeat(128) })).toBe("body-too-large: body.s is longer than 255 bytes.");
+    expect(at({ n: 1, s: 7 })).toBe("invalid-body: body.s must be a string.");
+    // An int is an integer within its limits: not a fraction, not a numeral in a string, not below the minimum.
+    expect(at({ n: 1.5 })).toBe("invalid-body: body.n must be an integer from 1 to 3.");
+    expect(at({ n: "2" })).toBe("invalid-body: body.n must be an integer from 1 to 3.");
+    expect(at({ n: 0 })).toBe("invalid-body: body.n must be an integer from 1 to 3.");
+    expect(at({ n: 3 })).toBe("ok");
     // `t` is required on target thread only; `n` on every target.
     expect(at({ n: 1, lease: 1 }, { lane })).toBe("invalid-body: body.t is required.");
     expect(at({ n: 1, lease: 1, t: "abcd" }, { lane })).toBe("body-too-large: body.t is longer than 3 bytes.");
+    // A text is a string, within its limit in bytes.
+    expect(at({ n: 1, lease: 1, t: 7 }, { lane })).toBe("invalid-body: body.t must be a string.");
+    expect(at({ n: 1, lease: 1, t: ["a"] }, { lane })).toBe("invalid-body: body.t must be a string.");
+    expect(at({ n: 1, lease: 1, t: "éé" }, { lane })).toBe("body-too-large: body.t is longer than 3 bytes.");
+    expect(at({ n: 1, lease: 1, t: "abc" }, { lane })).toBe("ok");
     expect(at({ lease: 1, t: "a" }, { lane })).toBe("invalid-body: body.n is required.");
     // member, act and segment are fixed-format: the entropy check skips them (R-SEC-4); text is never skipped.
     expect([...checkBody("x", null, { n: 1, m: "@bob", a: lane, s: "part" }, doc).fixed].sort()).toEqual(["body.a", "body.m", "body.s"]);

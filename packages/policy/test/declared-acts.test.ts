@@ -12,7 +12,7 @@ import { validateCheckerConfigV2, validatePolicyV2, type PolicyV2Context } from 
 import { bindingOf, bindingSubject } from "../src/binding.ts";
 import { CODE_REVIEW_ACTS } from "../src/codereview.ts";
 import { defaultPolicy } from "../src/helpers.ts";
-import { digestJson } from "../src/integrity.ts";
+import { canonicalize, digestJson } from "../src/integrity.ts";
 import { validatePolicy } from "../src/validate.ts";
 import { IN_KEY, JAM_ACTS, JAM_RULES } from "./support/jam.ts";
 
@@ -311,5 +311,54 @@ describe("built-in data (R-DECL-1, section 33.7)", () => {
 
   test("the code-review check act is one a checker configuration may name", () => {
     expect(problems(codeReview(), { checkers: { ci: CI, lint: { ...CI, inputs: ["src/**"] } } })).toEqual([]);
+  });
+});
+
+describe("bounds added by stage 2 (request fd6f00b6; R-DECL-2, R-DECL-12, R-DECL-26)", () => {
+  for (const name of ["constructor", "prototype"]) {
+    test(`G2:kind-profile refuses a kind named ${name}, which the JSON profile reserves as a key`, () => {
+      refused(edit(codeReview, (d) => (d.acts[name] = clone(d.acts["release"]!)))(), new RegExp(`^acts\\.${name}: ${name} is a name the JSON profile reserves`));
+    });
+    test(`G2:field-profile refuses a body field named ${name}`, () => {
+      refused(edit(codeReview, (d) => (at(d, "propose")["body"][name] = { type: "bool", optional: true }))(), new RegExp(`body\\.${name}: ${name} is a name the JSON profile reserves`));
+    });
+  }
+
+  test("every other name of an object's prototype is a valid kind or field, and its binding can be computed", async () => {
+    const d = codeReview();
+    for (const name of ["toString", "valueOf", "hasOwnProperty", "isPrototypeOf"]) at(d, "propose")["body"][name] = { type: "bool", optional: true };
+    d.acts["valueof"] = clone(d.acts["release"]!);
+    expect(problems(d)).toEqual([]);
+    expect(await bindingOf(d as unknown as PolicyDocumentV2, "propose")).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(await bindingOf(d as unknown as PolicyDocumentV2, "valueof")).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  test("G2:doc-bytes: a document of exactly 1,048,576 canonical bytes validates, and one byte more is refused", () => {
+    const codes = ["invalid-body", "body-too-large", "not-member", "key-revoked", "delegation-invalid", "role-forbids", "idempotency-mismatch", "secret-detected", "lane-unknown", "lane-held", "not-holder", "lease-fenced", "generation-moved", "scope-overlap", "glob-invalid", "head-unknown", "head-mismatch", "outside-claim"];
+    const words = "w".repeat(512);
+    const refusals = Object.fromEntries(codes.map((c) => [c, { reason: words, fix: words }]));
+    const sized = (helps: readonly number[]) => {
+      const d = codeReview();
+      helps.forEach((h, i) => (d.acts[`say${i}`] = { label: `Say ${i}`, help: "h".repeat(h), targets: { thread: ["version"] }, threads: ["claim"], body: { summary: { type: "text", max: 10 } }, who: { roles: ["member"] }, refusals }));
+      return d;
+    };
+    const bytes = (d: unknown) => new TextEncoder().encode(canonicalize(d as never)).length;
+    const BOUND = 1048576;
+    // Enough kinds with full-length help to pass the bound, then help shortened until the document is exactly on it.
+    const helps: number[] = [];
+    while (bytes(sized(helps)) <= BOUND) helps.push(4096);
+    let over = bytes(sized(helps)) - BOUND;
+    for (let i = 0; over > 0; i++) {
+      const cut = Math.min(over, helps[i]! - 1);
+      helps[i] = helps[i]! - cut;
+      over -= cut;
+    }
+    const exact = sized(helps);
+    expect(bytes(exact)).toBe(BOUND);
+    expect(problems(exact)).toEqual([]);
+    helps[0] = helps[0]! + 1;
+    const more = sized(helps);
+    expect(bytes(more)).toBe(BOUND + 1);
+    expect(problems(more)).toEqual(["policy: the document's canonical JSON must be at most 1048576 bytes"]);
   });
 });

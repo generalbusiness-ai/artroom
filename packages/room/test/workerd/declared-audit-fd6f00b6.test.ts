@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { ActDeclaration, ActRecord, Claim, PolicyDocument, PolicyDocumentV2, Redeemed, Refusal, RosterRecord } from "@generalbusiness/artroom-contract";
 import { CODE_REVIEW_ACTS, codeReviewPolicy, lanes as lanesPart, policy, requireReview } from "@generalbusiness/artroom-policy";
 import { activate, act, bindingIn, declaredRoom, headSeq, inDO, ok, signed, v2 } from "./declared-support.ts";
-import { addMember, b64url, call, Client, clock, day, DECLARED, digestBytes, expectOk, expectRefusal, iso, makeRoom, newKeyPair, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
+import { addMember, b64url, call, Client, clock, day, DECLARED, digestBytes, expectOk, expectRefusal, failure, iso, makeRoom, newKeyPair, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
 
 const reviewed = () => policy(requireReview({ paths: "src/**", from: "role:admin", id: "rv" }));
 const landing = (r: TestRoom, op: string) =>
@@ -269,8 +269,17 @@ describe.skipIf(DECLARED)("recover at step 4, and thread settings recorded at op
     expect(await headSeq(r)).toBe(seq);
     // A member, who could sign a legacy claim, is judged at step 7 as before: admin-required, recorded.
     expect(expectRefusal(await act(r, bob, "recover", null, { op: "open", goal: "g", scope: [".artroom/x"] }, { binding: null }), "admin-required").act).toBeDefined();
-    // An unknown op, and a target its op does not take, keep their codes.
+    // An unknown op keeps its code, invalid-body; a target its op does not take keeps bad-request, thrown at step 1.
     expectRefusal(await act(r, r.admin, "recover", null, { op: "nope" }, { binding: null }), "invalid-body");
+    const held = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "g", scope: [".artroom/x"] }, { binding: null });
+    const after = await headSeq(r);
+    for (const [target, body] of [
+      [{ lane: held.lane }, { op: "open", goal: "g", scope: [".artroom/y"] }],
+      [null, { op: "version", lease: 1, expectedGeneration: 0, head: "a".repeat(40), summary: "s" }],
+      [{ lane: held.lane }, { op: "land", lease: 1, head: "a".repeat(40) }],
+    ] as const)
+      expect((await failure(r.stub.submit(await signed(r, r.admin, "recover", target, body, { binding: null })))).code).toBe("bad-request");
+    expect(await headSeq(r)).toBe(after);
   });
 
   it("the opened effect names the thread's kind and binding in a v2 room, and the thread records its conflict mode; a v1 room records neither", async () => {

@@ -79,7 +79,7 @@ import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
 import { issueJobs, jobsDue, jobTokensDue, moveJobMints, oweJobs, revokeJobTokens } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { PUBLICATION_CODES, ROOM_SCRUB_TABLES, createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
-import { judge } from "./authority.ts";
+import { adminOwnKey, judge } from "./authority.ts";
 import { report, toConsole } from "./diag.ts";
 import { matchGlob } from "./glob.ts";
 import { ALARM } from "./budgets.ts";
@@ -177,6 +177,17 @@ const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints", "jobToken
 let faultHook: ((point: string) => void) | null = null;
 
 /** Tests only: throw at a named point inside a write, as a crash would. */
+/** How many versions' parsed policies a Room keeps: the active one, and those of operations and jobs made under earlier ones. */
+const POLICY_CACHE = 4;
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const v of Object.values(value)) deepFreeze(v);
+  }
+  return value;
+}
+
 /** A failed publication's code: a known one, a known Artifacts code, or `transport`. Never other text (request d29c09fa). */
 function publicationCode(e: unknown): string {
   const code = (e as { code?: unknown } | null | undefined)?.code;
@@ -719,15 +730,25 @@ export class RoomCore {
   }
 
   policyAt(version: PolicyVersion): ActivePolicyFull | null {
+    // A version is the ID of its `policy-activated` entry, so its row never changes: the parsed policy is kept, deeply
+    // frozen, for the few versions in use. Without this the document is parsed once per kind a grant or a request
+    // names (`declaredBinding`).
+    const kept = this.policyCache.get(version);
+    if (kept) return kept; // G2:policy-cache
     const r = one(this.sql, "SELECT * FROM policies WHERE version = ?", version);
     if (!r) return null;
-    return {
+    const policy: ActivePolicyFull = deepFreeze({
       version,
-      doc: Object.freeze(JSON.parse(str(r, "doc")!)) as PolicyDocument,
+      doc: JSON.parse(str(r, "doc")!) as PolicyDocument,
       digest: str(r, "digest") as Digest,
       checkers: JSON.parse(str(r, "checkers")!) as ActivePolicyFull["checkers"],
-    };
+    });
+    if (this.policyCache.size >= POLICY_CACHE) this.policyCache.delete(this.policyCache.keys().next().value!);
+    this.policyCache.set(version, policy);
+    return policy;
   }
+
+  private readonly policyCache = new Map<PolicyVersion, ActivePolicyFull>();
 
   /** Seal `policy-activated` and make it active. Synchronous; inside a transaction (R-POL-9, R-PUB-9). */
   activate(doc: AnyPolicyDocument, checkers: ActivePolicyFull["checkers"], commit: Sha | null, at: string): ActId {
@@ -1092,15 +1113,25 @@ export class RoomCore {
     if (!entry || entry.type !== "act") return { reason: "authority-lost", fix: "Land again." };
     const env = entry.act.envelope;
     const doc = this.activePolicy().doc as AnyPolicyDocument;
-    // Admission refuses an undeclared kind at step 4a; here there is no step 4a, and `judge` leaves that kind's role
-    // and coverage unjudged. So a landing whose kind the active document no longer declares has lost its authority.
-    if (isDeclared(doc) && !isPlatformKind(env.kind) && declarationOf(doc, env.kind) === null)
-      return { reason: "authority-lost", fix: `The room's active policy no longer declares ${env.kind}, so the landing's authority cannot be judged. Land again with an act the room declares.` }; // G2:revalidate-undeclared
-    const j = judge(this.sql, env, "submitted", this.now(), doc);
-    if (!j.ok) return { reason: "authority-lost", fix: `The land initiator's authority is no longer current (${j.refusal.rule}). Land again with current authority.` };
     const lane = laneRow(this.sql, op.lane);
-    if (lane?.purpose === "config-recovery" && !(j.authority.via === "member" && j.authority.role === "admin"))
-      return { reason: "authority-lost", fix: "Only an active admin may land a configuration-recovery lane (R-ADMIN-8)." };
+    if (lane?.purpose === "config-recovery") {
+      // R-DECL-21, R-ADMIN-8: platform code judges recovery, whatever the document in force declares and whatever
+      // kind the landing's act had under the document it was admitted in: an active admin's own key.
+      if (!adminOwnKey(this.sql, env)) return { reason: "authority-lost", fix: "Only an active admin may land a configuration-recovery lane (R-ADMIN-8)." }; // G2:revalidate-recovery
+    } else {
+      // Admission refuses an undeclared kind at step 4a; here there is no step 4a, and `judge` leaves that kind's role
+      // and coverage unjudged. So a landing whose kind the active document no longer declares has lost its authority.
+      if (isDeclared(doc) && !isPlatformKind(env.kind) && declarationOf(doc, env.kind) === null)
+        return { reason: "authority-lost", fix: `The room's active policy no longer declares ${env.kind}, so the landing's authority cannot be judged. Land again with an act the room declares.` }; // G2:revalidate-undeclared
+      const j = judge(this.sql, env, "submitted", this.now(), doc);
+      if (!j.ok) return { reason: "authority-lost", fix: `The land initiator's authority is no longer current (${j.refusal.rule}). Land again with current authority.` };
+      // R-LAND-7 judges authority "as for a new admission". A new act of this kind carries the active binding
+      // (R-DECL-16), and a grant covers a kind only for the binding its grantor signed (R-DECL-17). So a landing
+      // under a delegation whose binding is no longer the active one has lost its authority. A member's own key
+      // needs no grant: its landing completes under the declaration it was admitted in (R-DECL-23).
+      if (j.authority.via === "delegation" && isDeclared(doc) && !isPlatformKind(env.kind) && (env as { binding?: string }).binding !== this.declaredBinding(env.kind))
+        return { reason: "authority-lost", fix: `The delegation was granted for an earlier meaning of ${env.kind}. Ask the grantor to delegate again, then land again.` }; // G2:revalidate-binding
+    }
     const policy = this.activePolicy();
     const gen = generationRow(this.sql, op.lane, op.generation);
     if (!gen) return { reason: "authority-lost", fix: "Land again." };

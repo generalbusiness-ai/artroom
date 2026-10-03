@@ -308,14 +308,36 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
     expect(await inDO(r, (room) => room.core.sql.all("SELECT used FROM invitations WHERE id = ?", inv.id)[0]!["used"])).toBeNull();
   });
 
-  it("a room-custody invitation with no session grants renew and no declared kind; its bearer's code-review tools carry the code-review binding", async () => {
+  it("a room-custody invitation with no session grants renew and no declared kind: its bearer's renew is admitted, and its claim is delegation-invalid, unrecorded, because the delegation covers no declared kind", async () => {
     const r = await declaredRoom();
     const bytes = randomBytes(32);
     const inv = await ok<RosterRecord>(r, r.admin, "roster", null, { op: "invite", member: "@agent", role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(bytes) }, { binding: null });
     const b = await call<Redeemed>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(bytes) }, "x"));
     const d = (await r.admin.read({ q: "members" })).delegations.find((x) => x.id === b.delegation)!;
     expect(d).toMatchObject({ kinds: ["renew"], acts: {} });
-    expect(expectRefusal(await call(r.stub.bearerAct(b.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })), "delegation-invalid").reason).toContain("does not cover claim");
+    const seq = await headSeq(r);
+    const refused = expectRefusal(await call(r.stub.bearerAct(b.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })), "delegation-invalid");
+    expect(refused.reason).toBe(`Delegation ${b.delegation} does not cover claim.`);
+    expect(refused.act).toBeUndefined();
+    expect(await headSeq(r)).toBe(seq);
+    // The same member holds a thread through a second session, whose map names claim. The first session, which was
+    // granted renew alone, renews that thread: renew is the one kind it covers.
+    const more = randomBytes(32);
+    const second = await ok<RosterRecord>(
+      r,
+      r.admin,
+      "roster",
+      null,
+      { op: "invite", member: "@agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(more), session: { kinds: ["renew"], acts: { claim: (await bindingIn(r, "claim"))! }, lanes: "*", ttlSeconds: 3600 } },
+      { binding: null },
+    );
+    const holder = await call<Redeemed>(r.stub.redeem({ custody: "room", invitation: second.id, secret: b64url(more) }, "x"));
+    const c = expectOk(await call<Claim | Refusal>(r.stub.bearerAct(holder.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b2" })));
+    advance(60_000);
+    const renewed = expectOk(await call<ActRecord | Refusal>(r.stub.bearerAct(b.bearer, { kind: "renew", target: { lane: c.lane }, body: { lease: c.lease.generation }, idempotencyKey: "b3" })));
+    expect(renewed).toMatchObject({ kind: "renew", by: { via: "delegation", member: "@agent", delegation: b.delegation }, lease: { expiresAt: iso(clock.now + LEASE) } });
+    // Still no declared kind: a release of the thread it just renewed is not covered either.
+    expect(expectRefusal(await call(r.stub.bearerAct(b.bearer, { kind: "release", target: { lane: c.lane }, body: { lease: c.lease.generation }, idempotencyKey: "b4" })), "delegation-invalid").reason).toBe(`Delegation ${b.delegation} does not cover release.`);
   });
 
   it("an invitation's session map is judged when the invitation is admitted (R-DECL-17): a stale binding is binding-stale, an undeclared kind kind-undeclared, a kind the invited role may not sign invalid-body; nothing is recorded", async () => {
@@ -409,7 +431,7 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
     expectOk(await call(legacy.stub.bearerAct(lr.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })));
   });
 
-  it("bearer acts: the named tools' code-review binding is admitted where claim means the code-review claim, and binding-stale where it does not", async () => {
+  it("bearer acts carry the named tools' code-review binding: admitted where claim means the code-review claim; where the room's claim differs, delegation-invalid at step 4 under a grant for the room's meaning, and binding-stale at step 4a under a grant for the code-review meaning; a binding the caller names is used as given", async () => {
     const grantFor = async (r: TestRoom) => {
       const bytes = randomBytes(32);
       const inv = await ok<RosterRecord>(
@@ -422,15 +444,33 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
       );
       return call<Redeemed>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(bytes) }, "x"));
     };
+    const changed = () => v2((x) => void ((x["claim"] as { hold: unknown }).hold = { scope: "body.scope", workspace: true, leaseSeconds: 600 }));
+    const claim = (ikey: string) => ({ kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: ikey }) as const;
     const same = await declaredRoom();
+    const codeReview = (await bindingIn(same, "claim"))!;
     const a = await grantFor(same);
-    expectOk(await call(same.stub.bearerAct(a.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })));
-    const other = await declaredRoom(v2((x) => void ((x["claim"] as { hold: unknown }).hold = { scope: "body.scope", workspace: true, leaseSeconds: 600 })));
+    const first = expectOk(await call<Claim | Refusal>(same.stub.bearerAct(a.bearer, claim("b1"))));
+    // The act the room built carries the code-review binding, which here is the room's own.
+    expect(await inDO(same, (room) => (JSON.parse(String(room.core.sql.all("SELECT body FROM entries WHERE id = ?", first.id)[0]!["body"])) as { entry: { act: { envelope: Record<string, unknown> } } }).entry.act.envelope)).toMatchObject({ v: 2, kind: "claim", binding: codeReview });
+    // A room whose claim differs, and a grant admitted there, so for the room's meaning: the tool's binding is not
+    // the one the grant names, and the delegation does not cover it (step 4, before step 4a).
+    const other = await declaredRoom(changed());
+    expect(await bindingIn(other, "claim")).not.toBe(codeReview);
     const o = await grantFor(other);
-    // The tool's binding is not the one the grant names, so the delegation does not cover it (step 4, before 4a).
-    expectRefusal(await call(other.stub.bearerAct(o.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })), "delegation-invalid");
+    expect(expectRefusal(await call(other.stub.bearerAct(o.bearer, claim("b1"))), "delegation-invalid").reason).toBe("The delegation was granted for an earlier meaning of claim.");
     // A binding the bearer act names itself is used as given.
-    expectOk(await call(other.stub.bearerAct(o.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b2", binding: (await bindingIn(other, "claim"))! })));
+    expectOk(await call(other.stub.bearerAct(o.bearer, { ...claim("b2"), binding: (await bindingIn(other, "claim"))! })));
+    // The grant names the code-review meaning, and the room's claim changes after it: the tool's binding is the
+    // grant's, so step 4 passes, and step 4a refuses it binding-stale with the binding now in force. Not recorded.
+    const moved = await declaredRoom();
+    const m = await grantFor(moved);
+    await activate(moved, changed());
+    const seq = await headSeq(moved);
+    const stale = expectRefusal(await call(moved.stub.bearerAct(m.bearer, claim("b1"))), "binding-stale");
+    expect(stale.reason).toContain(`The act was prepared for claim as ${codeReview}`);
+    expect(stale.current).toMatchObject({ binding: await bindingIn(moved, "claim") });
+    expect(stale.act).toBeUndefined();
+    expect(await headSeq(moved)).toBe(seq);
   });
 
   it("a bearer session's exact retry across a change of vocabulary gets its original result: the room builds the act as it built it the first time", async () => {
@@ -567,7 +607,7 @@ describe.skipIf(DECLARED)("threads (R-DECL-6, R-DECL-8, R-DECL-23)", () => {
 });
 
 describe.skipIf(DECLARED)("what policy sees of a thread (R-EVAL-3 as amended)", () => {
-  it("under a v2 document the lane input carries the thread's kind, and null where there is no thread; under a v1 document it carries no kind", async () => {
+  it("a refuse rule's input: under a v2 document the lane carries the thread's kind, and null where there is no thread; under a v1 document it carries no kind", async () => {
     const rules = policy(
       rule({ id: "no-notes-on-claims", on: ["note"], refuse: "lane.kind = 'claim'", reason: "No notes on claim threads.", fix: "None." }),
       rule({ id: "lane-has-kind", on: ["claim"], refuse: "$exists(lane.kind) and act.body.goal = 'probe'", reason: "The lane input has a kind.", fix: "None." }),
@@ -585,10 +625,43 @@ describe.skipIf(DECLARED)("what policy sees of a thread (R-EVAL-3 as amended)", 
     expectOk(await al.act("note", { act: lc.id }, { text: "hello" }));
     expectOk(await al.act("claim", null, { goal: "probe", scope: ["docs/**"] }));
   });
+
+  it("the require, land and notify inputs carry the thread's kind under a v2 document, so a rule of each sort can read it; under a v1 document they carry none, and the same rules do nothing", async () => {
+    const rules = policy(
+      requireReview({ paths: "src/**", from: "role:admin", id: "rv", when: "lane.kind = 'claim'" }),
+      rule({ id: "claims-stay", kind: "land", block: "lane.kind = 'claim'", reason: "Claim threads do not land here.", fix: "None." }),
+      rule({ id: "tell-admins", kind: "notify", on: ["claim"], when: "lane.kind = 'claim'", to: ["role:admin"], why: "A claim thread opened." }),
+    );
+    const told = async (r: TestRoom) => (await r.admin.read({ q: "attention" })).items.filter((i) => i.why === "policy").length;
+    const obligations = async (r: TestRoom, lane: LaneId) => (await r.admin.read({ q: "proposal", ref: { lane, generation: 1 } }))!.obligations.map((o) => o.id);
+    // v2: each rule reads the kind.
+    const r = await declaredRoom(v2(() => {}, rules));
+    const bob = await addMember(r, "@bob", "member");
+    const c = await ok<Claim>(r, bob, "claim", null, { goal: "g", scope: ["src/**"] });
+    await tick(r, 2);
+    expect(await told(r)).toBe(1);
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    await ok(r, bob, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" });
+    expect(await obligations(r, c.lane)).toEqual(["obl_rv"]);
+    await ok(r, r.admin, "review", { lane: c.lane, generation: 1 }, { head, verdict: "approve", scope: ["src/**"], text: "ok" });
+    expect(expectRefusal(await act(r, bob, "land", { lane: c.lane, generation: 1 }, { lease: 1, head }), "claims-stay").reason).toBe("Claim threads do not land here.");
+    // v1: the inputs have no kind, so no one is told, nothing is required, and the version lands.
+    const legacy = await makeRoom({ policy: rules });
+    const al = await addMember(legacy, "@al", "member");
+    const lc = await al.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    await tick(legacy, 2);
+    expect(await told(legacy)).toBe(0);
+    const lhead = pushChange(legacy, lc.lane, { "src/app.ts": "v2" });
+    await al.ok("propose", { lane: lc.lane }, { lease: 1, expectedGeneration: 0, head: lhead, summary: "s" });
+    expect(await obligations(legacy, lc.lane)).toEqual([]);
+    const l = await al.ok("land", { lane: lc.lane, generation: 1 }, { lease: 1, head: lhead });
+    await tick(legacy, 6);
+    expect(await inDO(legacy, (room) => room.core.landing.view((l as unknown as { op: { id: string } }).op.id as never)?.state)).toBe("landed");
+  });
 });
 
 describe.skipIf(DECLARED)("a declared act's body is the application's own (R-DECL-12, R-DECL-21)", () => {
-  it("a declared field named purpose never selects configuration recovery, and goal, plan, summary and text reach the room's rows only as text", async () => {
+  it("a declared field named purpose never selects configuration recovery, and a goal declared as a number reaches the thread's row as empty text", async () => {
     const doc = v2(
       (a) => {
         a["claim"] = {
@@ -607,6 +680,42 @@ describe.skipIf(DECLARED)("a declared act's body is the application's own (R-DEC
     expect(await inDO(r, (room) => room.core.sql.all("SELECT goal FROM lanes WHERE id = ?", c.lane)[0]!["goal"])).toBe("");
     // Policy still judges it, whoever signs: recovery's bypass of refuse rules is not reachable from a declared field.
     expectRefusal(await act(r, r.admin, "claim", null, { goal: 0, purpose: "config-recovery", scope: ["docs/**"] }), "no-zero");
+  });
+
+  it("plan, summary and text declared as other types are admitted as declared and never reach the room's rows or records as anything but text: a number plan is no plan, a number summary and a true text are empty text, and an enum text is its own value", async () => {
+    const doc = v2((a) => {
+      a["claim"] = { ...a["claim"]!, body: { goal: { type: "text", max: 10, requiredFor: ["none"] }, plan: { type: "int", min: 0, max: 9, optional: true } } };
+      a["propose"] = { ...a["propose"]!, body: { summary: { type: "int", min: 0, max: 9 } } };
+      a["note"] = { ...a["note"]!, body: { text: { type: "bool" } } };
+      a["review"] = { ...a["review"]!, body: { text: { type: "enum", values: ["fine", "poor"] } } };
+    }, policy(requireReview({ paths: "src/**", from: "role:admin", id: "rv" })));
+    const r = await declaredRoom(doc);
+    const bob = await addMember(r, "@bob", "member");
+    const c = await ok<Claim>(r, bob, "claim", null, { goal: "g", plan: 7, scope: ["src/**"] });
+    expect("plan" in c).toBe(false);
+    // The declared types are the ones admitted: text where the declaration says a number is invalid-body.
+    expectRefusal(await act(r, r.admin, "claim", null, { goal: "g", plan: "a plan", scope: ["docs/**"] }), "invalid-body");
+    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    expectRefusal(await act(r, bob, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "words" }), "invalid-body");
+    const p = await ok(r, bob, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: 3 });
+    expect((p as unknown as { summary: unknown }).summary).toBe("");
+    const n = await ok(r, r.admin, "note", { act: p.id }, { text: true });
+    expect((n as unknown as { text: unknown }).text).toBe("");
+    const rv = await ok(r, r.admin, "review", { lane: c.lane, generation: 1 }, { head, verdict: "approve", scope: ["src/**"], text: "fine" });
+    // An enum's value is text already, and is kept as that text.
+    expect((rv as unknown as { text: unknown }).text).toBe("fine");
+    // A take-over that names a number plan leaves the thread with no plan.
+    const take = await ok<Claim>(r, bob, "claim", { lane: c.lane }, { scope: ["src/**"], expectedGeneration: 1, lease: 1, plan: 5 });
+    expect("plan" in take).toBe(false);
+    const rows = await inDO(r, (room) => ({
+      lane: room.core.sql.all("SELECT goal, plan FROM lanes WHERE id = ?", c.lane)[0],
+      generation: room.core.sql.all("SELECT summary FROM generations WHERE lane = ?", c.lane)[0],
+    }));
+    expect(rows).toEqual({ lane: { goal: "g", plan: null }, generation: { summary: "" } });
+    // What readers are given is text or nothing, too.
+    expect(await r.admin.read({ q: "lane", lane: c.lane })).toMatchObject({ goal: "g" });
+    expect((await r.admin.read({ q: "lane", lane: c.lane }) as unknown as { plan?: unknown }).plan ?? null).toBeNull();
+    expect(await r.admin.read({ q: "proposal", ref: { lane: c.lane, generation: 1 } })).toMatchObject({ summary: "" });
   });
 });
 
@@ -760,12 +869,25 @@ describe.skipIf(DECLARED)("recover, the platform kind (R-DECL-21)", () => {
     const head = pushChange(r, legacy.lane, { ".artroom/policy.json": JSON.stringify(v2()) + "\n" });
     expectRefusal(await act(r, bob, "recover", { lane: legacy.lane }, { op: "version", lease: 1, expectedGeneration: 0, head, summary: "s" }, { binding: null }), "not-holder");
     const p = await ok(r, r.admin, "recover", { lane: legacy.lane }, { op: "version", lease: 1, expectedGeneration: 0, head, summary: "repair" }, { binding: null });
-    expect(p).toMatchObject({ kind: "recover", op: "version", flags: ["config-recovery"] });
+    expect(p).toMatchObject({ kind: "recover", recover: "version", flags: ["config-recovery"] });
     const approve = await ok(r, r.admin, "recover", { lane: legacy.lane, generation: 1 }, { op: "approve", head, verdict: "approve", scope: [".artroom/**"], text: "ok" }, { binding: null });
     expect((approve as unknown as { flags: string[] }).flags).toEqual(expect.arrayContaining(["config-recovery", "sole-admin-self-approval"]));
     const l = await ok(r, r.admin, "recover", { lane: legacy.lane, generation: 1 }, { op: "land", lease: 1, head }, { binding: null });
+    // The landing's record names its op as `recover`; its own `op` is the landing operation.
+    expect(l).toMatchObject({ kind: "recover", recover: "land", op: { id: expect.stringMatching(/^op_/) } });
     await tick(r, 3);
     expect(await inDO(r, (room) => room.core.landing.view((l as unknown as { op: { id: string } }).op.id as never)?.state)).toBe("landed");
+    // The same path on a thread that `recover` opens: open, version, approve and land, each by the admin's own key.
+    const opened = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "repair again", scope: [".artroom/**"] }, { binding: null });
+    expect(opened).toMatchObject({ kind: "recover", recover: "open", purpose: "config-recovery", goal: "repair again", scope: [".artroom/**"], flags: ["config-recovery"], effect: { type: "opened" } });
+    expect(await laneRowOf(r, opened.lane)).toMatchObject({ kind: "recover", binding: null, purpose: "config-recovery" });
+    const head2 = pushChange(r, opened.lane, { ".artroom/note.txt": "recovered\n" });
+    expectRefusal(await act(r, bob, "recover", { lane: opened.lane }, { op: "version", lease: 1, expectedGeneration: 0, head: head2, summary: "s" }, { binding: null }), "not-holder");
+    expect(await ok(r, r.admin, "recover", { lane: opened.lane }, { op: "version", lease: 1, expectedGeneration: 0, head: head2, summary: "again" }, { binding: null })).toMatchObject({ kind: "recover", recover: "version" });
+    expect(await ok(r, r.admin, "recover", { lane: opened.lane, generation: 1 }, { op: "approve", head: head2, verdict: "approve", scope: [".artroom/**"], text: "ok" }, { binding: null })).toMatchObject({ kind: "recover", recover: "approve" });
+    const l2 = await ok(r, r.admin, "recover", { lane: opened.lane, generation: 1 }, { op: "land", lease: 1, head: head2 }, { binding: null });
+    await tick(r, 3);
+    expect(await inDO(r, (room) => room.core.landing.view((l2 as unknown as { op: { id: string } }).op.id as never)?.state)).toBe("landed");
     // A new recovery thread: non-admins and delegations are admin-required, recorded; scope outside .artroom is recovery-scope.
     expectRefusal(await act(r, bob, "recover", null, { op: "open", goal: "g", scope: [".artroom/policy.json"] }, { binding: null }), "admin-required");
     const k = newKeyPair();
@@ -774,6 +896,34 @@ describe.skipIf(DECLARED)("recover, the platform kind (R-DECL-21)", () => {
     expectRefusal(await act(r, r.admin, "recover", null, { op: "open", goal: "g", scope: ["src/**"] }, { binding: null }), "recovery-scope");
     // A recover body is closed per op.
     expectRefusal(await act(r, r.admin, "recover", null, { op: "open", goal: "g", scope: [".artroom/x"], purpose: "config-recovery" }, { binding: null }), "invalid-body");
+  });
+
+  it("recover take, note and release: an admin takes over a recovery thread whose lease expired, changes its scope within .artroom, notes on it and releases it; a legacy recovery lane and a recover thread alike", async () => {
+    // A legacy recovery lane, open at the first v2 activation, its holder's lease then expired (R-DECL-21, last item).
+    const r = await makeRoom();
+    const legacy = await r.admin.ok<Claim>("claim", null, { goal: "repair", scope: [".artroom/policy.json"], purpose: "config-recovery" });
+    await activate(r, v2());
+    const opened = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "second", scope: [".artroom/checkers/**"] }, { binding: null });
+    const bob = await addMember(r, "@bob", "member");
+    advance(LEASE + 1000);
+    await tick(r);
+    for (const c of [legacy, opened]) {
+      expect((await r.admin.read({ q: "lane", lane: c.lane })) as unknown).toMatchObject({ state: "unheld" });
+      // Not a member's to take, recorded as any recovery refusal is.
+      expect(expectRefusal(await act(r, bob, "recover", { lane: c.lane }, { op: "take", scope: [".artroom/**"], expectedGeneration: 0 }, { binding: null }), "admin-required").act).toBeDefined();
+      const t = await ok<Claim>(r, r.admin, "recover", { lane: c.lane }, { op: "take", scope: [".artroom/**"], expectedGeneration: 0 }, { binding: null });
+      expect(t).toMatchObject({ kind: "recover", recover: "take", lane: c.lane, purpose: "config-recovery", scope: [".artroom/**"], flags: ["config-recovery"], effect: { type: "taken-over" } });
+      const lease = t.lease.generation;
+      // The holder changes the scope with another take; outside .artroom it is recovery-scope.
+      expect(await ok<Claim>(r, r.admin, "recover", { lane: c.lane }, { op: "take", scope: [".artroom/policy.json"], expectedGeneration: 0, lease }, { binding: null })).toMatchObject({ recover: "take", effect: { type: "rescoped" } });
+      expectRefusal(await act(r, r.admin, "recover", { lane: c.lane }, { op: "take", scope: ["src/**"], expectedGeneration: 0, lease }, { binding: null }), "recovery-scope");
+      expect(await ok(r, r.admin, "recover", { act: c.id }, { op: "note", text: "taken over" }, { binding: null })).toMatchObject({ kind: "recover", recover: "note", text: "taken over" });
+      expect(await ok(r, r.admin, "recover", { lane: c.lane }, { op: "release", lease, note: "done" }, { binding: null })).toMatchObject({ kind: "recover", recover: "release", note: "done" });
+      expect((await r.admin.read({ q: "lane", lane: c.lane })) as unknown).toMatchObject({ state: "unheld" });
+    }
+    // The legacy thread keeps its kind and records no lease length; the recover thread's kind is recover.
+    expect(await laneRowOf(r, legacy.lane)).toMatchObject({ kind: "claim", lease_ms: null, purpose: "config-recovery" });
+    expect(await laneRowOf(r, opened.lane)).toMatchObject({ kind: "recover", purpose: "config-recovery" });
   });
 });
 
@@ -802,7 +952,7 @@ describe.skipIf(DECLARED)("R-DECL-24 at propose time, and the stage-4 steps", ()
     expect(expectRefusal(await proposeDoc(r, retired), "policy-invalid").reason).toContain("task is not room");
   });
 
-  it("a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time", async () => {
+  it("a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time: each of the seven, by the parser and through a proposal", async () => {
     const r = await declaredRoom();
     const cases: [string, PolicyDocumentV2][] = [
       ["then land in one act", v2((a) => void (a["propose"] = { ...a["propose"]!, targets: { thread: ["version", "land"] } }))],
@@ -823,19 +973,90 @@ describe.skipIf(DECLARED)("R-DECL-24 at propose time, and the stage-4 steps", ()
       const parsed = await inDO(r, (room) => room.core.parseConfig(JSON.stringify(doc), {}));
       expect(parsed.ok).toBe(false);
       expect((parsed as unknown as { problems: string[] }).problems.some((p) => p.endsWith(`${what} is not run by this room until declared acts stage 4`))).toBe(true);
+      // Each one through a proposal, where the room refuses it and records the refusal; the document never activates.
+      const version = await inDO(r, (room) => room.core.activePolicy().version);
+      const out = expectRefusal(await proposeDoc(r, doc), "policy-invalid");
+      // The refusal names the document's first problem. A hand-over needs reserveSeconds on the thread it hands over
+      // (R-DECL-24), which is itself a stage-4 setting and comes first in that document.
+      const named = what === "the step hand-over" ? "hold.reserveSeconds" : what;
+      expect(out.reason).toMatch(/^The proposed configuration is invalid: acts\.[a-z]+: /);
+      expect(out.reason.endsWith(`${named} is not run by this room until declared acts stage 4.`)).toBe(true);
+      expect(out.act).toBeDefined();
+      expect(await inDO(r, (room) => room.core.activePolicy().version)).toBe(version);
     }
-    expect(expectRefusal(await proposeDoc(r, cases[0]![1]), "policy-invalid").reason).toContain("version then land in one act is not run by this room until declared acts stage 4");
   });
 
-  it("a workspace request is judged as for an act with step version on the thread (R-CRED-5 as amended)", async () => {
+  it("a workspace or workspace-token request is judged as for an act with step version on the thread (R-CRED-5 as amended): the thread's kind decides whether any act makes versions there, and the holder is found", async () => {
     const r = await declaredRoom(v2((a) => void (a["propose"] = { ...a["propose"]!, threads: ["room"] })));
     const c = await ok<Claim>(r, r.admin, "claim", null, { goal: "g", scope: ["src/**"] });
-    expect(expectRefusal(await r.admin.request({ kind: "workspace", lane: c.lane, lease: 1 }), "wrong-thread").reason).toContain("No declared act makes versions");
+    for (const kind of ["workspace", "workspace-token"] as const)
+      expect(expectRefusal(await r.admin.request({ kind, lane: c.lane, lease: 1 }), "wrong-thread").reason).toBe(`No declared act makes versions on ${c.lane}, a claim thread.`);
     const ok2 = await declaredRoom();
     const c2 = await ok<Claim>(ok2, ok2.admin, "claim", null, { goal: "g", scope: ["src/**"] });
     expectOk(await ok2.admin.request({ kind: "workspace", lane: c2.lane, lease: 1 }));
+    await tick(ok2);
+    expect(expectOk(await ok2.admin.request<{ lane: string; leaseGeneration: number } | Refusal>({ kind: "workspace-token", lane: c2.lane, lease: 1 }))).toMatchObject({ lane: c2.lane, leaseGeneration: 1 });
     const bob = await addMember(ok2, "@bob", "member");
-    expectRefusal(await bob.request({ kind: "workspace", lane: c2.lane, lease: 1 }), "not-holder");
+    for (const kind of ["workspace", "workspace-token"] as const) {
+      expectRefusal(await bob.request({ kind, lane: c2.lane, lease: 1 }), "not-holder");
+      expectRefusal(await ok2.admin.request({ kind, lane: c2.lane, lease: 2 }), "lease-fenced");
+    }
+  });
+
+  it("a workspace request: the version act's who.roles decide for a member's own key, as they would for the act", async () => {
+    const r = await declaredRoom(v2((a) => void (a["propose"] = { ...a["propose"]!, who: { roles: ["maintainer"] } })));
+    const bob = await addMember(r, "@bob", "member");
+    const mo = await addMember(r, "@mo", "maintainer");
+    const cb = await ok<Claim>(r, bob, "claim", null, { goal: "g", scope: ["src/**"] });
+    // Bob holds the thread, but his role may not sign the act that makes versions on it.
+    for (const kind of ["workspace", "workspace-token"] as const)
+      expect(expectRefusal(await bob.request({ kind, lane: cb.lane, lease: 1 }), "role-forbids").reason).toBe("The role member may not sign propose.");
+    const cm = await ok<Claim>(r, mo, "claim", null, { goal: "g", scope: ["docs/**"] });
+    expectOk(await mo.request({ kind: "workspace", lane: cm.lane, lease: 1 }));
+    // An admin may sign every declared act (R-DECL-11).
+    const ca = await ok<Claim>(r, r.admin, "claim", null, { goal: "g", scope: ["test/**"] });
+    expectOk(await r.admin.request({ kind: "workspace", lane: ca.lane, lease: 1 }));
+  });
+
+  it("a workspace request under a delegation: the grant's map must name the version act, with the binding in force", async () => {
+    const r = await declaredRoom();
+    const bob = await addMember(r, "@bob", "member");
+    const c = await ok<Claim>(r, bob, "claim", null, { goal: "g", scope: ["src/**"] });
+    const grant = async (kinds: string[]) => {
+      const k = newKeyPair();
+      const acts: Record<string, string> = {};
+      for (const kind of kinds) acts[kind] = (await bindingIn(r, kind))!;
+      const g = await ok<RosterRecord>(r, bob, "roster", null, { op: "delegate", to: k.key, kinds: ["renew"], acts, lanes: "*", expiresAt: iso(clock.now + day) }, { binding: null });
+      return new Client(r, k, g.id);
+    };
+    const claimOnly = await grant(["claim"]);
+    const both = await grant(["claim", "propose"]);
+    for (const kind of ["workspace", "workspace-token"] as const)
+      expect(expectRefusal(await claimOnly.request({ kind, lane: c.lane, lease: 1 }), "delegation-invalid").reason).toBe(`Delegation ${claimOnly.delegation} does not cover propose.`);
+    expectOk(await both.request({ kind: "workspace", lane: c.lane, lease: 1 }));
+    // The meaning of propose changes: the grant names its earlier binding, so the request is refused as the act would be.
+    await activate(r, v2((a) => void (a["propose"] = { ...a["propose"]!, body: { ...a["propose"]!.body, why: { type: "text", max: 10, optional: true } } })));
+    for (const kind of ["workspace", "workspace-token"] as const)
+      expect(expectRefusal(await both.request({ kind, lane: c.lane, lease: 1 }), "delegation-invalid").reason).toBe("The delegation was granted for an earlier meaning of propose.");
+    // The holder's own key needs no grant.
+    expectOk(await bob.request({ kind: "workspace", lane: c.lane, lease: 1 }));
+  });
+
+  it("a workspace request on a recovery thread is judged as recover is: an active admin's own key, whatever the declarations say", async () => {
+    // No declared act makes versions on a recover thread, and none is needed.
+    const r = await declaredRoom();
+    const bob = await addMember(r, "@bob", "member");
+    const c = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "repair", scope: [".artroom/**"] }, { binding: null });
+    expectOk(await r.admin.request({ kind: "workspace", lane: c.lane, lease: 1 }));
+    const k = newKeyPair();
+    const g = await ok<RosterRecord>(r, r.admin, "roster", null, { op: "delegate", to: k.key, kinds: ["renew"], acts: { claim: (await bindingIn(r, "claim"))!, propose: (await bindingIn(r, "propose"))! }, lanes: "*", expiresAt: iso(clock.now + day) }, { binding: null });
+    for (const kind of ["workspace", "workspace-token"] as const) {
+      expectRefusal(await bob.request({ kind, lane: c.lane, lease: 1 }), "admin-required");
+      expectRefusal(await new Client(r, k, g.id).request({ kind, lane: c.lane, lease: 1 }), "admin-required");
+    }
+    // A checker, whose role could not sign the legacy propose, is refused before that: role-forbids.
+    const ci = await addMember(r, "@ci", "checker");
+    expectRefusal(await ci.request({ kind: "workspace", lane: c.lane, lease: 1 }), "role-forbids");
   });
 });
 
@@ -874,14 +1095,22 @@ describe.skipIf(DECLARED)("migration 4 (thread kind, binding and lease; grant ma
       expect(await inDO(r3, (room) => room.core.sql.all("SELECT id, kind, binding, lease_ms FROM lanes ORDER BY seq"))).toEqual(after.lanes);
     });
 
-  it("migration 4 is idempotent: run twice on one store, it adds each column once", async () => {
+  it("migration 4 is idempotent: run again on one store, each of its six columns is there once and no thread's kind changes", async () => {
     const r = await makeRoom();
     const out = await inDO(r, async (room) => {
       const { ROOM_MIGRATIONS } = await import("../../src/store.ts");
       const step = ROOM_MIGRATIONS.find((m) => m.version === 4)!;
+      const { DECLARED_COLUMNS } = await import("../../src/store.ts");
+      const columns = () => DECLARED_COLUMNS.map(([table, column]) => `${table}.${column}: ${room.core.sql.all("SELECT name FROM pragma_table_info(?) WHERE name = ?", table, column).length}`);
+      const before = columns();
+      const kinds = () => room.core.sql.all("SELECT id, kind FROM lanes ORDER BY seq");
+      const lanes = kinds();
+      // The store is at version 4 already: these are the step's second and third runs.
       room.core.sql.transaction(() => step.up(room.core.sql));
-      return room.core.sql.all("SELECT name FROM pragma_table_info('lanes') WHERE name IN ('kind', 'binding', 'lease_ms') ORDER BY name");
+      room.core.sql.transaction(() => step.up(room.core.sql));
+      return { before, after: columns(), same: JSON.stringify(kinds()) === JSON.stringify(lanes) };
     });
-    expect(out).toEqual([{ name: "binding" }, { name: "kind" }, { name: "lease_ms" }]);
+    const six = ["lanes.kind: 1", "lanes.binding: 1", "lanes.lease_ms: 1", "lanes.conflict: 1", "delegations.acts: 1", "invitations.declared: 1"];
+    expect(out).toEqual({ before: six, after: six, same: true });
   });
 });

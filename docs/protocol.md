@@ -3579,6 +3579,9 @@ Section 33.6 states that criterion.
   `land-reserved`, `abort-attempt`, `publication-unresolved`,
   `land-outcome`, `revert-lane`, `notified`, `checkpoint`, `prepared`,
   `reservation-ended`).
+- No document may declare a kind named `constructor` or `prototype`. The
+  signed JSON profile has no key of either name, and a kind is a key of
+  the document and of every grant map.
 
 **R-DECL-3. A declaration is data.** A declaration names the act's label,
 its targets and the steps each runs, the thread kinds it may act on, its
@@ -3749,6 +3752,9 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
 - A declaration's `body` names the application's own fields, beyond those
   its steps require. A field name matches `[a-z][A-Za-z0-9]{0,31}`, and is
   not `because` or any field a step of the same act requires (R-DECL-5).
+  It is not `constructor` or `prototype` either: a field is a key of the
+  binding's subject and of every rule input, and the signed JSON profile
+  has no key of either name.
 - Field types are a closed set (`DeclaredField`): `text` (with `max`, 1 to
   16,384 bytes), `int` (with safe-integer `min` and `max`, `min` at most
   `max`), `bool`, `enum` (1 to 64 distinct values, each matching
@@ -3779,6 +3785,12 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
   and `{kind}`. Nothing else is interpolated, and a brace that does not
   open one of these slots is refused with `policy-invalid`. So a template
   cannot leak body text or provider text into a refusal.
+- A slot is filled only with a fact in the form the room reports it. For a
+  refusal decided before the target is judged (R-DECL-16), `{lane}` is
+  filled only by a lane ID and `{generation}` only by a positive integer;
+  anything else fills the slot with nothing.
+- A filled `reason` or `fix` is at most 8,192 bytes. The room cuts a
+  longer one at a character boundary.
 - A refusal from a `refuse` rule keeps that rule's own `reason` and `fix`.
 
 **R-DECL-14. The steps version.**
@@ -4121,6 +4133,7 @@ is refused `policy-invalid`.
 | `hold.scope` template | 1 to 64 globs, each at most 256 characters |
 | `hold.leaseSeconds` | 10 to 86,400 |
 | `hold.reserveSeconds` | 1 to 600 |
+| The whole document, as canonical JSON | at most 1,048,576 bytes |
 
 ### 33.3 Amended rules
 

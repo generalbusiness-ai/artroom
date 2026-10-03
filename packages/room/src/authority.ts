@@ -67,6 +67,19 @@ function kindClass(doc: AnyPolicyDocument, kind: string): "legacy" | "declared" 
   return declarationOf(doc, kind) ? "declared" : "undeclared"; // G2:undeclared-class
 }
 
+/**
+ * Is this envelope signed by an active admin's own key, by case (a) of
+ * R-ADM-3 and under no delegation? That is all configuration recovery asks
+ * of a signer (R-ADMIN-8, R-DECL-21), whatever its act is called.
+ */
+export function adminOwnKey(sql: Sql, env: Pick<Signer, "actor" | "delegation">): boolean {
+  if (env.delegation !== undefined) return false;
+  const key = keyRow(sql, env.actor);
+  if (!key || key.state !== "active") return false;
+  const member = memberRow(sql, key.member);
+  return member !== null && member !== undefined && member.state === "active" && member.role === "admin";
+}
+
 /** The lane an envelope acts on, if any: what a delegation's `lanes` must cover. */
 export function laneOf(env: Pick<Signer, "target">): LaneId | null {
   const t = env.target as { lane?: LaneId; act?: string } | null;
