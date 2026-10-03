@@ -730,7 +730,8 @@ Not touched: `artroom-spike-isogit` and `artroom-spike-sandbox-git` (the
 spikes' own Workers), and the container application
 `artroom-lb-logbig-publisher` (`9cf9349e…`), which the deletion of
 `artroom-lb-logbig` left behind and which would block that harness's next
-deploy the same way.
+deploy the same way. (Retired later the same day under request 167a8ae6:
+see "Orphans retired" below.)
 
 **Live smoke**, `packages/room/measure/spike-smoke.mjs`, all phases:
 
@@ -820,6 +821,50 @@ events: 1,203 `ok` and 9 `canceled`, with no exception.
 error it turns into this 503, so a failure like this one cannot be
 diagnosed afterwards. Logging the error's name and a redacted message, or
 returning a cause code, would have identified the step.
+
+## Orphans retired (request 167a8ae6, 2026-10-02)
+
+Hugh's decision (planner assert `5b65f3ae`): retire what D5 left in place.
+
+**Listed first.** Before deleting, the account's Workers were listed
+through the API (Workers Scripts Read token) and its container
+applications with `wrangler containers list`. The `artroom-` Workers were
+`artroom-spike-checkers`, `artroom-spike-isogit`, `artroom-spike-room` and
+`artroom-spike-sandbox-git`. The applications were
+`artroom-spike-room-publisher` (`3388b66b…`),
+`artroom-spike-checkers-runnerbox` (`93863923…`),
+`artroom-lb-logbig-publisher` (`9cf9349e…`) and
+`artroom-spike-sandbox-git-gitbox` (`60795e20…`), all with 0 live
+instances. The listing showed one resource the request did not name: the
+`gitbox` application, created with the `artroom-spike-sandbox-git` Worker
+on 2026-10-01. Deleting that Worker alone would have left it behind as
+`artroom-lb-logbig` left its publisher, so the planner amended the request
+to include it (assert `b92867a5`). Neither spike config under
+`packages/room/` or `packages/checkers/` binds to any of the four.
+
+| Deleted | What it was | Last version |
+|---|---|---|
+| Worker `artroom-spike-isogit` | the sandbox-git spike's isomorphic-git variant (`spikes/sandbox-git/wrangler.iso.jsonc`) | `31f0a19d-958d-4867-b2c2-3a8780961388`, 2026-10-01 |
+| Worker `artroom-spike-sandbox-git` | the sandbox-git spike's container variant (`spikes/sandbox-git/wrangler.jsonc`) | `9fd42226-f212-4856-a867-6074b14c6506`, 2026-10-01 |
+| Container application `artroom-spike-sandbox-git-gitbox` (`60795e20…`) | that Worker's `GitBox` container | — |
+| Container application `artroom-lb-logbig-publisher` (`9cf9349e…`) | left by the deletion of `artroom-lb-logbig` | — |
+
+Each Worker was deleted with `wrangler delete -c <its config> --force`
+and each application with `wrangler containers delete <id>`.
+
+**Verified after.** The Workers list now holds `artroom-spike-checkers`
+and `artroom-spike-room` only, and the applications list
+`artroom-spike-room-publisher` and `artroom-spike-checkers-runnerbox`
+only. Both spike services still answer:
+`https://artroom-spike-room.inguz.workers.dev/` and
+`https://artroom-spike-checkers.inguz.workers.dev/` return 404 for `/`,
+as they did before. Nothing else on the account was touched: no other
+Worker, application, namespace, registry image or token.
+
+The spike's source and results stay in the repository under
+[`spikes/sandbox-git/`](../spikes/sandbox-git/) and
+[`2026-10-01-spike-sandbox-git.md`](2026-10-01-spike-sandbox-git.md);
+only the deployments are gone.
 
 ## Redeploy from the merge of main `3ac55e96` (plan 003)
 
