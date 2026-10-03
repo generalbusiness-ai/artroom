@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import { runInDurableObject } from "cloudflare:test";
+import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Claim, Landing, OpId } from "@generalbusiness/artroom-contract";
 import { WITHHELD, type LandRecord } from "@generalbusiness/artroom-git";
 import { jobTokenDuties } from "../../src/jobs.ts";
@@ -331,4 +331,48 @@ describe("request d29c09fa: the operators' job-token view shows safe metadata on
     });
     for (const s of ECHOED) expect(JSON.stringify(duties)).not.toContain(s);
   });
+});
+
+describe("request d29c09fa: in a founded room the upgrade drains through recovery and alarms alone, also while the canonical repository is gone", () => {
+  for (const gone of [false, true])
+    it(gone ? "canonical repository gone" : "a founded room", async () => {
+      const r = await makeRoom();
+      const later = clock.now + 24 * 3600_000;
+      const text = echoing().message;
+      await inDO(r, async (room, state) => {
+        await room.core.idle();
+        const sql = room.core.sql;
+        void room.core.workspaces; // its tables
+        void (room.core as unknown as { snapshotRepos: unknown }).snapshotRepos;
+        sql.all("INSERT INTO artroom_ws_duty (fork, kind, reason, state, started_at, next_at, last_error, done_at, done_reason) VALUES ('f', 'token', 'legacy', 'done', ?, ?, ?, ?, 'revoked')", clock.now, later, text, clock.now);
+        sql.all("INSERT INTO artroom_snap_duty (snapshot, name, kind, reason, state, next_at, last_error, done_at, done_reason) VALUES ('s', 'n', 'delete', 'legacy', 'done', ?, ?, ?, 'deleted')", later, text, clock.now);
+        sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tid_legacy', ?, ?, ?)", later, later, text);
+        if (gone) sql.all("INSERT INTO meta (k, v) VALUES ('canonical_gone', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", JSON.stringify({ since: new Date(clock.now).toISOString(), head: 0 }));
+        sql.all("UPDATE schema_version SET v = 1 WHERE id = 1");
+        await state.storage.deleteAlarm();
+      });
+      await inDO(r, (_room, state) => state.abort("legacy upgrade")).catch(() => undefined);
+      const stub = env.ROOMS.get(env.ROOMS.idFromName(r.id)) as unknown as TestRoom["stub"];
+      const again: TestRoom = { ...r, stub, admin: new Client({ id: r.id, stub }, r.admin.keys) };
+      const before = await inDO(again, async (room, state) => ({ cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'").length, alarm: await state.storage.getAlarm() }));
+      expect(before.cursor).toBe(1);
+      expect(before.alarm).not.toBeNull();
+      // Only alarms: no direct call to scrubErrors.
+      for (let i = 0; i < 10; i++) if (!(await runDurableObjectAlarm(again.stub as unknown as DurableObjectStub<Room>))) break;
+      const after = await inDO(again, (room) => ({
+        cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'").length,
+        gone: room.core.canonicalGone() !== null,
+        rows: [
+          room.core.sql.all("SELECT last_error FROM artroom_ws_duty WHERE reason = 'legacy'")[0]!["last_error"],
+          room.core.sql.all("SELECT last_error FROM artroom_snap_duty WHERE reason = 'legacy'")[0]!["last_error"],
+          room.core.sql.all("SELECT last_error FROM job_tokens WHERE token_id = 'tid_legacy'")[0]!["last_error"],
+        ],
+      }));
+      expect(after).toEqual({
+        cursor: 0,
+        gone,
+        rows: [`workspace step failed: ${WITHHELD}`, `snapshot step failed: ${WITHHELD}`, `revocation failed: ${WITHHELD}`],
+      });
+      await clean(again);
+    });
 });

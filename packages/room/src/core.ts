@@ -571,6 +571,30 @@ export class RoomCore {
     }
   }
 
+  /**
+   * Before founding, the alarm's work: the error upgrade's next batch, if
+   * one is due, and the founding debt. One failing does not stop the other.
+   */
+  async workUnfounded(): Promise<void> {
+    try {
+      this.scrubErrors();
+    } catch (e) {
+      this.diagnose("step-failed", "errors", e);
+    }
+    await this.settleFounding();
+  }
+
+  /** Before founding, when the alarm is next due: the founding debt, or the error upgrade (due at once while it lasts). */
+  unfoundedDue(): number | null {
+    const times = [this.foundingDue(), this.scrubDue()].filter((t): t is number => t !== null);
+    return times.length ? Math.min(...times) : null;
+  }
+
+  /** When the error upgrade's next batch is due: now while its cursor is stored, else null (request d29c09fa). */
+  scrubDue(): number | null {
+    return getMeta(this.sql, "error_scrub") !== null ? this.now() : null;
+  }
+
   /** Parse `.artroom/` files strictly and validate them (R-POL-1). `doc` is null when there is no policy file. */
   parseConfig(
     policyText: string | null,
@@ -1973,7 +1997,8 @@ export class RoomCore {
     // The 5-second loop, while its work makes progress; each kind on its own backoff after a failure (budgets.ts `ALARM`).
     for (const kind of this.loopPendingKinds()) if (this.loopAllowed(kind)) times.push(backoff[kind]?.next ?? now + ALARM.pendingIntervalMs);
     // The error upgrade (request d29c09fa), until its last batch.
-    if (getMeta(this.sql, "error_scrub") !== null) times.push(now);
+    const scrub = this.scrubDue();
+    if (scrub !== null) times.push(scrub);
     // Log publication: when due, never sooner than the loop's interval from now.
     const publication = this.publicationDueAt();
     if (publication !== null) times.push(Math.max(publication, now + ALARM.pendingIntervalMs));
