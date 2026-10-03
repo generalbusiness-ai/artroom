@@ -1,58 +1,36 @@
 {
-  "head": "3e6241dff9853f83f3a47e429e564c2b0baceb04",
-  "fixture_sha256": "92141b8dc68da7397427fe0e60f0bf25c7186cfc40d87f3814416437cdf22853",
+  "head": "4567a490cea451d1f4404b0dd1d49bd3422c24a3",
+  "status": "",
   "source_hashes": {
-    "packages/client/src/room.ts": "6e0a397ba7f07fb1593c51d1f4a7dca55bb49c30ea9324488eeb59c05a2b2a28",
-    "packages/client/src/canonical.ts": "ea1049a3fbbe717cc6122351758de5a13fe8ae84af0a58d30eff8d815cfce680",
-    "packages/client/src/envelope.ts": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9"
+    "packages/ui/src/room/live/live-room.ts": {
+      "sha256": "dc158fce3785ff4db45eb87578ffd927a25ecc003ad0d5b2cf15cce32a607944",
+      "git_blob": "0affb2aa4661386a6598989be874711ab68df52b"
+    },
+    "packages/ui/test/review-fcd7391d.test.ts": {
+      "sha256": "903ab6653f7e84ca8d7be7b047bc9f91ece92cbcc22d2264afa62b209bc082c9",
+      "git_blob": "696efb755a5ad59864e4be17b3c9fe36f43198a5"
+    }
   },
-  "repair": [
-    {
-      "name": "planner signed-JSON profile at preparation custom prototype keeps the existing bad-request refusal before sending",
-      "status": "failed",
-      "messages": [
-        "AssertionError: expected { kind: 'ask', target: null, \u2026(4) } to be undefined\n    at /private/tmp/artroom-planner-intent-profile-asvgk19u/repo/packages/client/test/planner-intent-profile.test.ts:21:24\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///private/tmp/artroom-planner-intent-profile-asvgk19u/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
-      ]
-    },
-    {
-      "name": "planner signed-JSON profile at preparation nonempty typed array keeps the existing bad-request refusal before sending",
-      "status": "failed",
-      "messages": [
-        "AssertionError: outside signed-JSON inputs remain a client bad-request: expected false to be 'bad-request' // Object.is equality\n    at /private/tmp/artroom-planner-intent-profile-asvgk19u/repo/packages/client/test/planner-intent-profile.test.ts:20:111\n    at file:///private/tmp/artroom-planner-intent-profile-asvgk19u/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
-      ]
-    },
-    {
-      "name": "planner signed-JSON profile at preparation Date keeps the existing bad-request refusal before sending",
-      "status": "passed",
-      "messages": []
-    },
-    {
-      "name": "planner signed-JSON profile at preparation plain data still reaches admission without a preparation error",
-      "status": "passed",
-      "messages": []
-    }
-  ],
-  "baseline": [
-    {
-      "name": "planner signed-JSON profile at preparation custom prototype keeps the existing bad-request refusal before sending",
-      "status": "passed",
-      "messages": []
-    },
-    {
-      "name": "planner signed-JSON profile at preparation nonempty typed array keeps the existing bad-request refusal before sending",
-      "status": "passed",
-      "messages": []
-    },
-    {
-      "name": "planner signed-JSON profile at preparation Date keeps the existing bad-request refusal before sending",
-      "status": "passed",
-      "messages": []
-    },
-    {
-      "name": "planner signed-JSON profile at preparation plain data still reaches admission without a preparation error",
-      "status": "passed",
-      "messages": []
-    }
-  ],
-  "clean_restoration": true
+  "copied_checker_fixture_sha256": "b58e94872c699b49fa48a108e34b26ac7c723211783509c9de41cc14a9caed57",
+  "planner_fixture_sha256": "8cf82744551421b1cb72887f273009f84316aa56cd4d75b26fd4bd05c03717d8",
+  "tests": {
+    "passed": 20,
+    "failed": 2,
+    "named_failures": [
+      {
+        "name": "planner confirmed activation through an unavailable read an older held answer stays behind a confirmed activation after a newer read fails, laterActivation=true",
+        "messages": [
+          "AssertionError: unavailability must not erase the later activation already confirmed here: expected 1 to be greater than or equal to 2\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui/test/planner-ui-unavailable.test.ts:36:135\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20",
+          "AssertionError: the accepted later record stays under its own confirmed policy: expected 'act_1_3f90684a' to be 'act_2_2eeb2724' // Object.is equality\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui/test/planner-ui-unavailable.test.ts:37:101\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20"
+        ]
+      },
+      {
+        "name": "planner confirmed activation through an unavailable read an older completed load cannot be published after the newest confirmed catalogue becomes unavailable",
+        "messages": [
+          "AssertionError: a missing catalogue must not allow the loaded older catalogue to roll back a confirmed activation: expected 3 to be greater than or equal to 5\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui/test/planner-ui-unavailable.test.ts:58:153\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20"
+        ]
+      }
+    ]
+  },
+  "removed_only_owned_untracked_fixtures": true
 }
