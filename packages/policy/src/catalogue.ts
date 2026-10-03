@@ -90,7 +90,7 @@ function valueText(v: unknown): string {
  * same title from the body a caller typed and from the record a reader
  * reads back.
  */
-export function titleOf(meaning: RecordMeaning, body: unknown): string {
+export function titleOf(meaning: { readonly label: string }, body: unknown): string {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return meaning.label;
   const names = Object.keys(body).sort(); // G5:title-order
   const name = names.find((n) => n !== "scope" && n !== "because"); // G5:title-first
@@ -104,7 +104,7 @@ export function titleOf(meaning: RecordMeaning, body: unknown): string {
  * named by that act, in the words in force when it opened (`titleOf`), and
  * by its ID when the opening act is not at hand.
  */
-export function threadTitle(lane: { readonly lane: string; readonly goal: string }, opening?: { readonly meaning: RecordMeaning; readonly body: unknown }): string {
+export function threadTitle(lane: { readonly lane: string; readonly goal: string }, opening?: { readonly meaning: { readonly label: string }; readonly body: unknown }): string {
   if (lane.goal !== "") return lane.goal; // G5:title-goal
   return opening ? titleOf(opening.meaning, opening.body) : lane.lane;
 }

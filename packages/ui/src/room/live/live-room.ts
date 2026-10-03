@@ -46,7 +46,7 @@ import type {
   Step,
   Subscription,
 } from "../contract.ts";
-import { holdsSlot } from "../contract.ts";
+import { envelopeOf, holdsSlot } from "../contract.ts";
 import type { CheckCarry, DraftRule, DryRunResult, FileDiff, Person, PolicyOutcome, ReviewDraft, RoomAdapter, RoomSnapshot, Why } from "../adapter.ts";
 import { entryMeaning, shapeOfTarget } from "../acts.ts";
 import { describeEntry, entryId, withRecovery, type Under } from "./describe.ts";
@@ -63,10 +63,14 @@ export class LiveRoom implements RoomAdapter {
   readonly kind: "mock" | "live";
   readonly viewers: readonly MemberId[];
   private snap: RoomSnapshot | null = null;
-  /** The catalogues read for the active policy version `key`. A new activation can retire a kind of an earlier version, so they are dropped then. */
-  private catalogues: { key: string | null; list: Catalogue[] } = { key: null, list: [] };
-  /** The code-review bindings under each catalogue read, by kind. */
-  private readonly builtFor = new WeakMap<Catalogue, Promise<ReadonlyMap<string, Binding>>>();
+  /**
+   * The active catalogue as last read. It answers for the entries it governs. Earlier versions are asked of the
+   * room's handle, which keeps each ended version it read and drops them when it sees a later activation, because
+   * that activation may retire one of their kinds. This adapter keeps no earlier version of its own.
+   */
+  private active: Catalogue | null = null;
+  /** The code-review bindings under each policy version, by kind. A version's steps and lanes never change. */
+  private readonly builtFor = new Map<string, Promise<ReadonlyMap<string, Binding>>>();
   private readonly listeners = new Set<() => void>();
   private watching: Subscription | null = null;
   private refreshing: Promise<void> | null = null;
@@ -128,23 +132,20 @@ export class LiveRoom implements RoomAdapter {
     }
   }
 
-  /** `D(s)`: the catalogue that governs the entry at `seq`, read once per policy version. */
+  /** `D(s)`: the catalogue that governs the entry at `seq`. */
   private async governing(seq: Seq): Promise<Catalogue | null> {
-    const hit = this.catalogues.list.find((c) => governs(c, seq)); // G5U:governs
-    if (hit) return hit;
-    let c: Catalogue | null;
+    const active = this.active;
+    if (active !== null && governs(active, seq)) return active; // G5U:governs
     try {
-      c = await this.room.actsAt({ seq });
+      return await this.room.actsAt({ seq });
     } catch {
       return null;
     }
-    if (c) this.catalogues.list.push(c);
-    return c;
   }
 
   /** The binding each code-review sentence was written for, under one catalogue. */
   private codeReviewBindings(c: Catalogue): Promise<ReadonlyMap<string, Binding>> {
-    let known = this.builtFor.get(c);
+    let known = this.builtFor.get(c.policy);
     if (!known) {
       known = (async () => {
         const out = new Map<string, Binding>();
@@ -155,19 +156,20 @@ export class LiveRoom implements RoomAdapter {
         }
         return out;
       })();
-      this.builtFor.set(c, known);
+      this.builtFor.set(c.policy, known);
     }
     return known;
   }
 
   /** How one entry's kind is read: under the catalogue of its own seq. */
   private async under(e: LogEntry): Promise<Under> {
-    if (e.entry.type === "system") return { meaning: null };
-    const env = e.entry.act.envelope as unknown as { kind: string; binding?: string };
+    const env = envelopeOf(e);
+    if (env === null) return { meaning: null };
+    const binding = "binding" in env ? env.binding : undefined;
     const c = await this.governing(e.seq);
     if (!c) return { meaning: null };
     const meaning = meaningOf(c, env.kind); // G5U:meaning-at-seq
-    const builtFor = meaning.vocabulary === "declared" && (await this.codeReviewBindings(c)).get(env.kind) === env.binding && env.binding !== undefined; // G5U:built-for-binding
+    const builtFor = meaning.vocabulary === "declared" && (await this.codeReviewBindings(c)).get(env.kind) === binding && binding !== undefined; // G5U:built-for-binding
     return { meaning, builtFor };
   }
 
@@ -179,8 +181,9 @@ export class LiveRoom implements RoomAdapter {
       this.readLog(),
       this.activeCatalogue(),
     ]);
-    // A new activation may retire a kind of an earlier version, so earlier catalogues are read again after one.
-    if ((catalogue?.policy ?? null) !== this.catalogues.key) this.catalogues = { key: catalogue?.policy ?? null, list: [] }; // G5U:catalogue-refresh
+    // The active catalogue of this load. Reading it also tells the handle of any new activation, so that it drops
+    // the earlier versions it kept: one of their kinds may have been retired.
+    this.active = catalogue; // G5U:catalogue-refresh
     const lanes: Lane[] = [...lanePage.items];
     const proposals: Proposal[] = [];
     for (const lane of lanes) {
@@ -295,7 +298,8 @@ export class LiveRoom implements RoomAdapter {
     if (!x) return null;
     const e = x.entry.entry;
     const by = e.type === "system" ? null : e.receipt.authority.member;
-    const body = e.type === "system" ? null : (e.act.envelope.body as { because?: Why["reasons"] });
+    const envelope = envelopeOf(x.entry);
+    const body = envelope === null ? null : (envelope.body as { because?: Why["reasons"] });
     // The room computes the meaning under D(s); where an older room does not, it is read the same way as the feed's.
     const read = await this.under(x.entry);
     const under: Under = x.meaning ? { ...read, meaning: x.meaning } : read; // G5U:explain-meaning
@@ -309,12 +313,13 @@ export class LiveRoom implements RoomAdapter {
       invariants: x.invariants,
       reasons: body?.because ?? [],
       published: x.published,
-      ...(e.type !== "system" && under.meaning ? { meaning: entryMeaning(e.act.envelope, under.meaning) } : {}),
+      ...(envelope !== null && under.meaning ? { meaning: entryMeaning(envelope, under.meaning) } : {}),
     };
   }
 
   async readCatalogue(): Promise<Catalogue | null> {
     const catalogue = await this.activeCatalogue();
+    this.active = catalogue;
     if (this.snap) {
       this.snap = { ...this.snap, catalogue, policy: { ...this.snap.policy, version: catalogue?.policy ?? null, activatedAt: catalogue?.since ?? null } };
       for (const l of this.listeners) l();
@@ -405,7 +410,7 @@ function recordsFromLog(entries: readonly LogEntry[], unders: readonly Under[]):
   const notes: Note[] = [];
   entries.forEach((e, i) => {
     if (e.entry.type !== "act") return;
-    const env = e.entry.act.envelope as unknown as { kind: string; target: unknown; body: Record<string, unknown> };
+    const env = envelopeOf(e) as { kind: string; target: unknown; body: Record<string, unknown> };
     const r = e.entry.receipt;
     const base = { id: entryId(e), seq: e.seq, by: r.authority, at: e.at, flags: r.flags, ...(r.after ? { after: r.after } : {}) };
     const step = evidenceStep(env.kind, env.target, unders[i]?.meaning ?? null);

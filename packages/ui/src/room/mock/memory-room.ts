@@ -40,6 +40,7 @@ import type {
   Step,
   Update,
 } from "../contract.ts";
+import { envelopeOf } from "../contract.ts";
 import { overlap } from "../glob.ts";
 import { fakeKey, hex8 } from "./ids.ts";
 
@@ -298,7 +299,7 @@ export class MemoryRoom {
 
   async lanes() {
     const items: Lane[] = [...this.threads.values()].map((t) => {
-      const base = { lane: t.id, purpose: "ordinary" as const, goal: t.goal, scope: t.scope, generation: t.generation, generations: [...t.generations], overlaps: [] };
+      const base = { lane: t.id, kind: t.kind, purpose: "ordinary" as const, goal: t.goal, scope: t.scope, generation: t.generation, generations: [...t.generations], overlaps: [] };
       return (
         t.holder
           ? { ...base, state: "held", lease: { holder: t.holder, generation: t.leaseGeneration, expiresAt: new Date(EPOCH + 24 * 3600_000).toISOString() } }
@@ -330,7 +331,7 @@ export class MemoryRoom {
     const e = this.entries.find((x) => this.idOf(x) === act);
     if (!e) return null;
     const x = e.entry;
-    const kind = x.type === "system" ? "system" : (x.act.envelope as unknown as { kind: string }).kind;
+    const kind = envelopeOf(e)?.kind ?? "system";
     const c = x.type === "system" ? null : await this.actsAt({ seq: e.seq });
     return {
       act,

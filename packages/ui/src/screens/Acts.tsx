@@ -110,10 +110,9 @@ function FieldInput({ f, value, problem, onInput }: { f: ActField; value: string
 
 function TargetInputs({ kind, declaration, shape, values, problems, onInput }: { kind: string; declaration: ActDeclaration; shape: TargetShape; values: Record<string, string>; problems: Readonly<Record<string, string>>; onInput: (name: string, v: string) => void }) {
   const { snap } = useApp();
-  // A thread's kind is the kind of the act that opened it (R-DECL-6). Offer the threads this act may act on.
+  // A thread's kind is the kind of the act that opened it (R-DECL-6), which the room gives on the lane. Offer the threads this act may act on.
   const threads = snap.lanes.filter((l) => {
-    const opened = snap.feed.find((f) => f.id === l.lane)?.kind;
-    return opened === undefined || !declaration.threads || declaration.threads.includes(opened); // G5U:thread-filter
+    return l.kind === undefined || !declaration.threads || declaration.threads.includes(l.kind); // G5U:thread-filter
   });
   return (
     <>

@@ -17,6 +17,7 @@
  */
 
 import type { ActId, LandOp, LogEntry, RecordMeaning } from "../contract.ts";
+import { envelopeOf } from "../contract.ts";
 import { checkCarriedText } from "../checks.ts";
 import { recoveryNow } from "../recovery.ts";
 import type { FeedEntry } from "../adapter.ts";
@@ -159,7 +160,7 @@ export function describeEntry(e: LogEntry, under: Under = { meaning: null }): Fe
     const op = "op" in ev ? ev.op : undefined;
     return { ...common, type: "system", kind: ev.type, by: null, text: text ?? ev.type, flags: [], ...(lane ? { lane } : {}), ...(refusal ? { refusal } : {}), ...(op ? { op } : {}) };
   }
-  const env = x.act.envelope as unknown as Env;
+  const env = envelopeOf(e) as Env;
   const by = x.receipt.authority.member;
   const lane = env.target && typeof env.target === "object" && "lane" in env.target ? (env.target as { lane: ActId }).lane : undefined;
   const meaning = under.meaning !== null ? { meaning: entryMeaning(env, under.meaning) } : {}; // G5U:meaning-attached

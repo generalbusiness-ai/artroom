@@ -94,4 +94,4 @@ export type {
   Verdict,
 } from "@generalbusiness/artroom-contract";
 
-export { isCarried, isHeld, isRefusal, holdsSlot, isTerminal } from "@generalbusiness/artroom-contract";
+export { envelopeOf, isCarried, isHeld, isRefusal, holdsSlot, isTerminal } from "@generalbusiness/artroom-contract";
