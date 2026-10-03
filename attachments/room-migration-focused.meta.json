@@ -1,0 +1,24 @@
+{
+  "label": "room-migration-focused",
+  "cwd": "/tmp/artroom-checker-stage2-35797-OdtWKz/packages/room",
+  "argv": [
+    "/tmp/artroom-checker-stage2-35797-OdtWKz/node_modules/.bin/vitest",
+    "run",
+    "--config",
+    "vitest.workers.config.ts",
+    "test/workerd/declared-fd6f00b6.test.ts",
+    "--testNamePattern=migration 4",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/tmp/artroom-checker-stage2-35797-evidence-c9ICmd/room-migration-focused.raw.json"
+  ],
+  "utcStart": "2026-10-03T22:07:05.693716+00:00",
+  "envOverrides": {
+    "CI": "1",
+    "NO_COLOR": "1",
+    "WRANGLER_SEND_METRICS": "false"
+  },
+  "rawLog": "/private/tmp/artroom-checker-stage2-35797-evidence-c9ICmd/room-migration-focused.log",
+  "exit": 0,
+  "utcEnd": "2026-10-03T22:07:12.730038+00:00"
+}

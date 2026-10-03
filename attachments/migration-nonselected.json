@@ -1,0 +1,639 @@
+[
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "declared acts stage 2: one vocabulary per document (R-DECL-1) a v1 room is the legacy vocabulary: a v: 2 envelope, a binding on v: 1, and recover are bad-request at step 1",
+    "title": "a v1 room is the legacy vocabulary: a v: 2 envelope, a binding on v: 1, and recover are bad-request at step 1",
+    "ancestorTitles": [
+      "declared acts stage 2: one vocabulary per document (R-DECL-1)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "declared acts stage 2: one vocabulary per document (R-DECL-1) a v2 room admits the code-review acts with their bindings; a thread records its kind, opening binding and lease length (R-DECL-6)",
+    "title": "a v2 room admits the code-review acts with their bindings; a thread records its kind, opening binding and lease length (R-DECL-6)",
+    "ancestorTitles": [
+      "declared acts stage 2: one vocabulary per document (R-DECL-1)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "declared acts stage 2: one vocabulary per document (R-DECL-1) the room's binding is the policy package's binding identity (R-DECL-15), for each code-review kind",
+    "title": "the room's binding is the policy package's binding identity (R-DECL-15), for each code-review kind",
+    "ancestorTitles": [
+      "declared acts stage 2: one vocabulary per document (R-DECL-1)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "who may sign: who.roles, admin implicit (R-DECL-11) a declared kind's roles decide at step 4, unrecorded; an admin may sign every declared act; renew keeps the legacy table",
+    "title": "a declared kind's roles decide at step 4, unrecorded; an admin may sign every declared act; renew keeps the legacy table",
+    "ancestorTitles": [
+      "who may sign: who.roles, admin implicit (R-DECL-11)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "step 1 under the document in force (R-ADM-1 as amended) admission judges step 1 again under the document it decides with: an envelope of the other vocabulary is bad-request there too",
+    "title": "admission judges step 1 again under the document it decides with: an envelope of the other vocabulary is bad-request there too",
+    "ancestorTitles": [
+      "step 1 under the document in force (R-ADM-1 as amended)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) an undeclared kind is kind-undeclared after authority and before the body check; nothing is recorded",
+    "title": "an undeclared kind is kind-undeclared after authority and before the body check; nothing is recorded",
+    "ancestorTitles": [
+      "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) a v: 1 envelope of a declared kind, and a v: 2 one with another binding, are binding-stale with the current binding and version; the signer signs again under the same key",
+    "title": "a v: 1 envelope of a declared kind, and a v: 2 one with another binding, are binding-stale with the current binding and version; the signer signs again under the same key",
+    "ancestorTitles": [
+      "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) same-shape change: an act signed under [version], submitted after activation of [version, land], is binding-stale and no landing starts",
+    "title": "same-shape change: an act signed under [version], submitted after activation of [version, land], is binding-stale and no landing starts",
+    "ancestorTitles": [
+      "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) hold change: a claim signed before leaseSeconds or the scope source changed is binding-stale",
+    "title": "hold change: a claim signed before leaseSeconds or the scope source changed is binding-stale",
+    "ancestorTitles": [
+      "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) unrelated update: a new kind, a changed refuse rule, a new label or wording leave the binding equal, and the act is admitted",
+    "title": "unrelated update: a new kind, a changed refuse rule, a new label or wording leave the binding equal, and the act is admitted",
+    "ancestorTitles": [
+      "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) exact retry: an act accepted before an activation, retried after it, gets its original receipt",
+    "title": "exact retry: an act accepted before an activation, retried after it, gets its original receipt",
+    "ancestorTitles": [
+      "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) exact retry across a change of shape: an accepted note on an entry, retried after its declaration lost the entry target, and an accepted claim, retried after the room returned to a v1 document, get their original receipts; nothing else is answered",
+    "title": "exact retry across a change of shape: an accepted note on an entry, retried after its declaration lost the entry target, and an accepted claim, retried after the room returned to a v1 document, get their original receipts; nothing else is answered",
+    "ancestorTitles": [
+      "step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) a grant signed for a meaning that changed before its admission is binding-stale; a kind it does not declare is kind-undeclared; nothing is recorded",
+    "title": "a grant signed for a meaning that changed before its admission is binding-stale; a kind it does not declare is kind-undeclared; nothing is recorded",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) the grantor's role and who.delegable bound the map; a grant expanded before a kind was added does not cover it",
+    "title": "the grantor's role and who.delegable bound the map; a grant expanded before a kind was added does not cover it",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) a grant's plain kinds are bound by the grantor's role: a checker, who may not sign renew, may not grant it by a delegation, nor be invited with a session that lists it; nothing is recorded",
+    "title": "a grant's plain kinds are bound by the grantor's role: a checker, who may not sign renew, may not grant it by a delegation, nor be invited with a session that lists it; nothing is recorded",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) an exact retry of an admitted grant after a meaning change gets its receipt; acts under it are then delegation-invalid",
+    "title": "an exact retry of an admitted grant after a meaning change gets its receipt; acts under it are then delegation-invalid",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) an invitation signed before a meaning change and redeemed after it is binding-stale; the invitation stays unused",
+    "title": "an invitation signed before a meaning change and redeemed after it is binding-stale; the invitation stays unused",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) a room-custody invitation with no session grants renew and no declared kind: its bearer's renew is admitted, and its claim is delegation-invalid, unrecorded, because the delegation covers no declared kind",
+    "title": "a room-custody invitation with no session grants renew and no declared kind: its bearer's renew is admitted, and its claim is delegation-invalid, unrecorded, because the delegation covers no declared kind",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) an invitation's session map is judged when the invitation is admitted (R-DECL-17): a stale binding is binding-stale, an undeclared kind kind-undeclared, a kind the invited role may not sign invalid-body; nothing is recorded",
+    "title": "an invitation's session map is judged when the invitation is admitted (R-DECL-17): a stale binding is binding-stale, an undeclared kind kind-undeclared, a kind the invited role may not sign invalid-body; nothing is recorded",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) an invitation from before declared acts, redeemed after the first v2 activation, grants only the delegable platform kinds its session covered: one limited to claim and propose grants nothing, one that lists renew grants renew (intersection, never acquisition)",
+    "title": "an invitation from before declared acts, redeemed after the first v2 activation, grants only the delegable platform kinds its session covered: one limited to claim and propose grants nothing, one that lists renew grants renew (intersection, never acquisition)",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) who.delegable is judged at each use: a kind made non-delegable after a grant, its binding unchanged, is no longer covered; the grantor's own key still signs it",
+    "title": "who.delegable is judged at each use: a kind made non-delegable after a grant, its binding unchanged, is no longer covered; the grantor's own key still signs it",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) an invitation whose session names declared kinds, redeemed after the room returned to a v1 document, is refused binding-stale and stays unused; a session that names only renew is redeemed",
+    "title": "an invitation whose session names declared kinds, redeemed after the room returned to a v1 document, is refused binding-stale and stays unused; a session that names only renew is redeemed",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) an invitation admitted under a v2 document never gains a kind: with no session, redeemed after the room returned to v1, it grants renew and no legacy kind",
+    "title": "an invitation admitted under a v2 document never gains a kind: with no session, redeemed after the room returned to v1, it grants renew and no legacy kind",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) bearer acts carry the named tools' code-review binding: admitted where claim means the code-review claim; where the room's claim differs, delegation-invalid at step 4 under a grant for the room's meaning, and binding-stale at step 4a under a grant for the code-review meaning; a binding the caller names is used as given",
+    "title": "bearer acts carry the named tools' code-review binding: admitted where claim means the code-review claim; where the room's claim differs, delegation-invalid at step 4 under a grant for the room's meaning, and binding-stale at step 4a under a grant for the code-review meaning; a binding the caller names is used as given",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) a bearer session's exact retry across a change of vocabulary gets its original result: the room builds the act as it built it the first time",
+    "title": "a bearer session's exact retry across a change of vocabulary gets its original result: the room builds the act as it built it the first time",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "grants carry the bindings their grantor signed (R-DECL-17) grants from before declared acts: after the first v2 activation a v1-era * delegation covers renew and no declared kind; one limited to review and check covers nothing",
+    "title": "grants from before declared acts: after the first v2 activation a v1-era * delegation covers renew and no declared kind; one limited to review and check covers nothing",
+    "ancestorTitles": [
+      "grants carry the bindings their grantor signed (R-DECL-17)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "threads (R-DECL-6, R-DECL-8, R-DECL-23) take-over with a new scope: a released claim taken over with a different scope moves its scope and lease generation; an overlap with an exclusive held thread is scope-overlap",
+    "title": "take-over with a new scope: a released claim taken over with a different scope moves its scope and lease generation; an overlap with an exclusive held thread is scope-overlap",
+    "ancestorTitles": [
+      "threads (R-DECL-6, R-DECL-8, R-DECL-23)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "threads (R-DECL-6, R-DECL-8, R-DECL-23) a room thread (a revert lane, R-REV-6) takes the code-review acts that name room: claim, propose, note, review, land and release",
+    "title": "a room thread (a revert lane, R-REV-6) takes the code-review acts that name room: claim, propose, note, review, land and release",
+    "ancestorTitles": [
+      "threads (R-DECL-6, R-DECL-8, R-DECL-23)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "threads (R-DECL-6, R-DECL-8, R-DECL-23) an entry target is not a thread target: a note on an entry of a thread its threads do not name is admitted; on a line of it, wrong-thread",
+    "title": "an entry target is not a thread target: a note on an entry of a thread its threads do not name is admitted; on a line of it, wrong-thread",
+    "ancestorTitles": [
+      "threads (R-DECL-6, R-DECL-8, R-DECL-23)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "threads (R-DECL-6, R-DECL-8, R-DECL-23) wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one",
+    "title": "wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one",
+    "ancestorTitles": [
+      "threads (R-DECL-6, R-DECL-8, R-DECL-23)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "threads (R-DECL-6, R-DECL-8, R-DECL-23) a retired opening kind: its held thread with an open version can still be reviewed and released by acts that name it; a new act of it is kind-undeclared",
+    "title": "a retired opening kind: its held thread with an open version can still be reviewed and released by acts that name it; a new act of it is kind-undeclared",
+    "ancestorTitles": [
+      "threads (R-DECL-6, R-DECL-8, R-DECL-23)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "what policy sees of a thread (R-EVAL-3 as amended) a refuse rule's input: under a v2 document the lane carries the thread's kind, and null where there is no thread; under a v1 document it carries no kind",
+    "title": "a refuse rule's input: under a v2 document the lane carries the thread's kind, and null where there is no thread; under a v1 document it carries no kind",
+    "ancestorTitles": [
+      "what policy sees of a thread (R-EVAL-3 as amended)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "what policy sees of a thread (R-EVAL-3 as amended) the require, land and notify inputs carry the thread's kind under a v2 document, so a rule of each sort can read it; under a v1 document they carry none, and the same rules do nothing",
+    "title": "the require, land and notify inputs carry the thread's kind under a v2 document, so a rule of each sort can read it; under a v1 document they carry none, and the same rules do nothing",
+    "ancestorTitles": [
+      "what policy sees of a thread (R-EVAL-3 as amended)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "a declared act's body is the application's own (R-DECL-12, R-DECL-21) a declared field named purpose never selects configuration recovery, and a goal declared as a number reaches the thread's row as empty text",
+    "title": "a declared field named purpose never selects configuration recovery, and a goal declared as a number reaches the thread's row as empty text",
+    "ancestorTitles": [
+      "a declared act's body is the application's own (R-DECL-12, R-DECL-21)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "a declared act's body is the application's own (R-DECL-12, R-DECL-21) plan, summary and text declared as other types are admitted as declared and never reach the room's rows or records as anything but text: a number plan is no plan, a number summary and a true text are empty text, and an enum text is its own value",
+    "title": "plan, summary and text declared as other types are admitted as declared and never reach the room's rows or records as anything but text: a number plan is no plan, a number summary and a true text are empty text, and an enum text is its own value",
+    "ancestorTitles": [
+      "a declared act's body is the application's own (R-DECL-12, R-DECL-21)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "declared field names are the body's own properties (R-DECL-12) a field named like an inherited property is absent when the body omits it: optional toString is not read from the prototype, and required valueOf is required",
+    "title": "a field named like an inherited property is absent when the body omits it: optional toString is not read from the prototype, and required valueOf is required",
+    "ancestorTitles": [
+      "declared field names are the body's own properties (R-DECL-12)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "refusal wording from the declaration (R-DECL-13) a platform refusal of a declared act takes the declaration's reason and fix, slots filled; the code is the room's; a rule's refusal keeps its own",
+    "title": "a platform refusal of a declared act takes the declaration's reason and fix, slots filled; the code is the room's; a rule's refusal keeps its own",
+    "ancestorTitles": [
+      "refusal wording from the declaration (R-DECL-13)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) a thread records the room's numeric lease at open and keeps it across a restart and a deployment lease change, for renewal and expiry; a new thread takes the new lease",
+    "title": "a thread records the room's numeric lease at open and keeps it across a restart and a deployment lease change, for renewal and expiry; a new thread takes the new lease",
+    "ancestorTitles": [
+      "the lease rule (R-DECL-6, R-DECL-9, R-DECL-15)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) hold.leaseSeconds is the thread's lease length: renewal and expiry use it; a take-over keeps it",
+    "title": "hold.leaseSeconds is the thread's lease length: renewal and expiry use it; a take-over keeps it",
+    "ancestorTitles": [
+      "the lease rule (R-DECL-6, R-DECL-9, R-DECL-15)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) a v1 thread keeps today's behaviour: no recorded length, and the room's current lease after a deployment change, also once the room is v2",
+    "title": "a v1 thread keeps today's behaviour: no recorded length, and the room's current lease after a deployment change, also once the room is v2",
+    "ancestorTitles": [
+      "the lease rule (R-DECL-6, R-DECL-9, R-DECL-15)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) a revert thread opened under a v2 document records the room's lease and the policy's conflict mode; under a v1 document it records neither",
+    "title": "a revert thread opened under a v2 document records the room's lease and the policy's conflict mode; under a v1 document it records neither",
+    "ancestorTitles": [
+      "the lease rule (R-DECL-6, R-DECL-9, R-DECL-15)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "recover, the platform kind (R-DECL-21) an admin's own key opens, versions, approves and lands a recovery thread; any other signer is admin-required; a legacy recovery lane takes recover ops after the first v2 activation",
+    "title": "an admin's own key opens, versions, approves and lands a recovery thread; any other signer is admin-required; a legacy recovery lane takes recover ops after the first v2 activation",
+    "ancestorTitles": [
+      "recover, the platform kind (R-DECL-21)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "recover, the platform kind (R-DECL-21) recover take, note and release: an admin takes over a recovery thread whose lease expired, changes its scope within .artroom, notes on it and releases it; a legacy recovery lane and a recover thread alike",
+    "title": "recover take, note and release: an admin takes over a recovery thread whose lease expired, changes its scope within .artroom, notes on it and releases it; a legacy recovery lane and a recover thread alike",
+    "ancestorTitles": [
+      "recover, the platform kind (R-DECL-21)"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "R-DECL-24 at propose time, and the stage-4 steps a v2 document is validated by the acts validator with the room's historical opening kinds; a v1 checker configuration in it is refused",
+    "title": "a v2 document is validated by the acts validator with the room's historical opening kinds; a v1 checker configuration in it is refused",
+    "ancestorTitles": [
+      "R-DECL-24 at propose time, and the stage-4 steps"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time: each of the seven, by the parser and through a proposal",
+    "title": "a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time: each of the seven, by the parser and through a proposal",
+    "ancestorTitles": [
+      "R-DECL-24 at propose time, and the stage-4 steps"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "R-DECL-24 at propose time, and the stage-4 steps a workspace or workspace-token request is judged as for an act with step version on the thread (R-CRED-5 as amended): the thread's kind decides whether any act makes versions there, and the holder is found",
+    "title": "a workspace or workspace-token request is judged as for an act with step version on the thread (R-CRED-5 as amended): the thread's kind decides whether any act makes versions there, and the holder is found",
+    "ancestorTitles": [
+      "R-DECL-24 at propose time, and the stage-4 steps"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "R-DECL-24 at propose time, and the stage-4 steps a workspace request: the version act's who.roles decide for a member's own key, as they would for the act",
+    "title": "a workspace request: the version act's who.roles decide for a member's own key, as they would for the act",
+    "ancestorTitles": [
+      "R-DECL-24 at propose time, and the stage-4 steps"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "R-DECL-24 at propose time, and the stage-4 steps a workspace request under a delegation: the grant's map must name the version act, with the binding in force",
+    "title": "a workspace request under a delegation: the grant's map must name the version act, with the binding in force",
+    "ancestorTitles": [
+      "R-DECL-24 at propose time, and the stage-4 steps"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  },
+  {
+    "run": "room-migration-focused",
+    "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+    "status": "skipped",
+    "fullName": "R-DECL-24 at propose time, and the stage-4 steps a workspace request on a recovery thread is judged as recover is: an active admin's own key, whatever the declarations say",
+    "title": "a workspace request on a recovery thread is judged as recover is: an active admin's own key, whatever the declarations say",
+    "ancestorTitles": [
+      "R-DECL-24 at propose time, and the stage-4 steps"
+    ],
+    "durationMs": null,
+    "failureMessages": [],
+    "exclusion": "not selected by --testNamePattern=migration 4"
+  }
+]

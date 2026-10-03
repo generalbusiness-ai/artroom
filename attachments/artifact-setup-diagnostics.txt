@@ -1,0 +1,11 @@
+Artifact packaging setup diagnostics, after every semantic baseline run had completed:
+
+Setup exited 1:
+Traceback (most recent call last):
+  File "<stdin>", line 5, in <module>
+NameError: name 'd' is not defined. Did you mean: 'id'?
+
+Dependent command python3 /tmp/artroom-checker-stage2-35797-evidence-c9ICmd/freeze.py exited 2:
+/opt/homebrew/Cellar/python@3.14/3.14.8/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python: can't open file '/tmp/artroom-checker-stage2-35797-evidence-c9ICmd/freeze.py': [Errno 2] No such file or directory
+
+Corrected the private evidence script to receive its checkout path as argv. No project source/test/dependency repair or change; compile/runtime results unaffected. Corrected artifact-freeze exact command, output and exit are preserved separately.

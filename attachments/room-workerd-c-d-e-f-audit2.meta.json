@@ -1,0 +1,27 @@
+{
+  "label": "room-workerd-c-d-e-f-audit2",
+  "cwd": "/tmp/artroom-checker-stage2-35797-OdtWKz/packages/room",
+  "argv": [
+    "/tmp/artroom-checker-stage2-35797-OdtWKz/node_modules/.bin/vitest",
+    "run",
+    "--config",
+    "vitest.workers.config.ts",
+    "test/workerd/declared-guards-c-fd6f00b6.test.ts",
+    "test/workerd/declared-guards-d-fd6f00b6.test.ts",
+    "test/workerd/declared-guards-e-fd6f00b6.test.ts",
+    "test/workerd/declared-guards-f-fd6f00b6.test.ts",
+    "test/workerd/declared-audit2-fd6f00b6.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/tmp/artroom-checker-stage2-35797-evidence-c9ICmd/room-workerd-c-d-e-f-audit2.raw.json"
+  ],
+  "utcStart": "2026-10-03T22:06:08.565679+00:00",
+  "envOverrides": {
+    "CI": "1",
+    "NO_COLOR": "1",
+    "WRANGLER_SEND_METRICS": "false"
+  },
+  "rawLog": "/private/tmp/artroom-checker-stage2-35797-evidence-c9ICmd/room-workerd-c-d-e-f-audit2.log",
+  "exit": 0,
+  "utcEnd": "2026-10-03T22:06:21.726427+00:00"
+}

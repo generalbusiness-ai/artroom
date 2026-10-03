@@ -1,0 +1,18 @@
+{
+  "label": "root-typecheck",
+  "cwd": "/tmp/artroom-checker-stage2-35797-OdtWKz",
+  "argv": [
+    "npm",
+    "run",
+    "typecheck"
+  ],
+  "utcStart": "2026-10-03T22:04:34.173846+00:00",
+  "envOverrides": {
+    "CI": "1",
+    "NO_COLOR": "1",
+    "WRANGLER_SEND_METRICS": "false"
+  },
+  "rawLog": "/private/tmp/artroom-checker-stage2-35797-evidence-c9ICmd/root-typecheck.log",
+  "exit": 0,
+  "utcEnd": "2026-10-03T22:04:54.461598+00:00"
+}

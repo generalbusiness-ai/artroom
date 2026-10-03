@@ -1,0 +1,63 @@
+304: export interface TestRoom {
+305:   readonly id: RoomId;
+306:   readonly genesis: Genesis;
+307:   readonly stub: RoomStub;
+308:   readonly world: World;
+309:   readonly admin: Client;
+310:   readonly recovery: Client;
+311:   readonly roomKey: KeyId;
+312: }
+313: 
+314: export async function call<T>(p: Promise<unknown>): Promise<T> {
+315:   return unwire((await p) as Wire<T>);
+316: }
+317: 
+318: /** The thrown failure of a call, or a test failure if it succeeded. */
+319: export async function failure(p: Promise<unknown>): Promise<{ code: string; message: string; retryable: boolean }> {
+320:   const w = (await p) as Wire<unknown>;
+321:   if ("ok" in w) throw new Error(`expected a failure, got ${JSON.stringify(w.ok).slice(0, 300)}`);
+322:   return w.error;
+323: }
+
+27: export const bindingIn = (r: TestRoom, kind: string) => inDO(r, (room) => room.core.declaredBinding(kind));
+28: 
+29: /** Activate a document directly, as a landing's `policy-activated` would (R-POL-9). */
+30: export async function activate(r: TestRoom, doc: PolicyDocument | PolicyDocumentV2): Promise<void> {
+31:   await inDO(r, (room) => room.core.sql.transaction(() => room.core.activate(doc, room.core.activePolicy().checkers, null, iso(clock.now))));
+32: }
+33: 
+34: export const headSeq = (r: TestRoom) => inDO(r, (room) => room.core.headSeq());
+35: 
+36: /** The room's object aborted, as after an eviction or a restart, and a fresh stub to it (job-token-mint.test.ts). */
+37: export async function restarted(before: TestRoom): Promise<TestRoom> {
+38:   await runInDurableObject(before.stub as unknown as DurableObjectStub<Room>, (_room: Room, state: DurableObjectState) => state.abort("restart")).catch(() => undefined);
+39:   const stub = env.ROOMS.get(env.ROOMS.idFromName(before.id)) as unknown as TestRoom["stub"];
+40:   return { ...before, stub, admin: new Client({ id: before.id, stub }, before.admin.keys) };
+41: }
+42: 
+43: export interface Signing {
+44:   /** `v: 2` with this binding; `null` signs `v: 1` with none; absent, the active binding. */
+45:   readonly binding?: string | null;
+46:   readonly v?: number;
+47:   readonly ikey?: string;
+48: }
+49: 
+50: /** An envelope this test signs itself: the harness never converts it. */
+51: export async function signed(r: TestRoom, c: Client, kind: string, target: unknown, body: unknown, s: Signing = {}): Promise<SignedEnvelope> {
+52:   const binding = s.binding === undefined ? await bindingIn(r, kind) : s.binding;
+53:   const envelope = {
+54:     v: s.v ?? (binding === null ? 1 : 2),
+55:     room: r.id,
+56:     actor: c.key,
+57:     kind,
+58:     ...(binding !== null ? { binding } : {}),
+59:     target,
+60:     body,
+61:     idempotencyKey: s.ikey ?? b64url(randomBytes(12)),
+62:     ...(c.delegation ? { delegation: c.delegation } : {}),
+63:   };
+64:   return { envelope, sig: sign(c.keys.seed, "artroom-envelope-v1", envelope) } as unknown as SignedEnvelope;
+65: }
+66: 
+67: export async function act<T extends ActRecord = ActRecord>(r: TestRoom, c: Client, kind: string, target: unknown, body: unknown, s: Signing = {}): Promise<T | Refusal> {
+68:   return call<T | Refusal>(r.stub.submit(await signed(r, c, kind, target, body, s)));

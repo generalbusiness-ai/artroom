@@ -1,0 +1,68 @@
+{
+  "head": "35797f844b55fea9439ac852451fd062c5177b73",
+  "tree": "8fb4596b51019f4ae60412e5f929af081e73d6b5",
+  "status": "",
+  "diffExit": 0,
+  "trackedCount": 700,
+  "trackedBad": [],
+  "sourceArchiveCount": 700,
+  "sourceArchiveBad": [],
+  "sourceArchiveMissing": [],
+  "dependencyIndexCount": 20231,
+  "currentDependencyBad": [],
+  "dependencyArchiveCount": 20231,
+  "dependencyArchiveBad": [],
+  "dependencyArchiveMissing": [],
+  "initialProofScope": "Before install clean diff/status and exact Git object inventory; not a pre-install per-file SHA256 inventory.",
+  "manifestSHA256": "5e653766914f3fafb60f0ee18c09ec7786c4dd682427742f25848281a1fe67d8",
+  "manifestCount": 47,
+  "manifestAllMatch": true,
+  "rawAssertionRows": 393,
+  "indexRowCount": 393,
+  "indexMismatchCount": 0,
+  "uniquePassedQualifiedTests": 317,
+  "statusCounts": {
+    "passed": 344,
+    "skipped": 49
+  },
+  "compileCompletedUTC": "2026-10-03T22:04:54.461598+00:00",
+  "compileExit": 0,
+  "semanticCommandGates": [
+    {
+      "run": "checker-f",
+      "exit": 0,
+      "afterFullCompiler": true
+    },
+    {
+      "run": "policy-e-node",
+      "exit": 0,
+      "afterFullCompiler": true
+    },
+    {
+      "run": "policy-e-workerd",
+      "exit": 0,
+      "afterFullCompiler": true
+    },
+    {
+      "run": "room-migration-focused",
+      "exit": 0,
+      "afterFullCompiler": true
+    },
+    {
+      "run": "room-node-a-b-e",
+      "exit": 0,
+      "afterFullCompiler": true
+    },
+    {
+      "run": "room-workerd-c-d-e-f-audit2",
+      "exit": 0,
+      "afterFullCompiler": true
+    }
+  ],
+  "rootVerificationScope": "Read actual six JSON status/message arrays programmatically, all nonselected names, exact new boundary/migration passed names, full compiler/command/log/report/runner/delta/helpers. Not a separate second semantic execution.",
+  "exclusionAnnotationMismatchCount": 0,
+  "originalFrozenRootSidecar": "/tmp/artroom-checker-stage2-35797-evidence-c9ICmd/root-verification.json",
+  "frozenEvidenceUntouched": true,
+  "sourceDependencyVerificationUTC": "2026-10-03T22:15:30.258450+00:00",
+  "completedUTC": "2026-10-03T22:20:35.254Z"
+}

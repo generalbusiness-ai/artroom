@@ -1,0 +1,2 @@
+Initial read attempted packages/policy/vitest.node.config.ts and got: cat: packages/policy/vitest.node.config.ts: No such file or directory
+This was a read-only path lookup, not a compiler/runtime result. The actual policy configuration is resolved separately.

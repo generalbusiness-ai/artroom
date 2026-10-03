@@ -1,0 +1,11 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-checker-stage2-35797-OdtWKz/packages/policy
+
+ ✓ test/declared-guards-e.test.ts (27 tests) 7ms
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+   Start at  18:05:31
+   Duration  480ms (transform 132ms, setup 0ms, import 185ms, tests 7ms, environment 0ms)
+
+JSON report written to /tmp/artroom-checker-stage2-35797-evidence-c9ICmd/policy-e-node.raw.json

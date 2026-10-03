@@ -1,0 +1,3 @@
+v26.10.0
+11.19.1
+Vitest 4.1.11 (actual raw logs)
