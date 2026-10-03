@@ -3769,7 +3769,8 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
   `[a-z0-9][a-z0-9-]{0,63}`), `globs` (with `max`, 1 to 64 patterns, in
   the restricted syntax of R-PATH-1), `member` (a member handle), `act`
   (an entry ID) and `segment` (one path segment: 1 to 255 bytes, not `.`
-  or `..`, with no `/` and no glob metacharacter).
+  or `..`, with no `/` and none of the characters R-PATH-1 keeps out of a
+  pattern: `*`, `?`, `[`, `]`, `{`, `}`, `!` and `\`).
 - A field is required for every target of the act unless it says
   `optional: true`, or `requiredFor` lists the target shapes where it is
   required (a non-empty, distinct subset of the act's targets). A field

@@ -457,6 +457,45 @@ describe.skipIf(DECLARED)("refusal wording is filled only with facts in the room
   });
 });
 
+describe.skipIf(DECLARED)("a refusal decided at the final boundary is in the declaration's words (R-DECL-13, R-ADM-6)", () => {
+  it("a delegation that expires while the act's policy is evaluated is refused in the same words as the same act sent afterwards", async () => {
+    const r = await declaredRoom(v2((a) => void (a["claim"] = { ...a["claim"]!, refusals: { "delegation-invalid": { reason: "Declared reason for {kind}.", fix: "Declared fix." } } })));
+    const bob = await addMember(r, "@bob", "member");
+    const k = newKeyPair();
+    const grant = await ok<RosterRecord>(r, bob, "roster", null, { op: "delegate", to: k.key, kinds: [], acts: { claim: (await bindingIn(r, "claim"))! }, lanes: "*", expiresAt: iso(clock.now + 60_000) }, { binding: null });
+    const d = new Client(r, k, grant.id);
+    // The claim waits in policy evaluation; the delegation expires meanwhile, so the last check before sealing refuses.
+    let open = () => {};
+    const before = r.world.policy.calls.refuse;
+    r.world.policy.gate = new Promise<void>((resolve) => (open = resolve));
+    const pending = act(r, d, "claim", null, { goal: "g", scope: ["src/**"] });
+    await until(async () => r.world.policy.calls.refuse > before);
+    advance(61_000);
+    r.world.policy.gate = null;
+    open();
+    const late = expectRefusal(await pending, "delegation-invalid");
+    expect(late).toMatchObject({ reason: "Declared reason for claim.", fix: "Declared fix." });
+    expect(late.act).toBeUndefined();
+    // The same act, decided at step 4, has the same words.
+    const after = expectRefusal(await act(r, d, "claim", null, { goal: "g", scope: ["src/**"] }), "delegation-invalid");
+    expect(after).toMatchObject({ reason: "Declared reason for claim.", fix: "Declared fix." });
+    // A declaration with no wording for the code keeps the room's own words at the final boundary too.
+    const plain = await declaredRoom();
+    const amy = await addMember(plain, "@amy", "member");
+    const k2 = newKeyPair();
+    const g2 = await ok<RosterRecord>(plain, amy, "roster", null, { op: "delegate", to: k2.key, kinds: [], acts: { claim: (await bindingIn(plain, "claim"))! }, lanes: "*", expiresAt: iso(clock.now + 60_000) }, { binding: null });
+    let open2 = () => {};
+    const before2 = plain.world.policy.calls.refuse;
+    plain.world.policy.gate = new Promise<void>((resolve) => (open2 = resolve));
+    const pending2 = act(plain, new Client(plain, k2, g2.id), "claim", null, { goal: "g", scope: ["src/**"] });
+    await until(async () => plain.world.policy.calls.refuse > before2);
+    advance(61_000);
+    plain.world.policy.gate = null;
+    open2();
+    expect(expectRefusal(await pending2, "delegation-invalid").reason).toMatch(/^Delegation act_\d+_[0-9a-f]{8} expired at /);
+  });
+});
+
 describe.skipIf(DECLARED)("the active document is parsed once per version, not once per kind", () => {
   it("a grant that names every kind of a 58-kind document reads the policy row at most once", async () => {
     const doc = v2((a) => {

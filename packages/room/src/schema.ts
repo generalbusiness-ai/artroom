@@ -475,7 +475,8 @@ function declaredField(c: Checker, f: DeclaredField, v: unknown, path: string): 
       return;
     case "segment": {
       const s = c.string(v, path, 255);
-      if (s === "" || s === "." || s === ".." || /[/*?[\]{}!]/.test(s)) c.error(path, "must be one path segment, with no slash or glob character"); // G2:field-segment
+      // The characters R-PATH-1 keeps out of a pattern, and the slash: a segment may fill a slot of a scope template.
+      if (s === "" || s === "." || s === ".." || /[/*?[\]{}!\\]/.test(s)) c.error(path, "must be one path segment, with no slash or glob character"); // G2:field-segment
       c.fixed.add(path); // G2:field-fixed
       return;
     }

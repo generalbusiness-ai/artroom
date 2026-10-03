@@ -302,8 +302,8 @@ describe("step 5 in a v2 room: a declared act's body (R-DECL-12)", () => {
     for (const part of ["...", ".a", "a.", "a..b"]) expect(form({ part }), part).toBe("ok");
   });
 
-  it("a segment has no slash and no glob character: each of / * ? [ ] { } !", () => {
-    for (const ch of ["/", "*", "?", "[", "]", "{", "}", "!"]) {
+  it("a segment has no slash and no character R-PATH-1 keeps out of a pattern: each of / * ? [ ] { } ! and the backslash (R-DECL-12)", () => {
+    for (const ch of ["/", "*", "?", "[", "]", "{", "}", "!", "\\"]) {
       expect(form({ part: `a${ch}b` }), ch).toBe(segmentWords);
       expect(form({ part: ch }), ch).toBe(segmentWords);
     }

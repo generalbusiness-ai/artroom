@@ -335,7 +335,8 @@ function stepOne(input: unknown, doc: AnyPolicyDocument | undefined): void {
 export function finalBoundary(core: RoomCore, plan: Extract<Plan, { t: "refused" | "accept" }>): Refusal | null {
   const ctx = plan.ctx;
   const j = judge(core.sql, ctx.env, ctx.path, core.now(), core.activePolicy().doc);
-  if (!j.ok) return j.refusal;
+  // A refusal decided here is a platform refusal of the act like any other: in its declaration's words (R-DECL-13).
+  if (!j.ok) return worded(j.refusal, ctx.decl, ctx.facts); // G2:boundary-wording
   if (canonicalize(j.authority) !== canonicalize(ctx.authority)) throw new Moved();
   const lane = laneOf(ctx.env);
   if (lane) {
