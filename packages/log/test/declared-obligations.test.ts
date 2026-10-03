@@ -21,11 +21,14 @@ import type { Decision, LogEntry, ReplayContext, SystemEvent } from "@generalbus
 import { replay } from "@generalbusiness/artroom-policy";
 import { type VerifyReason } from "../src/verify.ts";
 import type { Fixture } from "./support/declared-room.ts";
-import { contextOf, decisionsAt, forgeCall, insert, keep, open, policyOf, reseal, setDecisions, verify, type Log } from "./support/fixtures.ts";
+import { keys } from "./support/room-sim.ts";
+import { contextOf, decisionsAt, forgeCall, insert, keep, open, policyOf, reseal, setDecisions, verify, withEnvelope, type Log } from "./support/fixtures.ts";
+import activatesJson from "./fixtures/declared-activates-kind.json";
 import carryJson from "./fixtures/declared-carry.json";
 import plainJson from "./fixtures/declared-carry-plain.json";
 import snapshotJson from "./fixtures/declared-snapshot.json";
 
+const ACTIVATES = activatesJson as unknown as Fixture;
 const CARRY = carryJson as unknown as Fixture;
 const PLAIN = plainJson as unknown as Fixture;
 const SNAPSHOT = snapshotJson as unknown as Fixture;
@@ -81,6 +84,7 @@ const S = {
   t2propose3: 41,
   t2land: 45,
   /** Thread 3. */
+  t3notifiedFirst: 55,
   t3notified: 56,
   t3propose2: 57,
   /** Thread 4. */
@@ -121,6 +125,7 @@ describe("the fixtures are what the tests take them to be", () => {
       t2notified2: "notified",
       t2propose3: "act:propose",
       t2land: "act:land",
+      t3notifiedFirst: "notified",
       t3notified: "notified",
       t3propose2: "act:propose",
       t4land: "act:land",
@@ -301,6 +306,7 @@ describe("a notify directory's reviewers are rebuilt (R-POL-5)", () => {
   test("context-mismatch: the previous version's reviewer listed for a new version nobody has reviewed", withReviewers(S.t2notified2, ["@dave"]));
   test("context-mismatch: a reviewer who no longer qualifies under the policy in force listed", withReviewers(S.t4notified3, ["@alice", "@dave", "@erin"]));
   test("context-mismatch: one of two reviewers left out", withReviewers(S.t3notified, ["@erin"]));
+  test("context-mismatch: a notification sealed after a later review lists that later reviewer; the reviewers are those when its own act was sealed", withReviewers(S.t3notifiedFirst, ["@dave", "@erin"]));
 });
 
 // ================================================================== carry
@@ -532,6 +538,17 @@ describe("check-carried events are rebuilt (R-CARRY-6 to R-CARRY-14)", () => {
   });
 });
 
+// ============================================================ unknown threads
+
+describe("an act that names a thread or entry the log never had", () => {
+  test("guard-failed: a note on an entry the log never had, which the room refuses as lane-unknown", async () => {
+    const log = open(ACTIVATES);
+    expect(kindAt(log, 18)).toBe("act:note");
+    withEnvelope(log, 18, keys.bob, (env) => ({ ...env, target: { act: "act_3_deadbeef" } }));
+    await expectFailure(log, "guard-failed", 18);
+  });
+});
+
 // ================================================================ snapshots
 
 describe("a check on a filtered snapshot (R-CARRY-15, R-DECL-20)", () => {
@@ -553,5 +570,61 @@ describe("a check on a filtered snapshot (R-CARRY-15, R-DECL-20)", () => {
     const r = await verify(log);
     expect(r.failures).toEqual([]);
     expect(r.limits.map((l) => l.seq)).toEqual([16]);
+  });
+});
+
+// ==================================================== what a carry is kept for
+
+describe("a verdict is carried only to obligations the new version has (declared-carry-plain, second thread)", () => {
+  test("the honest log: the second version has no obligation, a later policy requires the review again, and the land input lists only the new approval", async () => {
+    const log = open(PLAIN);
+    expect(kindAt(log, 18)).toBe("act:propose");
+    expect(kindAt(log, 20)).toBe("obligations-recomputed");
+    expect(landContext(log, 22).input.obligations).toEqual([{ id: "obl_src-review", met: true }]);
+    expect(landContext(log, 22).input.reviews).toEqual([expect.objectContaining({ act: idOf(log, 21), basis: "here" })]);
+    const r = await verify(log);
+    expect(r.failures).toEqual([]);
+  });
+
+  test("context-mismatch: a land context that lists the earlier verdict as carried, though nothing was carried", async () => {
+    const log = open(PLAIN);
+    const alice = landContext(log, 8).input.reviews[0]!;
+    await forgeCall(log, 22, "land", (c) => ({ ...c, input: { ...c.input, reviews: [...c.input.reviews, { ...alice, act: idOf(log, 17) as typeof alice.act }].sort((a, b) => (a.act < b.act ? -1 : 1)) } }));
+    await expectFailure(log, "context-mismatch", 22);
+  });
+});
+
+// ================================================= a version with no such obligation
+
+describe("a check-carried judgement for an obligation the version does not have (declared-snapshot, third thread)", () => {
+  test("the honest log: the second version changes only notes, has no check obligation, and its land input lists none", async () => {
+    const log = open(SNAPSHOT);
+    expect(kindAt(log, 19)).toBe("act:check");
+    expect(kindAt(log, 22)).toBe("land-evaluated");
+    expect(landContext(log, 22).input.obligations).toEqual([]);
+  });
+
+  test("decision-extra: a judgement that carries the first version's check to the second, which has no such obligation", async () => {
+    const log = open(SNAPSHOT);
+    const evaluated = eventAt(log, 22, "land-evaluated");
+    const target = (log.entries[21]!.entry as Extract<LogEntry["entry"], { type: "act" }>).act.envelope.target as { lane: string; generation: number };
+    const act = idOf(log, 19);
+    insert(log, 23, {
+      type: "system",
+      event: {
+        type: "check-carried",
+        op: evaluated.op,
+        lane: target.lane,
+        generation: target.generation,
+        integration: evaluated.integration,
+        obligation: "obl_tests",
+        act,
+        policy: idOf(log, 1),
+        outcome: { carried: false, notCarried: { act, code: "integration-changed", text: "not carried: the integration tree changed, so the check reruns" } },
+        decisions: [],
+      } as never,
+    });
+    const f = await expectFailure(log, "decision-extra", 23);
+    expect(f.detail).toMatch(/is not a check obligation of the version/);
   });
 });

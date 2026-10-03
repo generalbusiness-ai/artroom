@@ -366,9 +366,8 @@ const DOC_B = valid({
   await room.act(propose(t3.id, 0, d1, "A helper and its guide", dave));
   await room.drainNotify();
   await room.act(review(dave, t3.id, 1, d1, "approve", ["docs/**"]));
-  await room.drainNotify();
   await room.act(review(erin, t3.id, 1, d1, "approve", ["lib/**", "docs/**"]));
-  await room.drainNotify();
+  await room.drainNotify(); // two notifications, each with the reviewers as they were when its act was sealed: dave; then dave and erin
   const d2 = room.recommit(d1);
   await room.act(propose(t3.id, 1, d2, "The same, rebased", dave)); // two carry calls: erin's verdict, then dave's own
   await room.drainNotify();
@@ -439,7 +438,10 @@ const DOC_B = valid({
 // --------------------------------------------------------- declared-carry-plain
 
 {
-  const doc = valid(v2(policy(requireReview({ paths: "src/**", from: "@alice", id: "src-review" }))));
+  const dave = pair(7);
+  const reviewers = ["@alice", "role:maintainer"];
+  const doc = valid(v2(policy(requireReview({ paths: "src/**", from: reviewers, id: "src-review" }))));
+  const firstOnly = valid(v2(policy(requireReview({ paths: "src/**", from: reviewers, id: "src-review", when: "lane.generation = 0" }))));
   const room = new DeclaredRoom();
   await room.activate(doc); // 1
   await room.join("@bob", "member", bob); // 2, 3
@@ -451,7 +453,23 @@ const DOC_B = valid({
   await room.act({ signer: bob, kind: "propose", target: { lane: claim.id }, body: { lease: 1, expectedGeneration: 1, head: h2, summary: "Nine, rebased" } }); // 7: carried on the platform's conditions; no rule, no decision
   const land = await room.act({ signer: bob, kind: "land", target: { lane: claim.id, generation: 2 }, body: { lease: 1, head: h2 } }); // 8: the land input lists the carried verdict
   await room.land(opOf(land)); // 9 land-evaluated, 10 land-reserved, 11 land-outcome
-  write("declared-carry-plain", room.fixture("A verdict carried to a second version by the platform's conditions alone: the policy has no carry rule, so the log records no carry decision, and the land input lists the carried verdict."));
+  // A verdict carries only for the obligations the new version still has. Under a policy that requires the review
+  // of a thread's first version only, the second version has no obligation for the verdict to be carried to; when
+  // a later policy requires it again, nothing was carried, and another reviewer's approval meets it.
+  await room.join("@dave", "maintainer", dave); // 12, 13
+  await room.activate(firstOnly); // 14
+  const second = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "The app again", scope: ["src/**"] } }); // 15
+  const g1 = room.change({ "src/app.ts": "export const x = 10;\n" });
+  await room.act({ signer: bob, kind: "propose", target: { lane: second.id }, body: { lease: 1, expectedGeneration: 0, head: g1, summary: "Ten" } }); // 16
+  await room.act({ signer: alice, kind: "review", target: { lane: second.id, generation: 1 }, body: { head: g1, verdict: "approve", scope: ["src/**"], text: "Approved." } }); // 17
+  const g2 = room.recommit(g1);
+  await room.act({ signer: bob, kind: "propose", target: { lane: second.id }, body: { lease: 1, expectedGeneration: 1, head: g2, summary: "Ten, rebased" } }); // 18: no obligation on this version
+  await room.activate(doc); // 19
+  await room.recompute(); // 20: src-review is required again; no verdict was carried
+  await room.act({ signer: dave, kind: "review", target: { lane: second.id, generation: 2 }, body: { head: g2, verdict: "approve", scope: ["src/**"], text: "Approved." } }); // 21
+  const land2 = await room.act({ signer: bob, kind: "land", target: { lane: second.id, generation: 2 }, body: { lease: 1, head: g2 } }); // 22: one verdict listed, dave's
+  await room.land(opOf(land2), true); // 23 land-evaluated
+  write("declared-carry-plain", room.fixture("A verdict carried to a second version by the platform's conditions alone: the policy has no carry rule, so the log records no carry decision, and the land input lists the carried verdict. Then a verdict that is not carried, because the new version has no obligation for it."));
 }
 
 // ------------------------------------------------------------ declared-snapshot
@@ -485,5 +503,20 @@ const DOC_B = valid({
   };
   await scoped("Prepared", "export const x = 10;\n", snapshot("a"), true); // 6 claim, 7 propose, 8 land, 9 prepared, 10 check, 11 land-evaluated
   await scoped("Not prepared", "export const x = 11;\n", snapshot("b"), false); // 12 claim, 13 propose, 14 land, 15 check, 16 land-evaluated
+  // A third thread: a check on a first version that needs it, then a second version that does not: no check is owed,
+  // carried or judged for it.
+  const third = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "Then only notes", scope: ["src/**", "docs/**"] } }); // 17
+  const first = room.change({ "src/app.ts": "export const x = 12;\n" });
+  await room.act({ signer: bob, kind: "propose", target: { lane: third.id }, body: { lease: 1, expectedGeneration: 0, head: first, summary: "Twelve" } }); // 18
+  await room.act({
+    signer: carol,
+    kind: "check",
+    target: { lane: third.id, generation: 1 },
+    body: { obligation: "obl_tests", check: "test", integration: first, input: { kind: "tree", tree: room.treeOf(first) }, config: digestJson(config), runner: RUNNER, volatile: false, ok: true, detail: "Passed." },
+  }); // 19
+  const notes = room.change({ "docs/notes.md": "# notes\n" });
+  await room.act({ signer: bob, kind: "propose", target: { lane: third.id }, body: { lease: 1, expectedGeneration: 1, head: notes, summary: "Only notes" } }); // 20: no obligation
+  const land3 = await room.act({ signer: bob, kind: "land", target: { lane: third.id, generation: 2 }, body: { lease: 1, head: notes } }); // 21
+  await room.land(opOf(land3), true); // 22 land-evaluated
   write("declared-snapshot", room.fixture("A scoped checker: a prepared event records the snapshot commit for a landing's integration, a check runs on that commit, and the landing's land input counts it; then the same on a second thread with no prepared event."));
 }
