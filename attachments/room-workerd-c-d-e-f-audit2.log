@@ -1,0 +1,17 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-checker-stage2-35797-OdtWKz/packages/room
+
+ ✓ test/workerd/declared-guards-d-fd6f00b6.test.ts (18 tests) 2114ms
+ ✓ test/workerd/declared-guards-f-fd6f00b6.test.ts (24 tests) 3289ms
+ ✓ test/workerd/declared-guards-e-fd6f00b6.test.ts (31 tests) 3383ms
+ ✓ test/workerd/declared-guards-c-fd6f00b6.test.ts (42 tests) 4272ms
+ ✓ test/workerd/declared-audit2-fd6f00b6.test.ts (35 tests) 5225ms
+     ✓ the job carries the check act's kind and its active binding; a check signed with them is admitted, and the landing lands  312ms
+     ✓ a document inside every other bound whose canonical JSON is over 1,048,576 bytes is policy-invalid at propose time; the same shape under the bound is admitted  362ms
+
+ Test Files  5 passed (5)
+      Tests  150 passed (150)
+   Start at  18:06:10
+   Duration  11.13s (transform 9.12s, setup 0ms, import 23.45s, tests 18.28s, environment 0ms)
+
+JSON report written to /tmp/artroom-checker-stage2-35797-evidence-c9ICmd/room-workerd-c-d-e-f-audit2.raw.json

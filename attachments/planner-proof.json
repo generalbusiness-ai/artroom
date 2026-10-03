@@ -1,0 +1,75 @@
+{
+  "verifiedBy": "planner",
+  "utc": "2026-10-03T22:42:46.877517+00:00",
+  "bundle": "/tmp/artroom-checker-stage2-35797-evidence-c9ICmd",
+  "head": "35797f844b55fea9439ac852451fd062c5177b73",
+  "tree": "8fb4596b51019f4ae60412e5f929af081e73d6b5",
+  "manifestCount": 47,
+  "manifestSha256": "5e653766914f3fafb60f0ee18c09ec7786c4dd682427742f25848281a1fe67d8",
+  "immutableTrackedAndArchivedSourceCount": 700,
+  "currentAndArchivedDependencyCount": 20231,
+  "generatedIgnoredFiles": 53,
+  "compilerExit": 0,
+  "compilerEnd": "2026-10-03T22:04:54.461598+00:00",
+  "allSixRuntimeStartsAfterCompiler": true,
+  "scopes": [
+    {
+      "run": "checker-f",
+      "actualFiles": 1,
+      "passed": 3,
+      "pending": 0,
+      "skipped": 0,
+      "failed": 0
+    },
+    {
+      "run": "policy-e-node",
+      "actualFiles": 1,
+      "passed": 27,
+      "pending": 0,
+      "skipped": 0,
+      "failed": 0
+    },
+    {
+      "run": "room-node-a-b-e",
+      "actualFiles": 3,
+      "passed": 133,
+      "pending": 0,
+      "skipped": 0,
+      "failed": 0
+    },
+    {
+      "run": "policy-e-workerd",
+      "actualFiles": 1,
+      "passed": 27,
+      "pending": 0,
+      "skipped": 0,
+      "failed": 0
+    },
+    {
+      "run": "room-workerd-c-d-e-f-audit2",
+      "actualFiles": 5,
+      "passed": 150,
+      "pending": 0,
+      "skipped": 0,
+      "failed": 0
+    },
+    {
+      "run": "room-migration-focused",
+      "actualFiles": 1,
+      "passed": 4,
+      "pending": 0,
+      "skipped": 49,
+      "failed": 0
+    }
+  ],
+  "actualAssertionRows": 393,
+  "allActualRowsMatchIndex": true,
+  "passingExecutions": 344,
+  "distinctPassedFileAndName": 317,
+  "migrationNameFilterNonselections": 49,
+  "sourceEdits": 0,
+  "newSemanticExecutions": 0,
+  "cloneStatus": "",
+  "initialProofScope": "pre-install clean status/diff and Git object inventory; no pre-install per-file SHA256 inventory",
+  "noMutationOrWholeStageCredit": true
+}
