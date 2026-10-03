@@ -1,9 +1,0 @@
-{
-  "head": "9aa91f52f6cf4ba9a9068e1bf8cc112b7a1a0eab",
-  "date": "2026-10-03T21:39:14.527561+00:00",
-  "clone": "/tmp/artroom-checker-stage2-9aa-mUSgwx",
-  "diffExit": 0,
-  "status": "",
-  "declaration508ByteIdentityExit": 0,
-  "operations": "Fresh local clone + detached exact checkout + read-only git/source inspection + static private artifact generation only. No source changes or tests/typecheck/install/mutations/live calls. Restoration required none: no tracked file edited."
-}
