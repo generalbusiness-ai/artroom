@@ -1,0 +1,93 @@
+/**
+ * Independent checker controls for preliminary repair 22ee206d.
+ * Private clone only; real workerd/SQLite, fake provider ports.
+ */
+import { describe, expect, it } from "vitest";
+import type { Claim, SignedEnvelope } from "@generalbusiness/artroom-contract";
+import { policy, validatePolicyV2 } from "@generalbusiness/artroom-policy";
+import { checkSignedEnvelope } from "../../src/schema.ts";
+import { activate, declaredRoom, headSeq, ok, signed, v2 } from "./declared-support.ts";
+import { call, sign, type TestRoom } from "./support.ts";
+
+async function observed(p: Promise<unknown>): Promise<unknown> {
+  try { return { result: await call(p) }; }
+  catch (e) {
+    const error = e as { code?: unknown; message?: unknown };
+    return { error: { code: error.code, message: error.message } };
+  }
+}
+function resign(r: TestRoom, original: SignedEnvelope, changes: Record<string, unknown>): SignedEnvelope {
+  const envelope = { ...original.envelope, ...changes };
+  return { envelope, sig: sign(r.admin.keys.seed, "artroom-envelope-v1", envelope) } as unknown as SignedEnvelope;
+}
+async function noteFixture() {
+  const r = await declaredRoom();
+  const c = await ok<Claim>(r, r.admin, "claim", null, { goal: "anchor", scope: ["src/**"] });
+  const envelope = await signed(r, r.admin, "note", { act: c.id }, { text: "hello" }, { ikey: "closed-wrapper-note" });
+  return { r, envelope };
+}
+
+describe("checker repair baseline controls", () => {
+  it("direct schema and a fresh request reject an unknown outer SignedEnvelope field", async () => {
+    const { r, envelope } = await noteFixture();
+    const extra = { ...envelope, extra: 1 };
+    expect(() => checkSignedEnvelope(extra, v2())).toThrow("act.extra is not a field of this type.");
+    expect(await observed(r.stub.submit(extra))).toMatchObject({ error: { code: "bad-request", message: "act.extra is not a field of this type." } });
+  });
+
+  it("after a target change, replay needs the valid signature and exact envelope digest", async () => {
+    const { r, envelope } = await noteFixture();
+    const first = await call(r.stub.submit(envelope));
+    const next = v2((acts) => { acts["note"] = { ...acts["note"]!, targets: { line: ["comment"] } }; });
+    expect(validatePolicyV2(next).ok).toBe(true);
+    await activate(r, next);
+    const seq = await headSeq(r);
+    expect(await observed(r.stub.submit(envelope))).toEqual({ result: first });
+    const changed = resign(r, envelope, { body: { text: "other" } });
+    expect(await observed(r.stub.submit(changed))).toMatchObject({ error: { code: "bad-request" } });
+    expect(await observed(r.stub.submit({ envelope: envelope.envelope, sig: changed.sig }))).toMatchObject({ error: { code: "bad-request" } });
+    expect(await observed(r.stub.submit(resign(r, envelope, { idempotencyKey: "new-key" })))).toMatchObject({ error: { code: "bad-request" } });
+    expect(await headSeq(r)).toBe(seq);
+  });
+
+  it("after a v2-to-v1 format change, replay needs the valid signature and exact envelope digest", async () => {
+    const r = await declaredRoom();
+    const envelope = await signed(r, r.admin, "claim", null, { goal: "anchor", scope: ["src/**"] }, { ikey: "format-retry" });
+    const first = await call(r.stub.submit(envelope));
+    await activate(r, policy());
+    const seq = await headSeq(r);
+    expect(await observed(r.stub.submit(envelope))).toEqual({ result: first });
+    const changed = resign(r, envelope, { body: { goal: "other", scope: ["src/**"] } });
+    expect(await observed(r.stub.submit(changed))).toMatchObject({ error: { code: "bad-request" } });
+    expect(await observed(r.stub.submit({ envelope: envelope.envelope, sig: changed.sig }))).toMatchObject({ error: { code: "bad-request" } });
+    expect(await observed(r.stub.submit(resign(r, envelope, { idempotencyKey: "other-key" })))).toMatchObject({ error: { code: "bad-request" } });
+    expect(await headSeq(r)).toBe(seq);
+  });
+
+  it("a changed body under the same accepted key is idempotency-mismatch when its shape is current", async () => {
+    const { r, envelope } = await noteFixture();
+    await call(r.stub.submit(envelope));
+    const seq = await headSeq(r);
+    expect(await observed(r.stub.submit(resign(r, envelope, { body: { text: "other" } }))))
+      .toMatchObject({ result: { refused: true, rule: "idempotency-mismatch" } });
+    expect(await headSeq(r)).toBe(seq);
+  });
+});
+
+describe("checker repair closed-wrapper regression probes", () => {
+  it("an accepted retry with an extra outer field remains bad-request under unchanged policy", async () => {
+    const { r, envelope } = await noteFixture();
+    await call(r.stub.submit(envelope));
+    expect(await observed(r.stub.submit({ ...envelope, extra: 1 })))
+      .toMatchObject({ error: { code: "bad-request", message: "act.extra is not a field of this type." } });
+  });
+
+  it("an accepted retry with an extra outer field remains bad-request after a target change", async () => {
+    const { r, envelope } = await noteFixture();
+    await call(r.stub.submit(envelope));
+    await activate(r, v2((acts) => { acts["note"] = { ...acts["note"]!, targets: { line: ["comment"] } }; }));
+    expect(await observed(r.stub.submit({ ...envelope, extra: 1 })))
+      .toMatchObject({ error: { code: "bad-request", message: "act.extra is not a field of this type." } });
+  });
+});
+

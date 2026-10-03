@@ -1,0 +1,113 @@
+import { describe, expect, it } from "vitest";
+import type { Claim, Redeemed, Refusal, RosterRecord } from "@generalbusiness/artroom-contract";
+import { lanes as laneMode, policy } from "@generalbusiness/artroom-policy";
+import { activate, bindingIn, declaredRoom, headSeq, inDO, ok, restarted, v2 } from "./declared-support.ts";
+import { b64url, call, Client, clock, day, DECLARED, digestBytes, expectOk, expectRefusal, iso, makeRoom, newKeyPair, randomBytes, type TestRoom } from "./support.ts";
+
+async function counts(r: TestRoom) {
+  return inDO(r, (room) => Object.fromEntries(["entries", "keys", "held_keys", "bearers", "delegations", "members", "invitations", "idem"].map((table) => [table, Number(room.core.sql.all("SELECT COUNT(*) AS n FROM " + table)[0]!["n"])])));
+}
+
+describe.skipIf(DECLARED)("checker adjacent grant repair controls at 22ee206d", () => {
+  it("issuing vocabulary survives restart; a stale mapped invitation reports current policy and changes no invite, key or log state", async () => {
+    let r = await declaredRoom();
+    const secret = randomBytes(32);
+    const inv = await ok<RosterRecord>(r, r.admin, "roster", null, {
+      op: "invite", member: "@durable", role: "agent", custody: "room",
+      expiresAt: iso(clock.now + day), secretHash: digestBytes(secret),
+      session: { kinds: ["renew"], acts: { claim: (await bindingIn(r, "claim"))! }, lanes: "*", ttlSeconds: 3600 },
+    }, { binding: null });
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT declared FROM invitations WHERE id = ?", inv.id)[0]!["declared"])).toBe(1);
+    r = await restarted(r);
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT declared FROM invitations WHERE id = ?", inv.id)[0]!["declared"])).toBe(1);
+    await activate(r, policy());
+    const current = await inDO(r, (room) => room.core.activePolicy().version);
+    const before = await counts(r);
+    const beforeSeq = await headSeq(r);
+    const out = expectRefusal(await call<Redeemed | Refusal>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(secret) }, "control")), "binding-stale");
+    expect(out.current).toEqual({ policy: current });
+    expect(out.act).toBeUndefined();
+    expect(await counts(r)).toEqual(before);
+    expect(await headSeq(r)).toBe(beforeSeq);
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT used FROM invitations WHERE id = ?", inv.id)[0]!["used"])).toBeNull();
+  });
+
+  it("migration 4 preserves stored v1 invitation defaults and a stored v1 explicit grant", async () => {
+    let r = await makeRoom();
+    const secret = randomBytes(32);
+    const inv = await r.admin.ok<RosterRecord>("roster", null, {
+      op: "invite", member: "@legacy", role: "agent", custody: "room",
+      expiresAt: iso(clock.now + day), secretHash: digestBytes(secret),
+    });
+    const key = newKeyPair();
+    const grant = await r.admin.ok<RosterRecord>("roster", null, {
+      op: "delegate", to: key.key, kinds: ["claim"], lanes: "*", expiresAt: iso(clock.now + day),
+    });
+    await inDO(r, (room) => {
+      for (const [table, column] of [["lanes", "kind"], ["lanes", "binding"], ["lanes", "lease_ms"], ["delegations", "acts"], ["invitations", "declared"]]) room.core.sql.all("ALTER TABLE " + table + " DROP COLUMN " + column);
+      room.core.sql.all("UPDATE schema_version SET v = 3 WHERE id = 1");
+    });
+    r = await restarted(r);
+    const stored = await inDO(r, (room) => ({
+      version: room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")[0]!["v"],
+      declared: room.core.sql.all("SELECT declared FROM invitations WHERE id = ?", inv.id)[0]!["declared"],
+      grant: room.core.sql.all("SELECT kinds, acts FROM delegations WHERE id = ?", grant.id)[0],
+    }));
+    expect(stored).toEqual({ version: 4, declared: null, grant: { kinds: '["claim"]', acts: null } });
+    await ok<Claim>(r, new Client(r, key, grant.id), "claim", null, { goal: "stored legacy grant", scope: ["stored/**"] });
+    const redeemed = expectOk(await call<Redeemed | Refusal>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(secret) }, "control")));
+    const kinds = await inDO(r, (room) => JSON.parse(String(room.core.sql.all("SELECT kinds FROM delegations WHERE id = ?", redeemed.delegation)[0]!["kinds"])) as string[]);
+    expect(kinds).toEqual(["claim", "propose", "note", "review", "land", "release", "renew"]);
+    expectOk(await call(r.stub.bearerAct(redeemed.bearer, { kind: "claim", target: null, body: { goal: "legacy default remains", scope: ["legacy/**"] }, idempotencyKey: "legacy-after-migration" })));
+  });
+
+  it("a bearer retry of a recorded refusal retains its original envelope and result across v1 to v2 activation", async () => {
+    const base = policy(laneMode("exclusive"));
+    const r = await makeRoom({ policy: base });
+    await r.admin.ok<Claim>("claim", null, { goal: "held", scope: ["busy/**"] });
+    const secret = randomBytes(32);
+    const inv = await r.admin.ok<RosterRecord>("roster", null, {
+      op: "invite", member: "@retry", role: "agent", custody: "room",
+      expiresAt: iso(clock.now + day), secretHash: digestBytes(secret),
+      session: { kinds: ["claim", "renew"], lanes: "*", ttlSeconds: 3600 },
+    });
+    const redeemed = expectOk(await call<Redeemed | Refusal>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(secret) }, "control")));
+    const input = { kind: "claim", target: null, body: { goal: "overlap", scope: ["busy/**"] }, idempotencyKey: "refused-claim-retry" };
+    const first = expectRefusal(await call(r.stub.bearerAct(redeemed.bearer, input)), "scope-overlap");
+    expect(first.act).toBeDefined();
+    await activate(r, v2(() => {}, base));
+    const before = await headSeq(r);
+    const retried = await call<Claim | Refusal>(r.stub.bearerAct(redeemed.bearer, input));
+    const observed = {
+      result: "refused" in retried ? retried.rule : "accepted",
+      originalResult: first.rule,
+      sameReceipt: JSON.stringify(retried) === JSON.stringify(first),
+      seqChanged: (await headSeq(r)) !== before,
+    };
+    console.info("recorded-refusal retry public observation", observed);
+    expect(observed).toEqual({ result: "scope-overlap", originalResult: "scope-overlap", sameReceipt: true, seqChanged: false });
+  });
+
+  it("retiring a kind makes its already signed invitation binding stale without consumption", async () => {
+    const r = await declaredRoom();
+    await ok<Claim>(r, r.admin, "claim", null, { goal: "historical opening kind", scope: ["history/**"] });
+    const secret = randomBytes(32);
+    const inv = await ok<RosterRecord>(r, r.admin, "roster", null, {
+      op: "invite", member: "@retired", role: "agent", custody: "room",
+      expiresAt: iso(clock.now + day), secretHash: digestBytes(secret),
+      session: { kinds: ["renew"], acts: { claim: (await bindingIn(r, "claim"))! }, lanes: "*", ttlSeconds: 3600 },
+    }, { binding: null });
+    const retiring = v2((acts) => { delete acts["claim"]; });
+    expect(await inDO(r, (room) => room.core.parseConfig(JSON.stringify(retiring), {}).ok)).toBe(true);
+    await activate(r, retiring);
+    const beforeSeq = await headSeq(r);
+    const out = await call<Redeemed | Refusal>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(secret) }, "control"));
+    const observed = {
+      result: "refused" in out ? out.rule : "redeemed",
+      invitationUnused: await inDO(r, (room) => room.core.sql.all("SELECT used FROM invitations WHERE id = ?", inv.id)[0]!["used"] === null),
+      seqChanged: (await headSeq(r)) !== beforeSeq,
+    };
+    console.info("retired-invitation public observation", observed);
+    expect(observed).toEqual({ result: "binding-stale", invitationUnused: true, seqChanged: false });
+  });
+});

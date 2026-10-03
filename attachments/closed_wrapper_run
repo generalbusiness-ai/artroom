@@ -1,0 +1,106 @@
+
+> @generalbusiness/artroom-room@0.0.0 test:workerd
+> vitest run --config vitest.workers.config.ts test/workerd/checker-stage2-repair-controls.test.ts
+
+
+ RUN  v4.1.11 /private/tmp/artroom-checker-stage2-probes-6FnlqA/packages/room
+
+ ❯ test/workerd/checker-stage2-repair-controls.test.ts (6 tests | 2 failed) 203ms
+     × an accepted retry with an extra outer field remains bad-request under unchanged policy 26ms
+     × an accepted retry with an extra outer field remains bad-request after a target change 28ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/workerd/checker-stage2-repair-controls.test.ts > checker repair closed-wrapper regression probes > an accepted retry with an extra outer field remains bad-request under unchanged policy
+AssertionError: expected { result: { …(8) } } to match object { Object (error) }
+(9 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "error": {
+-     "code": "bad-request",
+-     "message": "act.extra is not a field of this type.",
++   "result": {
++     "anchor": {
++       "act": "act_2_2f92988c",
++     },
++     "at": "2026-10-01T12:00:00.000Z",
++     "by": {
++       "key": "key_PTvP4wWAWdBcu16hLhuPHVmCufbx48y6Ngt5a7YxqB0",
++       "member": "@admin",
++       "role": "admin",
++       "via": "member",
++     },
++     "flags": [],
++     "id": "act_3_9351426f",
++     "kind": "note",
++     "seq": 3,
++     "text": "hello",
+    },
+  }
+
+ ❯ test/workerd/checker-stage2-repair-controls.test.ts:82:8
+     80|     await call(r.stub.submit(envelope));
+     81|     expect(await observed(r.stub.submit({ ...envelope, extra: 1 })))
+     82|       .toMatchObject({ error: { code: "bad-request", message: "act.ext…
+       |        ^
+     83|   });
+     84|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/workerd/checker-stage2-repair-controls.test.ts > checker repair closed-wrapper regression probes > an accepted retry with an extra outer field remains bad-request after a target change
+AssertionError: expected { result: { …(8) } } to match object { Object (error) }
+(9 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "error": {
+-     "code": "bad-request",
+-     "message": "act.extra is not a field of this type.",
++   "result": {
++     "anchor": {
++       "act": "act_2_815b5e61",
++     },
++     "at": "2026-10-01T12:00:00.000Z",
++     "by": {
++       "key": "key_NZEvh67JdgNxcrc6QYrxM6hK4o0yx-aD-aNsnibT0oA",
++       "member": "@admin",
++       "role": "admin",
++       "via": "member",
++     },
++     "flags": [],
++     "id": "act_3_34fe14df",
++     "kind": "note",
++     "seq": 3,
++     "text": "hello",
+    },
+  }
+
+ ❯ test/workerd/checker-stage2-repair-controls.test.ts:90:8
+     88|     await activate(r, v2((acts) => { acts["note"] = { ...acts["note"]!…
+     89|     expect(await observed(r.stub.submit({ ...envelope, extra: 1 })))
+     90|       .toMatchObject({ error: { code: "bad-request", message: "act.ext…
+       |        ^
+     91|   });
+     92| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  11:38:11
+   Duration  1.90s (transform 654ms, setup 0ms, import 1.43s, tests 203ms, environment 0ms)
+
+npm error Lifecycle script `test:workerd` failed with error:
+npm error code 1
+npm error path /private/tmp/artroom-checker-stage2-probes-6FnlqA/packages/room
+npm error workspace @generalbusiness/artroom-room@0.0.0
+npm error location /private/tmp/artroom-checker-stage2-probes-6FnlqA/packages/room
+npm error command failed
+npm error command sh -c vitest run --config vitest.workers.config.ts test/workerd/checker-stage2-repair-controls.test.ts
