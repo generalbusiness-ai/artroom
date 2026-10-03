@@ -1699,14 +1699,18 @@ Main `a04c774b` had 2,626 passed and 2 skipped (review `daba6bca`), and `a42c4d8
 
 ## Declared acts stage 5 (request a5d64b35)
 
-Status: implemented, provisional, not yet for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used.
+Status: implemented, provisional, not for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used. No reviewer has approved any head of this branch.
 
-This head is composed of three things: the stage 5 lane's work, the UI lane's work (`request/decl-stage5-ui`, `5dc0d044`), and the repaired stage 2 code, merged three times as it moved: `22ee206d`, `71584cbc`, then `15fa7f4c`. See "Composition" below.
+How to read this section. The parts from "What was built" to "The UI" describe the composed head `b7b9d8df` as it was reported then: the stage 5 lane's work, the UI lane's work (`request/decl-stage5-ui`, `5dc0d044`), and the stage 2 code as it stood at `15fa7f4c`. They are not rewritten, except choices 19, 20 and 22, a note at the head of the mutation table and of the old gates, and the last list, "For the planner or hugh". The part "Since `b7b9d8df`" has one section for each finding the checker or the planner made on that head or a later one, with its repair. Where the two parts disagree, the later one is right.
 
-Two things are true of this head and must change before review:
+Four things are true of the present head and must change before review:
 
-- **It is provisional.** It sits on the stage 2 code head `15fa7f4c`, which is not yet landed. Stage 2's sealed review head will add only its report section and its conversions list. The head for review is composed again on main after stage 2 lands, with every gate and every acceptance test run again there.
-- **Stage 3 is not in it.** `packages/log` is unchanged. `artroom verify` does not read a `v2` room's log until stage 3 lands.
+- **It is provisional.** It sits on the stage 2 code of `15fa7f4c`. Stage 2 is not landed and has changed since. The head for review is composed again on main after stage 2 lands, with every gate and every acceptance test run again there.
+- **Its mutation evidence does not meet the standard now in force** (the checker's `b256f7a0`). An independent reading of the source found 174 guards with no mutant outside the UI and 201 in the UI, and existing mutants that do not compile: 33 outside the UI and, by reading, 16 in it. See "The state of the evidence".
+- **The repairs since `b7b9d8df` are tested against stand-in rooms**, the fake room of the client's tests and the UI's memory room, unless a section says otherwise. They are not shown against a real Room, over real HTTPS or MCP.
+- **The whole-head gates are owed again.** Root `npm ci` and `npm test` have not been run at the present head. Each repair ran the tests of the packages it changed and the root typecheck. See "Gates since `b7b9d8df`".
+
+Stage 3 is not in this head either: `packages/log` is unchanged, and `artroom verify` does not read a `v2` room's log until stage 3 lands. The MCP core runtime (request `9ca1d290`) is on its own branch and is not in this head.
 
 ### What was built
 
@@ -1790,9 +1794,10 @@ Unit tests beside them, against the fake room in its declared mode: client 33 ([
 16. **The AGENTS.md block is unchanged.** It is pinned by a snapshot and teaches the named loop. The MCP server's instructions gain one sentence about `acts` and `act`, within their 512 characters.
 17. **A handle drops kept catalogues on evidence, not on a timer.** It cannot know of an activation it has not seen. Every answer that shows one drops the kept versions: `acts()`, another `actsAt()` answer, a `log()` page, an update, and a refusal that names the active policy version. A handle that has seen nothing may answer old marks, and `fresh` is the way to be sure.
 18. **The MCP tool `acts` always reads fresh.** A stdio server keeps one handle for its life, and an agent's call is a question to the room.
-19. **"First field" is by name.** The room keeps bodies and policy documents as canonical JSON with sorted keys. Neither the order a caller typed nor the order a declaration lists its fields is recorded. `titleOf` sorts, so the typed body and the record give one name. Open point 52. In the UI's setlist demo this names both songs "Start a song: c", by their `key`, not by their `title`.
-20. **The CLI names a new thread from the catalogue it read for the act.** It read that catalogue in the same command and the act carried its binding. After a lost answer that is finished from the journal, the first line is printed and the thread line is not.
+19. **A thread with no goal is named by its opening act's first text field by name.** This is the planner's decision `c37653e1`, built at `3a03d405`; it replaces "first field by name", under which the demo's songs were both "Start a song: c". The room keeps bodies and policy documents as canonical JSON with sorted keys, and records neither the order a caller typed nor the order a declaration lists its fields. `titleOf` sorts, so the typed body and the record give one name. "Text" is the field's declared type under the declaration of the opening act's own seq. With no text field present, the first field by name is used, as before. Open point 52 is updated to say so.
+20. **The CLI prints an act in the words of the declarations at the act's own seq.** After the room answers, `artroom act` reads `D(out.seq)` and takes the label and the thread's name from it and from the body the journal kept, for a new act and for one finished from the journal alike (`ff266354`; the checker's `0b9119de`, the planner's `b22d29ee` and `23ae8924`). Before that commit it used the catalogue read while the act was prepared, which is the wrong one when a label changes before admission, and it printed no thread line for an act finished from the journal. The read is for display only. If it fails, the act is still done: the kind is printed in place of the label, and the thread is named by its goal or its ID. With `--json` nothing is read.
 21. **The MCP tool `act` reads the declarations only for a thread with no goal**, and only at the record's seq. If that read fails, the act is still reported as done and the thread is named by its ID.
+22. **A saved act is named as the act it is.** The CLI's journal finds a saved generic act by its idempotency key, not by its kind. A run that names the key with another kind finishes the saved act with the saved bytes. Its receipt names the saved act, from the record's own kind, and the run is told on the error stream that no act of the kind it typed was made (`bdc35c53`). The other choice, to refuse the run because the kinds differ, would leave an act that the room has recorded without its local steps done.
 
 ### Edits to files other stages own
 
@@ -1894,6 +1899,8 @@ Each is a change of a pinned tool list, made as the coordinator asked. No other 
 - `packages/client/test/support/fake-room.ts`, the test double: policy versions, `activate`, the `acts` read, `v: 2` envelopes with step 4a, grant maps, a bearer act's binding, a lane's `kind`, and a declared kind of the room's own that opens a thread.
 
 ### Mutation table
+
+**This evidence does not meet the standard now in force.** The checker's finding `b256f7a0` on stage 2 applies to every lane: each new guard needs a mutant that passes the whole workspace's typecheck and turns a named assertion red, one mutant for each condition, with the tested head, the compiler's result and every failure message kept. The table below was made before that, at `477dda2f` and `b9ecd3af`. It is kept as a record of what was run and is not offered as proof. The same holds for the UI lane's mutation table further down. See "The state of the evidence" under "Since `b7b9d8df`".
 
 121 mutants, each one text edit to one guard, run against five test sets: the client, MCP and CLI node suites, the Room's steps test, and the Room's stage 5, MCP and HTTP workerd tests. 120 fail at least one test by an assertion. 1 survives. No mutant failed only by a timeout, a load failure or a missing report. The runner writes each file's original bytes back in a `finally`, and `git status --porcelain` was empty after the run.
 
@@ -2051,6 +2058,8 @@ The run was made at commit `477dda2f`. It left seven survivors. Six had no test,
 </details>
 
 ### Gates of the lane's own head
+
+These gates are of old heads. No whole-head gate has been run at the present head; see "Gates since `b7b9d8df`".
 
 These are the gates before composition. The gates of the composed head are under "Composition".
 
@@ -2229,14 +2238,420 @@ The API gave everything the UI needed to build. Four things would remove a worka
 
 Nothing here needs the planner or hugh to decide.
 
+### Since `b7b9d8df`
+
+The sections that follow are in the order the findings were made. Each names the act that records the finding, the commit that repairs it, its tests and its mutants. Each mutant named in these sections was run with the newer runners (`mut5/run2.py` and the UI harness's runner): it passes the root typecheck, is red by a named assertion, and its file was restored.
+
+| Finding | Recorded as | Repaired at |
+|---|---|---|
+| The UI read inherited functions for fields named `toString` or `valueOf`; a lost answer was shown as a refusal; an explicit refresh left historical meaning stale | checker `fb27de86` | `f606dd89` |
+| The client kept the caller's own target and body objects; an older historical read repopulated the cache | checker `43e8fe3b` | `3e6241df` |
+| A delayed catalogue read overwrote a newer activation; browser case 9 | checker `fcd7391d` | `4567a490`, `5590c318` |
+| Which field names a thread | planner `c37653e1` | `3a03d405` |
+| A failed read undid a confirmed activation | planner `0fd98c41` | `624dbb9f` |
+| The CLI printed the label read at preparation | checker `0b9119de`, planner `b22d29ee` | `ff266354` |
+| An act finished from the journal printed the raw kind and no thread | planner `23ae8924`, corrected by `c6f6ad78` | `ff266354` |
+| The same catalogue object let an earlier error clear availability | checker `8df737b8`, planner `80bef90a` | `c74f3696` |
+| A saved act was printed under the kind the finishing run typed | both reviewers, in the workroom | `bdc35c53` |
+
+### The checker's preliminary UI findings (act `fb27de86`)
+
+The checker read the UI at `5dc0d044` and recorded three defects, each with baselines that pass and assertions that fail. This branch had already repaired the first and the third when it was composed; it had no tests of its own for them. The second was open. All three now have tests in [packages/ui/test/review-fb27de86.test.tsx](../packages/ui/test/review-fb27de86.test.tsx), with the checker's baselines beside them, at `8f3615d5` (repairs and tests in `f606dd89`, the README in `8f3615d5`). The checker's own fifteen probes, run once against this branch, pass.
+
+| # | Defect | Rule | Repair | Tests |
+|---|---|---|---|---|
+| 1 | A legal field named `toString` or `valueOf` read the inherited function: an optional one left out threw, a required one left out threw, and the form showed the function as the field's value and as its problem | R-DECL-12 | `own(map, name)` reads form values, problems and bodies by own property only (`packages/ui/src/room/acts.ts`, `src/screens/Acts.tsx`). The names stay legal. A sweep of `packages/ui/src` found no other lookup by a declared name that reads a plain object: historical kinds are kept in a map with no prototype, and field changes are compared through `Map` | "a field named toString or valueOf": three baselines; left out when optional; one named problem when required; the control starts empty with no problem; a required one shows only its own problem, sends nothing, and is then sent under its own name |
+| 2 | An answer that was lost was shown as "The room did not take the act", though the room had recorded the act | R-IDEM-2 | The form keeps what it sent as one intent: target, body, binding and an idempotency key it makes. When the error says `maybeRecorded`, the form says the outcome is unresolved and offers "Ask again, the same act", which sends that intent unchanged with the same key. While unresolved it sends no other act and shows no Send button. The adapter passes the key to the room and reads the room again after an act, also when the answer was lost. A failure that says nothing of a record keeps the old wording | "an answer that was lost is not a rejection": two baselines; unresolved, never "not taken"; the page reads the room again with change notices held back; asking again is the same act and key, one entry; an act the room never saw is recorded once; no new act while unresolved; asking again after the meaning changed is `binding-stale`, shown, not resent |
+| 3 | After an explicit read of the declarations, the catalogue kept for `D(s)` was the old one, with `until: null`. A later act was read under the old policy, and a retired kind had no retired mark | R-DECL-23 | `readCatalogue` replaces the catalogue that `governing` answers from, as a load does | "an explicit read of the declarations is what D(s) is answered from": the unchanged case answers from what is kept and asks the room nothing; after an activation a later act is read under the new policy and an earlier entry under the old one, whose interval now ends; after a retirement the old catalogue has its end and the retired mark |
+
+The stand-in room (`MemoryRoom`) had no idempotency, so asking again could not be tested against it. It now answers a key as R-IDEM-2 to R-IDEM-4 say: the same act returns its record, another act is `idempotency-mismatch`, and a refusal it did not record leaves the key free. Four tests hold it to that.
+
+What this does not show. The retry is tested against the stand-in room, not over HTTPS or MCP against a real Room: that the transport's uncertain error and the Room's replay meet is the client's and the Room's tests' to show. The form keeps the intent in memory only; closing the page loses it, and the README says so.
+
+**Mutants.** The UI runner is brought to the stage 2 standard (checker's `b256f7a0`): with each mutant applied it runs the root `npm run typecheck`, then the UI suite, and records the tested head and tree, the typecheck's exit and errors, every red test with its full failure message, the file's SHA-256 before and after, and `git status`. Fifteen mutants are new, each a compiling fault, and two existing ones (`G5U:act-binding`, `G5U:send-binding`) follow their moved statements. `G5U:governs` failed the typecheck as first written (an unused import) and is rewritten to compile. These, with `G5U:own-name` and `G5U:catalogue-refresh`, were run at `8f3615d5`: 20 mutants, all typecheck, all red by a named assertion, every file restored. The other 46 mutants of the UI inventory have not been run under the new runner; some use a literal `false`, which may not typecheck. The whole inventory is owed at the final composed head.
+
+| Mutant | What it does | Typecheck | A red assertion |
+|---|---|---|---|
+| `G5U:governs` | every record is read under the active catalogue | 0 | 7 red. `review-fb27de86.test.tsx`: "after an activation and an explicit read, an act accepted later is read under the new policy, and an earlier entry under": `AssertionError: expected 'act_2_2eeb2724' to be 'act_1_3f90684a' // Object.is equality` |
+| `G5U:catalogue-refresh` | the first active catalogue read answers for good, also after an activation | 0 | 2 red. `declared-rendering.test.tsx`: "old records keep the meaning they had retirement: a record of a kind a later policy dropped says where it was retired, a": `AssertionError: expected { vocabulary: 'declared', …(7) } to match object { label: 'Wrap up', retired: 4, …(1) }` |
+| `G5U:act-binding` | the adapter rebinds the act to the active meaning by itself | 0 | 4 red. `review-fb27de86.test.tsx`: "asking again after the meaning changed is answered binding-stale: the form shows the new meaning and sends nothing by it": `AssertionError: expected null not to be null` |
+| `G5U:send-binding` | a confirmed resend carries the binding the form first held | 0 | 1 red. `acts-screen.test.tsx`: "a meaning that changed behind the form (binding-stale) confirming sends once more, with the new binding, when the form s": `AssertionError: expected null not to be null` |
+| `G5U:own-name` | a field named like an inherited property reads the inherited value | 0 | 5 red. `review-fb27de86.test.tsx`: "the control of an optional field toString starts empty, with no problem shown, and the act is sent without it": `AssertionError: expected [Function toString] to be '' // Object.is equality` |
+| `G5U:own-form-value` | a field's control starts with whatever the form state inherits under its name | 0 | 2 red. `review-fb27de86.test.tsx`: "the control of an optional field toString starts empty, with no problem shown, and the act is sent without it": `AssertionError: expected [Function toString] to be '' // Object.is equality` |
+| `G5U:own-form-problem` | a field shows as its problem whatever the problem map inherits under its name | 0 | 2 red. `review-fb27de86.test.tsx`: "the control of an optional field toString starts empty, with no problem shown, and the act is sent without it": `AssertionError: expected <p class="small tone-bad" …(1)></p> to be null` |
+| `G5U:unresolved` | a lost answer is shown as a rejection | 0 | 5 red. `review-fb27de86.test.tsx`: "an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken": `AssertionError: expected null to be <div class="notice warn" …(1)>…(1)</div> // Object.is equality` |
+| `G5U:same-intent` | asking again sends the act under a new idempotency key | 0 | 3 red. `review-fb27de86.test.tsx`: "an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken": `AssertionError: expected 'ui-f4f3b733e5300fe769c248b4d2c448f8' to be 'ui-65b4c6c986ae785a942133567fc700b2' // Object.is equality` |
+| `G5U:ask-again-kept` | asking again reads the form again and sends a new act | 0 | 2 red. `review-fb27de86.test.tsx`: "asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing ": `AssertionError: expected null not to be null` |
+| `G5U:unresolved-no-new` | the form sends a new act while an answer is unresolved | 0 | 1 red. `review-fb27de86.test.tsx`: "while the answer is unresolved the form sends no new act": `AssertionError: expected [ { kind: 'start-song', …(3) }, …(1) ] to have a length of 1 but got 2` |
+| `G5U:unresolved-no-send-button` | the Send button stays while an answer is unresolved | 0 | 1 red. `review-fb27de86.test.tsx`: "while the answer is unresolved the form sends no new act": `AssertionError: expected <button …(2)></button> to be null` |
+| `G5U:new-key` | every act the form sends has the same idempotency key | 0 | 1 red. `review-fb27de86.test.tsx`: "two keys are two acts": `AssertionError: expected 'ui-' to match /^ui-[0-9a-f]{32}$/` |
+| `G5U:act-key` | the adapter drops the caller's idempotency key | 0 | 3 red. `review-fb27de86.test.tsx`: "an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken": `AssertionError: expected 'ui-41a1aadfa699514a395c85ac2f1f6b6a' to be undefined // Object.is equality` |
+| `G5U:act-refresh` | the page does not read the room again after an act | 0 | 1 red. `review-fb27de86.test.tsx`: "the page reads the room again after a lost answer, also when the room sends it no notice of the change": `AssertionError: expected [] to have a length of 1 but got +0` |
+| `G5U:catalogue-read` | an explicit read of the declarations does not replace the catalogue that D(s) is answered from | 0 | 2 red. `review-fb27de86.test.tsx`: "after an activation and an explicit read, an act accepted later is read under the new policy, and an earlier entry under": `AssertionError: expected 'act_1_3f90684a' to be 'act_2_2eeb2724' // Object.is equality` |
+| `G5U:mock-same-act` | the stand-in room refuses a retry of the same act under its key | 0 | 3 red. `review-fb27de86.test.tsx`: "asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing ": `AssertionError: expected null not to be null` |
+| `G5U:mock-mismatch` | the stand-in room answers another act under a used key with the first act's record | 0 | 1 red. `review-fb27de86.test.tsx`: "another act under a used key is idempotency-mismatch, and records nothing": `AssertionError: expected { id: 'act_2_bd5e356e', seq: 2, …(5) } to match object { refused: true, …(1) }` |
+| `G5U:mock-recorded-only` | the stand-in room keeps a refusal it did not record under the key | 0 | 1 red. `review-fb27de86.test.tsx`: "a refusal the room did not record leaves the key free: the corrected act under it is admitted": `AssertionError: expected true to be false // Object.is equality` |
+| `G5U:mock-kept` | the stand-in room keeps nothing under a key, so a retry is admitted a second time | 0 | 4 red. `review-fb27de86.test.tsx`: "asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing ": `AssertionError: expected null not to be null` |
+
+### The checker's client findings (act `43e8fe3b`)
+
+The checker read the client at `b7b9d8df` and recorded two defects, each with controls that pass and named assertions that fail. Both are repaired at `3e6241df`, with tests in [packages/client/test/review-43e8fe3b.test.ts](../packages/client/test/review-43e8fe3b.test.ts). The tests are written for this branch and cover the checker's eight cases; its fixtures were read, not copied, and its local diagnostic patches were not adopted.
+
+| # | Defect | Rule | Repair | Tests |
+|---|---|---|---|---|
+| 1 | A prepared act held the caller's own target and body objects, and its signed envelope held the same objects. A caller that changed or reused them after a successful act changed the kept envelope: the signature no longer verified, and `replay` was `unauthenticated` instead of the original record | R-IDEM-2, R-SIG-5 | `ownedIntent` (`packages/client/src/room.ts`) takes the handle's own copy of the target and body, frozen all the way down, before the envelope is built, signed or given to `onPrepared`. `act` and the named methods both use it, for a key and for a bearer session. The caller's objects are left as they were, neither kept nor frozen. A target or body that is not plain data is `bad-request` before anything is signed or sent | "a generic act signed by a key: after the caller changes ..." (four cases: nothing, its body, its target, its body with a structured clone saved); "a named act signed by a key ..."; "a bearer session, where the room signs ..."; "the copies are frozen all the way down ..."; "a target or body that is not plain data is bad-request ..." |
+| 2 | `actsAt` kept an answer about an ended policy version though the handle had learnt of a later activation while the answer was on its way. The answer could have been read before that activation, and keeping it brought back `retired` marks older than what the handle knew: the next `actsAt` gave no `retired` mark, while `{ fresh: true }` gave it | R-DECL-23 | `actsAt` notes the latest activation the handle knows before it reads. If that has changed when the answer arrives, by any other answer, the answer is returned to its caller and not kept. An answer's own `until` does not count against it, so the sequential case is kept as before | "over https / over rpc: an answer read before a retirement, arriving after the handle saw that activation, is not kept ..."; "a held answer that no activation overtook is kept as before ..."; "a handle that learns of any activation while an answer is held does not keep that answer ..."; "in sequence, with no answer held ..." |
+
+Two choices, for the checker to judge:
+
+- **The overtaken answer is still returned to the caller that asked.** It is what the room said when it was read, as any read that races an activation is. Only keeping it was wrong.
+- **A handle that knew of no activation when it asked, and learns of the latest one while the answer is held, does not keep the answer either**, even when no activation happened in between. The handle cannot tell the two cases apart, and the cost is one more read.
+
+The nine mutants of these repairs, and `G5:catalogue-keep-ended`, whose statement the second repair changed, were run at `3e6241df` by the new runner (`run2.py` beside `mutants.py`), which records for each mutant the tested head and tree, the root `npm run typecheck` exit and errors with the mutant applied, every red test with its full failure message, and the file's SHA-256 before and after with `git status`. All ten pass the typecheck and are red by a named assertion; each file was restored. The results are `results-43e8fe3b.json`.
+
+| Mutant | Fault | Typecheck | Red tests | A named red |
+|---|---|---|---|---|
+| `G5:act-owned` | a generic act keeps and signs the caller's own target and body objects | 0 | 4 | "a bearer session, where the room signs: a generic and a named act are each sent again as first prepared, whate...": `AssertionError: expected { kind: 'ask', …(4) } to deeply equal { kind: 'ask', …(4) }` |
+| `G5:named-owned` | a named act keeps and signs the caller's own target and body objects | 0 | 3 | "a bearer session, where the room signs: a generic and a named act are each sent again as first prepared, whate...": `AssertionError: expected { kind: 'claim', target: null, …(2) } to deeply equal { kind: 'cl` |
+| `G5:intent-target` | the target is not copied: the handle keeps, and freezes, the caller's own object | 0 | 5 | "a generic act signed by a key: after the caller changes its body, the kept envelope still verifies and replay ...": `AssertionError: expected [ false, true ] to deeply equal [ false, false ]` |
+| `G5:intent-body` | the body is not copied: the handle keeps, and freezes, the caller's own object | 0 | 6 | "a generic act signed by a key: after the caller changes its body, the kept envelope still verifies and replay ...": `AssertionError: expected [ true, false ] to deeply equal [ false, false ]` |
+| `G5:intent-plain` | a target or body that is not plain data fails with an error that is not bad-request | 0 | 1 | "a target or body that is not plain data is bad-request before anything is signed or sent": `Error: expected Error: An act's target and body must be p… to match object { name: 'Artroo` |
+| `G5:intent-frozen` | the handle's copy is not frozen | 0 | 1 | "the copies are frozen all the way down, so the hook that is handed the prepared act cannot change what is sent": `AssertionError: expected [ false, false ] to deeply equal [ true, true ]` |
+| `G5:intent-frozen-deep` | only the outside of the handle's copy is frozen | 0 | 1 | "the copies are frozen all the way down, so the hook that is handed the prepared act cannot change what is sent": `AssertionError: expected [ false, false ] to deeply equal [ true, true ]` |
+| `G5:cache-overtaken` | an answer overtaken by a later activation is kept | 0 | 3 | "a handle that learns of any activation while an answer is held does not keep that answer, since it cannot tell...": `AssertionError: expected { vocabulary: 'declared', …(6) } not to be { vocabulary: 'declare` |
+| `G5:cache-overtaken-always` | no answer about an ended version is ever kept | 0 | 15 | "a held answer that no activation overtook is kept as before: the next question about its interval is answered ...": `AssertionError: expected { vocabulary: 'declared', …(6) } to be { vocabulary: 'declared', ` |
+| `G5:catalogue-keep-ended` | actsAt keeps the active version too | 0 | 1 | "is always read from the room; actsAt() keeps an ended version and answers its whole interval without a read": `AssertionError: expected 7 to be 8 // Object.is equality` |
+
+`frozen` skips `null` and values that are not objects. That condition cannot be weakened and still compile, since `Object.values` takes an object; the named and bearer tests send a `null` target through it.
+
+What this does not show. The tests run against the fake room over its local HTTPS routes and its RPC wire, not a real Room. The checker's own eight cases ran against a real Room at `b7b9d8df`; a rerun of those at this head is the checker's. The whole stage 5 inventory has not been run by the new runner: a typecheck-only pass of all 138 mutants at `3e6241df` shows 105 pass the root typecheck and 33 do not (listed in `typecheck-fails-3e6241df.md` beside the harness, mostly a name left unused or narrowing lost by a literal deletion). Those 33 are not evidence until each is rewritten as a compiling behavioural fault, and the 46 UI mutants not yet run by the new UI runner are in the same position. The full run at the final composed head is owed.
+
+### The checker's review fcd7391d (UI at `f606dd89`): answers out of order, and the browser suite
+
+**Finding 1 (P2), repaired at `4567a490`, tests corrected at `5590c318`.** A load and an explicit read each ask the room for its active catalogue, and the older question can be answered last. `readCatalogue`, `load` and `refresh` each published their answer as it came. So an answer read before an activation replaced the later catalogue the page had already confirmed: the snapshot went back a policy version, and `catalogueAt` read a record accepted after the activation under the earlier policy, through `governing`'s fast path.
+
+The repair is in `packages/ui/src/room/live/live-room.ts`, and uses the idea of the client's `actsAt` repair (`3e6241df`):
+
+- A catalogue's age is the seq of its activation (`since`), which only grows. No catalogue is older than any.
+- `confirm` takes a completed answer only if it is not older than what the adapter holds. A lost answer ("not available") has no age of its own: it stands only if nothing was confirmed while it was on its way, judged against the age held when the question was asked.
+- `load` and `readCatalogue` both publish through `confirm`. A load is also published under the catalogue held when it finishes (`current`), since an explicit read can confirm a later activation after the load read its own.
+- The late caller of `readCatalogue` is given the catalogue the page holds, not the older one its own question read. The client's `actsAt` returns the overtaken answer to its caller; the two differ here on purpose, because this read is "what is active now".
+
+Tests: `packages/ui/test/review-fcd7391d.test.ts`, 12 tests against the stand-in room with its change notices held back. They cover the checker's six cases (two regressions and four controls, the two historical-read controls among them) and six more: a newer answer to an older question is taken; a lost answer after a later activation does not blank the catalogue, from an explicit read and from a load; a lost answer with nothing confirmed in between still gives "not available"; a load still reading when a later activation is confirmed is published under the later one; a load that could not read the catalogue is published with the one an explicit read confirmed.
+
+Mutants (UI harness, results in `mut5ui-composed/results-fcd7391d.json`, run at `5590c318`; each passes the root typecheck, is red by a named assertion and was restored):
+
+| Mutant | Fault | A red assertion |
+|---|---|---|
+| `G5U:catalogue-older` | an answer from before a confirmed activation replaces the later catalogue | "an answer from before an activation the page has confirmed does not bring the earlier catalogue back" |
+| `G5U:catalogue-overtaken` | a lost answer blanks the catalogue though a later activation was confirmed meanwhile | "a lost answer that arrives after a later activation was confirmed does not blank the catalogue" |
+| `G5U:catalogue-read-age` | an explicit read judges a lost answer by what is held when it arrives | the same test |
+| `G5U:catalogue-refresh-age` | a load judges a lost answer by what is held when it arrives | "a load whose catalogue answer is lost after a later activation was confirmed keeps that catalogue" |
+| `G5U:refresh-current` | a load is published under the catalogue it read | "a load that has read its catalogue, and is still reading when a later activation is confirmed, is published under the later one" |
+| `G5U:catalogue-age` | no catalogue counts as newer than any | "with no activation in between, two reads answered out of order leave the same catalogue", and 41 more |
+| `G5U:catalogue-refresh` (moved) | the first catalogue read answers for good | 3 assertions |
+| `G5U:catalogue-read` (moved) | an explicit read does not replace the catalogue | 6 assertions |
+
+A first run at `4567a490` had three of these red by a `TypeError` on null, not by an expectation; the tests were changed to compare through a null-safe helper and the run repeated. That first run is kept as `results-fcd7391d-at-4567a490.json`.
+
+**Finding 2, the browser suite: cause found, not repaired; it needs a decision outside `packages/ui`.** The suite is still 8 of 9 at `5590c318` (`mut5ui-composed/e2e-5590c318.log`). The declared-room case fails at its first assertion, `smoke.spec.ts:199`, which expects a thread named "Start a song: Footprints"; the page shows "Start a song: c".
+
+The cause is not the form and not a lost input. It is the thread name rule itself. Section 33.10 of the protocol, and `titleOf` in `packages/policy/src/catalogue.ts`, name a thread with no goal by its opening act's label and "its first body field by name". The demo's `start-song` has the fields `key`, `swing`, `tempo` and `title`, so the first by name is `key`, and the name is "Start a song: c". Both demo songs are in the key of c, so the Room screen shows two threads with the same name. The browser case was written at `0eb42cb2`, when the name used the title; the rule was changed at `8fc6ae0c` and four UI unit tests were written to expect "Start a song: c" (`declared-rendering.test.tsx:106, 351`; `acts-screen.test.tsx:118, 140`). The browser suite was not run then.
+
+So the browser case and the rule contradict each other, and the page follows the rule. Nothing in `packages/ui` can satisfy both: the case fixes the field names (`title`, `key`, `tempo`, `scope`), and every reader must use the one rule. The expectation was not changed.
+
+A private, uncommitted copy of the case with the two names the rule gives ("Start a song: c", first match, and "Start a song: d" for the song the form sends) passes to the end (`e2e-5590c318-private-rule-titles.log`). So the two thread names are the only failing assertions of the case: the acts list, the form, its two validation messages, the recorded entry and the feed all pass.
+
+The decision owed: either the rule changes so that a song is named by its title, or the browser case and the screenshots change to the rule's names. The first seems right, since the rule as written gives two threads one name. One rule that needs no typed order and passes every existing CLI and MCP test: the first field by name whose declared type under `D(s)` is `text`, and the first field by name only when the act has no text field. That changes `titleOf` and its callers in `packages/policy`, the text of section 33.10, and the four UI unit expectations above.
+
+### The planner's decision c37653e1: which field names a thread (`3a03d405`)
+
+The planner decided the question the last section left open (act `c37653e1`). A thread with no goal is named by its opening act's label and its first text field by name. This replaces "first field by name", under which both demo songs were called "Start a song: c", because `key`, an enum, sorts before `title`.
+
+**The rule, as built in `titleOf`** (`packages/policy/src/catalogue.ts`, the helper every reader shares):
+
+1. A thread's non-empty goal still comes first (`threadTitle`, unchanged).
+2. Otherwise the opening act's label at its own seq, then the value of the first present body field by name that the act's own declaration at that seq types as `text`. `scope` and `because` are never taken.
+3. With no such field present, the first present field by name, of any type, as before.
+4. With no declaration at hand (a legacy, platform or unknown kind, or a caller that has only a label), the first field by name, as before.
+5. With no opening act at hand, the thread's ID, as before.
+
+"Text" is the declared type, not the type of the value. The declaration is the one of the record's own seq: callers pass the `meaning` that `meaningOf` gives under `actsAt({ seq })`, or the `meaning` that `explain` returns. No declaration member is added, no binding changes, and the helper still imports no evaluator.
+
+**One choice for review.** `titleOf` reads only the act's declared fields, not its steps' fields. The step an opening act runs is `open`, which brings only `scope`, and `scope` never names a thread. So there is no step-owned text field to carry, and the helper takes no target shape. Section 33.10 says this. If a later steps version gives an opening step a text field, the helper needs the target shape then.
+
+**What changed**
+
+- `packages/policy/src/catalogue.ts`: `titleOf` and `threadTitle` accept a meaning with an optional `declaration`; `textFields` lists a declaration's text fields by own name.
+- `packages/ui`: an entry's meaning (`EntryMeaning`) carries the declaration of its seq, so `laneGoal` can pass it to the shared helper. Four unit expectations now name songs by title.
+- `packages/cli/src/main.ts`, `packages/mcp/src/run.ts`: comments only; both already pass the meaning of the act's own catalogue.
+- `docs/protocol.md` section 33.10, the acceptance row "Thread name", and open point 52; the READMEs of policy, client, CLI, MCP and UI.
+- `packages/room/test/workerd/declared-stage5-a5d64b35.test.ts` is unchanged and still passes: its song declares `key` as text, so "first by name" and "first text field by name" agree there. Its title still says "label and first field".
+
+**Tests**
+
+- `packages/client/test/thread-names-c37653e1.test.ts`, 9 tests: an enum before a text field; one body under two declarations with the types exchanged, and the same string in both fields; typed order against canonical order; an absent optional text field; an act with no text field; `scope` and `because`; a field named `valueOf`; legacy, platform, unknown and label-only fallbacks; a thread opened before a document that relabels the act and exchanges its field types, read through `actsAt({ seq })`.
+- `packages/ui/test/thread-names-c37653e1.test.ts`, 3 tests: the page names a song by its title; a thread keeps its name after a later document retypes the fields; an act with no text field.
+- The CLI and MCP title tests each gain an enum field that sorts first, and assert the title is used.
+
+**Mutants at `624dbb9f`** (all pass the root typecheck, each red by a named assertion, each file restored)
+
+| Mutant | Fault | Red assertions | First named test |
+|---|---|---|---|
+| `G5:title-text` | a text field is never preferred | 9 | CLI: "an act that opens a thread names it as every reader does ..." |
+| `G5:title-text-type` | every declared field counts as text | 9 | CLI: the same |
+| `G5:title-fallback` | with no text field present, the label alone | 7 | client: "threadTitle: the goal when the thread has one ..." |
+| `G5:title-order` (moved) | first typed, not first by name | 6 | CLI: the same |
+| `G5:title-first` (moved) | `scope` may name a record | 3 | client: "titleOf: the label at the record's seq ..." |
+| `G5:title-first-because` (moved) | `because` may name a record | 2 | client: the same |
+| `G5U:record-declaration` | an entry's meaning carries no declaration | 7 | UI: "the title names the song, though the enum field key comes first by name" |
+| `G5U:thread-name` (rewritten to compile) | a thread with no goal is named by its ID | 7 | UI: the same |
+
+Results: `mut5/results-c37653e1.json` and `mut5ui-composed/results-0fd98c41.json`. Two conditions have no mutant because they exist only for the type checker: `meaning.declaration ? ... : null` and `declaration.body ?? {}`. The label-only and no-body tests run through both.
+
+**Browser suite at `624dbb9f`: 9 of 9.** Case 9, "a room that declares its own acts", passes through form validation, acceptance and its final lane checks, with its "Footprints" and "So What" assertions unchanged. Cases 1 to 8 pass as before. Log: `mut5ui-composed/e2e-c37653e1.log`.
+
+### The planner's review 0fd98c41: a failed read must not undo a confirmed activation (`624dbb9f`)
+
+The planner's review of `4567a490` found two cases that the repair for `fcd7391d` left open. Both are in the stand-in room and concern what the page shows, not Room admission.
+
+1. The page holds a catalogue, confirms a later activation, a record is accepted under it, and then a read fails. An older answer, held since before the activation, then arrives. The page took it: the earlier catalogue came back, and the later record was read under the earlier policy.
+2. A load has read a catalogue and is still reading. A later activation is confirmed, then a read fails. The load finishes and was published with the catalogue it had read.
+
+**Cause.** The page compared a late answer only with the catalogue it held. A failed read left it holding none, which lost the knowledge of what it had confirmed.
+
+**Repair** (`packages/ui/src/room/live/live-room.ts`)
+
+- The page keeps `confirmed`, the seq of the newest activation it has read, apart from the catalogue it holds. It only grows. An answer older than that is never taken, also while the page holds no catalogue.
+- A failed answer stands only if no other answer was taken while it was on its way. This is judged by the catalogue held when the question was asked, so a successful read of the same version also outranks an older failure.
+- A load is always published under the catalogue held when it finishes, or with none after a failed read. The page stays honestly without a catalogue until a read succeeds.
+
+**Tests:** `packages/ui/test/review-0fd98c41.test.ts`, 6 tests: the two cases; an older answer of the same age gives the catalogue back; a failed read does not blank a catalogue another read gave meanwhile; a newer answer restores the catalogue; the same load with no failed read is published under the later catalogue. The planner's four fixtures and the checker's six race fixtures, copied in unchanged for one run and removed, all pass (10 of 10).
+
+**Mutants at `624dbb9f`** (all pass the root typecheck, each red by a named assertion, each file restored)
+
+| Mutant | Fault | Assertion reds | First named test |
+|---|---|---|---|
+| `G5U:catalogue-confirmed` | the page never remembers what it confirmed | 3 | "with a later activation confirmed in between, it does not bring the earlier catalogue back ..." |
+| `G5U:catalogue-forget` | a failed read forgets what was confirmed | 1 | the same |
+| `G5U:catalogue-older` | an older answer replaces the later catalogue | 3 | the same |
+| `G5U:catalogue-overtaken` | a failed answer blanks the catalogue though another was taken | 2 (and 1 error) | fcd7391d: "a lost answer that arrives after a later activation was confirmed ..." |
+| `G5U:refresh-current` | a load is published under the catalogue it read | 4 | "it is not published with the earlier catalogue it read: the page still holds none" |
+| `G5U:catalogue-read-age` | a failed explicit read is compared at arrival | 1 (and 1 error) | fcd7391d: the same lost-answer test |
+| `G5U:catalogue-refresh-age` | a failed load read is compared at arrival | 1 | fcd7391d: "a load whose catalogue answer is lost after a later activation was confirmed ..." |
+| `G5U:catalogue-refresh`, `G5U:catalogue-read`, `G5U:governs` (unchanged text, rerun) | as before | 4, 8, 9 (and 1, 9, 5 timeouts) | thread-name and catalogue tests |
+
+`G5U:catalogue-age` is gone with the function it changed. Results: `mut5ui-composed/results-0fd98c41.json`.
+
+**Gates at `624dbb9f`**
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | 0 |
+| policy tests | 313 node; 311 workerd, 2 skipped |
+| client tests | 143 node; 2 workerd |
+| CLI tests | 182 |
+| MCP tests | 87 node; 5 workerd |
+| UI unit suite | 243 |
+| UI build | 0 |
+| Browser suite | 9 of 9 |
+| `git diff --check` | clean |
+
+Root `npm test` and the Room suites were not run. The other UI and stage 5 mutants were not rerun; 33 of the 138 in `mut5` still fail the root typecheck (`mut5/typecheck-fails-3e6241df.md`).
+
+**Limits.** All of this is tested against the stand-in room, not a real Room over HTTPS or MCP. After a failed read the page shows no catalogue until the next successful read; it does not ask again by itself. An application with two text fields gets the earlier name and cannot choose the other (open point 52).
+
+### The checker's review 0b9119de and the planner's b22d29ee: the CLI printed the label read at preparation (`ff266354`)
+
+**Finding (P2).** `artroom act` took the label and the thread's name from the declarations it read while it prepared the act. A label is no part of a binding, so a label-only activation between that read and the act's admission leaves the act valid. It was then admitted under one label and printed under another. The checker's fixture showed "Open a score: Nardis" printed for an act admitted under "Begin a tune". Its paired control showed that the latest label is wrong too: an activation after admission must not change what the accepted act is called.
+
+**Repair** (`packages/cli/src/main.ts`)
+
+- After the room answers, `recordedMeaning` reads the declarations in force at the record's own seq (`actsAt({ seq })`) through the run's one handle, and the `Done` line and the thread's name come from that meaning.
+- The thread is named from the prepared act's body, which `journaled` now returns. That is the body that was signed and sent.
+- With `--json` the record is printed and nothing is read.
+- A read that fails, or a room that has no declarations for that seq, changes only the words: the command still succeeds, `Done:` names the kind, and the thread is named by its goal or its ID. Nothing is signed or sent again.
+
+`packages/cli/README.md` says all of this. Choices 19 and 20 above are rewritten to match; they had still described the earlier rule and the catalogue read at preparation.
+
+**Tests** (`packages/cli/test/review-0b9119de.test.ts`, the first seven)
+
+| Test | What it holds |
+|---|---|
+| with no activation in between, the words are those the user read | the control |
+| a label changed after the act was prepared and before it was admitted: the act is printed under the new label, which governs it | the finding; one act, the binding unchanged |
+| a label changed after the act was admitted: the act keeps the label it was admitted under, not the latest | the paired control |
+| the words are read once, after the answer, at the record's seq; --json prints the record and reads no words | one read of the active declarations to prepare, one of `?at=<seq>`; none of the second with `--json` |
+| a failed read after the answer leaves the act done: the kind and the thread's ID are printed, and nothing is sent again | exit 0, one act, and the same key again gives the original record |
+| a room that has no declarations to give for that seq: the kind is printed, never the latest label | the null answer |
+| a thread that has a goal is named by it, with or without the words | the goal needs no declaration |
+
+### The planner's 23ae8924, as corrected by c6f6ad78: an act finished from the journal (`ff266354`)
+
+**Finding (P3, presentation).** A command finished from the journal printed `Done: start-song, recorded as …` and no thread line, with or without a later activation. The planner's correction and the checker's `7488b311` class this as presentation only: five sends of the same bytes gave one act and one thread, and that must stay so. Enriching the display was allowed, not required, and must use the saved intent and `D(out.seq)`, add no read to the preparation of the resend, and keep the receipt when the words cannot be read.
+
+**Repair.** The same code as the section above: the display no longer depends on anything the first run read. The saved act goes back exactly as before, through `resubmit`, with no session and no read. Only after its answer is known does the CLI open a session and read `D(out.seq)`. If no session can be opened, as for a key that is no longer a member's, the receipt is still printed with the kind and the thread's ID.
+
+**The read count is reconciled, not dropped.** The existing test "an act whose answer was lost is resent unchanged …" counted every `GET /declarations` and expected none. It now records each such read with its query and expects exactly one, `?at=<the record's seq>`: no read of the active declarations, which is what preparation reads, and one read for the words.
+
+**Tests** (the last three of `review-0b9119de.test.ts`)
+
+| Test | What it holds |
+|---|---|
+| the saved act goes back unchanged, and the receipt has the label and the thread's name from the body the journal kept | five identical signed bodies, one act, one thread; reads are exactly `?at=<seq>` |
+| after a later label-only activation the finished act still has the label it was admitted under | `D(out.seq)`, not the latest |
+| when no session can be opened to read the words, the saved act is still finished and its receipt given | every session request refused; exit 0; kind and ID printed; no declarations read; the journal holds nothing more |
+
+**Mutants for both CLI sections** (run at `c74f3696` with `mut5/run2.py`; results in `mut5/results-0b9119de.json`)
+
+| Mutant | The fault | Typecheck | Red tests | A red assertion |
+|---|---|---|---|---|
+| `G5:cli-thread` | artroom act names the thread it opened by its ID though it read the act's words | 0 | 6 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) after a later label-only activation the finished act still has the l: AssertionError: expected 'Thread: act_4_66dcc492 (lane act_4_66…' to match /^Thread: Start a song: Footprints \(l…/ |
+| `G5:cli-thread-line` | artroom act prints no thread line for the thread it opened | 0 | 10 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) when no session can be opened to read the words, the saved act is st: AssertionError: expected [ Array(1) ] to deeply equal [ …(2) ] |
+| `G5:cli-thread-goal` | artroom act names a thread that has a goal by the act | 0 | 2 | the words cannot be read: the receipt is still given (R-DECL-23, R-IDEM-2) a thread that has a goal is named by it, with or without the words: AssertionError: expected 'Thread: act_4_dbbd5381 (lane act_4_db…' to match /^Thread: Rate-limit login \(lane act_…/ |
+| `G5:cli-thread-opened` | artroom act prints a thread line for an act that opened nothing | 0 | 1 | artroom act: any declared act, under the binding the user read the lease, the generation and a version's head are read from the room when left out, as: AssertionError: expected 'Done: Release (release), recorded as …' to match /^Done: Release \(release\), recorded …/ |
+| `G5:cli-recorded-seq` | artroom act prints an act in the latest words, not those of its own seq | 0 | 8 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) after a later label-only activation the finished act still has the l: AssertionError: expected 'Done: Begin a tune (start-song), reco…' to match /^Done: Start a song \(start-song\), r…/ |
+| `G5:cli-recorded-null` | when the room has no declarations for the act's seq, artroom act prints the latest label | 0 | 1 | the words cannot be read: the receipt is still given (R-DECL-23, R-IDEM-2) a room that has no declarations to give for that seq: the kind is printed, : AssertionError: expected [ …(2) ] to deeply equal [ …(2) ] |
+| `G5:cli-recorded-unread` | a failed read of the words turns a recorded act's receipt into an error | 0 | 3 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) when no session can be opened to read the words, the saved act is st: AssertionError: expected 2 to be +0 // Object.is equality |
+| `G5:cli-recorded-json` | artroom act --json reads the words it does not print | 0 | 1 | artroom act prints the act as recorded, in the words of its own seq (R-DECL-23) the words are read once, after the answer, at the record's seq; --json: AssertionError: expected [ '', '?at=5' ] to deeply equal [ '' ] |
+| `G5:cli-label` | artroom act prints the kind where the label belongs | 0 | 10 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) after a later label-only activation the finished act still has the l: AssertionError: expected 'Done: start-song, recorded as act_4_0…' to match /^Done: Start a song \(start-song\), r…/ |
+| `G5:cli-prepared-body` | artroom act names a thread without the body that was sent | 0 | 6 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) after a later label-only activation the finished act still has the l: AssertionError: expected 'Thread: Start a song (lane act_4_7da2…' to match /^Thread: Start a song: Footprints \(l…/ |
+
+All ten pass the root typecheck, are red by a named assertion, and were restored (`git status` empty after each). Four were in the inventory before and are rewritten for the new code (`G5:cli-thread`, `G5:cli-thread-goal`, `G5:cli-thread-opened` unchanged in text, and `G5:cli-thread-line`, which replaces a literal `if (false)`); six are new.
+
+### The checker's review 8df737b8, accepted by the planner's 80bef90a: the same catalogue object (`c74f3696`)
+
+**Finding (P3).** A failed read of the active catalogue leaves the page without one only if no other answer was taken while it was on its way. The page told that by comparing the catalogue it held with the one it held when the question was asked. A custom room handle may return the same readonly object for two reads of an unchanged catalogue; the contract does not promise a new one. A later successful read then looked like no read at all, and the earlier failure cleared it. The built-in HTTP handle parses a new object from each answer and was not affected.
+
+**Repair** (`packages/ui/src/room/live/live-room.ts`). The page counts the answers it takes (`taken`). `load` and `readCatalogue` note the count when they ask, and `confirm` lets a failed answer stand only if the count has not moved. Object identity is no longer used. What was confirmed still outlasts a failed read, so the repaired lower-activation cases of `0fd98c41` stay closed, and their tests pass unchanged.
+
+**Tests** (`packages/ui/test/review-8df737b8.test.ts`, 6 tests; the room is the stand-in, with a handle that reuses the object when the catalogue is unchanged)
+
+| Test | What it holds |
+|---|---|
+| an explicit read that fails late does not blank the catalogue a later read gave, when the handle gives the same object again | the finding |
+| the same, when the handle gives a new object | the control: only the identity differs |
+| with no answer taken meanwhile, a failed read honestly leaves the page without a catalogue, also for a handle that reuses objects | the honest-null control; the next answer is taken |
+| a load whose read fails late is published under the catalogue an explicit read gave meanwhile, same object, and new object | the load path, both ways |
+| with no answer taken meanwhile, the load is published with no catalogue | the load's honest-null control |
+
+**Mutants** (run at `c74f3696` with the UI runner; results in `mut5ui-composed/results-8df737b8.json`)
+
+| Mutant | The fault | Typecheck | Red by assertion | A red assertion |
+|---|---|---|---|---|
+| `G5U:catalogue-refresh` | the first active catalogue read answers for good, also after an activation | 0 | 5 | a load whose read of the catalogue fails late (R-DECL-23) with no answer taken meanwhile, the load is published with no catalogue: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-read` | an explicit read of the declarations does not replace the catalogue that D(s) is answered from | 0 | 14 | a failed read and an answer taken while it was on its way (R-DECL-23) an explicit read that fails late does not blank the catalogue a later read gave,: AssertionError: expected 'Start a song' to be 'A later meaning' // Object.is equality |
+| `G5U:catalogue-overtaken` | a lost answer blanks the catalogue though another answer was taken while it was on its way | 0 | 6 | a failed read and an answer taken while it was on its way (R-DECL-23) an explicit read that fails late does not blank the catalogue a later read gave,: AssertionError: expected null to deeply equal { vocabulary: 'declared', …(6) } |
+| `G5U:catalogue-older` | an answer from before a confirmed activation replaces the later catalogue | 0 | 3 | an older answer that arrives after a newer read failed (R-DECL-23) with a later activation confirmed in between, it does not bring the earlier catalog: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-confirmed` | the page never remembers which activation it has confirmed | 0 | 3 | an older answer that arrives after a newer read failed (R-DECL-23) with a later activation confirmed in between, it does not bring the earlier catalog: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-forget` | a failed read forgets the activation the page had confirmed | 0 | 1 | an older answer that arrives after a newer read failed (R-DECL-23) with a later activation confirmed in between, it does not bring the earlier catalog: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-read-age` | an explicit read compares a lost answer with the answers taken when it arrives, not when it was asked | 0 | 3 | a failed read and an answer taken while it was on its way (R-DECL-23) an explicit read that fails late does not blank the catalogue a later read gave,: AssertionError: expected null to deeply equal { vocabulary: 'declared', …(6) } |
+| `G5U:catalogue-refresh-age` | a load compares a lost answer with the answers taken when it arrives, not when it was asked | 0 | 3 | a load whose read of the catalogue fails late (R-DECL-23) it is published under the catalogue an explicit read gave meanwhile, when the handle gives a: AssertionError: expected null to deeply equal { vocabulary: 'declared', …(6) } |
+| `G5U:catalogue-taken` | the page does not count the answers it takes, so a failed read blanks a catalogue a later read gave | 0 | 6 | a failed read and an answer taken while it was on its way (R-DECL-23) an explicit read that fails late does not blank the catalogue a later read gave,: AssertionError: expected null to deeply equal { vocabulary: 'declared', …(6) } |
+| `G5U:catalogue-asked-read` | an explicit read that fails always finds an answer taken meanwhile, and never leaves the page without a catalogue | 0 | 6 | a failed read and an answer taken while it was on its way (R-DECL-23) with no answer taken meanwhile, a failed read honestly leaves the page without a: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-asked-load` | a load whose read fails always finds an answer taken meanwhile, and is published with the earlier catalogue | 0 | 1 | a load whose read of the catalogue fails late (R-DECL-23) with no answer taken meanwhile, the load is published with no catalogue: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+
+All eleven pass the root typecheck, are red by a named assertion, and were restored. Three are new (`G5U:catalogue-taken`, `G5U:catalogue-asked-read`, `G5U:catalogue-asked-load`); five follow their changed statements; `G5U:catalogue-older`, `G5U:catalogue-confirmed` and `G5U:catalogue-forget` are unchanged and were run again because they sit in the same function. Some mutants also made other tests fail by a timeout or a thrown error (`G5U:catalogue-refresh`: timeout; `G5U:catalogue-read`: timeout; `G5U:catalogue-overtaken`: error; `G5U:catalogue-read-age`: error; `G5U:catalogue-taken`: error; `G5U:catalogue-asked-load`: timeout); those are not counted.
+
+**Gates at `c74f3696`**
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | 0 |
+| CLI typecheck; CLI tests | 0; 192 passed |
+| UI typecheck; UI unit tests | 0; 249 passed |
+| UI build | 0 |
+| Browser suite | 9 of 9 (`mut5ui-composed/e2e-8df737b8.log`): the scenario; the reviewer's queue; keyboard; screenshots light and dark; the jj recut history; check carry; phone width; the declared room's feed, acts and form |
+| `git diff --check` | clean |
+
+Root `npm test` and the Room suites were not run for these three commits.
+
+**Limits**
+
+- Every test here runs against the fake room over its local HTTPS routes, or the UI's stand-in room. None shows a real Room's admission, or the words read over MCP for a bearer session.
+- The words are read after the journal entry is finished. A run stopped between the two prints nothing; the same command with the same key then gets the original record from the room and prints it.
+- One read more is made for each successful `artroom act` that prints words. A record does not name its policy version, so the CLI cannot tell without a read whether the catalogue it prepared with still governs.
+- The section of `plans/README.md` on the branch still has the earlier choices 19 and 20; this draft has the corrected ones.
+
+### The reviewers' finding at `c74f3696`: a saved act finished under another kind's name (`bdc35c53`)
+
+Both reviewers reproduced this at `c74f3696` and reported it in the workroom; neither had recorded it as an act when the repair was made.
+
+**What was wrong.** The CLI's journal finds a saved `artroom act` by its idempotency key and the command `act`, not by the kind. A run that names the key again with another kind finishes the saved act: the saved bytes go back unchanged, and one act and one thread exist. That part was right. But the receipt added at `ff266354` took the kind from the finishing run's arguments. A saved `start-song` finished by a run that typed `start-tune` was printed as "Begin a different tune (start-tune)", on the "Done" line and the "Thread" line, and with the kind typed when the words could not be read.
+
+**The repair** (`packages/cli/src/main.ts`).
+
+- The receipt's kind is the record's own kind (`DeclaredRecord.kind`). The label is read for that kind at the record's seq, and the fallback names that kind.
+- The thread is still named from the body the journal kept.
+- A run that names another kind than the saved act's is told so, on the error stream, in text and `--json` alike: "This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made." The exit code is the saved act's. A run that names the same kind, or a new act, is told nothing.
+- If the room refuses the saved act when it is sent again, the explanation after `binding-stale` is for the saved kind and the binding the saved act was prepared under, not for what the run typed.
+- No read is added, and the replayed bytes are unchanged.
+
+**Tests** (`packages/cli/test/saved-kind-a5d64b35.test.ts`, 6 tests, against the fake room over its local HTTPS routes):
+
+- the changed kind with the words read: the saved act's label, kind and thread name; the line on the error stream; five identical sends, one act, one thread, no act of the typed kind;
+- the changed kind with every read session refused: "Done: start-song" and the thread by its ID, and the same line;
+- `--json`: the record is the saved act's, and the line is on the error stream;
+- control: the same kind with another body finishes the saved act with the saved body, and nothing more is said;
+- control: a new act of the other kind under its own key is that kind's;
+- a saved act that never reached the room, whose meaning then changed: `binding-stale`, explained for `start-song` under the saved binding, with what changed.
+
+The ten tests of `review-0b9119de.test.ts` pass unchanged. No test asserts a count of reads on a path where the client may ask again.
+
+**Mutants.** Run at `bdc35c53` with `mut5/run2.py`; results in `mut5/results-saved-kind.json`. Each passes the root typecheck, is red by a named assertion, and was restored.
+
+| Mutant | The fault | Red by |
+|---|---|---|
+| `G5:cli-saved-kind` | the finishing run takes the kind it typed for the saved act's kind | "the saved act's meaning changed before it reached the room ...": the line is missing |
+| `G5:cli-saved-kind-told` | a run that named another kind is not told | the same assertion, and the three "is told" assertions |
+| `G5:cli-saved-kind-told-only` | every act is told it finished a saved act | "control: the same kind with another body ...": expected no such line |
+| `G5:cli-stale-saved-kind` | a refused saved act is explained for the kind typed | "... start-song now means" not found |
+| `G5:cli-stale-saved-binding` | the change is looked up under the binding typed | "What changed since the meaning you read" not found |
+| `G5:cli-recorded-kind-words` | the label is read for the kind typed | expected "Done: Start a song (start-song)", got "Done: Begin a different tune (start-s…" |
+| `G5:cli-recorded-kind-shown` | the receipt shows the kind typed beside the label | got "Done: Start a song (start-tune)" |
+| `G5:cli-recorded-kind-fallback` | with no words read, the receipt names the kind typed | "when the words cannot be read ...": the two lines differ |
+
+Six mutants of the same lines were run again and are red: `G5:cli-label` (its text moved), `G5:cli-thread`, `G5:cli-recorded-seq`, `G5:cli-recorded-null`, `G5:cli-recorded-unread` and `G5:cli-recorded-json`.
+
+**Gates at `bdc35c53`**: CLI tests 198 passed; CLI typecheck 0; root typecheck 0; `git diff --check` clean.
+
+**Limits.** The tests use the fake room. The line is printed for a changed kind only: a run that names the same kind with another body or target is told nothing, as before. The refused-saved-act case is tested for `binding-stale` only.
+
+### The state of the evidence
+
+Condition 4's kind of evidence, a mutant for every new guard, is not complete for this stage.
+
+- **Guards with no mutant.** Two independent readings of the stage's source diff against the mutant inventories, made at `624dbb9f`, are kept outside the repository (`guard-audit-stage5-core.md` and `guard-audit-stage5-ui.md`, beside the harnesses). Outside the UI: 349 guards read, 126 covered, 174 with no mutant, 66 of those with no test that would fail, 20 judged equivalent or unreachable. In the UI: 349 guards read, 63 covered, 201 with no mutant (151 in the UI and 50 in its stand-in room), 93 of those with no test that would fail, 57 judged equivalent or unreachable. Nothing in either reading was compiled or run.
+- **Mutants that do not compile.** A typecheck of every mutant of `mut5` at `3e6241df` found 33 of 138 that fail the root typecheck. In the UI inventory, 16 of 74 are likely to fail by reading, and 45 of 74 have no recorded typecheck. None of these is rewritten yet. A mutant that does not compile shows nothing.
+- **What is to the standard.** Only the mutants named in the sections above, which were written and run with each repair.
+- **One survivor of the old table**, `G5:cli-binding-given`, is an equivalent mutant: the line before it forces the two values to be equal.
+
+Closing this is owed before review: a compiling fault and a named red for each guard, a test with its control where none exists, the equivalence claims checked against the code, and one run of every mutant at the head for review.
+
+### Gates since `b7b9d8df`
+
+No gate below is a whole-head gate. Each was run by the repair that the commit makes.
+
+| Commit | What was run | Result |
+|---|---|---|
+| `f606dd89`, `8f3615d5` | UI unit suite, UI typecheck, `git diff --check` | 222 passed; 0; clean |
+| `3e6241df` | client node and workerd, client typecheck, MCP, CLI, root typecheck, `git diff --check` | 134 and 2 passed; 0; 87 passed; 182 passed; 0; clean |
+| `5590c318` | UI unit suite, UI typecheck, root typecheck, UI build, browser suite | 234 passed; 0; 0; 0; 8 of 9 (case 9 failed on the thread name, see `c37653e1`) |
+| `624dbb9f` | root typecheck; policy; client; CLI; MCP; UI unit; UI build; browser suite; `git diff --check` | 0; 313 node, 311 workerd with 2 skipped; 143 and 2; 182; 87 and 5; 243; 0; 9 of 9; clean |
+| `c74f3696` | root typecheck; CLI typecheck and tests; UI typecheck and tests; UI build; browser suite; `git diff --check` | 0; 0 and 192 passed; 0 and 249 passed; 0; 9 of 9; clean |
+| `bdc35c53` | root typecheck; CLI typecheck and tests; `git diff --check` | 0; 0 and 198 passed; clean |
+
+Not run at the present head: root `npm ci`, root `npm test`, the Room suites, and the browser suite after `bdc35c53` (which changes `packages/cli` only). The Room's stage 5 test file still has a title that says "label and first field"; its assertions pass.
+
 ### For the planner or hugh
 
 1. **`recover` has no client surface** (open point 49). The request does not name it. Without it, configuration recovery in a `v2` room needs a hand-signed envelope.
 2. **The checker service still signs `v: 1`**, and its notes are `v: 1` too. That is stage 4's, as `fa120186` says. Until then a `v2` room gets checks from members' own keys or from a bearer through `act`.
 3. **The cost of the catalogue read for the named methods** (choice 5): two requests per handle before its first named act, in every room. If that is too much for the CLI, the vocabulary could be kept in its room configuration; that is a small follow-up, not done here.
-4. **Which field names a thread** (open point 52). The name of a thread with no goal uses the opening act's first field by name. An application cannot choose the field. A declaration could name it, which would be a new member of the declaration and a change to R-DECL rules. It is not made here.
-5. **The demo's songs are both named "Start a song: c".** The UI now uses the one rule, and the first field of `start-song` by name is `key`. This is open point 52 seen in the demo. Two remedies are possible and neither is made here: a declaration names the field for its thread's name, or the rule prefers a field of type `text`.
+4. **Which field names a thread** (open point 52) is decided: the planner's `c37653e1` prefers the first text field by name, built at `3a03d405`. An application still cannot choose the field; a declaration that names it would be a new member of the declaration, and is not proposed here.
+5. **The demo's songs** are now named by their titles, "Start a song: Footprints" and "Start a song: So What", under that decision.
 6. **Toolsets for `acts` and `act`** come from the planner's MCP core contract. This stage does not assign them.
 7. **A named act repeated from a new handle after a change of vocabulary** is built under the vocabulary then in force, because a new handle has nothing kept. The room answers `idempotency-mismatch` and names the first act. Nothing is recorded twice. The CLI is not affected: its journal keeps the signed bytes. A stdio MCP server that restarts between the two calls is.
 8. **The Acts form offers every thread to an act whose declaration names no `threads`.** The room refuses such an act on any thread (`wrong-thread`). This is the UI lane's choice and is left as it was.
-9. **Stage 2's sealed review head** is still to be merged by the coordinator. It adds only its report section and its conversions list.
+9. **Stage 2 has moved since this branch was composed on `15fa7f4c`.** It is not landed. This branch is composed again on main after it lands. Among stage 2's later changes, a `recover` record now names its op in `recover`, not `op`, and check jobs name their kind and binding; neither is read by this stage's code, by inspection only.
+10. **The MCP core runtime** (request `9ca1d290`) was built from `b7b9d8df` on its own branch and does not have the commits since.
