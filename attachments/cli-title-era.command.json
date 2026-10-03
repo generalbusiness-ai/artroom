@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "../../node_modules/.bin/vitest",
+    "run",
+    "--config",
+    "vitest.config.ts",
+    "test/checker-title-era-624.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/cli-title-era.vitest.json"
+  ],
+  "cwd": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/repo/packages/cli",
+  "env": {
+    "ARTROOM_CHECKER_TITLE_EVIDENCE": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/observations"
+  },
+  "exit": 1,
+  "elapsed_s": 1.6768748760223389,
+  "compiler_before_runtime": true
+}

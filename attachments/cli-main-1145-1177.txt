@@ -1,0 +1,33 @@
+1145:           if (lane !== undefined && wants("lease") && fields.find((f) => f.name === "lease")!.required) {
+1146:             const h = await held(api, lane, room.member);
+1147:             if (isRefusal(h)) return h;
+1148:             body["lease"] = h.lease.generation; // G5:cli-lease
+1149:           }
+1150:           if (lane !== undefined && wants("expectedGeneration")) {
+1151:             const l = await api.lane(lane);
+1152:             if (l !== null) body["expectedGeneration"] = l.generation; // G5:cli-generation
+1153:           }
+1154:           if (lane !== undefined && shape === "version" && wants("head")) {
+1155:             const p = await api.proposal({ lane, generation: (target as { generation: number }).generation });
+1156:             if (p !== null) body["head"] = p.head; // G5:cli-head
+1157:           }
+1158:           const lacks = missing(fields, body);
+1159:           if (lacks.length > 0) throw new UsageError(`${kind} on target ${shape} also needs: ${lacks.map((n) => `--set ${n}=…`).join(" ")}. See: artroom acts ${kind}`); // G5:cli-missing
+1160:           sent = body;
+1161:           return api.act(kind, target, body, { binding: given as Binding, ...opts }); // G5:cli-binding-given
+1162:         },
+1163:       });
+1164:       if (isRefusal(out)) {
+1165:         const code = refused(ctx, out);
+1166:         if (!ctx.json && out.rule === "binding-stale") for (const l of await staleText(ctx, reader, kind, given)) ctx.io.err(l);
+1167:         return code;
+1168:       }
+1169:       const label = active?.acts[kind]?.declaration.label;
+1170:       const lines = [`Done: ${label !== undefined ? `${label} (${kind})` : kind}, recorded as ${out.id}.`];
+1171:       // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and its first text field by name.
+1172:       const opened = out as { lane?: unknown; goal?: unknown; effect?: { type?: unknown } };
+1173:       if (active !== undefined && opened.effect?.type === "opened" && typeof opened.lane === "string") {
+1174:         const title = threadTitle({ lane: opened.lane, goal: typeof opened.goal === "string" ? opened.goal : "" }, { meaning: meaningOf(active, kind), body: sent }); // G5:cli-thread
+1175:         lines.push(`Thread: ${title} (lane ${opened.lane}).`);
+1176:       }
+1177:       return print(ctx, out, () => lines);

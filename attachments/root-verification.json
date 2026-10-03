@@ -1,0 +1,76 @@
+{
+  "manifestSha256": "f4b22813a9c82f74a0b01d8a2f8756b5895ae2a115d5d5b7601e4d695534c3a4",
+  "manifestCount": 86,
+  "manifestBad": [],
+  "sourceCount": 42,
+  "sourceBad": [],
+  "trackedCount": 713,
+  "trackedBad": [],
+  "headAndTree": [
+    "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+    "6aa9573e82143ee7a573a4d5aeb6ba451a46e0d1"
+  ],
+  "status": "",
+  "actualScopes": [
+    {
+      "file": "client-title-focused.vitest.json",
+      "total": 50,
+      "passed": 50,
+      "failed": 0,
+      "pending": 0,
+      "assertionCount": 50,
+      "actualPassed": 50,
+      "actualFailed": 0
+    },
+    {
+      "file": "cli-declared-focused.vitest.json",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "pending": 0,
+      "assertionCount": 20,
+      "actualPassed": 20,
+      "actualFailed": 0
+    },
+    {
+      "file": "mcp-declared-focused.vitest.json",
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "pending": 0,
+      "assertionCount": 10,
+      "actualPassed": 10,
+      "actualFailed": 0
+    },
+    {
+      "file": "ui-title-focused-corrected.vitest.json",
+      "total": 57,
+      "passed": 57,
+      "failed": 0,
+      "pending": 0,
+      "assertionCount": 57,
+      "actualPassed": 57,
+      "actualFailed": 0
+    },
+    {
+      "file": "ui-acts-screen-focused.vitest.json",
+      "total": 17,
+      "passed": 17,
+      "failed": 0,
+      "pending": 0,
+      "assertionCount": 17,
+      "actualPassed": 17,
+      "actualFailed": 0
+    },
+    {
+      "file": "cli-title-era.vitest.json",
+      "total": 3,
+      "passed": 2,
+      "failed": 1,
+      "pending": 0,
+      "assertionCount": 3,
+      "actualPassed": 2,
+      "actualFailed": 1
+    }
+  ]
+}

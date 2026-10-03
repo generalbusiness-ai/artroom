@@ -1,0 +1,13 @@
+{
+  "expected_head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+  "actual_head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+  "tracked_count": 713,
+  "all_tracked_match_initial": true,
+  "all_tracked_match_immutable_head": true,
+  "differences_from_initial": [],
+  "differences_from_head": [],
+  "status_porcelain": "",
+  "private_overlays_removed": true,
+  "canonical_workspace_modified": false,
+  "confirmed_again_after_ui_acts_screen_gate": true
+}

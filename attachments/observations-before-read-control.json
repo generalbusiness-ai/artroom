@@ -1,0 +1,15 @@
+{
+  "out": {
+    "code": 0,
+    "out": "Done: Begin a tune (score), recorded as act_5_93e3442f.\nThread: Begin a tune: Nardis (lane act_5_93e3442f).",
+    "err": ""
+  },
+  "historical": {
+    "id": "act_5_93e3442f",
+    "seq": 5,
+    "policy": "act_4_f07f07cb",
+    "label": "Begin a tune",
+    "binding": "sha256:d116745a9144eb892a65c21acab4ed441c979c5fe7f3a2a1869b94c019f84058"
+  },
+  "bindingUnchanged": true
+}

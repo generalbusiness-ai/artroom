@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "npm",
+    "run",
+    "typecheck"
+  ],
+  "cwd": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/repo",
+  "exit": 0,
+  "elapsed_s": 12.009703159332275,
+  "private_fixtures": [
+    "packages/client/test/checker-title-624.test.ts",
+    "packages/cli/test/checker-title-era-624.test.ts"
+  ]
+}
