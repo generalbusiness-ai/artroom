@@ -9,10 +9,15 @@
  * parsed with Babel's TypeScript parser (TypeScript 7, the native compiler,
  * ships no in-process parser), and every property access, optional or not,
  * every element access by the literal name, and every destructuring that
- * takes `createToken` is a reach. Type positions (`RepoHandle["createToken"]`,
- * `typeof x.createToken`), declarations (the `RepoHandle` interface, the
- * in-memory fake's method) and string arguments are not. A name built at
- * runtime (`"create" + "Token"`) is out of reach of any scan.
+ * takes `createToken` is a reach. The scan descends into every node except
+ * the syntax TypeScript erases (`ERASED`: type positions and type-only
+ * declarations), so executable TypeScript (namespaces, enums,
+ * assertions, parameter properties, decorators) is scanned like JavaScript
+ * (review 993dce7a); a TypeScript node it does not know stops the scan.
+ * Type positions (`RepoHandle["createToken"]`, `typeof x.createToken`),
+ * declarations (the `RepoHandle` interface, the in-memory fake's method)
+ * and string arguments are not reaches. A name built at runtime
+ * (`"create" + "Token"`) is out of reach of any scan.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -37,6 +42,89 @@ const INSIDE: Readonly<Record<string, string>> = { "packages/git/src/publisher/c
 
 type AstNode = { readonly type: string; readonly loc?: { readonly start: { readonly line: number } } } & Record<string, unknown>;
 
+/**
+ * TypeScript syntax the compiler erases: type positions and type-only
+ * declarations. The scan does not descend into these, and only these
+ * (review 993dce7a).
+ */
+const ERASED: ReadonlySet<string> = new Set([
+  // Type annotations, parameters and arguments.
+  "TSTypeAnnotation",
+  "TSTypeParameterDeclaration",
+  "TSTypeParameterInstantiation",
+  "TSTypeParameter",
+  // Types.
+  "TSAnyKeyword",
+  "TSBigIntKeyword",
+  "TSBooleanKeyword",
+  "TSIntrinsicKeyword",
+  "TSNeverKeyword",
+  "TSNullKeyword",
+  "TSNumberKeyword",
+  "TSObjectKeyword",
+  "TSStringKeyword",
+  "TSSymbolKeyword",
+  "TSUndefinedKeyword",
+  "TSUnknownKeyword",
+  "TSVoidKeyword",
+  "TSThisType",
+  "TSFunctionType",
+  "TSConstructorType",
+  "TSTypeReference",
+  "TSTypePredicate",
+  "TSTypeQuery",
+  "TSTypeLiteral",
+  "TSArrayType",
+  "TSTupleType",
+  "TSOptionalType",
+  "TSRestType",
+  "TSNamedTupleMember",
+  "TSUnionType",
+  "TSIntersectionType",
+  "TSConditionalType",
+  "TSInferType",
+  "TSParenthesizedType",
+  "TSTypeOperator",
+  "TSIndexedAccessType",
+  "TSMappedType",
+  "TSTemplateLiteralType",
+  "TSLiteralType",
+  "TSImportType",
+  "TSQualifiedName",
+  // Type-only declarations and their members.
+  "TSInterfaceDeclaration",
+  "TSInterfaceBody",
+  "TSInterfaceHeritage",
+  "TSClassImplements",
+  "TSExpressionWithTypeArguments",
+  "TSTypeAliasDeclaration",
+  "TSPropertySignature",
+  "TSMethodSignature",
+  "TSIndexSignature",
+  "TSCallSignatureDeclaration",
+  "TSConstructSignatureDeclaration",
+  "TSDeclareFunction",
+  "TSDeclareMethod",
+  "TSNamespaceExportDeclaration",
+]);
+/** TypeScript syntax that is emitted: the scan descends into these like any JavaScript node. */
+const EXECUTABLE: ReadonlySet<string> = new Set([
+  "TSAsExpression",
+  "TSSatisfiesExpression",
+  "TSNonNullExpression",
+  "TSTypeAssertion",
+  "TSInstantiationExpression",
+  "TSEnumDeclaration",
+  "TSEnumBody",
+  "TSEnumMember",
+  "TSModuleDeclaration",
+  "TSModuleBlock",
+  "TSParameterProperty",
+  "TSExportAssignment",
+  "TSImportEqualsDeclaration",
+  "TSExternalModuleReference",
+]);
+
 const NAME = "createToken";
 /** A key or property that is the literal name: an identifier (not computed), a string, or a template with no substitution. */
 function names(key: unknown, computed: boolean): boolean {
@@ -53,14 +141,22 @@ function names(key: unknown, computed: boolean): boolean {
 
 /** Every reach of `createToken` in one source: its line, and the function it is inside, if any. */
 function reaches(text: string, jsx = false): { line: number; inside: string | null }[] {
-  const ast = parse(text, { sourceType: "module", plugins: jsx ? ["typescript", "jsx"] : ["typescript"], errorRecovery: false }) as unknown as AstNode;
+  const ast = parse(text, { sourceType: "module", plugins: jsx ? ["typescript", "jsx", "decorators"] : ["typescript", "decorators"], errorRecovery: false }) as unknown as AstNode;
   const out: { line: number; inside: string | null }[] = [];
   const walk = (n: unknown, inside: string | null) => {
     if (Array.isArray(n)) return n.forEach((x) => walk(x, inside));
     if (!n || typeof n !== "object" || typeof (n as AstNode).type !== "string") return;
     const node = n as AstNode;
-    // Types never reach a value.
-    if (node.type.startsWith("TS") && node.type !== "TSAsExpression" && node.type !== "TSNonNullExpression" && node.type !== "TSSatisfiesExpression" && node.type !== "TSTypeAssertion" && node.type !== "TSInstantiationExpression") return;
+    // Erased syntax never reaches a value: type positions and type-only declarations. (`declare` declarations are
+    // scanned too: an ambient context holds only types, which are erased within it.)
+    if (ERASED.has(node.type)) return;
+    // Any other TypeScript node must be known to be emitted, or the scan stops: a new kind is classified, never skipped.
+    if (node.type.startsWith("TS") && !EXECUTABLE.has(node.type)) throw new Error(`the scan does not know TypeScript node ${node.type}: classify it as erased or executable`);
+    // `import alias = Namespace.createToken` takes a value too.
+    if (node.type === "TSImportEqualsDeclaration" && node["importKind"] !== "type") {
+      const ref = node["moduleReference"] as AstNode;
+      if (ref.type === "TSQualifiedName" && names(ref["right"], false)) out.push({ line: node.loc?.start.line ?? 0, inside });
+    }
     const fn = node.type === "FunctionDeclaration" ? (((node["id"] as AstNode | null)?.["name"] as string | undefined) ?? inside) : inside;
     const line = node.loc?.start.line ?? 0;
     if ((node.type === "MemberExpression" || node.type === "OptionalMemberExpression") && names(node["property"], node["computed"] === true)) out.push({ line, inside: fn });
@@ -134,14 +230,19 @@ describe("mint lane C (6): who reaches createToken", () => {
     const text = readFileSync(join(ROOT, path), "utf8");
     const lines = text.split("\n");
     const marked = lines.flatMap((l, i) => (l.endsWith("// reach") ? [i + 1] : []));
-    expect(marked).toHaveLength(10);
+    expect(marked).toHaveLength(20);
     expect(lines.some((l) => l.includes("repo.createToken?.(\"read\", 60); // reach"))).toBe(true);
     expect(violations([{ path, text }])).toEqual(marked.map((n) => `${path}:${n}: reaches createToken outside the allowed files`));
   });
 
+  it("the checker's namespace probe in a new production file fails", () => {
+    const text = "import type { RepoHandle } from '@generalbusiness/artroom-git';\nexport namespace CheckerMintProbe {\n  export const issue = (repo: RepoHandle) => repo.createToken?.('read', 60);\n}\n";
+    expect(violations([{ path: "packages/room/src/checker-mint-scan-probe.ts", text }])).toEqual(["packages/room/src/checker-mint-scan-probe.ts:3: reaches createToken outside the allowed files"]);
+  });
+
   it("the same file at an allowed path fails on its count, and a reach outside withForkToken in publisher/client.ts fails", () => {
     const text = readFileSync(join(ROOT, "packages/room/test/node/fixtures/create-token-forms.ts"), "utf8");
-    expect(violations([{ path: "packages/git/src/snapshot/repos.ts", text }])).toEqual(["packages/git/src/snapshot/repos.ts: 10 reaches of createToken, allowed 1"]);
+    expect(violations([{ path: "packages/git/src/snapshot/repos.ts", text }])).toEqual(["packages/git/src/snapshot/repos.ts: 20 reaches of createToken, allowed 1"]);
     const client = readFileSync(join(ROOT, "packages/git/src/publisher/client.ts"), "utf8");
     const swapped = client.replace("repo.createToken(\"read\", TOKEN_TTL.pin)", "repo.revokeToken(\"read\")") + "\nexport const sneaky = (r: RepoHandle) => r.createToken(\"write\", 60);\n";
     expect(violations([{ path: "packages/git/src/publisher/client.ts", text: swapped }])).toEqual([expect.stringMatching(/^packages\/git\/src\/publisher\/client\.ts:\d+: reaches createToken outside withForkToken$/)]);

@@ -19,7 +19,7 @@ import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import type { Check, CheckerConfig, CheckJob, Claim, Landing, OpId, Proposal, Refusal, Result } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import { setAlarmDelay, type Room } from "../../src/index.ts";
-import { jobTokensDue, setJobTokenWait } from "../../src/jobs.ts";
+import { JOB_BATCH, JOBS_DUE_SQL, JOB_TOKENS_DUE_SQL, jobTokensDue, setJobTokenWait } from "../../src/jobs.ts";
 import { artifactsErrors, type FakeRepo } from "../../src/memory/artifacts.ts";
 import { addMember, Client, clock, day, makeRoom, pushChange, type TestRoom } from "./support.ts";
 
@@ -939,5 +939,57 @@ describe("mint lane C: ended job tokens and due jobs are taken in bounded batche
       clock.now += 1_000;
       await inDO(r, (room) => room.core.steps.jobs());
       expect(await done()).toHaveLength(25);
+    }));
+});
+
+describe("mint lane C: the due indexes reach a room stored before them (review 993dce7a)", () => {
+  /** The query plan's steps for one of the production due queries. */
+  const plan = (room: Room, q: string) => room.core.sql.all(`EXPLAIN QUERY PLAN ${q}`, clock.now, JOB_BATCH).map((x) => String(x["detail"]));
+
+  it("a version-1 room reopened at version 2: both indexes installed, every row, owner, deadline and the history kept, and the due batches read by index with no sort", () =>
+    ahead(async () => {
+      const before = await makeRoom();
+      const due = clock.now + 3600_000;
+      const snapshot = (room: Room) => ({
+        tokens: room.core.sql.all("SELECT * FROM job_tokens ORDER BY token_id"),
+        jobs: room.core.sql.all("SELECT * FROM check_jobs ORDER BY id"),
+        ledger: room.core.mints.duties({ limit: 1000 }).records,
+        head: room.core.headSeq(),
+        meta: room.core.sql.all("SELECT k, v FROM meta WHERE k NOT IN ('loop_backoff') ORDER BY k"),
+      });
+      // As a room stored before this lane: schema version 1, no due indexes, a held job token, an owed job, an unknown mint.
+      const was = await inDO(before, async (room, state) => {
+        await room.core.idle();
+        expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 2 }]);
+        room.core.sql.all("DROP INDEX job_tokens_due");
+        room.core.sql.all("DROP INDEX check_jobs_due");
+        room.core.sql.all("UPDATE schema_version SET v = 1 WHERE id = 1");
+        room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tok_owned', ?, ?, 'held')", due, due);
+        room.core.sql.all(
+          "INSERT INTO check_jobs (id, owner, lane, generation, obligation, checker, config, integration, base, state, next_ms) VALUES ('job_old', 'op_x', 'lane_x', 1, 'obl_x', 'unit', ?, ?, ?, 'owed', ?)",
+          `sha256:${"1".repeat(64)}`,
+          "a".repeat(40),
+          "b".repeat(40),
+          due,
+        );
+        room.core.mints.adopt([{ purpose: "job:job_old_1", scope: "read", sentAt: clock.now, notAfter: due, note: "an unknown mint kept across the upgrade" }]);
+        expect(plan(room, JOB_TOKENS_DUE_SQL).join("; ")).toMatch(/SCAN job_tokens/);
+        await state.storage.deleteAlarm();
+        return snapshot(room);
+      });
+      const r = await restarted(before);
+      await inDO(r, (room) => {
+        expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 2 }]);
+        expect(room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('job_tokens_due', 'check_jobs_due') ORDER BY name")).toEqual([{ name: "check_jobs_due" }, { name: "job_tokens_due" }]);
+        expect(snapshot(room)).toEqual(was);
+        const tokens = plan(room, JOB_TOKENS_DUE_SQL);
+        const jobs = plan(room, JOBS_DUE_SQL);
+        // One indexed search each: no scan, and no temporary B-tree for the order.
+        expect(tokens).toEqual(["SEARCH job_tokens USING COVERING INDEX job_tokens_due (next_ms<?)"]);
+        expect(jobs).toEqual(["SEARCH check_jobs USING INDEX check_jobs_due (next_ms<?)"]);
+      });
+      // Reopened again: nothing runs twice.
+      const again = await restarted(r);
+      await inDO(again, (room) => expect(snapshot(room)).toEqual(was));
     }));
 });

@@ -57,6 +57,9 @@ export const JOB_IDLE_MS = 300_000;
 export const TOKEN_MARGIN_S = 5;
 /** Most jobs one jobs step issues, and most ended job tokens one revocation pass tries, earliest due first (R-MINT-7). */
 export const JOB_BATCH = 20;
+/** The due batches, read by the due indexes (`DUE_INDEXES`, migration 2): bind the room clock and the batch size. */
+export const JOBS_DUE_SQL = "SELECT * FROM check_jobs WHERE state != 'done' AND next_ms <= ? ORDER BY next_ms, rowid LIMIT ?";
+export const JOB_TOKENS_DUE_SQL = "SELECT token_id FROM job_tokens WHERE next_ms <= ? ORDER BY next_ms, token_id LIMIT ?";
 
 interface JobRow {
   readonly id: `job_${string}`;
@@ -169,7 +172,7 @@ export async function issueJobs(core: RoomCore): Promise<void> {
     core.sql.all("UPDATE check_jobs SET next_ms = ? WHERE state != 'done' AND next_ms <= ?", now + JOB_IDLE_MS, now);
     return;
   }
-  for (const r of core.sql.all("SELECT * FROM check_jobs WHERE state != 'done' AND next_ms <= ? ORDER BY next_ms, rowid LIMIT ?", now, JOB_BATCH)) {
+  for (const r of core.sql.all(JOBS_DUE_SQL, now, JOB_BATCH)) {
     const j: JobRow = {
       id: str(r, "id") as JobRow["id"],
       owner: str(r, "owner") as OpId,
@@ -253,7 +256,7 @@ const tokenPasses = new WeakMap<RoomCore, { until: number }>();
  */
 export function revokeJobTokens(core: RoomCore): void {
   if (!core.founded || tokenPasses.has(core)) return;
-  const batch = core.sql.all("SELECT token_id FROM job_tokens WHERE next_ms <= ? ORDER BY next_ms, token_id LIMIT ?", core.now(), JOB_BATCH).map((r) => str(r, "token_id")!);
+  const batch = core.sql.all(JOB_TOKENS_DUE_SQL, core.now(), JOB_BATCH).map((r) => str(r, "token_id")!);
   if (batch.length === 0) return;
   const pass = { until: core.now() + (tokenWaits.get(core) ?? MINT_WAIT_MS) };
   tokenPasses.set(core, pass);

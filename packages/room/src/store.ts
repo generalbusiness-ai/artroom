@@ -111,9 +111,6 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS evidence_lane ON evidence (lane, generation)`,
   `CREATE INDEX IF NOT EXISTS keys_member ON keys (member)`,
   `CREATE INDEX IF NOT EXISTS check_snapshots_commit ON check_snapshots (commit_sha)`,
-  // Bounded batches of due work, earliest due first (mint lane C, R-MINT-7): job tokens owed revocation, and jobs not done.
-  `CREATE INDEX IF NOT EXISTS job_tokens_due ON job_tokens (next_ms, token_id)`,
-  `CREATE INDEX IF NOT EXISTS check_jobs_due ON check_jobs (next_ms) WHERE state != 'done'`,
 ];
 
 /** One schema step: idempotent, so a step that ran without recording its version runs again harmlessly. */
@@ -143,7 +140,26 @@ export function migrate(sql: Sql, steps: readonly Migration[]): number {
 }
 
 /** The Room's migrations. A new table, column or index is added only here, as a version after the base. */
-export const ROOM_MIGRATIONS: readonly Migration[] = [{ version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) }];
+/**
+ * The due indexes (mint lane C, R-MINT-7): bounded batches of due work,
+ * earliest due first, read by index. Job tokens owed revocation, and jobs
+ * not done (a partial index, which the due queries' `state != 'done'` uses).
+ * Idempotent, and they change no row.
+ */
+export const DUE_INDEXES = [
+  `CREATE INDEX IF NOT EXISTS job_tokens_due ON job_tokens (next_ms, token_id)`,
+  `CREATE INDEX IF NOT EXISTS check_jobs_due ON check_jobs (next_ms) WHERE state != 'done'`,
+] as const;
+
+/**
+ * The Room's schema steps, run once each, in order, by `migrate`. Request
+ * d29c09fa (in review) also adds a version 2; whichever lands second
+ * renumbers its step to 3 and tests the composed chain from version 1.
+ */
+export const ROOM_MIGRATIONS: readonly Migration[] = [
+  { version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) },
+  { version: 2, name: "due indexes (mint lane C, request 5ff58c9a)", up: (sql) => DUE_INDEXES.forEach((q) => sql.all(q)) },
+];
 
 export function createSchema(sql: Sql): void {
   migrate(sql, ROOM_MIGRATIONS);
