@@ -16,6 +16,19 @@
  *   event, when the act it names was admitted; for a `check-carried` event,
  *   the version the event names (R-CARRY-13).
  *
+ * Declared acts (R-DECL-25, stage 3). Each act and recorded refusal is
+ * judged under `D(s)`, the document in force at its seq: under a `v1`
+ * document by the legacy vocabulary `artroom-legacy-v1`, exactly as before;
+ * under a `v2` document by its declarations and the steps version it names
+ * (declared.ts): kind (`kind-undeclared`), binding (`binding-stale`), body
+ * and target (`body-invalid`) and who may sign. For entries judged under a
+ * `v2` document verify derives the evaluation calls the room had to make and
+ * rebuilds their inputs from the fold (calls.ts, fold.ts):
+ * `decision-missing`, `decision-extra`, `context-mismatch`. A document
+ * naming a steps version or evaluator profile this verifier does not carry
+ * stops verification at the first entry that needs it (`steps-unsupported`,
+ * `profile-unsupported`): a limit of the verifier, reported, not a failure.
+ *
  * Untrusted content is decoded at one boundary (`decode.ts`) before any field
  * is read. Malformed content is a named failure, `malformed`, and the
  * verified prefix ends before it. Only reading the repository can throw.
@@ -42,16 +55,20 @@ import type {
   Sha,
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
-import { replay } from "@generalbusiness/artroom-policy";
+import type { AnyPolicyDocument, Authority, DeclaredVerifyFailure, Envelope, LaneId, PathChange, PolicyDocumentV2, Step, VerifyProofLimit, VerifyUnsupported } from "@generalbusiness/artroom-contract";
+import { STEPS_VERSIONS, replay, validatePolicyV2, type InputOf } from "@generalbusiness/artroom-policy";
 import { canonicalize } from "./canonical.ts";
 import { digestJson, sha256Hex, verifySig } from "./crypto.ts";
 import { LOG_REF, ROOT, contentOf, entryId, roomIdOf } from "./entries.ts";
 import { parseCommit, type GitReader } from "./git.ts";
-import { decodeCheckpoint, decodeEntry, decodeRetained, textOf } from "./decode.ts";
+import { Unsupported, decodeCheckpoint, decodeEntry, decodeRetained, textOf } from "./decode.ts";
 import { CHUNK_MISMATCH, commitLines, readLogCommit } from "./tree.ts";
 import { OBJECT_BOUND } from "./layout.ts";
 import { checkedTime } from "./time.ts";
 import { RosterReplay, type AuthorityFailure } from "./roster.ts";
+import { CARRIED_STEPS, LEGACY, bodyProblem, kindProblem, stepsOf, vocabularyOf, whoOf, type StepsSemantics, type Vocabulary } from "./declared.ts";
+import { Fold, gitChanges, missingChanges, type Thread, type Version, type Witness } from "./fold.ts";
+import { actorOf, carryCall, compareCalls, landCall, memberActor, notifyCall, refuseCall, requireCall, stoppedAt, type Call, type World } from "./calls.ts";
 
 export type VerifyReason =
   // the ref and its commits
@@ -101,7 +118,9 @@ export type VerifyReason =
   | "input-missing"
   | "policy-version-mismatch"
   | "stamp-mismatch"
-  | "policy-decision-mismatch";
+  | "policy-decision-mismatch"
+  // declared acts (R-DECL-25)
+  | DeclaredVerifyFailure;
 
 export interface VerifyFailure {
   readonly reason: VerifyReason;
@@ -131,6 +150,16 @@ export interface VerifyReport {
   readonly publishedThrough: Seq;
   readonly decisionsReplayed: number;
   readonly failures: readonly VerifyFailure[];
+  /**
+   * Set when a document names a steps version or evaluator profile this
+   * verifier does not carry (R-DECL-14, R-DECL-22): verification stopped at
+   * `seq`, and `verifiedThrough` is the entry before it. A limit of this
+   * verifier, not a finding against the log; `ok` is false, because the log
+   * was not verified to its end.
+   */
+  readonly unsupported: { readonly reason: VerifyUnsupported; readonly seq: Seq; readonly detail: string } | null;
+  /** Proof limits met at named entries (R-DECL-25): reported, not failures. */
+  readonly limits: readonly { readonly reason: VerifyProofLimit; readonly seq: Seq; readonly detail: string }[];
   /** Plain statements of what this verification cannot prove. */
   readonly cannotProve: readonly string[];
 }
@@ -151,6 +180,14 @@ export interface VerifyOptions {
   readonly ref?: string;
   /** Replay recorded policy decisions with the policy package. Default true. */
   readonly replayDecisions?: boolean;
+  /**
+   * The steps versions this verifier carries, by name (R-DECL-14). Default:
+   * this platform's (`CARRIED_STEPS`). A platform release adds a version; a
+   * test may register one to show a log judged across two.
+   */
+  readonly steps?: Readonly<Record<string, StepsSemantics>>;
+  /** The evaluator profiles this verifier carries (R-DECL-22). Default: `artroom-jsonata-v1`. */
+  readonly profiles?: readonly string[];
 }
 
 /**
@@ -182,6 +219,11 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     "Whether any act was admitted after the last published entry: unpublished acts cannot be proven to exist or not to exist.",
     "Lanes, leases, obligations and landings (R-LOG-15): verify checks each act's authority and replays every policy decision, but does not re-derive lane, lease, obligation or landing transitions, or the effects in receipts.",
     "The room clock: expiry checks use each entry's recorded `at`, which only the room key vouches for.",
+    "Refusals that are never recorded (R-ADM-8): kind-undeclared, binding-stale and the other refusals of admission steps 1 to 6 leave no entry, so verify can neither see nor prove them.",
+    "Under a v1 document, entries are judged by the legacy vocabulary as before declared acts: the decisions present are replayed, but the calls the room had to make are not derived (R-DECL-1).",
+    "Under a v2 document, the required evaluation calls are derived and rebuilt from the thread and roster fold, which takes receipt effects as recorded. What that fold cannot yet witness is taken from the retained context: a land input's obligations and reviews, a notify directory's reviewers, and each carry call's evidence, changes and facts; and which earlier verdicts carry calls were owed for is not derived (stage 6).",
+    "A version's changed paths are checked against Git objects, from the base its context names to its head, when the objects are present; without them they are the retained context's, reported as git-unwitnessed. That the base is the merge base of main and the head needs main's history, which the log does not carry.",
+    "Whether the room prepared a check's integration, for a version or landing with no prepared event: rooms seal prepared events from stage 4 (R-DECL-20); verify checks a check against them where they are present.",
   ];
   const empty = (extra: Partial<VerifyReport> = {}): VerifyReport => ({
     ok: false,
@@ -195,6 +237,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     publishedThrough: -1,
     decisionsReplayed: 0,
     failures,
+    unsupported: null,
+    limits: [],
     cannotProve,
     ...extra,
   });
@@ -341,7 +385,9 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     return bytes !== undefined && sha256Hex(bytes) === RETAINED.exec(path)?.[2];
   };
   type Contract = "input" | "json" | "policy" | "checker";
-  type Decoded = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly detail: string };
+  type Decoded = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly detail: string; readonly unsupported?: VerifyUnsupported };
+  const stepsCarried = opts.steps ?? CARRIED_STEPS;
+  const carried = { steps: Object.keys(stepsCarried), profiles: opts.profiles ?? ["artroom-jsonata-v1"] };
   const decodings = new Map<`${Contract} ${Digest}`, Decoded>();
   /** `bytes`, named by `digest`, decoded under `contract`; once per contract and digest. */
   const decodeAs = (contract: Contract, digest: Digest, bytes: Uint8Array): Decoded => {
@@ -349,9 +395,9 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     let d = decodings.get(key);
     if (!d) {
       try {
-        d = { ok: true, value: contract === "input" ? decodeRetained("input", bytes) : contract === "json" ? decodeRetained("json", bytes) : contract === "policy" ? decodeRetained("policy", bytes) : decodeRetained("checker", bytes) };
+        d = { ok: true, value: contract === "input" ? decodeRetained("input", bytes) : contract === "json" ? decodeRetained("json", bytes) : contract === "policy" ? decodeRetained("policy", bytes, carried) : decodeRetained("checker", bytes) };
       } catch (e) {
-        d = { ok: false, detail: (e as Error).message };
+        d = { ok: false, detail: (e as Error).message, ...(e instanceof Unsupported ? { unsupported: e.reason } : {}) };
       }
       decodings.set(key, d);
     }
@@ -384,26 +430,40 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
    */
   const lookup = (contract: "input" | "policy" | "checker", digest: Digest, missing: "input-missing" | "policy-missing" | "checker-missing"):
     | { readonly ok: true; readonly value: unknown }
-    | { readonly ok: false; readonly reason: VerifyReason; readonly detail: string } => {
+    | { readonly ok: false; readonly reason: VerifyReason | VerifyUnsupported; readonly detail: string } => {
     const path = contract === "input" ? inputPath(digest) : policyPath(digest);
     const what = contract === "input" ? "the replay context" : contract === "policy" ? "policy" : "checker configuration";
     if (!holds(top, path)) return { ok: false, reason: missing, detail: `${what} ${digest} is not published` };
     const d = decodeAs(contract, digest, top.files.get(path)!);
-    return d.ok ? d : { ok: false, reason: "malformed", detail: `${path}: ${d.detail}` };
+    return d.ok ? d : { ok: false, reason: d.unsupported ?? "malformed", detail: `${path}: ${d.detail}` };
   };
 
   // -------------------------------------------------------------- entries
   const roster = new RosterReplay(genesis);
+  const fold = new Fold();
   let operator: KeyId | null = null;
   const idem = new Map<string, Seq>();
   const notified = new Set<string>();
-  /** Each activated version: its document, and its checker configurations' digests by checker name (R-POL-9). */
-  const policyByVersion = new Map<PolicyVersion, { doc: PolicyDocument; digest: Digest; checkers: ReadonlyMap<string, Digest> }>();
+  type Lacking = { readonly unsupported: VerifyUnsupported; readonly detail: string };
+  /**
+   * Each activated version: its document, its checker configurations'
+   * digests by checker name (R-POL-9), and the vocabulary it means
+   * (R-DECL-1), or the version this verifier lacks (R-DECL-14, R-DECL-22).
+   */
+  const policyByVersion = new Map<PolicyVersion, { doc: AnyPolicyDocument | null; digest: Digest; checkers: ReadonlyMap<string, Digest>; vocab: Vocabulary | Lacking }>();
   let activePolicy: PolicyVersion | null = null;
   /** The policy in force when each entry was admitted, by seq. */
   const policyAt: (PolicyVersion | null)[] = [];
   let decisionsReplayed = 0;
+  let unsupported: VerifyReport["unsupported"] = null;
+  const limits: { reason: VerifyProofLimit; seq: Seq; detail: string }[] = [];
+  /** For each accepted act under a v2 document, the notify input the room built when it sealed it (R-LOG-13). */
+  const notifyInputs = new Map<string, { input: InputOf<"notify">; roles: ReturnType<RosterReplay["roles"]>; version: { lane: string; generation: number } | null }>();
   const checkpointsByCommit = new Map(views.slice(0, basis + 1).map((v) => [v.sha, v.checkpoint] as const));
+
+  /** The vocabulary of a version: the legacy one before any activation (R-POL-7 as amended). */
+  const vocabAt = (version: PolicyVersion | null): Vocabulary | Lacking => (version === null ? LEGACY : policyByVersion.get(version)!.vocab);
+  const lacking = (v: Vocabulary | Lacking): v is Lacking => "unsupported" in v; // V:unsupported
 
   /**
    * Replay `decisions` under `version`, the one policy they must name. The
@@ -435,14 +495,14 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       }
       const context = lookup("input", digest, "input-missing");
       if (!context.ok) {
-        fail({ seq, reason: context.reason, detail: context.detail });
+        fail({ seq, reason: context.reason as VerifyReason, detail: context.detail });
         return false;
       }
       needs.push({ seq, path: inputPath(digest), reason: "input-missing" });
       const policy = policyByVersion.get(version!)!;
       let replayed: readonly Decision[];
       try {
-        const result = await replay({ doc: policy.doc, version: version! }, context.value as ReplayContext);
+        const result = await replay({ doc: policy.doc as PolicyDocument, version: version! }, context.value as ReplayContext);
         replayed = result.evaluations.map((e) => e.decision);
       } catch (e) {
         fail({ reason: "policy-decision-mismatch", seq, detail: `replay failed: ${(e as Error).message}` });
@@ -457,10 +517,139 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     return true;
   };
 
+  /** The retained replay context for a digest, recording that entry `seq` needs it (R-LOG-9). */
+  const retainedFor = (seq: Seq) => (digest: Digest) => {
+    const c = lookup("input", digest, "input-missing");
+    if (c.ok) needs.push({ seq, path: inputPath(digest), reason: "input-missing" });
+    return c.ok ? c : { ok: false as const, reason: c.reason as "input-missing" | "malformed", detail: c.detail };
+  };
+
+  /** Make an entry's required calls under a v2 document and compare them with its decisions (calls.ts). */
+  const declaredCalls = async (seq: Seq, plan: readonly Call[], recorded: readonly Decision[], version: PolicyVersion, vocab: Extract<Vocabulary, { kind: "declared" }>, stopAtRefusal = true) => {
+    if (opts.replayDecisions === false) return { ok: true as const, refusal: null, replayed: 0 };
+    const r = await compareCalls(
+      plan,
+      recorded,
+      {
+        policy: { doc: vocab.doc as unknown as PolicyDocument, version },
+        retained: retainedFor(seq),
+        // R-DECL-22: the stamp names the profile of the document in force, with the genesis's pinned jsonata.
+        stampOk: (d) => d.stamp.profile === vocab.doc.profile && d.stamp.jsonata === genesis.profile.jsonata,
+      },
+      stopAtRefusal,
+    );
+    if (r.ok) decisionsReplayed += r.replayed;
+    return r;
+  };
+
+  /**
+   * A version's witness (note 4.3): the base and changed paths of the first
+   * retained context in `recorded` that carries a proposal, checked against
+   * Git objects when they are present. Changes Git shows that the context
+   * leaves out make the witness Git's, so that context fails as
+   * `context-mismatch`. Without the objects the context's are taken, and the
+   * entry is reported `git-unwitnessed`.
+   */
+  const witnessOf = async (seq: Seq, recorded: readonly Decision[], head: Sha): Promise<Witness | null> => {
+    let from: { base: Sha; changed: readonly PathChange[] } | null = null;
+    for (const d of recorded) {
+      const c = lookup("input", d.input, "input-missing");
+      const p = c.ok ? (c.value as { input?: { proposal?: { base?: unknown; changed?: unknown } | null } }).input?.proposal : null;
+      if (p && typeof p.base === "string" && Array.isArray(p.changed)) {
+        from = { base: p.base as Sha, changed: p.changed as PathChange[] };
+        break;
+      }
+    }
+    if (!from) return null;
+    const git = await gitChanges(reader, from.base, head);
+    if (git === null) {
+      limits.push({ reason: "git-unwitnessed", seq, detail: `the Git objects of ${from.base} and ${head} are not present, so the version's changed paths are the retained context's` });
+      return from;
+    }
+    const missing = missingChanges(from.changed, git);
+    return missing.length ? { base: from.base, changed: git } : from; // V:git-witness
+  };
+
+  /** Find a version's witness, from its own act's decisions or else from `recorded`, if it has none yet. */
+  const resolve = async (seq: Seq, v: Version, recorded: readonly Decision[]): Promise<void> => {
+    if (v.witness) return;
+    const own = entries[Number(v.act.split("_")[1])];
+    const first = own && own.entry.type === "act" ? own.entry.receipt.decisions : [];
+    v.witness = (await witnessOf(seq, first, v.head)) ?? (await witnessOf(seq, recorded, v.head));
+  };
+
+  /** The thread an act names, by its target (R-DECL-4): none for `none`, the anchored entry's for `entry`. */
+  const threadOf = (env: Envelope): Thread | null | undefined => {
+    const t = env.target as { lane?: unknown; act?: unknown } | null;
+    if (t === null) return null;
+    if (typeof t.lane === "string") return fold.thread(t.lane) ?? undefined;
+    if (typeof t.act === "string") return fold.entryLane.has(t.act as ActId) ? fold.thread(fold.entryLane.get(t.act as ActId)) : undefined;
+    return undefined;
+  };
+
+  /**
+   * The calls admission had to make for an act under a v2 document
+   * (R-ADM-1 steps 8 and 9 as amended; note 4.4), and the witness of a version
+   * it makes. `undefined` when the act names a thread or entry the log never
+   * had, which the room would have refused (`lane-unknown`).
+   */
+  const actPlan = (env: Envelope, by: Authority, steps: readonly Step[], doc: PolicyDocumentV2, witness: Witness | null): Call[] | undefined => {
+    const w: World = { fold, roster, doc: doc as unknown as PolicyDocument };
+    if ((env.kind as string) === "recover") return []; // R-DECL-21: no policy rules on configuration recovery
+    if (env.kind === "roster") return [refuseCall(w, env, by, null, null)];
+    const thread = threadOf(env);
+    if (thread === undefined) return undefined;
+    if (env.kind === "renew") return [refuseCall(w, env, by, thread, null)];
+    if (steps.includes("version")) {
+      if (!thread) return undefined;
+      const head = (env.body as { head: Sha }).head;
+      const proposal = Fold.proposal(w.doc, { generation: thread.generation + 1, head, witness });
+      const plan = [refuseCall(w, env, by, thread, proposal), requireCall(w, actorOf(roster, by), thread, proposal), carryCall(thread, proposal)];
+      if (steps.includes("land")) plan.push(landCall(w, actorOf(roster, by), thread, proposal, "land"));
+      return plan;
+    }
+    if (steps.includes("land")) {
+      const target = env.target as { lane: LaneId; generation: number };
+      const v = fold.version(target.lane, target.generation);
+      if (!thread || !v) return undefined;
+      return [refuseCall(w, env, by, thread, null), landCall(w, actorOf(roster, by), thread, Fold.proposal(w.doc, v), "land")];
+    }
+    return [refuseCall(w, env, by, thread, null)];
+  };
+
+  /**
+   * The notify input the room builds when it seals an act (R-LOG-13): after
+   * the act's own effects, on its thread, with the version it made or acts
+   * on. The proposal is resolved when the `notified` event is read, once the
+   * version's witness is known.
+   */
+  const notifySnapshot = (id: ActId, env: Envelope, by: Authority, steps: readonly Step[]) => {
+    const t = env.target as { lane?: unknown; generation?: unknown } | null;
+    const lane = fold.threads.get(id) ?? threadOf(env) ?? null;
+    const op = (env.kind as string) === "recover" ? (env.body as { op?: unknown }).op : null;
+    let version: { lane: string; generation: number } | null = null;
+    if ((steps.includes("version") || op === "version") && lane) version = { lane: lane.id, generation: lane.generation };
+    else if ((steps.some((s) => s === "review" || s === "check" || s === "land") || op === "approve" || op === "land") && typeof t?.lane === "string" && typeof t.generation === "number")
+      version = { lane: t.lane, generation: t.generation };
+    const input: InputOf<"notify"> = {
+      kind: "notify",
+      act: { id, kind: env.kind as never, target: env.target as never, body: env.body as never },
+      actor: actorOf(roster, by),
+      lane: lane ? fold.policyLane(lane, true) : null,
+      proposal: null,
+    };
+    return { input, roles: roster.roles(), version };
+  };
+
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i]!;
     const bad = (reason: VerifyReason, detail: string) => {
       fail({ reason, seq: i, detail });
+      firstBad = Math.min(firstBad, i);
+    };
+    /** Stop at an entry that needs a version this verifier lacks: a limit, not a failure (R-DECL-25). */
+    const stop = (v: Lacking) => {
+      unsupported = { reason: v.unsupported, seq: i, detail: v.detail };
       firstBad = Math.min(firstBad, i);
     };
     policyAt[i] = activePolicy;
@@ -512,33 +701,111 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         }
       } else if (ev.type === "policy-activated") {
         const doc = lookup("policy", ev.policy, "policy-missing");
+        if (!doc.ok && (doc.reason === "steps-unsupported" || doc.reason === "profile-unsupported")) {
+          // A document this verifier cannot read: entries under it stop verification (R-DECL-14, R-DECL-22).
+          needs.push({ seq: i, path: policyPath(ev.policy), reason: "policy-missing" });
+          policyByVersion.set(id, { doc: null, digest: ev.policy, checkers: new Map(), vocab: { unsupported: doc.reason, detail: `policy ${ev.policy}, activated at ${i}: ${doc.detail}` } });
+          activePolicy = id;
+          fold.applySystem(id, ev);
+          continue;
+        }
         if (!doc.ok) {
-          bad(doc.reason, doc.detail);
+          bad(doc.reason as VerifyReason, doc.detail);
           break;
         }
         // Every checker configuration it names is published, and is one (R-POL-9, R-LOG-9).
-        const missing = ev.checkers.map((c) => ({ c, r: lookup("checker", c.config, "checker-missing") })).find((x) => !x.r.ok);
+        const configs = ev.checkers.map((c) => ({ c, r: lookup("checker", c.config, "checker-missing") }));
+        const missing = configs.find((x) => !x.r.ok);
         if (missing && !missing.r.ok) {
-          bad(missing.r.reason, `checker ${missing.c.name}: ${missing.r.detail}`);
+          bad(missing.r.reason as VerifyReason, `checker ${missing.c.name}: ${missing.r.detail}`);
           break;
+        }
+        const d = doc.value as AnyPolicyDocument;
+        let vocab: Vocabulary = LEGACY;
+        if (d.format === "artroom-policy-v2") {
+          // R-DECL-8, R-DECL-18, R-DECL-24: valid in this room, with its historical opening kinds and its checkers.
+          const named = STEPS_VERSIONS.includes(d.steps) ? d : { ...d, steps: STEPS_VERSIONS[0]! };
+          const checked = validatePolicyV2(named, { historicalOpeningKinds: [...fold.openingKinds], checkers: Object.fromEntries(configs.map(({ c, r }) => [c.name, (r as { value: unknown }).value])) });
+          if (!checked.ok) {
+            bad("malformed", `the activated document is not valid in this room: ${checked.problems[0]}`); // V:activation-valid
+            break;
+          }
+          vocab = await vocabularyOf(d, stepsCarried[d.steps]!);
+        } else {
+          // A v1 document's checkers are artroom-checker-v1, as R-POL-1 has always required.
+          const v2 = configs.find(({ r }) => (r as { value: { format?: unknown } }).value.format !== "artroom-checker-v1");
+          if (v2) {
+            bad("malformed", `checker ${v2.c.name}: a v1 document's checker configuration must be artroom-checker-v1`); // V:checker-format-v1
+            break;
+          }
         }
         needs.push({ seq: i, path: policyPath(ev.policy), reason: "policy-missing" });
         for (const c of ev.checkers) needs.push({ seq: i, path: policyPath(c.config), reason: "checker-missing" });
-        policyByVersion.set(id, { doc: doc.value as PolicyDocument, digest: ev.policy, checkers: new Map(ev.checkers.map((c) => [c.name, c.config])) });
+        policyByVersion.set(id, { doc: d, digest: ev.policy, checkers: new Map(ev.checkers.map((c) => [c.name, c.config])), vocab });
         activePolicy = id;
       } else if (ev.type === "obligations-recomputed") {
         if (ev.policy !== activePolicy) {
           bad("policy-version-mismatch", `obligations-recomputed names policy ${ev.policy}; the active policy is ${activePolicy ?? "none"}`);
           break;
         }
-        if (!(await replayDecisions(i, ev.decisions, ev.policy, "the policy it was recomputed under"))) {
-          firstBad = Math.min(firstBad, i);
+        const vocab = vocabAt(ev.policy);
+        if (lacking(vocab)) {
+          stop(vocab);
           break;
         }
+        if (vocab.kind === "legacy") {
+          if (!(await replayDecisions(i, ev.decisions, ev.policy, "the policy it was recomputed under"))) {
+            firstBad = Math.min(firstBad, i);
+            break;
+          }
+        } else {
+          // R-POL-9: require for the version, by its proposer, under the new document; then carry.
+          const t = fold.thread(ev.lane);
+          const v = fold.version(ev.lane, ev.generation);
+          if (!t || !v) {
+            bad("guard-failed", `obligations-recomputed names ${ev.lane} generation ${ev.generation}, which the log never proposed`); // V:recompute-version
+            break;
+          }
+          await resolve(i, v, ev.decisions);
+          const w: World = { fold, roster, doc: vocab.doc as unknown as PolicyDocument };
+          const proposal = Fold.proposal(w.doc, v);
+          const r = await declaredCalls(i, [requireCall(w, memberActor(roster, v.proposer), t, proposal), carryCall(t, proposal)], ev.decisions, ev.policy, vocab, false);
+          if (!r.ok) {
+            bad(r.failure.reason, r.failure.detail);
+            break;
+          }
+          if (opts.replayDecisions !== false && (r.refusal?.rule ?? null) !== (ev.blocked?.rule ?? null)) {
+            bad("refusal-mismatch", `the require call ${r.refusal ? `refuses with ${r.refusal.rule}` : "refuses nothing"}, and the event records ${ev.blocked ? `blocked ${ev.blocked.rule}` : "no block"}`); // V:recompute-blocked
+            break;
+          }
+        }
       } else if (ev.type === "land-evaluated") {
-        if (!(await replayDecisions(i, ev.decisions, activePolicy, "the active policy"))) {
-          firstBad = Math.min(firstBad, i);
+        const vocab = vocabAt(activePolicy);
+        if (lacking(vocab)) {
+          stop(vocab);
           break;
+        }
+        if (vocab.kind === "legacy") {
+          if (!(await replayDecisions(i, ev.decisions, activePolicy, "the active policy"))) {
+            firstBad = Math.min(firstBad, i);
+            break;
+          }
+        } else {
+          // R-LAND-4: land rules at stage reservation, for the operation's version, as its initiator.
+          const op = fold.landOps.get(ev.op);
+          const t = op ? fold.thread(op.lane) : null;
+          const v = op ? fold.version(op.lane, op.generation) : null;
+          if (!op || !t || !v) {
+            bad("guard-failed", `land-evaluated names ${ev.op}, which no land act on a known version started`); // V:land-op
+            break;
+          }
+          await resolve(i, v, ev.decisions);
+          const w: World = { fold, roster, doc: vocab.doc as unknown as PolicyDocument };
+          const r = await declaredCalls(i, [landCall(w, actorOf(roster, op.authority), t, Fold.proposal(w.doc, v), "reservation")], ev.decisions, activePolicy!, vocab);
+          if (!r.ok) {
+            bad(r.failure.reason, r.failure.detail);
+            break;
+          }
         }
       } else if (ev.type === "check-carried") {
         // R-CARRY-13: `act` is an earlier accepted check of the same lane and obligation.
@@ -557,6 +824,11 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         }
         if (!policyByVersion.has(ev.policy)) {
           bad("policy-version-mismatch", `check-carried names policy ${ev.policy}, which no earlier policy-activated event activated`);
+          break;
+        }
+        const vocab = vocabAt(ev.policy);
+        if (lacking(vocab)) {
+          stop(vocab);
           break;
         }
         if (!(await replayDecisions(i, ev.decisions, ev.policy, "the policy the check-carried event names"))) {
@@ -580,9 +852,28 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           break;
         }
         notified.add(ev.entry);
-        if (!(await replayDecisions(i, ev.decisions, policyAt[target.seq] ?? null, `the policy pinned when ${ev.entry} was admitted`))) {
-          firstBad = Math.min(firstBad, i);
+        const pinned = policyAt[target.seq] ?? null;
+        const vocab = vocabAt(pinned);
+        if (lacking(vocab)) {
+          stop(vocab);
           break;
+        }
+        const snap = notifyInputs.get(ev.entry);
+        if (vocab.kind === "legacy") {
+          if (!(await replayDecisions(i, ev.decisions, pinned, `the policy pinned when ${ev.entry} was admitted`))) {
+            firstBad = Math.min(firstBad, i);
+            break;
+          }
+        } else {
+          // R-POL-5, R-LOG-13: notify rules on the act, with the input the room built when it sealed it; none for a roster act.
+          const v = snap?.version ? fold.version(snap.version.lane as LaneId, snap.version.generation) : null;
+          if (v) await resolve(i, v, ev.decisions);
+          const plan = snap ? [notifyCall({ ...snap.input, proposal: v ? Fold.proposal(vocab.doc as unknown as PolicyDocument, v) : null }, snap.roles)] : [];
+          const r = await declaredCalls(i, plan, ev.decisions, pinned!, vocab);
+          if (!r.ok) {
+            bad(r.failure.reason, r.failure.detail);
+            break;
+          }
         }
       } else if (ev.type === "checkpoint") {
         const cp = checkpointsByCommit.get(ev.commit);
@@ -594,6 +885,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         bad("self-reference", "a revert-lane event names its own lane");
         break;
       }
+      fold.applySystem(id, ev);
       continue;
     }
 
@@ -608,7 +900,23 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       bad("actor-signature", `the envelope is not signed by ${env.actor}`);
       break;
     }
-    const judged = roster.judge(env, checkedTime(e.at, "at"));
+    // R-DECL-1, R-DECL-16: the kind, its binding and its body, under the document in force at this seq.
+    const vocab = vocabAt(activePolicy);
+    if (lacking(vocab)) {
+      stop(vocab);
+      break;
+    }
+    const kind = kindProblem(env, vocab);
+    if (kind) {
+      bad(kind.reason, kind.detail);
+      break;
+    }
+    const shape = bodyProblem(env, vocab, (lane) => fold.thread(lane)?.scopeSource);
+    if (shape) {
+      bad("body-invalid", shape);
+      break;
+    }
+    const judged = roster.judge(env, checkedTime(e.at, "at"), whoOf(vocab));
     if (!judged.ok) {
       bad(judged.reason, judged.detail);
       break;
@@ -627,12 +935,22 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       break;
     }
     idem.set(key, i);
-    if (body.type === "act" && env.kind === "check") {
+    const steps = stepsOf(env, vocab);
+    if (body.type === "act" && (vocab.kind === "legacy" ? env.kind === "check" : steps.includes("check"))) {
       // R-OBL-3: an accepted check names its checker's configuration digest in the active version.
-      const { check, config } = env.body as CheckBody;
+      const { check, config, integration, input, landOp } = env.body as CheckBody;
       const expected = activePolicy === null ? undefined : policyByVersion.get(activePolicy)!.checkers.get(check);
       if (config !== expected) {
         bad("check-config-mismatch", `the check names config ${config} for ${check}; the active policy ${activePolicy ?? "none"} names ${expected ?? "no such checker"}`);
+        break;
+      }
+      // R-DECL-20, where the log has them: the room prepared the integration the check names.
+      const t = env.target as { lane?: unknown; generation?: unknown } | null;
+      const prepared = typeof t?.lane === "string" && typeof t.generation === "number" ? fold.preparedFor(t.lane as LaneId, t.generation, landOp) : [];
+      const bound = (p: (typeof prepared)[number]) =>
+        p.integration === integration && (input?.kind === "filtered" ? p.snapshots.some((x) => x.check === check && x.digest === input.snapshot) : p.tree === (input as { tree?: unknown } | undefined)?.tree);
+      if (prepared.length && !prepared.some(bound)) {
+        bad("guard-failed", `the check names integration ${integration}, which no prepared event for its ${landOp ? `operation ${landOp}` : "version"} names with its input`); // V:prepared
         break;
       }
     }
@@ -640,11 +958,54 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       bad("self-reference", "an opened effect names its own lane");
       break;
     }
-    if (!(await replayDecisions(i, body.receipt.decisions, activePolicy, "the active policy"))) {
-      firstBad = Math.min(firstBad, i);
-      break;
+    let witness: Witness | null = null;
+    if (vocab.kind === "legacy") {
+      if (!(await replayDecisions(i, body.receipt.decisions, activePolicy, "the active policy"))) {
+        firstBad = Math.min(firstBad, i);
+        break;
+      }
+    } else {
+      // Note 4.4: the calls admission had to make, rebuilt from the fold, against the decisions recorded.
+      const target = env.target as { lane?: unknown; generation?: unknown } | null;
+      if (steps.includes("version")) witness = await witnessOf(i, body.receipt.decisions, (env.body as { head: Sha }).head);
+      else if (steps.includes("land") && typeof target?.lane === "string" && typeof target.generation === "number") {
+        const v = fold.version(target.lane as LaneId, target.generation);
+        if (v) await resolve(i, v, body.receipt.decisions);
+      }
+      const refusal = body.type === "refusal" ? body.receipt.refusal : null;
+      const blocked = typeof target?.lane === "string" && typeof target.generation === "number" ? (fold.version(target.lane as LaneId, target.generation)?.blocked?.rule ?? null) : null;
+      const cut = refusal ? stoppedAt(refusal.rule, steps, blocked) : "policy";
+      const full = cut === "none" ? [] : actPlan(env, judged.authority, steps, vocab.doc, witness);
+      if (full === undefined) {
+        bad("guard-failed", `the act names a thread or entry the log never had, which the room refuses as lane-unknown`); // V:thread-known
+        break;
+      }
+      const plan = cut === "refuse" ? full.slice(0, 1) : full;
+      const r = await declaredCalls(i, plan, body.receipt.decisions, activePolicy!, vocab);
+      if (!r.ok) {
+        bad(r.failure.reason, r.failure.detail);
+        break;
+      }
+      if (opts.replayDecisions !== false) {
+        if (!refusal && r.refusal) {
+          bad("guard-failed", `the act was accepted, but the rule ${r.refusal.rule} refuses it`); // V:accepted-refused
+          break;
+        }
+        if (refusal && cut === "policy" && r.refusal?.rule !== refusal.rule) {
+          bad("refusal-mismatch", `the recorded refusal is ${refusal.rule}, but the rules ${r.refusal ? `refuse with ${r.refusal.rule}` : "refuse nothing"}`); // V:refusal-rule
+          break;
+        }
+        if (refusal && cut === "refuse" && r.refusal) {
+          bad("refusal-mismatch", `the recorded refusal is ${refusal.rule}, decided after the refuse rules, but the rule ${r.refusal.rule} refuses it first`); // V:refusal-after
+          break;
+        }
+      }
     }
-    if (body.type === "act") roster.apply(env, id, judged.authority);
+    if (body.type === "act") {
+      roster.apply(env, id, judged.authority);
+      fold.applyAct(id, env, body.receipt, vocab, witness);
+      if (vocab.kind === "declared" && env.kind !== "roster") notifyInputs.set(id, notifySnapshot(id, env, judged.authority, steps));
+    } else fold.applyRefusal(id, env);
   }
 
   const verifiedThrough = Math.min(entries.length - 1, firstBad - 1);
@@ -668,7 +1029,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   }
   const lastEntry = verifiedThrough >= 0 ? entries[verifiedThrough]! : null;
   return {
-    ok: failures.length === 0,
+    ok: failures.length === 0 && unsupported === null,
     ref,
     head,
     room,
@@ -679,6 +1040,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     publishedThrough: views.at(-1)!.checkpoint?.through ?? -1,
     decisionsReplayed,
     failures,
+    unsupported,
+    limits,
     cannotProve,
   };
 }
