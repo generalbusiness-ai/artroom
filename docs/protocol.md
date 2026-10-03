@@ -3499,7 +3499,7 @@ evaluator profile, which only activation changes (R-DECL-22). If hugh
 decides otherwise before review, those two rules change and nothing else
 here does.
 
-**Revision 2 wording (assert e7307f81).** Two points are worded as gitseq
+**Wording from assert e7307f81.** Two points are worded as gitseq
 assert e7307f81 states them. On grants from before declared acts: "the
 intended rule is intersection, never acquisition. A v1-era grant after v2
 activation covers exactly those platform kinds it covered when signed
