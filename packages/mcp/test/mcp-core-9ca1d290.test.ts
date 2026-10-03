@@ -972,25 +972,35 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
     const other = await bearer("@other", "agent", { kinds: [], acts: await bindings("note") });
     const api = await connect({ url }, room.id, { kind: "bearer", token: b.bearer });
     const roster = await api.members();
-    const exact = callerFromRoster(roster, { key: b.key, session: true, delegation: b.delegation });
+    // What the adapter answers: the caller, or the code it refuses with. So a wrong refusal fails as an assertion.
+    const read = (r: typeof roster, who: Parameters<typeof callerFromRoster>[1]) => {
+      try {
+        return callerFromRoster(r, who);
+      } catch (e) {
+        return { refused: (e as { code?: string }).code };
+      }
+    };
+    const exact = read(roster, { key: b.key, session: true, delegation: b.delegation });
     expect(exact).toEqual(await room.bearerCaller(b.bearer));
     expect(exact).toEqual({ role: "agent", delegation: { kinds: ["renew"], acts: await bindings("claim") } });
     // The same room-held key with a later delegation in the roster: the session's own recorded one is still used.
     const mine = roster.delegations.find((d) => d.id === b.delegation)!;
     const later = { ...mine, id: "act_999_00000000" as never, kinds: "*" as const, acts: await bindings("claim", "propose", "land") };
     const grown = { ...roster, delegations: [...roster.delegations, later] };
-    expect(callerFromRoster(grown, { key: b.key, session: true, delegation: b.delegation })).toEqual(exact);
+    expect(read(grown, { key: b.key, session: true, delegation: b.delegation })).toEqual(exact);
     // With no recorded ID (a credential saved before it was kept), the latest unrevoked one the key granted is used.
-    expect(callerFromRoster(grown, { key: b.key, session: true })).toEqual({ role: "agent", delegation: { kinds: "*", acts: later.acts } });
+    expect(read(grown, { key: b.key, session: true })).toEqual({ role: "agent", delegation: { kinds: "*", acts: later.acts } });
     // A session cannot name a delegation another key granted, though that delegation is current.
     expect(roster.delegations.some((d) => d.id === other.delegation && d.revoked === undefined)).toBe(true);
-    expect(() => callerFromRoster(roster, { key: b.key, session: true, delegation: other.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    expect(read(roster, { key: b.key, session: true, delegation: other.delegation })).toEqual({ refused: "unauthenticated" });
     // A client-held key that names a delegation must be the key it was granted to: the grantee is accepted, and the
     // grantor's key or any other key in that form is not.
     const granted = roster.delegations.find((d) => d.id === other.delegation)!;
-    expect(callerFromRoster(roster, { key: granted.grantee, delegation: other.delegation })).toEqual(await room.bearerCaller(other.bearer));
-    expect(() => callerFromRoster(roster, { key: other.key, delegation: other.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
-    expect(() => callerFromRoster(roster, { key: b.key, delegation: other.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    expect(read(roster, { key: granted.grantee, delegation: other.delegation })).toEqual(await room.bearerCaller(other.bearer));
+    expect(read(roster, { key: other.key, delegation: other.delegation })).toEqual({ refused: "unauthenticated" });
+    expect(read(roster, { key: b.key, delegation: other.delegation })).toEqual({ refused: "unauthenticated" });
+    // The session form of the same delegation, by its own room-held key, is accepted: the two forms do not mix.
+    expect(read(roster, { key: other.key, session: true, delegation: other.delegation })).toEqual(await room.bearerCaller(other.bearer));
     // Read for each list: once the delegation is revoked, the next list over stdio fails, and shows nothing.
     const caller = async () => callerFromRoster(await api.members().catch(() => roster), { key: b.key, session: true, delegation: b.delegation });
     expect(names(await stdioList(api, caller))).toEqual(await listed(b));
