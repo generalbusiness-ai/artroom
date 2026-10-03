@@ -1699,12 +1699,13 @@ Main `a04c774b` had 2,626 passed and 2 skipped (review `daba6bca`), and `a42c4d8
 
 ## Declared acts stage 5 (request a5d64b35)
 
-Status: implemented except the UI, provisional, not yet for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used.
+Status: implemented, provisional, not yet for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used.
 
-Three things are true of this head and must change before review:
+This head is composed of three things: the stage 5 lane's work, the UI lane's work (`request/decl-stage5-ui`, `5dc0d044`), and the repaired stage 2 code, merged three times as it moved: `22ee206d`, `71584cbc`, then `15fa7f4c`. See "Composition" below.
 
-- **It is provisional.** The branch was cut from the stage 2 candidate `2cd97b88`, which is not yet reviewed. If stage 2 changes in review, this work is redone against it. The head for review will be composed on main after stage 2 lands, with every gate and every acceptance test run again there.
-- **The UI is not in it.** A companion lane built the UI against this API on branch `request/decl-stage5-ui`, head `5dc0d044`, from the API commit `2eeb7e72`. It changes `packages/ui` only, and this branch does not touch `packages/ui`. The coordinator joins the two before review. Condition 1's UI part, and the UI part of historical rendering, are open on this head until then.
+Two things are true of this head and must change before review:
+
+- **It is provisional.** It sits on the stage 2 code head `15fa7f4c`, which is not yet landed. Stage 2's sealed review head will add only its report section and its conversions list. The head for review is composed again on main after stage 2 lands, with every gate and every acceptance test run again there.
 - **Stage 3 is not in it.** `packages/log` is unchanged. `artroom verify` does not read a `v2` room's log until stage 3 lands.
 
 ### What was built
@@ -1730,21 +1731,21 @@ The API the UI lane builds on is summarized in the session scratch file `stage5-
 
 | Condition of `a5d64b35` | State | Where and how shown |
 |---|---|---|
-| (1) Every stage 5 surface | Part met | Read, client, HTTPS, MCP and CLI: built and tested. The ten named MCP tools remain. **Open: the UI**, in the companion lane. The MCP core (`a9788a59`) is separately owed; see "Composing with the MCP core" |
+| (1) Every stage 5 surface | Met at this head | Read, client, HTTPS, MCP, CLI and UI: built and tested. The ten named MCP tools remain. The MCP core (`a9788a59`) is separately owed; see "Composing with the MCP core" |
 | (2) Signed meaning preserved | Met | The client, the MCP tool and the CLI never read a binding to act, never replace one and never sign again. Tests: "signed meaning is never changed by the client" (Room, 6), "a changed meaning is shown, never adopted for the user" (CLI, 3), the stale test of the MCP suite. Exact retries after an activation return the original record. Grants carry the grantor's bindings and are expanded before signing. Credential custody and redaction are unchanged |
-| (3) An honest act unknown to the client, and the listed cases | Met for HTTPS, MCP and CLI; **open for the UI** | See "Acceptance cases" |
+| (3) An honest act unknown to the client, and the listed cases | Met | See "Acceptance cases", and "The UI" for the UI's cases |
 | (4) Ownership and the read-route seam | Met | See "Edits to files other stages own" |
-| (5) Mutations, tests, gates, one composed head | Part met | Mutations and gates below, at this head. **Open: the one exact composed head**, which needs stage 2 on main and the UI |
+| (5) Mutations, tests, gates, one composed head | Part met | Mutations and gates below, at this composed head. **Open: the one exact head for review**, which needs stage 2 landed on main |
 
 | Point of `fa120186` | State | Where and how shown |
 |---|---|---|
-| Historical readers use `D(s)` | Met for the client, MCP and CLI; **open for the UI** | "old records are read under the declarations of their own seq" (Room, 5 tests): activation, retirement, later name reuse with a changed shape, a label-only change, legacy records, exact old retries |
+| Historical readers use `D(s)` | Met for the client, MCP, CLI and UI | "old records are read under the declarations of their own seq" (Room, 5 tests): activation, retirement, later name reuse with a changed shape, a label-only change, legacy records, exact old retries |
 | The generic bound check over the MCP endpoint | Met | "a declared check step under another name" (Room, 3 tests), "the generic act over the MCP endpoint" (Room, 4 tests). R-CRED-10 and R-API-9 are amended at this head in section 33.10 |
 | The first jam task need not use this path | Not a code matter | Nothing here makes it depend on it |
 
 ### Acceptance cases
 
-All of these run the real client package and the real MCP endpoint against the Worker and its Durable Object, in [packages/room/test/workerd/declared-stage5-a5d64b35.test.ts](../packages/room/test/workerd/declared-stage5-a5d64b35.test.ts) (36 tests). Nothing in them is a double.
+All of these run the real client package and the real MCP endpoint against the Worker and its Durable Object, in [packages/room/test/workerd/declared-stage5-a5d64b35.test.ts](../packages/room/test/workerd/declared-stage5-a5d64b35.test.ts) (38 tests). Nothing in them is a double.
 
 | Case of section 33.10 | Tests |
 |---|---|
@@ -1767,7 +1768,7 @@ All of these run the real client package and the real MCP endpoint against the W
 | Thread kind | "the lane reads give each thread's kind: claim in a v1 room; in a v2 room the kind of the act that opened it" |
 | Thread name | "a thread with no goal is named by its opening act, in the words in force when it opened: label and first field"; "the act tool names the thread it opened the same way; a thread with a goal is named by its goal"; CLI: "an act that opens a thread names it as every reader does: its goal, or the act's label and first field" |
 
-Unit tests beside them, against the fake room in its declared mode: client 28 ([declared-a5d64b35.test.ts](../packages/client/test/declared-a5d64b35.test.ts)), MCP 10 and 4 schema tests, CLI 18. A Room node test, 11 tests, checks that `STEP_FIELD_SPECS` agrees with admission's step 5 for every step: [declared-steps-a5d64b35.test.ts](../packages/room/test/node/declared-steps-a5d64b35.test.ts).
+Unit tests beside them, against the fake room in its declared mode: client 33 ([declared-a5d64b35.test.ts](../packages/client/test/declared-a5d64b35.test.ts)), MCP 10 and 4 schema tests, CLI 20. The UI suite has 195 tests. A Room node test, 11 tests, checks that `STEP_FIELD_SPECS` agrees with admission's step 5 for every step: [declared-steps-a5d64b35.test.ts](../packages/room/test/node/declared-steps-a5d64b35.test.ts).
 
 ### Choices where the design left room
 
@@ -1789,7 +1790,7 @@ Unit tests beside them, against the fake room in its declared mode: client 28 ([
 16. **The AGENTS.md block is unchanged.** It is pinned by a snapshot and teaches the named loop. The MCP server's instructions gain one sentence about `acts` and `act`, within their 512 characters.
 17. **A handle drops kept catalogues on evidence, not on a timer.** It cannot know of an activation it has not seen. Every answer that shows one drops the kept versions: `acts()`, another `actsAt()` answer, a `log()` page, an update, and a refusal that names the active policy version. A handle that has seen nothing may answer old marks, and `fresh` is the way to be sure.
 18. **The MCP tool `acts` always reads fresh.** A stdio server keeps one handle for its life, and an agent's call is a question to the room.
-19. **"First field" is by name.** The room keeps bodies and policy documents as canonical JSON with sorted keys. Neither the order a caller typed nor the order a declaration lists its fields is recorded. `titleOf` sorts, so the typed body and the record give one name. Open point 52.
+19. **"First field" is by name.** The room keeps bodies and policy documents as canonical JSON with sorted keys. Neither the order a caller typed nor the order a declaration lists its fields is recorded. `titleOf` sorts, so the typed body and the record give one name. Open point 52. In the UI's setlist demo this names both songs "Start a song: c", by their `key`, not by their `title`.
 20. **The CLI names a new thread from the catalogue it read for the act.** It read that catalogue in the same command and the act carried its binding. After a lost answer that is finished from the journal, the first line is printed and the thread line is not.
 21. **The MCP tool `act` reads the declarations only for a thread with no goal**, and only at the record's seq. If that read fails, the act is still reported as done and the thread is named by its ID.
 
@@ -1799,7 +1800,7 @@ Unit tests beside them, against the fake room in its declared mode: client 28 ([
 - **Stage 3's files.** None. `packages/log` is byte-identical to the stage 2 candidate's.
 - **The MCP core's files** (`a9788a59`, the planner's). `packages/contract/src/transports.ts`: additive, apart from six lines that had to change in place (`Explanation.kind`, the end of the `ReadQuery` union, `RoomWire.submit`, `RoomWire.bearerAct` and its comment, and the body of `POST /acts`). The two new `McpTools` entries are in their own block after the ten. The contract index gains four names in its transports export list: `ActsNotFound`, `AnyBearerAct`, `CatalogueAt` and `GenericActOptions`, and `envelopeOf` in its guards list. Its MCP exports are otherwise untouched.
 - **Main's Room files.** `packages/room/src/reads.ts` (the read and `explain`'s meaning) and `packages/room/src/http.ts` (the route). No migration.
-- **The UI lane's files.** None. `packages/ui` is byte-identical to the stage 2 candidate's.
+- **The UI lane's files.** Eight, at composition: `src/room/contract.ts`, `src/room/acts.ts`, `src/room/live/describe.ts`, `src/room/live/live-room.ts`, `src/room/mock/memory-room.ts`, `src/screens/Acts.tsx`, `src/ui/format.ts`, and the tests `acts-fields.test.ts`, `acts-screen.test.tsx` and `declared-rendering.test.tsx`. See "Composition".
 
 ### The UI lane's four questions
 
@@ -1812,7 +1813,66 @@ The UI lane finished at `5dc0d044` and asked four things of this lane.
 | A thread opened by an application's act has an empty `goal`. What do readers show? | One rule for every reader: the goal, else the opening act's label and first field, else the lane's ID. | `threadTitle` and `titleOf`. The CLI and the MCP tool `act` print it when an act opens a thread. Neither prints a thread's goal anywhere else. Three Room tests, one CLI test, one MCP test, two client tests |
 | Log entry envelopes are typed as `v: 1`. | A typed accessor is a small additive change. Widening `LogEntry` is not: it reaches `packages/log`. | `envelopeOf(entry)`. One client test. The CLI's log uses it |
 
-One difference from the UI remains. The UI's `laneGoal` takes the first field in the order `Object.entries` gives. Against a live room that is name order, the same as `titleOf`. Against the UI's mock room it is the order typed. The UI should call `threadTitle` after the two branches join.
+At composition the UI was changed to use all four: it calls `threadTitle`, reads `Lane.kind`, reads envelopes with `envelopeOf`, and keeps no earlier catalogue of its own. See "Composition".
+
+### Composition
+
+The head is three lines of work joined.
+
+| Step | Commit | What |
+|---|---|---|
+| Merge the UI lane | `9386487e` | `request/decl-stage5-ui` at `5dc0d044`, `packages/ui` only. No conflict |
+| The UI uses the four additions | `8fc6ae0c` | See below |
+| Merge the repaired stage 2 | `f7839217` | `22ee206d`. One conflict |
+| The defect classes, in stage 5's code | `ec16786b`, `2578faef` | See below |
+| Merge stage 2 again | `498ee159` | `71584cbc`, nine findings of an independent audit. No conflict |
+| The fake room follows it | `1a3d43a6` | The `opened` effect carries the thread's kind and binding in a `v2` room |
+| Merge stage 2 a third time | `cd5e494f` | `15fa7f4c`: the room's retry lookup requires the closed outer shape. No conflict |
+| The fake room follows it | `27421448` | Its retry lookup requires the same shape |
+
+**The conflict.** `plans/README.md`: both branches append a section at the end. Both are kept, stage 2's first. No source file conflicted.
+
+**What changed in the UI.**
+
+- `laneGoal` calls `threadTitle`. Four expectations in the UI's tests changed with it, in `acts-screen.test.tsx` (two) and `declared-rendering.test.tsx` (two): a song thread is named "Start a song: c", not "Start a song: Blue Bossa". New guard `G5U:thread-name`.
+- The Acts form finds the threads an act may act on from `Lane.kind`. The stand-in room gives a lane its kind. Guard `G5U:thread-filter`, re-anchored.
+- Log envelopes are read with `envelopeOf` in `live-room.ts`, `describe.ts` and the stand-in room. No cast of an envelope remains in the live adapter.
+- The live adapter keeps no earlier catalogue. The active catalogue of the last load answers for the entries it governs (`G5U:governs`, re-anchored). Earlier versions are asked of the handle, which drops what it kept when it sees a later activation. `G5U:catalogue-refresh` now guards the statement that takes each load's active catalogue.
+
+**What the repaired stage 2 changed, and what stage 5 needed.** Stage 5's tests passed on each merged head with no change. At `71584cbc` the Room's `reads.ts` and `model.ts`, which both lines edit, merged with no conflict. A declared kind's target is now judged after step 4a, so an act prepared for a removed target shape is `binding-stale`, as section 33.10's acceptance case already says. Two Room tests were added to show the repairs through the client: a prepared declared act replayed after the room returned to a `v1` document gets its original record, and a bearer's named act repeated with its key after the room moved to declared acts gets its original record.
+
+**The same classes of defect, looked for in stage 5's own code.**
+
+| Class | Where it was looked for | Found | Fix and test |
+|---|---|---|---|
+| A presence test that reads through the prototype | `catalogue.ts`, the client, the MCP runners, the CLI, the Room's read, the UI | The CLI's `missing` took a required field named `constructor` or `toString` as given | Own properties only. CLI test "a field named like an inherited property is the body's own or it is missing; a change of such a field is listed as one". Mutant `G5:cli-missing-own` |
+| The same | | The CLI's `meaningChanges` listed a new or removed field of such a name as changed | Own properties only. The same test. Mutants `G5:cli-changes-own`, `G5:cli-changes-own-after` |
+| The same | | The UI read a form value and a field's problem by name through the prototype (`readBody`, the Acts form, the stand-in room) | `own(o, name)`. UI test "its value is the form's own or it is empty: a required one is asked for, an optional one is left out, a given one is sent". Mutant `G5U:own-name` |
+| A retry rebuilt under the document now in force | The client's `replay`, the CLI journal, the MCP tool `act`, the HTTPS bearer client | Those four send the act as first built. One other place did not: a named act repeated with its key on the same handle was built again under the vocabulary then read | The handle keeps a named act it got no answer for, and sends those bytes when the same act is repeated with its key. Client tests "a named act repeated with its key on the same handle …" and "only the same act is the kept one …". Mutants `G5:named-retry-kept`, `G5:named-retry-keep`, `G5:named-retry-same`, `G5:named-retry-answered` |
+| A declared field given a platform meaning | `threadTitle`, the CLI's output, the MCP results, the UI's review screens | The CLI filled a declared field named `expectedGeneration`, `lease` or `head` from the room as if it were the step's | Only a step's own field is read for the user. CLI test "only a step's own field is read from the room …". Mutant `G5:cli-step-field-only` |
+| The same | | The UI showed a review step's field named `text` as the review's text whatever its type | Text only. UI test "a review or a comment under an application's own name is still evidence …", extended. Mutant `G5U:review-text` |
+| The same | | `threadTitle`, the CLI's thread line and the MCP tool `act` take a thread's goal only when it is text. No defect |  |
+| A grant or invitation that gains a kind across a change of vocabulary | `expandGrant`, the grant builders, the fake room | `expandGrant` names every kind and binding it grants and refuses a kind that may not be delegated. No defect | Client test "a kind whose declaration stops being delegable is not covered by a grant made before …" |
+| The same | | The fake room's `v2` mode did not follow the repaired Room in four places | It now answers an exact retry before a step 1 failure, refuses a `v2` session under a `v1` document, gives an invitation admitted under `v2` with no session only the platform kinds, and judges `who.delegable` at each use. Client tests "a prepared declared act replayed after the room returned to the legacy vocabulary …" and "a session signed under a v2 document is refused under a v1 one, and the invitation stays unused". The fake room is a test double and has no mutants |
+
+**Mutation at the composed head.**
+
+- Stage 5: 129 mutants, 128 red by assertion, 1 survivor: `G5:cli-binding-given`. The survivor is the equivalent mutant described under "Mutation table". Eight mutants are new, for the guards in the table above. At this head 38 mutants were run again: the eight new ones, every mutant whose guarded statement changed since the full run, the mutants of the title rule, and every mutant of a Room file, because the Room's code under them changed with the merge. The Room-file mutants were run once more after the second merge and are red. The other results are those of the full run at `477dda2f`.
+- The UI: 51 mutants, all run again at this head, 51 red by assertion, 0 survivors. The UI lane's table below lists its 48. Three are new here: `G5U:thread-name`, `G5U:own-name` and `G5U:review-text`. Four were re-anchored: `G5U:governs`, `G5U:catalogue-refresh`, `G5U:thread-filter` and `G5U:built-for-binding`.
+
+**Gates at the composed head.**
+
+Run one after another at commit `27421448`, from 12:21 to 12:29 local on 2026-10-03, with nothing else running in the worktree. An earlier run was stopped by a process kill on the machine at 12:08 and by two merges of stage 2 after it; no result of an interrupted run is recorded here. The commit that adds this text changes `plans/README.md` only; `git diff --check` and `git status` were run again after it.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm ci` (root) | 0 | installed |
+| `npm run typecheck` (root, every package) | 0 | |
+| `npm test` (root, every package) | 0 | checkers 43; CLI 182; client 121 and 2; log 198 and 193; MCP 87 and 5; policy 313, and 311 with 2 skipped; Room node 270, workerd legacy run 642, workerd declared run 533 with 109 skipped; UI 195 |
+| `git diff --check 15fa7f4c` | 0 | no whitespace errors |
+| `git status --porcelain` | | empty |
+
+No test failed. The declared run skips the files that found their own rooms, as stage 2's own tests do; the stage 5 integration file is one of them.
 
 ### Composing with the MCP core
 
@@ -1990,7 +2050,9 @@ The run was made at commit `477dda2f`. It left seven survivors. Six had no test,
 
 </details>
 
-### Gates
+### Gates of the lane's own head
+
+These are the gates before composition. The gates of the composed head are under "Composition".
 
 Run one after another at commit `b9ecd3af`, in the worktree, with nothing else running there. The commit that adds this section changes `plans/README.md` only; `git diff --check` and `git status` were run again after it.
 
@@ -2011,11 +2073,161 @@ Run one after another at commit `b9ecd3af`, in the worktree, with nothing else r
 
 No test failed and none was skipped that the stage 2 candidate does not skip. The declared run skips the files that found their own rooms, as stage 2's own tests do; the stage 5 integration file is one of them.
 
-The UI count is the stage 2 candidate's UI. The UI lane's branch is not in this head.
+The UI count there is the stage 2 candidate's UI, before the UI lane was merged.
 
 ### Not changed here
 
 `packages/log`, `packages/git`, `packages/checkers` and `packages/ui`; the Room's admission, schema, authority, store and migrations; the design note; the Worker entry and wrangler configuration; the deployed spike. `LICENSE`, `NOTICE` and `AGENTS.md` are untouched.
+
+### The UI (companion lane, branch `request/decl-stage5-ui`)
+
+> **Changed at composition.** This subsection is the UI lane's report as written at `5dc0d044`. Four things in it are no longer true of the composed head. Choice 4: the adapter keeps no earlier catalogue; the handle does, and drops them on a later activation. Choice 8: the thread's name comes from `threadTitle`. Choice 9: the thread list reads `Lane.kind`. The four items under "Asked of the companion lane" are answered in "The UI lane's four questions" and done. The suite has 195 tests and 51 mutants at the composed head. The gates of the composed head are under "Composition".
+
+
+Status: implemented on the stage 5 API commit `2eeb7e72`, as two commits, head `5dc0d04400336c31523054f765d16382960c3c91`. It changes only `packages/ui`. It is provisional in the same way as the rest of stage 5: it sits on the stage 2 candidate and is recomposed on main after stage 2 lands. Nothing was pushed or deployed.
+
+#### What was built
+
+- **Reads in the adapter.** `RoomSnapshot.catalogue` is the active policy version's declarations and bindings, or null when the transport cannot read them. `RoomAdapter` gains `readCatalogue()`, `catalogueAt(seq)` and `act(kind, target, body, binding)`. The UI still takes an `HttpRoom` from its caller and still has one contract import site (`src/room/contract.ts`). The live adapter calls the handle's `acts`, `actsAt` and `act`. A live room's Policy screen now shows the active version and the entry it took effect at.
+- **Records under D(s)** (`src/room/live/describe.ts`, `live-room.ts`, `src/room/acts.ts`). Each act and each recorded refusal is read under the catalogue that governs its own seq, one read per policy version in the loaded window. A feed entry carries its `meaning`: the label in force at its seq, the policy version, the binding, the target in words, each body field by name, and the seq where the kind was retired.
+- **The feed and the why panel** (`screens/Room.tsx`, `ui/bits.tsx`, `ui/WhyDialog.tsx`). A declared record shows who, its label, its target and its fields. A retired kind shows "Retired at seq N". A record of a kind the policy did not declare shows its kind and fields and says so. The why panel has a section "What it meant at entry N". It uses the meaning the Room computed (`Explanation.meaning`) when there is one.
+- **The Acts screen** (`screens/Acts.tsx`, route `#/acts`, key `4`). It lists the active declarations with label, help, who may sign and what each acts on. For a chosen act it builds a form from `fieldsOf(declaration, shape)`: one input per field by type, required and optional marked, the limits stated. It checks the limits before sending and sends once, with the binding of the declarations the person chose the act from.
+- **The second demo room** (`?app=setlist`). It is the live adapter over an in-memory room (`mock/memory-room.ts`) whose policy declares five acts for a band's setlist (`mock/setlist.ts`): start a song, add a part, cue, sign off, wrap up. A second policy version renames one, reshapes another and drops a third. None is a code-review verb. The declarations validate under `validatePolicyV2` and use every declared field type.
+
+#### Choices
+
+1. **A code-review sentence is chosen by binding, not by name.** A record whose binding equals `builtForBinding(catalogue, kind)` keeps the sentence it always had ("@ash claimed ..."). Any other declared record is shown generically, as "who: label." with its fields. A room that declares its own `claim` gets the generic rendering.
+2. **Legacy records are unchanged.** A record under a `v1` document, and `renew` and `roster` in every room, keep their sentences and get no field list in the feed. Their meaning, with the seq where the `v1` policy was replaced, is in the why panel.
+3. **When declarations cannot be read, nothing is guessed.** Only a `v: 1` envelope of one of the nine legacy kinds is read as a legacy record. Anything else says its meaning could not be read. The snapshot still loads, with `catalogue: null`.
+4. **Earlier catalogues are read again after an activation.** A new policy version can retire a kind of an ended version, so an ended version's catalogue is not final. The adapter keeps catalogues only while the active policy version is unchanged.
+5. **Evidence by step.** Reviews, checks and notes for the Proposal screen are rebuilt by the step a record ran under its own declaration (`review`, `check`, `comment`), so an application's own name for a review still counts. A comment with no `text` field is not a note.
+6. **A stale act is never resent by the UI.** On `binding-stale` the form reads the declarations again, lists what changed (fields, steps, targets, threads, hold), and waits. "Send it with the new meaning" validates the form against the new declaration first. If a new required field is empty, nothing is sent.
+7. **An open form keeps the declarations it was opened with.** A snapshot refresh behind it changes nothing in it. Only the person's confirmation replaces them.
+8. **A thread opened by an application's act has no goal.** The Room screen names it by that act's label and first field, read under the act's own entry.
+9. **The thread list in a form** offers threads whose opening act's kind is in the declaration's `threads`. The kind comes from the loaded feed, because `Lane` carries no kind. A thread whose opening entry is outside the loaded window is offered too.
+10. **A change that arrives during a load is not lost.** The live adapter loads once more after it. Before, an update in that window was dropped until the next one.
+
+#### Tests
+
+53 new tests in three files; the 141 existing tests are unchanged and pass.
+
+| Case | Test file | Tests |
+|---|---|---|
+| Activation: label, target and typed fields | `declared-rendering.test.tsx` | "an act of an application's own kind is a sentence with the label, and its typed fields by name"; "the feed shows the record's label, target and fields, and the thread is named by the act that opened it" |
+| Retirement | `declared-rendering.test.tsx` | "retirement: a record of a kind a later policy dropped says where it was retired, and still shows its label and fields" |
+| Name reuse with a changed shape | `declared-rendering.test.tsx` | "name reuse with a changed shape: the old record keeps the old meaning and its retirement; the new record has the new one" |
+| Label-only change | `declared-rendering.test.tsx` | "label-only change: the old record shows the old label, a new one the new label, under one binding" |
+| Legacy record | `declared-rendering.test.tsx` | "a legacy record keeps the sentence it always had, after the room moves to declared acts"; "a platform act reads the same in every room" |
+| Unknown kind | `declared-rendering.test.tsx` | "a kind the policy in force did not declare: its kind, its fields, and a plain statement"; "when the room cannot give its declarations, only a v: 1 record of a legacy kind is read as one"; "a kind it has no sentence for falls back to the plain statement" |
+| Sentence by binding | `declared-rendering.test.tsx` | "a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not" |
+| Evidence by step | `declared-rendering.test.tsx` | "a review or a comment under an application's own name is still evidence for the review screens, by its step" |
+| The why panel | `declared-rendering.test.tsx` | "it shows what the kind meant at that entry, its fields, and that a later policy dropped it"; "the meaning the room computed is the one shown" |
+| Each field type and its limits | `acts-fields.test.ts` | ten tests under "reading one field": required and optional, text (bytes), int (range), a step's int, bool, enum, globs, member, act and segment, a step's commit, an unknown type |
+| Body, targets, record view, what changed | `acts-fields.test.ts` | nine tests, among them "a body is built only when every field reads", "targets by shape", "a new required field, a changed limit and a removed field are each named" |
+| The list of acts | `acts-screen.test.tsx` | "every declaration is listed with its label, help, who may sign and what it acts on, in the room's words"; "a room on the built-in review acts says so, and offers no form"; "an address that names an act the room does not declare says so" |
+| The form, by field type | `acts-screen.test.tsx` | four tests under "the form is built from the declaration: one input per field, by type" |
+| Limits before sending | `acts-screen.test.tsx` | "the declared limits are checked first: a wrong field is named and nothing is sent"; "a target that is missing is named and nothing is sent" |
+| A submit with the binding | `acts-screen.test.tsx` | "a good act is sent once, with exactly the binding of the declarations the person was looking at, and is then in the feed" |
+| Refusal wording as given | `acts-screen.test.tsx` | "a refusal shows the room's rule with the reason and fix as the declaration worded them"; "an act the viewer's role may not sign is refused by the room, and the refusal is shown" |
+| Binding-stale | `acts-screen.test.tsx` | "nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend"; "confirming sends once more, with the new binding, when the form still fits the new meaning"; "the person can decline: nothing more is sent and the list returns" |
+| Kind-undeclared | `acts-screen.test.tsx` | "the kind is gone (kind-undeclared): the form says so, reads the acts again and sends nothing more" |
+| A non-code-review application, end to end | `declared-rendering.test.tsx`, `acts-screen.test.tsx`, `e2e/smoke.spec.ts` | "its feed, threads and acts are in its own words, and none of the review verbs appears"; "a person prepares and sends an act of an application that is not code review, and sees it recorded"; the browser test "a room that declares its own acts" |
+| The application itself | `acts-fields.test.ts` | "both policy versions validate with no problem"; "it shares no kind with the code-review seven, and uses every declared field type" |
+
+No existing assertion was changed. The browser test run rewrote the committed screenshots, because the top bar has a new item, and added three (`declared-room-light`, `declared-acts-light`, `declared-form-light`).
+
+#### Mutation table
+
+Each mutant was applied alone by `scratchpad/mut5ui/run.py` at the final source. It edits one guard, runs the whole UI suite (`npx vitest run`) with the JSON reporter, records the failing tests, and writes the file's original bytes back in a `finally`. It never runs `git checkout`. A failure counts only if it is an assertion failure; a timeout or a file that fails to load is flagged apart. Each guard is one statement marked `// G5U:<id>`, and a check before the run confirmed 48 markers and 48 mutants, each applying exactly once.
+
+**48 mutants, all red by assertion.** None survived. No red was a timeout or a load failure.
+
+| # | Guard | File | Mutation | Red by assertion | A test it turned red |
+|---|---|---|---|---|---|
+| 1 | `G5U:required` | `room/acts.ts` | An empty required field is accepted | 4 | `acts-fields.test.ts`: reading one field: each type, with its declared limits a required field left empty is a problem; an optional one is left out of the body; and 3 more |
+| 2 | `G5U:optional-absent` | `room/acts.ts` | An empty optional field is sent as an empty string | 3 | `acts-fields.test.ts`: reading one field: each type, with its declared limits a required field left empty is a problem; an optional one is left out of the body; and 2 more |
+| 3 | `G5U:text-max` | `room/acts.ts` | The text limit counts characters, not bytes | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits text: the limit is in bytes, and the text is sent as typed |
+| 4 | `G5U:int-whole` | `room/acts.ts` | A value that is not a whole number is accepted | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits int: whole numbers only, inside the declared range |
+| 5 | `G5U:int-min` | `room/acts.ts` | An int below the minimum is accepted | 2 | `acts-fields.test.ts`: reading one field: each type, with its declared limits int: whole numbers only, inside the declared range; and 1 more |
+| 6 | `G5U:int-max` | `room/acts.ts` | An int above the maximum is accepted | 3 | `acts-fields.test.ts`: reading one field: each type, with its declared limits int: whole numbers only, inside the declared range; and 2 more |
+| 7 | `G5U:bool` | `room/acts.ts` | A bool accepts any text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits bool: yes or no, nothing else |
+| 8 | `G5U:enum` | `room/acts.ts` | An enum accepts any text | 2 | `acts-fields.test.ts`: reading one field: each type, with its declared limits enum: one of the declared values; and 1 more |
+| 9 | `G5U:globs-max` | `room/acts.ts` | The count of path patterns is not limited | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits globs: one per line, blank lines dropped, no more than the declared count |
+| 10 | `G5U:member` | `room/acts.ts` | A member field accepts any text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits member, act and segment are fixed formats |
+| 11 | `G5U:act` | `room/acts.ts` | An entry field accepts any text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits member, act and segment are fixed formats |
+| 12 | `G5U:segment` | `room/acts.ts` | A segment accepts slashes and pattern characters | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits member, act and segment are fixed formats |
+| 13 | `G5U:sha` | `room/acts.ts` | A commit field accepts any text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits a step's commit is 40 hex digits |
+| 14 | `G5U:unknown-type` | `room/acts.ts` | A field of an unknown type is sent as text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits a field type this page does not know is refused, never guessed |
+| 15 | `G5U:body-problems` | `room/acts.ts` | A body is built although a field has a problem | 3 | `acts-fields.test.ts`: reading a whole body and a target a body is built only when every field reads; each problem is named by its field; and 2 more |
+| 16 | `G5U:target-lane` | `room/acts.ts` | A missing thread is accepted | 2 | `acts-fields.test.ts`: reading a whole body and a target targets by shape; and 1 more |
+| 17 | `G5U:target-generation` | `room/acts.ts` | A version that is not a positive whole number is accepted | 1 | `acts-fields.test.ts`: reading a whole body and a target targets by shape |
+| 18 | `G5U:target-entry` | `room/acts.ts` | An entry target that is not an entry ID is accepted | 1 | `acts-fields.test.ts`: reading a whole body and a target targets by shape |
+| 19 | `G5U:record-fields` | `room/acts.ts` | A record's field values are dropped | 11 | `acts-fields.test.ts`: a record under the meaning in force at its own seq (R-DECL-23) the label, the retirement, the target in words and every field by name; because is left to the reasons; and 10 more |
+| 20 | `G5U:record-label` | `room/acts.ts` | A record shows its kind where its label belongs | 13 | `acts-fields.test.ts`: a record under the meaning in force at its own seq (R-DECL-23) the label, the retirement, the target in words and every field by name; because is left to the reasons; and 12 more |
+| 21 | `G5U:record-retired` | `room/acts.ts` | A record never says its kind was retired | 6 | `acts-fields.test.ts`: a record under the meaning in force at its own seq (R-DECL-23) the label, the retirement, the target in words and every field by name; because is left to the reasons; and 5 more |
+| 22 | `G5U:changes-steps` | `room/acts.ts` | Changed steps are not reported | 1 | `acts-fields.test.ts`: what changed between two meanings of one kind changed steps, a new and a lost target, the threads and the hold |
+| 23 | `G5U:changes-added` | `room/acts.ts` | A new field is not reported | 2 | `acts-fields.test.ts`: what changed between two meanings of one kind a new required field, a changed limit and a removed field are each named; and 1 more |
+| 24 | `G5U:changes-field` | `room/acts.ts` | A changed field is not reported | 2 | `acts-fields.test.ts`: what changed between two meanings of one kind a new required field, a changed limit and a removed field are each named; and 1 more |
+| 25 | `G5U:changes-removed` | `room/acts.ts` | A removed field is not reported | 1 | `acts-fields.test.ts`: what changed between two meanings of one kind a new required field, a changed limit and a removed field are each named |
+| 26 | `G5U:sentence-default` | `room/live/describe.ts` | The sentence table invents a sentence for a kind it was not written for | 1 | `declared-rendering.test.tsx`: the sentence table is only for the kinds it was written for a kind it has no sentence for falls back to the plain statement, whatever vocabulary it is read under |
+| 27 | `G5U:unread-legacy-only` | `room/live/describe.ts` | With no readable declarations, a v: 2 record is read as a legacy one by its name | 1 | `declared-rendering.test.tsx`: a record whose kind had no meaning is shown plainly, never dropped when the room cannot give its declarations, only a v: 1 record of a legacy kind is read as one |
+| 28 | `G5U:built-for-sentence` | `room/live/describe.ts` | A record under the code-review declaration loses its sentence | 1 | `declared-rendering.test.tsx`: the code-review sentences belong to the code-review declarations, by binding and not by name a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not |
+| 29 | `G5U:declared-sentence` | `room/live/describe.ts` | A declared record is given a review sentence by its name | 11 | `acts-screen.test.tsx`: sending an act a good act is sent once, with exactly the binding of the declarations the person was looking at, and is then in the feed; and 10 more |
+| 30 | `G5U:unknown-shown` | `room/live/describe.ts` | An undeclared kind is not said to be undeclared | 1 | `declared-rendering.test.tsx`: a record whose kind had no meaning is shown plainly, never dropped a kind the policy in force did not declare: its kind, its fields, and a plain statement |
+| 31 | `G5U:refusal-label` | `room/live/describe.ts` | A refused declared act is named by its kind, not its label | 1 | `declared-rendering.test.tsx`: the code-review sentences belong to the code-review declarations, by binding and not by name a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not |
+| 32 | `G5U:meaning-attached` | `room/live/describe.ts` | Feed entries carry no meaning | 9 | `acts-screen.test.tsx`: the form is built from the declaration: one input per field, by type segment, globs, a thread to act on, and the version step's own fields; and 8 more |
+| 33 | `G5U:refresh-again` | `room/live/live-room.ts` | A change that arrives during a load is lost | 2 | `acts-screen.test.tsx`: the form is built from the declaration: one input per field, by type the thread list offers only threads the act may act on; and 1 more |
+| 34 | `G5U:catalogue-unavailable` | `room/live/live-room.ts` | A room that cannot give its declarations fails the whole load | 3 | `declared-rendering.test.tsx`: a record whose kind had no meaning is shown plainly, never dropped when the room cannot give its declarations, only a v: 1 record of a legacy kind is read as one; and 2 more |
+| 35 | `G5U:governs` | `room/live/live-room.ts` | Every record is read under the first catalogue that was read | 3 | `declared-rendering.test.tsx`: old records keep the meaning they had label-only change: the old record shows the old label, a new one the new label, under one binding; and 2 more |
+| 36 | `G5U:meaning-at-seq` | `room/live/live-room.ts` | Records are read under the active declarations | 5 | `declared-rendering.test.tsx`: old records keep the meaning they had label-only change: the old record shows the old label, a new one the new label, under one binding; and 4 more |
+| 37 | `G5U:built-for-binding` | `room/live/live-room.ts` | The code-review sentence is chosen by the kind's name, not its binding | 1 | `declared-rendering.test.tsx`: the code-review sentences belong to the code-review declarations, by binding and not by name a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not |
+| 38 | `G5U:catalogue-refresh` | `room/live/live-room.ts` | Earlier catalogues are never read again after an activation | 2 | `declared-rendering.test.tsx`: old records keep the meaning they had retirement: a record of a kind a later policy dropped says where it was retired, and still shows its label and fields; and 1 more |
+| 39 | `G5U:explain-meaning` | `room/live/live-room.ts` | The meaning the room computed is ignored | 1 | `declared-rendering.test.tsx`: the why panel reads a record under its own entry's policy the meaning the room computed is the one shown |
+| 40 | `G5U:act-binding` | `room/live/live-room.ts` | The adapter rebinds the act to the active meaning by itself | 3 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend; and 2 more |
+| 41 | `G5U:evidence-by-step` | `room/live/live-room.ts` | A declared review is not evidence | 1 | `declared-rendering.test.tsx`: activation: a declared record shows its label, its target and its fields a review or a comment under an application's own name is still evidence for the review screens, by its step |
+| 42 | `G5U:thread-filter` | `screens/Acts.tsx` | Every thread is offered, whatever its kind | 1 | `acts-screen.test.tsx`: the form is built from the declaration: one input per field, by type the thread list offers only threads the act may act on |
+| 43 | `G5U:no-send-on-problems` | `screens/Acts.tsx` | The act is sent although a field or the target is wrong | 3 | `acts-screen.test.tsx`: sending an act the declared limits are checked first: a wrong field is named and nothing is sent; and 2 more |
+| 44 | `G5U:send-binding` | `screens/Acts.tsx` | A confirmed resend carries the binding the form first held | 1 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) confirming sends once more, with the new binding, when the form still fits the new meaning |
+| 45 | `G5U:gone` | `screens/Acts.tsx` | A kind that is gone is shown as an ordinary refusal | 1 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) the kind is gone (kind-undeclared): the form says so, reads the acts again and sends nothing more |
+| 46 | `G5U:stale-no-resend` | `screens/Acts.tsx` | A stale act is sent again at once, with nobody asked | 3 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend; and 2 more |
+| 47 | `G5U:confirm-resend` | `screens/Acts.tsx` | Confirming the new meaning sends nothing | 2 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend; and 1 more |
+| 48 | `G5U:form-holds-catalogue` | `screens/Acts.tsx` | An open form follows every refresh of the declarations | 1 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend |
+
+#### Gates
+
+Run at head `5dc0d04400336c31523054f765d16382960c3c91`, under bash, with exit codes checked.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm ci` (root) | 0 | installed |
+| `npm run typecheck` in `packages/ui` | 0 | generates the policy declarations, then checks the UI |
+| `npm test` in `packages/ui` | 0 | 14 files, 194 passed (141 before, 53 new) |
+| `npm run typecheck` (root) | 0 | every workspace |
+| `npm run e2e` in `packages/ui` (not a requested gate) | 0 | 9 passed, 1 new |
+| `git diff --check` | 0 | clean |
+
+The root `npm test` was not run by this lane; the companion lane runs it on the composed branch.
+
+#### Not done
+
+- The form has no input for `because`.
+- The form does not send `recover` or the platform kinds.
+- A lost answer is not retried from the form. The adapter passes no idempotency key and leaves retries to the handle.
+- The page is still not wired to a live room: `main.tsx` runs the two demo rooms, and `LiveRoom` takes a handle from its caller (README gap 9).
+- The Room, Proposal and Needs-you screens keep the review application's words ("lane", "claim", "generation").
+- The in-memory room is a stand-in. It has no signatures, expiring leases, policy rules, landing or idempotency. The UI has not been run against the real Room with a `v2` document.
+- Stage 4's steps and hold settings are described by `fieldsOf` already, but no test here exercises them.
+
+#### Asked of the companion lane
+
+The API gave everything the UI needed to build. Four things would remove a workaround or a risk:
+
+1. **An ended catalogue is not final.** `retired` on a kind of an ended version changes when a later activation drops that kind. The API summary says the client handle keeps ended versions. If it keeps them for good, a reader sees a stale answer after a later activation. The UI drops its own catalogues when the active policy version changes; the handle should do the same, or say that `actsAt` may be stale.
+2. **A thread's kind is not in the `lanes` read.** `Lane` has no `kind`, so the form finds the threads an act may act on from the opening entry in the loaded feed. A `kind` on `Lane` (R-DECL-6) would make that exact.
+3. **A thread opened by an application's act has an empty `goal`.** The UI names it from the opening act. Nothing is needed if that is the intended reading.
+4. **The review screens read declared records through casts.** A record of a declared act with step `review`, `check` or `comment` has the fields of a `Review`, `Check` or `Note`, but the log entry's envelope is typed as the `v: 1` `Envelope`. The UI reads it as `AnyEnvelope` and casts.
+
+Nothing here needs the planner or hugh to decide.
 
 ### For the planner or hugh
 
@@ -2023,5 +2235,8 @@ The UI count is the stage 2 candidate's UI. The UI lane's branch is not in this 
 2. **The checker service still signs `v: 1`**, and its notes are `v: 1` too. That is stage 4's, as `fa120186` says. Until then a `v2` room gets checks from members' own keys or from a bearer through `act`.
 3. **The cost of the catalogue read for the named methods** (choice 5): two requests per handle before its first named act, in every room. If that is too much for the CLI, the vocabulary could be kept in its room configuration; that is a small follow-up, not done here.
 4. **Which field names a thread** (open point 52). The name of a thread with no goal uses the opening act's first field by name. An application cannot choose the field. A declaration could name it, which would be a new member of the declaration and a change to R-DECL rules. It is not made here.
-5. **The UI should call `threadTitle`**, so that one rule names a thread everywhere. That is a change in `packages/ui`, which this lane does not edit.
+5. **The demo's songs are both named "Start a song: c".** The UI now uses the one rule, and the first field of `start-song` by name is `key`. This is open point 52 seen in the demo. Two remedies are possible and neither is made here: a declaration names the field for its thread's name, or the rule prefers a field of type `text`.
 6. **Toolsets for `acts` and `act`** come from the planner's MCP core contract. This stage does not assign them.
+7. **A named act repeated from a new handle after a change of vocabulary** is built under the vocabulary then in force, because a new handle has nothing kept. The room answers `idempotency-mismatch` and names the first act. Nothing is recorded twice. The CLI is not affected: its journal keeps the signed bytes. A stdio MCP server that restarts between the two calls is.
+8. **The Acts form offers every thread to an act whose declaration names no `threads`.** The room refuses such an act on any thread (`wrong-thread`). This is the UI lane's choice and is left as it was.
+9. **Stage 2's sealed review head** is still to be merged by the coordinator. It adds only its report section and its conversions list.
