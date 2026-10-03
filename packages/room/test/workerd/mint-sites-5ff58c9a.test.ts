@@ -828,6 +828,45 @@ describe("mint lane C: ended job tokens and due jobs are taken in bounded batche
       }
     }));
 
+  it("a fresh object schedules job token debt with no request: overdue rows 1 s ahead; future rows at their own time, after an earlier unrelated alarm, which is kept; its alarms alone revoke them", () =>
+    ahead(async () => {
+      const before = await makeRoom();
+      await inDO(before, (room) => room.core.publish(true));
+      const overdue = await endedRows(before, 3);
+      await inDO(before, (_room, state) => state.storage.deleteAlarm());
+      let r = await restarted(before);
+      expect(await stored(r)).toBe(clock.now + 1_000);
+      clock.now += 1_000;
+      expect(await alarm(r)).toBe(true);
+      await settle(r);
+      expect(overdue.every((id) => token(r, id).revoked)).toBe(true);
+      // Future rows, due after a lane's lease expires: the lease's alarm first, then the rows' own time, exactly.
+      const { lane } = await r.admin.ok<Claim>("claim", null, { goal: "a lane", scope: ["docs/h/**"] });
+      await inDO(r, (room) => room.core.publish(true));
+      const leaseAt = (await inDO(r, (room) => room.core.sql.all("SELECT expires_ms FROM lanes WHERE id = ?", lane)))[0]!["expires_ms"] as number;
+      const repo = r.world.artifacts.canonicalRepo() as Repo;
+      const later = repo.mint("read", 3 * 3600).id;
+      const dueAt = leaseAt + 10 * 60_000;
+      await inDO(r, (room) => room.core.sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, 'ended')", later, dueAt + 3600_000, dueAt));
+      await inDO(r, (_room, state) => state.storage.deleteAlarm());
+      r = await restarted(r);
+      expect(await inDO(r, (room) => jobTokensDue(room.core))).toBe(dueAt);
+      expect(await stored(r)).toBe(leaseAt);
+      // The lease's alarm, and the work it leaves (its expiry's publication), run first; then the rows' time, exactly.
+      for (let i = 0; i < 6 && (await stored(r))! < dueAt; i++) {
+        clock.now = (await stored(r))!;
+        expect(await alarm(r)).toBe(true);
+        await settle(r);
+        expect(token(r, later).revoked).toBe(false);
+      }
+      expect(await stored(r)).toBe(dueAt);
+      clock.now = dueAt;
+      expect(await alarm(r)).toBe(true);
+      await settle(r);
+      expect(token(r, later).revoked).toBe(true);
+      expect(await jobTokens(r)).toEqual([]);
+    }));
+
   it("the job token pass is its own kind of loop work: a failure of its step takes that kind's backoff; an earlier alarm skips it; its next time waits for the backoff; then it runs and clears it; while the canonical repository is gone it is neither run nor scheduled", () =>
     ahead(async () => {
       const r = await makeRoom();

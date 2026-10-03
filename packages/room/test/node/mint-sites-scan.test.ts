@@ -1,61 +1,90 @@
 /**
  * Mint lane C (request 5ff58c9a), test 6 of notes/2026-10-02-canonical-mint-ownership.md:
  * a source scan. Outside the harnesses, `measure/` and tests, only the files
- * below name Artifacts' token creation at all (R-MINT-1). Every canonical
- * mint goes through the mint ledger (`mints.ts`); the others mint on
- * repositories that are not the canonical one.
+ * below reach Artifacts' token creation (R-MINT-1). Every canonical mint goes
+ * through the mint ledger (`mints.ts`); the others mint on repositories that
+ * are not the canonical one.
  *
- * The rule is the identifier, not a call shape: any occurrence of
- * `createToken` in production source fails, whether a call, an optional
- * call, an index, an alias, a destructuring or a comment, except in the
- * allowed files (each with its exact number of occurrences) and in three
- * exempt places checked separately: generated `.d.ts` files, the `RepoHandle`
- * declaration in `packages/git/src/artifacts.ts`, and the in-memory Artifacts
- * fake (`packages/room/src/memory/`), which defines the method for tests and
- * never reaches one. A name built at runtime (`"create" + "Token"`) is out of
- * reach of any scan.
+ * The scan is syntactic (review b84aead9): each production source file is
+ * parsed with Babel's TypeScript parser (TypeScript 7, the native compiler,
+ * ships no in-process parser), and every property access, optional or not,
+ * every element access by the literal name, and every destructuring that
+ * takes `createToken` is a reach. Type positions (`RepoHandle["createToken"]`,
+ * `typeof x.createToken`), declarations (the `RepoHandle` interface, the
+ * in-memory fake's method) and string arguments are not. A name built at
+ * runtime (`"create" + "Token"`) is out of reach of any scan.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { parse } from "@babel/parser";
 import { describe, expect, it } from "vitest";
 
 const ROOT = decodeURIComponent(new URL("../../../../", import.meta.url).pathname);
 
-/** The allowed files: occurrences of the identifier (calls, types and comments), and why. */
-const ALLOWED: Readonly<Record<string, { readonly occurrences: number; readonly why: string }>> = {
-  "packages/git/src/mints.ts": { occurrences: 2, why: "the canonical mint ledger: every canonical mint (R-MINT-1); its repository type and its one call" },
-  "packages/git/src/workspace/workspaces.ts": { occurrences: 2, why: "a lane fork's workspace lease token (R-CRED-8), not a canonical mint; a type and one call" },
-  "packages/git/src/snapshot/repos.ts": { occurrences: 1, why: "a snapshot repository's job token (R-CARRY-16), not a canonical mint; one call" },
+/** The allowed files: how many reaches each has, and why. */
+const ALLOWED: Readonly<Record<string, { readonly reaches: number; readonly why: string }>> = {
+  "packages/git/src/mints.ts": { reaches: 1, why: "the canonical mint ledger: every canonical mint (R-MINT-1)" },
+  "packages/git/src/workspace/workspaces.ts": { reaches: 1, why: "a lane fork's workspace lease token (R-CRED-8), not a canonical mint" },
+  "packages/git/src/snapshot/repos.ts": { reaches: 1, why: "a snapshot repository's job token (R-CARRY-16), not a canonical mint" },
   "packages/git/src/publisher/client.ts": {
-    occurrences: 2,
-    why: "pending exception, request 02836f9a: the lane fork's read token for pinning (`withForkToken`: a comment and one call), until the fork has its own ledger; never a canonical token",
+    reaches: 1,
+    why: "pending exception, request 02836f9a: the lane fork's read token for pinning, inside `withForkToken` only, until the fork has its own ledger; never a canonical token",
   },
 };
-const DECLARATION = "packages/git/src/artifacts.ts";
-const FAKE = "packages/room/src/memory/";
+/** In an allowed file, the function each reach must be inside, when it is fixed. */
+const INSIDE: Readonly<Record<string, string>> = { "packages/git/src/publisher/client.ts": "withForkToken" };
 
-const NAME = /\bcreateToken\b/g;
-/** Reaching the method: a property access (`.`, `?.`), an index by its name, or a destructuring that takes it. */
-const REACH = /(?:\?\.|\.)\s*createToken\b|\[\s*["'`]createToken["'`]\s*\]|\{[^{}]*\bcreateToken\b[^{}]*\}\s*=/g;
+type AstNode = { readonly type: string; readonly loc?: { readonly start: { readonly line: number } } } & Record<string, unknown>;
 
-const count = (text: string, re: RegExp) => [...text.matchAll(re)].length;
+const NAME = "createToken";
+/** A key or property that is the literal name: an identifier (not computed), a string, or a template with no substitution. */
+function names(key: unknown, computed: boolean): boolean {
+  const k = key as AstNode | null;
+  if (!k) return false;
+  if (k.type === "Identifier") return !computed && k["name"] === NAME;
+  if (k.type === "StringLiteral") return k["value"] === NAME;
+  if (k.type === "TemplateLiteral") {
+    const q = k["quasis"] as { value: { cooked: string } }[];
+    return (k["expressions"] as unknown[]).length === 0 && q.length === 1 && q[0]!.value.cooked === NAME;
+  }
+  return false;
+}
+
+/** Every reach of `createToken` in one source: its line, and the function it is inside, if any. */
+function reaches(text: string, jsx = false): { line: number; inside: string | null }[] {
+  const ast = parse(text, { sourceType: "module", plugins: jsx ? ["typescript", "jsx"] : ["typescript"], errorRecovery: false }) as unknown as AstNode;
+  const out: { line: number; inside: string | null }[] = [];
+  const walk = (n: unknown, inside: string | null) => {
+    if (Array.isArray(n)) return n.forEach((x) => walk(x, inside));
+    if (!n || typeof n !== "object" || typeof (n as AstNode).type !== "string") return;
+    const node = n as AstNode;
+    // Types never reach a value.
+    if (node.type.startsWith("TS") && node.type !== "TSAsExpression" && node.type !== "TSNonNullExpression" && node.type !== "TSSatisfiesExpression" && node.type !== "TSTypeAssertion" && node.type !== "TSInstantiationExpression") return;
+    const fn = node.type === "FunctionDeclaration" ? (((node["id"] as AstNode | null)?.["name"] as string | undefined) ?? inside) : inside;
+    const line = node.loc?.start.line ?? 0;
+    if ((node.type === "MemberExpression" || node.type === "OptionalMemberExpression") && names(node["property"], node["computed"] === true)) out.push({ line, inside: fn });
+    if (node.type === "ObjectPattern")
+      for (const p of node["properties"] as AstNode[]) if (p.type === "ObjectProperty" && names(p["key"], p["computed"] === true)) out.push({ line: p.loc?.start.line ?? line, inside: fn });
+    for (const [k, v] of Object.entries(node)) if (k !== "loc" && k !== "leadingComments" && k !== "trailingComments" && k !== "innerComments") walk(v, fn);
+  };
+  walk(ast, null);
+  return out;
+}
 
 /** What breaks the rule in these files: one line each, or none. */
 function violations(files: readonly { readonly path: string; readonly text: string }[]): string[] {
   const out: string[] = [];
   for (const { path, text } of files) {
-    const n = count(text, NAME);
+    const found = reaches(text, /\.[jt]sx$/.test(path));
     const allowed = ALLOWED[path];
-    if (path.endsWith(".d.ts")) continue; // generated declarations
-    if (path === DECLARATION) {
-      const lines = text.split("\n").filter((l) => /\bcreateToken\b/.test(l));
-      if (n !== 1 || !/^\s*createToken\(scope\?: "write" \| "read", ttl\?: number\): Promise<MintedToken>;\s*$/.test(lines[0] ?? "")) out.push(`${path}: only the RepoHandle declaration may name createToken (found ${n})`);
-    } else if (path.startsWith(FAKE)) {
-      if (count(text, REACH) > 0) out.push(`${path}: the in-memory fake reaches createToken`);
-    } else if (allowed) {
-      if (n !== allowed.occurrences) out.push(`${path}: ${n} occurrences of createToken, allowed ${allowed.occurrences}`);
-    } else if (n > 0) out.push(`${path}: ${n} occurrence(s) of createToken outside the allowed files`);
+    if (!allowed) {
+      for (const r of found) out.push(`${path}:${r.line}: reaches createToken outside the allowed files`);
+      continue;
+    }
+    if (found.length !== allowed.reaches) out.push(`${path}: ${found.length} reaches of createToken, allowed ${allowed.reaches}`);
+    const fn = INSIDE[path];
+    if (fn) for (const r of found) if (r.inside !== fn) out.push(`${path}:${r.line}: reaches createToken outside ${fn}`);
   }
   return out;
 }
@@ -68,7 +97,7 @@ function sources(): { path: string; text: string }[] {
       const p = join(dir, e.name);
       if (e.isDirectory()) {
         if (e.name !== "node_modules") walk(p);
-      } else if (/\.(ts|tsx|js|mjs|cjs|jsx)$/.test(e.name)) out.push(relative(ROOT, p).split("\\").join("/"));
+      } else if (/\.(ts|tsx|js|mjs|cjs|jsx)$/.test(e.name) && !e.name.endsWith(".d.ts")) out.push(relative(ROOT, p).split("\\").join("/"));
     }
   };
   for (const pkg of readdirSync(join(ROOT, "packages"), { withFileTypes: true }))
@@ -82,50 +111,39 @@ function sources(): { path: string; text: string }[] {
   return out.sort().map((path) => ({ path, text: readFileSync(join(ROOT, path), "utf8") }));
 }
 
-describe("mint lane C (6): who names createToken", () => {
-  it("outside the harnesses, measure/ and tests, only the ledger, workspaces, snapshot repositories and the fork token in publisher/client.ts name createToken, each as often as allowed", () => {
+describe("mint lane C (6): who reaches createToken", () => {
+  it("outside the harnesses, measure/ and tests, only the ledger, workspaces, snapshot repositories and the fork token in publisher/client.ts reach createToken, each once", () => {
     const files = sources();
-    // The scan reaches the former canonical sites, every allowed and exempt file, and every package's source.
-    for (const f of ["packages/room/src/core.ts", "packages/room/src/logremote.ts", "packages/room/src/jobs.ts", "packages/git/src/landing/engine.ts", DECLARATION, "packages/room/src/memory/artifacts.ts", ...Object.keys(ALLOWED)])
+    // The scan reaches the former canonical sites, every allowed file, the declaration and the fake, and every package's source.
+    for (const f of ["packages/room/src/core.ts", "packages/room/src/logremote.ts", "packages/room/src/jobs.ts", "packages/git/src/landing/engine.ts", "packages/git/src/artifacts.ts", "packages/room/src/memory/artifacts.ts", ...Object.keys(ALLOWED)])
       expect(files.map((x) => x.path)).toContain(f);
     expect(files.length).toBeGreaterThan(100);
     expect(violations(files)).toEqual([]);
   });
 
-  it("publisher/client.ts: its one call is the fork token's (`withForkToken`), used once, for the lane's fork; its canonical tokens go through the ledger", () => {
+  it("publisher/client.ts: its one reach is inside withForkToken, used once, for the lane's fork; its canonical tokens go through the ledger", () => {
     const text = readFileSync(join(ROOT, "packages/git/src/publisher/client.ts"), "utf8");
-    const fork = /async function withForkToken[\s\S]*?\n}\n/.exec(text)?.[0] ?? "";
-    expect(count(fork, REACH)).toBe(1);
-    expect(count(text.replace(fork, ""), REACH)).toBe(0);
+    expect(reaches(text).map((r) => r.inside)).toEqual(["withForkToken"]);
     expect([...text.matchAll(/withForkToken\s*(?:<[^>]*>)?\(/g)]).toHaveLength(2); // its definition and one use
     expect(text).toMatch(/withForkToken\(\s*forkRepo,/);
     for (const purpose of ["integrate:", "pin-objects:", "pin-ref:", "preview:"]) expect(text).toContain(`\`${purpose}`);
   });
 
-  const sneaky = "packages/room/src/sneaky.ts";
-  for (const [form, text] of [
-    ["a call", "await repo.createToken('read', 60);"],
-    ["an optional call (the checker's control)", "await repo.createToken?.('read', 60);"],
-    ["an optional receiver", "await repo?.createToken('read', 60);"],
-    ["an index by the name", "await repo['createToken']('read', 60);"],
-    ["an optional index", "await repo?.[\"createToken\"]?.('read', 60);"],
-    ["an alias", "const make = repo.createToken.bind(repo);\nawait make('read', 60);"],
-    ["a destructuring", "const { createToken } = repo;\nawait createToken('read', 60);"],
-    ["a renaming destructuring", "const { createToken: make } = repo;"],
-    ["a reflective read", "Reflect.get(repo, 'createToken');"],
-    ["a type reference", "type Make = RepoHandle['createToken'];"],
-    ["a comment", "// calls createToken elsewhere"],
-  ] as const)
-    it(`the scan catches ${form} in a new production file`, () => {
-      expect(violations([{ path: sneaky, text }])).toEqual([`${sneaky}: ${count(text, NAME)} occurrence(s) of createToken outside the allowed files`]);
-    });
+  it("an actual source file outside the allowed files, with every form of reach, fails on each of those lines and no other (the checker's repo.createToken?.('read', 60) among them)", () => {
+    const path = "packages/room/test/node/fixtures/create-token-forms.ts";
+    const text = readFileSync(join(ROOT, path), "utf8");
+    const lines = text.split("\n");
+    const marked = lines.flatMap((l, i) => (l.endsWith("// reach") ? [i + 1] : []));
+    expect(marked).toHaveLength(10);
+    expect(lines.some((l) => l.includes("repo.createToken?.(\"read\", 60); // reach"))).toBe(true);
+    expect(violations([{ path, text }])).toEqual(marked.map((n) => `${path}:${n}: reaches createToken outside the allowed files`));
+  });
 
-  it("the scan catches a new occurrence in an allowed file, a second name in the declaration file, and the fake reaching the method; it passes the fake's own definition", () => {
+  it("the same file at an allowed path fails on its count, and a reach outside withForkToken in publisher/client.ts fails", () => {
+    const text = readFileSync(join(ROOT, "packages/room/test/node/fixtures/create-token-forms.ts"), "utf8");
+    expect(violations([{ path: "packages/git/src/snapshot/repos.ts", text }])).toEqual(["packages/git/src/snapshot/repos.ts: 10 reaches of createToken, allowed 1"]);
     const client = readFileSync(join(ROOT, "packages/git/src/publisher/client.ts"), "utf8");
-    expect(violations([{ path: "packages/git/src/publisher/client.ts", text: `${client}\nconst f = canonical.createToken?.("write", 60);\n` }])).toHaveLength(1);
-    const decl = readFileSync(join(ROOT, DECLARATION), "utf8");
-    expect(violations([{ path: DECLARATION, text: `${decl}\nexport const make = (r: RepoHandle) => r.createToken("read", 60);\n` }])).toHaveLength(1);
-    expect(violations([{ path: `${FAKE}artifacts.ts`, text: "async createToken(scope = 'write', ttl = 86400) { return this.createToken(scope, ttl); }" }])).toHaveLength(1);
-    expect(violations([{ path: `${FAKE}artifacts.ts`, text: "async createToken(scope = 'write', ttl = 86400) {\n  this.host.enter(\"createToken\");\n}" }])).toEqual([]);
+    const swapped = client.replace("repo.createToken(\"read\", TOKEN_TTL.pin)", "repo.revokeToken(\"read\")") + "\nexport const sneaky = (r: RepoHandle) => r.createToken(\"write\", 60);\n";
+    expect(violations([{ path: "packages/git/src/publisher/client.ts", text: swapped }])).toEqual([expect.stringMatching(/^packages\/git\/src\/publisher\/client\.ts:\d+: reaches createToken outside withForkToken$/)]);
   });
 });
