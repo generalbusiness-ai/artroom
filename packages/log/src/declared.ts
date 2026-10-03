@@ -308,12 +308,14 @@ export function bodyProblem(env: Envelope, vocab: Vocabulary, scopeOf: ThreadSco
   const own = decl.body ?? {};
   for (const name of Object.keys(body))
     if (!Object.hasOwn(own, name) && !stepFields.has(name) && name !== "because") return `${name} is not a field of ${kind} on target ${shape}`; // V:body-closed
-  if ("because" in body) {
+  if (Object.hasOwn(body, "because")) {
     const b = becauseProblem(body["because"]);
     if (b) return b; // V:because
   }
   for (const [name, f] of Object.entries(own)) {
-    if (!(name in body)) {
+    // A field is present only as the body's own field: a declared name may also be a name every object inherits, such as toString (R-DECL-12).
+    const present = Object.hasOwn(body, name); // V:own-field
+    if (!present) {
       if (requiredOn(f, shape)) return `${name} is required on target ${shape}`; // V:declared-required
       continue;
     }
@@ -326,12 +328,12 @@ export function bodyProblem(env: Envelope, vocab: Vocabulary, scopeOf: ThreadSco
       // Where the scope comes from is fixed at open (R-DECL-7): the opening declaration's hold, or the thread's.
       const source = steps.includes("open") ? (decl.hold?.scope === "body.scope" ? "body.scope" : "fixed") : scopeOf(String((env.target as Obj | null)?.["lane"]));
       if (source === "fixed") {
-        if (name in body) return `${name} is not allowed: the thread's scope is fixed (R-DECL-7)`; // V:scope-fixed
+        if (Object.hasOwn(body, name)) return `${name} is not allowed: the thread's scope is fixed (R-DECL-7)`; // V:scope-fixed
         continue;
       }
       required = true;
     }
-    if (!(name in body)) {
+    if (!Object.hasOwn(body, name)) {
       if (required) return `${name} is required by step ${steps.join(" then ")}`; // V:step-required
       continue;
     }
@@ -388,12 +390,12 @@ function recoverProblem(target: unknown, body: unknown): string | null {
   if (shape === null || !spec.targets.includes(shape)) return `recover ${op} takes target ${spec.targets.join(" or ")}`; // V:recover-target
   for (const name of Object.keys(body))
     if (name !== "op" && !Object.hasOwn(spec.fields, name) && !(name === "because" && RECOVER_BECAUSE.includes(op))) return `${name} is not a field of recover ${op}`; // V:recover-closed
-  if ("because" in body) {
+  if (Object.hasOwn(body, "because")) {
     const b = becauseProblem(body["because"]);
     if (b) return b;
   }
   for (const [name, f] of Object.entries(spec.fields)) {
-    if (!(name in body)) {
+    if (!Object.hasOwn(body, name)) {
       if (f.need === "required") return `${name} is required by recover ${op}`; // V:recover-required
       continue;
     }

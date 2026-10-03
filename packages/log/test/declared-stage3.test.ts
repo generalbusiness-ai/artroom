@@ -14,7 +14,7 @@
 
 import { describe, expect, test } from "vitest";
 import type { Decision, Envelope, LogEntry, PolicyDocument, PolicyDocumentV2, ReplayContext, Sha } from "@generalbusiness/artroom-contract";
-import { bindingOf, CODE_REVIEW_ACTS, evaluateRefuse, evaluateRequire, actMeter, ownersFor, type InputOf } from "@generalbusiness/artroom-policy";
+import { bindingOf, CODE_REVIEW_ACTS, evaluateRefuse, evaluateRequire, actMeter, ownersFor, policy, validatePolicyV2, type InputOf } from "@generalbusiness/artroom-policy";
 import { canonicalize, parseStrict, utf8 } from "../src/canonical.ts";
 import { digestJson, sha256Hex, unb64url } from "../src/crypto.ts";
 import { retain } from "../src/entries.ts";
@@ -22,7 +22,7 @@ import { MemoryGit } from "../src/git.ts";
 import { verifyLog, type VerifyReason } from "../src/verify.ts";
 import { STEPS_V1, bodyProblem, kindProblem, vocabularyOf, LEGACY } from "../src/declared.ts";
 import { keys } from "./support/room-sim.ts";
-import { pair, type Fixture } from "./support/declared-room.ts";
+import { DeclaredRoom, pair, type Fixture } from "./support/declared-room.ts";
 import { actAt, contextOf, insert, keep, open, reseal, verify, withEnvelope, withReceipt, type Log } from "./support/fixtures.ts";
 import activatesJson from "./fixtures/declared-activates-kind.json";
 import refusalsJson from "./fixtures/declared-refusals.json";
@@ -299,6 +299,50 @@ describe("condition 1: decoding by grammar, and kind, binding, body and who unde
       const seq = appendAct(log, 9, carol, (env) => ({ ...env, binding }));
       const f = await expectFailure(log, "delegation-invalid", seq);
       expect(f.failures[0]!.detail).toMatch(/earlier meaning of note/);
+    });
+
+    // Checker observation 6dd8c0ba (2): `who.delegable` is outside the binding, so the declaration in force at each act decides.
+    describe("who.delegable bounds a delegation at each act, also after the grant (R-DECL-11, R-ADM-5)", () => {
+      /** The grants log, then a document that differs from the one in force only in `note.who.delegable`. */
+      async function afterNote(delegable: boolean): Promise<Log> {
+        const log = open(GRANTS);
+        const before = docOf(log, 6) as unknown as PolicyDocumentV2;
+        const later: PolicyDocumentV2 = { ...before, acts: { ...before.acts, note: { ...before.acts["note"]!, who: { ...before.acts["note"]!.who, delegable } } } } as PolicyDocumentV2;
+        expect(validatePolicyV2(later).ok).toBe(true);
+        // The binding leaves `who` out (R-DECL-15): the grant's map still names note's binding in force.
+        expect(await bindingOf(later, "note")).toBe(await bindingOf(before, "note"));
+        log.retained.push(retain("policy", later));
+        insert(log, 11, { type: "system", event: { type: "policy-activated", policy: digestJson(later), checkers: [], commit: null, previous: idOf(log, 6), recomputed: { proposals: 0, reopened: 0, fenced: [] } } } as LogEntry["entry"]);
+        return log;
+      }
+
+      test("the delegated note admitted before the change still verifies", async () => {
+        const r = await verify(await afterNote(false));
+        expect(r.failures).toEqual([]);
+        expect(r.ok).toBe(true);
+      });
+
+      test("a delegated note signed after the change is delegation-invalid at its own seq", async () => {
+        const log = await afterNote(false);
+        const seq = appendAct(log, 9, carol, (env) => env);
+        const f = await expectFailure(log, "delegation-invalid", seq);
+        expect(f.failures[0]!.detail).toMatch(/note may not be delegated/);
+      });
+
+      test("the same later note is not delegation-invalid when the later document leaves note delegable", async () => {
+        const log = await afterNote(true);
+        appendAct(log, 9, carol, (env) => env);
+        const r = await verify(log);
+        expect(r.failures.filter((x) => x.reason === "delegation-invalid")).toEqual([]);
+      });
+
+      test("the grant's binding is judged before who.delegable, as admission judges them", async () => {
+        const log = await afterNote(false);
+        const seq = appendAct(log, 9, carol, (env) => ({ ...env, kind: "claim", binding: "sha256:" + "0".repeat(64), target: null, body: { goal: "x", scope: ["lib/**"] } }));
+        const r = await verify(log);
+        // claim stays delegable; its envelope's stale binding is judged at step 4a, before any delegation.
+        expect(r.failures.find((x) => x.seq === seq)?.reason).toBe("binding-stale");
+      });
     });
 
     test("the grantor's role, changed since the grant, may no longer sign the kind", async () => {
@@ -721,6 +765,62 @@ describe("a thread whose scope is fixed by a template (R-DECL-7)", () => {
     // On a body-scoped thread, take must carry its new scope.
     expect(bodyProblem(env({ lane: "act_1_00000000" }, { expectedGeneration: 0 }), v, () => "body.scope")).toMatch(/scope is required/);
   });
+});
+
+// Checker observation 6dd8c0ba (1): a declared name may also be a name every object inherits.
+describe("a declared field is present only as the body's own field (R-DECL-12)", () => {
+  // `constructor` is not among them: canonical JSON reserves it as a key, so no binding can be computed for a field of that name.
+  const INHERITED = ["toString", "valueOf", "hasOwnProperty", "isPrototypeOf", "toLocaleString"];
+  const withField = (name: string, field: object): PolicyDocumentV2 => {
+    const doc = { ...policy(), format: "artroom-policy-v2", steps: "artroom-steps-v1", acts: CODE_REVIEW_ACTS } as unknown as PolicyDocumentV2;
+    return { ...doc, acts: { ...doc.acts, claim: { ...doc.acts["claim"]!, body: { ...doc.acts["claim"]!.body, [name]: field } } } } as PolicyDocumentV2;
+  };
+  const claim = (body: object): Envelope => ({ v: 2, room: "room_x", actor: bob.key, kind: "claim", target: null, body, idempotencyKey: "k" }) as unknown as Envelope;
+  const scoped = () => "body.scope" as const;
+
+  /** A log the simulated room writes: the document activated, then one claim. */
+  async function claimLog(name: string, body: Readonly<Record<string, unknown>>): Promise<Log> {
+    const doc = withField(name, { type: "text", max: 64, optional: true });
+    expect(validatePolicyV2(doc).ok).toBe(true);
+    const room = new DeclaredRoom();
+    await room.activate(doc);
+    await room.act({ signer: alice, kind: "claim", target: null, body: { goal: "The app", scope: ["src/**"], ...body } });
+    return open(room.fixture("an optional declared field with a name every object inherits"));
+  }
+
+  test("an optional field named toString, left out, verifies on a fresh replay", async () => {
+    const r = await verify(await claimLog("toString", {}));
+    expect(r.failures).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
+  test("controls: the same field supplied verifies, and a plainly named optional field left out verifies", async () => {
+    for (const log of [await claimLog("toString", { toString: "a caption" }), await claimLog("caption", {})]) {
+      const r = await verify(log);
+      expect(r.failures).toEqual([]);
+      expect(r.ok).toBe(true);
+    }
+  });
+
+  test("a supplied toString of the wrong type is still body-invalid", async () => {
+    const log = await claimLog("toString", { toString: "a caption" });
+    const seq = log.entries.length - 1;
+    withEnvelope(log, seq, alice, (env) => ({ ...env, body: { ...(env["body"] as object), toString: 7 } }));
+    const r = await expectFailure(log, "body-invalid", seq);
+    expect(r.failures[0]!.detail).toMatch(/toString must be text/);
+  });
+
+  for (const name of INHERITED)
+    test(`${name}: optional and left out is no problem; required and left out is named as required`, async () => {
+      const optional = withField(name, { type: "text", max: 64, optional: true });
+      const required = withField(name, { type: "text", max: 64 });
+      expect(validatePolicyV2(optional).ok).toBe(true);
+      expect(validatePolicyV2(required).ok).toBe(true);
+      const body = { goal: "The app", scope: ["src/**"] };
+      expect(bodyProblem(claim(body), await vocabularyOf(optional, STEPS_V1), scoped)).toBeNull();
+      expect(bodyProblem(claim({ ...body, [name]: "a caption" }), await vocabularyOf(optional, STEPS_V1), scoped)).toBeNull();
+      expect(bodyProblem(claim(body), await vocabularyOf(required, STEPS_V1), scoped)).toBe(`${name} is required on target none`);
+    });
 });
 
 void canonicalize;

@@ -382,7 +382,10 @@ function coverage(d: DelegationState, env: Envelope, who: Who): string | null {
     const binding = (env as unknown as { binding?: Binding }).binding;
     if (d.acts === null) return `the delegation was granted before declared acts and covers no declared kind such as ${kind}; ask the grantor to delegate again`;
     if (!Object.hasOwn(d.acts, kind)) return `delegation does not cover ${kind}`;
-    return d.acts[kind] === binding ? null : `the delegation was granted for an earlier meaning of ${kind}`; // V:grant-binding
+    if (d.acts[kind] !== binding) return `the delegation was granted for an earlier meaning of ${kind}`; // V:grant-binding
+    // `who.delegable` is outside the binding (R-DECL-15), so the declaration in force at this act decides, also after the grant was admitted (R-DECL-11).
+    if (who.declared.acts[kind]!.who.delegable === false) return `${kind} may not be delegated`; // V:delegation-delegable
+    return null;
   }
   // A platform kind (or, under the legacy vocabulary, any kind) is covered by name.
   if (who.declared === null && d.acts !== null) return d.kinds.includes(kind as DelegableKind) ? null : `delegation does not cover ${kind}`;
