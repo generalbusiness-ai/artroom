@@ -1,0 +1,47 @@
+[
+  {
+    "path": "fixture.test.ts",
+    "sha256": "92141b8dc68da7397427fe0e60f0bf25c7186cfc40d87f3814416437cdf22853",
+    "bytes": 2472
+  },
+  {
+    "path": "final-commands.json",
+    "sha256": "89e8cc47afd45854daef54e413ba661ef964fae5cb3241e716d291e15c40df16",
+    "bytes": 2030
+  },
+  {
+    "path": "repair-compile.log",
+    "sha256": "a102d4a044fa5ec6aef465728bd0e9b458bd32d122649fb78d359f47fa905168",
+    "bytes": 1882
+  },
+  {
+    "path": "repair-test.log",
+    "sha256": "e92dc2b6471d627f98edb5279c8d7866a13dad5a99adb4e93749a1ab30f0063a",
+    "bytes": 4233
+  },
+  {
+    "path": "repair.vitest.json",
+    "sha256": "3a813ce2c8b72e6dc095058a686a72e8dce3a49bad6269fb178ec58dd37098e1",
+    "bytes": 2927
+  },
+  {
+    "path": "baseline-compile.log",
+    "sha256": "a102d4a044fa5ec6aef465728bd0e9b458bd32d122649fb78d359f47fa905168",
+    "bytes": 1882
+  },
+  {
+    "path": "baseline-test.log",
+    "sha256": "a1855e10cee3e890219e7aa1165ea96cf93610e8b4ac708adc35a4b57254bc64",
+    "bytes": 2498
+  },
+  {
+    "path": "baseline.vitest.json",
+    "sha256": "70dc9a93dfcdfaf01f6568bc8656a944f88db1621eb4e4327ff6b567c30f9e8d",
+    "bytes": 2125
+  },
+  {
+    "path": "proof.json",
+    "sha256": "e83057b09896b973434395a60957955c36c89059ecbe237f79c78b78112cc39b",
+    "bytes": 2884
+  }
+]
