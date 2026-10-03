@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/README.md","body":{"commit":"df22d7713cc239f96a92f74596ee87509967a99f","path":"plans/README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:019fe4c03f994319cec4466f394194449ce61731","text":"Merge retired a covered predecessor; the successor is at packages/git/src/landing/engine.ts."}
