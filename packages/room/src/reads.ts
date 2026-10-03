@@ -159,7 +159,7 @@ export async function proposal(core: RoomCore, ref: ProposalRef): Promise<Propos
   const pin = one(core.sql, "SELECT ref, done FROM pins WHERE ref = ?", `refs/artroom/heads/${ref.lane}/${ref.generation}`);
   if (pin && num(pin, "done") === 0) {
     try {
-      await core.completePins();
+      await core.completePins(true);
     } catch (e) {
       core.diagnose("read-failed", "completePins", e);
       throw artroomError("unavailable", "The proposal's pinned ref is not written yet. Retry.");

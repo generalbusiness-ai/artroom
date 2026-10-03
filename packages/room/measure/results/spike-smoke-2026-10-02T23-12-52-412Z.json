@@ -1,0 +1,821 @@
+{
+  "run": "2026-10-02T23-12-52-412Z",
+  "url": "https://artroom-spike-room.inguz.workers.dev",
+  "namespace": "gitseq-spike",
+  "importNamespace": "gitseq-spike-import",
+  "steps": [
+    {
+      "step": "rows-check: throwaway repository created in gitseq-spike-import",
+      "ok": true,
+      "atMs": 3465,
+      "detail": {
+        "name": "6e9538685346a0787753e6acccf352e4",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/6e9538685346a0787753e6acccf352e4.git"
+      }
+    },
+    {
+      "step": "rows-check: one commit pushed; its creation token revoked",
+      "ok": true,
+      "atMs": 3465,
+      "detail": {
+        "main": "3ea671e2d316c8716d3c5a7fc45f4eb9f8b32120",
+        "revoked": 1,
+        "active": 0
+      }
+    },
+    {
+      "step": "rows-check: draft",
+      "ok": true,
+      "atMs": 3919,
+      "detail": {
+        "status": 200,
+        "repo": "gitseq-spike-import/6e9538685346a0787753e6acccf352e4",
+        "operator": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
+      }
+    },
+    {
+      "step": "rows-check: found",
+      "ok": true,
+      "atMs": 5914,
+      "detail": {
+        "status": 200,
+        "ms": 1994,
+        "room": "room_905565508fb92a90dfa5ece5a3432808"
+      }
+    },
+    {
+      "step": "rows-check: main is the imported commit; the Room wrote nothing",
+      "ok": true,
+      "atMs": 7016,
+      "detail": {
+        "main": "3ea671e2d316c8716d3c5a7fc45f4eb9f8b32120",
+        "imported": "3ea671e2d316c8716d3c5a7fc45f4eb9f8b32120"
+      }
+    },
+    {
+      "step": "rows-check: session",
+      "ok": true,
+      "atMs": 7106,
+      "detail": {
+        "status": 200,
+        "member": "@author"
+      }
+    },
+    {
+      "step": "rows-check: @manual-checker joins as checker",
+      "ok": true,
+      "atMs": 97688,
+      "detail": {
+        "key": "key_H5Yl0zOUVKDvZInVQXhI_oBE917TDDMY_ukamqLfsdo",
+        "invite": 200,
+        "join": 200,
+        "session": 200
+      }
+    },
+    {
+      "step": "lane 60: claim",
+      "ok": true,
+      "atMs": 188114,
+      "detail": {
+        "status": 200,
+        "ms": 423,
+        "lane": "act_6_78bbf147",
+        "seq": 6
+      }
+    },
+    {
+      "step": "lane 60: workspace requested",
+      "ok": true,
+      "atMs": 188266,
+      "detail": {
+        "status": 200,
+        "ms": 151,
+        "op": "op_ws_act_6_78bbf147_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 60: workspace ready",
+      "ok": true,
+      "atMs": 191687,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/6e9538685346a0787753e6acccf352e4--act_6_78bbf147.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 60: workspace token",
+      "ok": true,
+      "atMs": 191773,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/6e9538685346a0787753e6acccf352e4--act_6_78bbf147.git",
+        "expiresAt": "2026-10-02T23:45:54.820Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 60: clone fork",
+      "ok": true,
+      "atMs": 192233,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 60: push to fork",
+      "ok": true,
+      "atMs": 192584,
+      "detail": {
+        "head": "3e3bcd0cbd5d89693b9ba0d24b9f1a9f9c70e067",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 60: propose",
+      "ok": true,
+      "atMs": 291778,
+      "detail": {
+        "status": 200,
+        "ms": 9191,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_8",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T23:17:43.965Z",
+          "lane": "act_6_78bbf147",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "lib/x.js"
+          }
+        ],
+        "obligations": [
+          {
+            "id": "obl_check-manual",
+            "rule": "check-manual",
+            "policy": "act_1_b43f7ea0",
+            "paths": [
+              "lib/x.js"
+            ],
+            "kind": "check",
+            "check": "manual",
+            "by": [
+              "role:checker"
+            ],
+            "state": "open",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "step": "lane 60: preview",
+      "ok": true,
+      "atMs": 292394,
+      "detail": {
+        "state": "clean",
+        "integration": "3e3bcd0cbd5d89693b9ba0d24b9f1a9f9c70e067",
+        "base": "3ea671e2d316c8716d3c5a7fc45f4eb9f8b32120"
+      }
+    },
+    {
+      "step": "rows-check: the proposal owes the manual check, on a clean fast-forward preview",
+      "ok": true,
+      "atMs": 382394,
+      "detail": {
+        "obligation": {
+          "id": "obl_check-manual",
+          "rule": "check-manual",
+          "policy": "act_1_b43f7ea0",
+          "paths": [
+            "lib/x.js"
+          ],
+          "kind": "check",
+          "check": "manual",
+          "by": [
+            "role:checker"
+          ],
+          "state": "open",
+          "evidence": []
+        },
+        "integration": "3e3bcd0cbd5d89693b9ba0d24b9f1a9f9c70e067",
+        "head": "3e3bcd0cbd5d89693b9ba0d24b9f1a9f9c70e067"
+      }
+    },
+    {
+      "step": "rows-check: the manual checker's configuration digest, from policy-activated",
+      "ok": true,
+      "atMs": 382954,
+      "detail": {
+        "config": "sha256:bb5cd9dcdd5ad31c15c60c38e208ee1545cdacd76ffe50595299bd4d3605bfc4"
+      }
+    },
+    {
+      "step": "rows-check: the check was admitted",
+      "ok": true,
+      "atMs": 833663,
+      "detail": {
+        "status": 200
+      }
+    }
+  ],
+  "gaps": [],
+  "cleanup": {
+    "releases": {
+      "lane 60": {
+        "status": 200
+      }
+    },
+    "ok": true,
+    "duties": [
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "inventory",
+        "repos": [
+          "6e9538685346a0787753e6acccf352e4",
+          "6e9538685346a0787753e6acccf352e4--act_6_78bbf147"
+        ],
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "6e9538685346a0787753e6acccf352e4--act_6_78bbf147",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "6e9538685346a0787753e6acccf352e4--act_6_78bbf147",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "6e9538685346a0787753e6acccf352e4",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "6e9538685346a0787753e6acccf352e4",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "final-inventory",
+        "repos": [
+          "6e9538685346a0787753e6acccf352e4",
+          "6e9538685346a0787753e6acccf352e4--act_6_78bbf147"
+        ],
+        "outcome": "done"
+      }
+    ],
+    "unresolved": [],
+    "reposLeft": []
+  },
+  "rows": {
+    "mode": "check",
+    "rooms": [
+      "room_905565508fb92a90dfa5ece5a3432808"
+    ],
+    "windows": [
+      {
+        "name": "rows-check: found a dedicated room",
+        "kind": "setup",
+        "from": "2026-10-02T23:12:55.877Z",
+        "to": "2026-10-02T23:14:29.524Z",
+        "room": "room_905565508fb92a90dfa5ece5a3432808"
+      },
+      {
+        "name": "check: setup, a checker member joins",
+        "kind": "setup",
+        "from": "2026-10-02T23:14:29.524Z",
+        "to": "2026-10-02T23:16:00.102Z",
+        "room": "room_905565508fb92a90dfa5ece5a3432808"
+      },
+      {
+        "name": "check: setup, a lane on lib/** claimed and pushed",
+        "kind": "setup",
+        "from": "2026-10-02T23:16:00.102Z",
+        "to": "2026-10-02T23:17:34.998Z",
+        "room": "room_905565508fb92a90dfa5ece5a3432808"
+      },
+      {
+        "name": "check: setup, propose (owes the manual check; no job is sent)",
+        "kind": "setup",
+        "from": "2026-10-02T23:17:34.998Z",
+        "to": "2026-10-02T23:19:14.806Z",
+        "room": "room_905565508fb92a90dfa5ece5a3432808"
+      },
+      {
+        "name": "check: quiet before (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T23:19:15.366Z",
+        "to": "2026-10-02T23:24:15.370Z",
+        "room": "room_905565508fb92a90dfa5ece5a3432808"
+      },
+      {
+        "name": "check: the check, admitted",
+        "kind": "act",
+        "from": "2026-10-02T23:24:15.370Z",
+        "to": "2026-10-02T23:26:46.075Z",
+        "room": "room_905565508fb92a90dfa5ece5a3432808"
+      },
+      {
+        "name": "check: quiet after (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T23:26:46.075Z",
+        "to": "2026-10-02T23:31:46.078Z",
+        "room": "room_905565508fb92a90dfa5ece5a3432808"
+      }
+    ],
+    "table": [
+      {
+        "room": "room_905565508fb92a90dfa5ece5a3432808",
+        "window": "rows-check: found a dedicated room",
+        "kind": "setup",
+        "from": "2026-10-02T23:12:55.877Z",
+        "to": "2026-10-02T23:14:29.524Z",
+        "samples": 1,
+        "roomWritten": 179,
+        "roomRead": 124,
+        "baselineWritten": 0,
+        "baselineRead": 1.1,
+        "actWritten": 179,
+        "actRead": 122.9,
+        "roomInvocationsPerMinute": 3,
+        "registryWritten": 4,
+        "registryRead": 3,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "baseline": "quiet controls"
+      },
+      {
+        "room": "room_905565508fb92a90dfa5ece5a3432808",
+        "window": "check: setup, a checker member joins",
+        "kind": "setup",
+        "from": "2026-10-02T23:14:29.524Z",
+        "to": "2026-10-02T23:16:00.102Z",
+        "samples": 2,
+        "roomWritten": 42,
+        "roomRead": 443,
+        "baselineWritten": 0,
+        "baselineRead": 1.1,
+        "actWritten": 42,
+        "actRead": 440.8,
+        "roomInvocationsPerMinute": 3,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "baseline": "quiet controls"
+      },
+      {
+        "room": "room_905565508fb92a90dfa5ece5a3432808",
+        "window": "check: setup, a lane on lib/** claimed and pushed",
+        "kind": "setup",
+        "from": "2026-10-02T23:16:00.102Z",
+        "to": "2026-10-02T23:17:34.998Z",
+        "samples": 1,
+        "roomWritten": 31,
+        "roomRead": 330,
+        "baselineWritten": 0,
+        "baselineRead": 1.1,
+        "actWritten": 31,
+        "actRead": 328.9,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "baseline": "quiet controls"
+      },
+      {
+        "room": "room_905565508fb92a90dfa5ece5a3432808",
+        "window": "check: setup, propose (owes the manual check; no job is sent)",
+        "kind": "setup",
+        "from": "2026-10-02T23:17:34.998Z",
+        "to": "2026-10-02T23:19:14.806Z",
+        "samples": 2,
+        "roomWritten": 51,
+        "roomRead": 1000,
+        "baselineWritten": 0,
+        "baselineRead": 1.1,
+        "actWritten": 51,
+        "actRead": 997.8,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "baseline": "quiet controls"
+      },
+      {
+        "room": "room_905565508fb92a90dfa5ece5a3432808",
+        "window": "check: quiet before (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T23:19:15.366Z",
+        "to": "2026-10-02T23:24:15.370Z",
+        "samples": 5,
+        "roomWritten": 0,
+        "roomRead": 11,
+        "baselineWritten": 0,
+        "baselineRead": 1.1,
+        "actWritten": 0,
+        "actRead": 5.5,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "baseline": "quiet controls"
+      },
+      {
+        "room": "room_905565508fb92a90dfa5ece5a3432808",
+        "window": "check: the check, admitted",
+        "kind": "act",
+        "from": "2026-10-02T23:24:15.370Z",
+        "to": "2026-10-02T23:26:46.075Z",
+        "samples": 2,
+        "roomWritten": 17,
+        "roomRead": 349,
+        "baselineWritten": 0,
+        "baselineRead": 1.1,
+        "actWritten": 17,
+        "actRead": 346.8,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "baseline": "quiet controls"
+      },
+      {
+        "room": "room_905565508fb92a90dfa5ece5a3432808",
+        "window": "check: quiet after (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T23:26:46.075Z",
+        "to": "2026-10-02T23:31:46.078Z",
+        "samples": 5,
+        "roomWritten": 0,
+        "roomRead": 0,
+        "baselineWritten": 0,
+        "baselineRead": 1.1,
+        "actWritten": 0,
+        "actRead": -5.5,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "baseline": "quiet controls"
+      }
+    ],
+    "namespaces": [
+      {
+        "id": "3388b66bd8f345438705519a063d6bd7",
+        "name": "artroom-spike-room_Publisher",
+        "className": "Publisher"
+      },
+      {
+        "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+        "name": "artroom-spike-room_Registry",
+        "className": "Registry"
+      },
+      {
+        "id": "fd8efe823eb6430bb910ee34d469681b",
+        "name": "artroom-spike-room_Room",
+        "className": "Room"
+      }
+    ],
+    "samples": [
+      {
+        "className": "Publisher",
+        "objectId": "55895bd0028640f4dec55dbb37e3a4b70425a15c992665088621b228d91701c8",
+        "name": "2ff4825be44f75c124c73d3fb893747ed93fa1743680d1e58532a2ad94b87c8a",
+        "t": "2026-10-02T23:11:34Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "a414ecd3da049d820f9282b112320468e1a9060a0aafeb2fab89f1fa427eaeb6",
+        "name": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "t": "2026-10-02T23:13:58Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "a414ecd3da049d820f9282b112320468e1a9060a0aafeb2fab89f1fa427eaeb6",
+        "name": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "t": "2026-10-02T23:15:30Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "a414ecd3da049d820f9282b112320468e1a9060a0aafeb2fab89f1fa427eaeb6",
+        "name": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "t": "2026-10-02T23:17:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "a414ecd3da049d820f9282b112320468e1a9060a0aafeb2fab89f1fa427eaeb6",
+        "name": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "t": "2026-10-02T23:17:36Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "a414ecd3da049d820f9282b112320468e1a9060a0aafeb2fab89f1fa427eaeb6",
+        "name": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "t": "2026-10-02T23:18:44Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "a414ecd3da049d820f9282b112320468e1a9060a0aafeb2fab89f1fa427eaeb6",
+        "name": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "t": "2026-10-02T23:25:16Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T23:12:45Z",
+        "rowsWritten": 0,
+        "rowsRead": 1
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T23:12:56Z",
+        "rowsWritten": 4,
+        "rowsRead": 2
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:12:57Z",
+        "rowsWritten": 179,
+        "rowsRead": 124
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:13:57Z",
+        "rowsWritten": 35,
+        "rowsRead": 272
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:14:57Z",
+        "rowsWritten": 7,
+        "rowsRead": 171
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:15:57Z",
+        "rowsWritten": 31,
+        "rowsRead": 330
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:16:57Z",
+        "rowsWritten": 44,
+        "rowsRead": 758
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:17:57Z",
+        "rowsWritten": 7,
+        "rowsRead": 242
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:18:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 11
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:19:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:20:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:21:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:22:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:23:57Z",
+        "rowsWritten": 10,
+        "rowsRead": 100
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:24:57Z",
+        "rowsWritten": 7,
+        "rowsRead": 249
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:25:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:26:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:27:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:28:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:29:57Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "name": "room_905565508fb92a90dfa5ece5a3432808",
+        "t": "2026-10-02T23:30:57Z",
+        "rowsWritten": 21,
+        "rowsRead": 298
+      }
+    ]
+  },
+  "rowGate": {
+    "worker": "artroom-spike-room",
+    "from": "2026-10-02T23:12:52.414Z",
+    "to": "2026-10-02T23:33:49.994Z",
+    "sampledFrom": "2026-10-02T23:10:52.414Z",
+    "totalRowsWritten": 369,
+    "totalRowsRead": 3120,
+    "totalRequests": 26,
+    "namespaces": [
+      {
+        "id": "3388b66bd8f345438705519a063d6bd7",
+        "name": "artroom-spike-room_Publisher",
+        "className": "Publisher"
+      },
+      {
+        "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+        "name": "artroom-spike-room_Registry",
+        "className": "Registry"
+      },
+      {
+        "id": "fd8efe823eb6430bb910ee34d469681b",
+        "name": "artroom-spike-room_Room",
+        "className": "Room"
+      }
+    ],
+    "objects": [
+      {
+        "className": "Publisher",
+        "object": "2ff4825be44f75c124c73d3fb893747ed93fa1743680d1e58532a2ad94b87c8a",
+        "objectId": "55895bd0028640f4dec55dbb37e3a4b70425a15c992665088621b228d91701c8",
+        "rowsWritten": 0,
+        "rowsRead": 0,
+        "requests": 0,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Publisher",
+        "object": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "objectId": "a414ecd3da049d820f9282b112320468e1a9060a0aafeb2fab89f1fa427eaeb6",
+        "rowsWritten": 0,
+        "rowsRead": 0,
+        "requests": 14,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Registry",
+        "object": "registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "rowsWritten": 4,
+        "rowsRead": 3,
+        "requests": 2,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_905565508fb92a90dfa5ece5a3432808",
+        "objectId": "2f7bfdec6de00d3e3e361239f934ecef9fe05771901547805f4729ca470caaaa",
+        "rowsWritten": 353,
+        "rowsRead": 2823,
+        "requests": 10,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_20de22499ac4181a40d61546b04d36ef",
+        "objectId": "2ff4825be44f75c124c73d3fb893747ed93fa1743680d1e58532a2ad94b87c8a",
+        "rowsWritten": 12,
+        "rowsRead": 294,
+        "requests": 0,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_02f326f3c2ad55d920a05c6de80e0ec9",
+        "objectId": "3d161db3639169c1f95f04f298d063437ca9f76563f22e2d268e8856a704386e",
+        "rowsWritten": 0,
+        "rowsRead": 0,
+        "requests": 0,
+        "periodicSamples": 1
+      }
+    ],
+    "budget": {
+      "maxRowsWritten": 9200,
+      "maxRowsWrittenPerObject": 2100
+    },
+    "state": "pass",
+    "failures": []
+  },
+  "ok": true,
+  "ms": 1259551
+}

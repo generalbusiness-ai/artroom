@@ -40,6 +40,14 @@ export interface RoomEnv {
   /** The repository namespace reserved for public founding (R-GEN-12). */
   readonly PUBLIC_NAMESPACE?: string;
   readonly LEASE_SECONDS?: string;
+  /**
+   * Spike measurement only (request 8bd623cc; hugh's approval, assert
+   * 66a41558): leave each proposal's pin to the alarm, due this many
+   * milliseconds after its propose, so the alarm tick that completes a
+   * pending pin can be measured on its own. Unset (the default, and always in
+   * production): the propose's commit runs the pin at once, as before.
+   */
+  readonly PIN_DELAY_MS?: string;
   /** Required: the deployment's own `https://` origin, where `Redeemed.mcp` sends a bearer token. No default. */
   readonly PUBLIC_URL?: string;
   readonly ROOM_KEY_SECRET?: string;
@@ -141,6 +149,27 @@ export function setAlarmDelay(ms: number | null): void {
 /** The real time at which to set an alarm the room wants at `due` (room clock). */
 export function alarmTime(due: number): number {
   return alarmDelay !== null ? Date.now() + alarmDelay : Math.max(due, Date.now() + 10);
+}
+
+let pinDelayOverride: number | null = null;
+
+/** Tests only: the pin delay every Room made from now on uses, whatever its env says; null to read the env again. */
+export function setPinDelay(ms: number | null): void {
+  pinDelayOverride = ms;
+}
+
+/**
+ * The pin delay from `PIN_DELAY_MS`, in milliseconds; 0 (off) when unset or
+ * empty. Any other value that is not a whole number of milliseconds stops the
+ * Room from starting, rather than measuring with a switch it did not mean.
+ */
+export function pinDelayMs(env: Pick<RoomEnv, "PIN_DELAY_MS">): number {
+  if (pinDelayOverride !== null) return pinDelayOverride;
+  const v = env.PIN_DELAY_MS;
+  if (v === undefined || v === "") return 0;
+  const n = Number(v);
+  if (!/^\d+$/.test(v) || !Number.isSafeInteger(n)) throw new Error("PIN_DELAY_MS must be a whole number of milliseconds, or unset.");
+  return n;
 }
 
 /** Tests only: replace the room clock. */

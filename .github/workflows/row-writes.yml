@@ -1,0 +1,43 @@
+# Durable Object rows written by the spike, checked every hour against the
+# budget (request 8bd623cc; packages/room/measure/rows.mjs and
+# packages/room/measure/README.md).
+#
+# Inert until enabled: the job runs only when the repository variable
+# ARTROOM_ROW_MONITOR is "true", which is set after hugh installs the
+# read-only analytics token as the secret ARTROOM_CF_ANALYTICS_TOKEN. Once
+# enabled, a missing token or incomplete billing data fails the job: silence
+# is never read as an hour with no writes.
+#
+# A failing job is the alert. ARTROOM_ROW_ALERT_WEBHOOK_URL, an optional
+# secret, also receives the report.
+
+name: Durable Object rows written
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rows:
+    if: ${{ vars.ARTROOM_ROW_MONITOR == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      # One request to the Room each run, so the next run's window holds
+      # invocation evidence even when the spike is otherwise idle. A name
+      # that no room has answers 404 after the registry lookup.
+      - name: Probe the spike Room
+        run: curl -sS -o /dev/null -w '%{http_code}\n' https://artroom-spike-room.inguz.workers.dev/v1/rooms/row-monitor-probe
+      - name: Check the hour ending ten minutes ago
+        env:
+          ARTROOM_CF_ANALYTICS_TOKEN: ${{ secrets.ARTROOM_CF_ANALYTICS_TOKEN }}
+          ARTROOM_ROW_ALERT_WEBHOOK_URL: ${{ secrets.ARTROOM_ROW_ALERT_WEBHOOK_URL }}
+        run: node packages/room/measure/rows.mjs --worker artroom-spike-room

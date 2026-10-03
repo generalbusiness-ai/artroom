@@ -1,0 +1,3015 @@
+{
+  "run": "2026-10-02T17-23-45-894Z",
+  "url": "https://artroom-spike-room.inguz.workers.dev",
+  "namespace": "gitseq-spike",
+  "importNamespace": "gitseq-spike-import",
+  "steps": [
+    {
+      "step": "rows: throwaway repository created in gitseq-spike-import",
+      "ok": true,
+      "atMs": 3133,
+      "detail": {
+        "name": "e89721f6c15a7c710881fdb868d7f3ca",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca.git"
+      }
+    },
+    {
+      "step": "rows: one commit pushed; its creation token revoked",
+      "ok": true,
+      "atMs": 3133,
+      "detail": {
+        "main": "68ca636f6e768f75af37d839a003a3eba4dc6e4f",
+        "revoked": 1,
+        "active": 0
+      }
+    },
+    {
+      "step": "rows: draft",
+      "ok": true,
+      "atMs": 3467,
+      "detail": {
+        "status": 200,
+        "repo": "gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca",
+        "operator": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
+      }
+    },
+    {
+      "step": "rows: found",
+      "ok": true,
+      "atMs": 5654,
+      "detail": {
+        "status": 200,
+        "ms": 2186,
+        "room": "room_872e0b20159fb850fc36fd1deb49b3fc"
+      }
+    },
+    {
+      "step": "rows: main is the imported commit; the Room wrote nothing",
+      "ok": true,
+      "atMs": 6709,
+      "detail": {
+        "main": "68ca636f6e768f75af37d839a003a3eba4dc6e4f",
+        "imported": "68ca636f6e768f75af37d839a003a3eba4dc6e4f"
+      }
+    },
+    {
+      "step": "rows: session",
+      "ok": true,
+      "atMs": 6785,
+      "detail": {
+        "status": 200,
+        "member": "@author"
+      }
+    },
+    {
+      "step": "rows: invite",
+      "ok": true,
+      "atMs": 307353,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "rows: join",
+      "ok": true,
+      "atMs": 457696,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "rows: @checker joins as checker",
+      "ok": true,
+      "atMs": 458138,
+      "detail": {
+        "key": "key__5Feafe6dIDQmeA8IHuU-IyPQFWaQ8MnzskJMmfY11Y",
+        "invite": 200,
+        "join": 200,
+        "session": 200
+      }
+    },
+    {
+      "step": "lane 10: claim",
+      "ok": true,
+      "atMs": 548451,
+      "detail": {
+        "status": 200,
+        "ms": 311,
+        "lane": "act_14_2e5d2efb",
+        "seq": 14
+      }
+    },
+    {
+      "step": "lane 10: workspace requested",
+      "ok": true,
+      "atMs": 698801,
+      "detail": {
+        "status": 200,
+        "ms": 348,
+        "op": "op_ws_act_14_2e5d2efb_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 10: workspace ready",
+      "ok": true,
+      "atMs": 700995,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_14_2e5d2efb.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 10: workspace token",
+      "ok": true,
+      "atMs": 701066,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_14_2e5d2efb.git",
+        "expiresAt": "2026-10-02T18:02:48.608Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 10: clone fork",
+      "ok": true,
+      "atMs": 701587,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 10: push to fork",
+      "ok": true,
+      "atMs": 701959,
+      "detail": {
+        "head": "2752caade5b7a9662472d93af8922076ca7f1ddf",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 10: propose",
+      "ok": true,
+      "atMs": 794233,
+      "detail": {
+        "status": 200,
+        "ms": 2272,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_19",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T17:36:59.957Z",
+          "lane": "act_14_2e5d2efb",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d0/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 10: preview",
+      "ok": true,
+      "atMs": 794510,
+      "detail": {
+        "state": "clean",
+        "integration": "2752caade5b7a9662472d93af8922076ca7f1ddf",
+        "base": "68ca636f6e768f75af37d839a003a3eba4dc6e4f"
+      }
+    },
+    {
+      "step": "rows: note",
+      "ok": true,
+      "atMs": 1095074,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "lane 10: land accepted",
+      "ok": true,
+      "atMs": 1095780,
+      "detail": {
+        "status": 200,
+        "ms": 705,
+        "op": "op_land_25",
+        "state": "accepted"
+      }
+    },
+    {
+      "step": "lane 10: landed",
+      "ok": true,
+      "atMs": 1097417,
+      "detail": {
+        "op": "op_land_25",
+        "state": "landed",
+        "integration": "2752caade5b7a9662472d93af8922076ca7f1ddf"
+      }
+    },
+    {
+      "step": "rows: admin read session renewed",
+      "ok": true,
+      "atMs": 1247822,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "lane 11: claim",
+      "ok": true,
+      "atMs": 1398601,
+      "detail": {
+        "status": 200,
+        "ms": 626,
+        "lane": "act_34_a1c0a722",
+        "seq": 34
+      }
+    },
+    {
+      "step": "lane 11: workspace requested",
+      "ok": true,
+      "atMs": 1398752,
+      "detail": {
+        "status": 200,
+        "ms": 150,
+        "op": "op_ws_act_34_a1c0a722_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 11: workspace ready",
+      "ok": true,
+      "atMs": 1401407,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_34_a1c0a722.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 11: workspace token",
+      "ok": true,
+      "atMs": 1401524,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_34_a1c0a722.git",
+        "expiresAt": "2026-10-02T18:16:59.080Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 11: clone fork",
+      "ok": true,
+      "atMs": 1402410,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 11: push to fork",
+      "ok": true,
+      "atMs": 1402935,
+      "detail": {
+        "head": "554607114993c9664639852f18fbf6adbeb346a3",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 11: propose",
+      "ok": true,
+      "atMs": 1405168,
+      "detail": {
+        "status": 200,
+        "ms": 2232,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_35",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T17:47:10.889Z",
+          "lane": "act_34_a1c0a722",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d1/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 11: preview",
+      "ok": true,
+      "atMs": 1405395,
+      "detail": {
+        "state": "clean",
+        "integration": "554607114993c9664639852f18fbf6adbeb346a3",
+        "base": "2752caade5b7a9662472d93af8922076ca7f1ddf"
+      }
+    },
+    {
+      "step": "lane 12: claim",
+      "ok": true,
+      "atMs": 1405514,
+      "detail": {
+        "status": 200,
+        "ms": 119,
+        "lane": "act_36_7c01cdad",
+        "seq": 36
+      }
+    },
+    {
+      "step": "lane 12: workspace requested",
+      "ok": true,
+      "atMs": 1405641,
+      "detail": {
+        "status": 200,
+        "ms": 126,
+        "op": "op_ws_act_36_7c01cdad_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 12: workspace ready",
+      "ok": true,
+      "atMs": 1408120,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_36_7c01cdad.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 12: workspace token",
+      "ok": true,
+      "atMs": 1408232,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_36_7c01cdad.git",
+        "expiresAt": "2026-10-02T18:17:05.857Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 12: clone fork",
+      "ok": true,
+      "atMs": 1408693,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 12: push to fork",
+      "ok": true,
+      "atMs": 1409206,
+      "detail": {
+        "head": "4caf47e1f01b99d2df83417a597d9a5248277529",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 12: propose",
+      "ok": true,
+      "atMs": 1418133,
+      "detail": {
+        "status": 200,
+        "ms": 8926,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_37",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T17:47:23.851Z",
+          "lane": "act_36_7c01cdad",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d2/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 12: preview",
+      "ok": true,
+      "atMs": 1418339,
+      "detail": {
+        "state": "clean",
+        "integration": "4caf47e1f01b99d2df83417a597d9a5248277529",
+        "base": "2752caade5b7a9662472d93af8922076ca7f1ddf"
+      }
+    },
+    {
+      "step": "lane 13: claim",
+      "ok": true,
+      "atMs": 1418462,
+      "detail": {
+        "status": 200,
+        "ms": 122,
+        "lane": "act_38_bf22c68d",
+        "seq": 38
+      }
+    },
+    {
+      "step": "lane 13: workspace requested",
+      "ok": true,
+      "atMs": 1418593,
+      "detail": {
+        "status": 200,
+        "ms": 130,
+        "op": "op_ws_act_38_bf22c68d_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 13: workspace ready",
+      "ok": true,
+      "atMs": 1420666,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_38_bf22c68d.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 13: workspace token",
+      "ok": true,
+      "atMs": 1420782,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_38_bf22c68d.git",
+        "expiresAt": "2026-10-02T18:17:18.393Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 13: clone fork",
+      "ok": true,
+      "atMs": 1421670,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 13: push to fork",
+      "ok": true,
+      "atMs": 1422280,
+      "detail": {
+        "head": "28fccbf91eed96843b9a3ffe58fe55837d7cdce7",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 13: propose",
+      "ok": true,
+      "atMs": 1423581,
+      "detail": {
+        "status": 200,
+        "ms": 1300,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_39",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T17:47:29.288Z",
+          "lane": "act_38_bf22c68d",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d3/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 13: preview",
+      "ok": true,
+      "atMs": 1423895,
+      "detail": {
+        "state": "clean",
+        "integration": "28fccbf91eed96843b9a3ffe58fe55837d7cdce7",
+        "base": "2752caade5b7a9662472d93af8922076ca7f1ddf"
+      }
+    },
+    {
+      "step": "lane 14: claim",
+      "ok": true,
+      "atMs": 1424014,
+      "detail": {
+        "status": 200,
+        "ms": 118,
+        "lane": "act_40_dd218e13",
+        "seq": 40
+      }
+    },
+    {
+      "step": "lane 14: workspace requested",
+      "ok": true,
+      "atMs": 1424129,
+      "detail": {
+        "status": 200,
+        "ms": 114,
+        "op": "op_ws_act_40_dd218e13_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 14: workspace ready",
+      "ok": true,
+      "atMs": 1426103,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_40_dd218e13.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 14: workspace token",
+      "ok": true,
+      "atMs": 1426222,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_40_dd218e13.git",
+        "expiresAt": "2026-10-02T18:17:23.823Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 14: clone fork",
+      "ok": true,
+      "atMs": 1426662,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 14: push to fork",
+      "ok": true,
+      "atMs": 1427253,
+      "detail": {
+        "head": "4c5466190e0ecc02b91d38c7a9132bf0a6fc5fb9",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 14: propose",
+      "ok": true,
+      "atMs": 1428394,
+      "detail": {
+        "status": 200,
+        "ms": 1139,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_41",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T17:47:34.077Z",
+          "lane": "act_40_dd218e13",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d4/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 14: preview",
+      "ok": true,
+      "atMs": 1428611,
+      "detail": {
+        "state": "clean",
+        "integration": "4c5466190e0ecc02b91d38c7a9132bf0a6fc5fb9",
+        "base": "2752caade5b7a9662472d93af8922076ca7f1ddf"
+      }
+    },
+    {
+      "step": "lane 11: land accepted",
+      "ok": true,
+      "atMs": 1518958,
+      "detail": {
+        "status": 200,
+        "ms": 345,
+        "op": "op_land_43",
+        "state": "accepted"
+      }
+    },
+    {
+      "step": "lane 11: landed",
+      "ok": true,
+      "atMs": 1521167,
+      "detail": {
+        "op": "op_land_43",
+        "state": "landed",
+        "integration": "554607114993c9664639852f18fbf6adbeb346a3"
+      }
+    },
+    {
+      "step": "lane 30: claim",
+      "ok": true,
+      "atMs": 1762233,
+      "detail": {
+        "status": 200,
+        "ms": 632,
+        "lane": "act_51_16c3c108",
+        "seq": 51
+      }
+    },
+    {
+      "step": "lane 30: workspace requested",
+      "ok": true,
+      "atMs": 1762399,
+      "detail": {
+        "status": 200,
+        "ms": 165,
+        "op": "op_ws_act_51_16c3c108_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 30: workspace ready",
+      "ok": true,
+      "atMs": 1764958,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_51_16c3c108.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 30: workspace token",
+      "ok": true,
+      "atMs": 1765063,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_51_16c3c108.git",
+        "expiresAt": "2026-10-02T18:23:02.691Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 30: clone fork",
+      "ok": true,
+      "atMs": 1766138,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 30: push to fork",
+      "ok": true,
+      "atMs": 1766809,
+      "detail": {
+        "head": "54f35581001fcb6b98e68bd4590a7389ad2a5a25",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 30: propose",
+      "ok": true,
+      "atMs": 1768916,
+      "detail": {
+        "status": 200,
+        "ms": 2106,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_52",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T17:53:14.609Z",
+          "lane": "act_51_16c3c108",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "modified",
+            "path": ".artroom/policy.json"
+          }
+        ],
+        "obligations": [
+          {
+            "id": "obl_admin-approval",
+            "rule": "admin-approval",
+            "policy": "act_1_f3ecff38",
+            "paths": [
+              ".artroom/policy.json"
+            ],
+            "kind": "review",
+            "from": [
+              "role:admin"
+            ],
+            "count": 1,
+            "allowSelf": false,
+            "state": "open",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "step": "lane 30: preview",
+      "ok": true,
+      "atMs": 1769160,
+      "detail": {
+        "state": "clean",
+        "integration": "54f35581001fcb6b98e68bd4590a7389ad2a5a25",
+        "base": "554607114993c9664639852f18fbf6adbeb346a3"
+      }
+    },
+    {
+      "step": "lane 30: land accepted",
+      "ok": false,
+      "atMs": 1859623,
+      "detail": {
+        "status": 409,
+        "ms": 462,
+        "refused": "obligation-open",
+        "reason": "The obligation obl_admin-approval is open."
+      }
+    },
+    {
+      "step": "lane 40: claim",
+      "ok": true,
+      "atMs": 2100188,
+      "detail": {
+        "status": 200,
+        "ms": 381,
+        "lane": "act_59_dbac3201",
+        "seq": 59
+      }
+    },
+    {
+      "step": "lane 40: workspace requested",
+      "ok": true,
+      "atMs": 2100342,
+      "detail": {
+        "status": 200,
+        "ms": 153,
+        "op": "op_ws_act_59_dbac3201_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 40: workspace ready",
+      "ok": true,
+      "atMs": 2102471,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_59_dbac3201.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 40: workspace token",
+      "ok": true,
+      "atMs": 2102570,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/e89721f6c15a7c710881fdb868d7f3ca--act_59_dbac3201.git",
+        "expiresAt": "2026-10-02T18:28:40.182Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 40: clone fork",
+      "ok": true,
+      "atMs": 2103521,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 40: push to fork",
+      "ok": true,
+      "atMs": 2104084,
+      "detail": {
+        "head": "446b5741678ae7134bbf1b6b502812cf7d18d05e",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 40: propose",
+      "ok": true,
+      "atMs": 2196567,
+      "detail": {
+        "status": 200,
+        "ms": 2480,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_61",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T18:00:22.291Z",
+          "lane": "act_59_dbac3201",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "src/greet.js"
+          },
+          {
+            "status": "added",
+            "path": "test/greet.test.js"
+          }
+        ],
+        "obligations": [
+          {
+            "id": "obl_check-tests",
+            "rule": "check-tests",
+            "policy": "act_1_f3ecff38",
+            "paths": [
+              "src/greet.js",
+              "test/greet.test.js"
+            ],
+            "kind": "check",
+            "check": "tests",
+            "by": [
+              "role:checker"
+            ],
+            "state": "open",
+            "evidence": []
+          },
+          {
+            "id": "obl_independent-review",
+            "rule": "independent-review",
+            "policy": "act_1_f3ecff38",
+            "paths": [
+              "src/greet.js",
+              "test/greet.test.js"
+            ],
+            "kind": "review",
+            "from": [
+              "role:maintainer"
+            ],
+            "count": 1,
+            "allowSelf": false,
+            "state": "open",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "step": "lane 40: preview",
+      "ok": true,
+      "atMs": 2196862,
+      "detail": {
+        "state": "clean",
+        "integration": "446b5741678ae7134bbf1b6b502812cf7d18d05e",
+        "base": "554607114993c9664639852f18fbf6adbeb346a3"
+      }
+    },
+    {
+      "step": "rows: the check was admitted",
+      "ok": true,
+      "atMs": 2497371,
+      "detail": {
+        "check": {
+          "seq": 62,
+          "ok": true,
+          "integration": "446b5741678ae7134bbf1b6b502812cf7d18d05e",
+          "check": "tests",
+          "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+          "detail": "Machine-run check \"tests\": passed. It ran `npm ci`, then `npm test`, in an isolated runner.\nRunner environment: sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487\n\nnpm test exited 0.\n> spike-checks@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: adds\nok 1 - adds\n  ---\n  duration_ms: 1.107941\n  type: 'test'\n  ...\n# Subtest: greets\nok 2 - greets\n  ---\n  duration_ms: 1.049251"
+        },
+        "refused": []
+      }
+    },
+    {
+      "step": "rows: admin read session renewed",
+      "ok": true,
+      "atMs": 2497586,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "rows: review",
+      "ok": true,
+      "atMs": 2647696,
+      "detail": {
+        "status": 200
+      }
+    }
+  ],
+  "gaps": [],
+  "cleanup": {
+    "releases": {},
+    "ok": true,
+    "duties": [
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "inventory",
+        "repos": [
+          "e89721f6c15a7c710881fdb868d7f3ca",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_14_2e5d2efb",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_34_a1c0a722",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_36_7c01cdad",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_38_bf22c68d",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_40_dd218e13",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_51_16c3c108",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_59_dbac3201"
+        ],
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_59_dbac3201",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_59_dbac3201",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_51_16c3c108",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_51_16c3c108",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_40_dd218e13",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_40_dd218e13",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_38_bf22c68d",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_38_bf22c68d",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_36_7c01cdad",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_36_7c01cdad",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_34_a1c0a722",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_34_a1c0a722",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_14_2e5d2efb",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca--act_14_2e5d2efb",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "e89721f6c15a7c710881fdb868d7f3ca",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "final-inventory",
+        "repos": [
+          "e89721f6c15a7c710881fdb868d7f3ca",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_14_2e5d2efb",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_34_a1c0a722",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_36_7c01cdad",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_38_bf22c68d",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_40_dd218e13",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_51_16c3c108",
+          "e89721f6c15a7c710881fdb868d7f3ca--act_59_dbac3201"
+        ],
+        "outcome": "done"
+      }
+    ],
+    "unresolved": [],
+    "reposLeft": []
+  },
+  "rows": {
+    "room": "room_872e0b20159fb850fc36fd1deb49b3fc",
+    "open": 3,
+    "windows": [
+      {
+        "name": "found one room (draft, found, first session)",
+        "kind": "act",
+        "from": "2026-10-02T17:23:49.027Z",
+        "to": "2026-10-02T17:26:22.681Z"
+      },
+      {
+        "name": "invite",
+        "kind": "act",
+        "from": "2026-10-02T17:26:22.681Z",
+        "to": "2026-10-02T17:28:53.247Z"
+      },
+      {
+        "name": "join",
+        "kind": "act",
+        "from": "2026-10-02T17:28:53.247Z",
+        "to": "2026-10-02T17:31:23.590Z"
+      },
+      {
+        "name": "setup: the checker joins",
+        "kind": "setup",
+        "from": "2026-10-02T17:31:23.590Z",
+        "to": "2026-10-02T17:32:54.033Z"
+      },
+      {
+        "name": "claim",
+        "kind": "act",
+        "from": "2026-10-02T17:32:54.033Z",
+        "to": "2026-10-02T17:35:24.346Z"
+      },
+      {
+        "name": "setup: workspace, workspace token, push",
+        "kind": "setup",
+        "from": "2026-10-02T17:35:24.346Z",
+        "to": "2026-10-02T17:36:57.854Z"
+      },
+      {
+        "name": "propose (with its pin and preview)",
+        "kind": "act",
+        "from": "2026-10-02T17:36:57.854Z",
+        "to": "2026-10-02T17:39:30.405Z"
+      },
+      {
+        "name": "note",
+        "kind": "act",
+        "from": "2026-10-02T17:39:30.405Z",
+        "to": "2026-10-02T17:42:00.968Z"
+      },
+      {
+        "name": "land (no other open preview)",
+        "kind": "act",
+        "from": "2026-10-02T17:42:00.968Z",
+        "to": "2026-10-02T17:44:33.312Z"
+      },
+      {
+        "name": "release",
+        "kind": "act",
+        "from": "2026-10-02T17:44:33.312Z",
+        "to": "2026-10-02T17:47:03.868Z"
+      },
+      {
+        "name": "setup: 4 lanes claimed, pushed and proposed",
+        "kind": "setup",
+        "from": "2026-10-02T17:47:03.868Z",
+        "to": "2026-10-02T17:49:04.506Z"
+      },
+      {
+        "name": "land with 3 open previews",
+        "kind": "act",
+        "from": "2026-10-02T17:49:04.506Z",
+        "to": "2026-10-02T17:51:37.062Z"
+      },
+      {
+        "name": "setup: release the landed lane",
+        "kind": "setup",
+        "from": "2026-10-02T17:51:37.062Z",
+        "to": "2026-10-02T17:53:07.494Z"
+      },
+      {
+        "name": "setup: a policy lane claimed, pushed and proposed",
+        "kind": "setup",
+        "from": "2026-10-02T17:53:07.494Z",
+        "to": "2026-10-02T17:54:45.054Z"
+      },
+      {
+        "name": "land that activates a policy, with 3 open proposals",
+        "kind": "act",
+        "from": "2026-10-02T17:54:45.054Z",
+        "to": "2026-10-02T17:57:15.518Z"
+      },
+      {
+        "name": "setup: release the policy lane",
+        "kind": "setup",
+        "from": "2026-10-02T17:57:15.518Z",
+        "to": "2026-10-02T17:58:45.701Z"
+      },
+      {
+        "name": "setup: a checked lane claimed and pushed",
+        "kind": "setup",
+        "from": "2026-10-02T17:58:45.701Z",
+        "to": "2026-10-02T18:00:19.980Z"
+      },
+      {
+        "name": "propose (owes a check and a review; the check job is dispatched)",
+        "kind": "act",
+        "from": "2026-10-02T18:00:19.980Z",
+        "to": "2026-10-02T18:02:52.760Z"
+      },
+      {
+        "name": "check (the checker service's signed check, admitted)",
+        "kind": "act",
+        "from": "2026-10-02T18:02:52.760Z",
+        "to": "2026-10-02T18:05:23.265Z"
+      },
+      {
+        "name": "review",
+        "kind": "act",
+        "from": "2026-10-02T18:05:23.265Z",
+        "to": "2026-10-02T18:07:53.590Z"
+      },
+      {
+        "name": "idle: lanes held, nothing pending",
+        "kind": "idle",
+        "from": "2026-10-02T18:07:53.591Z",
+        "to": "2026-10-02T18:12:53.593Z"
+      },
+      {
+        "name": "setup: release every lane",
+        "kind": "setup",
+        "from": "2026-10-02T18:12:53.593Z",
+        "to": "2026-10-02T18:12:54.232Z"
+      }
+    ],
+    "table": [
+      {
+        "window": "found one room (draft, found, first session)",
+        "kind": "act",
+        "from": "2026-10-02T17:23:49.027Z",
+        "to": "2026-10-02T17:26:22.681Z",
+        "samples": 2,
+        "roomWritten": 187,
+        "roomRead": 267,
+        "baselineWritten": 8,
+        "baselineRead": 120,
+        "actWritten": 171,
+        "actRead": 27,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 4,
+        "registryRead": 11,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 408
+      },
+      {
+        "window": "invite",
+        "kind": "act",
+        "from": "2026-10-02T17:26:22.681Z",
+        "to": "2026-10-02T17:28:53.247Z",
+        "samples": 3,
+        "roomWritten": 33,
+        "roomRead": 640,
+        "baselineWritten": 7,
+        "baselineRead": 161,
+        "actWritten": 12,
+        "actRead": 157,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 321
+      },
+      {
+        "window": "join",
+        "kind": "act",
+        "from": "2026-10-02T17:28:53.247Z",
+        "to": "2026-10-02T17:31:23.590Z",
+        "samples": 2,
+        "roomWritten": 27,
+        "roomRead": 394,
+        "baselineWritten": 7,
+        "baselineRead": 176,
+        "actWritten": 13,
+        "actRead": 42,
+        "roomInvocationsPerMinute": 3,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 391
+      },
+      {
+        "window": "setup: the checker joins",
+        "kind": "setup",
+        "from": "2026-10-02T17:31:23.590Z",
+        "to": "2026-10-02T17:32:54.033Z",
+        "samples": 2,
+        "roomWritten": 41,
+        "roomRead": 485,
+        "baselineWritten": 7,
+        "baselineRead": 196,
+        "actWritten": 27,
+        "actRead": 93,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 2,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 180
+      },
+      {
+        "window": "claim",
+        "kind": "act",
+        "from": "2026-10-02T17:32:54.033Z",
+        "to": "2026-10-02T17:35:24.346Z",
+        "samples": 2,
+        "roomWritten": 23,
+        "roomRead": 481,
+        "baselineWritten": 7,
+        "baselineRead": 211,
+        "actWritten": 9,
+        "actRead": 59,
+        "roomInvocationsPerMinute": 2,
+        "registryWritten": 0,
+        "registryRead": 8,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 390
+      },
+      {
+        "window": "setup: workspace, workspace token, push",
+        "kind": "setup",
+        "from": "2026-10-02T17:35:24.346Z",
+        "to": "2026-10-02T17:36:57.854Z",
+        "samples": 2,
+        "roomWritten": 36,
+        "roomRead": 690,
+        "baselineWritten": 7,
+        "baselineRead": 240,
+        "actWritten": 22,
+        "actRead": 210,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 2,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 192
+      },
+      {
+        "window": "propose (with its pin and preview)",
+        "kind": "act",
+        "from": "2026-10-02T17:36:57.854Z",
+        "to": "2026-10-02T17:39:30.405Z",
+        "samples": 2,
+        "roomWritten": 40,
+        "roomRead": 773,
+        "baselineWritten": 7,
+        "baselineRead": 280,
+        "actWritten": 26,
+        "actRead": 213,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 393
+      },
+      {
+        "window": "note",
+        "kind": "act",
+        "from": "2026-10-02T17:39:30.405Z",
+        "to": "2026-10-02T17:42:00.968Z",
+        "samples": 3,
+        "roomWritten": 42,
+        "roomRead": 1186,
+        "baselineWritten": 7,
+        "baselineRead": 314,
+        "actWritten": 21,
+        "actRead": 244,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 7,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 355
+      },
+      {
+        "window": "land (no other open preview)",
+        "kind": "act",
+        "from": "2026-10-02T17:42:00.968Z",
+        "to": "2026-10-02T17:44:33.312Z",
+        "samples": 2,
+        "roomWritten": 77,
+        "roomRead": 1329,
+        "baselineWritten": 7,
+        "baselineRead": 381,
+        "actWritten": 63,
+        "actRead": 567,
+        "roomInvocationsPerMinute": 2,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 371
+      },
+      {
+        "window": "release",
+        "kind": "act",
+        "from": "2026-10-02T17:44:33.312Z",
+        "to": "2026-10-02T17:47:03.868Z",
+        "samples": 3,
+        "roomWritten": 48,
+        "roomRead": 1539,
+        "baselineWritten": 7,
+        "baselineRead": 404,
+        "actWritten": 27,
+        "actRead": 327,
+        "roomInvocationsPerMinute": 10,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 370
+      },
+      {
+        "window": "setup: 4 lanes claimed, pushed and proposed",
+        "kind": "setup",
+        "from": "2026-10-02T17:47:03.868Z",
+        "to": "2026-10-02T17:49:04.506Z",
+        "samples": 2,
+        "roomWritten": 260,
+        "roomRead": 7796,
+        "baselineWritten": 7,
+        "baselineRead": 769,
+        "actWritten": 246,
+        "actRead": 6258,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 299
+      },
+      {
+        "window": "land with 3 open previews",
+        "kind": "act",
+        "from": "2026-10-02T17:49:04.506Z",
+        "to": "2026-10-02T17:51:37.062Z",
+        "samples": 2,
+        "roomWritten": 87,
+        "roomRead": 3149,
+        "baselineWritten": 7,
+        "baselineRead": 813,
+        "actWritten": 73,
+        "actRead": 1523,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 333
+      },
+      {
+        "window": "setup: release the landed lane",
+        "kind": "setup",
+        "from": "2026-10-02T17:51:37.062Z",
+        "to": "2026-10-02T17:53:07.494Z",
+        "samples": 2,
+        "roomWritten": 35,
+        "roomRead": 2440,
+        "baselineWritten": 7,
+        "baselineRead": 836,
+        "actWritten": 21,
+        "actRead": 768,
+        "roomInvocationsPerMinute": 3,
+        "registryWritten": 0,
+        "registryRead": 2,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 244
+      },
+      {
+        "window": "setup: a policy lane claimed, pushed and proposed",
+        "kind": "setup",
+        "from": "2026-10-02T17:53:07.494Z",
+        "to": "2026-10-02T17:54:45.054Z",
+        "samples": 1,
+        "roomWritten": 75,
+        "roomRead": 3041,
+        "baselineWritten": 75,
+        "baselineRead": 3041,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 192,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "window": "land that activates a policy, with 3 open proposals",
+        "kind": "act",
+        "from": "2026-10-02T17:54:45.054Z",
+        "to": "2026-10-02T17:57:15.518Z",
+        "samples": 3,
+        "roomWritten": 26,
+        "roomRead": 2978,
+        "baselineWritten": 7,
+        "baselineRead": 937,
+        "actWritten": 5,
+        "actRead": 167,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 386
+      },
+      {
+        "window": "setup: release the policy lane",
+        "kind": "setup",
+        "from": "2026-10-02T17:57:15.518Z",
+        "to": "2026-10-02T17:58:45.701Z",
+        "samples": 1,
+        "roomWritten": 21,
+        "roomRead": 916,
+        "baselineWritten": 21,
+        "baselineRead": 916,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": 3,
+        "registryWritten": 0,
+        "registryRead": 2,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 192,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "window": "setup: a checked lane claimed and pushed",
+        "kind": "setup",
+        "from": "2026-10-02T17:58:45.701Z",
+        "to": "2026-10-02T18:00:19.980Z",
+        "samples": 2,
+        "roomWritten": 39,
+        "roomRead": 2521,
+        "baselineWritten": 0,
+        "baselineRead": 521,
+        "actWritten": 39,
+        "actRead": 1479,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 238
+      },
+      {
+        "window": "propose (owes a check and a review; the check job is dispatched)",
+        "kind": "act",
+        "from": "2026-10-02T18:00:19.980Z",
+        "to": "2026-10-02T18:02:52.760Z",
+        "samples": 3,
+        "roomWritten": 86,
+        "roomRead": 5650,
+        "baselineWritten": 7,
+        "baselineRead": 1070,
+        "actWritten": 65,
+        "actRead": 2440,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 360
+      },
+      {
+        "window": "check (the checker service's signed check, admitted)",
+        "kind": "act",
+        "from": "2026-10-02T18:02:52.760Z",
+        "to": "2026-10-02T18:05:23.265Z",
+        "samples": 2,
+        "roomWritten": 14,
+        "roomRead": 2229,
+        "baselineWritten": 7,
+        "baselineRead": 1082,
+        "actWritten": 0,
+        "actRead": 65,
+        "roomInvocationsPerMinute": 2,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 353
+      },
+      {
+        "window": "review",
+        "kind": "act",
+        "from": "2026-10-02T18:05:23.265Z",
+        "to": "2026-10-02T18:07:53.590Z",
+        "samples": 3,
+        "roomWritten": 37,
+        "roomRead": 3513,
+        "baselineWritten": 7,
+        "baselineRead": 1097,
+        "actWritten": 16,
+        "actRead": 222,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 4,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 356
+      },
+      {
+        "window": "idle: lanes held, nothing pending",
+        "kind": "idle",
+        "from": "2026-10-02T18:07:53.591Z",
+        "to": "2026-10-02T18:12:53.593Z",
+        "samples": 5,
+        "roomWritten": 28,
+        "roomRead": 4458,
+        "baselineWritten": 2,
+        "baselineRead": 302,
+        "actWritten": 18,
+        "actRead": 2948,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 10,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 704
+      },
+      {
+        "window": "setup: release every lane",
+        "kind": "setup",
+        "from": "2026-10-02T18:12:53.593Z",
+        "to": "2026-10-02T18:12:54.232Z",
+        "samples": 0,
+        "roomWritten": 0,
+        "roomRead": 0,
+        "baselineWritten": null,
+        "baselineRead": null,
+        "actWritten": null,
+        "actRead": null,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 12,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      }
+    ],
+    "samples": [
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:24:51Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:25:54Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:26:56Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:28:04Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:29:06Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:30:09Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:31:10Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:32:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:33:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:34:17Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:35:19Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:36:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:36:58Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:38:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:39:03Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:40:31Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:41:33Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:42:02Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:43:03Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:44:05Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:45:39Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:46:41Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:47:09Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:47:22Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:48:35Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:49:05Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:50:11Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:51:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:52:42Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:53:12Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:54:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:55:17Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:56:21Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:58:21Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T17:59:51Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:00:20Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:01:23Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:02:26Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:03:31Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:04:32Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:05:35Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:06:37Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:07:40Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:08:42Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:09:45Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:10:46Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:11:49Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "name": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "t": "2026-10-02T18:12:51Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:23:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:23:49Z",
+        "rowsWritten": 4,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:24:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:24:47Z",
+        "rowsWritten": 0,
+        "rowsRead": 3
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:25:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:26:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:27:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:28:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:29:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:30:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:31:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:32:13Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:32:59Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:33:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:34:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:35:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:36:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:37:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:38:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:39:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:40:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:40:29Z",
+        "rowsWritten": 0,
+        "rowsRead": 3
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:41:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:42:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:43:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:44:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:45:14Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:46:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:47:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:48:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:49:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:50:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:51:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:52:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:52:53Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:53:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:54:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:55:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:56:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:57:15Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:58:16Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T17:59:16Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:00:17Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:01:18Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:02:18Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:03:19Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:04:20Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:05:20Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:06:21Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:07:22Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:08:22Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:09:23Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:10:24Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:11:24Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T18:12:25Z",
+        "rowsWritten": 0,
+        "rowsRead": 2
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:23:49Z",
+        "rowsWritten": 179,
+        "rowsRead": 120
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:24:49Z",
+        "rowsWritten": 8,
+        "rowsRead": 147
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:25:49Z",
+        "rowsWritten": 16,
+        "rowsRead": 194
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:26:49Z",
+        "rowsWritten": 10,
+        "rowsRead": 285
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:27:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 161
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:28:49Z",
+        "rowsWritten": 20,
+        "rowsRead": 218
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:29:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 176
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:30:49Z",
+        "rowsWritten": 34,
+        "rowsRead": 289
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:31:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 196
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:32:49Z",
+        "rowsWritten": 16,
+        "rowsRead": 270
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:33:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 211
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:34:49Z",
+        "rowsWritten": 29,
+        "rowsRead": 450
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:35:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 240
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:36:49Z",
+        "rowsWritten": 33,
+        "rowsRead": 493
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:37:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 280
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:38:49Z",
+        "rowsWritten": 28,
+        "rowsRead": 553
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:39:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 314
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:40:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 319
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:41:49Z",
+        "rowsWritten": 70,
+        "rowsRead": 948
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:42:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 381
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:43:49Z",
+        "rowsWritten": 34,
+        "rowsRead": 726
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:44:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 404
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:45:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 409
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:46:49Z",
+        "rowsWritten": 253,
+        "rowsRead": 7027
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:47:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 769
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:48:49Z",
+        "rowsWritten": 80,
+        "rowsRead": 2336
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:49:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 813
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:50:49Z",
+        "rowsWritten": 28,
+        "rowsRead": 1604
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:51:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 836
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:52:49Z",
+        "rowsWritten": 75,
+        "rowsRead": 3041
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:53:49Z",
+        "rowsWritten": 12,
+        "rowsRead": 1099
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:54:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 937
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:55:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 942
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:56:49Z",
+        "rowsWritten": 21,
+        "rowsRead": 916
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:57:49Z",
+        "rowsWritten": 39,
+        "rowsRead": 2000
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:58:49Z",
+        "rowsWritten": 0,
+        "rowsRead": 521
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T17:59:49Z",
+        "rowsWritten": 72,
+        "rowsRead": 3508
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:00:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1070
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:01:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1072
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:02:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1147
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:03:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1082
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:04:49Z",
+        "rowsWritten": 23,
+        "rowsRead": 1314
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:05:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1097
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:06:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1102
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:07:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1107
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:08:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1112
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:09:49Z",
+        "rowsWritten": 7,
+        "rowsRead": 1117
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:10:49Z",
+        "rowsWritten": 2,
+        "rowsRead": 820
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:11:49Z",
+        "rowsWritten": 5,
+        "rowsRead": 302
+      },
+      {
+        "className": "Room",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "name": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "t": "2026-10-02T18:12:49Z",
+        "rowsWritten": 94,
+        "rowsRead": 4656
+      }
+    ]
+  },
+  "rowGate": {
+    "worker": "artroom-spike-room",
+    "from": "2026-10-02T17:23:45.896Z",
+    "to": "2026-10-02T18:15:08.764Z",
+    "totalRowsWritten": 8514,
+    "totalRowsRead": 1581252,
+    "totalRequests": 7526,
+    "namespaces": [
+      {
+        "id": "3388b66bd8f345438705519a063d6bd7",
+        "name": "artroom-spike-room_Publisher",
+        "className": "Publisher"
+      },
+      {
+        "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+        "name": "artroom-spike-room_Registry",
+        "className": "Registry"
+      },
+      {
+        "id": "fd8efe823eb6430bb910ee34d469681b",
+        "name": "artroom-spike-room_Room",
+        "className": "Room"
+      }
+    ],
+    "objects": [
+      {
+        "className": "Publisher",
+        "object": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "objectId": "ac46107ceceb1ded9c2a60afbe9038c0e33771d882b0911b8db98e7ccc3ede39",
+        "rowsWritten": 0,
+        "rowsRead": 0,
+        "requests": 118,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Registry",
+        "object": "registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "rowsWritten": 4,
+        "rowsRead": 112,
+        "requests": 59,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_872e0b20159fb850fc36fd1deb49b3fc",
+        "objectId": "c1b6ed0b3ef9ce4e374052d9675ecce93ac0d39619eb883913279b0f2104cd22",
+        "rowsWritten": 1370,
+        "rowsRead": 59873,
+        "requests": 49,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+        "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+        "rowsWritten": 600,
+        "rowsRead": 102042,
+        "requests": 606,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_1741490181aa074e9337b16af80dbe9d",
+        "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+        "rowsWritten": 598,
+        "rowsRead": 159727,
+        "requests": 615,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+        "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+        "rowsWritten": 596,
+        "rowsRead": 114432,
+        "requests": 609,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+        "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+        "rowsWritten": 595,
+        "rowsRead": 163098,
+        "requests": 605,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_fe9913737e6a034530cc430b92b2ff83",
+        "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+        "rowsWritten": 594,
+        "rowsRead": 100980,
+        "requests": 606,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_a81dc2db9888ec46487f56097aa249f2",
+        "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+        "rowsWritten": 592,
+        "rowsRead": 162208,
+        "requests": 607,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+        "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+        "rowsWritten": 591,
+        "rowsRead": 113518,
+        "requests": 610,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_3a6011559c193fd7f90b8d2392516840",
+        "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+        "rowsWritten": 590,
+        "rowsRead": 100300,
+        "requests": 604,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_5c1bb798d5da946c048160c51b321bfc",
+        "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+        "rowsWritten": 589,
+        "rowsRead": 113134,
+        "requests": 607,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+        "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+        "rowsWritten": 587,
+        "rowsRead": 112704,
+        "requests": 595,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+        "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+        "rowsWritten": 581,
+        "rowsRead": 159194,
+        "requests": 592,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_a490b23ca538a208de5528469b2a9689",
+        "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+        "rowsWritten": 577,
+        "rowsRead": 110830,
+        "requests": 593,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_c79f08919e5fb4263c76265750ae1f99",
+        "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+        "rowsWritten": 50,
+        "rowsRead": 9100,
+        "requests": 51,
+        "periodicSamples": 1
+      }
+    ],
+    "budget": {
+      "maxRowsWritten": 250000,
+      "maxRowsWrittenPerObject": 50000
+    },
+    "provisional": true,
+    "state": "pass",
+    "failures": []
+  },
+  "ok": false,
+  "ms": 3087728
+}

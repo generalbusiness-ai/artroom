@@ -31,6 +31,10 @@ describe("wrangler.jsonc (deploy)", () => {
     expect(deploy.migrations.flatMap((m) => m.new_sqlite_classes ?? [])).toEqual(["Room", "Registry", "Publisher"]);
   });
 
+  it("8bd623cc: no config sets PIN_DELAY_MS; only an explicit measurement step on the spike does (assert 66a41558)", () => {
+    for (const file of ["../../wrangler.jsonc", "../../wrangler.spike.jsonc", "../../wrangler.test.jsonc"]) expect(read(file).vars["PIN_DELAY_MS"], file).toBeUndefined();
+  });
+
   it("the spike config (wrangler.spike.jsonc) is the same Worker under its own name, namespaces and URL", () => {
     const spike = read("../../wrangler.spike.jsonc") as Config & { name: string; containers: readonly unknown[] };
     const prod = deploy as Config & { name: string; containers: readonly unknown[] };

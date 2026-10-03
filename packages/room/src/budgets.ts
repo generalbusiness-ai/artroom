@@ -54,22 +54,27 @@ export const ATTENTION_FIFO_PER_ROOM = 2_048;
 /**
  * The newest idempotency records a room keeps (`idem`: the table and its
  * primary-key index, 2 rows written per act; a deletion costs 2 more).
- * Under the hourly per-object ceiling (2,100 rows, measure/rows.mjs
- * HOURLY_BUDGET) a room admits at most 2,100 / 9 = 233 of the cheapest act,
- * a claim, in an hour, so 24 hours is 5,600 records. Rounded up to 8,192:
- * a retry within a day always replays. The quota changes storage, not rows
- * written: in steady state each act costs one insert and one deletion.
+ * Under the hourly per-object ceiling (3,600 rows, measure/rows.mjs
+ * HOURLY_BUDGET, re-grounded after the idle-write fix) a room admits at most
+ * 3,600 / 9 = 400 of the cheapest act, a claim, in an hour, so 24 hours is
+ * 9,600 records. Rounded up to 16,384: a retry within a day always replays.
+ * The quota changes storage, not rows written: in steady state each act
+ * costs one insert and one deletion.
  */
-export const IDEM_FIFO_PER_ROOM = 8_192;
+export const IDEM_FIFO_PER_ROOM = 16_384;
 
 /**
- * Alarms. Measured on 2026-10-02: an idle room writes 7 rows a minute,
- * forever, because each log publication seals a `checkpoint` entry that is
- * itself unpublished and becomes due a minute later (core.ts
- * `publicationDue`). That is 420 rows written an hour and 10,080 a day per
- * room, and each publication reads about 16 rows per entry in the log. A
- * room whose repository was deleted fails to publish and writes about
- * 12 rows a minute (720 an hour).
+ * Alarms. After the idle-write fix (request 3da1d82b), measured on
+ * 2026-10-02 and 03: an idle room writes 0 rows, an alarm tick with
+ * nothing pending writes 0 rows (202 read), and a tick that completes one
+ * pending pin writes at most 2 rows (136 read). The history below is why.
+ *
+ * Measured on 2026-10-02, before the fix: an idle room wrote 7 rows a minute,
+ * forever, because each log publication sealed a `checkpoint` entry that
+ * was itself unpublished and became due a minute later. That was 420 rows
+ * written an hour and 10,080 a day per room, and each publication read
+ * about 16 rows per entry in the log. A room whose repository was deleted
+ * failed to publish and wrote about 12 rows a minute (720 an hour).
  */
 export const ALARM = Object.freeze({
   /** Rows an idle room may write in an hour: a cohort of only checkpoint entries is never due. */

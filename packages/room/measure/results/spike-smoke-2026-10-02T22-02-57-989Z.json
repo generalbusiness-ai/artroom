@@ -1,0 +1,1187 @@
+{
+  "run": "2026-10-02T22-02-57-989Z",
+  "url": "https://artroom-spike-room.inguz.workers.dev",
+  "namespace": "gitseq-spike",
+  "importNamespace": "gitseq-spike-import",
+  "steps": [
+    {
+      "step": "rows-pin: throwaway repository created in gitseq-spike-import",
+      "ok": true,
+      "atMs": 3464,
+      "detail": {
+        "name": "db2142f437b7a2de006bffbd0dd193b2",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/db2142f437b7a2de006bffbd0dd193b2.git"
+      }
+    },
+    {
+      "step": "rows-pin: one commit pushed; its creation token revoked",
+      "ok": true,
+      "atMs": 3464,
+      "detail": {
+        "main": "6ec68e2de46a4966c2ae3fe637129a0576d0fb4e",
+        "revoked": 1,
+        "active": 0
+      }
+    },
+    {
+      "step": "rows-pin: draft",
+      "ok": true,
+      "atMs": 3595,
+      "detail": {
+        "status": 200,
+        "repo": "gitseq-spike-import/db2142f437b7a2de006bffbd0dd193b2",
+        "operator": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
+      }
+    },
+    {
+      "step": "rows-pin: found",
+      "ok": true,
+      "atMs": 4545,
+      "detail": {
+        "status": 200,
+        "ms": 949,
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      }
+    },
+    {
+      "step": "rows-pin: main is the imported commit; the Room wrote nothing",
+      "ok": true,
+      "atMs": 5541,
+      "detail": {
+        "main": "6ec68e2de46a4966c2ae3fe637129a0576d0fb4e",
+        "imported": "6ec68e2de46a4966c2ae3fe637129a0576d0fb4e"
+      }
+    },
+    {
+      "step": "rows-pin: session",
+      "ok": true,
+      "atMs": 5594,
+      "detail": {
+        "status": 200,
+        "member": "@author"
+      }
+    },
+    {
+      "step": "lane 50: claim",
+      "ok": true,
+      "atMs": 95986,
+      "detail": {
+        "status": 200,
+        "ms": 388,
+        "lane": "act_3_072c124a",
+        "seq": 3
+      }
+    },
+    {
+      "step": "lane 50: workspace requested",
+      "ok": true,
+      "atMs": 96059,
+      "detail": {
+        "status": 200,
+        "ms": 73,
+        "op": "op_ws_act_3_072c124a_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 50: workspace ready",
+      "ok": true,
+      "atMs": 99030,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/db2142f437b7a2de006bffbd0dd193b2--act_3_072c124a.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 50: workspace token",
+      "ok": true,
+      "atMs": 99087,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/db2142f437b7a2de006bffbd0dd193b2--act_3_072c124a.git",
+        "expiresAt": "2026-10-02T22:34:28.888Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 50: clone fork",
+      "ok": true,
+      "atMs": 99868,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 50: push to fork",
+      "ok": true,
+      "atMs": 100247,
+      "detail": {
+        "head": "d4723f424caabc0bfc2687e0b140b8dd33c6645e",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 50: propose",
+      "ok": true,
+      "atMs": 493470,
+      "detail": {
+        "status": 200,
+        "ms": 3218,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_5",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T22:11:11.264Z",
+          "lane": "act_3_072c124a",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/pa/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 50: preview",
+      "ok": true,
+      "atMs": 493642,
+      "detail": {
+        "state": "clean",
+        "integration": "d4723f424caabc0bfc2687e0b140b8dd33c6645e",
+        "base": "6ec68e2de46a4966c2ae3fe637129a0576d0fb4e"
+      }
+    },
+    {
+      "step": "rows-pin: lane A's pinned ref is not written before its due time",
+      "ok": true,
+      "atMs": 645019,
+      "detail": {
+        "pinned": null,
+        "head": "d4723f424caabc0bfc2687e0b140b8dd33c6645e"
+      }
+    },
+    {
+      "step": "rows-pin: the alarm wrote lane A's pinned ref",
+      "ok": true,
+      "atMs": 1016455,
+      "detail": {
+        "pinned": "d4723f424caabc0bfc2687e0b140b8dd33c6645e",
+        "head": "d4723f424caabc0bfc2687e0b140b8dd33c6645e"
+      }
+    },
+    {
+      "step": "lane 51: claim",
+      "ok": true,
+      "atMs": 1107138,
+      "detail": {
+        "status": 200,
+        "ms": 315,
+        "lane": "act_9_aade702a",
+        "seq": 9
+      }
+    },
+    {
+      "step": "lane 51: workspace requested",
+      "ok": true,
+      "atMs": 1107292,
+      "detail": {
+        "status": 200,
+        "ms": 154,
+        "op": "op_ws_act_9_aade702a_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 51: workspace ready",
+      "ok": true,
+      "atMs": 1109916,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/db2142f437b7a2de006bffbd0dd193b2--act_9_aade702a.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 51: workspace token",
+      "ok": true,
+      "atMs": 1109980,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/db2142f437b7a2de006bffbd0dd193b2--act_9_aade702a.git",
+        "expiresAt": "2026-10-02T22:51:19.665Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 51: clone fork",
+      "ok": true,
+      "atMs": 1111099,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 51: push to fork",
+      "ok": true,
+      "atMs": 1111689,
+      "detail": {
+        "head": "fbaba3245d0b08da8297d104189076295d804b6b",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 51: propose",
+      "ok": true,
+      "atMs": 1203079,
+      "detail": {
+        "status": 200,
+        "ms": 1389,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_11",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T22:23:00.907Z",
+          "lane": "act_9_aade702a",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/pb/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 51: preview",
+      "ok": true,
+      "atMs": 1203228,
+      "detail": {
+        "state": "clean",
+        "integration": "fbaba3245d0b08da8297d104189076295d804b6b",
+        "base": "6ec68e2de46a4966c2ae3fe637129a0576d0fb4e"
+      }
+    },
+    {
+      "step": "rows: admin read session renewed",
+      "ok": true,
+      "atMs": 1293717,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "rows-pin: the read wrote lane B's pinned ref before its due time",
+      "ok": true,
+      "atMs": 1385671,
+      "detail": {
+        "pinned": "fbaba3245d0b08da8297d104189076295d804b6b",
+        "head": "fbaba3245d0b08da8297d104189076295d804b6b"
+      }
+    }
+  ],
+  "gaps": [],
+  "cleanup": {
+    "releases": {},
+    "ok": true,
+    "duties": [
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "inventory",
+        "repos": [
+          "db2142f437b7a2de006bffbd0dd193b2",
+          "db2142f437b7a2de006bffbd0dd193b2--act_3_072c124a",
+          "db2142f437b7a2de006bffbd0dd193b2--act_9_aade702a"
+        ],
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "db2142f437b7a2de006bffbd0dd193b2--act_9_aade702a",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "db2142f437b7a2de006bffbd0dd193b2--act_9_aade702a",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "db2142f437b7a2de006bffbd0dd193b2--act_3_072c124a",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "db2142f437b7a2de006bffbd0dd193b2--act_3_072c124a",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "db2142f437b7a2de006bffbd0dd193b2",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "db2142f437b7a2de006bffbd0dd193b2",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "final-inventory",
+        "repos": [
+          "db2142f437b7a2de006bffbd0dd193b2",
+          "db2142f437b7a2de006bffbd0dd193b2--act_3_072c124a",
+          "db2142f437b7a2de006bffbd0dd193b2--act_9_aade702a"
+        ],
+        "outcome": "done"
+      }
+    ],
+    "unresolved": [],
+    "reposLeft": []
+  },
+  "rows": {
+    "mode": "pin",
+    "rooms": [
+      "room_ec960f931507255dad8c3e0b6c032784"
+    ],
+    "windows": [
+      {
+        "name": "rows-pin: found a dedicated room",
+        "kind": "setup",
+        "from": "2026-10-02T22:03:01.454Z",
+        "to": "2026-10-02T22:04:33.586Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: setup, lane A claimed and pushed",
+        "kind": "setup",
+        "from": "2026-10-02T22:04:33.586Z",
+        "to": "2026-10-02T22:06:08.238Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: quiet before (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T22:06:08.238Z",
+        "to": "2026-10-02T22:11:08.240Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: propose under the switch, its pin left pending (includes the switch's due time, 2 rows)",
+        "kind": "act",
+        "from": "2026-10-02T22:11:08.240Z",
+        "to": "2026-10-02T22:13:41.633Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: quiet, the pin pending (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T22:13:43.008Z",
+        "to": "2026-10-02T22:15:38.243Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: the alarm tick that completes the pending pin (includes deleting the switch's due time, 2 rows)",
+        "kind": "act",
+        "from": "2026-10-02T22:15:38.243Z",
+        "to": "2026-10-02T22:19:53.242Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: setup, release lane A",
+        "kind": "setup",
+        "from": "2026-10-02T22:19:54.444Z",
+        "to": "2026-10-02T22:21:24.811Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: setup, lane B claimed and pushed",
+        "kind": "setup",
+        "from": "2026-10-02T22:21:24.811Z",
+        "to": "2026-10-02T22:22:59.678Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: setup, propose B under the switch",
+        "kind": "setup",
+        "from": "2026-10-02T22:22:59.678Z",
+        "to": "2026-10-02T22:24:31.219Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: setup, a read of proposal B completes its pin early",
+        "kind": "setup",
+        "from": "2026-10-02T22:24:31.219Z",
+        "to": "2026-10-02T22:26:02.551Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "idle: quiet before the empty tick (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T22:26:03.660Z",
+        "to": "2026-10-02T22:27:29.680Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "idle: the alarm tick at B's old due time, nothing pending",
+        "kind": "act",
+        "from": "2026-10-02T22:27:29.680Z",
+        "to": "2026-10-02T22:31:44.678Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "idle: quiet after (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T22:31:44.678Z",
+        "to": "2026-10-02T22:36:44.682Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      },
+      {
+        "name": "pin: setup, release lane B",
+        "kind": "setup",
+        "from": "2026-10-02T22:36:44.682Z",
+        "to": "2026-10-02T22:36:45.260Z",
+        "room": "room_ec960f931507255dad8c3e0b6c032784"
+      }
+    ],
+    "table": [
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "rows-pin: found a dedicated room",
+        "kind": "setup",
+        "from": "2026-10-02T22:03:01.454Z",
+        "to": "2026-10-02T22:04:33.586Z",
+        "samples": 1,
+        "roomWritten": 179,
+        "roomRead": 124,
+        "baselineWritten": 179,
+        "baselineRead": 124,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": 3,
+        "registryWritten": 4,
+        "registryRead": 3,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: setup, lane A claimed and pushed",
+        "kind": "setup",
+        "from": "2026-10-02T22:04:33.586Z",
+        "to": "2026-10-02T22:06:08.238Z",
+        "samples": 2,
+        "roomWritten": 46,
+        "roomRead": 672,
+        "baselineWritten": 7,
+        "baselineRead": 187,
+        "actWritten": 32,
+        "actRead": 298,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: quiet before (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T22:06:08.238Z",
+        "to": "2026-10-02T22:11:08.240Z",
+        "samples": 5,
+        "roomWritten": 0,
+        "roomRead": 0,
+        "baselineWritten": null,
+        "baselineRead": null,
+        "actWritten": null,
+        "actRead": null,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: propose under the switch, its pin left pending (includes the switch's due time, 2 rows)",
+        "kind": "act",
+        "from": "2026-10-02T22:11:08.240Z",
+        "to": "2026-10-02T22:13:41.633Z",
+        "samples": 2,
+        "roomWritten": 41,
+        "roomRead": 786,
+        "baselineWritten": 7,
+        "baselineRead": 233,
+        "actWritten": 27,
+        "actRead": 320,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: quiet, the pin pending (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T22:13:43.008Z",
+        "to": "2026-10-02T22:15:38.243Z",
+        "samples": 2,
+        "roomWritten": 0,
+        "roomRead": 0,
+        "baselineWritten": null,
+        "baselineRead": null,
+        "actWritten": null,
+        "actRead": null,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: the alarm tick that completes the pending pin (includes deleting the switch's due time, 2 rows)",
+        "kind": "act",
+        "from": "2026-10-02T22:15:38.243Z",
+        "to": "2026-10-02T22:19:53.242Z",
+        "samples": 4,
+        "roomWritten": 2,
+        "roomRead": 136,
+        "baselineWritten": 2,
+        "baselineRead": 136,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: setup, release lane A",
+        "kind": "setup",
+        "from": "2026-10-02T22:19:54.444Z",
+        "to": "2026-10-02T22:21:24.811Z",
+        "samples": 2,
+        "roomWritten": 28,
+        "roomRead": 540,
+        "baselineWritten": 7,
+        "baselineRead": 246,
+        "actWritten": 14,
+        "actRead": 48,
+        "roomInvocationsPerMinute": 3,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: setup, lane B claimed and pushed",
+        "kind": "setup",
+        "from": "2026-10-02T22:21:24.811Z",
+        "to": "2026-10-02T22:22:59.678Z",
+        "samples": 1,
+        "roomWritten": 32,
+        "roomRead": 509,
+        "baselineWritten": 32,
+        "baselineRead": 509,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: setup, propose B under the switch",
+        "kind": "setup",
+        "from": "2026-10-02T22:22:59.678Z",
+        "to": "2026-10-02T22:24:31.219Z",
+        "samples": 2,
+        "roomWritten": 43,
+        "roomRead": 1323,
+        "baselineWritten": 2,
+        "baselineRead": 223,
+        "actWritten": 39,
+        "actRead": 877,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: setup, a read of proposal B completes its pin early",
+        "kind": "setup",
+        "from": "2026-10-02T22:24:31.219Z",
+        "to": "2026-10-02T22:26:02.551Z",
+        "samples": 2,
+        "roomWritten": 13,
+        "roomRead": 165,
+        "baselineWritten": 13,
+        "baselineRead": 165,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "idle: quiet before the empty tick (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T22:26:03.660Z",
+        "to": "2026-10-02T22:27:29.680Z",
+        "samples": 1,
+        "roomWritten": 0,
+        "roomRead": 0,
+        "baselineWritten": null,
+        "baselineRead": null,
+        "actWritten": null,
+        "actRead": null,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "idle: the alarm tick at B's old due time, nothing pending",
+        "kind": "act",
+        "from": "2026-10-02T22:27:29.680Z",
+        "to": "2026-10-02T22:31:44.678Z",
+        "samples": 4,
+        "roomWritten": 0,
+        "roomRead": 202,
+        "baselineWritten": 0,
+        "baselineRead": 202,
+        "actWritten": 0,
+        "actRead": 0,
+        "roomInvocationsPerMinute": 1,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "idle: quiet after (control)",
+        "kind": "quiet",
+        "from": "2026-10-02T22:31:44.678Z",
+        "to": "2026-10-02T22:36:44.682Z",
+        "samples": 5,
+        "roomWritten": 0,
+        "roomRead": 0,
+        "baselineWritten": null,
+        "baselineRead": null,
+        "actWritten": null,
+        "actRead": null,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      },
+      {
+        "room": "room_ec960f931507255dad8c3e0b6c032784",
+        "window": "pin: setup, release lane B",
+        "kind": "setup",
+        "from": "2026-10-02T22:36:44.682Z",
+        "to": "2026-10-02T22:36:45.260Z",
+        "samples": 0,
+        "roomWritten": 0,
+        "roomRead": 0,
+        "baselineWritten": null,
+        "baselineRead": null,
+        "actWritten": null,
+        "actRead": null,
+        "roomInvocationsPerMinute": null,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "caution": "fewer than two non-empty samples of the room: no quiet baseline in the window"
+      }
+    ],
+    "samples": [
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:04:02Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:05:34Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:11:09Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:12:12Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:17:11Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:20:55Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:22:25Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:23:00Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:24:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Publisher",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "name": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "t": "2026-10-02T22:24:31Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T22:02:51Z",
+        "rowsWritten": 0,
+        "rowsRead": 1
+      },
+      {
+        "className": "Registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "name": "registry",
+        "t": "2026-10-02T22:03:01Z",
+        "rowsWritten": 4,
+        "rowsRead": 2
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:03:01Z",
+        "rowsWritten": 179,
+        "rowsRead": 124
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:04:01Z",
+        "rowsWritten": 39,
+        "rowsRead": 485
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:05:01Z",
+        "rowsWritten": 7,
+        "rowsRead": 187
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:06:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:07:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:08:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:09:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:10:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:11:01Z",
+        "rowsWritten": 34,
+        "rowsRead": 553
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:12:01Z",
+        "rowsWritten": 7,
+        "rowsRead": 233
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:13:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:14:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:15:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:16:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:17:01Z",
+        "rowsWritten": 2,
+        "rowsRead": 136
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:18:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:19:01Z",
+        "rowsWritten": 21,
+        "rowsRead": 294
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:20:01Z",
+        "rowsWritten": 7,
+        "rowsRead": 246
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:21:01Z",
+        "rowsWritten": 32,
+        "rowsRead": 509
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:22:01Z",
+        "rowsWritten": 41,
+        "rowsRead": 1100
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:23:01Z",
+        "rowsWritten": 2,
+        "rowsRead": 223
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:24:01Z",
+        "rowsWritten": 13,
+        "rowsRead": 165
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:25:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:26:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:27:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:28:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 202
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:29:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:30:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:31:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:32:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:33:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:34:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:35:01Z",
+        "rowsWritten": 0,
+        "rowsRead": 0
+      },
+      {
+        "className": "Room",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "name": "room_ec960f931507255dad8c3e0b6c032784",
+        "t": "2026-10-02T22:36:01Z",
+        "rowsWritten": 21,
+        "rowsRead": 428
+      }
+    ],
+    "error": "Cannot read properties of undefined (reading 'map')"
+  },
+  "rowGate": {
+    "worker": "artroom-spike-room",
+    "from": "2026-10-02T22:02:57.990Z",
+    "to": "2026-10-02T22:38:52.092Z",
+    "sampledFrom": "2026-10-02T22:00:57.990Z",
+    "totalRowsWritten": 421,
+    "totalRowsRead": 5258,
+    "totalRequests": 32,
+    "namespaces": [
+      {
+        "id": "3388b66bd8f345438705519a063d6bd7",
+        "name": "artroom-spike-room_Publisher",
+        "className": "Publisher"
+      },
+      {
+        "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+        "name": "artroom-spike-room_Registry",
+        "className": "Registry"
+      },
+      {
+        "id": "fd8efe823eb6430bb910ee34d469681b",
+        "name": "artroom-spike-room_Room",
+        "className": "Room"
+      }
+    ],
+    "objects": [
+      {
+        "className": "Publisher",
+        "object": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "objectId": "67e64b3103affe0c2a6ffa91c37b4809ca7cddcff2983f4c175da89c7b66ff7d",
+        "rowsWritten": 0,
+        "rowsRead": 0,
+        "requests": 17,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Registry",
+        "object": "registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "rowsWritten": 4,
+        "rowsRead": 3,
+        "requests": 2,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_ec960f931507255dad8c3e0b6c032784",
+        "objectId": "d5b76298217fc70d3752e2b37eeefc478ac2c1de77dbc387cbc94e6972981bed",
+        "rowsWritten": 417,
+        "rowsRead": 5255,
+        "requests": 13,
+        "periodicSamples": 1
+      }
+    ],
+    "budget": {
+      "maxRowsWritten": 9200,
+      "maxRowsWrittenPerObject": 2100
+    },
+    "state": "pass",
+    "failures": []
+  },
+  "ok": true,
+  "ms": 2157534
+}

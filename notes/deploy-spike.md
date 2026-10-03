@@ -730,7 +730,8 @@ Not touched: `artroom-spike-isogit` and `artroom-spike-sandbox-git` (the
 spikes' own Workers), and the container application
 `artroom-lb-logbig-publisher` (`9cf9349e…`), which the deletion of
 `artroom-lb-logbig` left behind and which would block that harness's next
-deploy the same way.
+deploy the same way. (Retired later the same day under request 167a8ae6:
+see "Orphans retired" below.)
 
 **Live smoke**, `packages/room/measure/spike-smoke.mjs`, all phases:
 
@@ -821,6 +822,72 @@ error it turns into this 503, so a failure like this one cannot be
 diagnosed afterwards. Logging the error's name and a redacted message, or
 returning a cause code, would have identified the step.
 
+## Orphans retired (request 167a8ae6, 2026-10-02)
+
+Hugh's decision (planner assert `5b65f3ae`): retire what D5 left in place.
+
+**Listed first.** Before deleting, the account's Workers were listed
+through the API (Workers Scripts Read token) and its container
+applications with `wrangler containers list`. The `artroom-` Workers were
+`artroom-spike-checkers`, `artroom-spike-isogit`, `artroom-spike-room` and
+`artroom-spike-sandbox-git`. The applications were
+`artroom-spike-room-publisher` (`3388b66b…`),
+`artroom-spike-checkers-runnerbox` (`93863923…`),
+`artroom-lb-logbig-publisher` (`9cf9349e…`) and
+`artroom-spike-sandbox-git-gitbox` (`60795e20…`), all with 0 live
+instances. The listing showed one resource the request did not name: the
+`gitbox` application, created with the `artroom-spike-sandbox-git` Worker
+on 2026-10-01. Deleting that Worker alone would have left it behind as
+`artroom-lb-logbig` left its publisher, so the planner amended the request
+to include it (assert `b92867a5`). Neither spike config under
+`packages/room/` or `packages/checkers/` binds to any of the four.
+
+| Deleted | What it was | Last version |
+|---|---|---|
+| Worker `artroom-spike-isogit` | the sandbox-git spike's isomorphic-git variant (`spikes/sandbox-git/wrangler.iso.jsonc`) | `31f0a19d-958d-4867-b2c2-3a8780961388`, 2026-10-01 |
+| Worker `artroom-spike-sandbox-git` | the sandbox-git spike's container variant (`spikes/sandbox-git/wrangler.jsonc`) | `9fd42226-f212-4856-a867-6074b14c6506`, 2026-10-01 |
+| Container application `artroom-spike-sandbox-git-gitbox` (`60795e20…`) | that Worker's `GitBox` container | — |
+| Container application `artroom-lb-logbig-publisher` (`9cf9349e…`) | left by the deletion of `artroom-lb-logbig` | — |
+
+Each Worker was deleted with `wrangler delete -c <its config> --force`
+and each application with `wrangler containers delete <id>`.
+
+**Verified after.** The Workers list now holds `artroom-spike-checkers`
+and `artroom-spike-room` only, and the applications list
+`artroom-spike-room-publisher` and `artroom-spike-checkers-runnerbox`
+only. That is inventory preservation; the runtime check is separate.
+The checker service has `workers_dev: false`, so no URL probes it, and
+a root-path 404 from the Room's URL is only its route response. The
+runtime evidence is the smoke's checks phase, run after the deletions
+(`SPIKE_PHASE=checks`, 02:23 UTC, Room `59636ae9` as before): all 32
+steps ok, including "the Room dispatched the job, and the checker's
+signed check was admitted" (waited 10.4 seconds; the runner ran `npm ci`
+and `npm test` and passed), the lane landed, the log was published and
+`artroom verify` exit 0 through entry 15. Cleanup `ok`, 0 unresolved,
+no repository left. Record:
+[spike-smoke-2026-10-03T02-23-15-764Z.json](../packages/room/measure/results/spike-smoke-2026-10-03T02-23-15-764Z.json).
+So both services answered, through the Room's own service binding, with
+the four resources gone.
+
+Two separate things happened on the account, and they are bounded
+differently. The deletions removed the four resources named above and
+nothing else: no other Worker, application, namespace, registry image or
+token (condition (2) of request 167a8ae6). The verification run, as every
+smoke run does, created one throwaway repository and its short-lived
+tokens in the spike namespace `gitseq-spike-import` and removed all of
+them before it ended (`cleanup ok`, `repositories left []`, `unresolved
+0`); that fixture lifecycle is the agreed way to verify the spike at
+runtime and is covered by the standing instruction for spike work
+(planner amendment `42168fff` on request 167a8ae6). The before and after listings and the four
+deletion receipts, with account identifiers reduced to Worker names,
+created and modified times, are kept outside the repository for the
+review at `/tmp/artroom-builder-orphans-f77ebf20/`.
+
+The spike's source and results stay in the repository under
+[`spikes/sandbox-git/`](../spikes/sandbox-git/) and
+[`2026-10-01-spike-sandbox-git.md`](2026-10-01-spike-sandbox-git.md);
+only the deployments are gone.
+
 ## Redeploy from the merge of main `3ac55e96` (plan 003)
 
 Main's plan 003 changes lane B's landing code, which the Room Worker
@@ -846,6 +913,146 @@ head `4a522bd6`. No retry was needed, and the probe answered 404.
 | root `npm test` | 0 | checkers 43; cli 102; client 86 Node and 2 workerd; git 225; log 198 Node and 193 workerd; mcp 73 Node and 1 workerd; policy 199 Node and 198 workerd (1 skipped); room 125 Node and 380 workerd; ui 141 |
 | git `npm run test:workers` | 0 | 10 |
 
+## Rows written: the gate (request 8bd623cc, 2026-10-02)
+
+Part 2 of request 8bd623cc is built, but has not been run against
+Cloudflare. No analytics token exists yet, and the spike was being
+redeployed at the time.
+
+- **The gate,
+  [packages/room/measure/rows.mjs](../packages/room/measure/rows.mjs).**
+  It gets the physical rows written and read from Cloudflare's billing
+  datasets (`durableObjectsPeriodicGroups` and
+  `durableObjectsInvocationsAdaptiveGroups`). It attributes them to each
+  Worker namespace and each object over a window. It fails closed when the
+  token is missing, a namespace is missing, there is no invocation
+  evidence, or the result is truncated. It checks a total budget and a
+  budget for each object.
+- **The budgets were provisional at first.** They were woo's 250,000 rows
+  in total and 50,000 per object. The next section replaces them with
+  ceilings grounded on the spike.
+- **The smoke run.** `spike-smoke.mjs` gates itself when
+  `ARTROOM_CF_ANALYTICS_TOKEN` is set. `ARTROOM_ROW_GATE=1` makes the gate
+  required.
+- **The hourly check.** `.github/workflows/row-writes.yml` runs it. It does
+  nothing until the repository variable `ARTROOM_ROW_MONITOR` is `true`.
+- **The part 1 driver.** `SPIKE_PHASE=rows` runs each act once, each in its
+  own billing window, and writes the table.
+
+The method, the token's permissions, and what remains (the part 1 run, the
+table, grounded ceilings, and the part 3 budgets) are in
+[packages/room/measure/README.md](../packages/room/measure/README.md).
+
+## Rows per act, ceilings and budgets (request 8bd623cc, 2026-10-02)
+
+Parts 1 and 3 of request 8bd623cc. Both are partly done: see "not yet
+measured" below. These measurements were taken on the
+redeployed spike: `artroom-spike-room` 75758995 on the folded schema (D5),
+with the read-only analytics token. The driver was the only thing using the
+spike, apart from the older rooms' background.
+
+**Runs.** All cleanups reported ok.
+
+- `SPIKE_PHASE=rows` (17-23-45). Its policy landing was refused for
+  `obl_admin-approval`, so the driver now has a second admin approve it.
+- `SPIKE_PHASE=rows ROWS_ONLY=policy` (18-23-46).
+- A full smoke run with `ARTROOM_ROW_GATE=1` (18-47-09). The gate passed,
+  with 2,284 rows written.
+- A first driver run (16-35-35). It failed when its admin session expired.
+  Its two repositories were then deleted by hand, with the same cleanup
+  rules.
+
+**Method.** Cloudflare sends one sample a minute for each object, stamped
+with the start of its interval. Each act gets 150 s of quiet. Each sample
+belongs to the window that holds the end of its interval. An act's rows are
+the window's total minus the quiet-minute baseline.
+
+**Rows written by the Room object for each act** (reads are in the results
+file):
+
+| Act | Rows written |
+|---|---|
+| found | 171 |
+| invite | 9–12 |
+| join | 13 |
+| claim | 9 |
+| propose | 26 |
+| note | 21 |
+| review | 16 |
+| land | 63 |
+| release | 21–27 |
+| land with 3 open previews | 72–73 |
+| land that activates a policy with 3 open proposals | 113 |
+| policy activation alone, with 3 open | not yet measured (one subtraction gave about 40) |
+| one publication | 7 |
+
+Four isolated measurements were **not yet measured** at the time of this
+section: a check, an idle alarm tick, an alarm tick with a pending pin, and
+policy activation alone. They are measured in "Isolated measurements"
+below.
+Review 28615b74 asked for them, with billing evidence and controls. They
+will be measured after the idle-write fix is deployed. The methods are in
+`packages/room/measure/README.md`, "Not yet measured".
+
+The spike-only pin switch that hugh approved (assert 66a41558),
+`PIN_DELAY_MS`, is built and tested. It is off unless
+`deploy-spike.sh` is run with it set. The driver modes `ROWS_ONLY=pin`,
+`check` and `activation` are built for the four measurements. None of these
+has run on the spike yet. Every admitted act writes at least 7 rows:
+
+- `entries` 2 (the rowid and the UNIQUE `id`);
+- `records` 2;
+- `idem` 2;
+- `explain` 1.
+
+A claim is exactly that plus `lanes` 2. A join is that plus `members` 2,
+`keys` 3 and an `invitations` update 1. `attention` and the registry's
+`bindings` cost 4 rows per insert, which is the largest multiplier. On the
+folded schema, `entries` has one index besides its rowid, not six. The
+full table, the index count for each deployed table, and the method are in
+[packages/room/measure/results/row-costs-2026-10-02.md](../packages/room/measure/results/row-costs-2026-10-02.md).
+
+**Findings.**
+
+- **Idle rooms keep writing.** An idle room publishes its own checkpoint
+  every minute, forever. That costs 7 rows a minute: 10,080 a day for each
+  room. Its reads grow with its log.
+- **Rooms whose repository was deleted keep writing too.** These are the
+  smoke runs' rooms. Their log head stops moving, but each still writes
+  about 12 rows a minute.
+- **This background is most of the spike's writes.** It was 983 of the
+  smoke run's 2,284 rows. In the hour from 17:50 to 18:50, the spike wrote
+  11,285 rows and read 2,249,250.
+- **`attend` scans the whole attention table on every insert.**
+
+**Ceilings** (in `measure/rows.mjs`; each is the measured value times the
+headroom, rounded up to two significant figures):
+
+| Budget | Measured (total / per object) | Headroom | Ceiling (total / per object) |
+|---|---|---|---|
+| `SMOKE_BUDGET` | 2,284 / 508 | 4 | 9,200 / 2,100 |
+| `HOURLY_BUDGET` | 11,285 / 1,034 | 2 | 23,000 / 2,100 |
+
+**Budgets for the cost requests** (`packages/room/src/budgets.ts`):
+
+- **Attention fan-out: 15 per item.** 15 × 4 = 60 rows, which is no more
+  than a landing (63).
+- **Attention FIFO: 2,048 per room.** Each insert scans the whole table. At
+  2,048 rows, that scan reads about as much as a landing with 3 open
+  previews (1,241–1,523).
+- **Idem FIFO: 8,192 per room.** That is one day of claims at the hourly
+  per-object ceiling: 2,100 / 9 = 233 an hour.
+- **Alarms.**
+  - An idle room writes 0 rows an hour.
+  - The 5-second loop runs only while a step is due and making progress.
+  - A failing step retries with backoff up to 5 minutes: at most 12 retries
+    an hour.
+
+The Room enforces none of these yet. Request 99782949 does that.
+
+The last measurement window closed at 18:54 UTC. Since then, nothing has
+used the spike except two read-only log reads, made as the checker. The
+spike is free for the redeploy from main.
 
 ## Idle write storms fixed (request 3da1d82b, 2026-10-02)
 
@@ -933,3 +1140,72 @@ Logs could not be read to confirm it.
 | root `npm ci` | 0 | — |
 | root `npm run typecheck` | 0 | — |
 | root `npm test` | 0 | checkers 43; cli 162; client 88 Node and 2 workerd; git 225; log 198 Node and 193 workerd; mcp 73 Node and 5 workerd; policy 199 Node and 198 workerd (1 skipped); room 138 Node and 411 workerd; ui 141 |
+
+## Isolated measurements, the pin switch window, and re-grounded ceilings (request 8bd623cc, 2026-10-02 and 03)
+
+The merge of this lane with main `25a7b837` (the idle-write fix,
+`e50e062a`) passed its gates before it was deployed. I was the only user
+of the spike.
+
+**Deploys** (`deploy-spike.sh`, with hugh's OAuth):
+
+| Time (UTC) | Room version | Checkers version | `PIN_DELAY_MS` |
+|---|---|---|---|
+| 2026-10-02 22:02:51 | `474f4529` | `8a144b6b` | 360000 (measurement window) |
+| 2026-10-02 23:12:45 | `59636ae9` | `bb94561a` | unset |
+
+The switch was set for 70 minutes. The full smoke at 00:54 checked that it
+was off: "the propose wrote its pinned ref itself (PIN_DELAY_MS unset)"
+passed. Under the switch, a landing did not finish within 300 s, so the
+first `activation` run (23:00) was stopped. Its repositories were deleted
+by hand. `check` and `activation` were then run again after the unset.
+
+**Results.** Each is in a room of its own, with controls. The details are
+in [packages/room/measure/results/row-costs-2026-10-02.md](../packages/room/measure/results/row-costs-2026-10-02.md),
+"Isolated measurements".
+
+| Measurement | Written | Read |
+|---|---|---|
+| An alarm tick with one pending pin | 2 (including the switch's own due-time row) | 136 |
+| An alarm tick with nothing pending | 0 | 202 |
+| A check, admitted on its own | 17 in each run's raw window (16.6 and 17 less the baseline) | 349 in each raw window (319.6 and 346.8 less the baseline) |
+| Policy activation, N = 0 | 12.7 (2 to 20) | 823 |
+| Policy activation, N = 3 | 33.3 (31 to 37), about 6.9 for each open proposal | 905 |
+
+Every quiet control window wrote 0 rows except one: the first `check`
+run's "before" window, which held that run's pin tick (2 written). Idle
+rooms wrote nothing. The run files do not keep invocation rows, so
+invocations per minute cannot be rebuilt from them. The 120-second
+lookback behind the gate's totals is an assumption about the provider.
+
+**Clean smoke** (00:54, `ARTROOM_ROW_GATE=1`): ok. The gate passed with
+1,270 rows written: 1,258 by the run's own three rooms and 12 by the
+registry. The largest object wrote 489. Before the fix the same run wrote 2,284.
+
+**Ceilings re-grounded**, because the smoke run's total fell by 44%:
+- `SMOKE_BUDGET` is now 5,100 total and 2,000 per object (was 9,200 and
+  2,100).
+- `HOURLY_BUDGET` is now 5,100 and 3,600 (was 23,000 and 2,100), from the
+  busiest hour after the fix: 2,514 and 1,780.
+- The idempotency quota in `src/budgets.ts` follows the hourly ceiling:
+  16,384 per room (was 8,192).
+
+**All cleanups reported ok.** The stopped run's repositories were deleted
+by hand.
+
+**Known, not yet measured:** lane C's publication tokens. Once lane C
+lands, a failing publication mints 11 canonical tokens on each retry, at 4
+ledger records each: about 44 rows per retry, or about 528 rows an hour at
+12 retries an hour. Measure it when lanes B and C are deployed.
+
+**Later merges (no deploy).** This lane has since merged main `574568b2`
+(mint lane B), `df22d771` and `965c911a` (mint lane C). The spike still
+runs Room `59636ae9`, built from `e50e062a`.
+
+Mint lanes B and C send pinning, previews, landing pushes and log
+publication through the canonical mint ledger. So the measured pin,
+propose, landing, publication, policy-activation and smoke figures need
+measuring again on a deploy of the merged head, with the ceilings grounded
+again.
+
+The idle tick and the manual check's admission are outside those paths.

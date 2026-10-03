@@ -54,6 +54,20 @@ export function checkProject(run) {
   };
 }
 
+/** The paths the `manual` check covers (request 8bd623cc, ROWS_ONLY=check). */
+export const MANUAL_PATHS = ["lib/**"];
+export const MANUAL_CONFIG = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 300 };
+
+/**
+ * The checks project with one more checker, `manual`, required on lib/** by
+ * role:checker. No service is bound for it (no CHECKER_MANUAL), so the room
+ * sends no job, and a measured check can be signed and sent at a chosen time.
+ */
+export function manualCheckProject(run) {
+  const doc = policy(requireCheck(CHECK, { id: CHECK_RULE, paths: CHECKED_PATHS, by: "role:checker" }), requireReview({ id: REVIEW_RULE, paths: CHECKED_PATHS, from: "role:maintainer" }), requireCheck("manual", { id: "check-manual", paths: MANUAL_PATHS, by: "role:checker" }));
+  return { ...checkProject(run), ".artroom/policy.json": json(doc), ".artroom/checkers/manual.json": json(MANUAL_CONFIG) };
+}
+
 /** The lane's change: a function and its test, both under the checked paths, so it owes the check and the review. */
 export function checkedChange(run) {
   return {
