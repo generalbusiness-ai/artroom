@@ -1,1 +1,0 @@
-Excluded: root source+test compiler exited 1 because native DOM getReader overloads do not satisfy the simplified contract interface in TypeScript. No semantic test was run. Final fixture keeps the native object and uses the contract structural cast, matching decodeUpdates own native cast.
