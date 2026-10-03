@@ -1,0 +1,205 @@
+/** Bounded independent stage 3 replay follow-up at exact 5449d19c, private fixture simulation. */
+import { describe, expect, test } from "vitest";
+import type { LogEntry, PolicyPart, PolicyDocument, PolicyDocumentV2, ReplayContext } from "@generalbusiness/artroom-contract";
+import { CODE_REVIEW_ACTS, evaluateRequire, policy, requireReview, rule, validatePolicyV2 } from "@generalbusiness/artroom-policy";
+import { digestJson } from "../src/crypto.ts";
+import { DeclaredRoom, type Fixture } from "./support/declared-room.ts";
+import { actAt, contextOf, decisionsAt, forgeCall, insert, open, reseal, setDecisions, verify, type Log } from "./support/fixtures.ts";
+import { keys } from "./support/room-sim.ts";
+import carryJson from "./fixtures/declared-carry.json";
+
+type Ctx<K extends ReplayContext["kind"]> = Extract<ReplayContext, { readonly kind: K }>;
+const doc = (...parts: PolicyPart[]) => ({ ...policy(...parts), format: "artroom-policy-v2", steps: "artroom-steps-v1", acts: CODE_REVIEW_ACTS }) as PolicyDocumentV2;
+const output = (name: string, value: unknown) => console.log("CHECKER_OBSERVATION", JSON.stringify({ name, value }));
+async function good(log: Log) {
+  const r = await verify(log);
+  expect(r.failures, JSON.stringify(r.failures)).toEqual([]);
+  expect(r.ok).toBe(true);
+  expect(r.verifiedThrough).toBe(log.entries.length - 1);
+  expect(r.limits).toEqual([]);
+  return r;
+}
+async function bad(log: Log, reason: string, seq: number, detail?: RegExp) {
+  const r = await verify(log);
+  output(reason, r);
+  expect(r.ok).toBe(false);
+  expect(r.failures).toHaveLength(1);
+  expect(r.failures[0]).toMatchObject({ reason, seq });
+  if (detail) expect(r.failures[0]!.detail).toMatch(detail);
+  expect(r.verifiedThrough).toBe(seq - 1);
+  return r;
+}
+
+async function budgetLog() {
+  const scan = "($a := proposal.paths; $count($a.($$)); ";
+  const d = doc(
+    rule({ id: "scan-refuse", on: "propose", refuse: scan + "false)", fix: "x" }),
+    requireReview({ id: "scan-require", paths: "**", from: "@alice", when: scan + "true)" }),
+  );
+  expect(validatePolicyV2(d).ok).toBe(true);
+  const room = new DeclaredRoom();
+  await room.activate(d);
+  await room.join("@bob", "member", keys.bob);
+  const claim = await room.act({ signer: keys.bob, kind: "claim", target: null, body: { goal: "budget", scope: ["src/**"] } });
+  const edits = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`src/${"a".repeat(60)}/${i}.ts`, `export const x = ${i};\n`]));
+  const head = room.change(edits);
+  const p = await room.act({ signer: keys.bob, kind: "propose", target: { lane: claim.id }, body: { lease: 1, expectedGeneration: 0, head, summary: "A measured scan" } });
+  expect(p.refused).toBe(true);
+  expect(p.entry.entry).toMatchObject({ type: "refusal", receipt: { refusal: { rule: "policy-budget-exceeded" } } });
+  const log = open(room.fixture("Independent shared default-budget refusal"));
+  const seq = p.entry.seq;
+  const decisions = decisionsAt(log, seq);
+  expect(decisions.map((x) => x.kind)).toEqual(["refuse", "require"]);
+  expect(decisions[0]!.outcome.result).toBe("pass");
+  expect(decisions[1]!.outcome).toMatchObject({ result: "error", code: "policy-budget-exceeded" });
+  const require = contextOf(log, decisions[1]!) as Ctx<"require">;
+  expect(require.budget.start).toEqual(decisions[0]!.usage);
+  const fresh = await evaluateRequire({ doc: d as unknown as PolicyDocument, version: decisions[1]!.policy }, require.input);
+  expect(fresh.refusal).toBeNull();
+  expect(fresh.evaluations[0]!.decision.outcome.result).toBe("obligation");
+  output("shared-budget", { seq, recorded: decisions, budget: require.budget, pathCount: require.input.proposal.paths.length, fresh: fresh.evaluations.map((e) => e.decision) });
+  return { log, seq };
+}
+
+describe("checker condition 2: default-budget refusals use the derived shared meter", () => {
+  test("the recorded budget refusal verifies while the same require with a fresh meter succeeds", async () => {
+    const { log } = await budgetLog();
+    await good(log);
+  });
+  test("deleting the budget-failed required call reports decision-missing at that refusal", async () => {
+    const { log, seq } = await budgetLog();
+    await good(log);
+    setDecisions(log, seq, decisionsAt(log, seq).filter((d) => d.kind !== "require"));
+    await bad(log, "decision-missing", seq, /require call decides scan-require/);
+  });
+  test("a self-consistent require context with a reset budget reports context-mismatch", async () => {
+    const { log, seq } = await budgetLog();
+    await good(log);
+    await forgeCall(log, seq, "require", (c) => ({ ...c, budget: { ...c.budget, start: { steps: 0, inspectedBytes: 0 } } }));
+    await bad(log, "context-mismatch", seq, /budget/);
+  });
+  test("claiming acceptance after the reproduced budget refusal reports guard-failed", async () => {
+    const { log, seq } = await budgetLog();
+    await good(log);
+    const e = actAt(log, seq);
+    log.entries[seq] = { ...log.entries[seq]!, entry: { type: "act", act: e.act, receipt: { outcome: "accepted", authority: e.receipt.authority, decisions: e.receipt.decisions, effects: [], flags: [] } } as LogEntry["entry"] };
+    reseal(log, seq);
+    await bad(log, "guard-failed", seq, /policy-budget-exceeded refuses it/);
+  });
+});
+
+async function erasLog() {
+  const d = doc(
+    requireReview({ id: "agent-review", paths: "src/**", from: "@alice", when: 'actor.role = "agent"' }),
+    rule({ id: "claim-notify", kind: "notify", on: ["claim"], to: ["holder"], why: "Historical actor context." }),
+  );
+  expect(validatePolicyV2(d).ok).toBe(true);
+  const room = new DeclaredRoom();
+  await room.activate(d);
+  await room.join("@bob", "member", keys.bob);
+  const claim = await room.act({ signer: keys.bob, kind: "claim", target: null, body: { goal: "eras", scope: ["src/**"] } });
+  const head = room.change({ "src/app.ts": "export const x = 7;\n" });
+  await room.act({ signer: keys.bob, kind: "propose", target: { lane: claim.id }, body: { lease: 1, expectedGeneration: 0, head, summary: "Actor eras" } });
+  await room.act({ signer: keys.alice, kind: "roster", target: null, body: { op: "set-role", member: "@bob", role: "agent" } });
+  await room.act({ signer: keys.alice, kind: "roster", target: null, body: { op: "team", team: "@crew", members: ["@bob"] } });
+  await room.recompute();
+  const recompute = room.entries.length - 1;
+  await room.drainNotify();
+  const notify = room.entries.length - 1;
+  const log = open(room.fixture("Independent recompute-current and queued-notify historical contexts"));
+  const rc = contextOf(log, decisionsAt(log, recompute)[0]!) as Ctx<"require">;
+  const nc = contextOf(log, decisionsAt(log, notify)[0]!) as Ctx<"notify">;
+  expect(rc.input.actor).toMatchObject({ member: "@bob", role: "agent", teams: ["@crew"] });
+  expect(nc.input.actor).toMatchObject({ member: "@bob", role: "member", teams: [] });
+  const ev = log.entries[recompute]!.entry;
+  expect(ev).toMatchObject({ type: "system", event: { type: "obligations-recomputed", obligations: ["obl_agent-review"] } });
+  output("actor-eras", { recompute, notify, current: rc.input.actor, historical: nc.input.actor });
+  return { log, recompute, notify };
+}
+
+describe("checker condition 2: system evaluation context eras", () => {
+  test("recomputation uses current proposer role and teams; delayed notify keeps the admission actor", async () => {
+    const { log } = await erasLog();
+    await good(log);
+  });
+  test("a recomputation substituting the historical role and teams fails context-mismatch", async () => {
+    const { log, recompute } = await erasLog();
+    await good(log);
+    log.entries.length = recompute + 1;
+    await forgeCall(log, recompute, "require", (c) => ({ ...c, input: { ...c.input, actor: { ...c.input.actor, role: "member", teams: [] } } }));
+    await bad(log, "context-mismatch", recompute, /input.actor/);
+  });
+  test("a delayed notify substituting the current role and teams fails context-mismatch", async () => {
+    const { log, notify } = await erasLog();
+    await good(log);
+    await forgeCall(log, notify, "notify", (c) => ({ ...c, input: { ...c.input, actor: { ...c.input.actor, role: "agent", teams: ["@crew"] } } }));
+    await bad(log, "context-mismatch", notify, /input.actor/);
+  });
+});
+
+describe("checker condition 2: an entire required check carry judgement", () => {
+  test("the honest published prefix carries the passing test check before reservation evaluation", async () => {
+    const log = open(carryJson as unknown as Fixture);
+    log.entries.length = 29;
+    expect(log.entries[25]!.entry).toMatchObject({ type: "system", event: { type: "check-carried", outcome: { carried: true } } });
+    const c = contextOf(log, decisionsAt(log, 28)[0]!) as Ctx<"land">;
+    expect(c.input.obligations.find((o) => o.id === "obl_tests")).toEqual({ id: "obl_tests", met: true });
+    await good(log);
+  });
+  test("deleting the whole carry event and consistently denying its met obligation must report decision-missing", async () => {
+    const log = open(carryJson as unknown as Fixture);
+    log.entries.length = 29;
+    await good(log);
+    log.entries.splice(25, 1);
+    reseal(log, 25);
+    await forgeCall(log, 27, "land", (c) => ({ ...c, input: { ...c.input, obligations: c.input.obligations.map((o) => o.id === "obl_tests" ? { ...o, met: false } : o) } }));
+    const c = contextOf(log, decisionsAt(log, 27)[0]!) as Ctx<"land">;
+    expect(c.input.obligations.find((o) => o.id === "obl_tests")).toEqual({ id: "obl_tests", met: false });
+    const e = log.entries[27]!.entry;
+    expect(e.type).toBe("system");
+    if (e.type !== "system" || e.event.type !== "land-evaluated") throw new Error("expected reservation evaluation");
+    log.entries[27] = { ...log.entries[27]!, entry: { type: "system", event: { ...e.event, landInput: digestJson(c.input) } } };
+    reseal(log, 27);
+    const r = await verify(log);
+    output("whole-carry-omission", { report: r, omitted: 25, laterEvaluation: 27, consistentLandInput: digestJson(c.input), recordedLandInput: (log.entries[27]!.entry as Extract<LogEntry["entry"], { type: "system" }>).event });
+    expect(r.ok).toBe(false);
+    expect(r.failures.some((f) => f.reason === "decision-missing")).toBe(true);
+  });
+});
+
+
+async function preparedCarryPrefix() {
+  const log = open(carryJson as unknown as Fixture);
+  log.entries.length = 29;
+  const e = log.entries[25]!.entry;
+  if (e.type !== "system" || e.event.type !== "check-carried") throw new Error("expected check carry");
+  const c = contextOf(log, decisionsAt(log, 25)[0]!) as Ctx<"carry">;
+  expect(c.facts.check).not.toBeNull();
+  insert(log, 25, { type: "system", event: { type: "prepared", owner: { op: e.event.op, lane: e.event.lane, generation: e.event.generation }, integration: e.event.integration, base: c.input.proposal.base, tree: c.facts.check!.now.tree, snapshots: [] } } as unknown as LogEntry["entry"]);
+  expect(log.entries[25]!.entry).toMatchObject({ type: "system", event: { type: "prepared", owner: { op: "op_land_23" } } });
+  expect(log.entries[26]!.entry).toMatchObject({ type: "system", event: { type: "check-carried", outcome: { carried: true } } });
+  return log;
+}
+
+describe("checker condition 2: whole check carry omission with preparation witnessed", () => {
+  test("the honest prefix with a prepared event owned by the landing verifies without a Git limit", async () => {
+    await good(await preparedCarryPrefix());
+  });
+  test("deleting the entire carry judgement still must fail when the landing preparation is witnessed", async () => {
+    const log = await preparedCarryPrefix();
+    await good(log);
+    log.entries.splice(26, 1);
+    reseal(log, 26);
+    await forgeCall(log, 28, "land", (c) => ({ ...c, input: { ...c.input, obligations: c.input.obligations.map((o) => o.id === "obl_tests" ? { ...o, met: false } : o) } }));
+    const c = contextOf(log, decisionsAt(log, 28)[0]!) as Ctx<"land">;
+    expect(c.input.obligations.find((o) => o.id === "obl_tests")).toEqual({ id: "obl_tests", met: false });
+    const e = log.entries[28]!.entry;
+    if (e.type !== "system" || e.event.type !== "land-evaluated") throw new Error("expected reservation evaluation");
+    log.entries[28] = { ...log.entries[28]!, entry: { type: "system", event: { ...e.event, landInput: digestJson(c.input) } } };
+    reseal(log, 28);
+    const r = await verify(log);
+    output("prepared-whole-carry-omission", { report: r, prepared: log.entries[25]!.entry, omitted: 26, laterEvaluation: 28 });
+    expect(r.ok).toBe(false);
+    expect(r.failures.some((f) => f.reason === "decision-missing")).toBe(true);
+  });
+});
