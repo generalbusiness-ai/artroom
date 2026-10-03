@@ -220,6 +220,20 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
     expect(expectRefusal(await act(r, d, "ask", { act: c.id }, { text: "?" }), "delegation-invalid").reason).toContain("does not cover ask");
   });
 
+  it("a grant's plain kinds are bound by the grantor's role: a checker, who may not sign renew, may not grant it by a delegation, nor be invited with a session that lists it; nothing is recorded", async () => {
+    const r = await declaredRoom();
+    const ci = await addMember(r, "@ci", "checker");
+    const k = newKeyPair();
+    const seq = await headSeq(r);
+    expect(expectRefusal(await act(r, ci, "roster", null, await delegateOp(r, k.key, {}, ["renew"]), { binding: null }), "delegation-invalid").reason).toBe("The role checker may not grant renew.");
+    const session = { kinds: ["renew"], acts: {}, lanes: "*", ttlSeconds: 3600 };
+    const invite = { op: "invite", member: "@bot", role: "checker", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(randomBytes(32)), session };
+    expect(expectRefusal(await act(r, r.admin, "roster", null, invite, { binding: null }), "invalid-body").reason).toBe("The role checker may not sign every kind the session lists.");
+    expect(await headSeq(r)).toBe(seq);
+    // The same grant from a role that may sign renew is admitted.
+    expectOk(await act(r, r.admin, "roster", null, await delegateOp(r, k.key, {}, ["renew"]), { binding: null }));
+  });
+
   it("an exact retry of an admitted grant after a meaning change gets its receipt; acts under it are then delegation-invalid", async () => {
     const r = await declaredRoom();
     const k = newKeyPair();
