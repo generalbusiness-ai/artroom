@@ -437,6 +437,19 @@ describe.skipIf(DECLARED)("refusal wording is filled only with facts in the room
     const whole = expectRefusal(await act(exact, exact.admin, "propose", { lane: c2.lane }, { lease: 1, expectedGeneration: 0, head: head2, summary: "s" }), "outside-claim");
     expect(whole.reason).toBe(`${"p".repeat(62)}${long.repeat(10)}`);
     expect(bytes(whole.reason)).toBe(8192);
+    // A cut text is a prefix of the filled text itself: a leading U+FEFF, a legal character of a template, stays
+    // (checker finding 7ccec93c). The cut still falls on a character boundary: U+FEFF is three bytes.
+    const marked = `\uFEFF${"{path}".repeat(11)}`;
+    const bom = await declaredRoom(v2((a) => void (a["propose"] = { ...a["propose"]!, refusals: { "outside-claim": { reason: marked, fix: `${"{path}".repeat(10)}${"q".repeat(60)}\uFEFF\uFEFF` } } })));
+    const c3 = await ok<Claim>(bom, bom.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    const head3 = pushChange(bom, c3.lane, { [long]: "x" });
+    const kept = expectRefusal(await act(bom, bom.admin, "propose", { lane: c3.lane }, { lease: 1, expectedGeneration: 0, head: head3, summary: "s" }), "outside-claim");
+    expect(kept.reason).toBe(`\uFEFF${long.repeat(11)}`.slice(0, 1 + 8189));
+    expect(kept.reason.charCodeAt(0)).toBe(0xfeff);
+    expect(bytes(kept.reason)).toBe(8192);
+    // 8,130 bytes of paths and 60 of padding leave two bytes: the three-byte character that follows does not fit.
+    expect(kept.fix).toBe(`${long.repeat(10)}${"q".repeat(60)}`);
+    expect(bytes(kept.fix!)).toBe(8190);
     // The recorded entry holds the same bounded text.
     const sealed = await inDO(r, (room) => String(room.core.sql.all("SELECT body FROM entries WHERE id = ?", out.act!)[0]!["body"]));
     expect(sealed).toContain(out.fix!);
