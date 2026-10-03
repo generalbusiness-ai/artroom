@@ -65,6 +65,7 @@ export {
   TAKEOVER_AHEAD_MS,
   TAKEOVER_MOVE_MS,
   errorNote,
+  within,
   knownArtifactsCode,
 } from "./mints.ts";
 export type { ErrorStage, LedgerToken, MintDuties, MintDuty, MintLedgerOptions, MintRepo, MintScope, MintState } from "./mints.ts";

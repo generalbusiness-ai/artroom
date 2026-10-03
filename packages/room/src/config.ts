@@ -103,7 +103,7 @@ const productionServices: ServicesFactory = (env, roomObject) => {
       bindings,
       publisher: stub,
       writeSnapshot: (r) => publisher().writeSnapshot(r),
-      logRemote: async (repo) => artifactsLogRemote(bindingOf(repo.namespace), logStub, repo),
+      logRemote: async (repo, mints) => artifactsLogRemote(bindingOf(repo.namespace), logStub, repo, mints),
       firstCommit: (remote, token, at) => pushFirstCommit(remote, token, at),
     },
     // Each checker's service binding, by name (R-EXEC-8).

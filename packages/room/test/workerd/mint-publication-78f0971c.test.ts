@@ -55,12 +55,14 @@ async function proposed(r: TestRoom, scope: string, files: Record<string, string
 }
 
 /** Land a proposed lane: the act, then the landing step in the background (no alarm is run): once to prepare, once to reserve and publish. */
-async function startLanding(r: TestRoom, lane: string, head: string): Promise<OpId> {
+async function startLanding(r: TestRoom, lane: string, head: string, beforePublish?: () => Promise<unknown>): Promise<OpId> {
   const l = await r.admin.ok<Landing>("land", { lane, generation: 1 }, { lease: 1, head });
   const op = l.op.id as OpId;
   await inDO(r, (room) => room.core.run("landing"));
   await until(async () => (await opOf(r, op))?.state === "ready");
   await inDO(r, (room) => room.core.idle());
+  // The integration's own staging token (mint lane C) is behind it: what follows is the publication's.
+  await beforePublish?.();
   await inDO(r, (room) => room.core.run("landing"));
   return op;
 }
@@ -69,16 +71,17 @@ const opOf = (r: TestRoom, op: OpId) => inDO(r, (room) => room.core.landing.view
 const records = (r: TestRoom) => inDO(r, (room) => room.core.mints.duties({ limit: 1000 }));
 
 /**
- * Hold the first canonical write create that the ledger sends (a `sent`
- * record exists), before Artifacts applies it. Other creates (an
- * integration's, a preview's) are not held. `answer()` lets it go.
+ * Hold the first canonical write create that the ledger sends for a
+ * publication (a `sent` record `publish:…` exists), before Artifacts applies
+ * it. Other creates (an integration's, a preview's) are not held.
+ * `answer()` lets it go.
  */
 async function holdLedgerCreate(r: TestRoom) {
   const a = r.world.artifacts;
   const h = { call: 0, go: false, answer: () => void (h.go = true) };
   await inDO(r, (room) => {
     a.holdToken = (repo, scope, _ttl, n) => {
-      if (h.call === 0 && repo === a.canonical && scope === "write" && room.core.mints.duties().records.some((x) => x.state === "sent")) h.call = n;
+      if (h.call === 0 && repo === a.canonical && scope === "write" && room.core.mints.duties().records.some((x) => x.state === "sent" && x.purpose.startsWith("publish:"))) h.call = n;
       return n === h.call && !h.go;
     };
   });
@@ -106,22 +109,26 @@ describe("mint lane B: the publication token through the canonical mint ledger, 
       const { lane, head } = await proposed(r, "docs/a/**", { "docs/a/one.md": "one" });
       const held = await holdLedgerCreate(r);
       const asked: number[] = [];
-      // Nothing stored, and the Room's own scheduling switched off on this object: only a wake can store an alarm now.
-      // Storing it takes 20 s of room time.
-      await inDO(r, async (room, state) => {
-        await state.storage.deleteAlarm();
-        const o = room as unknown as { schedule: () => void; storeAlarm: (when: number) => Promise<void> };
-        o.schedule = () => {};
-        const store = o.storeAlarm.bind(room);
-        o.storeAlarm = async (when) => {
-          if (asked.length === 0) clock.now += 20_000;
-          asked.push(when);
-          return store(when);
-        };
+      // Once the integration is built: nothing stored, and the Room's own scheduling switched off on this object, so
+      // only a wake can store an alarm now. Storing it takes 20 s of room time.
+      let t1 = 0;
+      const op = await startLanding(r, lane, head, async () => {
+        await inDO(r, async (room, state) => {
+          await state.storage.deleteAlarm();
+          const o = room as unknown as { schedule: () => void; storeAlarm: (when: number) => Promise<void> };
+          o.schedule = () => {};
+          const store = o.storeAlarm.bind(room);
+          o.storeAlarm = async (when) => {
+            if (asked.length === 0) clock.now += 20_000;
+            asked.push(when);
+            return store(when);
+          };
+        });
+        expect(await stored(r)).toBeNull();
+        // The takeover time is moved only when less than 30 s away: the integration's is pushed past that.
+        clock.now += 31_000;
+        t1 = clock.now;
       });
-      expect(await stored(r)).toBeNull();
-      const t1 = clock.now;
-      const op = await startLanding(r, lane, head);
       await until(async () => held.call > 0);
       const seen = await inDO(r, async (room, state) => ({ alarm: await state.storage.getAlarm(), d: room.core.mints.duties(), now: clock.now }));
       expect(seen.d.records.map((x) => [x.purpose, x.state, x.ttlSeconds, x.sentAt])).toEqual([[`publish:${op}:1`, "sent", 60, t1 + 20_000]]);
@@ -276,16 +283,18 @@ describe("mint lane B: the publication token through the canonical mint ledger, 
       const a = r.world.artifacts;
       const { lane, head } = await proposed(r, "docs/d/**", { "docs/d/four.md": "four" });
       let sentWhilePublishing = 0;
-      await inDO(r, async (room, state) => {
-        await state.storage.deleteAlarm();
-        // Storage refuses every alarm on this object.
-        (room as unknown as { storeAlarm: (when: number) => Promise<void> }).storeAlarm = () => Promise.reject(new Error("storage refused the alarm"));
-        a.holdToken = () => {
-          if (room.core.landing.core.held()) sentWhilePublishing++;
-          return false;
-        };
-      });
-      const op = await startLanding(r, lane, head);
+      // Once the integration is built (its staging token is minted through the ledger since mint lane C): nothing
+      // stored, and storage refuses every alarm on this object.
+      const op = await startLanding(r, lane, head, () =>
+        inDO(r, async (room, state) => {
+          await state.storage.deleteAlarm();
+          (room as unknown as { storeAlarm: (when: number) => Promise<void> }).storeAlarm = () => Promise.reject(new Error("storage refused the alarm"));
+          a.holdToken = () => {
+            if (room.core.landing.core.held()) sentWhilePublishing++;
+            return false;
+          };
+        }),
+      );
       await until(async () => ((await inDO(r, (room) => room.core.landing.core.get(op)?.pushes?.length)) ?? 0) > 0);
       await inDO(r, (room) => room.core.idle());
       const attempt = await inDO(r, (room) => room.core.landing.core.get(op)!.pushes![0]!);

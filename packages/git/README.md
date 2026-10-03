@@ -126,7 +126,11 @@ calls `await landing.evaluate(op.id)`. `publisher` is `ContainerPublisher` in a 
 `publicationTokens({ mints, repo })`, over the room's one `MintLedger` (built
 once per object start, so its constructor takes over what a stopped object
 left). The host's alarm also runs `mints.reconcile()` and includes
-`mints.nextDue()` in its next alarm.
+`mints.nextDue()` in its next alarm. `ContainerPublisher` and `Pinning` take
+the same ledger (`mints`): since mint lane C, every canonical token they use
+(staging an integration, pinning, previews) is minted and revoked through
+it. The lane fork's read token for pinning is the one exception, until the
+fork has its own ledger (request 02836f9a).
 
 ## Previews
 

@@ -94,11 +94,10 @@ const SCHEMA = [
      obligation TEXT NOT NULL, checker TEXT NOT NULL, config TEXT NOT NULL, integration TEXT NOT NULL, base TEXT NOT NULL,
      state TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 0, next_ms INTEGER NOT NULL, token TEXT, outcome TEXT,
      UNIQUE (owner, integration, obligation, config))`,
-  // Canonical read tokens of job attempts that the Room has ended but Artifacts has not yet confirmed revoked:
-  // retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose expiry
-  // is not known is retried until it is revoked. A row `mint:<job>` is a mint in progress, written before
-  // Artifacts is asked; if the answer is lost it stays until an answer settles it (a refusal that changed
-  // nothing, or a usable answer whose token is then revoked); `expires_at` is only when it is first checked.
+  // Canonical read tokens of job attempts, claimed from the mint ledger (R-MINT-4): held by an attempt until it
+  // ends, then retried until revocation, or until the token's known expiry has passed (R-EXEC-9). A token whose
+  // expiry is not known is retried until it is revoked. A row `mint:<job>` is a stored room's mint record from
+  // before mint lane C; it moves into the mint ledger once, at the object's start (`moveJobMints`).
   `CREATE TABLE IF NOT EXISTS job_tokens (token_id TEXT PRIMARY KEY, expires_at INTEGER, next_ms INTEGER NOT NULL,
      attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)`,
   // R-LOG-13: notify runs after commit, from this durable queue.
@@ -142,9 +141,27 @@ export function migrate(sql: Sql, steps: readonly Migration[]): number {
 }
 
 /** The Room's migrations. A new table, column or index is added only here, as a version after the base. */
+/**
+ * The due indexes (mint lane C, R-MINT-7): bounded batches of due work,
+ * earliest due first, read by index. Job tokens owed revocation, and jobs
+ * not done (a partial index, which the due queries' `state != 'done'` uses).
+ * Idempotent, and they change no row.
+ */
+export const DUE_INDEXES = [
+  `CREATE INDEX IF NOT EXISTS job_tokens_due ON job_tokens (next_ms, token_id)`,
+  `CREATE INDEX IF NOT EXISTS check_jobs_due ON check_jobs (next_ms) WHERE state != 'done'`,
+] as const;
+
+/**
+ * The Room's schema steps, run once each, in order, by `migrate`. Version 3
+ * (mint lane C) was written as version 2 alongside request d29c09fa's scrub,
+ * and renumbered when that landed first: a version-1 room gets both, a
+ * version-2 room the indexes only.
+ */
 export const ROOM_MIGRATIONS: readonly Migration[] = [
   { version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) },
   { version: 2, name: "safe error metadata at rest (request d29c09fa)", up: scrubErrors },
+  { version: 3, name: "due indexes (mint lane C, request 5ff58c9a)", up: (sql) => DUE_INDEXES.forEach((q) => sql.all(q)) },
 ];
 
 /** Codes a failed publication may store as `publication_error` and name to the caller: lane L's and the Room's own. */

@@ -6,6 +6,14 @@
  * own SQLite write at a handoff, then stops the room's object, and checks
  * that a fresh object still owns the token and revokes it.
  *
+ * Since mint lane C (request 5ff58c9a), the token is the canonical mint
+ * ledger's until the `job_tokens` row is written and the ledger's record
+ * claimed, in one transaction (the transfer). A token that would outlive
+ * the deadline is never claimed: the ledger owes it. A `job_tokens` row ends
+ * when Artifacts answers its revocation, or once the token's known expiry
+ * has passed, with no revocation (R-MINT-4): it is never dropped while the
+ * token can still read.
+ *
  * Controls on the real Room Durable Object and SQLite.
  */
 
@@ -23,11 +31,13 @@ const R = `sha256:${"0".repeat(64)}` as const;
 const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: R };
 const refusal: Refusal = { refused: true, rule: "check-binding", reason: "refused by the test service", fix: "none" };
 const ledger = (r: TestRoom) => inDO(r, (room) => room.core.sql.all("SELECT token_id, next_ms, last_error FROM job_tokens ORDER BY token_id"));
+/** The canonical mint ledger's records. */
+const mintRecords = async (r: TestRoom) => (await inDO(r, (room) => room.core.mints.duties({ limit: 1000 }))).records;
 const jobsOf = (r: TestRoom) => inDO(r, (room) => room.core.sql.all("SELECT state, attempt, next_ms, token FROM check_jobs ORDER BY rowid"));
 const tokenOf = (job: CheckJob) => /^Authorization: Bearer (.+)$/.exec(job.gitAuthEnv.GIT_CONFIG_VALUE_0)![1]!;
 
 /** The token handoffs whose SQLite write a control fails, once. */
-const TRANSFER = "VALUES (?, ?, ?, ?) ON CONFLICT (token_id) DO UPDATE SET expires_at = excluded.expires_at";
+const TRANSFER = "VALUES (?, ?, ?, 'held')";
 const END = "'ended') ON CONFLICT (token_id)";
 
 /** Fail the Room's next SQLite statement containing `pattern`, once, as an injected persistence error. */
@@ -98,7 +108,7 @@ async function settle(r: TestRoom, limit = 6) {
 }
 
 describe("review 271dbd53: a known token keeps a durable owner across every handoff", () => {
-  it("a late usable answer whose token outlives the deadline (the checker's first control): the cleanup write fails once; after a restart the token is still owned, and revoked", async () => {
+  it("a late usable answer whose token outlives the deadline (the checker's first control): the job never owns it; the ledger owes it, and after a restart its alarm revokes it by its ID", async () => {
     const { r: before, seen, from } = await owed();
     const a = before.world.artifacts;
     const calls = a.remoteCalls.get("createToken") ?? 0;
@@ -106,20 +116,20 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     const running = step(before);
     await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls);
     clock.now += 30_000;
-    await failOnce(before, END);
     a.holdToken = null;
     await running;
     expect(seen).toEqual([]);
     const [token] = readTokens(before, from);
     expect(token!.revoked).toBe(false);
-    // Its record exists, due at once: the refused token is owned, though ending it failed.
-    const [owned] = await ledger(before);
-    expect(owned).toEqual({ token_id: token!.id, next_ms: expect.any(Number), last_error: "refused" });
-    expect(owned!["next_ms"] as number).toBeLessThanOrEqual(clock.now);
+    // Owed by the ledger's record, due at once; never in a job token row.
+    expect(await ledger(before)).toEqual([]);
+    expect(await mintRecords(before)).toEqual([expect.objectContaining({ state: "owed", tokenId: token!.id, lastError: "an expiry after notAfter" })]);
     const r = await restarted(before);
-    await settle(r);
+    clock.now += 2_000;
+    await tick(r);
+    await inDO(r, (room) => room.core.mints.idle());
     expect(token!.revoked).toBe(true);
-    expect(await ledger(r)).toEqual([]);
+    expect(await mintRecords(r)).toEqual([]);
   });
 
   it("normal completion (the checker's second control): the cleanup write after the answer fails once; after a restart the token is still owned, and revoked", async () => {
@@ -136,12 +146,15 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     // The operators' view: a held token, with its real expiry.
     expect(await call(r.stub.jobTokenDuties())).toEqual([expect.objectContaining({ token: token!.id, kind: "held", expiresAt: token!.expiresAt, nextCheckAt: token!.expiresAt })]);
     expect(await inDO(r, (room) => room.core.nextAlarm())).toBeLessThanOrEqual(token!.expiresAt);
+    // Owned while it can still read; settled once its known expiry has passed, with no revocation needed.
+    expect(r.world.artifacts.canonicalRepo().admits(token!.plaintext, "read")).toBe(true);
     await settle(r);
-    expect(token!.revoked).toBe(true);
+    expect(r.world.artifacts.canonicalRepo().admits(token!.plaintext, "read")).toBe(false);
+    expect(clock.now).toBeGreaterThanOrEqual(token!.expiresAt);
     expect(await ledger(r)).toEqual([]);
   });
 
-  it("an attempt in flight when the room restarts, then expired by the next jobs step with its cleanup write failing once: the token's record still revokes it", async () => {
+  it("an attempt in flight when the room restarts, then expired by the next jobs step with its cleanup write failing once: the token's record still ends it", async () => {
     const { r: before, seen, from } = await owed(() => new Promise<Result<Check>>(() => undefined));
     await inDO(before, (room) => room.core.steps.jobs());
     await until(async () => seen.length === 1);
@@ -157,7 +170,13 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     await failOnce(r, END);
     await inDO(r, (room) => room.core.steps.jobs().catch(() => undefined));
     await inDO(r, (room) => room.core.idle());
-    expect(token!.revoked).toBe(true);
+    // The job token pass (its own alarm step since mint lane C) takes the row, now due.
+    await inDO(r, async (room) => {
+      await room.core.steps.jobTokens();
+      await room.core.idle();
+    });
+    // Past the deadline the token has expired (it expires by the deadline): its record is settled, with no revocation needed.
+    expect(r.world.artifacts.canonicalRepo().admits(token!.plaintext, "read")).toBe(false);
     expect((await ledger(r)).filter((x) => x["token_id"] === token!.id)).toEqual([]);
   });
 
@@ -177,12 +196,15 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     expect(token!.revoked).toBe(false);
     expect((await ledger(before)).map((x) => x["token_id"])).toEqual([token!.id]);
     const r = await restarted(before);
+    // Owned while it can still read; settled once its known expiry has passed.
+    expect(r.world.artifacts.canonicalRepo().admits(token!.plaintext, "read")).toBe(true);
+    expect((await ledger(r)).map((x) => x["token_id"])).toEqual([token!.id]);
     await settle(r);
-    expect(token!.revoked).toBe(true);
+    expect(r.world.artifacts.canonicalRepo().admits(token!.plaintext, "read")).toBe(false);
     expect(await ledger(r)).toEqual([]);
   });
 
-  it("the transfer itself fails once: the mint record stays until the token, known in memory, is revoked; nothing is sent", async () => {
+  it("the transfer itself fails once: the ledger keeps the token and revokes it by its ID; nothing is sent", async () => {
     const { r, seen, from } = await owed();
     await failOnce(r, TRANSFER);
     await step(r);
@@ -190,10 +212,11 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     const [token] = readTokens(r, from);
     expect(token!.revoked).toBe(true);
     expect(await ledger(r)).toEqual([]);
+    expect(await mintRecords(r)).toEqual([]);
     expect(await jobsOf(r)).toMatchObject([{ state: "owed", attempt: 1, token: null }]);
   });
 
-  it("the transfer fails once and the revocation fails too: the mint record stays, an open duty across a restart; the token is never sent", async () => {
+  it("the transfer fails once and the revocation fails too: the ledger's record owes it, across a restart; the token is never sent", async () => {
     const { r: before, seen, from } = await owed();
     for (let i = 0; i < 40; i++) before.world.artifacts.failRemote("revokeToken", artifactsErrors.internal());
     await failOnce(before, TRANSFER);
@@ -201,9 +224,10 @@ describe("review 271dbd53: a known token keeps a durable owner across every hand
     expect(seen).toEqual([]);
     const [token] = readTokens(before, from);
     expect(token!.revoked).toBe(false);
-    const [kept] = await ledger(before);
-    expect(kept).toMatchObject({ token_id: expect.stringMatching(/^mint:/), last_error: "minting" });
+    expect(await ledger(before)).toEqual([]);
+    const [kept] = await mintRecords(before);
+    expect(kept).toMatchObject({ state: "owed", tokenId: token!.id, purpose: expect.stringMatching(/^job:/) });
     const r = await restarted(before);
-    expect((await ledger(r)).map((x) => x["token_id"])).toContain(kept!["token_id"]);
+    expect(await mintRecords(r)).toEqual([expect.objectContaining({ id: kept!.id, state: "owed", tokenId: token!.id })]);
   });
 });

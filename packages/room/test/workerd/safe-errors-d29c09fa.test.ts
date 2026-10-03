@@ -234,6 +234,8 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
       for (const [id, e] of tokens) sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, ?)", id, later, later, e);
       sql.all("INSERT INTO meta (k, v) VALUES ('publication_error', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", ECHOED[0]!);
       sql.all("UPDATE schema_version SET v = 1 WHERE id = 1");
+      // A room stored before mint lane C too: its `mint:` rows have not moved into the mint ledger yet.
+      sql.all("DELETE FROM meta WHERE k = 'job_mints_moved'");
       return `op_ws_${lane}_${lease}`;
     });
 
@@ -242,18 +244,19 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
     const stub = env.ROOMS.get(env.ROOMS.idFromName(r.id)) as unknown as TestRoom["stub"];
     const again: TestRoom = { ...r, stub, admin: new Client({ id: r.id, stub }, r.admin.keys) };
 
-    const shown = await inDO(again, (room) => ({ status: room.core.landing.status(), duties: jobTokenDuties(room.core) }));
+    const shown = await inDO(again, (room) => ({ status: room.core.landing.status(), duties: jobTokenDuties(room.core), mints: room.core.mints.duties({ limit: 1000 }).records }));
     expect(shown.status?.lastError).toBe(`main could not be read: ${WITHHELD}`);
     const wsView = (await again.admin.read({ q: "op", op: wsOp as never })) as { state: string; error: { message: string } };
     expect(wsView.error.message).toBe(`could not provision the workspace: ${WITHHELD}`);
-    expect(Object.fromEntries(shown.duties.map((d) => [d.token, d.status]))).toMatchObject({
-      "mint:job_legacy_1": `answer lost: create failed: ${WITHHELD}`,
-      "mint:job_legacy_2": `outcome unknown; the token inventory could not be read: ${WITHHELD}`,
+    expect(Object.fromEntries(shown.duties.map((d) => [d.token, d.status]))).toEqual({
       tid_legacy_revoke: `revocation failed: ${WITHHELD}`,
       tid_legacy_held: "held",
-      "mint:job_safe_1": "answer lost: create failed: Error INTERNAL_ERROR (10400)",
-      "mint:job_safe_2": "outcome unknown; 0 live token(s) on the canonical repository not accounted for at 2026-10-01T12:00:00.000Z",
     });
+    // Mint lane C: the `mint:` rows moved into the mint ledger at the start, as unknown records with a fixed note; no
+    // row's text came with them.
+    expect(shown.mints.map((x) => [x.purpose, x.state, x.lastError])).toEqual(
+      ["job:job_legacy_1", "job:job_legacy_2", "job:job_safe_1", "job:job_safe_2"].map((p) => [p, "unknown", "moved from the check job's own mint record; sent before this time, with its answer lost"]),
+    );
     // Before the upgrade's first batch, a row may still hold the text; nothing shown does.
     await clean(again, [shown, wsView], { rows: false });
 
@@ -274,7 +277,6 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
     // Ownership, expiry, retry timing and kinds of the job tokens are as they were; only their errors changed.
     expect(await inDO(again, (room) => room.core.sql.all("SELECT token_id, expires_at, next_ms, attempts FROM job_tokens ORDER BY token_id"))).toEqual(started.tokens);
     expect(Object.fromEntries((await inDO(again, (room) => jobTokenDuties(room.core))).map((d) => [d.token, d.kind]))).toMatchObject({
-      "mint:job_legacy_1": "unknown-mint",
       tid_legacy_revoke: "revoke",
       tid_legacy_held: "held",
     });
@@ -288,7 +290,7 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
     });
     expect(done).toBe(true);
 
-    // The rows themselves are rewritten, and the store is at version 2.
+    // The rows themselves are rewritten, and the store is at version 3 (mint lane C's due indexes follow the scrub).
     const rows = await inDO(again, (room) => {
       const sql = room.core.sql;
       const body = JSON.parse(String(sql.all("SELECT body FROM artroom_land_op WHERE id = ?", op)[0]!["body"]));
@@ -302,7 +304,7 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
       };
     });
     expect(rows).toEqual({
-      v: 2,
+      v: 3,
       land: [`main could not be read: ${WITHHELD}`, `landing step failed: ${WITHHELD}`],
       ws: `could not provision the workspace: ${WITHHELD}`,
       wsDuty: `workspace step failed: ${WITHHELD}`,
@@ -320,13 +322,11 @@ describe("request d29c09fa: the operators' job-token view shows safe metadata on
     const duties = await inDO(r, (room) => {
       const sql = room.core.sql;
       sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tid_x', ?, ?, ?)", later, later, `${echoing().message}`);
-      sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('mint:job_x_1', ?, ?, ?)", later, later, `answer lost: ${echoing().message}`);
       sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES ('tid_y', ?, ?, 'held')", later, later);
       return jobTokenDuties(room.core);
     });
     expect(Object.fromEntries(duties.map((d) => [d.token, [d.kind, d.status]]))).toEqual({
       tid_x: ["revoke", `revocation failed: ${WITHHELD}`],
-      "mint:job_x_1": ["unknown-mint", `answer lost: create failed: ${WITHHELD}`],
       tid_y: ["held", "held"],
     });
     for (const s of ECHOED) expect(JSON.stringify(duties)).not.toContain(s);
@@ -361,6 +361,9 @@ describe("request d29c09fa: in a founded room the upgrade drains through recover
       for (let i = 0; i < 10; i++) if (!(await runDurableObjectAlarm(again.stub as unknown as DurableObjectStub<Room>))) break;
       const after = await inDO(again, (room) => ({
         cursor: room.core.sql.all("SELECT v FROM meta WHERE k = 'error_scrub'").length,
+        // Mint lane C: the composed chain ran from version 1, the due indexes at 3.
+        v: room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")[0]!["v"],
+        indexes: room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('job_tokens_due', 'check_jobs_due') ORDER BY name").map((x) => x["name"]),
         gone: room.core.canonicalGone() !== null,
         rows: [
           room.core.sql.all("SELECT last_error FROM artroom_ws_duty WHERE reason = 'legacy'")[0]!["last_error"],
@@ -370,6 +373,8 @@ describe("request d29c09fa: in a founded room the upgrade drains through recover
       }));
       expect(after).toEqual({
         cursor: 0,
+        v: 3,
+        indexes: ["check_jobs_due", "job_tokens_due"],
         gone,
         rows: [`workspace step failed: ${WITHHELD}`, `snapshot step failed: ${WITHHELD}`, `revocation failed: ${WITHHELD}`],
       });

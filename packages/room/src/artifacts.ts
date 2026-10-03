@@ -25,6 +25,7 @@ import {
   withRetry,
   type ArtifactsNamespace,
   type DiffBounds,
+  type MintLedger,
   type PublisherStub,
   type RepoHandle,
 } from "@generalbusiness/artroom-git";
@@ -62,6 +63,8 @@ export interface ArtifactsAdapterOptions {
   readonly stub: PublisherStub;
   /** The room's repository: known once the room is founded, or while it is being founded. */
   readonly location: () => RepoLocation;
+  /** The Room's canonical mint ledger, through which pinning and previews mint and revoke their canonical tokens (R-MINT-1). */
+  readonly mints: Pick<MintLedger, "withToken">;
   readonly bounds?: Partial<DiffBounds>;
   readonly sleep?: (ms: number) => Promise<void>;
 }
@@ -107,7 +110,7 @@ export class ArtifactsAdapter implements ArtifactsPort {
 
   private async pinning(): Promise<Pinning> {
     const remote = await this.canonicalRemote();
-    return new Pinning({ stub: this.o.stub, artifacts: this.o.binding, canonical: { name: this.name, remote }, ...(this.o.sleep ? { sleep: this.o.sleep } : {}) });
+    return new Pinning({ stub: this.o.stub, artifacts: this.o.binding, canonical: { name: this.name, remote }, mints: this.o.mints, ...(this.o.sleep ? { sleep: this.o.sleep } : {}) });
   }
 
   async readMain(): Promise<Sha | null> {

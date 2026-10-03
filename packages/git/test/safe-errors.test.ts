@@ -13,6 +13,7 @@ import { ContainerPublisher, type PublisherStub } from "../src/publisher/client.
 import { GitError, type GitOps } from "../src/publisher/gitops.ts";
 import { outcomeNote } from "../src/publisher/push-outcome.ts";
 import type { ArtifactsNamespace, RepoHandle } from "../src/artifacts.ts";
+import type { MintLedger } from "../src/mints.ts";
 import { type ScrubCursor, type ScrubTable, WITHHELD, isSafeErrorText, safeErrorText, scrubBatch, scrubLegacyErrors } from "../src/safe-errors.ts";
 import { Clock, ControlledPublisher, ECHOED, FakeRoom, FakeTokens, Fixture, actId, echoNote, echoing, everyRow, laneId, noEcho, nodeSql, opId } from "./support.ts";
 
@@ -56,7 +57,9 @@ function containerPublisher(error: unknown): ContainerPublisher {
     },
   } as unknown as PublisherStub;
   const artifacts = { get: async () => repo } as unknown as ArtifactsNamespace;
-  return new ContainerPublisher({ stub, artifacts, canonical: { name: "canon", remote: "https://acct.artifacts.cloudflare.net/git/ns/canon.git" }, sleep: async () => {} });
+  // Since mint lane C the canonical token comes through the Room's mint ledger; here a stand-in that hands one over.
+  const mints = { withToken: async <T>(_p: string, _s: string, _t: unknown, fn: (t: { plaintext: string }) => Promise<T>) => fn({ plaintext: "x" }) } as unknown as MintLedger;
+  return new ContainerPublisher({ stub, artifacts, canonical: { name: "canon", remote: "https://acct.artifacts.cloudflare.net/git/ns/canon.git" }, mints, sleep: async () => {} });
 }
 
 test("d29c09fa, a failed integration (the engine's catch): the record keeps the stage, name, code and status only", async (t) => {

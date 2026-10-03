@@ -248,8 +248,11 @@ export interface Remotes {
   readonly publisher: import("@generalbusiness/artroom-git").PublisherStub;
   /** The publisher sandbox's snapshot writer (R-CARRY-15, R-CARRY-16). */
   readonly writeSnapshot: SnapshotWrite;
-  /** Lane L's git remote for `refs/artroom/log` on the room's repository. It must stage. */
-  readonly logRemote: (repo: import("./artifacts.ts").RepoLocation) => Promise<StagingRemote>;
+  /**
+   * Lane L's git remote for `refs/artroom/log` on the room's repository. It must stage. Its canonical read and
+   * write tokens are minted and revoked through the Room's mint ledger (R-MINT-1).
+   */
+  readonly logRemote: (repo: import("./artifacts.ts").RepoLocation, mints: Pick<import("@generalbusiness/artroom-git").MintLedger, "withToken">) => Promise<StagingRemote>;
   /** The most one log push may carry (lane L's `maxTransfer`); default lane L's `LOG_TRANSFER_LIMITS`. */
   readonly logTransfer?: { readonly objects: number; readonly bytes: number } | undefined;
   /** Waits between remote retries. Tests make them instant. */

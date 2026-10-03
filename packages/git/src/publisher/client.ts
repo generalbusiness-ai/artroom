@@ -1,16 +1,23 @@
 /**
  * The Room's side of the publisher sandbox. It owns the tokens: each
- * operation gets fresh 60 s tokens, minted here and revoked when the
- * operation ends, and the sandbox's gateway allows only that operation's ref
+ * operation gets fresh tokens, minted here and revoked when the operation
+ * ends, and the sandbox's gateway allows only that operation's ref
  * updates. The publication token is the exception: the landing engine mints
  * and revokes it, so it can record the token's ID before the push (R-PUB-3).
+ *
+ * Every token on the canonical repository is minted and revoked through the
+ * Room's mint ledger (protocol section 32, R-MINT-1): its record and
+ * wake-up are stored before the request, a lost answer stays an unknown
+ * record, and a revocation that fails stays owed. The lane fork's read
+ * token for pinning is not a canonical mint; it waits for the fork's own
+ * ledger (request 02836f9a).
  */
 
 import type { Sha } from "@generalbusiness/artroom-contract";
 import type { IntegrateResult } from "../landing/core.ts";
 import type { PublisherPort } from "../landing/engine.ts";
 import { type ArtifactsNamespace, type RepoHandle, readMainVia, withRetry } from "../artifacts.ts";
-import { errorNote } from "../mints.ts";
+import { type MintLedger, type MintScope, errorNote } from "../mints.ts";
 import type { BuildResult, PinResult, PreviewResult } from "./gitops.ts";
 import { integrationRef, pinnedRef } from "./gitops.ts";
 import type { PushOutcome } from "./push-outcome.ts";
@@ -57,6 +64,8 @@ export interface PublisherClientOptions {
   readonly artifacts: ArtifactsNamespace;
   /** The canonical repo's name and remote. */
   readonly canonical: { readonly name: string; readonly remote: string };
+  /** The Room's canonical mint ledger: every canonical token is minted and revoked through it (R-MINT-1). */
+  readonly mints: Pick<MintLedger, "withToken">;
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
@@ -71,16 +80,24 @@ export const TOKEN_TTL = {
   pin: 600,
 } as const;
 
-/** Mint a token on a repo, run `fn` with it, and revoke it whatever happens. */
-async function withToken<T>(
-  repo: RepoHandle,
-  scope: "read" | "write",
-  fn: (token: string) => Promise<T>,
-  sleep?: (ms: number) => Promise<void>,
-  ttl: number = TOKEN_TTL.short,
-): Promise<T> {
+/**
+ * A canonical token through the mint ledger (R-MINT-2 to R-MINT-4): `fn`
+ * gets its text, and the ledger revokes it by its ID however `fn` ends. A
+ * revocation that fails stays owed, never dropped.
+ */
+function withCanonicalToken<T>(mints: Pick<MintLedger, "withToken">, purpose: string, scope: MintScope, ttl: number, fn: (token: string) => Promise<T>): Promise<T> {
+  return mints.withToken(purpose, scope, () => ttl, (t) => fn(t.plaintext));
+}
+
+/**
+ * The lane fork's read token for pinning (R-PROP-1). Not a canonical mint
+ * (R-MINT-1): still a hidden retry and a dropped revocation, until request
+ * 02836f9a gives the fork its own ledger. The only `createToken` call in
+ * this file.
+ */
+async function withForkToken<T>(repo: RepoHandle, fn: (token: string) => Promise<T>, sleep?: (ms: number) => Promise<void>): Promise<T> {
   const opts = sleep ? { sleep } : {};
-  const t = await withRetry(() => repo.createToken(scope, ttl), opts);
+  const t = await withRetry(() => repo.createToken("read", TOKEN_TTL.pin), opts);
   try {
     return await fn(t.plaintext);
   } finally {
@@ -101,10 +118,11 @@ export class ContainerPublisher implements PublisherPort {
 
   async integrate(req: Parameters<PublisherPort["integrate"]>[0]): Promise<IntegrateResult> {
     try {
-      const repo = await this.repo();
-      const r = await withToken(
-        repo,
+      const r = await withCanonicalToken(
+        this.o.mints,
+        `integrate:${req.op}:${req.attempt}`,
         "write",
+        TOKEN_TTL.short,
         (token) =>
           this.o.stub.integrate({
             canonical: { remote: this.o.canonical.remote, token },
@@ -115,7 +133,6 @@ export class ContainerPublisher implements PublisherPort {
             lane: req.lane,
             generation: req.generation,
           }),
-        this.o.sleep,
       );
       return r.kind === "clean" ? { kind: "clean", integration: r.integration as Sha, ref: r.ref } : { kind: "conflict", paths: r.paths };
     } catch (e) {
@@ -150,32 +167,24 @@ export class Pinning {
 
   /** Step 1, before admission: copy the head's objects from the lane's fork. */
   async pinObjects(fork: { readonly name: string; readonly remote: string }, head: Sha): Promise<PinResult> {
-    const [forkRepo, canonical] = await Promise.all([this.get(fork.name), this.get(this.o.canonical.name)]);
-    return withToken(
+    const forkRepo = await this.get(fork.name);
+    return withForkToken(
       forkRepo,
-      "read",
       (forkToken) =>
-        withToken(
-          canonical,
-          "write",
-          (canonToken) =>
-            this.o.stub.pinObjects({
-              fork: { remote: fork.remote, token: forkToken },
-              canonical: { remote: this.o.canonical.remote, token: canonToken },
-              head,
-            }),
-          this.o.sleep,
-          TOKEN_TTL.pin,
+        withCanonicalToken(this.o.mints, `pin-objects:${head}`, "write", TOKEN_TTL.pin, (canonToken) =>
+          this.o.stub.pinObjects({
+            fork: { remote: fork.remote, token: forkToken },
+            canonical: { remote: this.o.canonical.remote, token: canonToken },
+            head,
+          }),
         ),
       this.o.sleep,
-      TOKEN_TTL.pin,
     );
   }
 
   /** Step 2, after admission: the pinned ref, which never moves. */
   async pinRef(lane: string, generation: number, head: Sha): Promise<PinResult> {
-    const canonical = await this.get(this.o.canonical.name);
-    return withToken(canonical, "write", (token) =>
+    return withCanonicalToken(this.o.mints, `pin-ref:${lane}:${generation}`, "write", TOKEN_TTL.short, (token) =>
       this.o.stub.pinRef({ canonical: { remote: this.o.canonical.remote, token }, ref: pinnedRef(lane, generation), head }),
     );
   }
@@ -186,8 +195,7 @@ export class Pinning {
    * same commit a landing on that main builds.
    */
   async preview(lane: string, generation: number, head: Sha): Promise<PreviewResult> {
-    const canonical = await this.get(this.o.canonical.name);
-    return withToken(canonical, "write", (token) =>
+    return withCanonicalToken(this.o.mints, `preview:${lane}:${generation}`, "write", TOKEN_TTL.short, (token) =>
       this.o.stub.preview({ canonical: { remote: this.o.canonical.remote, token }, head, headRef: pinnedRef(lane, generation), lane, generation }),
     );
   }
