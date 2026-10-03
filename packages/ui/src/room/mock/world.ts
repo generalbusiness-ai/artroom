@@ -1099,6 +1099,8 @@ export class World {
       feed: [...this.feed],
       log: { head, publishedThrough: this.publishedThrough },
       policy: { version: this.policyVersion, activatedAt: 1, document: POLICY, outcomes: [...this.outcomes] },
+      // The scripted room's policy is a v1 document: the built-in review acts, with no declarations of its own (R-DECL-1).
+      catalogue: { vocabulary: "artroom-legacy-v1", policy: this.policyVersion, since: 1, until: null },
       source: { kind: "mock", status: "live", note: "Scripted scenario" },
     };
   }

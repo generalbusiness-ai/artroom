@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoomAdapter } from "./room/adapter.ts";
 import type { ActId, MemberId } from "./room/contract.ts";
+import { ActsScreen } from "./screens/Acts.tsx";
 import { NeedsYou } from "./screens/NeedsYou.tsx";
 import { PolicyScreen } from "./screens/Policy.tsx";
 import { ProposalScreen } from "./screens/Proposal.tsx";
@@ -43,7 +44,7 @@ function useTheme(initial?: Theme): [Theme, (t: Theme) => void] {
 
 const typing = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 
-const TITLES: Record<Route["name"], string> = { needs: "Needs you", room: "Room", policy: "Policy", proposal: "Proposal" };
+const TITLES: Record<Route["name"], string> = { needs: "Needs you", room: "Room", policy: "Policy", acts: "Acts", proposal: "Proposal" };
 
 export function App({ adapter, dev = false, theme: initialTheme }: { adapter: RoomAdapter; dev?: boolean; theme?: Theme }) {
   const snap = useSnapshot(adapter);
@@ -82,6 +83,7 @@ export function App({ adapter, dev = false, theme: initialTheme }: { adapter: Ro
       if (e.key === "1") go(href.needs());
       else if (e.key === "2") go(href.room());
       else if (e.key === "3") go(href.policy());
+      else if (e.key === "4") go(href.acts());
       else if (e.key === "?") setHelp((h) => !h);
       else if (e.key === "d" && adapter.timeline) setDevOpen((d) => !d);
       else if ((e.key === "," || e.key === ".") && adapter.timeline && devOpen) {
@@ -109,10 +111,11 @@ export function App({ adapter, dev = false, theme: initialTheme }: { adapter: Ro
     );
   }
   const open = snap.attention.filter((a) => a.open).length;
-  const nav: { name: Route["name"]; label: string; href: string; icon: "inbox" | "room" | "shield" }[] = [
+  const nav: { name: Route["name"]; label: string; href: string; icon: "inbox" | "room" | "shield" | "commit" }[] = [
     { name: "needs", label: "Needs you", href: href.needs(), icon: "inbox" },
     { name: "room", label: "Room", href: href.room(), icon: "room" },
     { name: "policy", label: "Policy", href: href.policy(), icon: "shield" },
+    { name: "acts", label: "Acts", href: href.acts(), icon: "commit" },
   ];
   const lag = unpublished(snap);
 
@@ -197,11 +200,12 @@ export function App({ adapter, dev = false, theme: initialTheme }: { adapter: Ro
         {route.name === "needs" && <NeedsYou />}
         {route.name === "room" && <RoomScreen />}
         {route.name === "policy" && <PolicyScreen />}
+        {route.name === "acts" && <ActsScreen {...(route.kind ? { kind: route.kind } : {})} />}
         {route.name === "proposal" && <ProposalScreen key={route.lane} laneId={route.lane} {...(route.generation ? { generation: route.generation } : {})} {...(route.focus ? { focus: route.focus } : {})} />}
       </main>
 
       <footer class="footer">
-        {snap.source.kind === "mock" ? <span>A scripted demo room: three agents, two people, one checker.</span> : <span>Connected to {snap.room.name}.</span>}
+        {snap.source.kind === "mock" ? <span>{snap.source.note === "Scripted scenario" ? "A scripted demo room: three agents, two people, one checker." : "A demo room that declares its own acts."}</span> : <span>Connected to {snap.room.name}.</span>}
         {adapter.timeline && (
           <button class="btn quiet small" type="button" onClick={() => setDevOpen(!devOpen)} aria-pressed={devOpen}>
             <Icon name="play" /> {devOpen ? "Hide" : "Replay"} the scenario
@@ -212,7 +216,7 @@ export function App({ adapter, dev = false, theme: initialTheme }: { adapter: Ro
         </button>
         {help && (
           <p class="small" role="note">
-            <kbd>1</kbd> Needs you · <kbd>2</kbd> Room · <kbd>3</kbd> Policy · <kbd>j</kbd>/<kbd>k</kbd> next and previous item · <kbd>?</kbd> this help
+            <kbd>1</kbd> Needs you · <kbd>2</kbd> Room · <kbd>3</kbd> Policy · <kbd>4</kbd> Acts · <kbd>j</kbd>/<kbd>k</kbd> next and previous item · <kbd>?</kbd> this help
             {adapter.timeline && (
               <>
                 {" "}· <kbd>d</kbd> demo timeline · <kbd>,</kbd>/<kbd>.</kbd> step back and forward

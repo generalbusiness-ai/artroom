@@ -6,7 +6,10 @@
     "resolveJsonModule": true,
     // The policy runtime's sources assume a non-DOM lib, so the UI checks
     // against declarations generated from them by `npm run typecheck`.
-    "paths": { "@generalbusiness/artroom-policy": ["./.types/policy/src/index.d.ts"] },
+    "paths": {
+      "@generalbusiness/artroom-policy": ["./.types/policy/src/index.d.ts"],
+      "@generalbusiness/artroom-policy/declared": ["./.types/policy/src/declared.d.ts"]
+    },
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "types": []

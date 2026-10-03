@@ -4,6 +4,7 @@
  *   ?viewer=@sam   whose queue to show
  *   ?dev           show the demo timeline
  *   ?theme=dark    force a theme (light, dark or system)
+ *   ?app=setlist   a room that declares its own acts, not the review ones
  * The live adapter (src/room/live) needs the client package's `connect()`,
  * which lane 0 declares and a later lane implements.
  */
@@ -11,6 +12,8 @@
 import { render } from "preact";
 import { App, type Theme } from "./app.tsx";
 import type { MemberId } from "./room/contract.ts";
+import type { RoomAdapter } from "./room/adapter.ts";
+import { declaredDemo } from "./room/mock/declared-room.ts";
 import { MockRoom } from "./room/mock/mock-room.ts";
 import { DEFAULT_STEP } from "./room/mock/scenario.ts";
 
@@ -19,10 +22,13 @@ const stepParam = params.get("step");
 const viewer = params.get("viewer");
 const theme = params.get("theme");
 
-const adapter = new MockRoom({
-  step: stepParam !== null && stepParam !== "" ? Number(stepParam) : DEFAULT_STEP,
-  ...(viewer ? { viewer: viewer as MemberId } : {}),
-});
+const adapter: RoomAdapter =
+  params.get("app") === "setlist"
+    ? (await declaredDemo(viewer ? (viewer as MemberId) : undefined)).adapter
+    : new MockRoom({
+        step: stepParam !== null && stepParam !== "" ? Number(stepParam) : DEFAULT_STEP,
+        ...(viewer ? { viewer: viewer as MemberId } : {}),
+      });
 
 render(
   <App adapter={adapter} dev={params.has("dev")} {...(theme === "light" || theme === "dark" || theme === "system" ? { theme: theme as Theme } : {})} />,
