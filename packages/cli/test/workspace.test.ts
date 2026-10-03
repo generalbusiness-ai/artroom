@@ -72,8 +72,8 @@ const MANUAL = /Manual local step: .*credentials has no installation mark artroo
 
 describe("the reservation is made before the first await, and checked at the last (review 744a018a)", () => {
   test.each([
-    ["its first request, the read session", () => atSession()],
-    ["its last answer, the workspace token", () => atToken()],
+    ["the read session, its first request,", () => atSession()],
+    ["the workspace token, its last answer,", () => atToken()],
   ])("an older workspace delayed at %s does not overwrite a newer workspace for another lane", async (_where, pauser) => {
     const home = join(h.tmp, "alice");
     const dir = repo("repo");
@@ -574,7 +574,7 @@ describe("an unreadable mark keeps the cleanup duty (review c033fb54)", () => {
 
 describe("a release is bound to the lease it released, and removes only its own credential (reviews 80d3710c, f7c79158, 17013617)", () => {
   test.each([[[] as string[]], [["credential-removed", "config-written"]]])(
-    "repro 1: an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both (recovery interrupted after %j first)",
+    "an older release of lane X, recovered after X was reclaimed with a new lease and workspace, keeps both (recovery interrupted after %j first)",
     async (interruptions) => {
       const home = join(h.tmp, "alice");
       const dir = repo("repo");
