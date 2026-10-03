@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/README.md","body":{"commit":"a04c774b1abd424a09feecd9ff56fc29c8711d21","path":"plans/README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0717d5fb770ef2ef6a22461d16ab52f2618956be","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/mint-sites-scan.test.ts."}
