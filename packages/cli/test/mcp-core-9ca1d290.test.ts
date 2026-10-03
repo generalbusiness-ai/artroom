@@ -5,6 +5,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { EXIT } from "../src/main.ts";
@@ -13,8 +14,8 @@ import { useHarness } from "./harness.ts";
 
 const { h, cli, login } = useHarness();
 
-/** `tools/list`, and optionally one call, from the real bin over stdio. */
-async function stdio(home: string, args: string[], call?: { name: string; arguments: unknown }): Promise<{ listed: string[]; called?: any; code: number | null }> {
+/** The raw replies to `tools/list`, and optionally one call, from the real bin over stdio. */
+async function stdioRaw(home: string, args: string[], call?: { name: string; arguments: unknown }): Promise<{ list: any; called?: any; code: number | null }> {
   const child = spawn(process.execPath, [join(import.meta.dirname, "..", "bin", "artroom.js"), "mcp", ...args], { env: { ...process.env, ARTROOM_HOME: home }, stdio: ["pipe", "pipe", "pipe"] });
   let buffer = "";
   const replies = new Map<number, any>();
@@ -37,6 +38,12 @@ async function stdio(home: string, args: string[], call?: { name: string; argume
   const called = call ? await send(3, "tools/call", call) : undefined;
   child.stdin.end();
   const code = await new Promise<number | null>((resolve) => child.on("exit", resolve));
+  return { list, called, code };
+}
+
+/** `tools/list`, and optionally one call, from the real bin over stdio. */
+async function stdio(home: string, args: string[], call?: { name: string; arguments: unknown }): Promise<{ listed: string[]; called?: any; code: number | null }> {
+  const { list, called, code } = await stdioRaw(home, args, call);
   return { listed: list.result.tools.map((t: { name: string }) => t.name), called, code };
 }
 
@@ -73,5 +80,25 @@ describe("artroom mcp --toolset (R-API-14)", () => {
     expect((await cli(agent, ["redeem", invitationLink(h.room.url, h.room.id, invitation, secret)])).code).toBe(EXIT.ok);
     const out = await stdio(agent, []);
     expect(out.listed).toEqual(["claim", "workspace", "note", "attention", "explain", "lane", "proposal", "operation", "acts"]);
+    // The redemption's own delegation is kept with the credential, and the list is read under exactly that one.
+    const file = join(agent, "config.json");
+    const config = JSON.parse(readFileSync(file, "utf8"));
+    const mine = [...h.room.delegations.values()].at(-1)!;
+    expect(config.rooms[h.room.id]).toMatchObject({ custody: "room", delegation: mine.id });
+    // Naming another current delegation there, one this session's key did not grant, shows nothing: the credential
+    // is not that delegation's.
+    const other = join(h.tmp, "other");
+    const second = await h.room.invite("@other", { role: "agent", custody: "room", kinds: "*" as never });
+    expect((await cli(other, ["redeem", invitationLink(h.room.url, h.room.id, second.invitation, second.secret)])).code).toBe(EXIT.ok);
+    const theirs = [...h.room.delegations.values()].at(-1)!;
+    expect(theirs.id).not.toBe(mine.id);
+    writeFileSync(file, JSON.stringify({ ...config, rooms: { ...config.rooms, [h.room.id]: { ...config.rooms[h.room.id], delegation: theirs.id } } }));
+    const wrong = await stdioRaw(agent, []);
+    expect(wrong.list.error ?? wrong.list.result).toMatchObject({ message: expect.stringContaining("belongs to no active member") });
+    // A credential saved before the ID was kept names none: the session key's own latest delegation is used.
+    const { delegation: _dropped, ...legacy } = config.rooms[h.room.id];
+    void _dropped;
+    writeFileSync(file, JSON.stringify({ ...config, rooms: { ...config.rooms, [h.room.id]: legacy } }));
+    expect((await stdio(agent, [])).listed).toEqual(out.listed);
   });
 });

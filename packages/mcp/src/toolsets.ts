@@ -141,10 +141,14 @@ export async function toolsFor(caller: McpCaller, catalogue: Catalogue, asked?: 
  * A caller's authorization, from the roster (R-API-14), for a host that
  * knows the caller's key: the command line. Three forms:
  * - `{ key }`: a member's own key. No grant map is needed.
- * - `{ key, delegation }`: that key acts under the named delegation.
+ * - `{ key, delegation }`: that key acts under the named delegation, which
+ *   must have been granted to it.
  * - `{ key, session: true }`: `key` is a member key the room holds for a
  *   bearer session, and the caller acts under the delegation that key
- *   granted to the session.
+ *   granted to the session. With `delegation` too, it is exactly that
+ *   delegation, as the redemption recorded it, and `key` must be its
+ *   grantor. With none (a credential saved before the command line kept the
+ *   ID), it is the latest unrevoked delegation the key granted.
  * Under a delegation the role is the grantor's member's, as at admission.
  * A key or delegation the roster does not hold as current throws
  * `unauthenticated`.
@@ -162,6 +166,10 @@ export function callerFromRoster(roster: Roster, who: { readonly key: KeyId; rea
       ? roster.delegations.find((x) => x.id === who.delegation)
       : roster.delegations.filter((x) => x.grantor === who.key && x.revoked === undefined).at(-1);
   if (d === undefined || d.revoked !== undefined) throw fail(); // GM:roster-revoked
+  // A session's delegation is one its own room-held key granted: another key's delegation is not this credential's.
+  if (who.session === true && d.grantor !== who.key) throw fail(); // GM:roster-session-grantor
+  // A key that names a delegation must be the key it was granted to.
+  if (who.session !== true && d.grantee !== who.key) throw fail(); // GM:roster-grantee
   const member = memberOf(d.grantor);
   if (member === undefined) throw fail();
   return { role: member.role, delegation: { kinds: d.kinds, ...(d.acts !== undefined ? { acts: d.acts } : {}) } };

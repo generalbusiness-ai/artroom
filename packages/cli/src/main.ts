@@ -703,7 +703,7 @@ const COMMANDS: Record<string, Command> = {
       );
       const path = ctx.store.bearerPath(inv.room);
       const config = ctx.store.read();
-      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, mcp: shown.mcp, invitation: inv.invitation };
+      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, delegation: shown.delegation, mcp: shown.mcp, invitation: inv.invitation };
       config.current = inv.room;
       ctx.store.write(config);
       ctx.step("config-written");
@@ -1196,8 +1196,10 @@ const COMMANDS: Record<string, Command> = {
       const toolset = toolsetOf(str(ctx.values, "toolset"));
       const { api, room } = await open(ctx);
       // The tool list follows this credential's authorization, read from the roster at each `tools/list` (R-API-14):
-      // a key file is the member's own key; a bearer file acts under the session's delegation.
-      const who = room.custody === "room" ? { key: room.key, session: true } : { key: room.key }; // GM:cli-caller
+      // a key file is the member's own key; a bearer file acts under the session's delegation, the one its redemption
+      // recorded. (A credential saved before that ID was kept names none: then it is the key's latest delegation.)
+      const session = room.delegation !== undefined ? { key: room.key, session: true, delegation: room.delegation } : { key: room.key, session: true }; // GM:cli-delegation
+      const who = room.custody === "room" ? session : { key: room.key }; // GM:cli-caller
       const caller = async () => callerFromRoster(await api.members(), who);
       const asked = toolset !== undefined ? { toolset } : {}; // GM:cli-toolset
       const handle = serveArtroomStdio(api, { caller, ...asked });

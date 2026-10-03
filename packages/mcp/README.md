@@ -68,8 +68,15 @@ with `{ outcome: "not-found", what }`, `acts` with `{ outcome: "not-found" }`.
 A caller that asks for none gets the default for its authorization: `all`
 for an admin or maintainer, `builder` for a member or agent, `reviewer`
 for a checker, and `observer` for a delegation that may sign no act this
-server offers. A caller asks for another with `?toolset=NAME` on the MCP
-URL, or `artroom mcp --toolset NAME`. An unknown name is `bad-request`.
+server offers. A caller may select any of the four by name, whatever its
+default is, with `?toolset=NAME` on the MCP URL or `artroom mcp --toolset
+NAME`. The selected list has the same filter as the default one, so
+selecting `all` shows no act tool the caller could not use, and grants
+nothing. An unknown name is `bad-request`.
+
+Under a `v1` policy document the generic `act` is never shown, because the
+room refuses a `v: 2` envelope there. An admin then sees the fourteen named
+tools and `acts`; under a `v2` document, all sixteen.
 
 Within the chosen set, an act tool is shown only if the caller could make
 a new call of it: its role and the declaration's `who` allow the kind, and
@@ -82,10 +89,22 @@ still be called, and the room judges that call like any other. Listing
 changes no grant: a stale signed binding is never replaced, and a kind the
 grant does not name is never added.
 
-The host supplies the caller's authorization (`McpCaller`: its role, and
-its delegation's signed grant). The room's Worker reads it from the Room
-for a bearer token. The command line builds it from the roster with
-`callerFromRoster`. It is read again for every `tools/list`.
+The host that authenticated the request supplies the caller's
+authorization (`McpCaller`): the credential's current roster role and,
+under a delegation, that delegation's `kinds` and signed map exactly as
+the room recorded them. This is a seam between the server and its host,
+not a method of `RoomApi` or `RoomWire`:
+
+- The room's Worker asks the Room, which judges the bearer token as a read
+  does and reads its member's role and its session's delegation.
+- The command line builds it from the current roster with
+  `callerFromRoster`: a member's own key, or, for a redeemed bearer, the
+  delegation its redemption recorded, which the room-held key must have
+  granted. A key that names a delegation must be the key it was granted to.
+
+Both read it again for every `tools/list`, so the list follows a changed
+role, a revoked delegation or a changed declaration, and never an earlier
+call.
 
 ## Keys and waits (R-API-9, R-API-15)
 

@@ -157,6 +157,22 @@ describe("descriptors: sixteen tools, each with a title, an output schema and fi
     expect(new Set(tools.map((t) => t.title)).size).toBe(16);
   });
 
+  test("under an active v1 document an admin's list is the fourteen named tools and acts: the generic act is absent, and the rest is as under v2", async () => {
+    // No document was activated: the room is under the legacy vocabulary.
+    expect((await active()).vocabulary).not.toBe("declared");
+    const api = await connect({ url }, room.id, { kind: "key", signer: room.admin.signer });
+    const legacy = await stdioList(api, async () => ({ role: "admin" }));
+    expect(names(legacy)).toEqual(without(ORDER, "act"));
+    expect(legacy).toHaveLength(15);
+    // Asking for `all` by name shows no generic act either: a v: 2 envelope is bad-request under a v1 document.
+    expect(names(await stdioList(api, async () => ({ role: "admin" }), "all"))).toEqual(without(ORDER, "act"));
+    for (const t of legacy) expect(Object.keys(t).sort(), t.name).toEqual(["annotations", "description", "inputSchema", "name", "outputSchema", "title"]);
+    expect(legacy).toEqual(JSON.parse(JSON.stringify(listedTools())).filter((t: { name: string }) => t.name !== "act"));
+    // The same admin, once a v2 document is active, sees all sixteen.
+    await room.activate(DECLARED);
+    expect(names(await stdioList(api, async () => ({ role: "admin" })))).toEqual(ORDER);
+  });
+
   test("the annotations are the rule's table, and act's are conservative whatever an earlier call did", async () => {
     const hints = (readOnlyHint: boolean, destructiveHint: boolean) => ({ readOnlyHint, destructiveHint, idempotentHint: true, openWorldHint: false });
     const table: Record<string, ReturnType<typeof hints>> = {};
@@ -758,6 +774,36 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
     for (const name of ["builder", "reviewer", "observer", "all"]) expect(toolsetOf(name)).toBe(name);
   });
 
+  test("a caller may select any named toolset: the read-only-delegation override decides the default only, and every selected list has the same filter", async () => {
+    await room.activate(DECLARED);
+    const c = await active();
+    // A member's default is builder. It may select a larger set by name, and gets no act tool beyond its authority.
+    expect(await shown({ role: "member" }, c)).toEqual(inOrder(SETS.builder));
+    expect(await shown({ role: "member" }, c, "all")).toEqual(ORDER);
+    // A delegation that may newly sign nothing: observer by default, and by name any set, each without act tools.
+    const idle: McpCaller = { role: "agent", delegation: { kinds: [], acts: {} } };
+    expect(defaultToolset(idle, await eligible(idle, c))).toBe("observer");
+    expect(await shown(idle, c)).toEqual(inOrder(SETS.observer));
+    const acts = (set: McpToolset) => SETS[set].filter((n) => (ACT_TOOLS as readonly string[]).includes(n));
+    for (const set of ["builder", "reviewer", "observer", "all"] as const) expect(await shown(idle, c, set), set).toEqual(without(SETS[set], ...acts(set)));
+    // Selecting `all` grants nothing: over the endpoint the list has no act tool, and the room refuses the call itself.
+    const b = await bearer("@idle", "agent", { kinds: [], acts: {} });
+    expect(await listed(b)).toEqual(inOrder(SETS.observer));
+    expect(await listed(b, "?toolset=all")).toEqual(without(ORDER, ...acts("all")));
+    expect(await listed(b, "?toolset=builder")).toEqual(without(SETS.builder, ...acts("builder")));
+    const signed = JSON.stringify(room.delegations.get(b.delegation));
+    const claim = await call(b, "claim", { goal: "g", scope: ["src/**"] }, "?toolset=all");
+    expect(claim.isError).toBe(false);
+    expect(claim.structuredContent).toMatchObject({ refused: true, rule: "delegation-invalid" });
+    expect(room.lanes.size).toBe(0);
+    expect(JSON.stringify(room.delegations.get(b.delegation))).toBe(signed);
+    // A delegation with one current kind keeps that kind in every set that has its tool, and gains none by asking.
+    const one = await bearer("@one", "agent", { kinds: [], acts: await bindings("note") });
+    expect(await listed(one)).toEqual(without(SETS.builder, "claim", "propose", "land", "release", "renew"));
+    expect(await listed(one, "?toolset=all")).toEqual(without(ORDER, "claim", "propose", "review", "land", "release", "renew"));
+    expect(await listed(one, "?toolset=observer")).toEqual(inOrder(SETS.observer));
+  });
+
   test("an unknown toolset name is bad-request, over HTTPS and for stdio, and nothing runs", async () => {
     const b = await bearer("@agent", "agent");
     for (const query of ["?toolset=nope", "?toolset=", "?toolset=Builder", "?toolset=builder&toolset=all", "?toolset=__proto__"]) {
@@ -908,7 +954,7 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
     // What the command line builds from the roster is what the room gives its own endpoint.
     const roster = await api.members();
     expect(callerFromRoster(roster, { key: b.key, session: true })).toEqual(await room.bearerCaller(b.bearer));
-    expect(callerFromRoster(roster, { key: b.key, delegation: b.delegation })).toEqual(await room.bearerCaller(b.bearer));
+    expect(callerFromRoster(roster, { key: b.key, session: true, delegation: b.delegation })).toEqual(await room.bearerCaller(b.bearer));
     const alice = await member("@alice", "maintainer");
     expect(callerFromRoster(await alice.api.members(), { key: alice.key as never })).toEqual({ role: "maintainer" });
     expect(await stdioList(alice.api, async () => callerFromRoster(await alice.api.members(), { key: alice.key as never }))).toEqual(JSON.parse(JSON.stringify(listedTools())));
@@ -916,8 +962,42 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
     expect(() => callerFromRoster(roster, { key: "key_unknown" as never })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
     room.revokeDelegation(b.delegation);
     const after = await alice.api.members();
-    expect(() => callerFromRoster(after, { key: b.key, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    expect(() => callerFromRoster(after, { key: b.key, session: true, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
     expect(() => callerFromRoster(after, { key: b.key, session: true })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+  });
+
+  test("the command line's adapter gives a session exactly the delegation its redemption recorded: not a later one of the same key, and never another key's", async () => {
+    await room.activate(DECLARED);
+    const b = await bearer("@agent", "agent", { kinds: ["renew"], acts: await bindings("claim") });
+    const other = await bearer("@other", "agent", { kinds: [], acts: await bindings("note") });
+    const api = await connect({ url }, room.id, { kind: "bearer", token: b.bearer });
+    const roster = await api.members();
+    const exact = callerFromRoster(roster, { key: b.key, session: true, delegation: b.delegation });
+    expect(exact).toEqual(await room.bearerCaller(b.bearer));
+    expect(exact).toEqual({ role: "agent", delegation: { kinds: ["renew"], acts: await bindings("claim") } });
+    // The same room-held key with a later delegation in the roster: the session's own recorded one is still used.
+    const mine = roster.delegations.find((d) => d.id === b.delegation)!;
+    const later = { ...mine, id: "act_999_00000000" as never, kinds: "*" as const, acts: await bindings("claim", "propose", "land") };
+    const grown = { ...roster, delegations: [...roster.delegations, later] };
+    expect(callerFromRoster(grown, { key: b.key, session: true, delegation: b.delegation })).toEqual(exact);
+    // With no recorded ID (a credential saved before it was kept), the latest unrevoked one the key granted is used.
+    expect(callerFromRoster(grown, { key: b.key, session: true })).toEqual({ role: "agent", delegation: { kinds: "*", acts: later.acts } });
+    // A session cannot name a delegation another key granted, though that delegation is current.
+    expect(roster.delegations.some((d) => d.id === other.delegation && d.revoked === undefined)).toBe(true);
+    expect(() => callerFromRoster(roster, { key: b.key, session: true, delegation: other.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    // A client-held key that names a delegation must be the key it was granted to: the grantee is accepted, and the
+    // grantor's key or any other key in that form is not.
+    const granted = roster.delegations.find((d) => d.id === other.delegation)!;
+    expect(callerFromRoster(roster, { key: granted.grantee, delegation: other.delegation })).toEqual(await room.bearerCaller(other.bearer));
+    expect(() => callerFromRoster(roster, { key: other.key, delegation: other.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    expect(() => callerFromRoster(roster, { key: b.key, delegation: other.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    // Read for each list: once the delegation is revoked, the next list over stdio fails, and shows nothing.
+    const caller = async () => callerFromRoster(await api.members().catch(() => roster), { key: b.key, session: true, delegation: b.delegation });
+    expect(names(await stdioList(api, caller))).toEqual(await listed(b));
+    room.revokeDelegation(b.delegation);
+    const after = { ...roster, delegations: roster.delegations.map((d) => (d.id === b.delegation ? { ...d, revoked: 1 } : d)) };
+    expect(() => callerFromRoster(after, { key: b.key, session: true, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    expect((await list(b)).status).toBe(401);
   });
 
   test("the list is the same before and after other calls, and it is read afresh for each request", async () => {

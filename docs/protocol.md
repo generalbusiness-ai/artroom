@@ -2033,11 +2033,23 @@ intent under R-DECL-16.
   `member` or `agent`, and `reviewer` for `checker`. That last choice is a
   presentation set, not review authority: a checker still cannot sign a
   review or claim, and only eligible act tools are listed.
-- **A caller may ask for fewer.** The query parameter `toolset` on the MCP
-  URL (for example `?toolset=reviewer`) selects another toolset. An
-  unknown name is `bad-request`.
+- **A caller may select another named toolset.** The query parameter
+  `toolset` on the MCP URL (for example `?toolset=reviewer`), or
+  `--toolset` on `artroom mcp`, selects any one of `builder`, `reviewer`,
+  `observer` and `all`, whatever the caller's default is. The
+  read-only-delegation override decides the default only. Every selected
+  list is filtered by the same eligibility predicate, so selecting `all`
+  shows no act tool the caller could not make a new call of, and grants no
+  act and no signed binding. An unknown name is `bad-request`.
 - **One eligibility predicate governs HTTPS and stdio.** Authenticate the
-  request and use the active document and current roster role. For a `v2`
+  request and use the active document and current roster role. The host
+  that authenticated the request supplies the caller's facts
+  (`McpCaller`): the credential's current role and, under a delegation,
+  the delegation's `kinds` and signed map exactly as recorded. The Room's
+  own endpoint reads them from the token, by a method of the Room that is
+  not part of `RoomApi` or `RoomWire`. `artroom mcp` reads them from the
+  current roster and the credential's own recorded delegation. Both read
+  them again for every `tools/list`. For a `v2`
   document, a declared kind is eligible for a new generic call exactly
   when its `who` admits that role under R-DECL-11, including the implicit
   admin and narrow checker floor. With delegated credentials it must also
@@ -2306,7 +2318,7 @@ Cases added for amendment 2 (section 27). Each is normative.
 | **MCP keys.** `claim` with no `idempotencyKey`; `claim` with a key, its response lost, then the same call again | `bad-request` and nothing recorded; then one claim, and the retry returns its receipt | R-API-9, R-CRED-10 |
 | **MCP reads.** `lane` and `proposal` of unknown IDs; `lanes` with `touches` | `{ outcome: "not-found", what }` for each; the overlapping lanes | R-API-9 |
 | **MCP operation errors.** `RoomApi.op` throws lookup `not-found`; separately it throws `unauthenticated`, `forbidden` or `unavailable` | Only the lookup becomes `{ outcome: "not-found", what: "operation" }`; each other failure keeps its error | R-API-9 |
-| **MCP descriptors.** `tools/list` as an admin | Fourteen named tools plus `act` and `acts` in a fixed order, each with title, output schema and annotations; instructions of at most 512 characters | R-API-13, R-DECL-16 |
+| **MCP descriptors.** `tools/list` as an admin, under an active `v2` document and under an active `v1` document | Under `v2`: the fourteen named tools, then `acts` and `act`, in a fixed order, the act tools subject to binding and authorization. Under `v1`: the fourteen named tools and `acts`, with the generic `act` absent. In both, each tool has a title, an output schema and annotations, and the instructions are at most 512 characters | R-API-13, R-API-14, R-DECL-16 |
 | **MCP refusal conforms.** A `propose` refused `outside-claim` | Structured content validates against the tool's `outputSchema`; the text gives rule, reason and fix | R-API-13, R-API-1 |
 | **MCP toolsets.** `tools/list` as an `agent`; as an `agent` with `?toolset=reviewer`; with `?toolset=nope`; as a bearer whose delegation lacks `land` | The builder twelve and reviewer seven named tools, each composed with the generic tools and filtered by authorization; `bad-request`; the builder list without `land` | R-API-14, R-DECL-16 |
 | **MCP checker default.** A direct checker; a delegated checker with one eligible declared check kind; a delegated checker with no eligible new MCP act kind | The reviewer presentation filtered by authority for the first two; observer for the third; no review or claim authority in any case | R-API-14, R-DECL-11 |
@@ -4830,13 +4842,22 @@ and pass the relevant gates before landing.
    Toolsets filter authority without rebinding a signed grant or intent.
 
 **Lane E (`packages/cli`)**
-1. Rebuild against the amended `packages/mcp`; no source change is
-   required. (type, through the import)
+1. Rebuild against the amended `packages/mcp`. (type, through the import)
+   When this contract was first checked, the command line needed no
+   source change to typecheck. The runtime does need two: `artroom mcp`
+   gives the server the caller's authorization (the R-API-14 seam: the
+   member's own key, or a bearer's recorded delegation, read from the
+   current roster for each `tools/list`), and it takes `--toolset NAME`,
+   the stdio form of `?toolset=`.
 
 **The MCP endpoint's deployment (request `8ae3b2dc`)**
 1. The `RoomApi`-per-bearer adapter must serve `lane`, `lanes`,
    `proposal`, `op` and `wait` over `RoomWire.read`, and the attention wait
    over `RoomWire.subscribe`.
+2. The endpoint's host gives the server the caller's authorization for
+   each `tools/list` (R-API-14). Inside the Room's own Worker that is the
+   Room's reading of the token. It is not a method of `RoomApi` or
+   `RoomWire`, and no service binding returns it.
 
 **Other lanes**
 1. Stage 2 continues to own Room admission and shared policy vocabulary.

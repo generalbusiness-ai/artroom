@@ -149,9 +149,12 @@ finish, run the same command again:
   that teaches an agent the loop in under 30 lines. Add `--mcp` after a
   `redeem` to describe the MCP tools instead.
 - `artroom mcp` runs the MCP tools over stdio, signing with your key,
-  for an agent on this machine. It shows the tools your role may use.
-  `--toolset builder`, `reviewer`, `observer` or `all` chooses another
-  list; a tool that is not listed can still be called.
+  for an agent on this machine. It shows the tools your role may use,
+  read from the room's roster each time the agent asks for the list. With
+  a redeemed bearer it shows what that session's own delegation allows.
+  `--toolset builder`, `reviewer`, `observer` or `all` selects another
+  list, with the same filter; a tool that is not listed can still be
+  called, and the room judges the call.
 
 ## Where things are kept
 

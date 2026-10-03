@@ -16,12 +16,12 @@
 import { describe, expect, it } from "vitest";
 import { exports } from "cloudflare:workers";
 import type { ActDeclaration, Claim, DeclaredRecord, Landing, Proposal, Redeemed, Roster, RosterRecord } from "@generalbusiness/artroom-contract";
-import { validate } from "@generalbusiness/artroom-mcp";
-import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy";
+import { callerFromRoster, validate } from "@generalbusiness/artroom-mcp";
+import { CODE_REVIEW_ACTS, policy } from "@generalbusiness/artroom-policy";
 import type { CallerView } from "../../src/requests.ts";
 import { activate, bindingIn, declaredRoom, headSeq, laneRowOf, ok, v2 } from "./declared-support.ts";
 import { ASK, ORIGIN, bearer } from "./declared-stage5-support.ts";
-import { addMember, b64url, call, clock, day, DECLARED, digestBytes, iso, makeRoom, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
+import { addMember, b64url, call, Client, clock, day, DECLARED, digestBytes, iso, makeRoom, newKeyPair, pushChange, randomBytes, tick, type TestRoom } from "./support.ts";
 
 /** The fixed order of `tools/list` (R-API-13). */
 const ORDER = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release", "attention", "explain", "lanes", "lane", "proposal", "operation", "acts", "act"];
@@ -113,7 +113,100 @@ describe.skipIf(DECLARED)("the Room gives its MCP endpoint the caller's authoriz
   });
 });
 
+describe.skipIf(DECLARED)("the Room's reading of a credential and the command line's reading of the roster agree (R-API-14)", () => {
+  it("a v2 bearer, a v1 bearer and a member's own key: the same caller from the Room's token adapter and from the current roster, before and after a role change", async () => {
+    const r = await declaredRoom(doc());
+    const map = await bindings(r, "claim", "ask");
+    const b = await bearer(r, "@agent", "agent", { kinds: ["renew"], acts: map });
+    const fromRoster = async () => callerFromRoster(await roster(r), { key: b.key, session: true, delegation: b.delegation });
+    expect(await fromRoster()).toEqual(await callerOf(r, b.bearer));
+    expect(await fromRoster()).toEqual({ role: "agent", delegation: { kinds: ["renew"], acts: map } });
+    // A credential saved before the delegation's ID was kept: the room-held key granted one delegation, the same one.
+    expect(callerFromRoster(await roster(r), { key: b.key, session: true })).toEqual(await callerOf(r, b.bearer));
+    await r.admin.ok("roster", null, { op: "set-role", member: "@agent", role: "member" });
+    expect(await fromRoster()).toEqual(await callerOf(r, b.bearer));
+    expect((await fromRoster()).role).toBe("member");
+    // A member's own key (custody client) has no delegation on either side.
+    const bob = await addMember(r, "@bob", "maintainer");
+    expect(callerFromRoster(await roster(r), { key: bob.key })).toEqual(await callerOf(r, await bob.session()));
+    expect(callerFromRoster(await roster(r), { key: bob.key })).toEqual({ role: "maintainer" });
+    // A session cannot be read under a delegation another key granted, and the grantor's key is not its grantee.
+    const other = await bearer(r, "@other", "agent", { kinds: [], acts: await bindings(r, "note") });
+    const now = await roster(r);
+    expect(() => callerFromRoster(now, { key: b.key, session: true, delegation: other.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    expect(() => callerFromRoster(now, { key: b.key, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    // The legacy session of a v1 room: kinds as signed, and no map, on both sides.
+    const v1 = await makeRoom();
+    const legacy = await legacyBearer(v1, "@agent", ["claim", "note"]);
+    const legacyCaller = callerFromRoster(await roster(v1), { key: legacy.key, session: true, delegation: legacy.delegation });
+    expect(legacyCaller).toEqual(await callerOf(v1, legacy.bearer));
+    expect(legacyCaller).toEqual({ role: "agent", delegation: { kinds: ["claim", "note"] } });
+  });
+
+  it("revocation: after a delegation is revoked by its grantor, or a session's key by an admin, neither adapter gives a caller", async () => {
+    const r = await declaredRoom(doc());
+    const refusedAs = async (token: string) => ((await r.stub.caller(token)) as { error?: { code: string } }).error?.code;
+    // A client-held key acting under a member's delegation, with a read session of its own.
+    const bob = await addMember(r, "@bob", "member");
+    const k = newKeyPair();
+    const map = await bindings(r, "claim", "note");
+    const g = await ok<RosterRecord>(r, bob, "roster", null, { op: "delegate", to: k.key, kinds: ["renew"], acts: map, lanes: "*", expiresAt: iso(clock.now + day) }, { binding: null });
+    const delegate = new Client(r, k, g.id);
+    const token = await delegate.session();
+    const who = { key: k.key, delegation: g.id } as const;
+    expect(callerFromRoster(await roster(r), who)).toEqual(await callerOf(r, token));
+    expect(await callerOf(r, token)).toEqual({ role: "member", delegation: { kinds: ["renew"], acts: map } });
+    expect(await listed(r, token)).toEqual(["claim", "workspace", "note", "renew", "attention", "explain", "lane", "proposal", "operation", "acts", "act"]);
+    // Its grantor revokes the delegation: the Room refuses the token, and the roster no longer gives a caller.
+    await ok(r, bob, "roster", null, { op: "undelegate", delegation: g.id }, { binding: null });
+    expect(await refusedAs(token)).toBe("unauthenticated");
+    const afterUndelegate = await roster(r);
+    expect(() => callerFromRoster(afterUndelegate, who)).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    expect((await rpc(r, token, "tools/list")).status).toBe(401);
+    // Another session: its key is revoked. The Room refuses the token, and the roster no longer holds the key as current.
+    const c = await bearer(r, "@second", "agent", { kinds: ["renew"], acts: {} });
+    await r.admin.ok("roster", null, { op: "revoke-key", key: c.key, reason: "retired" });
+    expect(await refusedAs(c.bearer)).toBe("unauthenticated");
+    const afterRevoke = await roster(r);
+    expect(() => callerFromRoster(afterRevoke, { key: c.key, session: true, delegation: c.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+  });
+});
+
 describe.skipIf(DECLARED)("tools/list at the Worker's MCP endpoint (R-API-13, R-API-14)", () => {
+  it("an admin's list: under a v1 document the fourteen named tools and acts, with no generic act; under a v2 document all sixteen", async () => {
+    const v1 = await makeRoom();
+    const legacy = await listed(v1, await v1.admin.session());
+    expect(legacy).toEqual(without(ORDER, "act"));
+    expect(legacy).toHaveLength(15);
+    expect(await listed(v1, await v1.admin.session(), "?toolset=all")).toEqual(without(ORDER, "act"));
+    const r = await declaredRoom(doc());
+    expect(await listed(r, await r.admin.session())).toEqual(ORDER);
+    // The same room once it returns to a v1 document: the generic act is gone again, and nothing else moves.
+    await activate(r, policy());
+    expect(await listed(r, await r.admin.session())).toEqual(without(ORDER, "act"));
+  });
+
+  it("a caller may select any named toolset: a delegation that may newly sign nothing gets observer by default, and no act tool in any set it names; the room refuses its call", async () => {
+    const r = await declaredRoom(doc());
+    const idle = await bearer(r, "@idle", "agent", { kinds: [], acts: {} });
+    const ACTS = ["claim", "propose", "note", "review", "land", "renew", "release", "act"];
+    expect(await listed(r, idle.bearer)).toEqual(OBSERVER);
+    expect(await listed(r, idle.bearer, "?toolset=all")).toEqual(without(ORDER, ...ACTS));
+    expect(await listed(r, idle.bearer, "?toolset=builder")).toEqual(without(BUILDER, ...ACTS));
+    expect(await listed(r, idle.bearer, "?toolset=reviewer")).toEqual(without(REVIEWER, ...ACTS));
+    const seq = await headSeq(r);
+    const before = await callerOf(r, idle.bearer);
+    const claim = await tool(r, idle.bearer, "claim", { goal: "g", scope: ["src/**"] }, "?toolset=all");
+    expect(claim.structuredContent).toMatchObject({ refused: true, rule: "delegation-invalid" });
+    expect(await headSeq(r)).toBe(seq);
+    expect(await callerOf(r, idle.bearer)).toEqual(before);
+    // A member's bearer with a full map: builder by default, and all sixteen when it names `all`.
+    const agent = await bearer(r, "@agent", "agent", { kinds: ["renew"], acts: await bindings(r, "claim", "propose", "note", "review", "land", "release", "ask") });
+    expect(await listed(r, agent.bearer)).toEqual(BUILDER);
+    expect(await listed(r, agent.bearer, "?toolset=all")).toEqual(ORDER);
+  });
+
+
   it("a v1 room: an agent's builder list; ?toolset=reviewer; ?toolset=nope is bad-request; a delegation without land", async () => {
     const r = await makeRoom();
     const b = await legacyBearer(r, "@agent", ["claim", "propose", "note", "review", "land", "release", "renew"]);
