@@ -43,7 +43,6 @@ import {
 import { envelopeOf, isActId } from "@generalbusiness/artroom-contract";
 import type {
   ActId,
-  ActsCatalogue,
   Binding,
   Catalogue,
   Claim,
@@ -62,6 +61,7 @@ import type {
   Proposal,
   Reason,
   RecordMeaning,
+  Seq,
   Refusal,
   Release,
   Renewal,
@@ -433,7 +433,7 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
  * - `answered`: nothing is sent; the local steps run again from the kept
  *   answer.
  */
-async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T>; extra: string[] }> {
+async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T>; extra: string[]; prepared?: PreparedAct }> {
   const { id, room } = roomOf(ctx);
   const key = str(ctx.values, "idempotency-key") ?? commandKey();
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(key)) throw new UsageError("An idempotency key is 1 to 64 characters from A-Z, a-z, 0-9, '_' and '-'.");
@@ -487,7 +487,29 @@ async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T
   ctx.step("act-completed");
   ctx.store.finish(id, "act", key);
   ctx.act = undefined;
-  return { out, extra };
+  // The act as it was prepared, and so as it was sent: what the journal kept, whichever run prepared it.
+  return { out, extra, prepared: entry!.prepared };
+}
+
+/**
+ * The meaning a recorded act's kind had at the act's own seq, `D(seq)`
+ * (R-DECL-23), or undefined when it cannot be read. An act is shown in the
+ * words of the declaration it was admitted under: not those read while it
+ * was prepared, since a label can change before admission and leave the
+ * binding as it was, and not the latest, which may be later still. This is
+ * a read for display only. The act is already recorded, so a failure here
+ * changes the words printed and nothing else: nothing is sent again, and
+ * the receipt is still given.
+ */
+async function recordedMeaning(ctx: Ctx, seq: Seq, kind: string): Promise<RecordMeaning | undefined> {
+  try {
+    // The run's one handle: the one that sent a new act, or a new one for an act finished from the journal.
+    const { api } = await open(ctx);
+    const c: Catalogue | null = await api.actsAt({ seq }); // G5:cli-recorded-seq
+    return c === null ? undefined : meaningOf(c, kind); // G5:cli-recorded-null
+  } catch {
+    return undefined; // G5:cli-recorded-unread
+  }
 }
 
 /** The target of a generic act, from the command line: null, an entry, a thread, a version, or the JSON given. */
@@ -1103,16 +1125,13 @@ const COMMANDS: Record<string, Command> = {
         }
       }
       const because = list(ctx.values, "because").map(parseReason);
-      let active: ActsCatalogue | undefined;
       let reader: HttpRoomClient | undefined;
-      let sent: Record<string, Json> | undefined;
-      const { out } = await journaled<DeclaredRecord>(ctx, {
+      const { out, prepared } = await journaled<DeclaredRecord>(ctx, {
         command: "act",
         async start(api, room, opts) {
           reader = api;
           const c = await api.acts();
           if (c.vocabulary !== "declared") throw new UsageError("This room declares no acts of its own: it uses the legacy vocabulary. Use the named commands, such as artroom claim."); // G5:cli-legacy
-          active = c;
           const a = Object.hasOwn(c.acts, kind) ? c.acts[kind] : undefined;
           if (a === undefined)
             return { refused: true, rule: "kind-undeclared", reason: `The kind ${kind} is not declared in the room's active policy, version ${c.policy}.`, fix: "See what the room declares: artroom acts" }; // G5:cli-undeclared
@@ -1157,7 +1176,6 @@ const COMMANDS: Record<string, Command> = {
           }
           const lacks = missing(fields, body);
           if (lacks.length > 0) throw new UsageError(`${kind} on target ${shape} also needs: ${lacks.map((n) => `--set ${n}=…`).join(" ")}. See: artroom acts ${kind}`); // G5:cli-missing
-          sent = body;
           return api.act(kind, target, body, { binding: given as Binding, ...opts }); // G5:cli-binding-given
         },
       });
@@ -1166,12 +1184,16 @@ const COMMANDS: Record<string, Command> = {
         if (!ctx.json && out.rule === "binding-stale") for (const l of await staleText(ctx, reader, kind, given)) ctx.io.err(l);
         return code;
       }
-      const label = active?.acts[kind]?.declaration.label;
-      const lines = [`Done: ${label !== undefined ? `${label} (${kind})` : kind}, recorded as ${out.id}.`];
-      // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and its first text field by name.
+      // The words are those of the act as recorded, under the declarations of its own seq. They are read after the
+      // answer, for a new act and for one finished from the journal alike, and only when words are printed.
+      const meaning = ctx.json ? undefined : await recordedMeaning(ctx, out.seq, kind); // G5:cli-recorded-json
+      const lines = [`Done: ${meaning !== undefined ? `${meaning.label} (${kind})` : kind}, recorded as ${out.id}.`]; // G5:cli-label
+      // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and its
+      // first text field by name, from the body that was sent. Without the declaration it is named by its ID.
       const opened = out as { lane?: unknown; goal?: unknown; effect?: { type?: unknown } };
-      if (active !== undefined && opened.effect?.type === "opened" && typeof opened.lane === "string") {
-        const title = threadTitle({ lane: opened.lane, goal: typeof opened.goal === "string" ? opened.goal : "" }, { meaning: meaningOf(active, kind), body: sent }); // G5:cli-thread
+      if (opened.effect?.type === "opened" && typeof opened.lane === "string") {
+        const opening = meaning !== undefined ? { meaning, body: prepared?.body } : undefined; // G5:cli-thread
+        const title = threadTitle({ lane: opened.lane, goal: typeof opened.goal === "string" ? opened.goal : "" }, opening);
         lines.push(`Thread: ${title} (lane ${opened.lane}).`);
       }
       return print(ctx, out, () => lines);
