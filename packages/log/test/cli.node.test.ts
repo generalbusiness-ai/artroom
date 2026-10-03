@@ -5,9 +5,12 @@
  * (declared acts stage 3, request 1e8fee4b).
  *
  * Each case starts a Node process that runs git for every object it reads,
- * so the four cases run at the same time and the tests read their results.
+ * so the three cases run at the same time and the tests read their results.
  * The repositories are written as loose objects; publishing through the git
  * CLI is `gitcli.node.test.ts`'s subject.
+ *
+ * Without the pinned head the same version is reported `git-unwitnessed`:
+ * `declared-stage3.test.ts` shows that through verify, without a process.
  */
 
 import { beforeAll, describe, expect, test } from "vitest";
@@ -67,14 +70,13 @@ function verify(...args: string[]): Promise<Ran> {
 /** The entry of the fixture that proposes a version: verify checks its changed paths against Git objects. */
 const PROPOSE = 7;
 
-/** A declared-acts fixture with one proposed version; with `pin`, its head under refs/artroom/heads/<lane>/1, as the room publishes it. */
-async function declared(pin: boolean): Promise<string> {
+/** A declared-acts fixture with one proposed version, and its head pinned under refs/artroom/heads/<lane>/1, as the room publishes it. */
+async function declared(): Promise<string> {
   const log = open(checkJson as unknown as Fixture);
   const git = await publish(log);
   const propose = log.entries[PROPOSE]!.entry as { act: { envelope: { kind: string; target: { lane: string }; body: { head: Sha } } } };
   expect(propose.act.envelope.kind).toBe("propose");
-  const head = { [`refs/artroom/heads/${propose.act.envelope.target.lane}/1`]: propose.act.envelope.body.head };
-  return repository(git, { [LOG_REF]: (await git.readRef(LOG_REF))!, ...(pin ? head : {}) });
+  return repository(git, { [LOG_REF]: (await git.readRef(LOG_REF))!, [`refs/artroom/heads/${propose.act.envelope.target.lane}/1`]: propose.act.envelope.body.head });
 }
 
 /** A small log, then a second commit by someone else that alters a published line. */
@@ -93,34 +95,26 @@ async function rewritten(): Promise<string> {
 }
 
 describe("artroom verify, on a fresh clone", () => {
-  let pinned: Ran;
-  let unpinned: Ran;
+  let intact: Ran;
   let tampered: Ran;
   let unreadable: Ran;
   beforeAll(async () => {
-    [pinned, unpinned, tampered, unreadable] = await Promise.all([
-      declared(true).then((dir) => verify(dir, "--json")),
-      declared(false).then((dir) => verify(dir)),
-      rewritten().then((dir) => verify(dir, "--json")),
+    [intact, tampered, unreadable] = await Promise.all([
+      declared().then((dir) => verify(dir, "--json")),
+      rewritten().then((dir) => verify(dir)),
       verify(join(tmpdir(), "artroom-cli-no-such-repository")),
     ]);
   });
 
   test("an intact log exits 0; its version is witnessed by the pinned head the command fetches, so there is no proof limit", () => {
-    expect(pinned.status, pinned.stderr).toBe(0);
-    expect(JSON.parse(pinned.stdout)).toMatchObject({ ok: true, verifiedThrough: 9, failures: [], limits: [] });
+    expect(intact.status, intact.stderr).toBe(0);
+    expect(JSON.parse(intact.stdout)).toMatchObject({ ok: true, verifiedThrough: 9, failures: [], limits: [] });
   });
 
-  test("without the pinned head the log still verifies and exits 0, and the version is reported git-unwitnessed", () => {
-    expect(unpinned.status, unpinned.stderr).toBe(0);
-    expect(unpinned.stdout).toMatch(/^Verified\./);
-    expect(unpinned.stdout).toMatch(/verified through entry 9/);
-    expect(unpinned.stdout).toMatch(new RegExp(`git-unwitnessed at entry ${PROPOSE}`));
-  });
-
-  test("a log with a rewritten entry exits 1, and the report names history-rewritten", () => {
+  test("a log with a rewritten entry exits 1, and the report names history-rewritten; a room with no pinned heads is still read", () => {
     expect(tampered.status, tampered.stderr).toBe(1);
-    expect((JSON.parse(tampered.stdout) as { failures: { reason: string }[] }).failures.map((f) => f.reason)).toContain("history-rewritten");
+    expect(tampered.stdout).toMatch(/^Verification failed\./);
+    expect(tampered.stdout).toMatch(/history-rewritten at entry 2 in [0-9a-f]{40}/);
   });
 
   test("a remote that cannot be read exits 2, apart from a failed check, and prints no report", () => {

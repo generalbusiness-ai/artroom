@@ -9,8 +9,9 @@
  * limit: the object bound B, 1,000 entries to a segment, 4,096 names to a
  * directory. The rules are the same at any limit, so these cases run at
  * small limits (`at(...)`, `src/layout.ts` `setLayoutLimitsForTests`) and a
- * few entries cross them. `amendment-4-large.test.ts` holds the two cases
- * kept at the contract's own limits.
+ * few entries cross them. The last describe block keeps two cases at the
+ * contract's own bound and directory limit, to show that the defaults fit
+ * together at their real sizes.
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -20,11 +21,11 @@ import * as ref from "../../contract/examples/log-layout.ts";
 import { canonicalize, utf8 } from "../src/canonical.ts";
 import { digestBytes, sha256Hex } from "../src/crypto.ts";
 import { Malformed, decodeCheckpoint, decodeChunkedLine } from "../src/decode.ts";
-import { LOG_REF, ROOT, retain, type Retained } from "../src/entries.ts";
+import { LOG_REF, ROOT, makeCheckpoint, retain, seal, type Retained } from "../src/entries.ts";
 import { MemoryGit, OBJECT_TOO_LARGE, parseCommit } from "../src/git.ts";
 import * as layout from "../src/layout.ts";
 import { OBJECT_BOUND as B, Placement, twelve } from "../src/layout.ts";
-import { LogPublisher, PublishError, readPublishedEntries, type EntryLine, type EntrySource, type RetainedRef } from "../src/publisher.ts";
+import { LOG_TRANSFER_LIMITS, LogPublisher, PublishError, READ_LIMITS, readPublishedEntries, type EntryLine, type EntrySource, type RetainedRef } from "../src/publisher.ts";
 import { verifyLog } from "../src/verify.ts";
 import { LogPublisher as Reference } from "./support/publisher-417a1618.ts";
 import { L2, RoomSim, Scripted, alice, at, bareRoom, exact, expectSmallTrees, graft, keys, lineOf, note, partsSource, proportional, rewrite, walk } from "./support/layout2.ts";
@@ -1008,4 +1009,80 @@ describe("lengths past 32 bits and sizes that are not lengths (review of 04797d8
   test("eachChunk refuses a size that is not a length", () => {
     for (const n of [NaN, -1, 1.5, Infinity]) expect(() => layout.chunks(n)).toThrow(RangeError);
   });
+});
+
+// ------------------------------------------------ at the contract's own limits
+
+describe("acceptance cases (30.7) at the contract's own limits", () => {
+  test("Unpublished old entry over B, at B = 8 MiB and the default limits: its file is chunks of B and 1 bytes, every blob is at most B, the line is hashed in reads of at most 1 MiB and sent in staged parts of at most one transfer, and verify reassembles it", async () => {
+    expect(B).toBe(8 * 2 ** 20);
+    const sim = bareRoom();
+    const git = new MemoryGit();
+    git.objectLimit = B; // stricter than Artifacts: every object at most B
+    const p = new LogPublisher(git);
+    await p.publish(sim.entries, sim.checkpoint(), []); // layout 1, through entry 0
+    const one = sized(sim, B + 1);
+    p.resetStats();
+    const parts = partsSource(sim.entries);
+    const r = await p.publish(parts.source, sim.checkpoint(L2(1)), []);
+    const { files } = await walk(git, r.commit);
+    const seg = new TextDecoder().decode(files.get(`${ROOT}/segments/000000000000.jsonl`)).split("\n");
+    expect(seg[1]).toBe(ref.chunkedLine(1, B + 1, digestBytes(utf8(canonicalize(one)))));
+    const chunks = [...files].filter(([path]) => path.startsWith(`${ROOT}/entries/000000000001.jsonl/`));
+    expect(chunks.map(([path, d]) => [path.slice(-12), d.length])).toEqual(ref.chunks(B + 1).map((c) => [c.name, c.bytes]));
+    for (const [path, d] of files) expect(d.length, path).toBeLessThanOrEqual(B);
+    const hashing = parts.reads.slice(0, Math.ceil((B + 1) / READ_LIMITS.bytes));
+    expect(Math.max(...hashing)).toBeLessThanOrEqual(READ_LIMITS.bytes);
+    expect(Math.max(...parts.reads)).toBeLessThanOrEqual(LOG_TRANSFER_LIMITS.bytes);
+    expect(p.stats.peakBatchBytes).toBeLessThanOrEqual(LOG_TRANSFER_LIMITS.bytes);
+    expect(p.stats.peakObjectBytes).toBeLessThan(64 * 1024);
+    expect(p.stats.peakSendBytes).toBeLessThanOrEqual(LOG_TRANSFER_LIMITS.bytes);
+    await verifies(git, 1);
+  });
+
+  test(
+    "Many segments, at the directory limit of 4,096 names: a log of 5,000 segments (of 10 entries here, not 1,000); segments/ splits by digit groups where the contract's reference function says; every tree is within the limit and under 397,312 bytes; a restarted publisher reads the fanned-out index and continues it",
+    at({ segmentEntries: 10 }, async () => {
+      // The entries between the genesis and the last are one-byte lines given in parts, which the publisher
+      // places, hashes and sends without parsing. So verify, which checks every entry's signature, is not run
+      // here; its fan-out walk is covered by the retained prefix case.
+      expect(layout.DIRECTORY_ENTRIES).toBe(4096);
+      const N = 50_000;
+      const sim = bareRoom();
+      const last = seal({ format: "artroom-log-v1", seq: N - 1, prev: sim.entries[0]!.hash, at: sim.at(N - 1), entry: { type: "system", event: { type: "lease-expired", lane: "act_1_00000000" as never, holder: "@alice" as MemberId, leaseGeneration: 1 } } }, keys.room.seed);
+      const x = new Uint8Array([0x78]);
+      const tiny = (seq: number): EntryLine => ({ seq, bytes: 1, read: (o, l) => x.subarray(o, o + l) });
+      const source: EntrySource = {
+        through: N - 1,
+        read: (from, limit) => {
+          const out: (LogEntry | EntryLine)[] = [];
+          for (let s = from; s < Math.min(from + limit, N); s++) out.push(s === 0 ? sim.entries[0]! : s === N - 1 ? last : tiny(s));
+          return out;
+        },
+      };
+      const cp = makeCheckpoint(sim.room, keys.room.key, keys.room.seed, last, sim.at(N), L2(0));
+      const git = new MemoryGit();
+      const r = await new LogPublisher(git).publish(source, cp, []);
+      const { trees } = await walk(git, r.commit);
+      expectSmallTrees(trees);
+      const segs = trees.filter((t) => t.path.startsWith(`${ROOT}/segments`));
+      expect(segs.find((t) => t.path === `${ROOT}/segments`)!.names).toEqual(["000"]);
+      expect(segs.find((t) => t.path === `${ROOT}/segments/000`)!.names).toEqual(["000"]);
+      expect(segs.find((t) => t.path === `${ROOT}/segments/000/000`)!.names).toHaveLength(50);
+      const names = Array.from({ length: N / 10 }, (_, k) => `${twelve(k * 10)}.jsonl`);
+      for (const k of [0, 99, 100, 4096, 4999]) {
+        const dirs = ref.shardsOf(names, names[k]!, (n) => n.slice(0, 12), 3);
+        expect(dirs).toHaveLength(3);
+        expect(segs.find((t) => t.path === [`${ROOT}/segments`, ...dirs].join("/"))!.names).toContain(names[k]);
+      }
+      const reopened = await LogPublisher.open(git);
+      expect(reopened.publishedThrough).toBe(N - 1);
+      expect(git.refs.get(LOG_REF)).toBe(r.commit);
+      // A child of the head reads only the open segment and reuses every shard directory by ID:
+      // only the root, artroom-log/ and v1/ trees are encoded again.
+      reopened.resetStats();
+      reopened.commitFor(reopened.head, source, cp, []);
+      expect(reopened.stats.treesBuilt).toBe(3);
+    }),
+  );
 });

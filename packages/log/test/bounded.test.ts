@@ -294,7 +294,7 @@ describe("guards", () => {
       }
     }
     // Sizes that share no factor with the lines' lengths: a few bytes, under one line, over one line.
-    for (const bytes of [3, 97, 1001]) {
+    for (const bytes of [7, 97, 1001]) {
       seen.length = 0;
       const git = new Capture();
       const p = new LogPublisher(git, { maxTransfer: { objects: 100_000, bytes }, read: { entries: 3, bytes: 300 } });

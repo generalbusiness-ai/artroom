@@ -233,9 +233,9 @@ describe("a recorded context that differs from the one rebuilt from the log is c
     const met = prefix(CARRY, S.evaluated);
     await forgeCall(met, S.evaluated, "land", (c) => ({ ...c, input: { ...c.input, obligations: c.input.obligations.map((o) => (o.id === "obl_build" ? { ...o, met: true } : o)) } }));
     expect((await expectFailure(met, "context-mismatch", S.evaluated)).detail).toMatch(/input\.obligations/);
-    const left = prefix(CARRY, S.t4land);
-    await forgeCall(left, S.t4land, "land", (c) => ({ ...c, input: { ...c.input, obligations: c.input.obligations.filter((o) => o.id !== "obl_build") } }));
-    expect((await expectFailure(left, "context-mismatch", S.t4land)).detail).toMatch(/input\.obligations/);
+    const left = prefix(CARRY, S.land);
+    await forgeCall(left, S.land, "land", (c) => ({ ...c, input: { ...c.input, obligations: c.input.obligations.filter((o) => o.id !== "obl_build") } }));
+    expect((await expectFailure(left, "context-mismatch", S.land)).detail).toMatch(/input\.obligations/);
   });
 
   test("a land input's reviews (R-POL-7): the carried verdict listed as reviewed here", async () => {
