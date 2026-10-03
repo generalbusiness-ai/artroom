@@ -3339,10 +3339,13 @@ record became unknown:
   unreadable.
 - The token may be used only if the answer also gives its text, the scope
   asked, and a readable expiry no later than both the answer's arrival
-  plus the lifetime asked and the request's `notAfter`, and only by a
-  caller still waiting for it. This check runs before the token is given
-  to any caller or claimed by any owner. Otherwise it is owed revocation
-  at once, and no one uses its text.
+  plus the lifetime asked plus 5 seconds, and the request's `notAfter`,
+  and only by a caller still waiting for it. The 5 seconds allow for
+  Artifacts setting the expiry by its own clock, which ran 67 ms ahead of
+  the Room's on the spike (request df6ff8d3); `notAfter` has no
+  allowance. This check runs before the token is given to any caller or
+  claimed by any owner. Otherwise it is owed revocation at once, and no
+  one uses its text.
 - A check job's request carries the job's deadline as `notAfter`, and an
   attempt whose deadline has passed is never sent; its token is ended
   instead (R-EXEC-9).

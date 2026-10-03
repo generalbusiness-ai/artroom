@@ -23,7 +23,7 @@ Parent read every cited production path and test pattern. Read-only synthetic pr
 
 `packages/git/src/artifacts.ts:110,115` and `publisher/client.ts:84` retry non-idempotent canonical token creation after potentially applied internal errors (see artifacts.ts:60–68). `packages/room/src/logremote.ts:45` mints before its finally block. A lost answer can leave an unnamed token outside a cleanup owner's records; a usable publication answer can also be lost between mint and durable pushToken recording at landing/engine.ts:266–267. The ownership loss is evidenced, but a safe complete recovery design needs a contract decision: canonical inventories do not identify an owner and contain concurrent unrelated tokens. Do not turn this into a blanket revoke-all plan. Request explicit ownership of that design and its implementing lanes. Known tokens need durable handoffs; unknown effects need honest observation/retention or a documented provider completion fence. No unauthorized access or credential disclosure is claimed. Measured 60-second publication and longer pin token TTLs remain adopted behavior.
 
-Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A landed at `7be42275` (review `84b71c71`): see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lane B landed at `574568b2` (review `1266c4a7`): see [Mint lane B](#mint-lane-b-request-78f0971c). Lane C is implemented, pending review: see [Mint lane C](#mint-lane-c-request-5ff58c9a).
+Design for review under request `10fcfe4e`: [notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), with the contract in [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-1 to R-MINT-7). Revisions 2 to 5 answer checker reports `9ff903ab` and `851b215b` and their follow-ups. Approved in review `ad6cc052`. Lane A landed at `7be42275` (review `84b71c71`): see [Mint lane A](#mint-lane-a-request-1eda3c5e). Lane B landed at `574568b2` (review `1266c4a7`): see [Mint lane B](#mint-lane-b-request-78f0971c). Lane C is implemented, pending review: see [Mint lane C](#mint-lane-c-request-5ff58c9a). Live, lanes B and C made every propose fail, because the ledger's expiry check had no margin for Artifacts' clock: see [Live propose 503 after lanes B and C](#live-propose-503-after-lanes-b-and-c-request-df6ff8d3).
 
 ## Considered and excluded
 
@@ -950,3 +950,80 @@ Run at the exact head that carries this section, serially, with logs in `/privat
 ### Not changed here
 
 The fork read token in `pinObjects` (request `02836f9a`). `MintLedger`'s behaviour (lane A) and the publication token (lane B). Showing the ledger's records to admins stays with the cleanup projection request (`8d249233`). Requests `8bd623cc` (row writes) and `d29c09fa` (error sinks) touch `core.ts` and `jobs.ts`; this branch will merge main when they land.
+
+## Live propose 503 after lanes B and C (request df6ff8d3)
+
+Status: DONE, pending checker exact-head review. Gitseq request `df6ff8d3` (planner to builder), branch `request/live503`, cut from main `d3f7d3a8`, whose source equals `965c911a`. The head for review is the commit that carries this section. Main `b44601dd` (row writes `58a2f0a0`, the declared-acts note) was merged in afterwards. Only `notes/deploy-spike.md` conflicted, and both sides' sections are kept. The merge touches none of this fix's files. The spike still runs the build of `0753d7de`, which does not have the row-write changes.
+
+**The defect.** After the spike was redeployed from main `965c911a` (Room version `5ad0e3f2`), every `propose` failed in under a second with 503 `unavailable`, "The repository could not be read. Nothing was recorded; retry with the same idempotency key." The log was never published either. Reproduced at 03:03 UTC on `5ad0e3f2`: the full smoke failed 12 steps, the same 12 as the planner's run (all four proposes, the landings after them, and both log publications and verifications). Cleanup was `ok`.
+
+### Diagnosis
+
+**The step and its cause, from the Room's own diagnosis.** A temporary deploy (Room `e46f42bd`) put the diagnosis that `preAdmission` logs into the 503's message. Every propose gave:
+
+```
+{"event":"pre-admission-failed","step":"propose.pinObjects","name":"Error",
+ "message":"Artifacts' answer cannot be used (an expiry later than the lifetime asked); the token is owed revocation"}
+```
+
+That is the mint ledger's check on the answer to the canonical write token that `Pinning.pinObjects` asks for (`pin-objects:<head>`, 600 s). R-MINT-3 lets a token be used only if its reported expiry is no later than the answer's arrival plus the lifetime asked. A second temporary deploy (Room `b70de69e`) added the margin to the message. For the four proposes of one run, Artifacts' expiry was **67, 44, 41 and 45 ms** later than the Room's arrival time plus 600 s. Artifacts sets the expiry by its own clock and the Room reads the arrival by its own, and Artifacts' clock was ahead. The check had no margin, so every canonical mint failed: pinning, and also previews, integration, publication and log reads and pushes. That is why the logs were not published. The tests could not see this: the in-memory Artifacts and the Room share one clock.
+
+Mint lanes B and C caused the failure only by moving these mints into the ledger. Lane A's check was never run against live Artifacts before this deployment. The other suspects did not apply: the token-create answer had the shape, the scope and a readable expiry, and the ledger's tables and indexes were in place.
+
+**Why the tail showed no diagnosis.** The line was logged, but the Durable Object's trace events reached `wrangler tail` late, and not on the propose's own event:
+
+- In both tails (the planner's, and mine from 03:03 UTC), the Room `submit` event of each failing propose was missing while the tail ran. The Worker's `POST /acts` event with status 503 was there. (The planner's run from 02:54 UTC was still in its checks phase when mine began; its events are in my tail too.)
+- When the temporary deploy shut down the `5ad0e3f2` objects at about 03:14 UTC, the tail received a batch of their held events, some from 10 minutes before. It included failing proposes' `submit` events, with no logs, and Room alarm events that carried the lines. Each `pre-admission-failed` line came on the alarm event that started while that propose was still running: the ledger stores a wake-up at once for an owed token, so the alarm starts during the propose. For example, my run's lane 3 propose ran from `1790996955205` for 283 ms, its room's alarm started at `…955367`, and the line is stamped `…955398`. The `publication-failed` lines with the same message came on later alarm events. Some failing proposes' events had still not arrived when the tail stopped.
+- On the measurement build, a probe line logged at the start of each `submit` appeared on the `submit` events that arrived. So console output from the Room does reach the tail.
+
+So the diagnosis goes to the Worker's log as request `d268d249` intended. No sink other than the console is wired in production (`services.diagnose` is set only by tests). The catch is not bypassed. The delay and the attribution to another event are the Durable Object runtime's, and this request does not change them. To read a Room's diagnoses, keep the tail running until the object stops (a redeploy stops it), and look at every `Room` event, alarms included, not only the propose's. Why the runtime held these events for so long was not established.
+
+### The fix
+
+`packages/git/src/mints.ts`: the generic check allows `MINT_CLOCK_ALLOWANCE_MS` (5,000 ms, exported from the package) past the arrival plus the lifetime asked. That is about 75 times the largest margin measured, and the same 5 s as the deadline margins (`TOKEN_MARGIN_S`). An answer whose expiry is later than that still makes the token owed and unused. `notAfter` (a check job's deadline) has no allowance. A check job asks for a lifetime that ends 5 s before its deadline, so a fast clock up to that size is already covered there.
+
+R-MINT-3 in [docs/protocol.md](../docs/protocol.md) section 32 and the design note's "The answer" now state the allowance. No other Room record compares a reported expiry with the lifetime asked: workspace and snapshot tokens are checked against their lease end and deadline, with 5 s margins.
+
+### Tests
+
+| Test | On `965c911a`'s source | On the fix |
+|---|---|---|
+| Room, `test/workerd/live-propose-df6ff8d3.test.ts`, "67 ms ahead, as live": Artifacts' clock 67 ms ahead of the Room's. Two proposes are admitted, both lanes land (the second through a sandbox merge), the log publishes, and no ledger record or active canonical token is left | red: `ArtroomError: The repository could not be read. Nothing was recorded; retry with the same idempotency key.` at the first propose, as live | green |
+| Room, same file: an expiry a minute past the lifetime asked is still refused. The propose is `unavailable`, the diagnosis names `propose.pinObjects` and the reason, and the `pin-objects` record is owed | green | green |
+| Git, `test/mints.test.ts`, "(4) Artifacts' clock ahead …": 67 ms and exactly 5,000 ms past are usable, 5,001 ms is owed, 1 ms past `notAfter` is owed, and all four tokens are revoked by ID | red: the module has no `MINT_CLOCK_ALLOWANCE_MS` (without that import, the mutant "no allowance" below is the old code) | green |
+| Git, the existing "(4) … a longer expiry …" test: the longer expiry is now 5,001 ms past, not 1 ms | — | green |
+
+The Room test's skew is set on the in-memory Artifacts' own clock (`now`), which sets token expiries and expiry states. No process global is swapped.
+
+**Mutants**, each applied alone to `packages/git/src/mints.ts` and restored, with the Git ledger tests and the Room file run each time:
+
+| Mutant | Mutation | Red |
+|---|---|---|
+| no allowance | the check as before (`> arrival + ttl`) | Git: the new test. Room: "67 ms ahead" |
+| no check | the generic check removed | Git: the new test and "(4) … a longer expiry …". Room: "a minute past" |
+| boundary | `>=` for `>` | Git: the new test (exactly 5,000 ms) |
+| allowance on `notAfter` | `notAfter` also given 5 s | Git: the new test (1 ms past `notAfter`) |
+
+### Live
+
+| When (UTC) | Room version | Checker version | What |
+|---|---|---|---|
+| 02:41 (planner) | `5ad0e3f2` | `7cc7e16e` | main `965c911a` |
+| 03:03 | `5ad0e3f2` | `7cc7e16e` | reproduced: 12 FAIL, cleanup `ok` |
+| 03:14 | `e46f42bd` | `9b21cfc4` | temporary: the diagnosis in the 503 |
+| 03:22 | `b70de69e` | `0b4fd37d` | temporary: the measured margin in the 503, a probe line in `submit` |
+| 03:34 | `6d15d828` | `c18342a3` | the fix, `0753d7de` (source as at this head) |
+
+Each deploy used `packages/room/scripts/deploy-spike.sh`, with no retry. The same `ROOM_KEY_SECRET` and `CHECKER_KEY` values were put again; no credential was created or rotated. Neither temporary change is in any commit.
+
+**The smoke on the fix**, all phases, `node packages/room/measure/spike-smoke.mjs`, 03:35:10 to 03:39:12 UTC: passed, exit 0, 91 of 91 steps ok. The four proposes took 1.1 to 3.1 s. The public, import and checks logs were published and verified (through entries 14, 8 and 15). Cleanup was `ok`, with 0 unresolved and no repository left. A tail of that run recorded 239 events from `6d15d828`, all `ok`, with no log line and no exception. Record: [spike-smoke-2026-10-03T03-35-10-310Z.json](../packages/room/measure/results/spike-smoke-2026-10-03T03-35-10-310Z.json). The spike is left running this fix.
+
+**A cleanup that needed finishing.** The first temporary run (03:15 UTC) stopped after the public phase, when hugh's wrangler OAuth access token expired mid-run: Artifacts REST answered `10000 Authentication error`, so the smoke's cleanup could not run and reported `ok false`. After `wrangler whoami` refreshed the login, the same `cleanupRun` from `measure/cleanup.mjs` deleted the run's canonical repository and two forks, with no active token on them, and its final listing showed nothing left. Neither spike namespace has a smoke repository left. Later runs refreshed the login first.
+
+### Gates
+
+Run at the exact head that carries this section, serially; the exit codes are in the delivery report. `npm run typecheck`, `npm test`, `npm run test:workers` and `npm run test:log` in `@generalbusiness/artroom-git`; `npm run typecheck`, `npm run test:node` and `npm run test:workerd` in `@generalbusiness/artroom-room`; then from the root, under bash, `npm ci`, `npm run typecheck` and `npm test`.
+
+### Not changed here
+
+How the Durable Object runtime delivers trace events. Sending diagnoses from the stateless Worker as well, so they show at once, would need the Room to pass them over RPC; that is a separate request if wanted.
