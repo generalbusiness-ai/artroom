@@ -122,7 +122,7 @@ Acts this room declares
 
 Agents
   artroom agents-md [--mcp]             Print the block that teaches an agent the loop, for AGENTS.md.
-  artroom mcp                           Run the MCP tools over stdio, signing with your key.
+  artroom mcp [--toolset NAME]          Run the MCP tools over stdio, signing with your key.
 
 Options: --json for JSON output; --room ROOM and --lane LANE to choose; --idempotency-key KEY to
 finish an act that did not get an answer; --verbose to show each request.
@@ -1188,11 +1188,16 @@ const COMMANDS: Record<string, Command> = {
   },
 
   mcp: {
-    options: {},
+    options: { toolset: { type: "string" } },
     async run(ctx) {
-      const { api } = await open(ctx);
-      const { serveArtroomStdio } = await import("@generalbusiness/artroom-mcp/stdio");
-      const handle = serveArtroomStdio(api);
+      const { api, room } = await open(ctx);
+      const { callerFromRoster, serveArtroomStdio, toolsetOf } = await import("@generalbusiness/artroom-mcp/stdio");
+      // `--toolset` is the stdio form of the MCP URL's `?toolset=`: builder, reviewer, observer or all. An unknown name is bad-request.
+      const toolset = toolsetOf(str(ctx.values, "toolset"));
+      // The tool list follows this credential's authorization, read from the roster at each `tools/list` (R-API-14):
+      // a key file is the member's own key; a bearer file acts under the session's delegation.
+      const caller = async () => callerFromRoster(await api.members(), room.custody === "room" ? { key: room.key, session: true } : { key: room.key });
+      const handle = serveArtroomStdio(api, { caller, ...(toolset !== undefined ? { toolset } : {}) });
       await new Promise<void>((resolve) => process.stdin.once("end", resolve));
       await handle.close();
       return EXIT.ok;

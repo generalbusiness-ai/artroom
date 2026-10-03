@@ -14,8 +14,14 @@ import { b64url, call, clock, day, digestBytes, iso, makeRoom, pushChange, rando
 
 const base = "https://artroom.test/v1/rooms";
 const KINDS = ["claim", "propose", "note", "land", "release", "renew"];
-/** The ten named tools, and the two generic tools of declared acts stage 5 (R-API-9 as amended). The MCP core adds more. */
-const LISTED = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release", "attention", "explain", "acts", "act"];
+/**
+ * What an agent's bearer with these kinds is shown (R-API-14): the builder toolset's twelve named tools, and
+ * `acts`. `review` and `lanes` are the reviewer's. The generic `act` is listed only in a `v2` room, so it is
+ * not named here: this suite runs under both vocabularies. test/workerd/mcp-core-9ca1d290.test.ts pins both lists.
+ */
+const LISTED = ["claim", "workspace", "propose", "note", "land", "renew", "release", "attention", "explain", "lane", "proposal", "operation", "acts"];
+const ACT_TOOL_NAMES = ["claim", "propose", "note", "review", "land", "renew", "release", "act"];
+let keys = 0;
 const toolNames = (tools: readonly { name: string }[]) => tools.map((t) => t.name);
 
 /** A room-custody invitation, redeemed: the bearer an MCP agent gets (R-CRED-3). */
@@ -54,8 +60,10 @@ async function body(res: Response): Promise<any> {
   return JSON.parse(text.trim().startsWith("{") ? text : text.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5)).join(""));
 }
 
-async function tool(r: TestRoom, b: Redeemed, name: string, args: unknown): Promise<any> {
-  const res = await rpc(`${r.id}/mcp`, b.bearer, "tools/call", { name, arguments: args });
+/** One tool call. Every act tool requires an idempotency key (R-API-9, amendment 7): a fresh one where the test names none. */
+async function tool(r: TestRoom, b: Redeemed, name: string, args: Record<string, unknown>): Promise<any> {
+  const keyed = ACT_TOOL_NAMES.includes(name) && !("idempotencyKey" in args) ? { ...args, idempotencyKey: `test-key-${++keys}` } : args;
+  const res = await rpc(`${r.id}/mcp`, b.bearer, "tools/call", { name, arguments: keyed });
   expect(res.status).toBe(200);
   return (await body(res)).result;
 }
@@ -219,8 +227,8 @@ describe.each([
       const { tools } = await c.listTools();
       expect(toolNames(tools)).toEqual(expect.arrayContaining(LISTED));
       for (const t of tools) expect(t.outputSchema?.["type"]).toBe("object");
-      const claim = (await c.callTool({ name: "claim", arguments: { goal: "g", scope: ["src/**"] } })).structuredContent as unknown as Claim;
-      const refused = await c.callTool({ name: "renew", arguments: { lane: claim.lane, lease: 9 } });
+      const claim = (await c.callTool({ name: "claim", arguments: { goal: "g", scope: ["src/**"], idempotencyKey: "c1" } })).structuredContent as unknown as Claim;
+      const refused = await c.callTool({ name: "renew", arguments: { lane: claim.lane, lease: 9, idempotencyKey: "r1" } });
       expect(refused.isError).toBe(false);
       expect(refused.structuredContent).toMatchObject({ refused: true, rule: "lease-fenced" });
     } finally {

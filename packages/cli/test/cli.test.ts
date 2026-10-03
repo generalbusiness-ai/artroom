@@ -205,12 +205,15 @@ describe("usage and agents", () => {
     expect(init.result.serverInfo.name).toBe("artroom");
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
     const list = await send(2, "tools/list");
-    // The ten named tools, each once, and the two generic tools of declared acts stage 5 beside them.
+    // A member's own key gets the builder toolset (R-API-14): its twelve named tools, each once, and `acts`. The
+    // room's document is `v1`, so the generic `act` is not listed. `review` and `lanes` are the reviewer's.
     const listed: string[] = list.result.tools.map((t: { name: string }) => t.name);
-    for (const name of ["attention", "claim", "explain", "land", "note", "propose", "release", "renew", "review", "workspace"]) expect(listed.filter((n) => n === name)).toEqual([name]);
-    expect(listed).toContain("acts");
-    expect(listed).toContain("act");
-    const claim = await send(3, "tools/call", { name: "claim", arguments: { goal: "g", scope: ["src/**"] } });
+    expect(listed).toEqual(["claim", "workspace", "propose", "note", "land", "renew", "release", "attention", "explain", "lane", "proposal", "operation", "acts"]);
+    // A tool the list does not show still runs, and the room judges it: `lanes` is a read any member may make.
+    const unlisted = await send(4, "tools/call", { name: "lanes", arguments: {} });
+    expect(unlisted.result.isError).toBe(false);
+    expect(unlisted.result.structuredContent).toMatchObject({ items: [], more: false });
+    const claim = await send(3, "tools/call", { name: "claim", arguments: { goal: "g", scope: ["src/**"], idempotencyKey: "stdio-claim-1" } });
     expect(claim.result.structuredContent.by).toMatchObject({ via: "member", member: "@alice" });
     child.stdin.end();
     const code = await new Promise<number | null>((resolve) => child.on("exit", resolve));

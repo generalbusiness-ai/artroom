@@ -37,7 +37,11 @@ export function agentsMd(opts: AgentsMdOptions): string {
           "5. When the proposal's reviews and checks are met, `artroom land --wait`.",
           "6. `artroom release -m \"handover\"` when you stop, or `artroom renew` to keep the lane.",
         ];
-  const retry = opts.mcp !== undefined ? "repeat the call with the same `idempotencyKey`" : "repeat the command with the `--idempotency-key` it names";
+  // Over MCP every act tool requires the key (R-API-9), so the block says so, and that a retry reuses it.
+  const retry =
+    opts.mcp !== undefined
+      ? "- Every act needs an `idempotencyKey`: any unique string. To retry a call, send it again with the same key. It never acts twice." // GM:agents-key
+      : "- If an error says the act may have been recorded, repeat the command with the `--idempotency-key` it names. It never acts twice.";
   const rules = [
     "",
     "Rules:",
@@ -45,7 +49,7 @@ export function agentsMd(opts: AgentsMdOptions): string {
     "- `generation-moved`: read the lane again, then propose with its current generation.",
     "- `lease-fenced` or `not-holder`: your lease ended. Claim the lane again before acting.",
     "- `outside-claim`: claim the extra paths, or drop those changes.",
-    `- If an error says the act may have been recorded, ${retry}. It never acts twice.`,
+    retry,
     "- Never print, log or commit a token. `explain` an act to see why something happened.",
     AGENTS_MD_END,
   ];

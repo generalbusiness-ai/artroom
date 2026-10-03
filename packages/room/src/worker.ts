@@ -34,7 +34,7 @@ import { unwire, type Wire } from "./errors.ts";
 import { clock, publicUrl, type RoomEnv } from "./config.ts";
 import { draftRoom, foundRoom } from "./founding.ts";
 import { roomStub, route } from "./http.ts";
-import { isMcpRoute, mcpEndpoint } from "./mcp.ts";
+import { isMcpRoute, mcpEndpoint, type McpCaller, type McpWire } from "./mcp.ts";
 import type { Room } from "./room.ts";
 
 /**
@@ -74,7 +74,22 @@ export class RoomWireTarget extends RpcTarget implements RoomWire {
 }
 
 /** The MCP endpoint over this Worker's own `RoomWire`: the `RoomApi`-per-bearer adapter (src/mcp.ts). */
-const mcp = mcpEndpoint(async (env, room) => new RoomWireTarget((await roomStub(env, room)) as unknown as DurableObjectStub<Room>));
+/**
+ * The wire the MCP endpoint uses inside this Worker: `RoomWire`, and the
+ * authorization behind a bearer for `tools/list` (R-API-14). It is never
+ * returned over a service binding.
+ */
+class McpRoomWire extends RoomWireTarget implements McpWire {
+  constructor(private readonly room: DurableObjectStub<Room>) {
+    super(room);
+  }
+  /** The Room judges the token and reads its member's role and its delegation's signed grant. */
+  async caller(bearer: string): Promise<McpCaller> {
+    return unwire((await this.room.caller(bearer)) as Wire<McpCaller>);
+  }
+}
+
+const mcp = mcpEndpoint(async (env, room) => new McpRoomWire((await roomStub(env, room)) as unknown as DurableObjectStub<Room>));
 
 /** The default export: `fetch` serves HTTPS; RPC methods serve `env.ARTROOM` bindings (`ArtroomService`, `ArtroomFounder`). */
 export default class Artroom extends WorkerEntrypoint<RoomEnv> implements Omit<ArtroomService, "room">, ArtroomFounder {

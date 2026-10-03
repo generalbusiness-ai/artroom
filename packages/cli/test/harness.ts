@@ -34,6 +34,8 @@ export function useHarness() {
     // The deployment's MCP Worker: a bearer handle on RoomWire (bearerAct, bearerRequest), null for a bad token.
     const mcp = createMcpFetch<unknown>({
       room: (_r, _e, bearer) => connect({ room: async () => room.wire() }, room.id, { kind: "bearer", token: bearer }).catch(() => null),
+      // What the Room gives its endpoint for `tools/list`: the bearer's role and signed grant (R-API-14).
+      caller: (_r, _e, bearer) => room.bearerCaller(bearer),
     });
     room.mcp = (request) => mcp(request, {});
     h.tmp = mkdtempSync(join(tmpdir(), "artroom-cli-"));

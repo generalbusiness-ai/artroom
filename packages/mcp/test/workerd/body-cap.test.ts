@@ -12,7 +12,7 @@ import { createMcpFetch } from "../../src/worker.ts";
 
 const MiB = 1024 * 1024;
 const room = {} as unknown as RoomApi;
-const handler = createMcpFetch<unknown>({ room: async (_r, _e, bearer) => (bearer === "good" ? room : null) });
+const handler = createMcpFetch<unknown>({ room: async (_r, _e, bearer) => (bearer === "good" ? room : null), caller: async () => ({ role: "admin" }) });
 
 /** A body of `total` bytes in 64 KiB chunks, with no length, counting the bytes the reader pulled. */
 function streamed(total: number): { body: ReadableStream<Uint8Array>; pulled: () => number } {

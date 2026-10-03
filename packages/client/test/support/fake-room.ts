@@ -904,6 +904,19 @@ export class FakeRoom {
     return b;
   }
 
+  /**
+   * The authorization behind a bearer, as the Room gives it to its MCP
+   * endpoint for `tools/list` (R-API-14): the member's roster role now, and
+   * the session delegation's `kinds` and signed map `acts`, unchanged.
+   */
+  async bearerCaller(token: string): Promise<{ role: Role; delegation: { kinds: Delegation["kinds"]; acts?: NonNullable<Delegation["acts"]> } }> {
+    const b = await this.bearerSession(token);
+    const m = b ? this.members.get(b.member) : undefined;
+    if (!b || !m || m.state !== "active") throw artroomError("unauthenticated", "The bearer token is not valid.");
+    const d = this.delegations.get(b.delegation)!;
+    return { role: m.role, delegation: { kinds: d.kinds, ...(d.acts !== undefined ? { acts: d.acts } : {}) } };
+  }
+
   // ---------------------------------------------------------------- reads
 
   async reader(token: string | undefined): Promise<MemberId> {
