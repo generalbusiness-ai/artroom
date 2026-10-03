@@ -10,7 +10,7 @@ import { describe, expect, test } from "vitest";
 import type { ActDeclaration } from "@generalbusiness/artroom-contract";
 import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
 import { explainText, refusalText } from "../src/format.ts";
-import { meaningChanges } from "../src/declared.ts";
+import { FieldError, meaningChanges, parseValue } from "../src/declared.ts";
 import { invitationLink } from "../src/link.ts";
 import { useHarness } from "./harness.ts";
 
@@ -167,6 +167,13 @@ describe("artroom act: any declared act, under the binding the user read", () =>
     expect(last.entry.type === "act" && last.entry.act.envelope.body).toEqual({ text: "from json", urgency: "low" });
   });
 
+  test("a yes-or-no field takes true or false and nothing else", () => {
+    const flag = { name: "swing", from: "declaration", required: false, field: { type: "bool" } } as const;
+    expect(parseValue(flag, "true")).toBe(true);
+    expect(parseValue(flag, "false")).toBe(false);
+    for (const bad of ["yes", "1", "", "TRUE"]) expect(() => parseValue(flag, bad), bad).toThrow(FieldError);
+  });
+
   test("a kind the room does not declare is refused, and a v1 room has no generic act", async () => {
     const { alice, claim, binding } = await ready();
     const sent = posts("/acts");
@@ -186,6 +193,8 @@ describe("artroom act: any declared act, under the binding the user read", () =>
     const release = (await h.room.bindingOf("release"))!;
     const res = await cli(alice, ["act", "release", "--binding", release, "--lane", claim.lane, "--set", "note=done"]);
     expect(res.code).toBe(0);
+    // One line: a release names a lane in its record, and it opened no thread.
+    expect(res.out).toMatch(/^Done: Release \(release\), recorded as act_\d+_[0-9a-f]{8}\.$/);
     const last = h.room.entries.at(-1)!;
     expect(last.entry.type === "act" && last.entry.act.envelope).toMatchObject({ v: 2, kind: "release", binding: release, target: { lane: claim.lane }, body: { lease: 1, note: "done" } });
     // A version step: the lease and the lane's generation are read; the user gives the head and the summary.
@@ -241,6 +250,22 @@ describe("a changed meaning is shown, never adopted for the user", () => {
     // The user reads it and acts again, deliberately, with the new binding and the field it now needs.
     const again = await cli(alice, ["act", "ask", "--binding", now, "--entry", claim.id, "--set", "text=still?", "--set", "topic=scope"]);
     expect(again.code).toBe(0);
+  });
+
+  test("what changed is listed against the version that held the binding the user gave, not merely the one before; with none, the CLI says it cannot list it", async () => {
+    const { alice, claim, binding } = await ready();
+    // Two changes of meaning since the user read it.
+    await h.room.activate(withAsk({ ...ASK, body: { ...ASK.body, text: { type: "text", max: 100 } } }));
+    await h.room.activate(withAsk(NARROW));
+    const res = await cli(alice, ["act", "ask", "--binding", binding, "--entry", claim.id, "--set", "text=still?"]);
+    expect(res.code).toBe(3);
+    expect(res.err).toContain('    Field text: was {"type":"text","max":200}, now {"type":"text","max":50}.');
+    expect(res.err).not.toContain('"max":100');
+    // A binding that no recent version gave for this kind.
+    const never = await cli(alice, ["act", "ask", "--binding", `sha256:${"0".repeat(64)}`, "--entry", claim.id, "--set", "text=still?"]);
+    expect(never.code).toBe(3);
+    expect(never.err).toContain("  The meaning you read is not in the room's recent policy versions, so the change cannot be listed.");
+    expect(never.err).not.toContain("What changed since the meaning you read");
   });
 
   test("the meaning changes between the read and the send: the room refuses, the act is not sent again, and the same help is printed", async () => {

@@ -7,7 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import type { ActDeclaration, ArtroomError, Claim, DeclaredRecord, Redeemed, RoomApi } from "@generalbusiness/artroom-contract";
-import { connect, isArtroomError, isRefusal, redeem } from "@generalbusiness/artroom-client";
+import { connect, isArtroomError, isRefusal, redeem, type HttpRoomClient } from "@generalbusiness/artroom-client";
 import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
 import { callTool, errorResult } from "../src/index.ts";
 import { roomWithMcp, rpc, type FakeRoom, type Url } from "./support.ts";
@@ -188,6 +188,10 @@ describe("the HTTPS bearer client (R-CRED-10 as amended)", () => {
     const fails = async (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (isArtroomError(e) ? e : null));
     expect((await fails(api.check({ lane: claim.lane, generation: 1 }, {} as never)))?.code).toBe("forbidden");
     expect((await fails(api.roster({ op: "remove", member: "@admin" })))?.code).toBe("forbidden");
+    expect(room.requests.length).toBe(sent);
+    // A prepared act of a kind with no named tool and no binding is refused here: it is never sent to the act tool without one.
+    const unbound = await fails((api as HttpRoomClient).replay({ kind: "ask" as never, target: { act: claim.id }, body: { text: "q" }, idempotencyKey: "h2" }));
+    expect(unbound).toMatchObject({ code: "bad-request", message: expect.stringContaining("There is no named tool for ask") });
     expect(room.requests.length).toBe(sent);
   });
 });

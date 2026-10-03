@@ -444,6 +444,11 @@ describe("the named methods (R-API-9 as amended)", () => {
     expect(lastEnvelope()).toMatchObject({ v: 1, kind: "roster" });
     // One read for the named acts, one for the grant builder.
     expect(gets("/declarations")).toBe(reads + 2);
+    // A platform kind never needs the catalogue: a handle whose first act is a renewal reads nothing.
+    const third = await connect({ url }, room.id, { kind: "key", signer: alice.signer });
+    await third.renew(c2);
+    expect(lastEnvelope()).toMatchObject({ v: 1, kind: "renew" });
+    expect(gets("/declarations")).toBe(reads + 2);
   });
 
   test("the built-for binding is the code-review declaration's under the room's steps and lanes, never the room's own declaration's", async () => {
