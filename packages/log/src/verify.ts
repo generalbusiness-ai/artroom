@@ -1325,8 +1325,12 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       // R-DECL-20, where the log has them: the room prepared the integration the check names.
       const t = env.target as { lane?: unknown; generation?: unknown } | null;
       const prepared = typeof t?.lane === "string" && typeof t.generation === "number" ? fold.preparedFor(t.lane as LaneId, t.generation, landOp) : [];
+      // A whole-tree check names the integration and its tree. A check on a filtered snapshot names the checker's
+      // snapshot digest, and either the snapshot commit the event records or the integration itself (R-CARRY-15).
       const bound = (p: (typeof prepared)[number]) =>
-        p.integration === integration && (input?.kind === "filtered" ? p.snapshots.some((x) => x.check === check && x.digest === input.snapshot) : p.tree === (input as { tree?: unknown } | undefined)?.tree);
+        input?.kind === "filtered"
+          ? p.snapshots.some((x) => x.check === check && x.digest === input.snapshot && (x.commit === integration || p.integration === integration))
+          : p.integration === integration && p.tree === (input as { tree?: unknown } | undefined)?.tree;
       if (prepared.length && !prepared.some(bound)) {
         bad("guard-failed", `the check names integration ${integration}, which no prepared event for its ${landOp ? `operation ${landOp}` : "version"} names with its input`); // V:prepared
         break;

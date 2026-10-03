@@ -29,11 +29,24 @@
  *   v1-era `*` delegation used for `renew` after it, a v2 grant with a
  *   signed map used for a `note`, and a room-custody invitation whose
  *   session names a binding.
+ * - declared-carry: obligations, evidence and carrying across versions: a
+ *   verdict carried to a second version by a carry rule, judged again at a
+ *   recomputation, and read by the land input; a check carried onto the
+ *   landing's integration by a `check-carried` event; an advisory check
+ *   obligation; a verdict that does not carry because its scope changed;
+ *   an objection, then an approval; reviewers in notify directories; and a
+ *   check whose key is revoked as compromised before the landing.
+ * - declared-carry-plain: a verdict carried by the platform's conditions
+ *   alone, with no carry rule and so no recorded decision, and read by a
+ *   land input.
+ * - declared-snapshot: a scoped checker: a `prepared` event that records
+ *   the snapshot commit for a landing's integration, a check on that
+ *   commit, and the same on a second thread with no `prepared` event.
  */
 
 import { writeFileSync } from "node:fs";
 import type { ActDeclaration, Authority, CheckerConfigV2, OpId, PolicyDocument, PolicyDocumentV2, Sha } from "@generalbusiness/artroom-contract";
-import { CODE_REVIEW_ACTS, bindingOf, policy, requireCheck, requireReview, rule, validatePolicyV2 } from "@generalbusiness/artroom-policy";
+import { CODE_REVIEW_ACTS, bindingOf, carry, checkerInputs, policy, requireCheck, requireReview, rule, validatePolicyV2 } from "@generalbusiness/artroom-policy";
 import { digestJson } from "../src/crypto.ts";
 import { DeclaredRoom, pair, type Fixture } from "../test/support/declared-room.ts";
 import { keys } from "../test/support/room-sim.ts";
@@ -239,4 +252,238 @@ const DOC_B = valid({
   }); // 10: a room-custody invitation whose session names a binding
   void erin;
   write("declared-grants", room.fixture("Grants across the first v2 activation (R-DECL-17): a v1-era * delegation used for renew after it, a v2 grant with a signed map used for a note, and a room-custody invitation whose session names a binding; release is not delegable."));
+}
+
+// --------------------------------------------------------------- declared-carry
+
+{
+  const dave = pair(7);
+  const erin = pair(8);
+  const RUNNER = `sha256:${"c".repeat(64)}` as const;
+  const test: CheckerConfigV2 = { format: "artroom-checker-v2", act: "check", volatile: false, timeoutSeconds: 600, runner: RUNNER };
+  const lint: CheckerConfigV2 = { format: "artroom-checker-v2", act: "check", volatile: false, timeoutSeconds: 600, runner: RUNNER, advisory: true };
+  const build: CheckerConfigV2 = { format: "artroom-checker-v2", act: "check", volatile: true, timeoutSeconds: 600, runner: RUNNER };
+  const build2: CheckerConfigV2 = { ...build, timeoutSeconds: 900 };
+  const rules = (libReviewers: string) => [
+    requireReview({ paths: "src/**", from: "@alice", id: "src-review" }),
+    requireReview({ paths: "lib/**", from: libReviewers, id: "lib-review" }),
+    requireReview({ paths: "docs/**", from: "role:maintainer", id: "docs-review", allowSelf: true }),
+    requireCheck("test", { paths: "src/**", by: "@carol", id: "tests" }),
+    requireCheck("lint", { paths: "src/**", by: "@carol", id: "lint" }),
+    requireCheck("build", { paths: "src/**", by: "@carol", id: "build" }),
+    carry({
+      allow: [
+        { id: "verdicts-carry", evidence: "review", allow: "true" },
+        { id: "checks-carry", evidence: "check", allow: "true" },
+      ],
+    }),
+    rule({ id: "reviewers-see", kind: "notify", on: ["propose", "review", "land"], to: ["reviewers"], why: "A version you reviewed moved." }),
+  ];
+  const freeze = rule({ id: "freeze", kind: "land", block: "false", reason: "Not on a freeze.", fix: "Wait for the freeze to end." });
+  const c1 = valid(v2(policy(...rules("role:maintainer"))), { test, lint, build });
+  const c2 = valid(v2(policy(...rules("role:maintainer"), freeze)), { test, lint, build });
+  const c3 = valid(v2(policy(...rules("@erin"), freeze)), { test, lint, build: build2 });
+  const c4 = valid(v2(policy(...rules("@erin"), freeze, requireReview({ paths: "**", from: "@alice", id: "broken", when: '"yes"' }))), { test, lint, build: build2 });
+  const c5 = valid(v2(policy(...rules("@erin"), freeze, rule({ id: "admins-see-lands", kind: "notify", on: ["land"], to: ["role:admin"], why: "A landing started." }))), { test, lint, build: build2 });
+  const check = (room: DeclaredRoom, name: "test" | "build", config: CheckerConfigV2, lane: string, generation: number, integration: Sha, ok = true, landOp?: OpId) => ({
+    signer: carol,
+    kind: "check",
+    target: { lane, generation },
+    body: {
+      obligation: name === "test" ? "obl_tests" : "obl_build",
+      check: name,
+      integration,
+      input: { kind: "tree", tree: room.treeOf(integration) },
+      config: digestJson(config),
+      runner: RUNNER,
+      volatile: config.volatile,
+      ok,
+      detail: ok ? "Passed." : "Failed.",
+      ...(landOp ? { landOp } : {}),
+    },
+  });
+  const propose = (lane: string, expectedGeneration: number, head: Sha, summary: string, signer = bob) => ({ signer, kind: "propose", target: { lane }, body: { lease: 1, expectedGeneration, head, summary } });
+  const review = (signer: typeof bob, lane: string, generation: number, head: Sha, verdict: "approve" | "object", scope: string[]) => ({ signer, kind: "review", target: { lane, generation }, body: { head, verdict, scope, text: verdict === "approve" ? "Approved." : "Not yet." } });
+  const land = (lane: string, generation: number, head: Sha, signer = bob) => ({ signer, kind: "land", target: { lane, generation }, body: { lease: 1, head } });
+
+  const room = new DeclaredRoom();
+  await room.activate(c1, { test, lint, build });
+  await room.join("@bob", "member", bob);
+  await room.join("@carol", "checker", carol);
+  await room.join("@dave", "maintainer", dave);
+  await room.join("@erin", "maintainer", erin);
+
+  // Thread 1: a verdict carried to a version with the same tree; checks counted by integration; a check carried onto
+  // the landing's integration.
+  const t1 = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "The app", scope: ["src/**", "docs/**"] } });
+  const h1 = room.change({ "src/app.ts": "export const x = 5;\n" });
+  await room.act(propose(t1.id, 0, h1, "Five"));
+  await room.drainNotify();
+  await room.act(review(alice, t1.id, 1, h1, "approve", ["src/**"]));
+  await room.drainNotify();
+  await room.act(check(room, "test", test, t1.id, 1, h1));
+  await room.act(check(room, "build", build, t1.id, 1, h1));
+  const h2 = room.recommit(h1);
+  await room.act(propose(t1.id, 1, h2, "Five, on a new commit")); // the verdict carries (verdicts-carry)
+  await room.drainNotify();
+  await room.activate(c2, { test, lint, build });
+  await room.recompute(); // require, then the carried verdict judged again
+  await room.act(check(room, "test", test, t1.id, 2, h2));
+  await room.act(check(room, "build", build, t1.id, 2, h2));
+  const land1 = await room.act(land(t1.id, 2, h2));
+  await room.drainNotify();
+  const i2 = room.recommit(h2); // the landing's integration: another commit, the same tree
+  await room.carryChecks(opOf(land1), i2, { tree: room.treeOf(i2) }); // tests carries (tree-identical); build is volatile and does not
+  await room.land(opOf(land1), true); // land-evaluated: tests met by the carry, build open on this integration
+  await room.act(check(room, "build", build, t1.id, 2, i2, true, opOf(land1)));
+  await room.land(opOf(land1), true); // land-evaluated: every blocking obligation met
+
+  // Thread 2: a verdict that does not carry, an objection that is not carried either, then an approval.
+  const t2 = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "The library", scope: ["lib/**"] } });
+  const l1 = room.change({ "lib/util.ts": "export const u = 1;\n" });
+  await room.act(propose(t2.id, 0, l1, "A helper"));
+  await room.drainNotify();
+  await room.act(review(dave, t2.id, 1, l1, "approve", ["lib/**"]));
+  await room.drainNotify();
+  const l2 = room.change({ "lib/util.ts": "export const u = 2;\n" });
+  await room.act(propose(t2.id, 1, l2, "A better helper")); // lib/util.ts changed inside the reviewed scope: the platform does not carry it, and no rule is asked
+  await room.drainNotify();
+  await room.act(review(dave, t2.id, 2, l2, "object", ["lib/**"]));
+  await room.drainNotify();
+  await room.act(land(t2.id, 2, l2)); // refused obligation-open, before policy
+  const l3 = room.recommit(l2);
+  await room.act(propose(t2.id, 2, l3, "The same helper, rebased")); // an objection is not carried: no call is owed
+  await room.drainNotify();
+  await room.act(review(dave, t2.id, 3, l3, "approve", ["lib/**"]));
+  await room.drainNotify();
+  const land2 = await room.act(land(t2.id, 3, l3));
+  await room.drainNotify();
+  await room.land(opOf(land2));
+
+  // Thread 3: an author's own approval counts for a documentation obligation and not for the other; two verdicts carry.
+  const t3 = await room.act({ signer: dave, kind: "claim", target: null, body: { goal: "Library notes", scope: ["lib/**", "docs/**"] } });
+  const d1 = room.change({ "lib/util.ts": "export const u = 3;\n", "docs/guide.md": "# guide\n" });
+  await room.act(propose(t3.id, 0, d1, "A helper and its guide", dave));
+  await room.drainNotify();
+  await room.act(review(dave, t3.id, 1, d1, "approve", ["docs/**"]));
+  await room.drainNotify();
+  await room.act(review(erin, t3.id, 1, d1, "approve", ["lib/**", "docs/**"]));
+  await room.drainNotify();
+  const d2 = room.recommit(d1);
+  await room.act(propose(t3.id, 1, d2, "The same, rebased", dave)); // two carry calls: erin's verdict, then dave's own
+  await room.drainNotify();
+  const land3 = await room.act(land(t3.id, 2, d2, dave));
+  await room.drainNotify();
+  await room.land(opOf(land3));
+
+  // Thread 4: a failing check; then a new policy changes who may review lib/** and the build checker's configuration.
+  const t4 = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "App and library", scope: ["src/**", "lib/**"] } });
+  const s1 = room.change({ "src/app.ts": "export const x = 7;\n", "lib/util.ts": "export const u = 4;\n" });
+  await room.act(propose(t4.id, 0, s1, "Seven and four"));
+  await room.drainNotify();
+  await room.act(review(alice, t4.id, 1, s1, "approve", ["src/**"]));
+  await room.drainNotify();
+  await room.act(review(dave, t4.id, 1, s1, "approve", ["lib/**"]));
+  await room.drainNotify();
+  await room.act(check(room, "test", test, t4.id, 1, s1));
+  await room.act(check(room, "build", build, t4.id, 1, s1, false)); // a failing check meets nothing
+  const land4 = await room.act(land(t4.id, 1, s1));
+  await room.drainNotify();
+  await room.land(opOf(land4), true);
+  await room.activate(c3, { test, lint, build: build2 });
+  await room.recompute(); // thread 1's and thread 4's open versions
+  await room.land(opOf(land1), true); // thread 1 under the new policy: its check carry was judged under the old one; its build check names the old configuration
+  await room.carryChecks(opOf(land1), i2, { tree: room.treeOf(i2) }); // judged again under the new policy
+  await room.land(opOf(land1), true);
+  await room.land(opOf(land4), true); // thread 4: dave no longer qualifies for lib-review, so his verdict is not listed
+  await room.act(review(erin, t4.id, 1, s1, "approve", ["lib/**"]));
+  await room.drainNotify(); // reviewers: alice and erin, not dave
+  await room.act(review(alice, t1.id, 2, h2, "object", ["src/**"])); // her verdict here replaces her carried one
+  await room.drainNotify();
+  await room.land(opOf(land1), true); // objection-open blocks
+
+  // Thread 5: a check whose key is revoked as compromised stops counting.
+  const t5 = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "The app again", scope: ["src/**"] } });
+  const x1 = room.change({ "src/app.ts": "export const x = 8;\n" });
+  await room.act(propose(t5.id, 0, x1, "Eight"));
+  await room.drainNotify();
+  await room.act(review(alice, t5.id, 1, x1, "approve", ["src/**"]));
+  await room.drainNotify();
+  await room.act(check(room, "test", test, t5.id, 1, x1));
+  const land5 = await room.act(land(t5.id, 1, x1)); // tests met, build open
+  await room.drainNotify();
+  await room.land(opOf(land5), true);
+  await room.act({ signer: alice, kind: "roster", target: null, body: { op: "revoke-key", key: carol.key, reason: "compromised" } });
+  await room.land(opOf(land5), true); // tests is open again
+
+  // Thread 6: a sole admin's flagged self-approval counts only while the room has one active admin.
+  const t6 = await room.act({ signer: alice, kind: "claim", target: null, body: { goal: "Tell admins about landings", scope: [".artroom/**"] } });
+  const p1 = room.change({ ".artroom/policy.json": JSON.stringify(c5) });
+  await room.act(propose(t6.id, 0, p1, "Notify admins of landings", alice));
+  await room.drainNotify();
+  await room.act(review(alice, t6.id, 1, p1, "approve", [".artroom/**"])); // flagged sole-admin-self-approval
+  await room.drainNotify();
+  const land6 = await room.act(land(t6.id, 1, p1, alice));
+  await room.drainNotify();
+  await room.land(opOf(land6), true); // obl_admin-approval met
+  await room.act({ signer: alice, kind: "roster", target: null, body: { op: "set-role", member: "@dave", role: "admin" } });
+  await room.land(opOf(land6), true); // two active admins: the self-approval no longer counts
+
+  // A policy whose require rule cannot be evaluated: each open version is blocked, keeps its obligations, and its
+  // carried verdicts are still judged.
+  await room.activate(c4, { test, lint, build: build2 });
+  await room.recompute();
+  write("declared-carry", room.fixture("Obligations, evidence and carrying under a v2 document: verdicts carried, not carried and replaced; checks counted by integration, carried by check-carried events and judged again after an activation; an advisory and a failing check; an author's own approval; a policy that changes who qualifies; a revoked checker key; a sole admin's self-approval; a recomputation that fails."));
+}
+
+// --------------------------------------------------------- declared-carry-plain
+
+{
+  const doc = valid(v2(policy(requireReview({ paths: "src/**", from: "@alice", id: "src-review" }))));
+  const room = new DeclaredRoom();
+  await room.activate(doc); // 1
+  await room.join("@bob", "member", bob); // 2, 3
+  const claim = await room.act({ signer: bob, kind: "claim", target: null, body: { goal: "The app", scope: ["src/**"] } }); // 4
+  const h1 = room.change({ "src/app.ts": "export const x = 9;\n" });
+  await room.act({ signer: bob, kind: "propose", target: { lane: claim.id }, body: { lease: 1, expectedGeneration: 0, head: h1, summary: "Nine" } }); // 5
+  await room.act({ signer: alice, kind: "review", target: { lane: claim.id, generation: 1 }, body: { head: h1, verdict: "approve", scope: ["src/**"], text: "Approved." } }); // 6
+  const h2 = room.recommit(h1);
+  await room.act({ signer: bob, kind: "propose", target: { lane: claim.id }, body: { lease: 1, expectedGeneration: 1, head: h2, summary: "Nine, rebased" } }); // 7: carried on the platform's conditions; no rule, no decision
+  const land = await room.act({ signer: bob, kind: "land", target: { lane: claim.id, generation: 2 }, body: { lease: 1, head: h2 } }); // 8: the land input lists the carried verdict
+  await room.land(opOf(land)); // 9 land-evaluated, 10 land-reserved, 11 land-outcome
+  write("declared-carry-plain", room.fixture("A verdict carried to a second version by the platform's conditions alone: the policy has no carry rule, so the log records no carry decision, and the land input lists the carried verdict."));
+}
+
+// ------------------------------------------------------------ declared-snapshot
+
+{
+  const RUNNER = `sha256:${"c".repeat(64)}` as const;
+  const config: CheckerConfigV2 = { format: "artroom-checker-v2", act: "check", volatile: false, timeoutSeconds: 600, runner: RUNNER, inputs: ["src/**"] };
+  const base = policy(requireCheck("test", { paths: "src/**", by: "@carol", id: "tests" }));
+  const doc = valid(v2(base), { test: config });
+  const paths = checkerInputs(config.inputs, base.carry)!;
+  const snapshot = (n: string) => `sha256:${n.repeat(64)}`;
+  const room = new DeclaredRoom();
+  await room.activate(doc, { test: config }); // 1
+  await room.join("@bob", "member", bob); // 2, 3
+  await room.join("@carol", "checker", carol); // 4, 5
+  const scoped = async (goal: string, content: string, digest: string, prepare: boolean) => {
+    const claim = await room.act({ signer: bob, kind: "claim", target: null, body: { goal, scope: ["src/**"] } });
+    const head = room.change({ "src/app.ts": content });
+    await room.act({ signer: bob, kind: "propose", target: { lane: claim.id }, body: { lease: 1, expectedGeneration: 0, head, summary: goal } });
+    const land = await room.act({ signer: bob, kind: "land", target: { lane: claim.id, generation: 1 }, body: { lease: 1, head } });
+    // The snapshot commit: a commit that holds only the checker's inputs, as R-CARRY-15 builds it.
+    const commit = room.commit({ "src/app.ts": content }, null);
+    if (prepare) room.prepared(claim.id, 1, { op: opOf(land), snapshots: [{ check: "test", commit, digest }] });
+    await room.act({
+      signer: carol,
+      kind: "check",
+      target: { lane: claim.id, generation: 1 },
+      body: { obligation: "obl_tests", check: "test", integration: commit, input: { kind: "filtered", snapshot: digest, paths }, config: digestJson(config), runner: RUNNER, volatile: false, ok: true, detail: "Passed.", landOp: opOf(land) },
+    });
+    await room.land(opOf(land), true);
+  };
+  await scoped("Prepared", "export const x = 10;\n", snapshot("a"), true); // 6 claim, 7 propose, 8 land, 9 prepared, 10 check, 11 land-evaluated
+  await scoped("Not prepared", "export const x = 11;\n", snapshot("b"), false); // 12 claim, 13 propose, 14 land, 15 check, 16 land-evaluated
+  write("declared-snapshot", room.fixture("A scoped checker: a prepared event records the snapshot commit for a landing's integration, a check runs on that commit, and the landing's land input counts it; then the same on a second thread with no prepared event."));
 }

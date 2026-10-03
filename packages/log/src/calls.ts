@@ -104,7 +104,8 @@ export interface CarryStep {
   readonly optional?: boolean;
 }
 
-const same = (a: unknown, b: unknown) => canonicalize(a) === canonicalize(b);
+/** Equal as canonical JSON. A field one side lacks is a difference, never an error. */
+const same = (a: unknown, b: unknown) => (a === undefined || b === undefined ? a === b : canonicalize(a) === canonicalize(b));
 
 /** Recorded decisions, in calls: consecutive decisions with one context digest are one call. */
 function callsOf(decisions: readonly Decision[]): { readonly digest: Digest; readonly kind: Decision["kind"]; readonly decisions: Decision[] }[] {
