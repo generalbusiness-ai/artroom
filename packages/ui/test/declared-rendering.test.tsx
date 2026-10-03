@@ -118,6 +118,12 @@ describe("activation: a declared record shows its label, its target and its fiel
     // A cue is a comment with no text: it is not one of the review screens' notes.
     expect(snap.notes).toEqual([]);
     expect(snap.checks).toEqual([]);
+    // A review step's `text` is the application's field. Where it is not text, the review screens show none.
+    const c = await r.acts();
+    const binding = c.vocabulary === "declared" ? c.acts["sign-off"]!.binding : "";
+    const odd = r.record("@ivo", { v: 2, kind: "sign-off", binding, target: { lane: s1.id, generation: 1 }, body: { head: sha("a"), verdict: "approve", scope: ["songs/**"], text: 7 } });
+    const after = (await live(r)).snapshot()!;
+    expect(after.reviews.find((x) => x.id === odd)).toMatchObject({ verdict: "approve", text: "" });
   });
 });
 

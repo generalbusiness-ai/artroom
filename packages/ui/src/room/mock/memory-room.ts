@@ -14,7 +14,7 @@
  */
 
 import { bindingsOf, fieldsOf, governs, meaningOf, PLATFORM_KIND_LIST } from "@generalbusiness/artroom-policy/declared";
-import { readField, shapeOfTarget } from "../acts.ts";
+import { own, readField, shapeOfTarget } from "../acts.ts";
 import type {
   ActDeclaration,
   ActId,
@@ -162,7 +162,7 @@ export class MemoryRoom {
       if (v.doc === "legacy") continue;
       for (const kind of Object.keys(v.doc.acts)) if ((doc === "legacy" || !Object.hasOwn(doc.acts, kind)) && v.retired[kind] === undefined) v.retired[kind] = e.seq;
     }
-    this.versions.push({ policy, since: e.seq, until: null, doc, bindings, retired: {} });
+    this.versions.push({ policy, since: e.seq, until: null, doc, bindings, retired: Object.create(null) as Record<string, number> });
     this.changed();
     return policy;
   }
@@ -218,7 +218,7 @@ export class MemoryRoom {
     if (!shape || !fields) return refuse("invalid-body", `The target is not one of ${kind}'s targets.`, "Correct the target and sign it again.");
     for (const name of Object.keys(body)) if (name !== "because" && !fields.some((f) => f.name === name)) return refuse("invalid-body", `${name} is not a field of ${kind}.`, "Correct the body and sign it again.");
     for (const f of fields) {
-      const value = body[f.name];
+      const value = own(body, f.name);
       const raw = value === undefined ? "" : Array.isArray(value) ? value.join("\n") : typeof value === "object" ? JSON.stringify(value) : String(value);
       const r = readField(f, raw);
       if (!r.ok) return refuse("invalid-body", r.problem, "Correct the body and sign it again.");

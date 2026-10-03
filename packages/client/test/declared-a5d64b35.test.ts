@@ -15,6 +15,7 @@ import {
   checkBinding,
   connect,
   delegateOp,
+  expandGrant,
   fieldsOf,
   generateSigner,
   governs,
@@ -472,6 +473,88 @@ describe("the named methods (R-API-9 as amended)", () => {
     await alice.api.claim({ goal: "g", scope: ["src/**"] });
     expect(gets("/declarations")).toBe(reads + 1);
     expect(posts("/acts")).toBe(sent + 1);
+  });
+});
+
+describe("a retry is sent as it was first built, whatever the room's document is now (R-IDEM-2, R-DECL-16)", () => {
+  test("a named act repeated with its key on the same handle, after a lost answer and a change of vocabulary, sends the same bytes and gets the original record", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = await connect({ url }, room.id, { kind: "key", signer: alice.signer }, { retries: 0 });
+    const seen = (await api.claim({ goal: "first", scope: ["docs/**"] })) as Claim;
+    // The room records the claim; its answer is lost.
+    room.faults.push({ route: "POST /acts", kind: "drop" });
+    await caught(api.claim({ goal: "g", scope: ["src/**"] }, { idempotencyKey: "claim-1" }));
+    const recorded = room.entries.at(-1)!;
+    expect(recorded.entry.type === "act" && recorded.entry.act.envelope).toMatchObject({ v: 1, kind: "claim", idempotencyKey: "claim-1" });
+    // The room moves to declared acts, and another named act makes the handle read the vocabulary again.
+    await room.activate({ ...CODE_REVIEW_ACTS });
+    const stale = await api.note({ act: seen.id }, { text: "n" });
+    expect(isRefusal(stale) && stale.rule).toBe("binding-stale");
+    // The repeat is the act first built, v: 1, not a new v: 2 act under the same key.
+    const again = await api.claim({ goal: "g", scope: ["src/**"] }, { idempotencyKey: "claim-1" });
+    expect(isRefusal(again)).toBe(false);
+    expect((again as Claim).id).toBe(FakeRoom.idOf(recorded));
+    expect(room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.idempotencyKey === "claim-1")).toHaveLength(1);
+    // Once answered the act is no longer kept: the same key with the same act is built for the room as it is now, and is the room's to judge.
+    const later = await api.claim({ goal: "g", scope: ["src/**"] }, { idempotencyKey: "claim-1" });
+    expect(isRefusal(later) && later.rule).toBe("idempotency-mismatch");
+  });
+
+  test("only the same act is the kept one: the same key with another body is built anew, and the room refuses it", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = await connect({ url }, room.id, { kind: "key", signer: alice.signer }, { retries: 0 });
+    room.faults.push({ route: "POST /acts", kind: "drop" });
+    await caught(api.claim({ goal: "g", scope: ["src/**"] }, { idempotencyKey: "claim-2" }));
+    const other = await api.claim({ goal: "another goal", scope: ["src/**"] }, { idempotencyKey: "claim-2" });
+    expect(isRefusal(other) && other.rule).toBe("idempotency-mismatch");
+  });
+
+  test("a prepared declared act replayed after the room returned to the legacy vocabulary gets its original record; an act never accepted is refused at step 1", async () => {
+    await room.activate(withAsk());
+    const alice = await joinAs(room, "@alice");
+    const binding = (await room.bindingOf("ask"))!;
+    let prepared: PreparedAct | undefined;
+    const first = (await (alice.api as HttpRoomClient).act("ask", { act: FakeRoom.idOf(room.entries[1]!) }, { text: "x" }, { binding, onPrepared: (p) => void (prepared = p) })) as DeclaredRecord;
+    await room.activate(null);
+    const entries = room.entries.length;
+    expect(await (alice.api as HttpRoomClient).replay(prepared!)).toEqual(first);
+    expect((await caught(alice.api.act("ask", { act: first.id }, { text: "y" }, { binding }))).code).toBe("bad-request");
+    expect(room.entries.length).toBe(entries);
+  });
+});
+
+describe("a grant never gains a kind across a change of vocabulary (R-DECL-11, R-DECL-17)", () => {
+  async function invited(acts: Record<string, string>) {
+    return room.invite("@agent", { role: "agent", custody: "room", kinds: [], acts });
+  }
+
+  test("a session signed under a v2 document is refused under a v1 one, and the invitation stays unused", async () => {
+    await room.activate(withAsk());
+    const inv = await invited({ ask: (await room.bindingOf("ask"))! });
+    await room.activate(null);
+    const out = await redeem({ url }, room.id, inv);
+    expect(isRefusal(out) && out.rule).toBe("binding-stale");
+    expect(isRefusal(out) && out.current).toMatchObject({ policy: expect.stringMatching(/^act_\d+_/) });
+    // Unused: once the room declares that meaning again, the same invitation redeems.
+    await room.activate(withAsk());
+    expect(isRefusal(await redeem({ url }, room.id, inv))).toBe(false);
+  });
+
+  test("a kind whose declaration stops being delegable is not covered by a grant made before: the binding is equal, and the act is refused", async () => {
+    await room.activate(withAsk());
+    const binding = (await room.bindingOf("ask"))!;
+    const b = await redeem({ url }, room.id, await invited({ ask: binding }));
+    if (isRefusal(b)) throw new Error(b.rule);
+    const api = await connect(service(), room.id, { kind: "bearer", token: b.bearer });
+    expect(await api.act("ask", { act: FakeRoom.idOf(room.entries[1]!) }, { text: "q" }, { binding })).toMatchObject({ kind: "ask" });
+    await room.activate(withAsk({ ...ASK, who: { ...ASK.who, delegable: false } }));
+    expect(await room.bindingOf("ask")).toBe(binding);
+    const out = await api.act("ask", { act: FakeRoom.idOf(room.entries[1]!) }, { text: "q2" }, { binding });
+    expect(isRefusal(out) && out.rule).toBe("delegation-invalid");
+    // And a grantor is told before signing: the expansion refuses a kind that may not be delegated.
+    const c = (await api.acts()) as ActsCatalogue;
+    expect(expandGrant(c, "member", ["ask"])).toMatchObject({ ok: false });
+    expect(expandGrant(c, "member", "*")).toMatchObject({ ok: true, grant: { acts: expect.not.objectContaining({ ask: expect.anything() }) } });
   });
 });
 

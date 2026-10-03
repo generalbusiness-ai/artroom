@@ -4,6 +4,7 @@
  * and read; only the wire differs.
  */
 
+import { canonicalize } from "./canonical.ts";
 import {
   isArtroomError,
   isRefusal,
@@ -173,6 +174,14 @@ abstract class RoomCore {
   readonly #ended: Catalogue[] = [];
   /** The seq of the latest `policy-activated` entry this handle has seen, by any read. */
   #activation = -1;
+  /**
+   * Named acts this handle sent and got no answer for, by idempotency key.
+   * A caller that repeats the call with the same key gets the same bytes
+   * sent again, as first built, also when the room's vocabulary changed in
+   * between (R-IDEM-2, R-DECL-16). Building the act again under the
+   * vocabulary now in force would be a different act under the same key.
+   */
+  readonly #unanswered = new Map<string, PreparedAct>();
 
   constructor(wire: Wire & { redactor: import("./errors.ts").Redactor }, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActor) {
     this.wire = wire;
@@ -308,8 +317,11 @@ abstract class RoomCore {
   /** One of the named methods' acts: built, signed for a key, and sent. */
   protected async named<T>(kind: EnvelopeKind, target: unknown, body: unknown, opts?: ClientActOptions): Promise<Result<T>> {
     const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
+    const kept = this.#unanswered.get(idempotencyKey);
     let prepared: PreparedAct;
-    if (this.bearer !== undefined) {
+    if (kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)) {
+      prepared = kept; // G5:named-retry-kept
+    } else if (this.bearer !== undefined) {
       // The room signs. For a named tool in a `v2` room it adds the built-for binding itself (R-CRED-10).
       prepared = { kind, target, body, idempotencyKey };
     } else {
@@ -326,9 +338,18 @@ abstract class RoomCore {
       out = await this.replay(prepared);
     } catch (e) {
       // A room that left the vocabulary this handle read answers `bad-request` at step 1: read again next time.
-      if (isArtroomError(e) && e.code === "bad-request") this.#vocabulary = undefined; // G5:named-forget-vocabulary
+      if (isArtroomError(e) && e.code === "bad-request") {
+        this.#vocabulary = undefined; // G5:named-forget-vocabulary
+        // The room answers an exact retry of an accepted act before step 1, so it never accepted this one.
+        this.#unanswered.delete(idempotencyKey);
+      } else {
+        // No answer: the room may have recorded it. A repeat with this key sends these bytes.
+        if (this.#unanswered.size >= 64 && !this.#unanswered.has(idempotencyKey)) this.#unanswered.delete(this.#unanswered.keys().next().value!);
+        this.#unanswered.set(idempotencyKey, prepared); // G5:named-retry-keep
+      }
       throw e;
     }
+    this.#unanswered.delete(idempotencyKey);
     this.#vocabularyStale(out);
     this.sawRefusal(out);
     return out as Result<T>;

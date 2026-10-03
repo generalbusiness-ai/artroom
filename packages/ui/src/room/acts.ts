@@ -166,12 +166,19 @@ export function readField(f: ActField, raw: string): FieldRead {
 /** A body read from a form: the fields by name, or the problems by field name. */
 export type BodyRead = { readonly ok: true; readonly body: { readonly [field: string]: Json } } | { readonly ok: false; readonly problems: Readonly<Record<string, string>> };
 
+/**
+ * The value kept under one of an application's names, never one inherited
+ * from `Object.prototype`: a field may be named `constructor` or `toString`
+ * (R-DECL-12).
+ */
+export const own = <T>(o: Readonly<Record<string, T>>, name: string): T | undefined => (Object.hasOwn(o, name) ? o[name] : undefined); // G5U:own-name
+
 /** Read every field of a form. One problem per field; the body is built only when there are none. */
 export function readBody(fields: readonly ActField[], raw: Readonly<Record<string, string>>): BodyRead {
   const body: Record<string, Json> = {};
   const problems: Record<string, string> = {};
   for (const f of fields) {
-    const r = readField(f, raw[f.name] ?? "");
+    const r = readField(f, own(raw, f.name) ?? "");
     if (!r.ok) problems[f.name] = r.problem;
     else if (r.value !== undefined) body[f.name] = r.value;
   }

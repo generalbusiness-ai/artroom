@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from "vitest";
 import { codeReviewPolicy, defaultPolicy, validatePolicyV2 } from "@generalbusiness/artroom-policy";
-import { declarationChanges, entryMeaning, fieldsOf, readBody, readField, readTarget, shapeOfTarget, targetText, targetsOf, typeText, valueText, type ActField } from "../src/room/acts.ts";
+import { declarationChanges, entryMeaning, fieldsOf, own, readBody, readField, readTarget, shapeOfTarget, targetText, targetsOf, typeText, valueText, type ActField } from "../src/room/acts.ts";
 import type { ActDeclaration, RecordMeaning } from "../src/room/contract.ts";
 import { SETLIST_ACTS_2 } from "../src/room/mock/declared-room.ts";
 import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
@@ -21,6 +21,17 @@ const value = (f: ActField, raw: string) => {
   if (!r.ok) throw new Error(r.problem);
   return r.value;
 };
+
+describe("a field may be named like an inherited property (R-DECL-12)", () => {
+  test("its value is the form's own or it is empty: a required one is asked for, an optional one is left out, a given one is sent", () => {
+    const fields = [declared("constructor", { type: "text", max: 20 }), declared("toString", { type: "text", max: 20 }, false), declared("title", { type: "text", max: 20 })];
+    expect(readBody(fields, { title: "X" })).toEqual({ ok: false, problems: { constructor: "constructor is required." } });
+    expect(readBody(fields, { title: "X", constructor: "built" })).toEqual({ ok: true, body: { title: "X", constructor: "built" } });
+    expect(readBody(fields, { title: "X", constructor: "built", toString: "said" })).toEqual({ ok: true, body: { title: "X", constructor: "built", toString: "said" } });
+    expect(own({ a: "1" }, "a")).toBe("1");
+    expect(own({ a: "1" }, "hasOwnProperty")).toBeUndefined();
+  });
+});
 
 describe("the setlist application is a valid set of declarations, and none of them is a code-review act", () => {
   test("both policy versions validate with no problem", () => {

@@ -417,7 +417,7 @@ function recordsFromLog(entries: readonly LogEntry[], unders: readonly Under[]):
     const t = (env.target ?? {}) as { lane?: unknown; generation?: unknown };
     const b = env.body;
     if (step === "review") {
-      reviews.push({ ...base, kind: "review", lane: t.lane, generation: t.generation, head: b["head"], verdict: b["verdict"], scope: b["scope"], dependsOn: b["dependsOn"] ?? [], text: b["text"] ?? "", fulfils: [] } as unknown as Review);
+      reviews.push({ ...base, kind: "review", lane: t.lane, generation: t.generation, head: b["head"], verdict: b["verdict"], scope: b["scope"], dependsOn: b["dependsOn"] ?? [], text: typeof b["text"] === "string" ? b["text"] : "", fulfils: [] } as unknown as Review); // G5U:review-text
     } else if (step === "check") {
       const { obligation, check, integration, input, config, runner, volatile, ok, detail, landOp } = b;
       checks.push({ ...base, kind: "check", lane: t.lane, generation: t.generation, obligation, check, integration, input, config, runner, volatile, ok, detail, ...(landOp ? { landOp } : {}) } as unknown as Check);

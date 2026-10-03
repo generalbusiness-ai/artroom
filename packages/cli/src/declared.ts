@@ -145,7 +145,9 @@ export function bodyOf(fields: readonly ActField[], base: Readonly<Record<string
 }
 
 /** The required fields a body still lacks. */
-export const missing = (fields: readonly ActField[], body: Readonly<Record<string, Json>>): string[] => fields.filter((f) => f.required && body[f.name] === undefined).map((f) => f.name);
+export const missing = (fields: readonly ActField[], body: Readonly<Record<string, Json>>): string[] =>
+  // Own properties only: a field may be named like an inherited one, such as constructor or toString (R-DECL-12).
+  fields.filter((f) => f.required && (!Object.hasOwn(body, f.name) || body[f.name] === undefined)).map((f) => f.name); // G5:cli-missing-own
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -160,8 +162,9 @@ export function meaningChanges(before: ActDeclaration, after: ActDeclaration): s
   if (!same(before.threads ?? [], after.threads ?? [])) out.push(`Threads it acts on: was ${(before.threads ?? []).join(", ") || "none"}, now ${(after.threads ?? []).join(", ") || "none"}.`);
   const names = new Set([...Object.keys(before.body ?? {}), ...Object.keys(after.body ?? {})]);
   for (const name of names) {
-    const b = before.body?.[name];
-    const a = after.body?.[name];
+    // Own properties only: a field may be named like an inherited one (R-DECL-12).
+    const b = before.body !== undefined && Object.hasOwn(before.body, name) ? before.body[name] : undefined; // G5:cli-changes-own
+    const a = after.body !== undefined && Object.hasOwn(after.body, name) ? after.body[name] : undefined;
     if (b === undefined) out.push(`Field ${name}: new.`);
     else if (a === undefined) out.push(`Field ${name}: removed.`);
     else if (!same(b, a)) out.push(`Field ${name}: was ${JSON.stringify(b)}, now ${JSON.stringify(a)}.`);

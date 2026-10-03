@@ -10,7 +10,7 @@ import { describe, expect, test } from "vitest";
 import type { ActDeclaration } from "@generalbusiness/artroom-contract";
 import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
 import { explainText, refusalText } from "../src/format.ts";
-import { FieldError, meaningChanges, parseValue } from "../src/declared.ts";
+import { FieldError, meaningChanges, missing, parseValue } from "../src/declared.ts";
 import { invitationLink } from "../src/link.ts";
 import { useHarness } from "./harness.ts";
 
@@ -172,6 +172,27 @@ describe("artroom act: any declared act, under the binding the user read", () =>
     expect(parseValue(flag, "true")).toBe(true);
     expect(parseValue(flag, "false")).toBe(false);
     for (const bad of ["yes", "1", "", "TRUE"]) expect(() => parseValue(flag, bad), bad).toThrow(FieldError);
+  });
+
+  test("a field named like an inherited property is the body's own or it is missing; a change of such a field is listed as one", () => {
+    const named = (name: string) => ({ name, from: "declaration" as const, required: true, field: { type: "text" as const, max: 5 } });
+    expect(missing([named("constructor"), named("toString"), named("text")], { text: "x" })).toEqual(["constructor", "toString"]);
+    expect(missing([named("constructor"), named("toString")], { constructor: "a", toString: "b" } as never)).toEqual([]);
+    const plain: ActDeclaration = { ...ASK, body: { text: { type: "text", max: 200 } } };
+    const odd: ActDeclaration = { ...ASK, body: { text: { type: "text", max: 200 }, toString: { type: "text" as const, max: 5 }, constructor: { type: "text" as const, max: 5 } } };
+    expect(meaningChanges(plain, odd)).toEqual(["Field toString: new.", "Field constructor: new."]);
+    expect(meaningChanges(odd, plain)).toEqual(["Field toString: removed.", "Field constructor: removed."]);
+  });
+
+  test("only a step's own field is read from the room: a field the declaration names expectedGeneration is the application's and is left alone", async () => {
+    const { alice, claim } = await ready();
+    const wrap: ActDeclaration = { label: "Wrap", targets: { thread: ["release"] }, threads: ["claim"], body: { expectedGeneration: { type: "int", min: 0, max: 99, optional: true } }, who: { roles: ["member"] } };
+    await h.room.activate({ ...withAsk(), wrap });
+    const res = await cli(alice, ["act", "wrap", "--binding", (await h.room.bindingOf("wrap"))!, "--lane", claim.lane]);
+    expect(res.code).toBe(0);
+    const last = h.room.entries.at(-1)!;
+    // The lease is the release step's field and is read for the user. The declared field was not given, so it is absent.
+    expect(last.entry.type === "act" && last.entry.act.envelope.body).toEqual({ lease: 1 });
   });
 
   test("a kind the room does not declare is refused, and a v1 room has no generic act", async () => {

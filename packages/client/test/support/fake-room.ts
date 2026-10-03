@@ -310,6 +310,9 @@ export class FakeRoom {
         // R-DECL-17: a declared kind only by the signed map, and only for the binding the grantor signed.
         if (acts === undefined || !Object.hasOwn(acts, env.kind)) return refusal("delegation-invalid", `The delegation does not cover ${env.kind}.`);
         if (acts[env.kind] !== (env as { binding?: string }).binding) return refusal("delegation-invalid", `The delegation was granted for an earlier meaning of ${env.kind}.`, "Ask the grantor to delegate again.");
+        // As the Room (R-DECL-11): `who.delegable` is judged at each use, also after the grant was admitted.
+        const active = this.policies.at(-1)!.acts!;
+        if (Object.hasOwn(active, env.kind) && active[env.kind]!.who.delegable === false) return refusal("delegation-invalid", `${env.kind} may not be delegated.`, "Sign it with the member's own key.");
       } else if (d.kinds !== "*" && !d.kinds.includes(env.kind as DelegableKind)) return refusal("delegation-invalid", `The delegation does not cover ${env.kind}.`);
       const grantor = this.keys.get(d.grantor);
       const m = grantor ? this.members.get(grantor.member) : undefined;
@@ -350,9 +353,17 @@ export class FakeRoom {
     const binding = (env as { binding?: unknown } | null)?.binding;
     // Step 1, by the active document's vocabulary (R-ADM-1 as amended): `v: 1` only in a `v1` room; in a `v2` room a
     // platform kind is `v: 1` and a binding belongs to `v: 2`.
-    if (typeof env !== "object" || env === null || (v !== 1 && !(declared && v === 2))) throw artroomError("bad-request", "Not an envelope.");
-    if (v === 2 && isPlatformKind(env.kind)) throw artroomError("bad-request", `envelope.v must be 1 for the platform kind ${env.kind}.`);
-    if (v === 1 && binding !== undefined) throw artroomError("bad-request", "envelope.binding is only for an envelope of v: 2.");
+    try {
+      if (typeof env !== "object" || env === null || (v !== 1 && !(declared && v === 2))) throw artroomError("bad-request", "Not an envelope.");
+      if (v === 2 && isPlatformKind(env.kind)) throw artroomError("bad-request", `envelope.v must be 1 for the platform kind ${env.kind}.`);
+      if (v === 1 && binding !== undefined) throw artroomError("bad-request", "envelope.binding is only for an envelope of v: 2.");
+    } catch (e) {
+      // As the Room (R-DECL-16): an exact retry of an accepted act gets its original result, even when the document
+      // now in force no longer admits its version or kind. Only that exact envelope, with its signature.
+      const before = typeof env === "object" && env !== null ? this.#idem.get(`${env.actor}|${env.idempotencyKey}`) : undefined;
+      if (before && before.bytes === canonicalize(env) && (await verifyValue("artroom-envelope-v1", env, signed.sig, env.actor))) return before.result;
+      throw e;
+    }
     if (env.room !== this.id) throw artroomError("unauthenticated", "The envelope is for another room.");
     if (!(await verifyValue("artroom-envelope-v1", env, signed.sig, env.actor))) throw artroomError("unauthenticated", "The signature does not verify.");
     const idemKey = `${env.actor}|${env.idempotencyKey}`;
@@ -455,7 +466,9 @@ export class FakeRoom {
             expiresAt: op.expiresAt,
             secretHash: op.secretHash,
             ...(op.session ? { session: op.session } : {}),
-          });
+            // As the Room's `invitations.declared`: the vocabulary the invitation was admitted under.
+            ...(this.policies.at(-1)!.acts !== null ? { declared: true } : {}),
+          } as never);
           return { ...this.#base(e, "roster", by), op, invitation: id } as ActRecord;
         }
         if (op.op === "join") {
@@ -695,7 +708,7 @@ export class FakeRoom {
           const effect = { type: "opened", purpose: "ordinary", lease };
           const e = await this.#record(signed, by, [effect]);
           const lane = FakeRoom.idOf(e);
-          this.lanes.set(lane, { lane, seq: e.seq, kind: env.kind, goal: (body["goal"] as string | undefined) ?? "", scope, holder: member, leaseGeneration: 1, expiresAt: this.now() + LEASE_MS, generations: [] });
+          this.lanes.set(lane, { lane, seq: e.seq, kind: env.kind, goal: typeof body["goal"] === "string" ? body["goal"] : "", scope, holder: member, leaseGeneration: 1, expiresAt: this.now() + LEASE_MS, generations: [] });
           return { ...body, ...this.#base(e, env.kind, by), kind: env.kind, lane, purpose: "ordinary", scope, lease, overlaps: [], effect } as unknown as ActRecord;
         }
         const e = await this.#record(signed, by);
@@ -827,6 +840,19 @@ export class FakeRoom {
     const hash = `sha256:${await sha256Hex(new TextEncoder().encode(r.secret))}`;
     if (hash !== inv.secretHash) return refusal("invitation-invalid", "The invitation secret does not match.");
     if (inv.custody !== "room") return refusal("custody-mismatch", "This invitation is for a key you hold.", "Redeem it with `artroom login`.");
+    // As the Room (R-DECL-17): what the session grants. A map signed under a `v2` document is never dropped under a
+    // `v1` one: the redemption is refused and the invitation stays unused. An invitation admitted under `v2` with no
+    // session granted the delegable platform kinds only, and gains nothing by a later return to `v1`.
+    const nowDeclared = this.policies.at(-1)!.acts !== null;
+    const sessionActs = (inv.session as { acts?: Readonly<Record<string, string>> } | undefined)?.acts;
+    if (!nowDeclared && sessionActs !== undefined && Object.keys(sessionActs).length > 0) {
+      const named = Object.keys(sessionActs)[0]!;
+      return { ...refusal("binding-stale", `The invitation's session was prepared for ${named} as ${sessionActs[named]}; the room's active policy, version ${this.policies.at(-1)!.policy}, declares no acts.`, "Ask an admin to invite again."), current: { policy: this.policies.at(-1)!.policy } } as Refusal;
+    }
+    const sessionGrant: { kinds: unknown; acts?: unknown } =
+      inv.session === undefined && (nowDeclared || (inv as { declared?: boolean }).declared === true)
+        ? { kinds: ["renew"], ...(nowDeclared ? { acts: {} } : {}) }
+        : { kinds: inv.session?.kinds ?? "*", ...(sessionActs !== undefined && nowDeclared ? { acts: sessionActs } : {}) };
     const memberKey = (await generateSigner()).signer;
     const join = await signEnvelope(buildEnvelope(this.id, { signer: memberKey }, "roster", null, { op: "join", invitation: inv.id, secret: r.secret }, newIdempotencyKey()) as never, memberKey);
     const joined = await this.admit(join as SignedEnvelope, "room-redemption");
@@ -843,8 +869,7 @@ export class FakeRoom {
         {
           op: "delegate",
           to: sessionKey.key,
-          kinds: inv.session?.kinds ?? "*",
-          ...((inv.session as { acts?: unknown } | undefined)?.acts !== undefined ? { acts: (inv.session as { acts?: unknown }).acts } : {}),
+          ...sessionGrant,
           lanes: "*",
           expiresAt: this.iso(expiresAt),
         },

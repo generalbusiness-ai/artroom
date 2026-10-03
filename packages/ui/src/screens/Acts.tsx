@@ -19,7 +19,7 @@
  */
 
 import { useRef, useState } from "preact/hooks";
-import { SHAPE_TAG, SHAPE_TEXT, TARGET_INPUTS, declarationChanges, fieldsOf, readBody, readTarget, targetsOf, typeText, type ActField } from "../room/acts.ts";
+import { SHAPE_TAG, SHAPE_TEXT, TARGET_INPUTS, declarationChanges, fieldsOf, own, readBody, readTarget, targetsOf, typeText, type ActField } from "../room/acts.ts";
 import type { ActDeclaration, ActsCatalogue, DeclaredRecord, Refusal, TargetShape } from "../room/contract.ts";
 import { isRefusal } from "../room/contract.ts";
 import { Badge, RefusalNotice, WhyLink } from "../ui/bits.tsx";
@@ -270,7 +270,7 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
 
       <TargetInputs kind={kind} declaration={d} shape={shape} values={target} problems={problems.target} onInput={(name, v) => setTarget({ ...target, [name]: v })} />
       {fields.map((f) => (
-        <FieldInput key={f.name} f={f} value={values[f.name] ?? ""} problem={problems.body[f.name]} onInput={(v) => setValues({ ...values, [f.name]: v })} />
+        <FieldInput key={f.name} f={f} value={own(values, f.name) ?? ""} problem={own(problems.body, f.name)} onInput={(v) => setValues({ ...values, [f.name]: v })} />
       ))}
 
       {status.state === "stale" && fresh && (

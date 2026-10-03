@@ -1139,7 +1139,9 @@ const COMMANDS: Record<string, Command> = {
           if (because.length > 0) body["because"] = because as unknown as Json;
           // What the room already knows is read for the user, as the named commands do: the lease, the generation, the head.
           const lane = target !== null && "lane" in target ? target.lane : undefined;
-          const wants = (name: string) => fields.some((f) => f.name === name) && body[name] === undefined;
+          // Only a step's own field is read from the room. A field the declaration gives one of these names is the
+          // application's, with a meaning of its own, and is left as the user gave it.
+          const wants = (name: string) => fields.some((f) => f.name === name && f.from === "step") && body[name] === undefined; // G5:cli-step-field-only
           if (lane !== undefined && wants("lease") && fields.find((f) => f.name === "lease")!.required) {
             const h = await held(api, lane, room.member);
             if (isRefusal(h)) return h;

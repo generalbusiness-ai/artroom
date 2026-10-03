@@ -818,3 +818,31 @@ describe.skipIf(DECLARED)("a kind dropped more than once (R-DECL-23)", () => {
     expect((await at(last)).acts["tell"]).not.toHaveProperty("retired");
   });
 });
+
+describe.skipIf(DECLARED)("a retry is answered as it was first built (R-IDEM-2, R-DECL-16)", () => {
+  it("a prepared declared act replayed after the room returned to a v1 document gets its original record; a new act of it is bad-request", async () => {
+    const r = await declaredRoom(withAsk());
+    const bob = await addMember(r, "@bob", "member");
+    const api = await httpClient(r, bob.keys);
+    const c = expectOk(await api.claim({ goal: "g", scope: ["src/**"] }));
+    const binding = (await bindingIn(r, "ask"))!;
+    let prepared: Parameters<typeof api.replay>[0] | undefined;
+    const first = (await api.act("ask", { act: c.id }, { text: "q" }, { binding, onPrepared: (p) => void (prepared = p) })) as DeclaredRecord;
+    await activate(r, policy());
+    const seq = await headSeq(r);
+    expect(await api.replay(prepared!)).toEqual(first);
+    expect((await thrown(api.act("ask", { act: c.id }, { text: "another" }, { binding }))).code).toBe("bad-request");
+    expect(await headSeq(r)).toBe(seq);
+  });
+
+  it("a bearer's named act repeated with its key after the room moved to declared acts gets its original record", async () => {
+    const r = await makeRoom();
+    const b = await bearer(r, "@agent", "agent", { kinds: ["claim"] } as never);
+    const api = await bearerClient(r, b);
+    const first = expectOk(await api.claim({ goal: "g", scope: ["src/**"] }, { idempotencyKey: "claim-1" }));
+    await activate(r, v2());
+    const seq = await headSeq(r);
+    expect(await api.claim({ goal: "g", scope: ["src/**"] }, { idempotencyKey: "claim-1" })).toEqual(first);
+    expect(await headSeq(r)).toBe(seq);
+  });
+});
