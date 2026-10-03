@@ -634,3 +634,19 @@ describe.skipIf(DECLARED)("bearer sessions across a change of document (R-IDEM-3
     expect(await inDO(d, (room) => room.core.sql.all("SELECT used FROM invitations WHERE id = ?", inv.id)[0]!["used"])).toBeNull();
   });
 });
+
+describe.skipIf(DECLARED)("a recover op is read only as text (R-DECL-21)", () => {
+  it("a list that holds an op's name is an invalid body for every signer, a checker included; the name itself is judged by the role table", async () => {
+    const r = await declaredRoom();
+    const ci = await addMember(r, "@ci", "checker");
+    const bob = await addMember(r, "@bob", "member");
+    const body = (op: unknown) => ({ op, goal: "g", scope: [".artroom/x"] });
+    const before = await inDO(r, (room) => room.core.headSeq());
+    // The role table of the legacy act an op stands for refuses a checker's `open`, unrecorded.
+    expectRefusal(await act(r, ci, "recover", null, body("open"), { binding: null }), "role-forbids");
+    // `["open"]` is not that op: it has no role table entry, and step 5 refuses the body, whoever signs.
+    for (const who of [ci, bob, r.admin]) expectRefusal(await act(r, who, "recover", null, body(["open"]), { binding: null }), "invalid-body");
+    expectRefusal(await act(r, ci, "recover", null, body("nope"), { binding: null }), "invalid-body");
+    expect(await inDO(r, (room) => room.core.headSeq())).toBe(before);
+  });
+});

@@ -155,7 +155,9 @@ export function judge(
   } else if (cls === "recover") {
     // R-DECL-21: exactly as a legacy configuration-recovery lane. A role that could not sign the legacy act an op
     // stands for is refused here, unrecorded; any other signer is judged admin-required at step 7, as it was.
-    const legacy = as ? "propose" : RECOVER_LEGACY[String((env.body as { op?: unknown } | null)?.op)];
+    // The op is read only as text: a list holding the name is not the name.
+    const op = (env.body as { op?: unknown } | null)?.op;
+    const legacy = as ? "propose" : typeof op === "string" ? RECOVER_LEGACY[op] : undefined; // G2:recover-op-text
     if (legacy !== undefined && !roleMaySign(member.role, legacy))
       return no("role-forbids", `The role ${member.role} may not sign recover.`, "Configuration recovery needs an active admin's own key."); // G2:recover-role
   }
