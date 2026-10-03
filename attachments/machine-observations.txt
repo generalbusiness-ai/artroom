@@ -1,5 +1,0 @@
-Apple M5 Max
-18
-v26.10.0
-19:01  up 4 days, 10:41, 7 users, load averages: 7.43 26.16 39.57
-19:09  up 4 days, 10:49, 7 users, load averages: 15.51 15.73 28.44
