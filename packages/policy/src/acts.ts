@@ -209,8 +209,9 @@ export function validatePolicyV2(doc: unknown, ctx: PolicyV2Context = {}): Polic
     const at = `acts.${kind}`;
     if (!KIND.test(kind)) p.add(at, "a kind must match [a-z][a-z0-9-]{0,31}"); // G:kind-grammar
     if (RESERVED_KINDS.includes(kind)) p.add(at, `${kind} is reserved by the platform`); // G:kind-reserved
-    // A kind is a key of the document and of every grant map, and the signed JSON profile has no key so named.
-    if (!safeName(kind)) p.add(at, `${kind} is a name the JSON profile reserves`); // G2:kind-profile
+    // A kind is a key of every grant map, which a rule input carries, and the evaluator's value profile (values.ts,
+    // `safeName`) admits no key so named. Of the kind grammar that is `constructor` and `prototype` only.
+    if (!safeName(kind)) p.add(at, `${kind} is a key name the evaluator's value profile reserves`); // G2:kind-profile
     const d = raw![kind];
     if (!isObj(d)) {
       p.add(at, "must be an object"); // G:decl-object
@@ -341,8 +342,9 @@ function declaration(p: Problems, kind: string, at: string, d: Obj): Act {
 function field(p: Problems, at: string, name: string, f: unknown, taken: ReadonlySet<string>, targets: readonly TargetShape[]): void {
   if (!FIELD.test(name)) p.add(at, "a field name must match [a-z][A-Za-z0-9]{0,31}"); // G:field-name
   if (taken.has(name)) p.add(at, `${name} is a field of this act's steps, or because`); // G:field-reserved
-  // A field is a key of the binding subject and of every rule input, and the signed JSON profile has no key so named.
-  if (!safeName(name)) p.add(at, `${name} is a name the JSON profile reserves`); // G2:field-profile
+  // A field is a key of the binding subject and of every rule input that carries the body, and the evaluator's value
+  // profile, under which both are made canonical, admits no key so named: `constructor` and `prototype` only.
+  if (!safeName(name)) p.add(at, `${name} is a key name the evaluator's value profile reserves`); // G2:field-profile
   if (!isObj(f)) return p.add(at, "must be an object"); // G:field-object
   const type = f["type"];
   if (!isString(type) || !Object.hasOwn(FIELD_KEYS, type)) return p.add(at, "type must be text, int, bool, enum, globs, member, act or segment"); // G:field-type

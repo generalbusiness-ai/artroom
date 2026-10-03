@@ -196,6 +196,21 @@ describe.skipIf(DECLARED)("reservation judges authority as for a new admission (
     expect(out.state).toBe("landed");
   });
 
+  it("a landing by the member's own key whose role the active declaration no longer lets sign land loses its authority, whatever the binding", async () => {
+    const { out, changed } = await flight(false, (a) => void (a["land"] = { ...a["land"]!, who: { roles: ["maintainer"] } }));
+    // `who` is not part of the binding (R-DECL-15): the meaning is the same, and the signer's current role decides.
+    expect(changed).toBe(false);
+    expect(out).toMatchObject({ state: "retryable", reason: "authority-lost" });
+    expect(out.fix).toContain("role-forbids");
+  });
+
+  it("a landing under a delegation whose grantor's role the active declaration no longer lets sign land loses its authority", async () => {
+    const { out, changed } = await flight(true, (a) => void (a["land"] = { ...a["land"]!, who: { roles: ["maintainer"] } }));
+    expect(changed).toBe(false);
+    expect(out).toMatchObject({ state: "retryable", reason: "authority-lost" });
+    expect(out.fix).toContain("delegation-invalid");
+  });
+
   async function recovery(r: TestRoom, approver: Client = r.admin) {
     const c = await ok<Claim>(r, r.admin, "recover", null, { op: "open", goal: "g", scope: [".artroom/**"] }, { binding: null });
     const head = pushChange(r, c.lane, { ".artroom/note.txt": "x" });

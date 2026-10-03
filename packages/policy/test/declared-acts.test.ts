@@ -316,11 +316,11 @@ describe("built-in data (R-DECL-1, section 33.7)", () => {
 
 describe("bounds added by stage 2 (request fd6f00b6; R-DECL-2, R-DECL-12, R-DECL-26)", () => {
   for (const name of ["constructor", "prototype"]) {
-    test(`G2:kind-profile refuses a kind named ${name}, which the JSON profile reserves as a key`, () => {
-      refused(edit(codeReview, (d) => (d.acts[name] = clone(d.acts["release"]!)))(), new RegExp(`^acts\\.${name}: ${name} is a name the JSON profile reserves`));
+    test(`G2:kind-profile refuses a kind named ${name}, a key name the evaluator's value profile reserves`, () => {
+      refused(edit(codeReview, (d) => (d.acts[name] = clone(d.acts["release"]!)))(), new RegExp(`^acts\\.${name}: ${name} is a key name the evaluator's value profile reserves`));
     });
     test(`G2:field-profile refuses a body field named ${name}`, () => {
-      refused(edit(codeReview, (d) => (at(d, "propose")["body"][name] = { type: "bool", optional: true }))(), new RegExp(`body\\.${name}: ${name} is a name the JSON profile reserves`));
+      refused(edit(codeReview, (d) => (at(d, "propose")["body"][name] = { type: "bool", optional: true }))(), new RegExp(`body\\.${name}: ${name} is a key name the evaluator's value profile reserves`));
     });
   }
 

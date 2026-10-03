@@ -3580,8 +3580,12 @@ Section 33.6 states that criterion.
   `land-outcome`, `revert-lane`, `notified`, `checkpoint`, `prepared`,
   `reservation-ended`).
 - No document may declare a kind named `constructor` or `prototype`. The
-  signed JSON profile has no key of either name, and a kind is a key of
-  the document and of every grant map.
+  evaluator's value profile admits no object key of either name
+  (`reserved_key`; R-EVAL-3 keeps such names out of keys for the same
+  reason). A kind is a key of every grant map, and a `delegate` op's body
+  is part of a rule input. These are the only two names of the kind
+  grammar that the profile reserves; every other name, `valueof` or
+  `tostring` included, may be declared.
 
 **R-DECL-3. A declaration is data.** A declaration names the act's label,
 its targets and the steps each runs, the thread kinds it may act on, its
@@ -3752,9 +3756,13 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
 - A declaration's `body` names the application's own fields, beyond those
   its steps require. A field name matches `[a-z][A-Za-z0-9]{0,31}`, and is
   not `because` or any field a step of the same act requires (R-DECL-5).
-  It is not `constructor` or `prototype` either: a field is a key of the
-  binding's subject and of every rule input, and the signed JSON profile
-  has no key of either name.
+  It is not `constructor` or `prototype` either. A field is a key of the
+  binding's subject (R-DECL-15) and of every rule input that carries the
+  act's body, and the evaluator's value profile, under which both are
+  made canonical, admits no object key of either name. These are the only
+  two names of the field grammar that the profile reserves: a field may
+  be named `toString` or `valueOf`, and is then read only as the body's
+  own property.
 - Field types are a closed set (`DeclaredField`): `text` (with `max`, 1 to
   16,384 bytes), `int` (with safe-integer `min` and `max`, `min` at most
   `max`), `bool`, `enum` (1 to 64 distinct values, each matching
