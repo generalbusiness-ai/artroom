@@ -1,0 +1,149 @@
+{
+  "head": "20fdd82e1598fbab970a3d8e8af2dcfa8b7598ea",
+  "steps": [
+    {
+      "step": "ci",
+      "exit": 0,
+      "elapsedSeconds": 5.06,
+      "userCpuSeconds": 3.85,
+      "systemCpuSeconds": 7.33,
+      "loadAtStart": 7.43
+    },
+    {
+      "step": "typecheck",
+      "exit": 0,
+      "elapsedSeconds": 7.12,
+      "userCpuSeconds": 12.45,
+      "systemCpuSeconds": 2.19,
+      "loadAtStart": 7.8
+    },
+    {
+      "step": "checkers",
+      "exit": 0,
+      "elapsedSeconds": 39.49,
+      "userCpuSeconds": 24.13,
+      "systemCpuSeconds": 12.41,
+      "loadAtStart": 7.97
+    },
+    {
+      "step": "cli",
+      "exit": 0,
+      "elapsedSeconds": 8.72,
+      "userCpuSeconds": 11.87,
+      "systemCpuSeconds": 7.1,
+      "loadAtStart": 14.87
+    },
+    {
+      "step": "client-node",
+      "exit": 0,
+      "elapsedSeconds": 6.65,
+      "userCpuSeconds": 3.72,
+      "systemCpuSeconds": 0.84,
+      "loadAtStart": 19.04
+    },
+    {
+      "step": "client-workerd",
+      "exit": 0,
+      "elapsedSeconds": 1.09,
+      "userCpuSeconds": 1.1,
+      "systemCpuSeconds": 0.19,
+      "loadAtStart": 18.72
+    },
+    {
+      "step": "git",
+      "exit": 0,
+      "elapsedSeconds": 84.1,
+      "userCpuSeconds": 31.67,
+      "systemCpuSeconds": 34.86,
+      "loadAtStart": 17.62
+    },
+    {
+      "step": "log-node",
+      "exit": 0,
+      "elapsedSeconds": 36.36,
+      "userCpuSeconds": 146.63,
+      "systemCpuSeconds": 11.24,
+      "loadAtStart": 16.42
+    },
+    {
+      "step": "log-workerd",
+      "exit": 0,
+      "elapsedSeconds": 202.34,
+      "userCpuSeconds": 351.4,
+      "systemCpuSeconds": 2.25,
+      "loadAtStart": 14.96
+    },
+    {
+      "step": "mcp-node",
+      "exit": 0,
+      "elapsedSeconds": 1.16,
+      "userCpuSeconds": 2.62,
+      "systemCpuSeconds": 0.45,
+      "loadAtStart": 6.92
+    },
+    {
+      "step": "mcp-workerd",
+      "exit": 0,
+      "elapsedSeconds": 1.45,
+      "userCpuSeconds": 1.92,
+      "systemCpuSeconds": 0.26,
+      "loadAtStart": 6.92
+    },
+    {
+      "step": "policy-node",
+      "exit": 0,
+      "elapsedSeconds": 1.01,
+      "userCpuSeconds": 3.92,
+      "systemCpuSeconds": 0.93,
+      "loadAtStart": 6.61
+    },
+    {
+      "step": "policy-workerd",
+      "exit": 0,
+      "elapsedSeconds": 2.38,
+      "userCpuSeconds": 4.91,
+      "systemCpuSeconds": 0.71,
+      "loadAtStart": 6.61
+    },
+    {
+      "step": "room-node",
+      "exit": 0,
+      "elapsedSeconds": 1.98,
+      "userCpuSeconds": 7.67,
+      "systemCpuSeconds": 1.66,
+      "loadAtStart": 6.61
+    },
+    {
+      "step": "room-workerd",
+      "exit": 0,
+      "elapsedSeconds": 28.17,
+      "userCpuSeconds": 126.64,
+      "systemCpuSeconds": 19.95,
+      "loadAtStart": 8.08
+    },
+    {
+      "step": "room-declared",
+      "exit": 0,
+      "elapsedSeconds": 33.35,
+      "userCpuSeconds": 133.65,
+      "systemCpuSeconds": 18.59,
+      "loadAtStart": 11.92
+    },
+    {
+      "step": "ui",
+      "exit": 0,
+      "elapsedSeconds": 3.85,
+      "userCpuSeconds": 16.33,
+      "systemCpuSeconds": 3.31,
+      "loadAtStart": 15.73
+    }
+  ],
+  "summedElapsedSeconds": 464.28,
+  "summedCpuSeconds": 1008.75,
+  "logElapsedSeconds": 238.7,
+  "logCpuSeconds": 511.52,
+  "currentMcpSourceNotIncluded": true,
+  "heavyFixtureSha256": "2604d3286b536ff152d0dd190b8c1b2e2da478966302efea1b61de2835f01e4d",
+  "referenceSha256": "94e553fa02618d9e10a2aff60c5c184cad14fda310a7826af34555139e419718",
+  "scope": "Recorded full17-step baseline at stated source composition; no semantic completeness, source correctness or10x claim. CPU is not aggregate worker elapsed."
+}
