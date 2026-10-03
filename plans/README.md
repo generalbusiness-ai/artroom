@@ -601,7 +601,7 @@ Lane C's sites keep their own mints: the publisher client's `withToken` (integra
 
 ## Request d29c09fa: safe error metadata at durable sinks
 
-Status: DONE, pending checker review. Gitseq request `d29c09fa`, branch `request/land-errors`, cut from main `574568b2`. Revised for review `f80d6692` (changes requested: legacy rows): see [Review f80d6692](#review-f80d6692). The head for review is the commit that carries this section.
+Status: DONE, pending checker review. Gitseq request `d29c09fa`, branch `request/land-errors`, cut from main `574568b2`. Revised for review `f80d6692` (changes requested: legacy rows) and the checker's founding control on `18d69cda`: see [Review f80d6692](#review-f80d6692). The head for review is the commit that carries this section.
 
 **The rule** (review `0ab6dac3`, lane A's standard). A durable or projected error field keeps lane A's `errorNote(stage, error)` and nothing more: a fixed stage phrase, the error's name if it is in a fixed list, an Artifacts code if `artifacts.ts` classifies it, and an integer numeric code or HTTP status. It never keeps the provider's message, even redacted: no token format in the contract lets a pattern find every credential. Operator logs are different. The Room's `diagnose` (`src/diag.ts`, request `d268d249`) logs the error's name and its redacted, bounded message; that is unchanged.
 
@@ -663,7 +663,7 @@ Each test makes the provider throw (or answer) with a message echoing an `art_v1
 | `packages/git/test/workspaces.test.ts` (3 new) | provisioning that keeps failing (the view, `artroom_ws`, the steps), a refused step (`answered`), failed cleanup (`defer`) | every row, `view`, `duties`, the returned view |
 | `packages/git/test/snapshots.test.ts` (2 new) | a failed create, then its check; failed retirement (revoke and delete) | every row, `duties` |
 | `packages/room/test/workerd/safe-errors-d29c09fa.test.ts` (new, 5) | the production Room: integration through `ContainerPublisher` then readiness; an answered push with main not read back, then an unanswered push; a publication failing with a credential as its code, with no code, and with a known Artifacts code | every row of every table, the `log`, `attention`, `lanes` and `op` reads, `PublicationStatus`, the operator diagnoses, the caller's error |
-| Review `f80d6692` (Node 7 more in the three files above; Room 2 more) | stored rows with old text, reopened; terminal rows; batches; see [Review f80d6692](#review-f80d6692) | every row, the projections before the upgrade, and after it |
+| Review `f80d6692` and the checker's founding control (Node 7 more in the three files above; Room 4 more, and 2 in `founding-gaps.test.ts`) | stored rows with old text, reopened; terminal rows; batches; see [Review f80d6692](#review-f80d6692) | every row, the projections before the upgrade, and after it |
 | `packages/room/test/workerd/request-d268d249.test.ts` (1 changed) | the lost mint, the unreadable inventory, the failed revocation of job tokens | `job_tokens`, every row of every table, `jobTokenDuties()` |
 
 ### Mutation table
@@ -746,6 +746,31 @@ Report `f80d6692` on `f81a102d` (changes requested) found one P2. New writes wer
 | S16 | a job token's status checked only in parts, never whole | Room: reopen (a safe `outcome unknown; N live token(s)` observation) |
 
 24 mutants, all red, each applied alone by `/private/tmp/claude-501/landerr/mutants/run2.py` at `e5a2efb3` (logs beside it). S15 and S16 were green there. The commit after it adds the write count and the safe observation, and both are red at `a1176a89`.
+
+#### The founding path (checker's control on `18d69cda`)
+
+The checker's control showed a cursor that was never drained. A public founding failed its revocation, and its alarm then settled all the remote debt without sealing the genesis. A version-1 room with a done workspace step holding old text was then reopened. Migration 2 stored the cursor, but an unfounded room's `recover` and `schedule` used only `foundingDue` (null by then), and its alarm ran only `settleFounding`.
+
+**Change.** On the founding path, `recover` and `schedule` now use `RoomCore.unfoundedDue()`: the earlier of the founding debt and the upgrade, which is due at once while its cursor is stored (`scrubDue`). The alarm's work there is `workUnfounded()`: the upgrade's next batch, then the founding cleanup. A failure of one does not stop the other. A founded room already had the upgrade in `nextAlarm` and in `runAll` (the `errors` step). That step is not a loop kind, so it also runs while the canonical repository is gone, and when other steps fail. There is no other alarm path: a room's alarm runs either the founded composition or the founding one, and the registry stores no error fields.
+
+| Control | What it shows |
+|---|---|
+| `founding-gaps.test.ts`: the checker's control | As the checker ran it, with its file also run as it was (`/private/tmp/claude-501/landerr/checker-founding-control.log`, passed). After the founding debt is settled, a reopened version-1 room with old text in a done workspace step stores an alarm, and alarms alone drain the cursor and rewrite the text. The room stays unfounded |
+| `founding-gaps.test.ts`: founding debt still owed | The same with every workspace step holding old text while the revocation is still owed: the same alarms drain the upgrade and settle the founding debt |
+| `safe-errors-d29c09fa.test.ts`: a founded room; the canonical repository gone | Old text in a done workspace step, a done snapshot step and a job token, reopened at version 1: recovery stores an alarm, and alarms alone drain the cursor and rewrite all three, also while `canonical_gone` is set |
+
+| Mutant | Mutation | Red tests |
+|---|---|---|
+| F1 | an unfounded alarm running only `settleFounding` (the reviewed code) | both founding controls |
+| F2 | an unfounded `schedule` using only `foundingDue` | both founding controls |
+| F3 | an unfounded `recover` using only `foundingDue` | the checker's control |
+| F4 | `unfoundedDue` leaving out the upgrade | both founding controls |
+| F5 | `workUnfounded` not running the batch | both founding controls |
+| F6 | `scrubDue` always null | both founding controls; the Room reopen control |
+| F7 | `nextAlarm` leaving out the upgrade | the Room reopen control |
+| F8 | the `errors` step doing nothing | a founded room; canonical repository gone |
+
+8 mutants, all red, each applied alone by `/private/tmp/claude-501/landerr/mutants/run3.py` at `db6247c8`.
 
 ### Gates
 
