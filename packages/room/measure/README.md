@@ -10,7 +10,7 @@ Where each part stands:
 - **Part 2 is built.** That is the gate, its use in the smoke run, the
   scheduled check, and the part 1 driver. Review 28615b74's code findings
   are fixed.
-- **Part 1 is measured.** The acts are in
+- **Part 1 is measured, on the code before mint lanes B and C.** The acts are in
   [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md).
   That includes the four isolated measurements that review 28615b74 asked
   for: a check, an idle alarm tick, an alarm tick with a pending pin, and
@@ -294,6 +294,30 @@ figures, the run files and the evidence are in
 [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md),
 "Isolated measurements".
 
+**Which code these figures are for.** They were measured on Room code
+`e50e062a`: main `25a7b837` plus this lane. Since then this branch has
+merged main `574568b2` (mint lane B), `df22d771` (safe error metadata) and
+`965c911a` (mint lane C).
+
+Mint lanes B and C route pinning, previews, landing pushes and log
+publication through the canonical mint ledger, which writes ledger rows
+for each token it mints. So these figures may be higher on the merged code
+and are not yet re-measured:
+- the pin tick;
+- the propose;
+- the landings;
+- publication;
+- policy activation;
+- the smoke total behind `SMOKE_BUDGET`.
+
+Two paths are outside those changes:
+- **The idle tick.** Lane B's own test shows an idle mints step writes
+  nothing.
+- **The manual check's admission.** It sends no job and mints no token.
+
+Their rows read may still differ. Re-measure all of them on a deploy of
+this head, and ground the ceilings again then.
+
 How to read the table:
 - **Raw or adjusted.** "Raw window" is the room's total in the act's
   window. "Less the baseline" subtracts the room's mean per sample in the
@@ -464,6 +488,9 @@ Hugh approved this as a spike-only switch (assert 66a41558).
 
 ## What remains
 
+- **Re-measure on a deploy of this head.** The landing, publication, pin
+  and smoke figures predate mint lanes B and C (see "Isolated
+  measurements"). Then ground `SMOKE_BUDGET` and `HOURLY_BUDGET` again.
 - **Measure the lane C publication-token cost** when lanes B and C are
   deployed. After mint lane C lands (checker's review b84aead9), a failing
   log publication mints 11 canonical tokens each time it retries. Each mint

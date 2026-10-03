@@ -1130,3 +1130,15 @@ by hand.
 lands, a failing publication mints 11 canonical tokens on each retry, at 4
 ledger records each: about 44 rows per retry, or about 528 rows an hour at
 12 retries an hour. Measure it when lanes B and C are deployed.
+
+**Later merges (no deploy).** This lane has since merged main `574568b2`
+(mint lane B), `df22d771` and `965c911a` (mint lane C). The spike still
+runs Room `59636ae9`, built from `e50e062a`.
+
+Mint lanes B and C send pinning, previews, landing pushes and log
+publication through the canonical mint ledger. So the measured pin,
+propose, landing, publication, policy-activation and smoke figures need
+measuring again on a deploy of the merged head, with the ceilings grounded
+again.
+
+The idle tick and the manual check's admission are outside those paths.
