@@ -1,0 +1,24 @@
+ci	0	12.23	10.91	13.55	16.61
+typecheck	0	6.55	12.10	2.13	17.72
+checkers	0	36.53	22.81	10.95	16.94
+cli	0	8.78	14.15	7.65	12.69
+client-node	0	6.69	3.68	0.85	16.61
+client-workerd	0	1.04	1.06	0.17	16.24
+git	0	72.28	27.47	28.98	18.30
+log-node	0	32.01	127.58	9.61	11.82
+log-workerd	0	194.19	326.15	1.96	11.54
+mcp-node	0	2.50	3.42	0.62	5.74
+mcp-workerd	0	1.39	1.87	0.25	5.44
+policy-node	0	1.01	3.83	0.91	5.44
+policy-workerd	0	2.37	4.93	0.74	5.44
+room-node	0	1.73	6.78	1.60	5.65
+room-workerd	0	15.59	77.54	13.34	5.65
+room-declared	0	13.93	69.71	10.57	7.32
+ui	0	1.57	9.17	3.08	8.64
+a1990c9433f9d8e403d58657bdf88c2e36c58b42
+0
+Apple M5 Max
+18
+v26.10.0
+19:11  up 4 days, 10:50, 7 users, load averages: 16.61 15.69 26.99
+19:18  up 4 days, 10:57, 7 users, load averages: 8.64 10.37 20.13
