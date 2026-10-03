@@ -1076,3 +1076,23 @@ test("F26 (checker C3) the sweep asks again before each revocation: a pin token 
   await token.release();
   assert.equal(live, true, "the sweep never revokes a token held by pinning");
 });
+
+test("F27 a failed handoff writes the known ID before the revocation at once: a host that stops while that revocation is out leaves the record owed with its ID, and the next host revokes it", async () => {
+  const r = room();
+  const f = r.fork("f-a");
+  r.sql.all("CREATE TRIGGER no_held BEFORE UPDATE ON artroom_fork_mint WHEN NEW.state = 'held' BEGIN SELECT RAISE(ABORT, 'storage failure'); END");
+  f.holdRevokes = true;
+  void r.ledger.mint("f-a", "pin-objects:h1", TTL).catch(() => undefined);
+  await until(() => f.heldRevokes.length === 1, "the revocation at once is out");
+  const id = f.tokens[0]!.id;
+  assert.equal(only(r.sql)["state"], "owed");
+  assert.equal(only(r.sql)["token"], id);
+  // The host stops with that revocation unanswered; a fresh host on the same storage.
+  r.sql.all("DROP TRIGGER no_held");
+  f.holdRevokes = false;
+  r.start();
+  assert.equal(only(r.sql)["state"], "owed");
+  await alarm(r);
+  assert.equal(f.live(id), false);
+  assert.equal(rows(r.sql).length, 0);
+});
