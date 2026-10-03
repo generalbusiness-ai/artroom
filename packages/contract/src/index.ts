@@ -4,7 +4,8 @@
  * Artroom's shared contract: identifiers, the signed envelope, the seven acts
  * and their records, lanes and leases, obligations and evidence, landing
  * operations, the roster, the log format, policy, checkers and the
- * per-transport surfaces. Types only, plus type guards.
+ * per-transport surfaces, and declared acts (R-DECL). Types only, plus type
+ * guards and one frozen datum: the legacy vocabulary and its digest.
  *
  * The normative rules are in docs/protocol.md. Policy authoring helpers are
  * exported from `@generalbusiness/artroom-contract/policy`.
@@ -21,6 +22,7 @@ export type * from "./landing.ts";
 export type * from "./log.ts";
 export type * from "./pagination.ts";
 export type * from "./checker.ts";
+export type * from "./declarations.ts";
 export type {
   BudgetState,
   CarryFactsRecord,
@@ -108,3 +110,4 @@ export {
   isSha,
   isTerminal,
 } from "./guards.ts";
+export { ARTROOM_LEGACY_V1, ARTROOM_LEGACY_V1_DIGEST, type LegacyVocabulary } from "./legacy.ts";

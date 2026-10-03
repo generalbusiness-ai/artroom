@@ -81,6 +81,21 @@ export { activate, type Activation, type ActivationResult, type OpenProposal } f
 export { explain, type ExplainData } from "./explain.ts";
 export { isPrincipal, validateCheckerConfig, validatePolicy, type Validation } from "./validate.ts";
 export {
+  DECLARATION_BOUNDS,
+  PLATFORM_KINDS,
+  REFUSAL_SLOTS,
+  RESERVED_KINDS,
+  STEP_FIELDS,
+  STEPS_FOR_TARGET,
+  STEPS_VERSIONS,
+  validateCheckerConfigV2,
+  validatePolicyV2,
+  type PolicyV2Context,
+  type PolicyV2Validation,
+} from "./acts.ts";
+export { TARGET_ORDER, bindingOf, bindingSubject, bindingsOf } from "./binding.ts";
+export { CODE_REVIEW_ACTS } from "./codereview.ts";
+export {
   OBJECTION_OPEN,
   carry,
   defaultPolicy,

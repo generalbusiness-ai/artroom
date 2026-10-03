@@ -17,15 +17,16 @@ const KINDS = new Set(["claim", "propose", "note", "review", "check", "land", "r
 /** Rule IDs the platform uses for its own obligations and refusals. */
 const RESERVED_IDS = new Set(["admin-approval"]);
 
-type Obj = Record<string, unknown>;
-const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
-const isText = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
+export type Obj = Record<string, unknown>;
+export const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
+export const isText = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
 
 export function isPrincipal(v: unknown): boolean {
   return typeof v === "string" && (MEMBER.test(v) || (v.startsWith("role:") && ROLES.has(v.slice(5))));
 }
 
-class Problems {
+/** A list of validation problems, each `where: what`. Shared with the acts validator (acts.ts). */
+export class Problems {
   readonly list: string[] = [];
   add(where: string, what: string) {
     this.list.push(`${where}: ${what}`);
@@ -56,7 +57,7 @@ class Problems {
   }
 }
 
-function rule(p: Problems, r: unknown, i: number, seen: Set<string>) {
+function rule(p: Problems, r: unknown, i: number, seen: Set<string>, isKind: (k: unknown) => boolean) {
   const at = `rules[${i}]`;
   if (!isObj(r)) return p.add(at, "must be an object");
   if (typeof r["id"] !== "string" || !RULE_ID.test(r["id"])) p.add(at, "id must match [a-z][a-z0-9-]{0,63}");
@@ -68,7 +69,7 @@ function rule(p: Problems, r: unknown, i: number, seen: Set<string>) {
   switch (r["kind"]) {
     case "refuse":
       p.keys(at, r, [...base, "on", "refuse", "reason", "fix"]);
-      p.list_of(`${at}.on`, r["on"], (k) => typeof k === "string" && KINDS.has(k), "an act kind");
+      p.list_of(`${at}.on`, r["on"], isKind, "an act kind");
       p.expr(`${at}.refuse`, r["refuse"]);
       if (!isText(r["reason"])) p.add(at, "reason must be a sentence");
       if (!isText(r["fix"])) p.add(at, "fix must be a sentence");
@@ -107,7 +108,7 @@ function rule(p: Problems, r: unknown, i: number, seen: Set<string>) {
       break;
     case "notify":
       p.keys(at, r, [...base, "on", "when", "to", "why"]);
-      p.list_of(`${at}.on`, r["on"], (k) => typeof k === "string" && KINDS.has(k), "an act kind");
+      p.list_of(`${at}.on`, r["on"], isKind, "an act kind");
       if (r["when"] !== undefined) p.expr(`${at}.when`, r["when"]);
       p.list_of(`${at}.to`, r["to"], (v) => v === "owners" || v === "holder" || v === "reviewers" || isPrincipal(v), "a notify target");
       if (!isText(r["why"])) p.add(at, "why must be a sentence");
@@ -121,7 +122,7 @@ export type Validation<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly problems: readonly string[]; readonly refusal: Refusal };
 
-function result<T>(p: Problems, value: unknown, what: string): Validation<T> {
+export function result<T>(p: Problems, value: unknown, what: string): Validation<T> {
   if (!p.list.length) return { ok: true, value: value as T };
   return {
     ok: false,
@@ -145,6 +146,16 @@ export function validatePolicy(doc: unknown): Validation<PolicyDocument> {
   p.keys("policy", doc, ["format", "profile", "owners", "carry", "lanes", "retiredEvidence", "rules"]);
   if (doc["format"] !== "artroom-policy-v1") p.add("format", "must be artroom-policy-v1");
   if (doc["profile"] !== "artroom-jsonata-v1") p.add("profile", "must be artroom-jsonata-v1");
+  documentFields(p, doc, (k) => typeof k === "string" && KINDS.has(k));
+  return result(p, doc, "policy");
+}
+
+/**
+ * The fields `v1` and `v2` documents share: owners, carry, lanes,
+ * retiredEvidence and rules. `isKind` decides which names a rule's `on` may
+ * use: the fixed list for `v1`, declared and platform kinds for `v2`.
+ */
+export function documentFields(p: Problems, doc: Obj, isKind: (k: unknown) => boolean): void {
   const owners = doc["owners"];
   if (!isObj(owners)) p.add("owners", "must be an object");
   else
@@ -175,9 +186,8 @@ export function validatePolicy(doc: unknown): Validation<PolicyDocument> {
   if (!Array.isArray(rules)) p.add("rules", "must be an array");
   else {
     const seen = new Set<string>();
-    rules.forEach((r, i) => rule(p, r, i, seen));
+    rules.forEach((r, i) => rule(p, r, i, seen, isKind));
   }
-  return result(p, doc, "policy");
 }
 
 /** Check a candidate `.artroom/checkers/<name>.json` (R-CARRY-7). */
@@ -189,6 +199,12 @@ export function validateCheckerConfig(config: unknown): Validation<CheckerConfig
   }
   p.keys("checker", config, ["format", "inputs", "volatile", "timeoutSeconds", "advisory", "runner"]);
   if (config["format"] !== "artroom-checker-v1") p.add("format", "must be artroom-checker-v1");
+  checkerFields(p, config);
+  return result(p, config, "checker configuration");
+}
+
+/** The fields `artroom-checker-v1` and `artroom-checker-v2` share. */
+export function checkerFields(p: Problems, config: Obj): void {
   if (config["inputs"] !== undefined) p.globs("inputs", config["inputs"], true);
   if (typeof config["volatile"] !== "boolean") p.add("volatile", "must be true or false");
   const t = config["timeoutSeconds"];
@@ -198,5 +214,4 @@ export function validateCheckerConfig(config: unknown): Validation<CheckerConfig
   if (config["runner"] !== undefined && (typeof config["runner"] !== "string" || !/^sha256:[0-9a-f]{64}$/.test(config["runner"]))) {
     p.add("runner", "must be a sha256: digest of 64 lowercase hex characters");
   }
-  return result(p, config, "checker configuration");
 }
