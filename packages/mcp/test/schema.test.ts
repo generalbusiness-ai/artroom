@@ -6,7 +6,7 @@
 
 import { describe, expect, expectTypeOf, test } from "vitest";
 import type { McpInput, McpToolName } from "@generalbusiness/artroom-contract";
-import { listedTools, TOOL_LIST, TOOLS, validate, type Tools } from "../src/index.ts";
+import { listedTools, NAMED_TOOLS, TOOL_LIST, TOOLS, validate, type Tools } from "../src/index.ts";
 
 /** Every property name of an input type, across the members of a union. */
 type InputKeys<T> = T extends unknown ? keyof T : never;
@@ -30,13 +30,17 @@ describe("the ten tools (R-API-9)", () => {
   });
 
   test("exactly the contract's ten names, each calling the method of the same name", () => {
-    expect(TOOL_LIST.map((t) => t.name).sort()).toEqual([...CONTRACT_TOOLS].sort());
+    // Declared acts stage 5 adds `acts` and `act` beside the ten (below), and the MCP core adds more reads: each of the
+    // ten named tools is still here, once, and every listed tool is a contract tool (`keyof Tools`, above).
+    const names = TOOL_LIST.map((t) => t.name);
+    for (const name of CONTRACT_TOOLS) expect(names.filter((n) => n === name)).toEqual([name]);
+    expect(new Set(names).size).toBe(names.length);
     for (const t of TOOL_LIST) expect(t.method).toBe(t.name);
     expect(listedTools().map((t) => Object.keys(t).sort())).toEqual(TOOL_LIST.map(() => ["description", "inputSchema", "name", "outputSchema"]));
   });
 
   test("required fields are the contract's required fields", () => {
-    const required = Object.fromEntries(TOOL_LIST.map((t) => [t.name, [...(t.inputSchema.required ?? [])].sort()]));
+    const required = Object.fromEntries(TOOL_LIST.filter((t) => (CONTRACT_TOOLS as readonly string[]).includes(t.name)).map((t) => [t.name, [...(t.inputSchema.required ?? [])].sort()]));
     expect(required).toEqual({
       claim: ["scope"], // the one field both claim forms require
       workspace: ["lane", "lease"],
@@ -106,5 +110,47 @@ describe("input validation", () => {
     ["explain", { act: "op_land_1" }, /does not match/],
   ] as const)("refuses a bad %s input", (name, input, problem) => {
     expect(validate(TOOLS[name].inputSchema, input).join("; ")).toMatch(problem);
+  });
+});
+
+describe("the two generic tools, beside the ten (R-API-9 as amended; declared acts stage 5)", () => {
+  test("input schema properties equal the contract's input keys (checked by the compiler)", () => {
+    expectTypeOf<SchemaKeys<"acts">>().toEqualTypeOf<InputKeys<McpInput<"acts">>>();
+    expectTypeOf<SchemaKeys<"act">>().toEqualTypeOf<InputKeys<McpInput<"act">>>();
+  });
+
+  test("acts and act are listed, each calling the method of the same name; the ten named tools are NAMED_TOOLS", () => {
+    const names = TOOL_LIST.map((t) => t.name);
+    expect(names).toContain("acts");
+    expect(names).toContain("act");
+    expect(TOOLS.acts.method).toBe("acts");
+    expect(TOOLS.act.method).toBe("act");
+    expect([...NAMED_TOOLS].sort()).toEqual([...CONTRACT_TOOLS].sort());
+  });
+
+  test("act requires kind, target, body, binding and idempotencyKey, and nothing else is allowed", () => {
+    expect([...TOOLS.act.inputSchema.required].sort()).toEqual(["binding", "body", "idempotencyKey", "kind", "target"]);
+    expect(TOOLS.act.inputSchema.additionalProperties).toBe(false);
+    const ok = { kind: "take-part", target: null, body: { part: "bass" }, binding: `sha256:${"a".repeat(64)}`, idempotencyKey: "k1" };
+    expect(validate(TOOLS.act.inputSchema, ok)).toEqual([]);
+    for (const drop of ["kind", "target", "body", "binding", "idempotencyKey"] as const) {
+      const { [drop]: _gone, ...rest } = ok;
+      void _gone;
+      expect(validate(TOOLS.act.inputSchema, rest).join(" "), drop).toContain(`input.${drop}: is required`);
+    }
+    expect(validate(TOOLS.act.inputSchema, { ...ok, binding: "sha256:short" }).join(" ")).toContain("input.binding");
+    expect(validate(TOOLS.act.inputSchema, { ...ok, kind: "Take" }).join(" ")).toContain("input.kind");
+    expect(validate(TOOLS.act.inputSchema, { ...ok, target: "lane" }).length).toBeGreaterThan(0);
+    expect(validate(TOOLS.act.inputSchema, { ...ok, target: { lane: "act_1_00000000" } })).toEqual([]);
+    expect(validate(TOOLS.act.inputSchema, { ...ok, delegation: "act_1_00000000" }).join(" ")).toContain("input.delegation: is not allowed");
+  });
+
+  test("acts takes an optional seq or policy version, and nothing else", () => {
+    expect(TOOLS.acts.inputSchema.additionalProperties).toBe(false);
+    expect(validate(TOOLS.acts.inputSchema, {})).toEqual([]);
+    expect(validate(TOOLS.acts.inputSchema, { at: 12 })).toEqual([]);
+    expect(validate(TOOLS.acts.inputSchema, { policy: "act_3_0a1b2c3d" })).toEqual([]);
+    expect(validate(TOOLS.acts.inputSchema, { at: -1 }).length).toBeGreaterThan(0);
+    expect(validate(TOOLS.acts.inputSchema, { policy: "latest" }).length).toBeGreaterThan(0);
   });
 });

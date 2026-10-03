@@ -12,6 +12,7 @@ import {
   isArtroomError,
   isRefusal,
   type ArtroomError,
+  type Catalogue,
   type Held,
   type LandOp,
   type Landing,
@@ -19,6 +20,7 @@ import {
   type McpInput,
   type McpOutput,
   type McpToolName,
+  type RecordMeaning,
   type RoomApi,
 } from "@generalbusiness/artroom-contract";
 import { TOOLS } from "./tools.ts";
@@ -144,6 +146,18 @@ const RUN: { readonly [T in McpToolName]: Runner<T> } = {
     // MCP structured content must be an object, so an unknown act is `ExplainNotFound`, never null (R-API-9).
     return (await room.explain(input.act)) ?? { act: input.act, outcome: "not-found" as const };
   },
+
+  async acts(room, input) {
+    if (input.at !== undefined && input.policy !== undefined) throw error("bad-request", "Give at or policy, not both.");
+    if (input.at === undefined && input.policy === undefined) return room.acts();
+    // MCP structured content must be an object, so a version the room does not retain is `ActsNotFound`.
+    return (await room.actsAt(input.at !== undefined ? { seq: input.at } : { policy: input.policy! })) ?? { outcome: "not-found" as const }; // G5:acts-not-found
+  },
+
+  async act(room, input) {
+    // The caller's kind, target, body and binding, unchanged: the tool never reads a binding for the agent (R-DECL-16).
+    return room.act(input.kind, input.target, input.body, { binding: input.binding, idempotencyKey: input.idempotencyKey }); // G5:act-binding
+  },
 };
 
 function refusalOf(rule: string, reason: string, fix: string) {
@@ -152,11 +166,31 @@ function refusalOf(rule: string, reason: string, fix: string) {
 
 /** The first line of a result's text: what happened, for an agent that reads only text. */
 function headline(name: McpToolName, out: unknown): string {
-  if (isRefusal(out)) return `Refused (${out.rule}): ${out.reason}${out.fix ? ` Fix: ${out.fix}` : ""}`;
+  if (isRefusal(out)) {
+    // A stale binding: say what the active meaning is, so the agent reads it before it decides to act again (R-DECL-16).
+    const now =
+      out.rule === "binding-stale" && out.current?.binding !== undefined
+        ? ` The active binding is ${out.current.binding}, in policy version ${String(out.current.policy)}. Nothing was done. Call acts and read the declaration before you act again.` // G5:headline-stale
+        : "";
+    return `Refused (${out.rule}): ${out.reason}${out.fix ? ` Fix: ${out.fix}` : ""}${now}`;
+  }
   if (out === null) return "Nothing found.";
-  if ((out as { outcome?: unknown }).outcome === "not-found") return `The room has no act ${String((out as { act: unknown }).act)}. Check the ID.`;
+  if ((out as { outcome?: unknown }).outcome === "not-found")
+    return name === "acts" ? "The room retains no such policy version." : `The room has no act ${String((out as { act: unknown }).act)}. Check the ID.`;
   const o = out as Record<string, unknown>;
   switch (name) {
+    case "acts": {
+      const c = o as unknown as Catalogue;
+      if (c.vocabulary !== "declared") return `Policy version ${c.policy} is the legacy vocabulary: use the named tools.`;
+      const kinds = Object.entries(c.acts).map(([k, a]) => `${k} (${a.declaration.label}${a.retired !== undefined ? `, retired at seq ${a.retired}` : ""})`);
+      return `Policy version ${c.policy} declares ${kinds.length} acts: ${kinds.join(", ")}.`;
+    }
+    case "explain": {
+      const m = (o as { meaning?: RecordMeaning }).meaning;
+      // The label in force at the record's own seq, and where the kind was retired (R-DECL-23).
+      const what = m === undefined ? String(o["kind"]) : `${m.label} (${m.kind})${"retired" in m && m.retired !== undefined ? `, retired at seq ${m.retired}` : ""}`; // G5:headline-meaning
+      return `${String(o["act"])}: ${what}, ${String(o["outcome"])}.`;
+    }
     case "claim":
       return `Claimed lane ${String(o["lane"])} with lease ${String((o["lease"] as { generation: number }).generation)}.`;
     case "workspace":
@@ -188,7 +222,7 @@ export function errorResult(e: ArtroomError): ToolResult {
 }
 
 /** Validates the input, runs the tool, and shapes the result. Never throws. */
-/** True only for the ten tools' own names: never `constructor`, `__proto__` or another inherited name. */
+/** True only for the tools' own names: never `constructor`, `__proto__` or another inherited name. */
 export function isToolName(name: unknown): name is McpToolName {
   return typeof name === "string" && Object.hasOwn(TOOLS, name) && Object.hasOwn(RUN, name);
 }

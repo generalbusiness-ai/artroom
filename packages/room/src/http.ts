@@ -179,6 +179,13 @@ export async function route(req: Request, env: RoomEnv, log: DiagnosisSink = toC
       return e ? json(e) : failure(artroomError("not-found", "There is no such entry."));
     }
     if (one === "members") return json(await readQ({ q: "members" }));
+    if (one === "declarations") {
+      // The declarations of one policy version (R-API-3, R-API-9 as amended): the active one, or `at` an entry's seq, or `policy`.
+      const at = intParam(url, "at");
+      const policy = url.searchParams.get("policy");
+      const c = await readQ({ q: "acts", ...(at !== undefined ? { at } : {}), ...(policy !== null ? { policy: policy as `act_${number}_${string}` } : {}) });
+      return c ? json(c) : failure(artroomError("not-found", "The room retains no such policy version.")); // G5:route-acts-missing
+    }
     if (one === "subscribe") {
       const cursor = url.searchParams.get("cursor") ?? undefined;
       const waitMs = intParam(url, "waitMs") ?? 25_000;

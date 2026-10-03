@@ -14,6 +14,7 @@ import {
   type HttpRoom,
   type InvitationId,
   type ActRecord,
+  type AnySignedEnvelope,
   type Joined,
   type LogPage,
   type JoinEnvelope,
@@ -177,7 +178,7 @@ async function recoverJoin(wire: HttpWire | RpcWire, room: RoomId, signed: Signe
  * the original result if it recorded the act, even after the signing key
  * was retired or revoked (R-IDEM-2). Only the act's own room is accepted.
  */
-export async function resubmit(endpoint: Endpoint, room: RoomId, signed: SignedEnvelope, options: ClientOptions = {}): Promise<Result<ActRecord>> {
+export async function resubmit(endpoint: Endpoint, room: RoomId, signed: AnySignedEnvelope, options: ClientOptions = {}): Promise<Result<ActRecord>> {
   if (signed.envelope.room !== room) throw artroomError("bad-request", "This act was signed for another room.");
   const wire = new HttpWire(endpointUrl(endpoint.url), room, options, new Redactor());
   return withRetries(() => wire.submit(signed), options.retries ?? 3, signed.envelope.idempotencyKey);

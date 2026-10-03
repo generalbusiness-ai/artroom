@@ -14,6 +14,9 @@ import { b64url, call, clock, day, digestBytes, iso, makeRoom, pushChange, rando
 
 const base = "https://artroom.test/v1/rooms";
 const KINDS = ["claim", "propose", "note", "land", "release", "renew"];
+/** The ten named tools, and the two generic tools of declared acts stage 5 (R-API-9 as amended). The MCP core adds more. */
+const LISTED = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release", "attention", "explain", "acts", "act"];
+const toolNames = (tools: readonly { name: string }[]) => tools.map((t) => t.name);
 
 /** A room-custody invitation, redeemed: the bearer an MCP agent gets (R-CRED-3). */
 async function bearer(r: TestRoom, kinds: string[] = KINDS, handle = "@agent"): Promise<Redeemed> {
@@ -101,7 +104,7 @@ describe("the route guards", () => {
     expect(bad.status).toBe(400);
     const byName = await rpc(`${encodeURIComponent(r.genesis.name)}/mcp`, b.bearer, "tools/list");
     expect(byName.status).toBe(200);
-    expect((await body(byName)).result.tools).toHaveLength(10);
+    expect(toolNames((await body(byName)).result.tools)).toEqual(expect.arrayContaining(LISTED));
   });
 
   it("other paths are untouched: /mcp/x and /mcpx are the router's 404, not the MCP handler's", async () => {
@@ -214,7 +217,7 @@ describe.each([
     try {
       expect(c.getInstructions()?.length).toBeLessThanOrEqual(512);
       const { tools } = await c.listTools();
-      expect(tools).toHaveLength(10);
+      expect(toolNames(tools)).toEqual(expect.arrayContaining(LISTED));
       for (const t of tools) expect(t.outputSchema?.["type"]).toBe("object");
       const claim = (await c.callTool({ name: "claim", arguments: { goal: "g", scope: ["src/**"] } })).structuredContent as unknown as Claim;
       const refused = await c.callTool({ name: "renew", arguments: { lane: claim.lane, lease: 9 } });

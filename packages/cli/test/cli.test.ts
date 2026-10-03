@@ -205,9 +205,11 @@ describe("usage and agents", () => {
     expect(init.result.serverInfo.name).toBe("artroom");
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
     const list = await send(2, "tools/list");
-    expect(list.result.tools.map((t: { name: string }) => t.name).sort()).toEqual(
-      ["attention", "claim", "explain", "land", "note", "propose", "release", "renew", "review", "workspace"],
-    );
+    // The ten named tools, each once, and the two generic tools of declared acts stage 5 beside them.
+    const listed: string[] = list.result.tools.map((t: { name: string }) => t.name);
+    for (const name of ["attention", "claim", "explain", "land", "note", "propose", "release", "renew", "review", "workspace"]) expect(listed.filter((n) => n === name)).toEqual([name]);
+    expect(listed).toContain("acts");
+    expect(listed).toContain("act");
     const claim = await send(3, "tools/call", { name: "claim", arguments: { goal: "g", scope: ["src/**"] } });
     expect(claim.result.structuredContent.by).toMatchObject({ via: "member", member: "@alice" });
     child.stdin.end();

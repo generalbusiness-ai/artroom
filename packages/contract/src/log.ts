@@ -302,7 +302,8 @@ export interface EntrySummary {
   readonly id: ActId;
   readonly seq: Seq;
   readonly type: "act" | "refusal" | "system";
-  readonly kind: EnvelopeKind | SystemEvent["type"];
+  /** A legacy, platform or declared kind (R-DECL-2), or a system event's type. */
+  readonly kind: EnvelopeKind | import("./declarations.ts").KindName | SystemEvent["type"];
   readonly lane?: LaneId;
   readonly by?: MemberId | null;
   readonly at: Timestamp;

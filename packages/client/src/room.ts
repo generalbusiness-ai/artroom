@@ -10,7 +10,16 @@ import {
   type ActId,
   type ActOptions,
   type ActRecord,
+  type AnySignedEnvelope,
   type ArtroomError,
+  type Binding,
+  type Catalogue,
+  type CatalogueAt,
+  type DeclaredRecord,
+  type DeclaredTarget,
+  type GenericActOptions,
+  type Json,
+  type KindName,
   type AttentionPage,
   type Check,
   type CheckActInput,
@@ -20,7 +29,6 @@ import {
   type Cursor,
   type EnvelopeKind,
   type IdempotencyKey,
-  type SignedEnvelope,
   type Explanation,
   type Held,
   type HttpRoom,
@@ -69,7 +77,8 @@ import {
   type WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { artroomError } from "./errors.ts";
-import { buildEnvelope, checkIdempotencyKey, signEnvelope, signRequest, type Identity } from "./envelope.ts";
+import { builtForBinding, governs, isPlatformKind } from "@generalbusiness/artroom-policy/declared";
+import { buildDeclaredEnvelope, buildEnvelope, checkBinding, checkIdempotencyKey, signEnvelope, signRequest, type Identity } from "./envelope.ts";
 import { newIdempotencyKey } from "./keys.ts";
 import type { BearerActor } from "./bearer.ts";
 import type { ClientOptions, HttpWire, RequestResult, RpcWire, Wire } from "./wire.ts";
@@ -115,18 +124,33 @@ export async function withRetries<T>(attempt: () => Promise<T>, retries: number,
 
 /** An act, resolved and, for a key, signed: everything needed to send it again unchanged. */
 export interface PreparedAct {
-  readonly kind: EnvelopeKind;
+  /** A legacy, platform or declared kind. */
+  readonly kind: EnvelopeKind | KindName;
   readonly target: unknown;
   readonly body: unknown;
   readonly idempotencyKey: IdempotencyKey;
-  /** The signed envelope; absent for a bearer session, where the room signs. */
-  readonly signed?: SignedEnvelope;
+  /**
+   * For a generic declared act: the binding the caller read (R-DECL-16). It
+   * is kept with the act, so a resend carries the same binding and never a
+   * newer one. Absent for the named methods.
+   */
+  readonly binding?: Binding;
+  /** The signed envelope, of either version; absent for a bearer session, where the room signs. */
+  readonly signed?: AnySignedEnvelope;
 }
 
 /** `ActOptions`, plus a hook to persist the prepared act before it is first sent. */
 export interface ClientActOptions extends ActOptions {
   readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
 }
+
+/** The generic act's options: the binding is required; the hook is as for the named methods. */
+export interface ClientGenericActOptions extends GenericActOptions {
+  readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
+}
+
+/** The seven code-review kinds the named methods sign. `renew` and `roster` are platform kinds and stay `v: 1`. */
+const NAMED_DECLARED: ReadonlySet<string> = new Set(["claim", "propose", "note", "review", "check", "land", "release"]);
 
 /** The shared core of every handle. */
 abstract class RoomCore {
@@ -138,6 +162,10 @@ abstract class RoomCore {
   protected readonly bearer: BearerActor | undefined;
   #session: Session | undefined;
   #sessionPending: Promise<Session> | undefined;
+  /** The active catalogue the named methods sign under, read once and kept until the room says it is stale. */
+  #vocabulary: Catalogue | undefined;
+  /** Retained catalogues of ended policy versions, by interval, for `actsAt`. */
+  readonly #ended: Catalogue[] = [];
 
   constructor(wire: Wire & { redactor: import("./errors.ts").Redactor }, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActor) {
     this.wire = wire;
@@ -215,28 +243,109 @@ abstract class RoomCore {
 
   // -------------------------------------------------------------------- acts
 
-  protected async act<T>(kind: EnvelopeKind, target: unknown, body: unknown, opts?: ClientActOptions): Promise<Result<T>> {
+  /**
+   * The binding a named method signs with, or undefined for envelope `v: 1`
+   * (R-API-9 as amended). `renew` and `roster` are platform kinds: always
+   * `v: 1`. For the seven code-review kinds the handle reads the room's
+   * active catalogue once. Under a `v1` document they are `v: 1`, as before.
+   * Under a `v2` document each is `v: 2` with the binding of the code-review
+   * declaration the method was built for, under the room's steps version
+   * and `lanes`. It is never the room's own declaration's binding: where the
+   * two differ the room refuses `binding-stale`.
+   */
+  async #builtFor(kind: string): Promise<Binding | undefined> {
+    if (!NAMED_DECLARED.has(kind)) return undefined; // G5:named-platform-v1
+    this.#vocabulary ??= await this.acts();
+    const c = this.#vocabulary;
+    if (c.vocabulary !== "declared") return undefined; // G5:named-legacy-v1
+    return (await builtForBinding(c, kind)) ?? undefined;
+  }
+
+  /**
+   * Forget the catalogue the named methods sign under. Called when the room
+   * says an act's vocabulary or binding is not the active one, so the
+   * caller's next call reads again. The refused act itself is never sent
+   * again by the handle (R-DECL-16).
+   */
+  #vocabularyStale(out: unknown): void {
+    if (isRefusal(out) && (out.rule === "binding-stale" || out.rule === "kind-undeclared")) this.#vocabulary = undefined; // G5:named-forget
+  }
+
+  /** One of the named methods' acts: built, signed for a key, and sent. */
+  protected async named<T>(kind: EnvelopeKind, target: unknown, body: unknown, opts?: ClientActOptions): Promise<Result<T>> {
     const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
+    let prepared: PreparedAct;
+    if (this.bearer !== undefined) {
+      // The room signs. For a named tool in a `v2` room it adds the built-for binding itself (R-CRED-10).
+      prepared = { kind, target, body, idempotencyKey };
+    } else {
+      const binding = await this.#builtFor(kind);
+      const envelope =
+        binding === undefined
+          ? buildEnvelope(this.id, this.identity, kind, target, body, idempotencyKey)
+          : buildDeclaredEnvelope(this.id, this.identity, kind, binding, target as DeclaredTarget, body, idempotencyKey); // G5:named-v2
+      prepared = { kind, target, body, idempotencyKey, signed: await signEnvelope(envelope, this.identity.signer) };
+    }
+    await opts?.onPrepared?.(prepared);
+    let out: Result<ActRecord>;
+    try {
+      out = await this.replay(prepared);
+    } catch (e) {
+      // A room that left the vocabulary this handle read answers `bad-request` at step 1: read again next time.
+      if (isArtroomError(e) && e.code === "bad-request") this.#vocabulary = undefined; // G5:named-forget-vocabulary
+      throw e;
+    }
+    this.#vocabularyStale(out);
+    return out as Result<T>;
+  }
+
+  /**
+   * An act of any declared kind (R-DECL-16, R-API-9 as amended). The caller
+   * gives the binding it read from `acts()`: the meaning it intends. The
+   * handle signs exactly this kind, target, body and binding in envelope
+   * `v: 2`, or for a bearer session passes them to the room unchanged.
+   *
+   * It never reads the catalogue, never replaces the binding and never
+   * signs again. If the room refuses `binding-stale`, the refusal's
+   * `current` names the active binding and policy version; the caller reads
+   * the declaration, decides, and calls again with that binding if the new
+   * meaning is still what it intends. An exact retry (the same idempotency
+   * key and bytes, by `replay`) of an act the room accepted returns the
+   * original record, also after an activation (R-IDEM-2).
+   */
+  async act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: GenericActOptions & Pick<ClientGenericActOptions, "onPrepared">): Promise<Result<DeclaredRecord>> {
+    const binding = checkBinding(opts?.binding);
+    if (typeof kind !== "string" || isPlatformKind(kind))
+      throw artroomError("bad-request", `${String(kind)} is a platform kind, signed in envelope v: 1 with no binding. Use its own method.`); // G5:generic-platform
+    const idempotencyKey = checkIdempotencyKey(opts.idempotencyKey ?? newIdempotencyKey());
     const prepared: PreparedAct =
       this.bearer !== undefined
-        ? { kind, target, body, idempotencyKey }
-        : { kind, target, body, idempotencyKey, signed: await signEnvelope(buildEnvelope(this.id, this.identity, kind, target, body, idempotencyKey), this.identity.signer) };
-    await opts?.onPrepared?.(prepared);
-    return (await this.replay(prepared)) as Result<T>;
+        ? { kind, target, body, idempotencyKey, binding }
+        : {
+            kind,
+            target,
+            body,
+            idempotencyKey,
+            binding,
+            signed: await signEnvelope(buildDeclaredEnvelope(this.id, this.identity, kind, binding, target, body, idempotencyKey), this.identity.signer),
+          };
+    await opts.onPrepared?.(prepared);
+    return (await this.replay(prepared)) as Result<DeclaredRecord>;
   }
 
   /**
    * Sends a prepared act, unchanged: the same signed bytes, or for a bearer
-   * the same tool call, with the same idempotency key. If the room recorded
-   * it before, it returns the original result (R-IDEM-2). Use it to finish
-   * an act after a restart, without reading or rebuilding anything.
+   * the same tool call, with the same idempotency key and, for a generic
+   * act, the same binding. If the room recorded it before, it returns the
+   * original result (R-IDEM-2). Use it to finish an act after a restart,
+   * without reading or rebuilding anything.
    */
   async replay(act: PreparedAct): Promise<Result<ActRecord>> {
     const retries = this.opts.retries ?? 3;
     if (act.signed === undefined) {
       if (this.bearer === undefined) throw artroomError("bad-request", "This act was prepared for a bearer session; it has no signature.");
       const bearer = this.bearer;
-      return withRetries(() => bearer.act(act.kind, act.target, act.body, act.idempotencyKey), retries, act.idempotencyKey);
+      return withRetries(() => bearer.act(act.kind, act.target, act.body, act.idempotencyKey, act.binding), retries, act.idempotencyKey); // G5:replay-binding
     }
     if (act.signed.envelope.room !== this.id) throw artroomError("bad-request", "This act was prepared for another room.");
     const signed = act.signed;
@@ -247,24 +356,24 @@ abstract class RoomCore {
   claim(input: ClaimInput, opts?: ClientActOptions): Promise<Result<Claim>> {
     const lane = (input as { lane?: LaneId | Held }).lane;
     if (lane === undefined) {
-      return this.act("claim", null, pick(input, ["goal", "scope", "purpose", "plan", "because"]), opts);
+      return this.named("claim", null, pick(input, ["goal", "scope", "purpose", "plan", "because"]), opts);
     }
     const body = pick(input, ["scope", "goal", "plan", "because", "expectedGeneration"]);
-    if (typeof lane === "string") return this.act("claim", { lane }, body, opts); // take-over (R-LANE-7)
-    return this.act("claim", { lane: lane.lane }, { ...body, lease: lane.lease.generation }, opts); // rescope (R-LANE-2)
+    if (typeof lane === "string") return this.named("claim", { lane }, body, opts); // take-over (R-LANE-7)
+    return this.named("claim", { lane: lane.lane }, { ...body, lease: lane.lease.generation }, opts); // rescope (R-LANE-2)
   }
 
   propose(held: Held, input: ProposeInput, opts?: ClientActOptions): Promise<Result<Proposal>> {
-    return this.act("propose", { lane: held.lane }, { ...pick(input, ["expectedGeneration", "head", "summary", "because"]), lease: held.lease.generation }, opts);
+    return this.named("propose", { lane: held.lane }, { ...pick(input, ["expectedGeneration", "head", "summary", "because"]), lease: held.lease.generation }, opts);
   }
 
   note(anchor: NoteAnchor, input: NoteInput, opts?: ClientActOptions): Promise<Result<Note>> {
     const target = "act" in anchor ? { act: anchor.act } : pick(anchor, ["lane", "generation", "head", "path", "line", "endLine"]);
-    return this.act("note", target, pick(input, ["text", "replyTo"]), opts);
+    return this.named("note", target, pick(input, ["text", "replyTo"]), opts);
   }
 
   review(proposal: ProposalAt, input: ReviewInput, opts?: ClientActOptions): Promise<Result<Review>> {
-    return this.act(
+    return this.named(
       "review",
       { lane: proposal.lane, generation: proposal.generation },
       { head: proposal.head, ...pick(input, ["verdict", "scope", "dependsOn", "text"]) },
@@ -273,7 +382,7 @@ abstract class RoomCore {
   }
 
   check(proposal: ProposalRef, input: CheckActInput, opts?: ClientActOptions): Promise<Result<Check>> {
-    return this.act(
+    return this.named(
       "check",
       { lane: proposal.lane, generation: proposal.generation },
       pick(input, ["obligation", "check", "integration", "input", "config", "runner", "volatile", "ok", "detail", "landOp"]),
@@ -283,19 +392,19 @@ abstract class RoomCore {
 
   land(held: Held, proposal: ProposalAt, opts?: ClientActOptions): Promise<Result<Landing>> {
     if (held.lane !== proposal.lane) return Promise.reject(artroomError("bad-request", "The proposal is not on the held lane."));
-    return this.act("land", { lane: proposal.lane, generation: proposal.generation }, { lease: held.lease.generation, head: proposal.head }, opts);
+    return this.named("land", { lane: proposal.lane, generation: proposal.generation }, { lease: held.lease.generation, head: proposal.head }, opts);
   }
 
   release(held: Held, input?: ReleaseInput, opts?: ClientActOptions): Promise<Result<Release>> {
-    return this.act("release", { lane: held.lane }, { lease: held.lease.generation, ...pick(input ?? {}, ["note"]) }, opts);
+    return this.named("release", { lane: held.lane }, { lease: held.lease.generation, ...pick(input ?? {}, ["note"]) }, opts);
   }
 
   renew(held: Held, opts?: ClientActOptions): Promise<Result<Renewal>> {
-    return this.act("renew", { lane: held.lane }, { lease: held.lease.generation }, opts);
+    return this.named("renew", { lane: held.lane }, { lease: held.lease.generation }, opts);
   }
 
   roster(op: RosterOp, opts?: ClientActOptions): Promise<Result<RosterRecord>> {
-    return this.act("roster", null, op, opts);
+    return this.named("roster", null, op, opts);
   }
 
   async workspace(held: Held): Promise<Result<WorkspaceOp>> {
@@ -363,6 +472,34 @@ abstract class RoomCore {
 
   members(): Promise<Roster> {
     return this.read({ q: "members" });
+  }
+
+  /**
+   * The active policy version's declarations, with each kind's binding
+   * (R-API-9 as amended). A room whose active document is `v1` answers with
+   * the legacy catalogue. Always read from the room: this is what a caller
+   * looks at before it prepares an act.
+   */
+  async acts(): Promise<Catalogue> {
+    const c = await this.read({ q: "acts" });
+    if (c === null) throw artroomError("internal", "The room has no active policy version.");
+    return c;
+  }
+
+  /**
+   * The declarations in force at an entry's seq, `D(s)`, or of a named
+   * policy version (R-DECL-23). Readers show a record with these labels and
+   * fields, never the active ones. Null when the room retains no such
+   * version. An ended version's declarations never change, so the handle
+   * keeps it and answers later seqs of its interval without a read; its
+   * `retired` marks are those of the time it was read.
+   */
+  async actsAt(at: CatalogueAt): Promise<Catalogue | null> {
+    const kept = this.#ended.find((c) => (at.seq !== undefined ? governs(c, at.seq) : c.policy === at.policy)); // G5:catalogue-cache
+    if (kept) return kept;
+    const c = await this.read(at.seq !== undefined ? { q: "acts", at: at.seq } : { q: "acts", policy: at.policy });
+    if (c !== null && c.until !== null && !this.#ended.some((k) => k.policy === c.policy)) this.#ended.push(c);
+    return c;
   }
 
   /** Releases the client side only: the room holds no state for a handle (R-API-2). */

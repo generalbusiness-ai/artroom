@@ -1,7 +1,9 @@
 /**
- * The ten MCP tools (R-API-9), as `McpToolDescriptor` values (section 22,
- * point 21). Each input schema has exactly the properties of the
- * contract's `McpInput<T>`; test/schema.test.ts checks that at compile time.
+ * The MCP tools (R-API-9 as amended), as `McpToolDescriptor` values (section
+ * 22, point 21): the ten named tools of the code-review module, then `acts`
+ * and `act` for any declared act. Each input schema has exactly the
+ * properties of the contract's `McpInput<T>`; test/schema.test.ts checks
+ * that at compile time.
  *
  * The descriptions are an agent's user interface: each says what the tool
  * is for, what to keep from its result, and what to do on each likely
@@ -70,7 +72,10 @@ const refusal: JsonSchema = {
     reason: { type: "string" },
     fix: { type: "string" },
     act: id("The recorded refusal's entry, when it was recorded."),
-    current: { type: "object", description: "The lane's current generation, lease generation or operation." },
+    current: {
+      type: "object",
+      description: "The lane's current generation, lease generation or operation. On `binding-stale`: the active `binding` and `policy` version.",
+    },
   },
   required: ["refused", "rule", "reason"],
 };
@@ -304,8 +309,74 @@ const explain = {
   },
 } as const satisfies McpToolDescriptor<"explain">;
 
-/** The ten tools, in the order an agent meets them. */
-export const TOOLS = { claim, workspace, propose, note, review, land, renew, release, attention, explain } as const;
+const binding: JsonSchema = {
+  type: "string",
+  pattern: "^sha256:[0-9a-f]{64}$",
+  description: "The binding of the kind, exactly as `acts` gave it. It names the meaning you read. The room never replaces it.",
+};
+
+const acts = {
+  name: "acts",
+  method: "acts",
+  description: [
+    "List the acts this room declares: each kind's label, targets, body fields, who may sign it, help, and its `binding`.",
+    "Call it before `act`, and again whenever `act` is refused `binding-stale` or `kind-undeclared`.",
+    "A room with `vocabulary: \"artroom-legacy-v1\"` declares none: use the named tools there.",
+    "To read an old record, pass `at` (its seq) or `policy`: you get the declarations in force then, with `retired` on a kind a later version dropped.",
+    "For a version the room does not have, it returns `{ outcome: \"not-found\" }`.",
+  ].join(" "),
+  inputSchema: {
+    type: "object",
+    properties: {
+      at: { type: "integer", minimum: 0, description: "Optional. An entry's seq: the declarations in force for that entry. Not with `policy`." },
+      policy: { type: "string", pattern: "^act_(0|[1-9][0-9]{0,15})_[0-9a-f]{8}$", description: "Optional. A policy version. Not with `at`." },
+    },
+    additionalProperties: false,
+  },
+  // A read: it never refuses. The root is an object, so 2025-era clients get it unwrapped.
+  outputSchema: {
+    type: "object",
+    oneOf: [
+      { type: "object", description: "The declarations of one policy version.", required: ["vocabulary", "policy", "since", "until"] },
+      { type: "object", description: "The room retains no such version.", properties: { outcome: { type: "string", enum: ["not-found"] } }, required: ["outcome"] },
+    ],
+  },
+} as const satisfies McpToolDescriptor<"acts">;
+
+const act = {
+  name: "act",
+  method: "act",
+  description: [
+    "Do any act this room declares, including one with no named tool. First call `acts` and read the kind's declaration.",
+    "Give `kind`, the `target` its declaration accepts (null, `{ lane }`, `{ lane, generation }`, `{ act }` or a line anchor),",
+    "a `body` with its fields and its steps' fields, the kind's `binding` from `acts`, and an `idempotencyKey` you choose.",
+    "On `binding-stale` the act's meaning changed since you read it: nothing was done. `current` names the active binding.",
+    "Call `acts` again, read the new declaration, and call `act` with the new binding only if that meaning is still what you intend.",
+    "On `kind-undeclared` the room no longer declares the kind. After a timeout, call again with the same idempotencyKey and binding.",
+  ].join(" "),
+  inputSchema: {
+    type: "object",
+    properties: {
+      kind: { type: "string", pattern: "^[a-z][a-z0-9-]{0,31}$", description: "A kind `acts` lists. Not `renew`, `roster` or `recover`." },
+      target: {
+        description: "What the act is about, in one of the shapes the declaration's `targets` names. `null` for target `none`.",
+        oneOf: [{ type: "null" }, { type: "object" }],
+      },
+      body: { type: "object", description: "The act's fields: the declaration's `body` fields and the fields its steps need, such as `lease` or `head`." },
+      binding,
+      idempotencyKey: { type: "string", pattern: "^[A-Za-z0-9_-]{1,64}$", description: "Required. Choose one per act; reuse it to retry safely." },
+    },
+    required: ["kind", "target", "body", "binding", "idempotencyKey"],
+    additionalProperties: false,
+  },
+  outputSchema: record("The act's record: its own `kind`, and the fields its step produces.", []),
+} as const satisfies McpToolDescriptor<"act">;
+
+/** The tools, in the order an agent meets them: the ten named tools (R-API-9), then `acts` and `act` for any declared act. */
+export const TOOLS = { claim, workspace, propose, note, review, land, renew, release, attention, explain, acts, act } as const;
+
+/** The named tools of the code-review module. `acts` and `act` are the generic pair beside them. */
+export const NAMED_TOOLS = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release", "attention", "explain"] as const satisfies readonly McpToolName[];
 
 export type Tools = typeof TOOLS;
 
@@ -319,6 +390,7 @@ export const TOOL_LIST: readonly McpToolDescriptor[] = Object.values(TOOLS satis
 export const INSTRUCTIONS = [
   "Artroom coordinates changes to one git repository. Call attention first to see what needs you.",
   "To change code: claim the paths, get a workspace, push with git, propose the commit, land it, then release.",
+  "For an act with no tool of its own, call acts, then act with its binding.",
   "A refusal is an answer, not a failure: read rule, reason and fix, and do the fix.",
   "After a timeout, repeat the call with the same idempotencyKey. Never print or commit a token.",
 ].join(" ");
