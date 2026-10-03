@@ -16,7 +16,8 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { connect, generateSigner, isRefusal, join, redeem } from "@generalbusiness/artroom-client";
-import type { ActDeclaration, Catalogue, Claim, HttpRoom, McpToolset, Proposal, Redeemed, Role, RoomApi } from "@generalbusiness/artroom-contract";
+import type { ActDeclaration, Catalogue, Claim, HttpRoom, McpToolset, Proposal, Redeemed, Role, RoomApi, Update } from "@generalbusiness/artroom-contract";
+import { decodeUpdates } from "../../client/src/room.ts";
 import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy";
 import {
   ACT_TOOLS,
@@ -116,6 +117,33 @@ async function stdioList(api: RoomApi, caller: () => Promise<McpCaller>, toolset
   const out = await send(2, "tools/list");
   await handle.close();
   return out.result.tools;
+}
+
+/** One long-lived stdio server, as a local agent's host keeps it: `list()` gives each whole reply to `tools/list`, error or result. */
+async function stdioServer(api: RoomApi, caller: () => Promise<McpCaller>): Promise<{ list(): Promise<any>; close(): Promise<void> }> {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const handle = serveArtroomStdio(api, { caller }, { transport: new StdioServerTransport(stdin, stdout) });
+  const replies = new Map<number, any>();
+  let buffer = "";
+  stdout.on("data", (chunk: Buffer) => {
+    buffer += chunk.toString("utf8");
+    for (let nl = buffer.indexOf("\n"); nl >= 0; nl = buffer.indexOf("\n")) {
+      const msg = JSON.parse(buffer.slice(0, nl));
+      buffer = buffer.slice(nl + 1);
+      if (msg.id !== undefined) replies.set(msg.id, msg);
+    }
+  });
+  let id = 0;
+  const send = async (method: string, params: unknown = {}) => {
+    const mine = ++id;
+    stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: mine, method, params })}\n`);
+    for (let i = 0; i < 500 && !replies.has(mine); i++) await new Promise((r) => setTimeout(r, 10));
+    return replies.get(mine);
+  };
+  await send("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } });
+  stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
+  return { list: () => send("tools/list"), close: () => handle.close() };
 }
 
 /** A `RoomApi` that records every call and answers from `answers`; a method with no answer throws. */
@@ -742,6 +770,145 @@ describe("attention with waitMs waits for an item for the caller (R-API-15)", ()
 
 // ------------------------------------------------------------ toolsets (R-API-14)
 
+describe("an attention wait ends the subscription it opened (R-API-15; checker finding 48765af0)", () => {
+  const upd = (attention: unknown[] = []): Update => ({ cursor: "u", entries: [], attention, publishedThrough: 3 }) as never;
+  const EMPTY = { items: [], cursor: "c1", more: false, publishedThrough: 3 };
+  const FULL = { items: [{ id: "att_1" }], cursor: "c2", more: false, publishedThrough: 4 };
+
+  /** A native stream of updates, as a host may give one: its source counts cancellations, and every read is kept. */
+  function native(onCancel: () => void = () => {}) {
+    let controller!: ReadableStreamDefaultController<Update>;
+    const seen = { cancels: 0, reads: [] as Promise<{ done: boolean }>[] };
+    const stream = new ReadableStream<Update>({
+      start: (c) => void (controller = c),
+      cancel: () => {
+        seen.cancels++;
+        onCancel();
+      },
+    });
+    const getReader = stream.getReader.bind(stream);
+    (stream as { getReader: unknown }).getReader = () => {
+      const reader = getReader();
+      const read = reader.read.bind(reader);
+      reader.read = () => {
+        const p = read();
+        seen.reads.push(p);
+        return p;
+      };
+      return reader;
+    };
+    return { stream, seen, push: (u: Update) => controller.enqueue(u), locked: () => stream.locked };
+  }
+
+  /** The same updates as bytes through the client's own decoder: what an HTTPS or RPC handle's subscription is. */
+  function decoded(onCancel: () => void = () => {}) {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const seen = { cancels: 0 };
+    const bytes = new ReadableStream<Uint8Array>({
+      start: (c) => void (controller = c),
+      cancel: () => {
+        seen.cancels++;
+        onCancel();
+      },
+    });
+    return { stream: decodeUpdates(bytes as never), seen, push: (u: Update) => controller.enqueue(new TextEncoder().encode(`${JSON.stringify(u)}\n`)) };
+  }
+
+  /** One `attention` call over a handle whose subscription is `stream`; the pages are answered in order. */
+  async function wait(stream: unknown, pages: unknown[], waitMs: number, during: () => void = () => {}) {
+    let read = 0;
+    let opened = 0;
+    const r = recording({
+      attention: () => pages[Math.min(read++, pages.length - 1)],
+      subscribe: () => {
+        opened++;
+        setTimeout(during, 20);
+        return stream;
+      },
+    });
+    const out = await callTool(r.room, "attention", { waitMs });
+    return { out, opened, pageReads: read };
+  }
+  const settled = (reads: Promise<unknown>[]) => Promise.race([Promise.allSettled(reads), new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 1_000))]);
+
+  test("a native stream, a page that already has items: the page returns, its source is cancelled once and its reader released", async () => {
+    const n = native();
+    const { out, opened } = await wait(n.stream, [FULL], 30_000);
+    expect(out.structuredContent).toEqual(FULL);
+    expect([opened, n.seen.cancels, n.locked()]).toEqual([1, 1, false]);
+    expect(await n.stream.getReader().read()).toEqual({ done: true, value: undefined });
+  });
+
+  test("a native stream, the wait runs out: the empty page returns, the source is cancelled once, the reader released, and the read left pending ends as done", async () => {
+    const n = native();
+    const { out, pageReads } = await wait(n.stream, [EMPTY], 80);
+    expect(out.isError).toBe(false);
+    expect(out.structuredContent).toEqual(EMPTY);
+    expect(pageReads).toBe(2);
+    expect([n.seen.cancels, n.locked()]).toEqual([1, false]);
+    expect(n.seen.reads.length).toBeGreaterThan(0);
+    const ended = await settled(n.seen.reads);
+    expect(ended).not.toBe("pending");
+    expect((ended as PromiseSettledResult<{ done: boolean }>[]).at(-1)).toEqual({ status: "fulfilled", value: { done: true, value: undefined } });
+  });
+
+  test("a native stream, an item arrives: the page with the item returns, the source is cancelled once and the reader released", async () => {
+    const n = native();
+    // Another member's update first, which does not end the wait; then one with an item for the caller.
+    const { out } = await wait(n.stream, [EMPTY, FULL], 30_000, () => {
+      n.push(upd());
+      n.push(upd([{ id: "att_1" }]));
+    });
+    expect(out.structuredContent).toEqual(FULL);
+    expect([n.seen.cancels, n.locked()]).toEqual([1, false]);
+    expect(n.seen.reads.length).toBe(2);
+  });
+
+  test("the client's decoded stream, in the same three cases: its byte source is cancelled once each time", async () => {
+    const now = decoded();
+    expect((await wait(now.stream, [FULL], 30_000)).out.structuredContent).toEqual(FULL);
+    expect(now.seen.cancels).toBe(1);
+    const late = decoded();
+    expect((await wait(late.stream, [EMPTY], 80)).out.structuredContent).toEqual(EMPTY);
+    expect(late.seen.cancels).toBe(1);
+    const item = decoded();
+    const got = await wait(item.stream, [EMPTY, FULL], 30_000, () => {
+      item.push(upd());
+      item.push(upd([{ id: "att_1" }]));
+    });
+    expect(got.out.structuredContent).toEqual(FULL);
+    expect(item.seen.cancels).toBe(1);
+    // After the wait the decoded stream is ended: a new reader reads done.
+    expect(await item.stream.getReader().read()).toEqual({ done: true });
+  });
+
+  test("with waitMs 0, or none, no subscription is opened and nothing is cancelled", async () => {
+    const n = native();
+    for (const waitMs of [0, undefined]) {
+      let opened = 0;
+      const r = recording({ attention: () => EMPTY, subscribe: () => (opened++, n.stream) });
+      expect((await callTool(r.room, "attention", waitMs === undefined ? {} : { waitMs })).structuredContent).toEqual(EMPTY);
+      expect([opened, n.seen.cancels, n.locked()]).toEqual([0, 0, false]);
+    }
+  });
+
+  test("a source whose cancel fails does not fail the tool: the page still returns, and a native reader is still released", async () => {
+    const boom = () => {
+      throw new Error("the source could not be cancelled");
+    };
+    const n = native(boom);
+    const first = await wait(n.stream, [FULL], 30_000);
+    expect(first.out.isError).toBe(false);
+    expect(first.out.structuredContent).toEqual(FULL);
+    expect([n.seen.cancels, n.locked()]).toEqual([1, false]);
+    const d = decoded(boom);
+    const second = await wait(d.stream, [FULL], 30_000);
+    expect(second.out.isError).toBe(false);
+    expect(second.out.structuredContent).toEqual(FULL);
+    expect(d.seen.cancels).toBe(1);
+  });
+});
+
 describe("toolsets: what tools/list shows follows the caller's authorization (R-API-14)", () => {
   test("the default comes from the roster role: all for admin and maintainer, builder for member and agent, reviewer for checker", async () => {
     await room.activate(DECLARED);
@@ -1001,13 +1168,41 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
     expect(read(roster, { key: b.key, delegation: other.delegation })).toEqual({ refused: "unauthenticated" });
     // The session form of the same delegation, by its own room-held key, is accepted: the two forms do not mix.
     expect(read(roster, { key: other.key, session: true, delegation: other.delegation })).toEqual(await room.bearerCaller(other.bearer));
-    // Read for each list: once the delegation is revoked, the next list over stdio fails, and shows nothing.
-    const caller = async () => callerFromRoster(await api.members().catch(() => roster), { key: b.key, session: true, delegation: b.delegation });
-    expect(names(await stdioList(api, caller))).toEqual(await listed(b));
+  });
+
+  test("over stdio the caller is read again for each list: after the delegation is revoked, the next list on the same server is an error and shows no tool", async () => {
+    await room.activate(DECLARED);
+    const b = await bearer("@agent", "agent", { kinds: ["renew"], acts: await bindings("claim") });
+    const api = await connect({ url }, room.id, { kind: "bearer", token: b.bearer });
+    // The callback is the command line's: a fresh roster read with the credential, whose failure is not caught.
+    const reads: string[] = [];
+    const caller = async () => {
+      const roster = await api.members().then(
+        (r) => (reads.push("read"), r),
+        (e) => {
+          reads.push(`failed: ${(e as { code?: string }).code}`);
+          throw e;
+        },
+      );
+      return callerFromRoster(roster, { key: b.key, session: true, delegation: b.delegation });
+    };
+    const server = await stdioServer(api, caller);
+    const first = await server.list();
+    expect(names(first.result.tools)).toEqual(await listed(b));
+    expect(names(first.result.tools)).toContain("claim");
     room.revokeDelegation(b.delegation);
-    const after = { ...roster, delegations: roster.delegations.map((d) => (d.id === b.delegation ? { ...d, revoked: 1 } : d)) };
-    expect(() => callerFromRoster(after, { key: b.key, session: true, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    // The same server, asked again: the roster read itself is refused for the revoked session, and nothing is listed.
+    const second = await server.list();
+    expect(second.result).toBeUndefined();
+    expect(second.error).toBeDefined();
+    expect(reads).toEqual(["read", "failed: unauthenticated"]);
+    await server.close();
+    // The other two views of the same fact: HTTPS answers 401, and a roster that shows the revocation gives no caller.
     expect((await list(b)).status).toBe(401);
+    const admin = await connect({ url }, room.id, { kind: "key", signer: room.admin.signer });
+    const after = await admin.members();
+    expect(after.delegations.find((d) => d.id === b.delegation)?.revoked).toBeDefined();
+    expect(() => callerFromRoster(after, { key: b.key, session: true, delegation: b.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
   });
 
   test("the list is the same before and after other calls, and it is read afresh for each request", async () => {

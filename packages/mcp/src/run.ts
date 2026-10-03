@@ -85,6 +85,21 @@ interface AttentionWatch {
 
 type Subscribing = { subscribe?: (cursor?: Cursor, opts?: { readonly waitMs?: number }) => Promise<Update | UpdateStream> };
 
+/**
+ * End a subscription whose reader this watch holds: cancel its source once,
+ * and give the lock back. A native stream refuses `cancel` while a reader
+ * holds its lock, so it is cancelled through that reader, which also ends a
+ * read still pending as done. A structural stream with no such reader (the
+ * client's decoded one) cancels through its own active reader. A failing
+ * cancel does not fail the tool: the page was already read.
+ */
+async function endStream(stream: UpdateStream, reader: ReturnType<UpdateStream["getReader"]>): Promise<void> {
+  const native = reader as typeof reader & { cancel?: (reason?: unknown) => Promise<void> };
+  if (typeof native.cancel === "function") await native.cancel().catch(() => undefined); // GM:watch-native-cancel
+  else await stream.cancel().catch(() => undefined); // GM:watch-cancel
+  reader.releaseLock(); // GM:watch-release
+}
+
 async function watchAttention(room: RoomApi): Promise<AttentionWatch> {
   const handle = room as RoomApi & Subscribing;
   // A handle with no subscription: wait out the time, and let the second read answer.
@@ -108,7 +123,7 @@ async function watchAttention(room: RoomApi): Promise<AttentionWatch> {
           clearTimeout(timer);
         }
       },
-      close: () => stream.cancel().catch(() => undefined),
+      close: () => endStream(stream, reader),
     };
   }
   let cursor = (first as Update).cursor;
