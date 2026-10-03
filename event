@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5c426395ccb26299c387d516010bf497d8cdc3aa","text":"Replaced by the review request for exact head c6d416f3e6eaeb9f61c1b19ffbd97d722b190918; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"promise","text":"Checker takes declared-acts revision 3 at c6d416f3, checking all six findings and the complete design contract."}
