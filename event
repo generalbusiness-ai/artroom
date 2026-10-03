@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5cc48486f7c254a23a4d1ab367d2cdcb10336b24","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/founding-gaps.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5fab48d2da5bbd879e64bd83ae34f74348d218ab","text":"Merge retired a covered predecessor; the successor is at packages/room/src/config.ts."}
