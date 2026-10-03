@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e0dd46be9fd27fc4911087fd08962815570311d7","text":"Merge retired a covered predecessor; the successor is at packages/git/src/mints.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f2e04864d9c28ee5368d1d5930954923df6a0b32","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-02-canonical-mint-ownership.md."}
