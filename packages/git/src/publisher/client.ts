@@ -9,8 +9,9 @@
  * Room's mint ledger (protocol section 32, R-MINT-1): its record and
  * wake-up are stored before the request, a lost answer stays an unknown
  * record, and a revocation that fails stays owed. The lane fork's read
- * token for pinning is not a canonical mint; it waits for the fork's own
- * ledger (request 02836f9a).
+ * token for pinning is not a canonical mint: the fork's own ledger, which
+ * its workspaces own (`ForkTokens`, request 02836f9a), mints and revokes it
+ * under the same rules.
  */
 
 import type { Sha } from "@generalbusiness/artroom-contract";
@@ -18,6 +19,7 @@ import type { IntegrateResult } from "../landing/core.ts";
 import type { PublisherPort } from "../landing/engine.ts";
 import { type ArtifactsNamespace, type RepoHandle, readMainVia, withRetry } from "../artifacts.ts";
 import { type MintLedger, type MintScope, errorNote } from "../mints.ts";
+import type { ForkTokens } from "../workspace/fork-tokens.ts";
 import type { BuildResult, PinResult, PreviewResult } from "./gitops.ts";
 import { integrationRef, pinnedRef } from "./gitops.ts";
 import type { PushOutcome } from "./push-outcome.ts";
@@ -69,6 +71,11 @@ export interface PublisherClientOptions {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
+export interface PinningOptions extends PublisherClientOptions {
+  /** The lane forks' read-token ledger, which the workspaces own: every fork read token is minted and revoked through it (request 02836f9a). */
+  readonly forkTokens: Pick<ForkTokens, "withToken">;
+}
+
 import type { LogPushOutcome, LogPushRequest, LogStageRequest } from "./log-push.ts";
 import type { StageResult } from "./gitops.ts";
 
@@ -87,22 +94,6 @@ export const TOKEN_TTL = {
  */
 function withCanonicalToken<T>(mints: Pick<MintLedger, "withToken">, purpose: string, scope: MintScope, ttl: number, fn: (token: string) => Promise<T>): Promise<T> {
   return mints.withToken(purpose, scope, () => ttl, (t) => fn(t.plaintext));
-}
-
-/**
- * The lane fork's read token for pinning (R-PROP-1). Not a canonical mint
- * (R-MINT-1): still a hidden retry and a dropped revocation, until request
- * 02836f9a gives the fork its own ledger. The only `createToken` call in
- * this file.
- */
-async function withForkToken<T>(repo: RepoHandle, fn: (token: string) => Promise<T>, sleep?: (ms: number) => Promise<void>): Promise<T> {
-  const opts = sleep ? { sleep } : {};
-  const t = await withRetry(() => repo.createToken("read", TOKEN_TTL.pin), opts);
-  try {
-    return await fn(t.plaintext);
-  } finally {
-    await withRetry(() => repo.revokeToken(t.id), opts).catch(() => false);
-  }
 }
 
 /** `PublisherPort` for the landing engine, over the publisher sandbox. */
@@ -156,29 +147,28 @@ export class ContainerPublisher implements PublisherPort {
 
 /** Pinning proposed heads (R-PROP-1, R-PROP-2) and previews (R-PROP-7). */
 export class Pinning {
-  private readonly o: PublisherClientOptions;
-  constructor(opts: PublisherClientOptions) {
+  private readonly o: PinningOptions;
+  constructor(opts: PinningOptions) {
     this.o = opts;
   }
 
-  private get(name: string): Promise<RepoHandle> {
-    return withRetry(() => this.o.artifacts.get(name), this.o.sleep ? { sleep: this.o.sleep } : {});
-  }
-
-  /** Step 1, before admission: copy the head's objects from the lane's fork. */
+  /**
+   * Step 1, before admission: copy the head's objects from the lane's fork.
+   * Its fork read token comes from the fork's ledger, which records it
+   * before the request and revokes it by its ID afterwards; its canonical
+   * write token from the canonical mint ledger. Neither is retried here:
+   * each ledger retries a transient error only as a new request with its own
+   * record.
+   */
   async pinObjects(fork: { readonly name: string; readonly remote: string }, head: Sha): Promise<PinResult> {
-    const forkRepo = await this.get(fork.name);
-    return withForkToken(
-      forkRepo,
-      (forkToken) =>
-        withCanonicalToken(this.o.mints, `pin-objects:${head}`, "write", TOKEN_TTL.pin, (canonToken) =>
-          this.o.stub.pinObjects({
-            fork: { remote: fork.remote, token: forkToken },
-            canonical: { remote: this.o.canonical.remote, token: canonToken },
-            head,
-          }),
-        ),
-      this.o.sleep,
+    return this.o.forkTokens.withToken(fork.name, `pin-objects:${head}`, TOKEN_TTL.pin, (forkToken) =>
+      withCanonicalToken(this.o.mints, `pin-objects:${head}`, "write", TOKEN_TTL.pin, (canonToken) =>
+        this.o.stub.pinObjects({
+          fork: { remote: fork.remote, token: forkToken.plaintext },
+          canonical: { remote: this.o.canonical.remote, token: canonToken },
+          head,
+        }),
+      ),
     );
   }
 

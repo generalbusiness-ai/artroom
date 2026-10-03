@@ -214,6 +214,66 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     expect([due, due - 4_000, due - 6_000]).not.toContain(fenced);
   });
 
+  it("set, composed with mint lane F (request 02836f9a): the fork token ledger is a sixth candidate; the earliest wins among the delayed pin, the mint ledger, the error upgrade, the job-token pass, the check jobs and the fork token ledger; only its own backoff holds it, and the repository-gone fence does not", async () => {
+    setPinDelay(DELAY);
+    const r = await makeRoom();
+    await proposed(r);
+    const due = clock.now + DELAY;
+    await inDO(r, (room) => room.core.idle());
+    await tick(r, 2);
+    // Each ledger's due time is set directly on this object's ledgers: only nextAlarm's composition is under test here.
+    const next = (mints: number | null, fork: number | null) =>
+      inDO(r, (room) => {
+        (room.core.mints as unknown as { nextDue: () => number | null }).nextDue = () => mints;
+        (room.core.workspaces.forkTokens as unknown as { nextDue: () => number | null }).nextDue = () => fork;
+        return room.core.nextAlarm();
+      });
+    const sql = (q: string, ...b: (string | number)[]) => inDO(r, (room) => room.core.sql.all(q, ...b));
+    const meta = (k: string, v: string | null) => (v === null ? sql("DELETE FROM meta WHERE k = ?", k) : sql("INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", k, v));
+    const job = (at: number | null) =>
+      at === null
+        ? sql("DELETE FROM check_jobs WHERE id = 'job_probe'")
+        : sql("INSERT INTO check_jobs (id, owner, lane, generation, obligation, checker, config, integration, base, state, next_ms) VALUES ('job_probe', 'op_probe', 'act_probe', 1, 'obl_probe', 'tests', 'sha256:probe', ?, ?, 'owed', ?) ON CONFLICT (id) DO UPDATE SET next_ms = excluded.next_ms", "a".repeat(40), "a".repeat(40), at);
+    const token = (at: number | null) =>
+      at === null ? sql("DELETE FROM job_tokens WHERE token_id = 'tok_probe'") : sql("INSERT INTO job_tokens (token_id, expires_at, next_ms) VALUES ('tok_probe', NULL, ?) ON CONFLICT (token_id) DO UPDATE SET next_ms = excluded.next_ms", at);
+    // Alone, the delayed pin; the fork token ledger later than it does not move it.
+    expect(await next(null, null)).toBe(due);
+    expect(await next(null, due + 5_000)).toBe(due);
+    // The fork token ledger earliest: it wins.
+    expect(await next(due - 4_000, due - 9_000)).toBe(due - 9_000);
+    // Each other candidate earlier than it wins in turn.
+    expect(await next(due - 10_000, due - 9_000)).toBe(due - 10_000);
+    await job(due - 12_000);
+    expect(await next(null, due - 9_000)).toBe(due - 12_000);
+    await job(null);
+    await token(due - 11_000);
+    expect(await next(null, due - 9_000)).toBe(due - 11_000);
+    await token(null);
+    await meta("error_scrub", "0");
+    expect(await next(null, due - 9_000)).toBe(clock.now);
+    await meta("error_scrub", null);
+    // Its own backoff holds it, and only it: the pin wins.
+    await meta("loop_backoff", JSON.stringify({ forkTokens: { attempts: 1, next: due + 30_000 } }));
+    expect(await next(null, due - 9_000)).toBe(due);
+    // Other kinds' backoffs (the pins, the mint ledger, the job-token pass) do not hold it.
+    await meta("loop_backoff", JSON.stringify({ pins: { attempts: 1, next: due + 30_000 }, mints: { attempts: 1, next: due + 30_000 }, jobTokens: { attempts: 1, next: due + 30_000 } }));
+    await token(due - 11_000);
+    expect(await next(due - 10_000, due - 9_000)).toBe(due - 9_000);
+    await token(null);
+    await meta("loop_backoff", null);
+    // The repository gone fences the pin, the mint ledger and the job-token pass, not the fork token ledger: forks are
+    // not the canonical repository.
+    await meta("canonical_gone", JSON.stringify({ since: new Date(clock.now).toISOString(), head: 0 }));
+    await token(due - 11_000);
+    expect(await next(due - 10_000, due - 9_000)).toBe(due - 9_000);
+    await token(null);
+    // While it is gone, the fork token ledger's own backoff still holds it: a check job later than that backoff loses.
+    await meta("loop_backoff", JSON.stringify({ forkTokens: { attempts: 1, next: due + 30_000 } }));
+    await job(due + 40_000);
+    expect(await next(due - 10_000, due - 9_000)).toBe(due + 30_000);
+    await job(null);
+  });
+
   it("set, before founding: the room's start dates no pins and the unfounded schedule (founding debt and error upgrade) is unchanged", async () => {
     setPinDelay(DELAY);
     const stub = env.ROOMS.get(env.ROOMS.idFromName(`room_unfounded_pin_${clock.now}`)) as unknown as DurableObjectStub<Room>;
