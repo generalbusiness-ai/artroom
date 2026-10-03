@@ -16,14 +16,18 @@ import { gitAuthEnvFor } from "../src/job.ts";
 import { snapshotCommitId, snapshotMessage } from "../src/snapshot-commit.ts";
 import { job, tok, urlOf } from "./support.ts";
 
-/** Runs a process with exactly `env` plus PATH. */
+/**
+ * Runs a process with exactly `env` plus PATH. A command given no directory
+ * runs in the system's temporary directory, never in this package: a real
+ * `npm ci` that lost its directory must not reinstall the repository.
+ */
 export class LocalRunner implements Runner {
   readonly digest = `sha256:${"d".repeat(64)}` as Digest;
   readonly calls: string[][] = [];
   exec(argv: readonly [string, ...string[]], opts: { cwd?: string; env?: Readonly<Record<string, string>>; timeoutMs?: number } = {}) {
     this.calls.push([...argv]);
     return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolve) => {
-      execFile(argv[0], argv.slice(1), { cwd: opts.cwd, env: { ...opts.env, PATH: process.env["PATH"] ?? "/usr/bin:/bin" }, timeout: opts.timeoutMs, maxBuffer: 32 << 20 }, (err, stdout, stderr) => {
+      execFile(argv[0], argv.slice(1), { cwd: opts.cwd ?? tmpdir(), env: { ...opts.env, PATH: process.env["PATH"] ?? "/usr/bin:/bin" }, timeout: opts.timeoutMs, maxBuffer: 32 << 20 }, (err, stdout, stderr) => {
         const code = err ? (typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : 1) : 0;
         resolve({ exitCode: code, stdout: String(stdout), stderr: String(stderr) });
       });
@@ -204,15 +208,13 @@ export class Fixture {
   constructor() {
     for (const d of ["publisher", "runners", "canonical"]) mkdirSync(join(this.root, d));
     sh(this.canonical, "init", "-q");
+    // Like the fake Artifacts, it serves any commit it holds by its ID.
+    appendFileSync(join(this.canonical, ".git", "config"), "[uploadpack]\n\tallowAnySHA1InWant = true\n");
     this.ops = new GitOps({ exec: (a, o) => new LocalRunner().exec(a as [string, ...string[]], o).then((r) => ({ code: r.exitCode, stdout: r.stdout, stderr: r.stderr })), workdir: join(this.root, "publisher"), config: ["protocol.file.allow=always"] });
     this.artifacts = new FakeArtifacts(this.root);
     this.snapshots = new SnapshotRepos({ sql: nodeSql(), artifacts: this.artifacts, prefix: "canon", sleep: async () => {} });
   }
-  /**
-   * Add a commit on top of the last one: `files`, and whatever `more` does to
-   * the work tree. The commit gets a ref of its own, as an integration has,
-   * so a runner can fetch it by its ID.
-   */
+  /** Add a commit on top of the last one: `files`, and whatever `more` does to the work tree. */
   commit(name: string, files: Record<string, string>, more?: (dir: string) => void): Commit {
     for (const [p, body] of Object.entries(files)) {
       mkdirSync(dirname(join(this.canonical, p)), { recursive: true });
@@ -222,7 +224,6 @@ export class Fixture {
     sh(this.canonical, "add", "-A");
     sh(this.canonical, "commit", "-q", "-m", name);
     const [sha, tree] = sh(this.canonical, "rev-parse", "HEAD", "HEAD^{tree}").split("\n") as [Sha, Sha];
-    sh(this.canonical, "update-ref", `refs/artroom/integration/op_${name}/1`, sha);
     return { sha, tree };
   }
   /**

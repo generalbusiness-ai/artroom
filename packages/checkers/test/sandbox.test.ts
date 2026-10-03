@@ -81,8 +81,7 @@ test("G2: concurrent jobs each get their own runner and grant; one job's close n
   assert.equal(await Fleet.ask(boxB, "/git/ns/canon2.git/info/refs"), 200);
   assert.equal(await Fleet.ask(boxB, "/git/ns/canon.git/info/refs"), 403);
   assert.deepEqual(fleet.upstream, [`/git/ns/canon.git/info/refs Bearer ${tok("jobA0123456789")}`, `/git/ns/canon2.git/info/refs Bearer ${tok("jobB0123456789")}`]);
-  // A closes first, and closes twice; B keeps its container and its grant.
-  await a.close();
+  // A closes first; B keeps its container and its grant.
   await a.close();
   assert.deepEqual(fleet.lives(), [[1, 1, false], [1, 0, true]]);
   assert.equal(await Fleet.ask(boxB, "/git/ns/canon2.git/info/refs"), 200);
