@@ -45,6 +45,12 @@ import type {
 
 /** The active policy: the pinned, immutable document and the ID of the event that activated it. */
 export interface ActivePolicy {
+  /**
+   * The document. At run time it may be a `v2` document with declared acts
+   * (`AnyPolicyDocument`, R-DECL-1): it has every field the rule runtime
+   * reads, and a rule's `on` names kinds the runtime matches by name. Read
+   * its declarations through the vocabulary (`isDeclared`, `declarationOf`).
+   */
   readonly doc: PolicyDocument;
   readonly version: PolicyVersion;
 }

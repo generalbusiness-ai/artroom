@@ -290,7 +290,7 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
     });
     expect(done).toBe(true);
 
-    // The rows themselves are rewritten, and the store is at version 3 (mint lane C's due indexes follow the scrub).
+    // The rows themselves are rewritten, and the store is at version 4 (mint lane C's due indexes, then declared acts stage 2's columns, follow the scrub).
     const rows = await inDO(again, (room) => {
       const sql = room.core.sql;
       const body = JSON.parse(String(sql.all("SELECT body FROM artroom_land_op WHERE id = ?", op)[0]!["body"]));
@@ -304,7 +304,7 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
       };
     });
     expect(rows).toEqual({
-      v: 3,
+      v: 4,
       land: [`main could not be read: ${WITHHELD}`, `landing step failed: ${WITHHELD}`],
       ws: `could not provision the workspace: ${WITHHELD}`,
       wsDuty: `workspace step failed: ${WITHHELD}`,
@@ -373,7 +373,7 @@ describe("request d29c09fa: in a founded room the upgrade drains through recover
       }));
       expect(after).toEqual({
         cursor: 0,
-        v: 3,
+        v: 4,
         indexes: ["check_jobs_due", "job_tokens_due"],
         gone,
         rows: [`workspace step failed: ${WITHHELD}`, `snapshot step failed: ${WITHHELD}`, `revocation failed: ${WITHHELD}`],

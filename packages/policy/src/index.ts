@@ -96,6 +96,23 @@ export {
 export { TARGET_ORDER, bindingOf, bindingSubject, bindingsOf } from "./binding.ts";
 export { CODE_REVIEW_ACTS } from "./codereview.ts";
 export {
+  DELEGABLE_PLATFORM,
+  LEGACY_DELEGABLE,
+  LEGACY_KINDS,
+  LEGACY_ROLE_KINDS,
+  PLATFORM_KIND_LIST,
+  ROSTER_OPS,
+  codeReviewPolicy,
+  declarationOf,
+  delegableBy,
+  isDeclared,
+  isPlatformKind,
+  kindsOf,
+  roleMaySign,
+  shapeOf,
+  stepsOf,
+} from "./vocabulary.ts";
+export {
   OBJECTION_OPEN,
   carry,
   defaultPolicy,

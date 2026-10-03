@@ -9,6 +9,7 @@
 
 import type {
   ActRecord,
+  AnyPolicyDocument,
   DelegationId,
   Envelope,
   InvitationId,
@@ -26,17 +27,18 @@ import type {
   WorkspaceGrant,
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
+import { CODE_REVIEW_ACTS, bindingSubject, delegableBy as grantable, isDeclared, isPlatformKind, stepsOf } from "@generalbusiness/artroom-policy";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { admit, commit, decide, earlySteps, finalBoundary, refuseApplies, refuseInput, submit, type DecideOptions } from "./admission.ts";
-import { judge, refusal } from "./authority.ts";
+import { judge, refusal, type Judged } from "./authority.ts";
 import { utf8 } from "./canonical.ts";
 import { fault, Moved, type RoomCore } from "./core.ts";
 import { digestBytes, digestJson, newKeyPair, randomToken, sha256Hex, sign, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { iso, parseTime, RE } from "./ids.ts";
-import { laneRow } from "./model.ts";
+import { laneRow, type LaneRow } from "./model.ts";
 import { limitAddress, limitInvitation } from "./ratelimit.ts";
-import { delegation, invitation, keyRow, memberRow, revocationOf } from "./roster.ts";
+import { delegation, delegableBy, invitation, keyRow, memberRow, revocationOf } from "./roster.ts";
 import { checkRedemption, checkSignedRequest, isPlainObject, ShapeError } from "./schema.ts";
 import { num, one, str } from "./store.ts";
 
@@ -73,8 +75,9 @@ export async function request(core: RoomCore, input: unknown): Promise<Workspace
 
 /**
  * `workspace` and `workspace-token`, for a signed request or for a bearer
- * session (R-CRED-5, R-CRED-10): judged as for `propose` on that lane, now,
- * under the key and delegation given (R-WS-2).
+ * session (R-CRED-5, R-CRED-10): judged as for an act with step `version` on
+ * that lane (`propose` under the legacy vocabulary), now, under the key and
+ * delegation given (R-WS-2).
  */
 async function workspaceRequest(
   core: RoomCore,
@@ -105,9 +108,29 @@ async function workspaceRequest(
   return ws.grant(lane.id, lane.leaseGen);
 }
 
+/**
+ * The kinds whose step `version` acts on this thread (R-CRED-5 as amended):
+ * `propose` under the legacy vocabulary; in a `v2` room, `recover` on a
+ * configuration-recovery thread, and otherwise each declared act with step
+ * `version` whose `threads` name the thread's kind.
+ */
+function versionKinds(core: RoomCore, lane: LaneRow | null): string[] {
+  const doc = core.activePolicy().doc as AnyPolicyDocument;
+  if (!isDeclared(doc)) return ["propose"];
+  if (lane?.purpose === "config-recovery") return ["recover"];
+  return Object.keys(doc.acts).filter((k) => stepsOf(doc, k, { lane: lane?.id ?? "" })?.includes("version") && (!lane || doc.acts[k]!.threads?.includes(lane.kind)));
+}
+
 function workspaceAuthority(core: RoomCore, actor: KeyId, delegationId: DelegationId | undefined, laneId: LaneId, lease: number) {
-  const env = { actor, kind: "propose" as const, target: { lane: laneId }, body: {} as never, ...(delegationId ? { delegation: delegationId } : {}) };
-  const j = judge(core.sql, env as Pick<Envelope, "actor" | "kind" | "target" | "body" | "delegation">, "submitted", core.now(), { kind: "propose", lane: laneId });
+  const doc = core.activePolicy().doc;
+  const found = laneRow(core.sql, laneId);
+  let j: Judged | null = null;
+  for (const kind of versionKinds(core, found)) {
+    const env = { actor, kind, target: { lane: laneId }, body: {}, ...(delegationId ? { delegation: delegationId } : {}) };
+    j = judge(core.sql, env, "submitted", core.now(), doc, { kind, lane: laneId, ...(isPlatformKind(kind) ? {} : { binding: core.declaredBinding(kind) ?? "" }) });
+    if (j.ok) break;
+  }
+  if (!j) return found ? refusal("wrong-thread", `No declared act makes versions on ${laneId}, a ${found.kind} thread.`, "Declare an act with step version whose threads name this kind.") : refusal("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane.");
   if (!j.ok) return j.refusal;
   const lane = laneRow(core.sql, laneId);
   if (!lane) return refusal("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane.");
@@ -179,7 +202,7 @@ export function authenticateHash(core: RoomCore, h: string): MemberId {
  */
 export async function redeem(core: RoomCore, input: unknown, address: string | null, mcpBase: string): Promise<Joined | Redeemed | Refusal> {
   try {
-    checkRedemption(input);
+    checkRedemption(input, core.founded ? core.activePolicy().doc : undefined);
   } catch (e) {
     throw artroomError("bad-request", e instanceof ShapeError ? e.message : "The redemption is not valid.");
   }
@@ -203,6 +226,26 @@ export async function redeem(core: RoomCore, input: unknown, address: string | n
   }
   limitInvitation(core, r.invitation);
   return redeemRoom(core, r.invitation, r.secret, mcpBase);
+}
+
+/**
+ * What a room-custody session's delegation grants (R-CRED-3 as amended).
+ * Under a `v1` document: the session's kinds, or `*`. Under a `v2` one: a
+ * `v2` session's platform kinds and signed map, which the grant's admission
+ * checks against the active bindings, so a stale one refuses the redemption
+ * with `binding-stale` (R-DECL-17). An invitation with no `v2` session, new
+ * or from before declared acts, grants no declared kind, only the delegable
+ * platform kinds of what it covered: intersection, never acquisition.
+ */
+function sessionGrant(core: RoomCore, inv: NonNullable<ReturnType<typeof invitation>>): { kinds: readonly string[] | "*"; acts?: Readonly<Record<string, string>> } {
+  const doc = core.activePolicy().doc as AnyPolicyDocument;
+  const session = inv.session as (NonNullable<typeof inv.session> & { acts?: Readonly<Record<string, string>> }) | undefined;
+  if (!isDeclared(doc)) return { kinds: session?.kinds ?? "*" };
+  if (session?.acts !== undefined) return { kinds: session.kinds as readonly string[], acts: session.acts };
+  const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
+  if (!role) return { kinds: [], acts: {} };
+  const covered: readonly string[] = session === undefined || session.kinds === "*" ? delegableBy(role) : session.kinds;
+  return { kinds: grantable(doc, role).platform.filter((k) => covered.includes(k)), acts: {} };
 }
 
 class Abort extends Error {
@@ -255,7 +298,7 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
     actor: memberKey.key,
     kind: "roster",
     target: null,
-    body: { op: "delegate", to: sessionKey.key, kinds: inv.session?.kinds ?? "*", lanes: "*", expiresAt: iso(expiresMs) },
+    body: { op: "delegate", to: sessionKey.key, ...sessionGrant(core, inv), lanes: "*", expiresAt: iso(expiresMs) } as never,
     idempotencyKey: `session-${randomToken().slice(0, 32)}`,
   });
 
@@ -269,7 +312,7 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
       // The delegate, as it would be judged after the join (simulated, then rolled back).
       const sim = core.simulate(() => {
         commit(core, joinPlan, {});
-        const j = judge(core.sql, grant.envelope, "submitted", core.now());
+        const j = judge(core.sql, grant.envelope, "submitted", core.now(), core.activePolicy().doc);
         if (!j.ok) return { refusal: j.refusal } as const;
         const early = earlySteps(core, grant, "submitted", digestJson(grant.envelope), j.authority);
         if (early) return { refusal: early.t === "unrecorded" ? early.refusal : refusal("invalid-body", "The session grant was refused.") } as const;
@@ -352,11 +395,36 @@ function judgeBearer(core: RoomCore, bearer: unknown): { readonly key: KeyId; re
  */
 export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): Promise<ActRecord | Refusal> {
   const b = judgeBearer(core, bearer);
-  if (!isPlainObject(act) || Object.keys(act).some((k) => !["kind", "target", "body", "idempotencyKey"].includes(k)))
-    throw artroomError("bad-request", "A bearer act has only kind, target, body and idempotencyKey.");
-  const a = act as Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey">;
-  const env = { v: 1, room: core.roomId, actor: b.key, kind: a.kind, target: a.target, body: a.body, idempotencyKey: a.idempotencyKey, delegation: b.delegation } as Envelope;
+  if (!isPlainObject(act) || Object.keys(act).some((k) => !["kind", "target", "body", "idempotencyKey", "binding"].includes(k)))
+    throw artroomError("bad-request", "A bearer act has only kind, target, body, idempotencyKey and, for a declared kind, binding.");
+  const a = act as Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey"> & { binding?: unknown };
+  const binding = a.binding !== undefined ? a.binding : builtFor(core, a.kind);
+  const env = {
+    v: binding === undefined ? 1 : 2,
+    room: core.roomId,
+    actor: b.key,
+    kind: a.kind,
+    ...(binding !== undefined ? { binding } : {}),
+    target: a.target,
+    body: a.body,
+    idempotencyKey: a.idempotencyKey,
+    delegation: b.delegation,
+  } as unknown as Envelope;
   return submit(core, { envelope: env, sig: sign(b.seed, "artroom-envelope-v1", env) }, "submitted");
+}
+
+/**
+ * The binding a bearer act carries when its caller gave none, in a `v2`
+ * room (R-API-9 as amended): bearer acts come from the named MCP tools,
+ * each built for one code-review declaration, so it is that declaration's
+ * binding under this room's steps version and `lanes`. A room whose
+ * declaration of the kind differs refuses the act `binding-stale`; the room
+ * never gives an act the meaning its own declaration has.
+ */
+function builtFor(core: RoomCore, kind: unknown): string | undefined {
+  const doc = core.activePolicy().doc as AnyPolicyDocument;
+  if (!isDeclared(doc) || typeof kind !== "string" || isPlatformKind(kind) || !Object.hasOwn(CODE_REVIEW_ACTS, kind)) return undefined;
+  return digestJson(bindingSubject({ ...doc, acts: CODE_REVIEW_ACTS }, kind));
 }
 
 /** `workspace` or `workspace-token` for a bearer session, judged under its delegation (R-CRED-10, R-WS-2). */

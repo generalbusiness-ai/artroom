@@ -9,11 +9,13 @@ import type { CheckerConfig, PolicyDocument, Refusal } from "@generalbusiness/ar
 import { admit } from "./evaluator.ts";
 import { PolicyEvalError } from "./errors.ts";
 import { globProblem } from "./glob.ts";
+import { LEGACY_KINDS } from "./vocabulary.ts";
 
 const RULE_ID = /^[a-z][a-z0-9-]{0,63}$/;
 const MEMBER = /^@[a-z0-9][a-z0-9-]{0,38}$/;
 const ROLES = new Set(["admin", "maintainer", "member", "agent", "checker"]);
-const KINDS = new Set(["claim", "propose", "note", "review", "check", "land", "release", "renew", "roster"]);
+/** A `v1` rule's `on` names legacy kinds, from the one source (vocabulary.ts). */
+const KINDS: ReadonlySet<string> = new Set(LEGACY_KINDS);
 /** Rule IDs the platform uses for its own obligations and refusals. */
 const RESERVED_IDS = new Set(["admin-approval"]);
 

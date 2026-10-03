@@ -78,7 +78,14 @@ export interface Refusal {
   /** The recorded refusal's log entry, when it was recorded. */
   readonly act?: ActId;
   /** Present on lane refusals: the current state the caller should act on. */
-  readonly current?: { readonly generation?: number; readonly leaseGeneration?: number; readonly op?: OpId };
+  readonly current?: {
+    readonly generation?: number;
+    readonly leaseGeneration?: number;
+    readonly op?: OpId;
+    /** On `binding-stale`: the active declaration's binding, and the policy version that holds it (R-DECL-16). */
+    readonly binding?: string;
+    readonly policy?: string;
+  };
 }
 
 /** Either the record the caller asked for, or a refusal. */

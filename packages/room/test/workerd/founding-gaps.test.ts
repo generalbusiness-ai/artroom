@@ -572,7 +572,7 @@ describe("request d29c09fa: the error upgrade drains in an unfounded room, throu
     expect(before.cursor).toHaveLength(1);
     expect(before.debt).toBe(false);
     expect(before.alarm).not.toBeNull(); // recovery stored the upgrade's alarm, with no founding debt left
-    expect(before.chain).toEqual({ v: 3, indexes: ["check_jobs_due", "job_tokens_due"], due: true, scrubFirst: true });
+    expect(before.chain).toEqual({ v: 4, indexes: ["check_jobs_due", "job_tokens_due"], due: true, scrubFirst: true });
     // No founding retry, and no direct call to scrubErrors: the production recovery and alarm route.
     const after = await drained(id);
     expect(JSON.stringify(after.rows), "terminal legacy founding error remains without any cleanup alarm").not.toContain(sample);
@@ -589,7 +589,7 @@ describe("request d29c09fa: the error upgrade drains in an unfounded room, throu
     expect(before).toMatchObject({ founded: false, debt: true });
     expect(before.cursor).toHaveLength(1);
     expect(before.alarm).not.toBeNull();
-    expect(before.chain).toEqual({ v: 3, indexes: ["check_jobs_due", "job_tokens_due"], due: true, scrubFirst: true });
+    expect(before.chain).toEqual({ v: 4, indexes: ["check_jobs_due", "job_tokens_due"], due: true, scrubFirst: true });
     advance(60_000);
     const after = await drained(id);
     expect(JSON.stringify(after.rows)).not.toContain(sample);

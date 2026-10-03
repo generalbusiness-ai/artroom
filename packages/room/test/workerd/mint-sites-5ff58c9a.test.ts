@@ -965,7 +965,7 @@ describe("mint lane C: the due indexes reach a room stored before them (review 9
         // an unknown mint, and no scrub in progress.
         const was = await inDO(before, async (room, state) => {
           await room.core.idle();
-          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 3 }]);
+          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 4 }]);
           room.core.sql.all("DROP INDEX job_tokens_due");
           room.core.sql.all("DROP INDEX check_jobs_due");
           room.core.sql.all("DELETE FROM meta WHERE k = 'error_scrub'");
@@ -986,7 +986,7 @@ describe("mint lane C: the due indexes reach a room stored before them (review 9
         });
         const r = await restarted(before);
         await inDO(r, (room) => {
-          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 3 }]);
+          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 4 }]);
           expect(room.core.sql.all("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('job_tokens_due', 'check_jobs_due') ORDER BY name")).toEqual([{ name: "check_jobs_due" }, { name: "job_tokens_due" }]);
           expect(snapshot(room)).toEqual(was);
           // Step 2's effect: from version 1 the scrub's cursor is stored; from version 2 it is not started again.
@@ -1009,7 +1009,7 @@ describe("mint lane C: the due indexes reach a room stored before them (review 9
         const at3 = await inDO(r, (room) => ({ ...snapshot(room), legacy: room.core.sql.all("SELECT last_error FROM job_tokens WHERE token_id = 'tok_legacy'") }));
         const again = await restarted(r);
         await inDO(again, (room) => {
-          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 3 }]);
+          expect(room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")).toEqual([{ v: 4 }]);
           expect({ ...snapshot(room), legacy: room.core.sql.all("SELECT last_error FROM job_tokens WHERE token_id = 'tok_legacy'") }).toEqual(at3);
           expect(room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'")).toEqual([]);
         });
@@ -1041,7 +1041,7 @@ describe("mint lane C: the due indexes reach a room stored before them (review 9
         alarm: await state.storage.getAlarm(),
         plan: plan(room, JOB_TOKENS_DUE_SQL),
       }));
-      expect(opened).toMatchObject({ v: 3, indexes: ["check_jobs_due", "job_tokens_due"], cursor, plan: ["SEARCH job_tokens USING COVERING INDEX job_tokens_due (next_ms<?)"] });
+      expect(opened).toMatchObject({ v: 4, indexes: ["check_jobs_due", "job_tokens_due"], cursor, plan: ["SEARCH job_tokens USING COVERING INDEX job_tokens_due (next_ms<?)"] });
       expect(opened.alarm).not.toBeNull(); // recovery stored the scrub's alarm, with no request
       // Production alarms only.
       for (let i = 0; i < 10; i++) {
@@ -1063,6 +1063,6 @@ describe("mint lane C: the due indexes reach a room stored before them (review 9
       // A restart changes nothing.
       const again = await restarted(r);
       expect(await rows(again)).toEqual(finished);
-      expect(await inDO(again, (room) => ({ v: room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")[0]!["v"], cursor: room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'") }))).toEqual({ v: 3, cursor: [] });
+      expect(await inDO(again, (room) => ({ v: room.core.sql.all("SELECT v FROM schema_version WHERE id = 1")[0]!["v"], cursor: room.core.sql.all("SELECT k FROM meta WHERE k = 'error_scrub'") }))).toEqual({ v: 4, cursor: [] });
     }));
 });

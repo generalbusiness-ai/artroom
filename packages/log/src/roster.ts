@@ -20,6 +20,7 @@ import type {
   Role,
   RosterOp,
 } from "@generalbusiness/artroom-contract";
+import { LEGACY_DELEGABLE, LEGACY_ROLE_KINDS } from "@generalbusiness/artroom-policy";
 import { digestBytes, unb64url } from "./crypto.ts";
 import { checkedTime } from "./time.ts";
 
@@ -39,8 +40,9 @@ export type Judgement =
   | { readonly ok: true; readonly authority: Authority }
   | { readonly ok: false; readonly reason: AuthorityFailure; readonly detail: string };
 
-const MEMBER_KINDS: readonly EnvelopeKind[] = ["claim", "propose", "note", "review", "land", "release", "renew"];
-const DELEGABLE: readonly DelegableKind[] = ["claim", "propose", "note", "review", "check", "land", "release", "renew"];
+/** The legacy vocabulary's kinds, from the one source (policy vocabulary.ts): a member's, without `roster`, and the delegable ones. */
+const MEMBER_KINDS: readonly EnvelopeKind[] = LEGACY_ROLE_KINDS.member.filter((k) => k !== "roster");
+const DELEGABLE: readonly DelegableKind[] = LEGACY_DELEGABLE;
 const NOT_RECOVERY_OPS: readonly RosterOp["op"][] = ["join", "delegate", "undelegate"];
 
 /** R-GEN-5 and R-GEN-4: may this role sign this kind (and roster op)? */

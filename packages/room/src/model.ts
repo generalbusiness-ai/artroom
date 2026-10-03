@@ -51,6 +51,12 @@ export interface LaneRow {
   readonly why: "released" | "expired" | "opened-by-room" | null;
   readonly handover: ActId | null;
   readonly revertOf: OpId | null;
+  /** The thread's kind: the kind of the act that opened it, or `room` (R-DECL-6). */
+  readonly kind: string;
+  /** The binding of the act that opened it; null for a thread the legacy vocabulary or the room opened. */
+  readonly binding: string | null;
+  /** The lease length recorded when it opened (R-DECL-9); null: the room's current lease, as a legacy thread keeps. */
+  readonly leaseMs: number | null;
 }
 
 export function laneRow(sql: Sql, id: string): LaneRow | null {
@@ -71,6 +77,9 @@ export function laneRow(sql: Sql, id: string): LaneRow | null {
     why: str(r, "why") as LaneRow["why"],
     handover: str(r, "handover") as ActId | null,
     revertOf: str(r, "revert_of") as OpId | null,
+    kind: str(r, "kind")!,
+    binding: str(r, "binding"),
+    leaseMs: num(r, "lease_ms"),
   };
 }
 
