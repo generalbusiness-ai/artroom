@@ -1,0 +1,122 @@
+[
+  {
+    "path": "docs/protocol.md",
+    "sha256": "a557f16e86bcccf00b32c3ba57ed90e76cca30027080dd05b8bb6dd3daa62c4f",
+    "bytes": 290699,
+    "blob": "f3165e842e4b03771e4b9ba5658446ca37200364"
+  },
+  {
+    "path": "packages/cli/README.md",
+    "sha256": "f408c6eb2a01d80c8abaabb2678875a2cfd62f7d5cd9d777b95099fa94bdd774",
+    "bytes": 7617,
+    "blob": "40f39ca4843679a09776cd08dcaed33cc38858f0"
+  },
+  {
+    "path": "packages/cli/src/main.ts",
+    "sha256": "4e78eca7ec15b72ec72f43a661c51612edeab7a5af2c02f3233f3ea18eb365b1",
+    "bytes": 62580,
+    "blob": "be8441cb6f48a516a1ffe5f0a1e63615b71c671b"
+  },
+  {
+    "path": "packages/cli/test/declared-a5d64b35.test.ts",
+    "sha256": "d70f7765d13285d14850230dc2583bb9798feb99cee0d775834cfce8b041f22f",
+    "bytes": 28848,
+    "blob": "24701da6ab5792d0972044df14e4bb7b37ab5b73"
+  },
+  {
+    "path": "packages/client/README.md",
+    "sha256": "44db14d69970bd0c73e888719f21bc4aca89ce22bfcd23272b22b256e9f875af",
+    "bytes": 28842,
+    "blob": "3562aa6c13ef1caac374c9b7d177bf4a8a4fb314"
+  },
+  {
+    "path": "packages/client/test/declared-a5d64b35.test.ts",
+    "sha256": "a43fccc27f5cf78ba3e03ae2e3ea54968d6d0f3868b9eb85c32db71b824c2f9d",
+    "bytes": 39821,
+    "blob": "bf45d041482d9387e713e17a22e12febfcd0b7b7"
+  },
+  {
+    "path": "packages/client/test/thread-names-c37653e1.test.ts",
+    "sha256": "264f5b0cce96d447ca87fbb1662b752bb8b9ea2d5c8e33a342f5a3171d2a356c",
+    "bytes": 9556,
+    "blob": "d1bf97205ac80e80ec08208e2970a3abcca94453"
+  },
+  {
+    "path": "packages/mcp/README.md",
+    "sha256": "b55a4035ddfe5aca1a83f628f8e7ade74e45a58c84299d6cc07fa2fd33a45fb1",
+    "bytes": 5512,
+    "blob": "e508736a0ad49e85a9f66427bbd5bbf3db5686ad"
+  },
+  {
+    "path": "packages/mcp/src/run.ts",
+    "sha256": "139628b6056f04562d79b4508ba02f8fc323e5256b84adcbc58830ddb66f5dc9",
+    "bytes": 14341,
+    "blob": "d759ab7d5a0a8730308c56410a7ea92567d34bcd"
+  },
+  {
+    "path": "packages/mcp/test/declared-a5d64b35.test.ts",
+    "sha256": "2ea41205833ec813e7fe658b27bcad591e98529e0f9b5819045cfffeadaf0148",
+    "bytes": 16409,
+    "blob": "730b5d94b491a33bee343d40dc34dd9abe772d8e"
+  },
+  {
+    "path": "packages/policy/README.md",
+    "sha256": "b778fc252eef492e71461bd57ecc0f8a4956571d4aed966fa3980e10484ab468",
+    "bytes": 20121,
+    "blob": "a62c694086664612373dd387c7aa199ba1e29277"
+  },
+  {
+    "path": "packages/policy/src/catalogue.ts",
+    "sha256": "0522e8c997109b32db8443efedbbc03c82ac18bfb701f4ea7f10557b1ee4b19b",
+    "bytes": 10996,
+    "blob": "79cce93bc4afd6717b80be486c15d4ecd73d7a91"
+  },
+  {
+    "path": "packages/ui/README.md",
+    "sha256": "512193c44b7b44ebbc84a2cdbd15c8c9d32a2b05f99f19ef816cb2fa7176f9e9",
+    "bytes": 35519,
+    "blob": "38ede515792027519b5af927b6380a2a51481c26"
+  },
+  {
+    "path": "packages/ui/src/room/acts.ts",
+    "sha256": "47d004ae2ff3f50fb9dcd2824a772c5e50864987c70321896e179276438b3360",
+    "bytes": 17864,
+    "blob": "0f9ae7e27dcf27cb0ad64b912e711098c20ddf05"
+  },
+  {
+    "path": "packages/ui/src/room/adapter.ts",
+    "sha256": "cf01a4239c9c9fac4d1488343f47c2f4c4f6a4d8791e4be8b281952ca2ceec4a",
+    "bytes": 14001,
+    "blob": "2c76ea3a13d492fc54752290748bacbd19031814"
+  },
+  {
+    "path": "packages/ui/src/ui/format.ts",
+    "sha256": "548ab3cdecd84c037addc6c986a6b4f012f638eb9d15e8fa4fccc7cdbc322181",
+    "bytes": 3435,
+    "blob": "a7458143f6b13c098cae95307f13f299a5474762"
+  },
+  {
+    "path": "packages/ui/test/acts-fields.test.ts",
+    "sha256": "552b4f6d1c878c5dcc70d8ed769fa2a7d2462c589f00543b629f6d83297d8012",
+    "bytes": 13720,
+    "blob": "e836bbd3a3c4a71f69c8f2b736deb9ab8b68f26e"
+  },
+  {
+    "path": "packages/ui/test/acts-screen.test.tsx",
+    "sha256": "fc65ae9af2411224da884a19c5f38e3587acdea0407550223255a9efaddfe2e2",
+    "bytes": 20143,
+    "blob": "f8f703f1c7045433866e78611e334c478cdb9302"
+  },
+  {
+    "path": "packages/ui/test/declared-rendering.test.tsx",
+    "sha256": "e5d3d5c3ade3ecdb896ee7fcbbe83939bdafa67e5e0ec94e945438f2873d4eba",
+    "bytes": 22476,
+    "blob": "d8a861eb8e33d887aef0e46a8331cb74d6acabf9"
+  },
+  {
+    "path": "packages/ui/test/thread-names-c37653e1.test.ts",
+    "sha256": "38c5df7792727d15702c75a91d0d1c40d865d684a9995b9c9ca2a25d1c758c5c",
+    "bytes": 4171,
+    "blob": "189987c65ddd92862f80ca687d9eadec88ae9147"
+  }
+]

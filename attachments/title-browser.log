@@ -1,0 +1,28 @@
+
+> @generalbusiness/artroom-ui@0.0.0 e2e
+> playwright test
+
+[WebServer] (node:28496) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:29567) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:31131) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:32070) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 9 tests using 1 worker
+
+(node:33839) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/smoke.spec.ts:41:1 › the scenario plays end to end and each screen shows its idea (1.5s)
+  ✓  2 e2e/smoke.spec.ts:91:1 › a reviewer clears their queue (273ms)
+  ✓  3 e2e/smoke.spec.ts:105:1 › keyboard: skip link, number keys, and visible focus (125ms)
+  ✓  4 e2e/smoke.spec.ts:117:3 › screenshots, light (576ms)
+  ✓  5 e2e/smoke.spec.ts:117:3 › screenshots, dark (606ms)
+  ✓  6 e2e/smoke.spec.ts:140:1 › the per-change history of a jj recut (440ms)
+  ✓  7 e2e/smoke.spec.ts:165:1 › screenshot, check carry and an advisory check (255ms)
+  ✓  8 e2e/smoke.spec.ts:179:1 › screenshot, phone width (298ms)
+  ✓  9 e2e/smoke.spec.ts:195:1 › a room that declares its own acts: the feed, the acts and a form, in its own words (524ms)
+
+  9 passed (7.0s)

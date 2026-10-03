@@ -7,8 +7,8 @@
       "typecheck"
     ],
     "cwd": "/tmp/artroom-planner-ui-4567-ajquzk40/repo",
-    "start": "2026-10-03T20:58:11.752452+00:00",
-    "end": "2026-10-03T20:58:18.659976+00:00",
+    "start": "2026-10-03T21:05:25.463164+00:00",
+    "end": "2026-10-03T21:05:35.393481+00:00",
     "exit": 0
   },
   {
@@ -19,80 +19,14 @@
       "--",
       "vitest",
       "run",
+      "test/planner-title-era.test.ts",
       "--reporter=verbose",
       "--reporter=json",
-      "--outputFile=/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-ui-624-final-3jb8g6tr/tests.vitest.json"
-    ],
-    "cwd": "/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui",
-    "start": "2026-10-03T20:58:18.660309+00:00",
-    "end": "2026-10-03T20:58:20.693863+00:00",
-    "exit": 0
-  },
-  {
-    "name": "client-title",
-    "args": [
-      "npm",
-      "exec",
-      "--",
-      "vitest",
-      "run",
-      "test/declared-a5d64b35.test.ts",
-      "test/thread-names-c37653e1.test.ts",
-      "--reporter=verbose",
-      "--reporter=json",
-      "--outputFile=/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-ui-624-final-3jb8g6tr/client-title.vitest.json"
-    ],
-    "cwd": "/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/client",
-    "start": "2026-10-03T21:01:09.869815+00:00",
-    "end": "2026-10-03T21:01:11.554568+00:00",
-    "exit": 0
-  },
-  {
-    "name": "cli-title",
-    "args": [
-      "npm",
-      "exec",
-      "--",
-      "vitest",
-      "run",
-      "test/declared-a5d64b35.test.ts",
-      "--reporter=verbose",
-      "--reporter=json",
-      "--outputFile=/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-ui-624-final-3jb8g6tr/cli-title.vitest.json"
+      "--outputFile=/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-cli-era-flomo622/tests.vitest.json"
     ],
     "cwd": "/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli",
-    "start": "2026-10-03T21:01:11.555516+00:00",
-    "end": "2026-10-03T21:01:14.800561+00:00",
-    "exit": 0
-  },
-  {
-    "name": "mcp-title",
-    "args": [
-      "npm",
-      "exec",
-      "--",
-      "vitest",
-      "run",
-      "test/declared-a5d64b35.test.ts",
-      "--reporter=verbose",
-      "--reporter=json",
-      "--outputFile=/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-ui-624-final-3jb8g6tr/mcp-title.vitest.json"
-    ],
-    "cwd": "/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/mcp",
-    "start": "2026-10-03T21:01:14.800863+00:00",
-    "end": "2026-10-03T21:01:15.870800+00:00",
-    "exit": 0
-  },
-  {
-    "name": "ui-title",
-    "args": [
-      "npm",
-      "run",
-      "e2e"
-    ],
-    "cwd": "/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/ui",
-    "start": "2026-10-03T21:01:15.871114+00:00",
-    "end": "2026-10-03T21:01:23.476624+00:00",
-    "exit": 0
+    "start": "2026-10-03T21:05:35.393892+00:00",
+    "end": "2026-10-03T21:05:36.710233+00:00",
+    "exit": 1
   }
 ]

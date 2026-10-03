@@ -1,50 +1,44 @@
 {
   "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
-  "tree": "6aa9573e82143ee7a573a4d5aeb6ba451a46e0d1",
-  "fixtures": [
-    {
-      "path": "checker-ui-f606-races.test.ts",
-      "bytes": 8188,
-      "sha256": "b58e94872c699b49fa48a108e34b26ac7c723211783509c9de41cc14a9caed57"
-    },
-    {
-      "path": "planner-ui-unavailable.test.ts",
-      "bytes": 5624,
-      "sha256": "8cf82744551421b1cb72887f273009f84316aa56cd4d75b26fd4bd05c03717d8"
-    }
-  ],
+  "fixtureSha256": "4b2f84801bfa082b9b6a4bb70369d005c5af8f3577f38b0b744ec675a0021e25",
   "sources": [
     {
-      "path": "packages/ui/src/room/live/live-room.ts",
-      "sha256": "d95ed7bfc73c82a0d83637c303caf26a3b76cfd1e47930363fe58a95dbf16855",
-      "blob": "85212f289a5d482e73d3853fd55c0b4f850410da",
-      "bytes": 20692,
+      "path": "packages/cli/src/main.ts",
+      "sha256": "4e78eca7ec15b72ec72f43a661c51612edeab7a5af2c02f3233f3ea18eb365b1",
+      "blob": "be8441cb6f48a516a1ffe5f0a1e63615b71c671b",
       "restoredMatches": true
     },
     {
-      "path": "packages/ui/test/review-0fd98c41.test.ts",
-      "sha256": "916d984c3e2f5036f71842505932e7873c34357a1a867032017f8d5349e20e38",
-      "blob": "b88acd6c2f1a34136dd1987061ce2fd292b17290",
-      "bytes": 9166,
+      "path": "packages/policy/src/catalogue.ts",
+      "sha256": "0522e8c997109b32db8443efedbbc03c82ac18bfb701f4ea7f10557b1ee4b19b",
+      "blob": "79cce93bc4afd6717b80be486c15d4ecd73d7a91",
+      "restoredMatches": true
+    },
+    {
+      "path": "packages/client/test/support/fake-room.ts",
+      "sha256": "f26259921e31e1c5f1ef78ed2c027d4ebf41184f85990dceec3d9d8a11447349",
+      "blob": "0a6ad45e5cb5b6049a4d4fde2f468feac79bc45e",
       "restoredMatches": true
     }
   ],
   "compileExit": 0,
-  "testsExit": 0,
+  "testsExit": 1,
   "counts": {
-    "numTotalTests": 253,
-    "numPassedTests": 253,
-    "numFailedTests": 0,
-    "numPendingTests": 0,
-    "numTotalTestSuites": 83,
-    "numPassedTestSuites": 83,
-    "numFailedTestSuites": 0
+    "numTotalTests": 2,
+    "numPassedTests": 1,
+    "numFailedTests": 1,
+    "numPendingTests": 0
   },
-  "failures": [],
+  "failures": [
+    {
+      "name": "planner CLI thread title under the policy of its actual admission a label-only activation after preparation uses the admitted record's words, activateDuringSend=true",
+      "messages": [
+        "AssertionError: expected 'Done: Start a song (start-song), reco\u2026' to contain 'Done: Begin a tune (start-song), reco\u2026'\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli/test/planner-title-era.test.ts:42:43\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20",
+        "AssertionError: expected 'Thread: Start a song: Footprints (lan\u2026' to match /^Thread: Begin a tune: Footprints \\(l\u2026/\n    at /private/tmp/artroom-planner-ui-4567-ajquzk40/repo/packages/cli/test/planner-title-era.test.ts:43:43\n    at file:///private/tmp/artroom-planner-ui-4567-ajquzk40/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ]
+    }
+  ],
   "actualHead": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
   "status": "",
-  "trackedDiff": "",
-  "finalHead": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
-  "finalStatus": "",
-  "finalTrackedDiff": ""
+  "diff": ""
 }
