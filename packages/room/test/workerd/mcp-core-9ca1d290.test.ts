@@ -169,6 +169,14 @@ describe.skipIf(DECLARED)("the Room's reading of a credential and the command li
     expect(await refusedAs(c.bearer)).toBe("unauthenticated");
     const afterRevoke = await roster(r);
     expect(() => callerFromRoster(afterRevoke, { key: c.key, session: true, delegation: c.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    // A third session: its member is removed from the room.
+    const e = await bearer(r, "@third", "agent", { kinds: ["renew"], acts: {} });
+    expect(callerFromRoster(await roster(r), { key: e.key, session: true, delegation: e.delegation })).toEqual(await callerOf(r, e.bearer));
+    await r.admin.ok("roster", null, { op: "remove", member: "@third" });
+    expect(await refusedAs(e.bearer)).toBe("unauthenticated");
+    const afterRemove = await roster(r);
+    expect(() => callerFromRoster(afterRemove, { key: e.key, session: true, delegation: e.delegation })).toThrowError(expect.objectContaining({ code: "unauthenticated" }));
+    expect((await rpc(r, e.bearer, "tools/list")).status).toBe(401);
   });
 });
 
@@ -241,6 +249,29 @@ describe.skipIf(DECLARED)("tools/list at the Worker's MCP endpoint (R-API-13, R-
     expect(await listed(r, agent.bearer, "?toolset=all")).toEqual(ORDER);
     const noLand = await bearer(r, "@careful", "agent", { kinds: ["renew"], acts: await bindings(r, "claim", "propose", "note", "release") });
     expect(await listed(r, noLand.bearer)).toEqual(without(BUILDER, "land"));
+  });
+
+  it("a checker's own key: the reviewer presentation by default, with note and the generic act and never review or claim; the stdio adapter reads the same caller", async () => {
+    const r = await declaredRoom(doc());
+    const ci = await addMember(r, "@ci", "checker");
+    const token = await ci.session();
+    expect(await callerOf(r, token)).toEqual({ role: "checker" });
+    expect(callerFromRoster(await roster(r), { key: ci.key })).toEqual({ role: "checker" });
+    // Its role may sign `note` and the renamed check kind, so the reviewer set keeps `note` and `act`, and drops `review`.
+    expect(await listed(r, token)).toEqual(without(REVIEWER, "review"));
+    expect(await listed(r, token, "?toolset=all")).toEqual(["workspace", "note", "attention", "explain", "lanes", "lane", "proposal", "operation", "acts", "act"]);
+    expect(await listed(r, token, "?toolset=observer")).toEqual(OBSERVER);
+    // Under a document that declares nothing a checker may sign, its own key keeps the reviewer presentation, with no
+    // act tool: the observer override is for delegations only.
+    await activate(
+      r,
+      v2((a) => {
+        for (const kind of Object.keys(a)) delete a[kind];
+        a["ask"] = ASK;
+      }),
+    );
+    expect(await listed(r, token)).toEqual(without(REVIEWER, "note", "review", "act"));
+    expect(await callerOf(r, token)).toEqual({ role: "checker" });
   });
 
   it("a checker's bearer: with one eligible declared check kind, the reviewer presentation; with none, observer; never review or claim", async () => {
