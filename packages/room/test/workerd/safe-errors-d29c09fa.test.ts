@@ -229,6 +229,7 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
         ["tid_legacy_revoke", legacy()],
         ["tid_legacy_held", "held"],
         ["mint:job_safe_1", "answer lost: create failed: Error INTERNAL_ERROR (10400)"],
+        ["mint:job_safe_2", "outcome unknown; 0 live token(s) on the canonical repository not accounted for at 2026-10-01T12:00:00.000Z"],
       ];
       for (const [id, e] of tokens) sql.all("INSERT INTO job_tokens (token_id, expires_at, next_ms, last_error) VALUES (?, ?, ?, ?)", id, later, later, e);
       sql.all("INSERT INTO meta (k, v) VALUES ('publication_error', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", ECHOED[0]!);
@@ -251,6 +252,7 @@ describe("request d29c09fa: rows stored with provider text before the rule, reop
       tid_legacy_revoke: `revocation failed: ${WITHHELD}`,
       tid_legacy_held: "held",
       "mint:job_safe_1": "answer lost: create failed: Error INTERNAL_ERROR (10400)",
+      "mint:job_safe_2": "outcome unknown; 0 live token(s) on the canonical repository not accounted for at 2026-10-01T12:00:00.000Z",
     });
     // Before the upgrade's first batch, a row may still hold the text; nothing shown does.
     await clean(again, [shown, wsView], { rows: false });

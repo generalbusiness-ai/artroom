@@ -232,6 +232,16 @@ test("d29c09fa: the scrub keeps safe values as they are", async (t) => {
   w.pub.push = () => Promise.reject(echoing());
   await w.engine.publish();
   const before = everyRow(w.sql);
+  // Nothing is written for a safe value: count the upgrade's writes.
+  let writes = 0;
+  const all = w.sql.all.bind(w.sql);
+  w.sql.all = (q, ...b) => {
+    if (/^\s*(UPDATE|INSERT|DELETE)/i.test(q)) writes++;
+    return all(q, ...b);
+  };
+  scrubLegacyErrors(w.sql);
+  w.sql.all = all;
+  assert.equal(writes, 0);
   {
     const once = everyRow(w.sql);
     scrubLegacyErrors(w.sql); // a second run changes nothing
