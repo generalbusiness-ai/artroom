@@ -74,4 +74,3 @@ export async function ok<T extends ActRecord = ActRecord>(r: TestRoom, c: Client
 
 export const laneRowOf = (r: TestRoom, lane: string) =>
   inDO(r, (room) => room.core.sql.all("SELECT kind, binding, lease_ms, expires_ms, purpose FROM lanes WHERE id = ?", lane)[0] as { kind: string; binding: string | null; lease_ms: number | null; expires_ms: number | null; purpose: string });
-

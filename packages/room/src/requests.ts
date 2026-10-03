@@ -27,10 +27,11 @@ import type {
   WorkspaceGrant,
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
-import { CODE_REVIEW_ACTS, bindingSubject, delegableBy as grantable, isDeclared, isPlatformKind, stepsOf } from "@generalbusiness/artroom-policy";
+import { CODE_REVIEW_ACTS, DELEGABLE_PLATFORM, bindingSubject, delegableBy as grantable, isDeclared, isPlatformKind, stepsOf } from "@generalbusiness/artroom-policy";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { admit, commit, decide, earlySteps, finalBoundary, refuseApplies, refuseInput, submit, type DecideOptions } from "./admission.ts";
 import { judge, refusal, type Judged } from "./authority.ts";
+import { entryAt } from "./log.ts";
 import { utf8 } from "./canonical.ts";
 import { fault, Moved, type RoomCore } from "./core.ts";
 import { digestBytes, digestJson, newKeyPair, randomToken, sha256Hex, sign, unb64url, verify } from "./crypto.ts";
@@ -237,10 +238,32 @@ export async function redeem(core: RoomCore, input: unknown, address: string | n
  * or from before declared acts, grants no declared kind, only the delegable
  * platform kinds of what it covered: intersection, never acquisition.
  */
-function sessionGrant(core: RoomCore, inv: NonNullable<ReturnType<typeof invitation>>): { kinds: readonly string[] | "*"; acts?: Readonly<Record<string, string>> } {
-  const doc = core.activePolicy().doc as AnyPolicyDocument;
+function sessionGrant(core: RoomCore, inv: NonNullable<ReturnType<typeof invitation>>): { kinds: readonly string[] | "*"; acts?: Readonly<Record<string, string>> } | { refusal: Refusal } {
+  const policy = core.activePolicy();
+  const doc = policy.doc as AnyPolicyDocument;
   const session = inv.session as (NonNullable<typeof inv.session> & { acts?: Readonly<Record<string, string>> }) | undefined;
-  if (!isDeclared(doc)) return { kinds: session?.kinds ?? "*" };
+  if (!isDeclared(doc)) {
+    // A session signed under a v2 document, redeemed after the room returned to v1: no binding of its map is the active
+    // one, so the redemption is refused binding-stale and the invitation stays unused (R-DECL-17). The map is never
+    // dropped silently.
+    const named = Object.keys(session?.acts ?? {});
+    if (named.length > 0)
+      return {
+        refusal: refusal(
+          "binding-stale",
+          `The invitation's session was prepared for ${named[0]} as ${session!.acts![named[0]!]}; the room's active policy, version ${policy.version}, declares no acts.`,
+          "Ask an admin to invite again.",
+          { current: { policy: policy.version } },
+        ), // G2:session-v1
+      };
+    // An invitation admitted under a v2 document never gains a kind by a later return to v1: with no session it
+    // granted the delegable platform kinds of its role, and it still grants only those.
+    if (inv.declared && session === undefined) { // G2:invitation-no-gain
+      const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
+      return { kinds: role ? DELEGABLE_PLATFORM.filter((k) => (delegableBy(role) as readonly string[]).includes(k)) : [] };
+    }
+    return { kinds: session?.kinds ?? "*" };
+  }
   if (session?.acts !== undefined) return { kinds: session.kinds as readonly string[], acts: session.acts }; // G2:session-map
   const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
   if (!role) return { kinds: [], acts: {} };
@@ -278,6 +301,8 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
       "This invitation is for a key the client holds; it can be redeemed only with a join the client signs.",
       "Make a key, sign a join, and send it to redeem with custody client.",
     );
+  const granted = sessionGrant(core, inv);
+  if ("refusal" in granted) return granted.refusal;
   const memberKey = newKeyPair();
   const sessionKey = newKeyPair();
   const ttl = inv.session?.ttlSeconds ?? 24 * 3600;
@@ -298,7 +323,7 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
     actor: memberKey.key,
     kind: "roster",
     target: null,
-    body: { op: "delegate", to: sessionKey.key, ...sessionGrant(core, inv), lanes: "*", expiresAt: iso(expiresMs) } as never,
+    body: { op: "delegate", to: sessionKey.key, ...granted, lanes: "*", expiresAt: iso(expiresMs) } as never,
     idempotencyKey: `session-${randomToken().slice(0, 32)}`,
   });
 
@@ -398,9 +423,12 @@ export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): 
   if (!isPlainObject(act) || Object.keys(act).some((k) => !["kind", "target", "body", "idempotencyKey", "binding"].includes(k)))
     throw artroomError("bad-request", "A bearer act has only kind, target, body, idempotencyKey and, for a declared kind, binding.");
   const a = act as Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey"> & { binding?: unknown };
-  const binding = a.binding !== undefined ? a.binding : builtFor(core, a.kind); // G2:bearer-binding
+  // A retry of an act this session already made is built as it was built then, so the same act and key give the same
+  // bytes and the original result, whatever the room's document is now (R-IDEM-2, R-DECL-16).
+  const earlier = a.binding === undefined ? builtBefore(core, b.key, a.idempotencyKey, a.kind) : null; // G2:bearer-retry
+  const binding = a.binding !== undefined ? a.binding : earlier ? earlier.binding : builtFor(core, a.kind); // G2:bearer-binding
   const env = {
-    v: binding === undefined ? 1 : 2,
+    v: earlier ? earlier.v : binding === undefined ? 1 : 2,
     room: core.roomId,
     actor: b.key,
     kind: a.kind,
@@ -411,6 +439,20 @@ export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): 
     delegation: b.delegation,
   } as unknown as Envelope;
   return submit(core, { envelope: env, sig: sign(b.seed, "artroom-envelope-v1", env) }, "submitted");
+}
+
+/**
+ * The envelope version and binding the room gave this session's earlier act
+ * under the same idempotency key and kind, or null when there is none. The
+ * recorded entry holds the envelope the room signed then.
+ */
+function builtBefore(core: RoomCore, key: string, ikey: unknown, kind: unknown): { readonly v: 1 | 2; readonly binding: string | undefined } | null {
+  if (typeof ikey !== "string" || typeof kind !== "string") return null;
+  const prior = one(core.sql, "SELECT seq FROM idem WHERE actor = ? AND ikey = ?", key, ikey);
+  const entry = prior ? entryAt(core.sql, num(prior, "seq")! as never) : null;
+  if (!entry || entry.entry.type !== "act") return null;
+  const env = entry.entry.act.envelope as unknown as { v: 1 | 2; kind: string; binding?: string };
+  return env.kind === kind ? { v: env.v, binding: env.binding } : null;
 }
 
 /**

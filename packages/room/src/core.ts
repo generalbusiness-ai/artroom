@@ -15,6 +15,7 @@
 import type {
   AnyPolicyDocument,
   Binding,
+  DeclaredPolicyLane,
   PolicyDocument,
   ActId,
   CheckBody,
@@ -910,9 +911,19 @@ export class RoomCore {
     return { member, role, teams: teamsOf(this.sql, member), delegated: false };
   }
 
+  /**
+   * The lane as policy sees it (R-EVAL-3). Under a `v2` document it also
+   * carries the thread's kind, null for the room's null lane
+   * (`DeclaredPolicyLane`, R-EVAL-3 as amended by section 33.3). Under a `v1`
+   * document the input is as it always was, with no `kind`.
+   */
   policyLane(lane: LaneRow | null): PolicyLane {
-    if (!lane) return { id: null, claimed: false, holder: null, scope: [], generation: 0, purpose: "ordinary" };
-    return { id: lane.id, claimed: lane.state === "held", holder: lane.holder, scope: lane.scope, generation: lane.generation, purpose: lane.purpose };
+    const l: PolicyLane = lane
+      ? { id: lane.id, claimed: lane.state === "held", holder: lane.holder, scope: lane.scope, generation: lane.generation, purpose: lane.purpose }
+      : { id: null, claimed: false, holder: null, scope: [], generation: 0, purpose: "ordinary" };
+    if (!isDeclared(this.activePolicy().doc)) return l;
+    const declared: DeclaredPolicyLane = { ...l, kind: lane?.kind ?? null }; // G2:policy-lane-kind
+    return declared;
   }
 
   policyRoom(): PolicyRoom {
