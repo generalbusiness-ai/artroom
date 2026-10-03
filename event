@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will independently review exact 7eb9e36fadf095b1d1e7ce142bb6296066733242 for both findings in #9972: bounded background job-token cleanup, alarm recovery and fairness, syntax scan enforcement, all 31 artifacts, runtime guard proofs and complete gates."}
+{"kind":"artifact","text":"packages/git/src/index.ts at exact 55139e15d00daf462387ec7cba5a47f2ccc2a892 on request/land-errors, under promise git:sha1…10d1d0f on request git:sha1…2d38177","body":{"commit":"55139e15d00daf462387ec7cba5a47f2ccc2a892","path":"packages/git/src/index.ts"}}
