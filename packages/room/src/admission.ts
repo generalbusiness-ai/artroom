@@ -313,7 +313,7 @@ export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: Admissi
   const sql = core.sql;
   const policy = core.activePolicy();
   // Step 1 again, under the document in force now: an activation may have changed the vocabulary since.
-  stepOne(signed, policy.doc);
+  stepOne(signed, policy.doc); // G2:step1-recheck
   // Step 3: idempotency, scoped to the signing key (R-IDEM-1 to R-IDEM-4). It runs first, so an exact retry of an
   // accepted act gets its original receipt even after its binding has gone stale (R-DECL-16).
   const prior = one(sql, "SELECT digest, seq, result FROM idem WHERE actor = ? AND ikey = ?", env.actor, env.idempotencyKey);
@@ -329,11 +329,11 @@ export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: Admissi
   const j = authority ? ({ ok: true, authority } as const) : judge(sql, env, path, core.now(), policy.doc);
   if (!j.ok) return { t: "unrecorded", refusal: j.refusal };
   // Step 4a, in a v2 room (R-DECL-16): the kind is declared, and the act carries the active declaration's binding.
-  if (isDeclared(policy.doc) && !isPlatformKind(env.kind)) {
+  if (isDeclared(policy.doc) && !isPlatformKind(env.kind)) { // G2:4a-platform
     const current = core.declaredBinding(env.kind);
-    if (current === null) return { t: "unrecorded", refusal: kindUndeclared(env.kind, policy.version) };
+    if (current === null) return { t: "unrecorded", refusal: kindUndeclared(env.kind, policy.version) }; // G2:undeclared
     const signedFor = (env as Signer).binding;
-    if ((env.v as number) !== 2 || signedFor !== current) return { t: "unrecorded", refusal: bindingStale(env.kind, signedFor, current, policy.version) };
+    if ((env.v as number) !== 2 || signedFor !== current) return { t: "unrecorded", refusal: bindingStale(env.kind, signedFor, current, policy.version) }; // G2:stale
   }
   // Step 5: body schema and sizes (R-SIG-4, R-SIG-6, R-PATH-1).
   let fixed: ReadonlySet<string>;
@@ -364,13 +364,13 @@ export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: Admissi
  */
 function grantProblem(core: RoomCore, doc: AnyPolicyDocument, role: Role, kinds: readonly string[], acts: Readonly<Record<string, string>>, invalid: (reason: string) => Refusal): Refusal | null {
   const may = grantable(doc, role);
-  for (const k of kinds) if (!may.platform.includes(k)) return invalid(`The role ${role} may not grant ${k}.`);
+  for (const k of kinds) if (!may.platform.includes(k)) return invalid(`The role ${role} may not grant ${k}.`); // G2:grant-platform
   const policy = core.activePolicy();
   for (const [k, b] of Object.entries(acts)) {
     const current = core.declaredBinding(k);
-    if (current === null) return kindUndeclared(k, policy.version);
-    if (!may.declared.includes(k)) return invalid(declarationOf(doc, k)!.who.delegable === false ? `${k} may not be delegated.` : `The role ${role} may not grant ${k}.`);
-    if (b !== current) return bindingStale(k, b, current, policy.version);
+    if (current === null) return kindUndeclared(k, policy.version); // G2:grant-undeclared
+    if (!may.declared.includes(k)) return invalid(declarationOf(doc, k)!.who.delegable === false ? `${k} may not be delegated.` : `The role ${role} may not grant ${k}.`); // G2:grant-delegable
+    if (b !== current) return bindingStale(k, b, current, policy.version); // G2:grant-stale
   }
   return null;
 }
@@ -394,7 +394,7 @@ function rosterSemantics(core: RoomCore, env: Envelope, by: Authority, doc: AnyP
         const role = op.role ?? existing!.role;
         if (isDeclared(doc)) {
           const s = op.session as unknown as { kinds: readonly string[]; acts: Readonly<Record<string, string>> };
-          return grantProblem(core, doc, role, s.kinds, s.acts, () => bad(`The role ${role} may not sign every kind the session lists.`));
+          return grantProblem(core, doc, role, s.kinds, s.acts, () => bad(`The role ${role} may not sign every kind the session lists.`)); // G2:session-grant
         }
         const may = delegableBy(role);
         if (op.session.kinds !== "*" && op.session.kinds.some((k) => !may.includes(k))) return bad(`The role ${role} may not sign every kind the session lists.`);
@@ -563,7 +563,7 @@ const fromRule = <R extends Refusal | null>(r: R): R => {
 
 /** A platform refusal of a declared act, in its declaration's words (R-DECL-13). */
 function wordedPlan(plan: Plan, decl: ActDeclaration | null, facts: RefusalFacts): Plan {
-  if (!decl || (plan.t !== "unrecorded" && plan.t !== "refused") || RULE_REFUSALS.has(plan.refusal)) return plan;
+  if (!decl || (plan.t !== "unrecorded" && plan.t !== "refused") || RULE_REFUSALS.has(plan.refusal)) return plan; // G2:wording
   const r = worded(plan.refusal, decl, facts);
   return r === plan.refusal ? plan : { ...plan, refusal: r };
 }
@@ -614,7 +614,7 @@ function dispatch(ctx: Ctx): Promise<Plan> {
   const step = stepOfEnvelope(ctx.policy.doc, env);
   const t = env.target as { lane: LaneId; generation: Generation } & NoteAnchor;
   // A recover op's body is its step's, with `op` (R-DECL-21); an open is a configuration-recovery open.
-  const b = (ctx.recover ? { ...(env.body as RecoverOp), op: undefined, ...(ctx.recover === "open" ? { purpose: "config-recovery" } : {}) } : env.body) as never;
+  const b = (ctx.recover ? { ...(env.body as RecoverOp), op: undefined, ...(ctx.recover === "open" ? { purpose: "config-recovery" } : {}) } : env.body) as never; // G2:recover-open
   switch (step) {
     case "open":
       return claimNew(ctx, b);
@@ -658,7 +658,7 @@ function holderCheck(ctx: Ctx, lane: LaneRow, lease: number): Refusal | null {
 
 /** The lease length a thread uses for renewal and expiry: recorded when it opened, or the room's current one (R-DECL-9). */
 function leaseMsOf(core: RoomCore, lane: Pick<LaneRow, "leaseMs">): number {
-  return lane.leaseMs ?? core.leaseMs;
+  return lane.leaseMs ?? core.leaseMs; // G2:lease-of
 }
 
 /** The facts of a thread an act names, for refusal wording (R-DECL-13). */
@@ -680,13 +680,13 @@ function laneFacts(ctx: Ctx, lane: LaneRow): void {
 function threadCheck(ctx: Ctx, lane: LaneRow | null, entry = false): Refusal | null {
   if (!isDeclared(ctx.policy.doc) || ctx.env.kind === "renew") return null;
   if (ctx.recover) {
-    if (lane?.purpose === "config-recovery") return null;
+    if (lane?.purpose === "config-recovery") return null; // G2:recover-ordinary
     return nope("wrong-thread", lane ? `${lane.id} is not a configuration-recovery thread; recover acts only on those.` : "recover acts only on a configuration-recovery thread.", "Act on it with the room's declared acts.");
   }
   if (!lane) return null;
   if (lane.purpose === "config-recovery")
-    return nope("wrong-thread", `${lane.id} is a configuration-recovery thread, on which only recover ops act.`, "Use the platform kind recover, with an admin's own key.");
-  if (entry || ctx.decl?.threads?.includes(lane.kind)) return null;
+    return nope("wrong-thread", `${lane.id} is a configuration-recovery thread, on which only recover ops act.`, "Use the platform kind recover, with an admin's own key."); // G2:recovery-thread
+  if (entry || ctx.decl?.threads?.includes(lane.kind)) return null; // G2:thread-kind
   return nope("wrong-thread", `${lane.id} is a ${lane.kind} thread, which ${ctx.env.kind} does not act on.`, `Act on it with an act whose threads name ${lane.kind}.`);
 }
 
@@ -789,10 +789,10 @@ async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
   // R-DECL-6: the thread's kind and the opening act's binding; R-DECL-9: its lease length, resolved and recorded now in
   // a v2 room (a hold's leaseSeconds, or the room's lease), and left unset under the legacy vocabulary.
   const declared = isDeclared(ctx.policy.doc);
-  const kind = ctx.recover ? "recover" : ctx.env.kind;
-  const binding = declared && !ctx.recover ? core.declaredBinding(kind) : null;
+  const kind = ctx.recover ? "recover" : ctx.env.kind; // G2:thread-kind-record
+  const binding = declared && !ctx.recover ? core.declaredBinding(kind) : null; // G2:binding-record
   const leaseSeconds = ctx.decl?.hold?.leaseSeconds;
-  const recordedLease = declared ? (leaseSeconds !== undefined ? leaseSeconds * 1000 : core.leaseMs) : null;
+  const recordedLease = declared ? (leaseSeconds !== undefined ? leaseSeconds * 1000 : core.leaseMs) : null; // G2:lease-record
   const leaseMs = recordedLease ?? core.leaseMs;
   if (purpose === "config-recovery") {
     ctx.flags.push("config-recovery");
@@ -1698,7 +1698,7 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
         case "delegate": {
           const exp = parseTime(op.expiresAt)!;
           // R-DECL-17: a grant in a v2 room keeps its signed map from declared kind to binding.
-          const acts = (op as { acts?: unknown }).acts;
+          const acts = (op as { acts?: unknown }).acts; // G2:grant-store
           sql.all(
             "INSERT INTO delegations (id, grantor, grantee, kinds, lanes, expires_at, expires_ms, acts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             id,

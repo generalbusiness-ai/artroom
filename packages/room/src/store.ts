@@ -177,8 +177,8 @@ const hasColumn = (sql: Sql, table: string, column: string): boolean => one(sql,
  * place and adds none.
  */
 function declaredColumns(sql: Sql): void {
-  for (const [table, column, type] of DECLARED_COLUMNS) if (!hasColumn(sql, table, column)) sql.all(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
-  sql.all("UPDATE lanes SET kind = CASE WHEN revert_of IS NOT NULL THEN 'room' ELSE 'claim' END WHERE kind IS NULL");
+  for (const [table, column, type] of DECLARED_COLUMNS) if (!hasColumn(sql, table, column)) sql.all(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); // G2:migration-add
+  sql.all("UPDATE lanes SET kind = CASE WHEN revert_of IS NOT NULL THEN 'room' ELSE 'claim' END WHERE kind IS NULL"); // G2:migration-backfill
 }
 
 /**

@@ -25,16 +25,16 @@ export function stagedProblems(doc: PolicyDocumentV2): string[] {
     for (const shape of TARGET_ORDER) {
       const steps: readonly Step[] | undefined = d.targets[shape];
       if (!steps) continue;
-      if (steps.length > 1) later(kind, `${steps.join(" then ")} in one act`);
-      if (steps.includes("hand-over")) later(kind, "the step hand-over");
-      if (shape === "none" && steps.includes("comment")) later(kind, "a comment on target none");
+      if (steps.length > 1) later(kind, `${steps.join(" then ")} in one act`); // G2:staged-pair
+      if (steps.includes("hand-over")) later(kind, "the step hand-over"); // G2:staged-handover
+      if (shape === "none" && steps.includes("comment")) later(kind, "a comment on target none"); // G2:staged-unanchored
     }
     const h = d.hold;
     if (!h) continue;
-    if (h.scope !== "body.scope") later(kind, "a scope template");
-    if (h.conflict !== undefined) later(kind, "hold.conflict");
-    if (h.reserveSeconds !== undefined) later(kind, "hold.reserveSeconds");
-    if (h.workspace !== true) later(kind, "a hold without a workspace");
+    if (h.scope !== "body.scope") later(kind, "a scope template"); // G2:staged-template
+    if (h.conflict !== undefined) later(kind, "hold.conflict"); // G2:staged-conflict
+    if (h.reserveSeconds !== undefined) later(kind, "hold.reserveSeconds"); // G2:staged-reserve
+    if (h.workspace !== true) later(kind, "a hold without a workspace"); // G2:staged-workspace
   }
   return out;
 }
@@ -44,7 +44,7 @@ export type RefusalFacts = Partial<Record<RefusalSlot, string>>;
 
 /** Fill a template's slots. Only the eight slots are interpolated; validation refused any other brace. */
 export function fill(template: string, facts: RefusalFacts): string {
-  return template.replace(/\{(holder|lane|generation|obligation|path|reservedFor|until|kind)\}/g, (_, slot: RefusalSlot) => facts[slot] ?? "");
+  return template.replace(/\{(holder|lane|generation|obligation|path|reservedFor|until|kind)\}/g, (_, slot: RefusalSlot) => facts[slot] ?? ""); // G2:fill
 }
 
 /**

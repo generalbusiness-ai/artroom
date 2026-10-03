@@ -154,9 +154,9 @@ export function checkSignedEnvelope(v: unknown, doc?: AnyPolicyDocument): void {
   const signed = c.object(v, "act", ["envelope", "sig"]);
   c.format(signed.sig, "act.sig", RE.sig, "an Ed25519 signature in base64url");
   const declared = doc !== undefined && isDeclared(doc);
-  const e = c.object(signed.envelope, "envelope", ["v", "room", "actor", "kind", "target", "body", "idempotencyKey"], declared ? ["delegation", "binding"] : ["delegation"]);
-  if (!declared && e.v !== 1) c.error("envelope.v", "must be 1");
-  if (declared && e.v !== 1 && e.v !== 2) c.error("envelope.v", "must be 1 or 2");
+  const e = c.object(signed.envelope, "envelope", ["v", "room", "actor", "kind", "target", "body", "idempotencyKey"], declared ? ["delegation", "binding"] : ["delegation"]); // G2:binding-field
+  if (!declared && e.v !== 1) c.error("envelope.v", "must be 1"); // G2:v1-version
+  if (declared && e.v !== 1 && e.v !== 2) c.error("envelope.v", "must be 1 or 2"); // G2:v2-version
   c.format(e.room, "envelope.room", RE.roomId, "a room ID");
   c.format(e.actor, "envelope.actor", RE.keyId, "a key ID");
   if (!declared) {
@@ -166,18 +166,18 @@ export function checkSignedEnvelope(v: unknown, doc?: AnyPolicyDocument): void {
     checkTarget(c, kind, e.target, e.body);
     return;
   }
-  if (typeof e.kind !== "string" || !KIND_NAME.test(e.kind)) c.error("envelope.kind", "must be a kind name, [a-z][a-z0-9-]{0,31}");
+  if (typeof e.kind !== "string" || !KIND_NAME.test(e.kind)) c.error("envelope.kind", "must be a kind name, [a-z][a-z0-9-]{0,31}"); // G2:kind-grammar
   const kind = e.kind as string;
   c.format(e.idempotencyKey, "envelope.idempotencyKey", RE.idempotencyKey, "1 to 64 characters from A-Z, a-z, 0-9, _ and -");
   if (e.delegation !== undefined) c.format(e.delegation, "envelope.delegation", RE.actId, "an entry ID");
   // R-DECL-16: a binding exactly on v: 2; platform kinds are v: 1.
   if (e.v === 2) {
-    if (isPlatformKind(kind)) c.error("envelope.v", `must be 1 for the platform kind ${kind}`);
-    c.format(e.binding, "envelope.binding", RE.digest, "a binding: sha256: and 64 lowercase hex digits");
-  } else if (e.binding !== undefined) c.error("envelope.binding", "is only for an envelope of v: 2");
+    if (isPlatformKind(kind)) c.error("envelope.v", `must be 1 for the platform kind ${kind}`); // G2:platform-v1
+    c.format(e.binding, "envelope.binding", RE.digest, "a binding: sha256: and 64 lowercase hex digits"); // G2:binding-format
+  } else if (e.binding !== undefined) c.error("envelope.binding", "is only for an envelope of v: 2"); // G2:binding-v1
   if (kind === "renew" || kind === "roster") return checkTarget(c, kind, e.target, e.body);
   if (kind === "recover") return recoverTarget(c, e.target, e.body);
-  declaredTarget(c, declarationOf(doc, kind), e.target);
+  declaredTarget(c, declarationOf(doc, kind), e.target); // G2:declared-target
 }
 
 /**
@@ -222,7 +222,7 @@ function recoverTarget(c: Checker, t: unknown, body: unknown): void {
   if (!shapes) return declaredTarget(c, null, t);
   const path = "envelope.target";
   if (shapes.includes("none")) {
-    if (t !== null) c.error(path, `must be null for recover ${String(op)}`);
+    if (t !== null) c.error(path, `must be null for recover ${String(op)}`); // G2:recover-target
     return;
   }
   if (shapes.includes("entry") && isPlainObject(t) && "act" in t) return entryTarget(c, t, path);
@@ -419,7 +419,7 @@ const STEP_BODY: Readonly<Record<Step, { readonly required: readonly string[]; r
 /** Is a declared field required on this target shape (R-DECL-12)? */
 export function requiredOn(field: DeclaredField, shape: TargetShape): boolean {
   if (field.optional) return false;
-  return field.requiredFor ? field.requiredFor.includes(shape) : true;
+  return field.requiredFor ? field.requiredFor.includes(shape) : true; // G2:required-on
 }
 
 /** A declared act's body: closed against its declared fields, its steps' fields and `because` (R-DECL-12). */
@@ -430,40 +430,40 @@ function declaredBody(c: Checker, d: ActDeclaration, target: unknown, body: unkn
   const required = [...steps.flatMap((s) => STEP_BODY[s].required), ...fields.filter(([, f]) => requiredOn(f, shape)).map(([n]) => n)];
   const optional = [...steps.flatMap((s) => STEP_BODY[s].optional), ...fields.filter(([, f]) => !requiredOn(f, shape)).map(([n]) => n), "because"];
   const b = c.object(body, "body", [...new Set(required)], [...new Set(optional)]) as Readonly<Record<string, unknown>>;
-  for (const [name, field] of fields) if (b[name] !== undefined) declaredField(c, field, b[name], `body.${name}`);
-  for (const step of steps) stepFields(c, step, b);
-  if (b["because"] !== undefined) c.reasons(b["because"], "body.because");
+  for (const [name, field] of fields) if (b[name] !== undefined) declaredField(c, field, b[name], `body.${name}`); // G2:declared-fields
+  for (const step of steps) stepFields(c, step, b); // G2:step-fields
+  if (b["because"] !== undefined) c.reasons(b["because"], "body.because"); // G2:because
 }
 
 /** One declared field, by its type (R-DECL-12). `member`, `act` and `segment` are fixed-format (R-SEC-4). */
 function declaredField(c: Checker, f: DeclaredField, v: unknown, path: string): void {
   switch (f.type) {
     case "text":
-      c.string(v, path, f.max);
+      c.string(v, path, f.max); // G2:field-text
       return;
     case "int":
-      c.int(v, path, f.min, f.max);
+      c.int(v, path, f.min, f.max); // G2:field-int
       return;
     case "bool":
       c.bool(v, path);
       return;
     case "enum":
-      c.oneOf(v, path, f.values);
+      c.oneOf(v, path, f.values); // G2:field-enum
       return;
     case "globs":
-      c.array(v, path, f.max);
+      c.array(v, path, f.max); // G2:field-globs
       c.globs(v, path);
       return;
     case "member":
-      c.format(v, path, RE.handle, "a member handle");
+      c.format(v, path, RE.handle, "a member handle"); // G2:field-member
       return;
     case "act":
-      c.format(v, path, RE.actId, "an entry ID");
+      c.format(v, path, RE.actId, "an entry ID"); // G2:field-act
       return;
     case "segment": {
       const s = c.string(v, path, 255);
-      if (s === "" || s === "." || s === ".." || /[/*?[\]{}!]/.test(s)) c.error(path, "must be one path segment, with no slash or glob character");
-      c.fixed.add(path);
+      if (s === "" || s === "." || s === ".." || /[/*?[\]{}!]/.test(s)) c.error(path, "must be one path segment, with no slash or glob character"); // G2:field-segment
+      c.fixed.add(path); // G2:field-fixed
       return;
     }
   }
@@ -538,7 +538,7 @@ function checkFields(c: Checker, b: Readonly<Record<string, unknown>>): void {
 /** A `recover` op (R-DECL-21): the legacy recovery acts' fields and limits, by op. */
 function recoverBody(c: Checker, body: unknown): void {
   if (!isPlainObject(body)) return c.error("body", "must be an object");
-  const op = c.oneOf(body["op"], "body.op", RECOVER_OPS);
+  const op = c.oneOf(body["op"], "body.op", RECOVER_OPS); // G2:recover-op
   const p = "body";
   switch (op) {
     case "open": {
@@ -601,7 +601,7 @@ function recoverBody(c: Checker, body: unknown): void {
 /** A `v2` grant's platform kinds: a list, never `*`, of delegable platform kinds (R-DECL-17). */
 function platformKinds(c: Checker, v: unknown, path: string): void {
   const list = c.array(v, path, DELEGABLE_PLATFORM.length);
-  list.forEach((k, i) => c.oneOf(k, `${path}[${i}]`, DELEGABLE_PLATFORM));
+  list.forEach((k, i) => c.oneOf(k, `${path}[${i}]`, DELEGABLE_PLATFORM)); // G2:grant-kinds
   if (new Set(list).size !== list.length) c.error(path, "must not repeat a kind");
 }
 
@@ -612,7 +612,7 @@ function grantMap(c: Checker, v: unknown, path: string): void {
   if (kinds.length > 64) c.error(path, "names more than 64 kinds", "body-too-large");
   for (const k of kinds) {
     if (!KIND_NAME.test(k)) c.error(`${path}.${k}`, "is not a kind name");
-    c.format(v[k], `${path}.${k}`, RE.digest, "a binding: sha256: and 64 lowercase hex digits");
+    c.format(v[k], `${path}.${k}`, RE.digest, "a binding: sha256: and 64 lowercase hex digits"); // G2:grant-map
   }
 }
 
@@ -683,7 +683,7 @@ function checkRosterOp(c: Checker, body: unknown, exempt: Set<string>, declared:
     }
     case "delegate": {
       // R-DECL-17: in a v2 room a grant names platform kinds and a signed grant map, never `*`.
-      const b = declared ? c.object(body, p, ["op", "to", "kinds", "acts", "lanes", "expiresAt"]) : c.object(body, p, ["op", "to", "kinds", "lanes", "expiresAt"]);
+      const b = declared ? c.object(body, p, ["op", "to", "kinds", "acts", "lanes", "expiresAt"]) : c.object(body, p, ["op", "to", "kinds", "lanes", "expiresAt"]); // G2:grant-shape
       c.format(b.to, "body.to", RE.keyId, "a key ID");
       if (declared) {
         platformKinds(c, b.kinds, "body.kinds");

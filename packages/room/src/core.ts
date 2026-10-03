@@ -623,7 +623,7 @@ export class RoomCore {
       } catch (e) {
         return { ok: false, problems: [`.artroom/policy.json is not valid JSON: ${(e as Error).message}`] };
       }
-      if (typeof raw === "object" && raw !== null && (raw as { format?: unknown }).format === "artroom-policy-v2") return this.parseDeclared(raw, checkerTexts);
+      if (typeof raw === "object" && raw !== null && (raw as { format?: unknown }).format === "artroom-policy-v2") return this.parseDeclared(raw, checkerTexts); // G2:parse-declared
       const v = this.ports.policy.validatePolicy(raw);
       if (!v.ok) return { ok: false, problems: v.problems };
       doc = v.doc;
@@ -656,10 +656,10 @@ export class RoomCore {
         return { ok: false, problems: [`.artroom/checkers/${name}.json is not valid JSON: ${(e as Error).message}`] };
       }
     }
-    const v = validatePolicyV2(raw, { historicalOpeningKinds: this.openingKinds(), checkers: configs });
+    const v = validatePolicyV2(raw, { historicalOpeningKinds: this.openingKinds(), checkers: configs }); // G2:historical
     if (!v.ok) return { ok: false, problems: v.problems };
     const staged = stagedProblems(v.value);
-    if (staged.length) return { ok: false, problems: staged };
+    if (staged.length) return { ok: false, problems: staged }; // G2:staged
     const checkers: Record<string, { config: CheckerConfig; digest: Digest }> = {};
     for (const [name, config] of Object.entries(configs)) checkers[name] = { config: config as CheckerConfig, digest: digestJson(config) };
     return { ok: true, doc: v.value, checkers };
@@ -675,7 +675,7 @@ export class RoomCore {
     const policy = this.activePolicy();
     const doc = policy.doc as AnyPolicyDocument;
     if (!isDeclared(doc) || !Object.hasOwn(doc.acts, kind)) return null;
-    if (this.bindingCache?.version !== policy.version) this.bindingCache = { version: policy.version, bindings: new Map() };
+    if (this.bindingCache?.version !== policy.version) this.bindingCache = { version: policy.version, bindings: new Map() }; // G2:binding-cache
     let b = this.bindingCache.bindings.get(kind);
     if (b === undefined) {
       b = digestJson(bindingSubject(doc, kind)) as Binding;
@@ -1401,7 +1401,7 @@ export class RoomCore {
       // R-REV-6: an unheld lane whose ID is this event's ID.
       const scope = event.scope.length ? [...event.scope] : ["**"];
       // R-DECL-6: a thread of kind `room`. Under a v2 document the room's lease is resolved and recorded now.
-      const leaseMs = isDeclared(this.activePolicy().doc) ? this.leaseMs : null;
+      const leaseMs = isDeclared(this.activePolicy().doc) ? this.leaseMs : null; // G2:revert-lease
       this.sql.all(
         "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, why, handover, revert_of, kind, binding, lease_ms) VALUES (?, ?, 'ordinary', ?, NULL, ?, 0, 0, NULL, NULL, 'unheld', 'opened-by-room', NULL, ?, 'room', NULL, ?)",
         act,

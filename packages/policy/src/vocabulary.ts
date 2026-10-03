@@ -91,7 +91,7 @@ export function declarationOf(doc: AnyPolicyDocument, kind: string): ActDeclarat
 
 /** The kinds a room with this document admits: legacy, or declared plus platform (R-DECL-1, R-DECL-21). */
 export function kindsOf(doc: AnyPolicyDocument): readonly string[] {
-  return isDeclared(doc) ? [...Object.keys(doc.acts), ...PLATFORM_KIND_LIST] : LEGACY_KINDS;
+  return isDeclared(doc) ? [...Object.keys(doc.acts), ...PLATFORM_KIND_LIST] : LEGACY_KINDS; // G2:kinds-of
 }
 
 /** The shape of a target value (R-DECL-4), or null when it fits none. */
@@ -115,7 +115,7 @@ export function shapeOf(target: unknown): TargetShape | null {
 export function stepsOf(doc: AnyPolicyDocument, kind: string, target: unknown): StepList | null {
   const shape = shapeOf(target);
   if (!shape) return null;
-  if (isDeclared(doc)) return declarationOf(doc, kind)?.targets[shape] ?? null;
+  if (isDeclared(doc)) return declarationOf(doc, kind)?.targets[shape] ?? null; // G2:declared-steps
   const step = Object.hasOwn(LEGACY_STEPS, kind) ? LEGACY_STEPS[kind]![shape] : undefined;
   return step ? [step] : null;
 }
@@ -132,7 +132,7 @@ export function roleMaySign(doc: AnyPolicyDocument, role: Role, kind: string): b
   if (!isDeclared(doc) || kind === "renew" || kind === "roster") return (LEGACY_ROLE_KINDS[role] as readonly string[]).includes(kind);
   const d = declarationOf(doc, kind);
   if (!d) return false;
-  return role === "admin" || (d.who.roles as readonly string[]).includes(role);
+  return role === "admin" || (d.who.roles as readonly string[]).includes(role); // G2:admin-implicit
 }
 
 /**
@@ -145,7 +145,7 @@ export function delegableBy(doc: AnyPolicyDocument, role: Role): { readonly plat
   if (!isDeclared(doc)) return { platform: LEGACY_DELEGABLE.filter((k) => roleMaySign(doc, role, k)), declared: [] };
   return {
     platform: DELEGABLE_PLATFORM.filter((k) => roleMaySign(doc, role, k)),
-    declared: Object.keys(doc.acts).filter((k) => doc.acts[k]!.who.delegable !== false && roleMaySign(doc, role, k)),
+    declared: Object.keys(doc.acts).filter((k) => doc.acts[k]!.who.delegable !== false && roleMaySign(doc, role, k)), // G2:delegable
   };
 }
 

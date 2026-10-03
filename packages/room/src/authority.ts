@@ -52,7 +52,7 @@ export interface Signer {
 function kindClass(doc: AnyPolicyDocument, kind: string): "legacy" | "declared" | "recover" | "undeclared" {
   if (!isDeclared(doc) || kind === "renew" || kind === "roster") return "legacy";
   if (kind === "recover") return "recover";
-  return declarationOf(doc, kind) ? "declared" : "undeclared";
+  return declarationOf(doc, kind) ? "declared" : "undeclared"; // G2:undeclared-class
 }
 
 /** The lane an envelope acts on, if any: what a delegation's `lanes` must cover. */
@@ -123,7 +123,7 @@ export function judge(
   } else if (cls === "legacy" || cls === "declared") {
     // R-GEN-5 as amended: the legacy table, or a declared kind's `who.roles` with admin implicit (R-DECL-11).
     if (!roleMaySign(member.role, kind, undefined, cls === "declared" ? doc : undefined))
-      return no("role-forbids", `The role ${member.role} may not sign ${kind}.`, "Ask an admin for a role that may.");
+      return no("role-forbids", `The role ${member.role} may not sign ${kind}.`, "Ask an admin for a role that may."); // G2:who-roles
   }
   return { ok: true, authority: { via: "member", member: member.handle, role: member.role, key: actor }, flags: [] };
 }
@@ -153,9 +153,9 @@ function judgeDelegation(
   if (cls === "declared") {
     // R-DECL-17: a declared kind only by the signed grant map, and only for the binding the grantor signed.
     if (d.acts === undefined)
-      return no("delegation-invalid", `Delegation ${id} was granted before this room declared its acts, so it covers no declared kind, ${kind} included.`, "Ask the grantor to delegate again.");
-    if (!Object.hasOwn(d.acts, kind)) return no("delegation-invalid", `Delegation ${id} does not cover ${kind}.`, "Ask the grantor for a delegation that covers it.");
-    if (d.acts[kind] !== binding) return no("delegation-invalid", `The delegation was granted for an earlier meaning of ${kind}.`, "Ask the grantor to delegate again.");
+      return no("delegation-invalid", `Delegation ${id} was granted before this room declared its acts, so it covers no declared kind, ${kind} included.`, "Ask the grantor to delegate again."); // G2:delegation-v1-era
+    if (!Object.hasOwn(d.acts, kind)) return no("delegation-invalid", `Delegation ${id} does not cover ${kind}.`, "Ask the grantor for a delegation that covers it."); // G2:delegation-covers
+    if (d.acts[kind] !== binding) return no("delegation-invalid", `The delegation was granted for an earlier meaning of ${kind}.`, "Ask the grantor to delegate again."); // G2:delegation-binding
   } else if (cls === "legacy") {
     // A grant's platform kinds, or a legacy grant's kinds: intersection, never acquisition (R-DECL-17).
     const kinds = d.kinds;

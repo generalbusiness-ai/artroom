@@ -117,8 +117,8 @@ async function workspaceRequest(
 function versionKinds(core: RoomCore, lane: LaneRow | null): string[] {
   const doc = core.activePolicy().doc as AnyPolicyDocument;
   if (!isDeclared(doc)) return ["propose"];
-  if (lane?.purpose === "config-recovery") return ["recover"];
-  return Object.keys(doc.acts).filter((k) => stepsOf(doc, k, { lane: lane?.id ?? "" })?.includes("version") && (!lane || doc.acts[k]!.threads?.includes(lane.kind)));
+  if (lane?.purpose === "config-recovery") return ["recover"]; // G2:workspace-recover
+  return Object.keys(doc.acts).filter((k) => stepsOf(doc, k, { lane: lane?.id ?? "" })?.includes("version") && (!lane || doc.acts[k]!.threads?.includes(lane.kind))); // G2:workspace-kinds
 }
 
 function workspaceAuthority(core: RoomCore, actor: KeyId, delegationId: DelegationId | undefined, laneId: LaneId, lease: number) {
@@ -241,11 +241,11 @@ function sessionGrant(core: RoomCore, inv: NonNullable<ReturnType<typeof invitat
   const doc = core.activePolicy().doc as AnyPolicyDocument;
   const session = inv.session as (NonNullable<typeof inv.session> & { acts?: Readonly<Record<string, string>> }) | undefined;
   if (!isDeclared(doc)) return { kinds: session?.kinds ?? "*" };
-  if (session?.acts !== undefined) return { kinds: session.kinds as readonly string[], acts: session.acts };
+  if (session?.acts !== undefined) return { kinds: session.kinds as readonly string[], acts: session.acts }; // G2:session-map
   const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
   if (!role) return { kinds: [], acts: {} };
   const covered: readonly string[] = session === undefined || session.kinds === "*" ? delegableBy(role) : session.kinds;
-  return { kinds: grantable(doc, role).platform.filter((k) => covered.includes(k)), acts: {} };
+  return { kinds: grantable(doc, role).platform.filter((k) => covered.includes(k)), acts: {} }; // G2:session-intersection
 }
 
 class Abort extends Error {
@@ -398,7 +398,7 @@ export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): 
   if (!isPlainObject(act) || Object.keys(act).some((k) => !["kind", "target", "body", "idempotencyKey", "binding"].includes(k)))
     throw artroomError("bad-request", "A bearer act has only kind, target, body, idempotencyKey and, for a declared kind, binding.");
   const a = act as Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey"> & { binding?: unknown };
-  const binding = a.binding !== undefined ? a.binding : builtFor(core, a.kind);
+  const binding = a.binding !== undefined ? a.binding : builtFor(core, a.kind); // G2:bearer-binding
   const env = {
     v: binding === undefined ? 1 : 2,
     room: core.roomId,
@@ -424,7 +424,7 @@ export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): 
 function builtFor(core: RoomCore, kind: unknown): string | undefined {
   const doc = core.activePolicy().doc as AnyPolicyDocument;
   if (!isDeclared(doc) || typeof kind !== "string" || isPlatformKind(kind) || !Object.hasOwn(CODE_REVIEW_ACTS, kind)) return undefined;
-  return digestJson(bindingSubject({ ...doc, acts: CODE_REVIEW_ACTS }, kind));
+  return digestJson(bindingSubject({ ...doc, acts: CODE_REVIEW_ACTS }, kind)); // G2:bearer-builtfor
 }
 
 /** `workspace` or `workspace-token` for a bearer session, judged under its delegation (R-CRED-10, R-WS-2). */

@@ -71,6 +71,38 @@ describe.skipIf(DECLARED)("declared acts stage 2: one vocabulary per document (R
   });
 });
 
+describe.skipIf(DECLARED)("who may sign: who.roles, admin implicit (R-DECL-11)", () => {
+  it("a declared kind's roles decide at step 4, unrecorded; an admin may sign every declared act; renew keeps the legacy table", async () => {
+    const r = await declaredRoom(v2((a) => void (a["claim"] = { ...a["claim"]!, who: { roles: ["maintainer"] } })));
+    const bob = await addMember(r, "@bob", "member");
+    const mo = await addMember(r, "@mo", "maintainer");
+    const ci = await addMember(r, "@ci", "checker");
+    expect(expectRefusal(await act(r, bob, "claim", null, { goal: "g", scope: ["src/**"] }), "role-forbids").act).toBeUndefined();
+    const c = await ok<Claim>(r, mo, "claim", null, { goal: "g", scope: ["src/**"] });
+    await ok<Claim>(r, r.admin, "claim", null, { goal: "g", scope: ["docs/**"] });
+    expectRefusal(await act(r, ci, "renew", { lane: c.lane }, { lease: 1 }, { binding: null }), "role-forbids");
+    expectRefusal(await act(r, ci, "claim", null, { goal: "g", scope: ["lib/**"] }), "role-forbids");
+  });
+});
+
+describe.skipIf(DECLARED)("step 1 under the document in force (R-ADM-1 as amended)", () => {
+  it("admission judges step 1 again under the document it decides with: an envelope of the other vocabulary is bad-request there too", async () => {
+    const r = await makeRoom();
+    const d = await declaredRoom();
+    const env = await signed(d, d.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    const out = await inDO(r, async (room) => {
+      const { earlySteps } = await import("../../src/admission.ts");
+      try {
+        earlySteps(room.core, { ...env, envelope: { ...env.envelope, room: r.id } } as never, "submitted", "x");
+        return "decided";
+      } catch (e) {
+        return (e as { code?: string }).code ?? "threw";
+      }
+    });
+    expect(out).toBe("bad-request");
+  });
+});
+
 describe.skipIf(DECLARED)("step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16)", () => {
   it("an undeclared kind is kind-undeclared after authority and before the body check; nothing is recorded", async () => {
     const r = await declaredRoom();
@@ -314,6 +346,15 @@ describe.skipIf(DECLARED)("threads (R-DECL-6, R-DECL-8, R-DECL-23)", () => {
     await ok(r, bob, "release", { lane: other }, { lease: 1 });
   });
 
+  it("an entry target is not a thread target: a note on an entry of a thread its threads do not name is admitted; on a line of it, wrong-thread", async () => {
+    const r = await declaredRoom(v2((a) => void (a["note"] = { ...a["note"]!, threads: ["room"] })));
+    const c = await ok<Claim>(r, r.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    expectOk(await act(r, r.admin, "note", { act: c.id }, { text: "on the entry" }));
+    const head = pushChange(r, c.lane as LaneId, { "src/app.ts": "v2" });
+    await ok(r, r.admin, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "s" });
+    expectRefusal(await act(r, r.admin, "note", { lane: c.lane, generation: 1, head, path: "src/app.ts", line: 1 }, { text: "on a line" }), "wrong-thread");
+  });
+
   it("wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one", async () => {
     // `release` here acts only on room threads.
     const r = await declaredRoom(v2((a) => void (a["release"] = { ...a["release"]!, threads: ["room"] })));
@@ -377,6 +418,16 @@ describe.skipIf(DECLARED)("refusal wording from the declaration (R-DECL-13)", ()
     expect(entry.entry.receipt.refusal).toMatchObject({ rule: "not-holder", reason: out.reason, fix: out.fix });
     expect(expectRefusal(await act(r, bob, "note", { act: "act_999_00000000" }, { text: "hi" }), "lane-unknown")).toMatchObject({ reason: "No such entry for note.", fix: "Pick another." });
     expect(expectRefusal(await act(r, bob, "note", { act: c.id }, { text: "shh" }), "quiet")).toMatchObject({ reason: "Rule reason.", fix: "Rule fix." });
+    // A rule's deterministic failure has a platform code, and still keeps the rule's own text.
+    const typed = await declaredRoom(
+      v2(
+        (a) => void (a["note"] = { ...a["note"]!, refusals: { "policy-type-error": { reason: "Declared {kind} wording.", fix: "Declared fix." } } }),
+        policy(rule({ id: "typed", on: ["note"], refuse: "'not a boolean'", reason: "Never shown.", fix: "Never shown." })),
+      ),
+    );
+    const t = await ok<Claim>(typed, typed.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    const err = expectRefusal(await act(typed, typed.admin, "note", { act: t.id }, { text: "hi" }), "policy-type-error");
+    expect(err.reason).not.toContain("Declared");
     // An unrecorded refusal is worded too, and an act without wording keeps the platform's.
     expectRefusal(await act(r, bob, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head: "a".repeat(40), summary: "s" }), "not-holder");
   });
