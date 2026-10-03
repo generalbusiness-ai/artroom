@@ -1,0 +1,113 @@
+{
+  "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+  "tree": "6aa9573e82143ee7a573a4d5aeb6ba451a46e0d1",
+  "status": "",
+  "manifest_sha256": "f4b22813a9c82f74a0b01d8a2f8756b5895ae2a115d5d5b7601e4d695534c3a4",
+  "manifest_entries_matched": 86,
+  "immutable_source_snapshots_matched": 42,
+  "tracked_paths_matched_before_after_and_head": 713,
+  "actual_scopes": [
+    {
+      "group": "client-title-focused",
+      "total": 50,
+      "passed": 50,
+      "failed": 0,
+      "pending": 0,
+      "exit": 0
+    },
+    {
+      "group": "cli-declared-focused",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "pending": 0,
+      "exit": 0
+    },
+    {
+      "group": "mcp-declared-focused",
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "pending": 0,
+      "exit": 0
+    },
+    {
+      "group": "ui-title-focused-corrected",
+      "total": 57,
+      "passed": 57,
+      "failed": 0,
+      "pending": 0,
+      "exit": 0
+    },
+    {
+      "group": "cli-title-era",
+      "total": 3,
+      "passed": 2,
+      "failed": 1,
+      "pending": 0,
+      "exit": 1
+    },
+    {
+      "group": "ui-acts-screen-focused",
+      "total": 17,
+      "passed": 17,
+      "failed": 0,
+      "pending": 0,
+      "exit": 0
+    }
+  ],
+  "all_private_names_status": [
+    {
+      "name": "independent title reader controls at exact 624 the client and policy reader entrypoints share the same pure functions",
+      "status": "passed"
+    },
+    {
+      "name": "independent title reader controls at exact 624 identical enum/text values agree, while distinct values expose the descriptor rather than JavaScript string rule",
+      "status": "passed"
+    },
+    {
+      "name": "independent title reader controls at exact 624 body and declaration insertion orders do not choose a different name; absent text is passed over",
+      "status": "passed"
+    },
+    {
+      "name": "independent title reader controls at exact 624 member and act strings do not outrank present text, and nontext-only values retain the original formatting",
+      "status": "passed"
+    },
+    {
+      "name": "independent title reader controls at exact 624 an own text descriptor named toString is used, while inherited metadata and body values do not choose the title",
+      "status": "passed"
+    },
+    {
+      "name": "independent title reader controls at exact 624 legacy/platform/unknown/label-only meanings keep the first present field fallback",
+      "status": "passed"
+    },
+    {
+      "name": "independent title reader controls at exact 624 a nonempty goal wins; an available empty opening body gives the label; only unavailable opening gives the ID",
+      "status": "passed"
+    },
+    {
+      "name": "independent title reader controls at exact 624 the applicable opening step has only excluded scope metadata; check/release text fields belong to other targets",
+      "status": "passed"
+    },
+    {
+      "name": "CLI title comes from the accepted opening record's D(s) control: label-only activation before the CLI read prints the new historical title",
+      "status": "passed"
+    },
+    {
+      "name": "CLI title comes from the accepted opening record's D(s) label-only activation between preparation and admission must print the accepted record's new historical title",
+      "status": "failed"
+    },
+    {
+      "name": "CLI title comes from the accepted opening record's D(s) paired timing control: a label-only activation after admission must keep the record's old historical title",
+      "status": "passed"
+    }
+  ],
+  "all_nonpassing_messages": [
+    {
+      "name": "CLI title comes from the accepted opening record's D(s) label-only activation between preparation and admission must print the accepted record's new historical title",
+      "messages": [
+        "AssertionError: expected 'Thread: Open a score: Nardis (lane ac\u2026' to be 'Thread: Begin a tune: Nardis (lane ac\u2026' // Object.is equality\n    at /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/repo/packages/cli/test/checker-title-era-624.test.ts:65:36\n    at file:///private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-title-624-ei7wb2vf/repo/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ]
+    }
+  ]
+}
