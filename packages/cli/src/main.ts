@@ -1190,10 +1190,11 @@ const COMMANDS: Record<string, Command> = {
   mcp: {
     options: { toolset: { type: "string" } },
     async run(ctx) {
-      const { api, room } = await open(ctx);
       const { callerFromRoster, serveArtroomStdio, toolsetOf } = await import("@generalbusiness/artroom-mcp/stdio");
-      // `--toolset` is the stdio form of the MCP URL's `?toolset=`: builder, reviewer, observer or all. An unknown name is bad-request.
+      // `--toolset` is the stdio form of the MCP URL's `?toolset=`: builder, reviewer, observer or all. An unknown name
+      // is bad-request, before anything is asked of the room.
       const toolset = toolsetOf(str(ctx.values, "toolset"));
+      const { api, room } = await open(ctx);
       // The tool list follows this credential's authorization, read from the roster at each `tools/list` (R-API-14):
       // a key file is the member's own key; a bearer file acts under the session's delegation.
       const caller = async () => callerFromRoster(await api.members(), room.custody === "room" ? { key: room.key, session: true } : { key: room.key });

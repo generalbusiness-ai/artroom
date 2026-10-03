@@ -121,6 +121,11 @@ describe("the two generic tools, beside the ten (R-API-9 as amended; declared ac
   test("input schema properties equal the contract's input keys (checked by the compiler)", () => {
     expectTypeOf<SchemaKeys<"acts">>().toEqualTypeOf<InputKeys<McpInput<"acts">>>();
     expectTypeOf<SchemaKeys<"act">>().toEqualTypeOf<InputKeys<McpInput<"act">>>();
+    // The four named reads of the MCP core (amendment 7).
+    expectTypeOf<SchemaKeys<"lanes">>().toEqualTypeOf<InputKeys<McpInput<"lanes">>>();
+    expectTypeOf<SchemaKeys<"lane">>().toEqualTypeOf<InputKeys<McpInput<"lane">>>();
+    expectTypeOf<SchemaKeys<"proposal">>().toEqualTypeOf<InputKeys<McpInput<"proposal">>>();
+    expectTypeOf<SchemaKeys<"operation">>().toEqualTypeOf<InputKeys<McpInput<"operation">>>();
   });
 
   test("acts and act are listed, each calling the method of the same name; the ten named tools are NAMED_TOOLS", () => {
