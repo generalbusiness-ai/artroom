@@ -221,7 +221,15 @@ export async function submit(core: RoomCore, input: unknown, path: AdmissionPath
  */
 export async function admit(core: RoomCore, input: unknown, path: AdmissionPath, hooks: AdmitHooks = {}): Promise<Admitted> {
   // Step 1: parse, version, room ID, size (R-SIG-4, R-SIG-5, R-SIG-6), under the active document's vocabulary.
-  stepOne(input, core.founded ? core.activePolicy().doc : undefined);
+  try {
+    stepOne(input, core.founded ? core.activePolicy().doc : undefined);
+  } catch (e) {
+    // R-DECL-16: an exact retry of an accepted act gets its original receipt, even when the document now in force no
+    // longer admits its version, kind or target. Only that exact envelope, with its signature, is answered.
+    const prior = core.founded ? await acceptedBefore(core, input) : null; // G2:retry-before-shape
+    if (prior) return { result: prior, replay: true };
+    throw e;
+  }
   const signed = input as SignedEnvelope;
   const env = signed.envelope;
   if (env.room !== core.roomId) throw artroomError("unauthenticated", "The envelope names a different room.");
@@ -274,6 +282,33 @@ export async function admit(core: RoomCore, input: unknown, path: AdmissionPath,
   });
 }
 
+/**
+ * The stored result of an earlier admission of exactly this signed envelope,
+ * or null. It is asked only when step 1 fails under the document in force:
+ * the envelope was well formed under the document it was admitted under, so
+ * it is read here without that document. It must be an object with a string
+ * actor and idempotency key, inside the signed JSON profile and the size
+ * limit, with a signature that verifies, and the same digest as the stored
+ * act (R-IDEM-2).
+ */
+async function acceptedBefore(core: RoomCore, input: unknown): Promise<ActRecord | Refusal | null> {
+  const signed = input as { envelope?: unknown; sig?: unknown } | null;
+  if (typeof signed !== "object" || signed === null || typeof signed.sig !== "string") return null;
+  const env = signed.envelope as { actor?: unknown; idempotencyKey?: unknown; room?: unknown } | null;
+  if (typeof env !== "object" || env === null || typeof env.actor !== "string" || typeof env.idempotencyKey !== "string" || env.room !== core.roomId) return null;
+  let digest: string;
+  try {
+    checkEnvelopeSize(utf8(canonicalize(env)).length);
+    digest = digestJson(env);
+  } catch {
+    return null;
+  }
+  const prior = one(core.sql, "SELECT digest, result FROM idem WHERE actor = ? AND ikey = ?", env.actor, env.idempotencyKey);
+  if (!prior || str(prior, "digest") !== digest) return null;
+  if (!(await verify(env.actor as never, "artroom-envelope-v1", env as never, signed.sig).catch(() => false))) return null;
+  return JSON.parse(str(prior, "result")!) as ActRecord | Refusal;
+}
+
 /** Step 1's shape checks (R-ADM-1 step 1 as amended): an `ArtroomError` `bad-request` or `payload-too-large`, never recorded. */
 function stepOne(input: unknown, doc: AnyPolicyDocument | undefined): void {
   try {
@@ -312,13 +347,14 @@ export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: Admissi
   const env = signed.envelope;
   const sql = core.sql;
   const policy = core.activePolicy();
+  // Step 3: idempotency, scoped to the signing key (R-IDEM-1 to R-IDEM-4). An exact retry of an accepted act gets its
+  // original receipt first of all, even after its binding has gone stale or the document stopped admitting its shape
+  // (R-DECL-16).
+  const prior = one(sql, "SELECT digest, seq, result FROM idem WHERE actor = ? AND ikey = ?", env.actor, env.idempotencyKey);
+  if (prior && str(prior, "digest") === digest) return { t: "replay", result: JSON.parse(str(prior, "result")!) as ActRecord | Refusal }; // G2:retry-first
   // Step 1 again, under the document in force now: an activation may have changed the vocabulary since.
   stepOne(signed, policy.doc); // G2:step1-recheck
-  // Step 3: idempotency, scoped to the signing key (R-IDEM-1 to R-IDEM-4). It runs first, so an exact retry of an
-  // accepted act gets its original receipt even after its binding has gone stale (R-DECL-16).
-  const prior = one(sql, "SELECT digest, seq, result FROM idem WHERE actor = ? AND ikey = ?", env.actor, env.idempotencyKey);
   if (prior) {
-    if (str(prior, "digest") === digest) return { t: "replay", result: JSON.parse(str(prior, "result")!) as ActRecord | Refusal };
     const original = str(one(sql, "SELECT id FROM entries WHERE seq = ?", num(prior, "seq")!), "id");
     return {
       t: "unrecorded",
@@ -544,6 +580,23 @@ export function stepOfEnvelope(doc: AnyPolicyDocument, env: Pick<Envelope, "kind
   return steps?.length === 1 ? steps[0] : null;
 }
 
+/**
+ * A declared act's body, as the step handlers read it. The handlers were
+ * written for the legacy kinds, whose `purpose` selects configuration
+ * recovery and whose `goal`, `plan`, `summary` and `text` are text. A
+ * declaration may give those names to fields of its own, of any type
+ * (R-DECL-12). So `purpose` never reaches a handler from a declared act:
+ * recovery is the platform kind `recover` (R-DECL-21). The other four reach
+ * it only as text, which is what the thread and version rows hold.
+ */
+function handlerBody(body: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const { purpose: _purpose, ...kept } = body; // G2:declared-purpose
+  void _purpose;
+  const rest: Record<string, unknown> = kept;
+  for (const name of ["goal", "plan", "summary", "text"]) if (rest[name] !== undefined && typeof rest[name] !== "string") delete rest[name]; // G2:declared-text
+  return rest;
+}
+
 /** Facts every refusal of this envelope may report (R-DECL-13): its kind, and the lane and generation it names. */
 function envelopeFacts(env: Envelope): RefusalFacts {
   const t = env.target as { lane?: unknown; generation?: unknown } | null;
@@ -614,7 +667,11 @@ function dispatch(ctx: Ctx): Promise<Plan> {
   const step = stepOfEnvelope(ctx.policy.doc, env);
   const t = env.target as { lane: LaneId; generation: Generation } & NoteAnchor;
   // A recover op's body is its step's, with `op` (R-DECL-21); an open is a configuration-recovery open.
-  const b = (ctx.recover ? { ...(env.body as RecoverOp), op: undefined, ...(ctx.recover === "open" ? { purpose: "config-recovery" } : {}) } : env.body) as never; // G2:recover-open
+  const b = (ctx.recover
+    ? { ...(env.body as RecoverOp), op: undefined, ...(ctx.recover === "open" ? { purpose: "config-recovery" } : {}) } // G2:recover-open
+    : ctx.decl
+      ? handlerBody(env.body as unknown as Readonly<Record<string, unknown>>) // G2:declared-body
+      : env.body) as never;
   switch (step) {
     case "open":
       return claimNew(ctx, b);

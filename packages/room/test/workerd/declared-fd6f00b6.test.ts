@@ -184,6 +184,34 @@ describe.skipIf(DECLARED)("step 4a: kind-undeclared and binding-stale, unrecorde
     const again = await signed(r, r.admin, "claim", null, { goal: "g", scope: ["src/**"] }, { ikey: (env.envelope as unknown as { idempotencyKey: string }).idempotencyKey });
     expectRefusal(await call(r.stub.submit(again)), "idempotency-mismatch");
   });
+
+  it("exact retry across a change of shape: an accepted note on an entry, retried after its declaration lost the entry target, and an accepted claim, retried after the room returned to a v1 document, get their original receipts; nothing else is answered", async () => {
+    const r = await declaredRoom();
+    const c = await ok<Claim>(r, r.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    const note = await signed(r, r.admin, "note", { act: c.id }, { text: "hello" });
+    const first = expectOk(await call<ActRecord | Refusal>(r.stub.submit(note)));
+    await activate(r, v2((a) => void (a["note"] = { ...a["note"]!, targets: { line: ["comment"] } })));
+    const seq = await headSeq(r);
+    expect(await call(r.stub.submit(note))).toEqual(first);
+    // A new note on an entry is not in this vocabulary: bad-request at step 1, as before.
+    const fresh = await signed(r, r.admin, "note", { act: c.id }, { text: "again" });
+    expect((await failure(r.stub.submit(fresh))).code).toBe("bad-request");
+    // Only the exact envelope with its own signature is answered: not another body under the same key, nor another signature.
+    const sameKey = await signed(r, r.admin, "note", { act: c.id }, { text: "other" }, { ikey: (note.envelope as unknown as { idempotencyKey: string }).idempotencyKey });
+    expect((await failure(r.stub.submit(sameKey))).code).toBe("bad-request");
+    expect((await failure(r.stub.submit({ envelope: note.envelope, sig: fresh.sig } as never))).code).toBe("bad-request");
+    // The room returns to a v1 document: a v: 2 envelope is bad-request there, but the accepted one keeps its receipt.
+    const binding = (await bindingIn(r, "claim"))!;
+    const claim = await signed(r, r.admin, "claim", null, { goal: "h", scope: ["docs/**"] });
+    const accepted = expectOk(await call<ActRecord | Refusal>(r.stub.submit(claim)));
+    await activate(r, policy());
+    const seq1 = await headSeq(r);
+    expect(await call(r.stub.submit(claim))).toEqual(accepted);
+    const late = await signed(r, r.admin, "claim", null, { goal: "i", scope: ["lib/**"] }, { binding });
+    expect(await failure(r.stub.submit(late))).toMatchObject({ code: "bad-request", message: "envelope.binding is not a field of this type." });
+    expect(seq1).toBeGreaterThan(seq);
+    expect(await headSeq(r)).toBe(seq1);
+  });
 });
 
 describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DECL-17)", () => {
@@ -320,6 +348,42 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
     expect(await grantOf(wide)).toMatchObject({ kinds: ["renew"], acts: {} });
   });
 
+  it("who.delegable is judged at each use: a kind made non-delegable after a grant, its binding unchanged, is no longer covered; the grantor's own key still signs it", async () => {
+    const r = await declaredRoom();
+    const bob = await addMember(r, "@bob", "member");
+    const k = newKeyPair();
+    const grant = await ok<RosterRecord>(r, bob, "roster", null, await delegateOp(r, k.key, { claim: (await bindingIn(r, "claim"))! }), { binding: null });
+    const before = await bindingIn(r, "claim");
+    const d = new Client(r, k, grant.id);
+    await ok<Claim>(r, d, "claim", null, { goal: "g", scope: ["src/**"] });
+    await activate(r, v2((a) => void (a["claim"] = { ...a["claim"]!, who: { roles: ["maintainer", "member", "agent"], delegable: false } })));
+    expect(await bindingIn(r, "claim")).toBe(before);
+    const out = expectRefusal(await act(r, d, "claim", null, { goal: "g", scope: ["docs/**"] }), "delegation-invalid");
+    expect(out.reason).toBe("claim may not be delegated.");
+    expect(out.act).toBeUndefined();
+    await ok<Claim>(r, bob, "claim", null, { goal: "g", scope: ["docs/**"] });
+  });
+
+  it("an invitation whose session names declared kinds, redeemed after the room returned to a v1 document, is refused kind-undeclared and stays unused; a session that names only renew is redeemed", async () => {
+    const r = await declaredRoom();
+    const invite = async (member: string, acts: Record<string, string>) => {
+      const bytes = randomBytes(32);
+      const session = { kinds: ["renew"], acts, lanes: "*", ttlSeconds: 3600 };
+      const inv = await ok<RosterRecord>(r, r.admin, "roster", null, { op: "invite", member, role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(bytes), session }, { binding: null });
+      return { id: inv.id, secret: b64url(bytes) };
+    };
+    const withClaim = await invite("@one", { claim: (await bindingIn(r, "claim"))! });
+    const renewOnly = await invite("@two", {});
+    await activate(r, policy());
+    const seq = await headSeq(r);
+    const refused = expectRefusal(await call(r.stub.redeem({ custody: "room", invitation: withClaim.id as never, secret: withClaim.secret }, "x")), "kind-undeclared");
+    expect(refused.reason).toContain("The kind claim is not declared");
+    expect(await headSeq(r)).toBe(seq);
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT used FROM invitations WHERE id = ?", withClaim.id)[0]!["used"])).toBeNull();
+    const b = await call<Redeemed>(r.stub.redeem({ custody: "room", invitation: renewOnly.id as never, secret: renewOnly.secret }, "x"));
+    expect((await r.admin.read({ q: "members" })).delegations.find((x) => x.id === b.delegation)!.kinds).toEqual(["renew"]);
+  });
+
   it("bearer acts: the named tools' code-review binding is admitted where claim means the code-review claim, and binding-stale where it does not", async () => {
     const grantFor = async (r: TestRoom) => {
       const bytes = randomBytes(32);
@@ -342,6 +406,33 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
     expectRefusal(await call(other.stub.bearerAct(o.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })), "delegation-invalid");
     // A binding the bearer act names itself is used as given.
     expectOk(await call(other.stub.bearerAct(o.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b2", binding: (await bindingIn(other, "claim"))! })));
+  });
+
+  it("a bearer session's exact retry across a change of vocabulary gets its original result: the room builds the act as it built it the first time", async () => {
+    const redeemed = async (r: TestRoom, session: unknown, signing?: { binding: null }) => {
+      const bytes = randomBytes(32);
+      const op = { op: "invite", member: "@agent", role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(bytes), session };
+      const inv = signing ? await ok<RosterRecord>(r, r.admin, "roster", null, op, signing) : await r.admin.ok<RosterRecord>("roster", null, op as never);
+      return call<Redeemed>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(bytes) }, "x"));
+    };
+    const claim = { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "retry-1" };
+    // From v1 to v2: the first attempt was a v: 1 envelope with no binding.
+    const r = await makeRoom();
+    const b = await redeemed(r, { kinds: ["claim", "renew"], lanes: "*", ttlSeconds: 3600 });
+    const first = expectOk(await call(r.stub.bearerAct(b.bearer, claim as never)));
+    await activate(r, v2());
+    const seq = await headSeq(r);
+    expect(await call(r.stub.bearerAct(b.bearer, claim as never))).toEqual(first);
+    expect(await headSeq(r)).toBe(seq);
+    // The same key with another body is idempotency-mismatch, as ever; a new act is judged under the v2 document.
+    expectRefusal(await call(r.stub.bearerAct(b.bearer, { ...claim, body: { goal: "other", scope: ["src/**"] } } as never)), "idempotency-mismatch");
+    expectRefusal(await call(r.stub.bearerAct(b.bearer, { ...claim, idempotencyKey: "new-1", body: { goal: "h", scope: ["docs/**"] } } as never)), "delegation-invalid");
+    // From v2 to v1: the first attempt was a v: 2 envelope with the code-review binding.
+    const d = await declaredRoom();
+    const db = await redeemed(d, { kinds: ["renew"], acts: { claim: (await bindingIn(d, "claim"))! }, lanes: "*", ttlSeconds: 3600 }, { binding: null });
+    const dFirst = expectOk(await call(d.stub.bearerAct(db.bearer, claim as never)));
+    await activate(d, policy());
+    expect(await call(d.stub.bearerAct(db.bearer, claim as never))).toEqual(dFirst);
   });
 
   it("grants from before declared acts: after the first v2 activation a v1-era * delegation covers renew and no declared kind; one limited to review and check covers nothing", async () => {
@@ -468,6 +559,29 @@ describe.skipIf(DECLARED)("what policy sees of a thread (R-EVAL-3 as amended)", 
     const lc = await al.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
     expectOk(await al.act("note", { act: lc.id }, { text: "hello" }));
     expectOk(await al.act("claim", null, { goal: "probe", scope: ["docs/**"] }));
+  });
+});
+
+describe.skipIf(DECLARED)("a declared act's body is the application's own (R-DECL-12, R-DECL-21)", () => {
+  it("a declared field named purpose never selects configuration recovery, and goal, plan, summary and text reach the room's rows only as text", async () => {
+    const doc = v2(
+      (a) => {
+        a["claim"] = {
+          ...a["claim"]!,
+          body: { goal: { type: "int", min: 0, max: 9, requiredFor: ["none"] }, purpose: { type: "enum", values: ["config-recovery", "demo"], optional: true } },
+        };
+      },
+      policy(rule({ id: "no-zero", on: ["claim"], refuse: "act.body.goal = 0", reason: "Rule reason.", fix: "Rule fix." })),
+    );
+    const r = await declaredRoom(doc);
+    const bob = await addMember(r, "@bob", "member");
+    // A member, not an admin: under the legacy reading this body would be an admin-only recovery claim.
+    const c = await ok<Claim>(r, bob, "claim", null, { goal: 7, purpose: "config-recovery", scope: ["src/**"] });
+    expect(c.purpose).toBe("ordinary");
+    expect(await laneRowOf(r, c.lane)).toMatchObject({ kind: "claim", purpose: "ordinary" });
+    expect(await inDO(r, (room) => room.core.sql.all("SELECT goal FROM lanes WHERE id = ?", c.lane)[0]!["goal"])).toBe("");
+    // Policy still judges it, whoever signs: recovery's bypass of refuse rules is not reachable from a declared field.
+    expectRefusal(await act(r, r.admin, "claim", null, { goal: 0, purpose: "config-recovery", scope: ["docs/**"] }), "no-zero");
   });
 });
 

@@ -156,6 +156,8 @@ function judgeDelegation(
       return no("delegation-invalid", `Delegation ${id} was granted before this room declared its acts, so it covers no declared kind, ${kind} included.`, "Ask the grantor to delegate again."); // G2:delegation-v1-era
     if (!Object.hasOwn(d.acts, kind)) return no("delegation-invalid", `Delegation ${id} does not cover ${kind}.`, "Ask the grantor for a delegation that covers it."); // G2:delegation-covers
     if (d.acts[kind] !== binding) return no("delegation-invalid", `The delegation was granted for an earlier meaning of ${kind}.`, "Ask the grantor to delegate again."); // G2:delegation-binding
+    // R-DECL-11: `who.delegable` says whether a delegation may cover the kind, also after the grant was admitted.
+    if (declarationOf(doc, kind)!.who.delegable === false) return no("delegation-invalid", `${kind} may not be delegated.`, "Sign it with the member's own key."); // G2:delegation-delegable
   } else if (cls === "legacy") {
     // A grant's platform kinds, or a legacy grant's kinds: intersection, never acquisition (R-DECL-17).
     const kinds = d.kinds;
