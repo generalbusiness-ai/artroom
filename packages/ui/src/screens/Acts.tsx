@@ -151,11 +151,13 @@ function TargetInputs({ kind, declaration, shape, values, problems, onInput }: {
   );
 }
 
-/** The form for one act. `opened` is the catalogue the person chose the act from; its binding is what gets sent. */
-function ActForm({ opened, kind, onBack }: { opened: ActsCatalogue; kind: string; onBack: () => void }) {
+/**
+ * The form for one act. `held` is the declarations the person is looking at:
+ * the catalogue they chose the act from, until they accept a new meaning
+ * (`onAccept`). Its binding is what gets sent.
+ */
+function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: string; onBack: () => void; onAccept: (fresh: ActsCatalogue) => void }) {
   const { adapter } = useApp();
-  // The declarations the person is looking at. They change only when the person accepts a new meaning.
-  const [held, setHeld] = useState(opened);
   const act = held.acts[kind]!;
   const d = act.declaration;
   const shapes = targetsOf(d);
@@ -206,7 +208,7 @@ function ActForm({ opened, kind, onBack }: { opened: ActsCatalogue; kind: string
 
   /** The person accepts the new meaning: the form now shows it, and sends under it. */
   const confirm = (fresh: ActsCatalogue) => {
-    setHeld(fresh);
+    onAccept(fresh);
     if (!targetsOf(fresh.acts[kind]!.declaration).includes(shape)) {
       setShape(targetsOf(fresh.acts[kind]!.declaration)[0] ?? "none");
       setStatus({ state: "editing" });
@@ -335,6 +337,7 @@ export function ActsScreen({ kind }: { kind?: string }) {
   // The catalogue the person chose the act from stays the form's until they accept another:
   // a refresh of the snapshot behind an open form changes nothing in it.
   const opened = useRef<{ kind: string; catalogue: ActsCatalogue } | null>(null);
+  const [, redraw] = useState(0);
   if (!kind) opened.current = null;
   else if (opened.current?.kind !== kind) opened.current = catalogue?.vocabulary === "declared" && Object.hasOwn(catalogue.acts, kind) ? { kind, catalogue } : null; // G5U:form-holds-catalogue
 
@@ -385,7 +388,16 @@ export function ActsScreen({ kind }: { kind?: string }) {
         </p>
       )}
       {chosen ? (
-        <ActForm key={chosen.kind} opened={chosen.catalogue} kind={chosen.kind} onBack={back} />
+        <ActForm
+          key={chosen.kind}
+          held={chosen.catalogue}
+          kind={chosen.kind}
+          onBack={back}
+          onAccept={(fresh) => {
+            opened.current = { kind: chosen.kind, catalogue: fresh };
+            redraw((n) => n + 1);
+          }}
+        />
       ) : (
         <ul class="stack" data-acts="declared" style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {entries.map(([k, a]) => (

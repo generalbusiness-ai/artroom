@@ -13,6 +13,7 @@ import { CODE_REVIEW_ACTS } from "@generalbusiness/artroom-policy/declared";
 import type { FeedEntry, RoomSnapshot } from "../src/room/adapter.ts";
 import type { ActDeclaration, ActId, DeclaredRecord, HttpRoom, MemberId, Result, Sha } from "../src/room/contract.ts";
 import { isRefusal } from "../src/room/contract.ts";
+import { describeEntry, entryId } from "../src/room/live/describe.ts";
 import { LiveRoom } from "../src/room/live/live-room.ts";
 import { BAND, SETLIST_ACTS_2, declaredDemo } from "../src/room/mock/declared-room.ts";
 import { MemoryRoom, type MemoryDoc } from "../src/room/mock/memory-room.ts";
@@ -240,6 +241,7 @@ describe("a record whose kind had no meaning is shown plainly, never dropped", (
     Object.defineProperty(old, "acts", { value: undefined });
     Object.defineProperty(old, "actsAt", { value: undefined });
     const adapter = await live(old);
+    expect(adapter.snapshot()).not.toBeNull();
     const snap = adapter.snapshot()!;
     expect(snap.catalogue).toBeNull();
     expect(snap.source.status).toBe("live");
@@ -249,6 +251,18 @@ describe("a record whose kind had no meaning is shown plainly, never dropped", (
     expect(entry(snap, strange).text).toBe("@noor recorded an act of kind riff. Its meaning could not be read from this room.");
     renderAt("#/acts", adapter);
     expect(document.querySelector("[data-acts='unavailable']")!.textContent).toBe("This connection cannot read the room's acts.");
+  });
+});
+
+describe("the sentence table is only for the kinds it was written for", () => {
+  test("a kind it has no sentence for falls back to the plain statement, whatever vocabulary it is read under", async () => {
+    const r = await room("legacy");
+    const id = r.record("@ivo", { v: 1, kind: "riff", target: null, body: {} });
+    const e = (await r.log()).acts.find((x) => x.seq === 2)!;
+    expect(entryId(e)).toBe(id);
+    const policy = (await r.acts()).policy;
+    expect(describeEntry(e, { meaning: { vocabulary: "artroom-legacy-v1", policy, kind: "riff", label: "Riff" } }).text).toBe("@ivo recorded an act of kind riff.");
+    expect(describeEntry(e, { meaning: { vocabulary: "platform", policy, kind: "riff", label: "Riff" } }).text).toBe("@ivo recorded an act of kind riff.");
   });
 });
 
