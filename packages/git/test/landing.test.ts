@@ -1,42 +1,42 @@
 // The landing operation (plan section 8; protocol R-LAND, R-PUB, R-REV-5),
-// against real git and real SQLite. Test names start with the plan's
+// against real SQLite and the canonical repository in memory
+// (`MemoryCanonical`): the engine's own transactions, retries, restarts and
+// ordering are real, and no test here starts a process. The same engine over
+// real git, and the proof that the memory repository answers as real git
+// does, are in landing-git.test.ts. Test names start with the plan's
 // acceptance case or the rule they show.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { OpId, Sha } from "@generalbusiness/artroom-contract";
 import { Landing, REVOKE_TIMEOUT_MS, type FaultPoint } from "../src/landing/engine.ts";
 import { TOKEN_CLEANUP_BACKOFF } from "../src/landing/core.ts";
-import { GitPublisher } from "../src/publisher/git-publisher.ts";
-import { GitOps, pinnedRef } from "../src/publisher/gitops.ts";
-import { mkdirSync } from "node:fs";
 import type { Sql } from "../src/sql.ts";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
 import {
   Clock,
   ControlledPublisher,
   FakeRoom,
   FakeTokens,
-  Fixture,
   LedgerHost,
+  MemoryCanonical,
   actId,
+  deferred,
   edit,
   laneId,
   lines,
-  localExec,
   nodeSql,
   opId,
-  sh,
 } from "./support.ts";
 
 class Crash extends Error {}
 
 async function world() {
-  const f = await new Fixture().init();
+  const f = new MemoryCanonical().init();
   const room = new FakeRoom();
   const tokens = new FakeTokens();
   const clock = new Clock();
   const sql = nodeSql();
-  const pub = new ControlledPublisher(new GitPublisher(f.ops, f.canonical));
+  const pub = new ControlledPublisher(f.publisher);
   const engines: Landing[] = [];
   const make = (fault?: (p: FaultPoint, op: OpId) => void, opts: { revokeTimeoutMs?: number } = {}) => {
     for (const e of engines) e.kill(); // a restart replaces the old instance
@@ -198,45 +198,7 @@ test("two operations preparing in parallel: one lands, the other re-prepares on 
   assert.equal(main, final && "integration" in final ? final.integration : null, "what landed is the integration that was prepared");
   assert.match(await w.f.show(main, "src/a.txt"), /from lane a/);
   assert.match(await w.f.show(main, "src/b.txt"), /from lane b/);
-  assert.equal(await sh(w.f.root, "--git-dir", w.f.canonical, "rev-parse", `${main}^1`), a.head);
-});
-
-test("contract gap 7: the integration a clean preview shows is the commit the landing puts on main, byte for byte", async (t) => {
-  const w = await world();
-  t.after(w.dispose);
-  const a = await w.land(1, { "src/a.txt": edit(lines("a"), 2, "from lane a") });
-  await w.engine.settle();
-  assert.equal(w.engine.view(a.id)?.state, "landed");
-  const b = await w.land(2, { "src/b.txt": edit(lines("b"), 2, "from lane b") }, { accept: false });
-  // The preview runs in another sandbox, before the landing is accepted.
-  mkdirSync(join(w.f.root, "previewer"));
-  const previewer = new GitOps({ exec: localExec, workdir: join(w.f.root, "previewer"), config: ["protocol.file.allow=always"] });
-  const p = await previewer.preview(w.f.canonical, b.head, pinnedRef(b.lane, 1), b.lane, 1);
-  assert.ok(p.kind === "clean" && !p.fastForward, "a clean non-fast-forward preview");
-  assert.equal(p.base, a.head);
-  const r = w.engine.accept({ id: b.id, lane: b.lane, generation: 1, head: b.head, act: actId(502), leaseGeneration: 1, policyVersion: w.room.policy });
-  assert.ok(!("refused" in r));
-  await w.engine.settle();
-  assert.equal(w.engine.view(b.id)?.state, "landed");
-  assert.equal(await w.f.canonicalMain(), p.integration, "main is the previewed integration");
-  assert.equal(await sh(w.f.root, "--git-dir", w.f.canonical, "rev-parse", `${p.integration}^{tree}`), p.tree);
-});
-
-test("serial publication with a rebuild on every main move: wasted preparations, measured", async (t) => {
-  const w = await world();
-  t.after(w.dispose);
-  const n = 5;
-  const ops = [];
-  for (let i = 1; i <= n; i++) ops.push(await w.land(i, { [`src/f${i}.txt`]: `${i}\n` }));
-  await Promise.all(ops.map((o) => w.engine.prepare(o.id)));
-  await w.engine.settle(50);
-  for (const o of ops) assert.equal(w.engine.view(o.id)?.state, "landed");
-  const attempts = ops.map((o) => w.engine.view(o.id)!.attempts);
-  const total = attempts.reduce((x, y) => x + y, 0);
-  t.diagnostic(`${n} disjoint operations, all ready on one main: ${total} preparations, ${total - n} wasted; per operation ${attempts.join(", ")}`);
-  assert.equal(total, (n * (n + 1)) / 2, "each landing re-prepares every operation still waiting");
-  assert.equal(w.pub.integrations, total);
-  assert.equal(landedCount(w), n);
+  assert.deepEqual(w.f.parents(main), [a.head, b.head], "a merge of b's head onto a's landing");
 });
 
 // ------------------------------------------------------- invalidation before reservation
@@ -315,7 +277,7 @@ test("R-LAND-7: a generation change at reservation ends the operation; a main mo
   const b = await w.land(2, { "src/d.txt": "d\n" });
   await w.engine.prepare(b.id);
   const moved = await w.f.propose(laneId(9), 1, w.f.main, { "src/z.txt": "z\n" });
-  await sh(w.f.root, "--git-dir", w.f.canonical, "update-ref", "refs/heads/main", moved);
+  w.f.setMain(moved);
   w.engine.core.observeMain(moved);
   assert.equal(w.engine.view(b.id)?.state, "preparing");
   assert.equal(w.engine.view(b.id)?.expectedMain, moved);
@@ -343,7 +305,7 @@ test("a conflict fails the operation with the paths; a failing check fails it; w
   const w = await world();
   t.after(w.dispose);
   const other = await w.f.propose(laneId(9), 1, w.f.main, { "src/a.txt": edit(lines("a"), 3, "main side") });
-  await sh(w.f.root, "--git-dir", w.f.canonical, "update-ref", "refs/heads/main", other);
+  w.f.setMain(other);
   w.engine.core.observeMain(other as Sha);
   const a = await w.land(1, { "src/a.txt": edit(lines("a"), 3, "lane side") });
   await w.engine.prepare(a.id);
@@ -567,7 +529,7 @@ test("the forward retry itself fails because Artifacts is unavailable: the slot 
   assert.equal(w.engine.view(b.id)?.state, "landed");
   assert.equal(landedCount(w, id), 1);
   assert.match(await w.f.show(await w.f.canonicalMain(), "src/c.txt"), /c/);
-  assert.equal(await sh(w.f.root, "--git-dir", w.f.canonical, "rev-parse", `${await w.f.canonicalMain()}^1`), head);
+  assert.equal(w.f.parents(await w.f.canonicalMain())[0], head);
   assert.equal(w.tokens.live.size, 0);
 });
 
@@ -577,7 +539,7 @@ test("another writer moves main during publication: the slot stays held, pushing
   const { id } = await w.land(1, { "src/c.txt": "c\n" });
   await readyAndReserve(w, id);
   const intruder = await w.f.propose(laneId(9), 1, w.f.main, { "x.txt": "x\n" });
-  await sh(w.f.root, "--git-dir", w.f.canonical, "update-ref", "refs/heads/main", intruder);
+  w.f.setMain(intruder);
   await w.engine.publish();
   const v = w.engine.view(id);
   assert.deepEqual(v?.state === "unresolved" ? v.readBack : null, { main: "unexpected", observed: intruder });
@@ -607,9 +569,7 @@ test("a lease race on publication: two rooms that both believe they hold the slo
   t.after(w.dispose);
   // A second room with its own SQLite, publishing into the same canonical repo.
   const room2 = new FakeRoom();
-  mkdirSync(join(w.f.root, "publisher-room2"));
-  const ops2 = new GitOps({ exec: localExec, workdir: join(w.f.root, "publisher-room2"), config: ["protocol.file.allow=always"] });
-  const pub2 = new ControlledPublisher(new GitPublisher(ops2, w.f.canonical));
+  const pub2 = new ControlledPublisher(w.f.publisher);
   const e2 = new Landing({ sql: nodeSql(), room: room2, publisher: pub2, tokens: new FakeTokens(), now: w.clock.now });
   await e2.refreshMain();
   const a = await w.land(1, { "src/c.txt": "c\n" });
@@ -853,7 +813,7 @@ test("R-PUB-3: a held publication's tokens stay with its own publication steps; 
   assert.deepEqual(owed.map((c) => [c.op, c.n, c.backoffMs]), [[id, 1, 1_000], [id, 2, 1_000]]);
   // An instance asks for a revocation, and is replaced before Artifacts answers.
   w.tokens.failRevoke = false;
-  const gate = (await import("./support.ts")).deferred();
+  const gate = deferred();
   const real = w.tokens.revoke.bind(w.tokens);
   w.tokens.revoke = async (tok: string) => {
     await gate.promise;
@@ -1190,7 +1150,7 @@ test("R-LAND-4, R-LAND-7: preparation retains the reservation-stage land input; 
   await w.engine.prepare(id);
   const v = w.engine.view(id);
   const canonical = w.room.inputOf(id);
-  const digest = `sha256:${(await import("node:crypto")).createHash("sha256").update(canonical).digest("hex")}`;
+  const digest = `sha256:${createHash("sha256").update(canonical).digest("hex")}`;
   assert.equal(v?.state === "ready" ? v.landInput : null, digest, "ready.landInput is the retained input's digest");
   // An objection arrives before reservation: the input rebuilt now differs.
   w.room.inputNow.set(id, canonical.replace('"approve"', '"approve","object"'));
@@ -1204,7 +1164,7 @@ test("R-LAND-4: the Room's readiness is asked outside any transaction; an answer
   const w = await world();
   t.after(w.dispose);
   const { id } = await w.land(1, { "src/c.txt": "c\n" });
-  const gate = (await import("./support.ts")).deferred();
+  const gate = deferred();
   let calls = 0;
   w.room.readinessOf.set(id, async () => {
     calls++;
@@ -1215,7 +1175,7 @@ test("R-LAND-4: the Room's readiness is asked outside any transaction; an answer
   while (calls < 1) await new Promise((r) => setTimeout(r, 5));
   // Main moves while the Room is still answering.
   const moved = await w.f.propose(laneId(9), 1, w.f.main, { "src/z.txt": "z\n" });
-  await sh(w.f.root, "--git-dir", w.f.canonical, "update-ref", "refs/heads/main", moved);
+  w.f.setMain(moved);
   w.engine.core.observeMain(moved as Sha);
   gate.resolve();
   await preparing;
@@ -1380,12 +1340,12 @@ function spySql(inner: Sql) {
 }
 
 async function ledgerWorld(o: { waitMs?: number } = {}) {
-  const f = await new Fixture().init();
+  const f = new MemoryCanonical().init();
   const room = new FakeRoom();
   const clock = new Clock();
   const sql = spySql(nodeSql());
   const host = new LedgerHost(sql, clock, o.waitMs);
-  const pub = new ControlledPublisher(new GitPublisher(f.ops, f.canonical));
+  const pub = new ControlledPublisher(f.publisher);
   // The remote takes a push only with a live token, so the pushed token is the one the room holds.
   pub.authAtRemote = host;
   const engines: Landing[] = [];
@@ -1705,7 +1665,7 @@ test("mint lane B (3), R-MINT-4: the revocation of a token that pushToken did no
 });
 
 test("mint lane B, R-MINT-4: a publication token's revocation is bounded: unanswered, it ends with the wait, the landing goes on, no retry is sent after it, and plan 003's record revokes it later", async (t) => {
-  const w = await ledgerWorld({ waitMs: 200 });
+  const w = await ledgerWorld({ waitMs: 20 });
   t.after(w.dispose);
   const { id } = await w.land(1, { "src/c.txt": "c\n" });
   await w.ready(id);
@@ -1726,9 +1686,9 @@ test("mint lane B, R-MINT-4: a publication token's revocation is bounded: unansw
   assert.deepEqual(w.rows(), []);
 });
 
-/** Publish with a 200 ms revocation wait while the revocation path is held as `hold` says; the landing ends with its token's revocation owed. */
+/** Publish with a 20 ms revocation wait while the revocation path is held as `hold` says; the landing ends with its token's revocation owed. */
 async function revocationHeldPastTheWait(t: { after: (fn: () => unknown) => void }, hold: (w: Awaited<ReturnType<typeof ledgerWorld>>) => void) {
-  const w = await ledgerWorld({ waitMs: 200 });
+  const w = await ledgerWorld({ waitMs: 20 });
   t.after(w.dispose);
   const { id } = await w.land(1, { "src/c.txt": "c\n" });
   await w.ready(id);
