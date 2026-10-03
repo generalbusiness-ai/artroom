@@ -855,11 +855,16 @@ and each application with `wrangler containers delete <id>`.
 **Verified after.** The Workers list now holds `artroom-spike-checkers`
 and `artroom-spike-room` only, and the applications list
 `artroom-spike-room-publisher` and `artroom-spike-checkers-runnerbox`
-only. Both spike services still answer:
-`https://artroom-spike-room.inguz.workers.dev/` and
-`https://artroom-spike-checkers.inguz.workers.dev/` return 404 for `/`,
-as they did before. Nothing else on the account was touched: no other
-Worker, application, namespace, registry image or token.
+only. The Room still answers at
+`https://artroom-spike-room.inguz.workers.dev/` (404 for `/`, its route
+response, as before). The checker service has `workers_dev: false`, so
+no URL probes it; its evidence is that it stays in the Workers list and
+its container application stays in the applications list. Nothing else
+on the account was touched: no other Worker, application, namespace,
+registry image or token. The before and after listings and the four
+deletion receipts, with account identifiers reduced to Worker names,
+created and modified times, are kept outside the repository for the
+review at `/tmp/artroom-builder-orphans-f77ebf20/`.
 
 The spike's source and results stay in the repository under
 [`spikes/sandbox-git/`](../spikes/sandbox-git/) and
