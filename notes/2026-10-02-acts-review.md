@@ -1,7 +1,8 @@
 # Acts review for self-hosting
 
-Started 2026-10-02. Revision 3, 2026-10-03. Request `9ea217bc`, promise
-`6d0528df`; review repairs `4d82c9a8`, current direction `2b1105bb`.
+Started 2026-10-02. Revision 4, 2026-10-03. Request `9ea217bc`, promise
+`6d0528df`; review repairs `4d82c9a8` and `b12a7797`, current direction
+`2b1105bb`.
 This note preserves the original five-part review and the wider question:
 is Artroom a useful way to represent work as commitments about shared
 artifacts? It proposes no implementation and adopts no work-tracking
@@ -200,7 +201,7 @@ head's `transports.ts`, protocol section 34; runtime unfinished]
 | `lanes` | `state?: "held" or "unheld"`, `holder?: MemberId`, `touches?: Glob`, `cursor?: Cursor`, `limit?: number` |
 | `lane` | `lane: LaneId` |
 | `proposal` | `lane: LaneId`, `generation: Generation` |
-| `operation` | `id: OpId`, `until?: string[]`, `waitMs?: number` |
+| `operation` | `id: OpId`, `kind: "workspace" or "preview" or "land"`, `until?: string[]`, `waitMs?: number` |
 
 The older MCP plan's section 6 described eighteen tools: these fourteen
 plus `room`, `diff`, `file` and `policy`. Its inputs below are design
