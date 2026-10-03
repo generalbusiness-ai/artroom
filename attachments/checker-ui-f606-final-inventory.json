@@ -1,0 +1,177 @@
+{
+  "time_utc": "2026-10-03T19:29:11.783641+00:00",
+  "runtime_head": "f606dd89dc9c7e900210639d3b0cd050b71d3713",
+  "base": "b7b9d8dfe6f37866bfd57a94d7118d35d93bd8e0",
+  "source": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/repo",
+  "node": "v26.10.0",
+  "npm": "11.19.1",
+  "diff_paths": [
+    {
+      "path": "packages/ui/src/room/acts.ts",
+      "bytes": 17804,
+      "lines": 392,
+      "sha256": "ca43309ddb1a913a89810c0a8c0995fbd8d2c84a1fad6ce6458cdc53a85d7668",
+      "matches_head": true,
+      "git_blob": "f4fb51a78d1bb9d94183b96362bce3a0d7b3dee9"
+    },
+    {
+      "path": "packages/ui/src/room/adapter.ts",
+      "bytes": 13829,
+      "lines": 366,
+      "sha256": "5bd1cd6a05cc3e2724f45a570f933db4ade3b18f416025661da0604dd9e0ac56",
+      "matches_head": true,
+      "git_blob": "0e667034d5ac6d0d1db813dd181278a80a1943cb"
+    },
+    {
+      "path": "packages/ui/src/room/live/live-room.ts",
+      "bytes": 18216,
+      "lines": 435,
+      "sha256": "77b4f833d62db34f6c193da06878f03965f91c05d8ab1306887f9b3d0c4e4f4b",
+      "matches_head": true,
+      "git_blob": "4bfab00fbb50eb410ca6ae55c9f712ce8721c7d2"
+    },
+    {
+      "path": "packages/ui/src/room/mock/memory-room.ts",
+      "bytes": 20177,
+      "lines": 392,
+      "sha256": "3481ab14b6b7751d43a9fa5d9c49e13de06ba3287c13d8847e4c304122d86d18",
+      "matches_head": true,
+      "git_blob": "4dc5d5b2d1fbdd65c33e489668c12f938ce6a3f0"
+    },
+    {
+      "path": "packages/ui/src/screens/Acts.tsx",
+      "bytes": 20512,
+      "lines": 478,
+      "sha256": "14bc851c102b35c1730d8cb69431090279e25706c76d2edb017837577ce0ae1b",
+      "matches_head": true,
+      "git_blob": "dc3c71ca05ca2dbef60e0287e26c39f2301efbba"
+    },
+    {
+      "path": "packages/ui/test/review-fb27de86.test.tsx",
+      "bytes": 19542,
+      "lines": 369,
+      "sha256": "b6ad0f331d332b5302078b17e8854f33d3e24a9c35e0b954b5331ac60c00bf5c",
+      "matches_head": true,
+      "git_blob": "ef51515d060ce885572ef4c4e9cfc8a55a535ee8"
+    }
+  ],
+  "probes": [
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/probes/checker-ui-catalogue-cache.test.ts",
+      "bytes": 3236,
+      "lines": 61,
+      "sha256": "0a3cf3b77c9e3a0ba392910ad95ed57a80ecee8451dfe3ee360bb5973bae58e8"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/probes/checker-ui-f606-intents.test.tsx",
+      "bytes": 6023,
+      "lines": 112,
+      "sha256": "724cc4a15a6ce70b403fc4836dcf3fc3ffc049c9fdb57c5a2f680c95b47cb7df"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/probes/checker-ui-f606-races.test.ts",
+      "bytes": 8188,
+      "lines": 158,
+      "sha256": "b58e94872c699b49fa48a108e34b26ac7c723211783509c9de41cc14a9caed57"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/probes/checker-ui-preflight.test.tsx",
+      "bytes": 6355,
+      "lines": 119,
+      "sha256": "27b74170c93db4e135c5e364bd79d03d8570ed4d55ed671dc873eb51131c490a"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/baseline-checkout.log",
+      "bytes": 255,
+      "sha256": "0f3da01d047981bd13b45594a3867f90a6ed44b2853fd1650b50f6895987c47f"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/checkout.log",
+      "bytes": 144,
+      "sha256": "e6394029d15acf3b23f0aa9f91f6f0e99b1b7fc889aa5a80597dd145f261ec8b"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/clone.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/npm-ci.log",
+      "bytes": 1073,
+      "sha256": "a553b7017082b31ebc89afd48facad5bfec3209f0c88e637ed6400c34062fa77"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/restore-f606.log",
+      "bytes": 255,
+      "sha256": "62cf78abd50292838cd5ae46443455aa9f1a5b8338821b7a15cf9d594fb01ae3"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-build.log",
+      "bytes": 429,
+      "sha256": "f8888f023d4f4cccea895a026b2f7fd8a15aebd31704374c65341275bda9b79d"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-e2e-b7-declared-control.log",
+      "bytes": 3118,
+      "sha256": "f67b4fcdf19643b5432913cc38f36cb0f2ebdd414e61264bc688c6801a8d3183"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-e2e.log",
+      "bytes": 3698,
+      "sha256": "e017fec89ba588424f7b070be42a52a0c0852614ff3d113d7e47752373a56d2a"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-f606-intent-probes.log",
+      "bytes": 367,
+      "sha256": "88f9aca5615f8253244cc134cf1470be52679e82c018793f62e6ce1e90483c27"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-f606-race-probes-final.log",
+      "bytes": 5012,
+      "sha256": "9b2b41d37da2fb36a4751b45c1aa968691dd559f46eaa439f347cf914c9ed1bb"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-f606-race-probes.log",
+      "bytes": 5012,
+      "sha256": "c7a18a3c85829b2a3d5220a42a5b0e594226a20ffcc8fb0d24cb395e0da738db"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-original-probes.log",
+      "bytes": 406,
+      "sha256": "df3be0291d9ffe9fdd72a6940c2ca4d5016fcbeaf60d36253ee40c579e11be88"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-supplied-tests.log",
+      "bytes": 590,
+      "sha256": "5e430fc53a5368704bd7166560d15359ed5d83884c5ffdcd905fbd950c6d85c4"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-typecheck-all-probes.log",
+      "bytes": 179,
+      "sha256": "82b02e89a7a99cc960a25de7b47eebad2987173cdf82e2bef8dc5ae876d1c180"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-typecheck-with-probes-final.log",
+      "bytes": 179,
+      "sha256": "82b02e89a7a99cc960a25de7b47eebad2987173cdf82e2bef8dc5ae876d1c180"
+    },
+    {
+      "path": "/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/ui-typecheck-with-probes.log",
+      "bytes": 1036,
+      "sha256": "97210e677672c887b1e9d34d2c5fa375a6fd9e71061fd9f87588b8f43e7515c7"
+    }
+  ],
+  "git_status_before_probe_removal": "?? packages/ui/test/checker-ui-catalogue-cache.test.ts\n?? packages/ui/test/checker-ui-f606-intents.test.tsx\n?? packages/ui/test/checker-ui-f606-races.test.ts\n?? packages/ui/test/checker-ui-preflight.test.tsx\n",
+  "source_diff": "",
+  "test_counts": {
+    "supplied": 222,
+    "unchanged_original": 15,
+    "intent_controls": 3,
+    "race_controls": 4,
+    "race_failures": 2,
+    "browser_pass": 8,
+    "browser_fail": 1
+  }
+}
