@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-01-docs-plan.md","body":{"commit":"a42c4d838ac49cee49f8c4b9ceb44ff1942cffa4","path":"notes/2026-10-01-docs-plan.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9ddc9ed2f57f5ccf5af9825b20850088db0a9a56","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-docs-plan.md."}
