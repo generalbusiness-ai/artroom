@@ -1,0 +1,752 @@
+{
+  "run": "2026-10-03T02-23-15-764Z",
+  "url": "https://artroom-spike-room.inguz.workers.dev",
+  "namespace": "gitseq-spike",
+  "importNamespace": "gitseq-spike-import",
+  "steps": [
+    {
+      "step": "checks: throwaway repository created in gitseq-spike-import",
+      "ok": true,
+      "atMs": 3065,
+      "detail": {
+        "name": "6952bbeecb1a30c77856c5bc19612c55",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/6952bbeecb1a30c77856c5bc19612c55.git"
+      }
+    },
+    {
+      "step": "checks: one commit pushed; its creation token revoked",
+      "ok": true,
+      "atMs": 3065,
+      "detail": {
+        "main": "97a511fc11767bc522f92239319691e107fe98c9",
+        "revoked": 1,
+        "active": 0
+      }
+    },
+    {
+      "step": "checks: draft",
+      "ok": true,
+      "atMs": 3426,
+      "detail": {
+        "status": 200,
+        "repo": "gitseq-spike-import/6952bbeecb1a30c77856c5bc19612c55",
+        "operator": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
+      }
+    },
+    {
+      "step": "checks: found",
+      "ok": true,
+      "atMs": 4623,
+      "detail": {
+        "status": 200,
+        "ms": 1196,
+        "room": "room_3a563e722d3ee4dc5108a6ff96626791"
+      }
+    },
+    {
+      "step": "checks: main is the imported commit; the Room wrote nothing",
+      "ok": true,
+      "atMs": 6001,
+      "detail": {
+        "main": "97a511fc11767bc522f92239319691e107fe98c9",
+        "imported": "97a511fc11767bc522f92239319691e107fe98c9"
+      }
+    },
+    {
+      "step": "checks: session",
+      "ok": true,
+      "atMs": 6076,
+      "detail": {
+        "status": 200,
+        "member": "@author"
+      }
+    },
+    {
+      "step": "checks: @reviewer joins as maintainer",
+      "ok": true,
+      "atMs": 6291,
+      "detail": {
+        "key": "key_-y_tl7I7epGaf5DuYVVg5R4EcUMOSxzxKCIh6XllXlk",
+        "invite": 200,
+        "join": 200,
+        "session": 200
+      }
+    },
+    {
+      "step": "checks: @checker joins as checker",
+      "ok": true,
+      "atMs": 6506,
+      "detail": {
+        "key": "key__5Feafe6dIDQmeA8IHuU-IyPQFWaQ8MnzskJMmfY11Y",
+        "invite": 200,
+        "join": 200,
+        "session": 200
+      }
+    },
+    {
+      "step": "lane 4: claim",
+      "ok": true,
+      "atMs": 6573,
+      "detail": {
+        "status": 200,
+        "ms": 66,
+        "lane": "act_6_d29dc7d0",
+        "seq": 6
+      }
+    },
+    {
+      "step": "lane 4: workspace requested",
+      "ok": true,
+      "atMs": 6669,
+      "detail": {
+        "status": 200,
+        "ms": 95,
+        "op": "op_ws_act_6_d29dc7d0_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 4: workspace ready",
+      "ok": true,
+      "atMs": 8822,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/6952bbeecb1a30c77856c5bc19612c55--act_6_d29dc7d0.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 4: workspace token",
+      "ok": true,
+      "atMs": 8879,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/6952bbeecb1a30c77856c5bc19612c55--act_6_d29dc7d0.git",
+        "expiresAt": "2026-10-03T02:53:16.458Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 4: clone fork",
+      "ok": true,
+      "atMs": 9364,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 4: push to fork",
+      "ok": true,
+      "atMs": 10125,
+      "detail": {
+        "head": "8fee1ce27f4f936eb58c3c17259926fee5eda464",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 4: propose",
+      "ok": true,
+      "atMs": 12470,
+      "detail": {
+        "status": 200,
+        "ms": 2344,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_7",
+          "kind": "preview",
+          "updatedAt": "2026-10-03T02:23:28.071Z",
+          "lane": "act_6_d29dc7d0",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "src/greet.js"
+          },
+          {
+            "status": "added",
+            "path": "test/greet.test.js"
+          }
+        ],
+        "obligations": [
+          {
+            "id": "obl_check-tests",
+            "rule": "check-tests",
+            "policy": "act_1_c1f0eb6c",
+            "paths": [
+              "src/greet.js",
+              "test/greet.test.js"
+            ],
+            "kind": "check",
+            "check": "tests",
+            "by": [
+              "role:checker"
+            ],
+            "state": "open",
+            "evidence": []
+          },
+          {
+            "id": "obl_independent-review",
+            "rule": "independent-review",
+            "policy": "act_1_c1f0eb6c",
+            "paths": [
+              "src/greet.js",
+              "test/greet.test.js"
+            ],
+            "kind": "review",
+            "from": [
+              "role:maintainer"
+            ],
+            "count": 1,
+            "allowSelf": false,
+            "state": "open",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "step": "lane 4: preview",
+      "ok": true,
+      "atMs": 12644,
+      "detail": {
+        "state": "clean",
+        "integration": "8fee1ce27f4f936eb58c3c17259926fee5eda464",
+        "base": "97a511fc11767bc522f92239319691e107fe98c9"
+      }
+    },
+    {
+      "step": "checks: the proposal owes one check and one review",
+      "ok": true,
+      "atMs": 12644,
+      "detail": {
+        "obligations": [
+          {
+            "id": "obl_check-tests",
+            "rule": "check-tests",
+            "policy": "act_1_c1f0eb6c",
+            "paths": [
+              "src/greet.js",
+              "test/greet.test.js"
+            ],
+            "kind": "check",
+            "check": "tests",
+            "by": [
+              "role:checker"
+            ],
+            "state": "open",
+            "evidence": []
+          },
+          {
+            "id": "obl_independent-review",
+            "rule": "independent-review",
+            "policy": "act_1_c1f0eb6c",
+            "paths": [
+              "src/greet.js",
+              "test/greet.test.js"
+            ],
+            "kind": "review",
+            "from": [
+              "role:maintainer"
+            ],
+            "count": 1,
+            "allowSelf": false,
+            "state": "open",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "step": "checks: attention asks the reviewer to review and the checker to check",
+      "ok": true,
+      "atMs": 12719,
+      "detail": {
+        "review": {
+          "why": "review-requested",
+          "proposal": {
+            "lane": "act_6_d29dc7d0",
+            "generation": 1
+          },
+          "obligation": "obl_independent-review",
+          "as": "role:maintainer",
+          "text": "Review act_6_d29dc7d0 generation 1 for obl_independent-review.",
+          "id": "att_7_1",
+          "seq": 7,
+          "lane": "act_6_d29dc7d0",
+          "open": true
+        },
+        "check": {
+          "why": "check-requested",
+          "proposal": {
+            "lane": "act_6_d29dc7d0",
+            "generation": 1
+          },
+          "obligation": "obl_check-tests",
+          "text": "Run tests on act_6_d29dc7d0 generation 1.",
+          "id": "att_7_0",
+          "seq": 7,
+          "lane": "act_6_d29dc7d0",
+          "open": true
+        }
+      }
+    },
+    {
+      "step": "checks: land before the review is refused (obligation-open)",
+      "ok": true,
+      "atMs": 12794,
+      "detail": {
+        "status": 409,
+        "rule": "obligation-open",
+        "reason": "The obligation obl_independent-review is open."
+      }
+    },
+    {
+      "step": "checks: the Room dispatched the job, and the checker's signed check was admitted",
+      "ok": true,
+      "atMs": 23221,
+      "detail": {
+        "waitedMs": 10427,
+        "check": {
+          "seq": 9,
+          "ok": true,
+          "integration": "8fee1ce27f4f936eb58c3c17259926fee5eda464",
+          "check": "tests",
+          "runner": "sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487",
+          "detail": "Machine-run check \"tests\": passed. It ran `npm ci`, then `npm test`, in an isolated runner.\nRunner environment: sha256:31dd5087c0e3eeabfe27711bb98ed40bd74d72cfa670844212e6779296661487\n\nnpm test exited 0.\n> spike-checks@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: adds\nok 1 - adds\n  ---\n  duration_ms: 0.997309\n  type: 'test'\n  ...\n# Subtest: greets\nok 2 - greets\n  ---\n  duration_ms: 0.567849"
+        },
+        "refused": [],
+        "integration": "8fee1ce27f4f936eb58c3c17259926fee5eda464"
+      }
+    },
+    {
+      "step": "checks: the check obligation is met",
+      "ok": true,
+      "atMs": 23269,
+      "detail": {
+        "check": {
+          "id": "obl_check-tests",
+          "rule": "check-tests",
+          "policy": "act_1_c1f0eb6c",
+          "paths": [
+            "src/greet.js",
+            "test/greet.test.js"
+          ],
+          "kind": "check",
+          "check": "tests",
+          "by": [
+            "role:checker"
+          ],
+          "state": "met",
+          "evidence": [
+            {
+              "basis": "here",
+              "act": "act_9_fa05e7ce",
+              "kind": "check",
+              "generation": 1,
+              "head": "8fee1ce27f4f936eb58c3c17259926fee5eda464"
+            }
+          ]
+        },
+        "review": {
+          "id": "obl_independent-review",
+          "rule": "independent-review",
+          "policy": "act_1_c1f0eb6c",
+          "paths": [
+            "src/greet.js",
+            "test/greet.test.js"
+          ],
+          "kind": "review",
+          "from": [
+            "role:maintainer"
+          ],
+          "count": 1,
+          "allowSelf": false,
+          "state": "open",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "step": "checks: attention: the checker's request is closed",
+      "ok": true,
+      "atMs": 23312,
+      "detail": {
+        "item": {
+          "why": "check-requested",
+          "proposal": {
+            "lane": "act_6_d29dc7d0",
+            "generation": 1
+          },
+          "obligation": "obl_check-tests",
+          "text": "Run tests on act_6_d29dc7d0 generation 1.",
+          "id": "att_7_0",
+          "seq": 7,
+          "lane": "act_6_d29dc7d0",
+          "open": false
+        }
+      }
+    },
+    {
+      "step": "checks: the reviewer approves",
+      "ok": true,
+      "atMs": 23384,
+      "detail": {
+        "status": 200,
+        "fulfils": [
+          {
+            "obligation": "obl_independent-review",
+            "evidence": {
+              "basis": "here",
+              "act": "act_10_d76f3cd4",
+              "kind": "review",
+              "generation": 1,
+              "head": "8fee1ce27f4f936eb58c3c17259926fee5eda464"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "checks: the review obligation is met",
+      "ok": true,
+      "atMs": 23427,
+      "detail": {
+        "review": {
+          "id": "obl_independent-review",
+          "rule": "independent-review",
+          "policy": "act_1_c1f0eb6c",
+          "paths": [
+            "src/greet.js",
+            "test/greet.test.js"
+          ],
+          "kind": "review",
+          "from": [
+            "role:maintainer"
+          ],
+          "count": 1,
+          "allowSelf": false,
+          "state": "met",
+          "evidence": [
+            {
+              "basis": "here",
+              "act": "act_10_d76f3cd4",
+              "kind": "review",
+              "generation": 1,
+              "head": "8fee1ce27f4f936eb58c3c17259926fee5eda464"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "checks: attention: the reviewer's request is closed",
+      "ok": true,
+      "atMs": 23475,
+      "detail": {
+        "item": {
+          "why": "review-requested",
+          "proposal": {
+            "lane": "act_6_d29dc7d0",
+            "generation": 1
+          },
+          "obligation": "obl_independent-review",
+          "as": "role:maintainer",
+          "text": "Review act_6_d29dc7d0 generation 1 for obl_independent-review.",
+          "id": "att_7_1",
+          "seq": 7,
+          "lane": "act_6_d29dc7d0",
+          "open": false
+        }
+      }
+    },
+    {
+      "step": "lane 4: land accepted",
+      "ok": true,
+      "atMs": 23597,
+      "detail": {
+        "status": 200,
+        "ms": 121,
+        "op": "op_land_11",
+        "state": "accepted"
+      }
+    },
+    {
+      "step": "lane 4: landed",
+      "ok": true,
+      "atMs": 27304,
+      "detail": {
+        "op": "op_land_11",
+        "state": "landed",
+        "integration": "8fee1ce27f4f936eb58c3c17259926fee5eda464"
+      }
+    },
+    {
+      "step": "checks: main is the landed integration",
+      "ok": true,
+      "atMs": 28269,
+      "detail": {
+        "main": "8fee1ce27f4f936eb58c3c17259926fee5eda464",
+        "integration": "8fee1ce27f4f936eb58c3c17259926fee5eda464"
+      }
+    },
+    {
+      "step": "checks: attention tells the author the landing's outcome",
+      "ok": true,
+      "atMs": 28312,
+      "detail": {
+        "item": {
+          "why": "land-outcome",
+          "op": "op_land_11",
+          "state": "landed",
+          "text": "Landing op_land_11 is landed.",
+          "id": "att_14_0",
+          "seq": 14,
+          "lane": "act_6_d29dc7d0",
+          "open": true
+        }
+      }
+    },
+    {
+      "step": "checks: log published to refs/artroom/log",
+      "ok": true,
+      "atMs": 81089,
+      "detail": {
+        "logHead": 15,
+        "publishedThrough": 15,
+        "ref": "65dcc40a7dc521437ba13c7a92af1b9e3a223e05"
+      }
+    },
+    {
+      "step": "checks: artroom verify",
+      "ok": true,
+      "atMs": 83499,
+      "detail": {
+        "exit": 0,
+        "ok": true,
+        "room": "room_3a563e722d3ee4dc5108a6ff96626791",
+        "head": "65dcc40a7dc521437ba13c7a92af1b9e3a223e05",
+        "commits": 1,
+        "publishedThrough": 15,
+        "verifiedThrough": 15,
+        "decisionsReplayed": 4,
+        "operator": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE",
+        "failures": []
+      }
+    },
+    {
+      "step": "checks: the verified log holds the check, the review and the landing",
+      "ok": true,
+      "atMs": 83579,
+      "detail": {
+        "kinds": [
+          "genesis",
+          "policy-activated",
+          "roster",
+          "roster",
+          "roster",
+          "roster",
+          "claim",
+          "propose",
+          "land",
+          "check",
+          "review",
+          "land",
+          "land-evaluated",
+          "land-reserved",
+          "land-outcome",
+          "release",
+          "checkpoint"
+        ]
+      }
+    }
+  ],
+  "gaps": [],
+  "cleanup": {
+    "releases": {},
+    "ok": true,
+    "duties": [
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "inventory",
+        "repos": [
+          "6952bbeecb1a30c77856c5bc19612c55",
+          "6952bbeecb1a30c77856c5bc19612c55--act_6_d29dc7d0"
+        ],
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "6952bbeecb1a30c77856c5bc19612c55--act_6_d29dc7d0",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "6952bbeecb1a30c77856c5bc19612c55--act_6_d29dc7d0",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "6952bbeecb1a30c77856c5bc19612c55",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "6952bbeecb1a30c77856c5bc19612c55",
+        "outcome": "done"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "final-inventory",
+        "repos": [
+          "6952bbeecb1a30c77856c5bc19612c55",
+          "6952bbeecb1a30c77856c5bc19612c55--act_6_d29dc7d0"
+        ],
+        "outcome": "done"
+      }
+    ],
+    "unresolved": [],
+    "reposLeft": []
+  },
+  "checks": {
+    "repo": "gitseq-spike-import/6952bbeecb1a30c77856c5bc19612c55",
+    "room": "room_3a563e722d3ee4dc5108a6ff96626791",
+    "name": "deploy-spike-checks-murrpc8e",
+    "verify": {
+      "exit": 0,
+      "report": {
+        "ok": true,
+        "ref": "refs/artroom/log",
+        "head": "65dcc40a7dc521437ba13c7a92af1b9e3a223e05",
+        "room": "room_3a563e722d3ee4dc5108a6ff96626791",
+        "operator": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE",
+        "commits": 1,
+        "verifiedThrough": 15,
+        "last": {
+          "id": "act_15_8cd7bf56",
+          "hash": "sha256:8cd7bf56b93044d5309d55da7fe06336148aaa5f983f10cf3ab7fc27044836b1"
+        },
+        "publishedThrough": 15,
+        "decisionsReplayed": 4,
+        "failures": [],
+        "cannotProve": [
+          "Whether any act was admitted after the last published entry: unpublished acts cannot be proven to exist or not to exist.",
+          "Lanes, leases, obligations and landings (R-LOG-15): verify checks each act's authority and replays every policy decision, but does not re-derive lane, lease, obligation or landing transitions, or the effects in receipts.",
+          "The room clock: expiry checks use each entry's recorded `at`, which only the room key vouches for."
+        ]
+      }
+    },
+    "log": [
+      {
+        "seq": 0,
+        "at": "2026-10-03T02:23:20.178Z",
+        "type": "system",
+        "kind": "genesis"
+      },
+      {
+        "seq": 1,
+        "at": "2026-10-03T02:23:20.178Z",
+        "type": "system",
+        "kind": "policy-activated"
+      },
+      {
+        "seq": 2,
+        "at": "2026-10-03T02:23:21.837Z",
+        "type": "act",
+        "kind": "roster"
+      },
+      {
+        "seq": 3,
+        "at": "2026-10-03T02:23:21.905Z",
+        "type": "act",
+        "kind": "roster"
+      },
+      {
+        "seq": 4,
+        "at": "2026-10-03T02:23:22.036Z",
+        "type": "act",
+        "kind": "roster"
+      },
+      {
+        "seq": 5,
+        "at": "2026-10-03T02:23:22.097Z",
+        "type": "act",
+        "kind": "roster"
+      },
+      {
+        "seq": 6,
+        "at": "2026-10-03T02:23:22.253Z",
+        "type": "act",
+        "kind": "claim"
+      },
+      {
+        "seq": 7,
+        "at": "2026-10-03T02:23:28.071Z",
+        "type": "act",
+        "kind": "propose"
+      },
+      {
+        "seq": 8,
+        "at": "2026-10-03T02:23:28.356Z",
+        "type": "refusal",
+        "kind": "land",
+        "rule": "obligation-open"
+      },
+      {
+        "seq": 9,
+        "at": "2026-10-03T02:23:32.022Z",
+        "type": "act",
+        "kind": "check"
+      },
+      {
+        "seq": 10,
+        "at": "2026-10-03T02:23:39.096Z",
+        "type": "act",
+        "kind": "review"
+      },
+      {
+        "seq": 11,
+        "at": "2026-10-03T02:23:39.251Z",
+        "type": "act",
+        "kind": "land"
+      },
+      {
+        "seq": 12,
+        "at": "2026-10-03T02:23:41.186Z",
+        "type": "system",
+        "kind": "land-evaluated"
+      },
+      {
+        "seq": 13,
+        "at": "2026-10-03T02:23:41.225Z",
+        "type": "system",
+        "kind": "land-reserved"
+      },
+      {
+        "seq": 14,
+        "at": "2026-10-03T02:23:42.957Z",
+        "type": "system",
+        "kind": "land-outcome"
+      },
+      {
+        "seq": 15,
+        "at": "2026-10-03T02:23:44.064Z",
+        "type": "act",
+        "kind": "release"
+      },
+      {
+        "seq": 16,
+        "at": "2026-10-03T02:24:27.610Z",
+        "type": "system",
+        "kind": "checkpoint"
+      }
+    ]
+  },
+  "ok": true,
+  "ms": 86082
+}
