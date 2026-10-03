@@ -58,6 +58,9 @@ test("pushed to an empty repository, main is created at the first commit; the pa
   assert.equal(seen.length, 1);
   assert.equal(seen[0]!.url, "https://acct.artifacts.cloudflare.net/git/ns/repo.git/git-receive-pack");
   assert.equal(seen[0]!.auth, "Bearer art_v1_secret");
+  // The same first commit pushed again (a retried founding) is refused, and main is the first's.
+  assert.equal((await pushFirstCommit("https://acct.artifacts.cloudflare.net/git/ns/repo.git", "art_v1_secret", AT, gitBackend(bare, []))).kind, "refused");
+  assert.equal(readRef(bare, "refs/heads/main"), commit);
 });
 
 test("a repository whose main exists is never moved: the push is refused, and main keeps its commit", async (t) => {
@@ -72,11 +75,6 @@ test("a repository whose main exists is never moved: the push is refused, and ma
   assert.equal(out.kind, "refused");
   assert.match(out.kind === "refused" ? out.detail : "", /ng refs\/heads\/main/);
   assert.equal(readRef(bare, "refs/heads/main"), before);
-  // The same first commit pushed twice (a retried founding): the second is refused, and main is the first's.
-  const fresh = bareRepo(join(root, "again.git"));
-  assert.equal((await pushFirstCommit("https://h/git/ns/r.git", "t", AT, gitBackend(fresh, []))).kind, "created");
-  assert.equal((await pushFirstCommit("https://h/git/ns/r.git", "t", AT, gitBackend(fresh, []))).kind, "refused");
-  assert.equal(readRef(fresh, "refs/heads/main"), (await firstCommit(AT)).commit);
 });
 
 test("an answer that is not a clear ok is refused, never created", async () => {

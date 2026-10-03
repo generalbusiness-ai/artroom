@@ -17,40 +17,31 @@ import { createHash } from "node:crypto";
 const lane = "act_1001_abcdef01";
 const other = "act_1002_abcdef02";
 
-test("hooks never run, even if one is placed in the publisher's repo", async (t) => {
-  const f = new Fixture().init();
-  t.after(() => f.dispose());
-  const dir = await f.ops.repo(f.canonical);
-  const marker = join(f.root, "hook-ran");
-  for (const hook of ["reference-transaction", "pre-push", "post-update", "pre-auto-gc"]) {
-    const p = join(dir, "hooks", hook);
-    mkdirSync(join(dir, "hooks"), { recursive: true });
-    writeFileSync(p, `#!/bin/sh\necho ${hook} >> ${marker}\n`);
-    chmodSync(p, 0o755);
-  }
-  const head = f.propose(lane, 1, f.main, { "src/c.txt": "c\n" });
-  // The push fetches the head into the publisher's repo (a ref update there), then pushes it.
-  const out = await f.ops.pushMain(f.canonical, head, f.main, pinnedRef(lane, 1));
-  assert.equal(out.outcome, "landed");
-  assert.equal(existsSync(marker), false, "a hook ran");
-  assert.ok(HARDENING.includes("core.hooksPath=/dev/null"));
-  // Control: the same hooks do run under plain git.
-  await localExec(["git", "-C", dir, "update-ref", "refs/x", head], { env: {} });
-  assert.equal(existsSync(marker), true, "control: plain git runs the reference-transaction hook");
-});
-
-test("lease race: two fresh sandboxes fetch their stored heads and push different ones on the same main; exactly one wins, and a missing repository is an error", async (t) => {
+test("lease race: two fresh sandboxes fetch their stored heads and push different ones on the same main; exactly one wins; no hook in a sandbox's repository runs; a missing repository is an error", async (t) => {
   const f = new Fixture().init();
   t.after(() => f.dispose());
   const a = f.propose(lane, 1, f.main, { "race/a.txt": "a\n" });
   const b = f.propose(other, 1, f.main, { "race/b.txt": "b\n" });
+  // Hooks, placed in one sandbox's repository, for the ref updates of a fetch and for a push.
+  const dir = await f.ops.repo(f.canonical);
+  const marker = join(f.root, "hook-ran");
+  mkdirSync(join(dir, "hooks"), { recursive: true });
+  for (const hook of ["reference-transaction", "pre-push", "post-update", "pre-auto-gc"]) {
+    writeFileSync(join(dir, "hooks", hook), `#!/bin/sh\necho ${hook} >> ${marker}\n`);
+    chmodSync(join(dir, "hooks", hook), 0o755);
+  }
   // Neither sandbox has its head yet: each fetches it from the pinned ref first. The loser's lease is stale, whichever push git takes first.
   const [ra, rb] = await Promise.all([
-    f.sandbox("pa").pushMain(f.canonical, a, f.main, pinnedRef(lane, 1)),
+    f.ops.pushMain(f.canonical, a, f.main, pinnedRef(lane, 1)),
     f.sandbox("pb").pushMain(f.canonical, b, f.main, pinnedRef(other, 1)),
   ]);
   assert.deepEqual([ra.outcome, rb.outcome].sort(), ["landed", "rejected"]);
   assert.equal(f.canonicalMain(), ra.outcome === "landed" ? a : b);
+  assert.equal(existsSync(marker), false, "a hook ran");
+  assert.ok(HARDENING.includes("core.hooksPath=/dev/null"));
+  // Control: the same hooks do run under plain git.
+  await localExec(["git", "-C", dir, "update-ref", "refs/x", a], { env: {} });
+  assert.equal(existsSync(marker), true, "control: plain git runs the reference-transaction hook");
   // Nothing was sent to a repository that is not there: an error, never unknown.
   assert.equal((await f.ops.pushMain(join(f.root, "nope.git"), a, f.main, pinnedRef(lane, 1))).outcome, "error");
 });
@@ -163,20 +154,21 @@ function seed(gitDir: string, c: ReturnType<typeof logCommit>): string {
   return c.commit;
 }
 
-test("pushLog writes lane L's next commit, on top of its parent, to refs/artroom/log under the lease; readLogRef reads the ref, null when it does not exist, and fails (never null) when the remote cannot be read", async (t) => {
+test("pushLog writes lane L's commit with its parent to refs/artroom/log under the lease, then the next one on top; readLogRef reads the ref, null when it does not exist, and fails (never null) when the remote cannot be read", async (t) => {
   const f = new Fixture().init();
   t.after(() => f.dispose());
   assert.equal(await f.ops.readLogRef(f.canonical), null);
-  // The log's first commit is there already. (A first publication, with no lease, is in the staging tests below.)
+  // A first publication: no lease, and the objects come with the call.
   const c1 = logCommit("first", null);
-  f.setRef(LOG_REF, seed(f.canonical, c1));
-  // ls-remote sees refs outside refs/heads/.
-  assert.equal(await f.ops.readLogRef(f.canonical, LOG_REF), c1.commit);
-  // The sandbox has nothing yet: the parent comes from the canonical repo, and only the new objects are sent.
+  const r1 = await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
+  assert.equal(r1.outcome.outcome, "landed");
+  assert.deepEqual(toLogOutcome(r1), { ok: true });
+  assert.equal(f.ref(LOG_REF), c1.commit);
+  // A fresh sandbox reads it: ls-remote sees refs outside refs/heads/. The parent comes from the canonical repo, and only the new objects are sent.
+  const fresh = f.sandbox("publisher-2");
+  assert.equal(await fresh.readLogRef(f.canonical, LOG_REF), c1.commit);
   const c2 = logCommit("second", c1.commit);
-  const r2 = await f.ops.pushLog(f.canonical, c2.objects, c2.commit, c1.commit);
-  assert.equal(r2.outcome.outcome, "landed");
-  assert.deepEqual(toLogOutcome(r2), { ok: true });
+  assert.equal((await fresh.pushLog(f.canonical, c2.objects, c2.commit, c1.commit)).outcome.outcome, "landed");
   assert.equal(f.ref(LOG_REF), c2.commit);
   assert.deepEqual(objectsIn(f.canonical).commitFacts(c2.commit).parents, [c1.commit]);
   assert.equal((await localExec(["git", "--git-dir", f.canonical, "fsck", "--no-dangling"], { env: {} })).code, 0);
