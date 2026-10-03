@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ee240bfe63c0250ecc8b6d60aa1d1d1f40837995","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/pin-delay.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f2746d44b61a643d943ea39b2eef0c2d9e68ae22","text":"Merge retired a covered predecessor; the successor is at packages/git/measure/harness/worker.ts."}
