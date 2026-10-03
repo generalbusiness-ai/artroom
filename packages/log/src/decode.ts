@@ -7,14 +7,21 @@
  * - checkpoints;
  * - retained replay contexts and policy documents.
  *
+ * Kinds are decoded by grammar (R-SIG-4 as amended by R-DECL-2): any name
+ * of `[a-z][a-z0-9-]{0,31}` decodes, in envelope `v: 1` or, with a
+ * `binding`, `v: 2` (R-DECL-16). Whether the kind, its binding and its body
+ * fit the declarations in force at the entry's seq is verify's judgement
+ * (declared.ts), not this boundary's.
+ *
  * Each function either returns a value of the contract's shape, or throws
  * `Malformed` naming the first bad field. It checks the fields that verify
  * reads, and the type of every closed union it branches on. It does not
  * check signatures or digests: verify does that on the decoded value.
  */
 
-import type { CheckerConfig, Checkpoint, ChunkedLine, LogEntry, LogLayout, PolicyDocument, ReplayContext } from "@generalbusiness/artroom-contract";
-import { validateCheckerConfig, validatePolicy } from "@generalbusiness/artroom-policy";
+import type { AnyPolicyDocument, CheckerConfig, CheckerConfigV2, Checkpoint, ChunkedLine, LogEntry, LogLayout, ReplayContext } from "@generalbusiness/artroom-contract";
+import { ARTROOM_LEGACY_V1 } from "@generalbusiness/artroom-contract";
+import { PLATFORM_KINDS, STEPS_VERSIONS, validateCheckerConfig, validateCheckerConfigV2, validatePolicy, validatePolicyV2 } from "@generalbusiness/artroom-policy";
 import { canonicalize, fromUtf8, parseStrict } from "./canonical.ts";
 import { hex } from "./crypto.ts";
 import { parseTime } from "./time.ts";
@@ -22,6 +29,30 @@ import { parseTime } from "./time.ts";
 export class Malformed extends Error {
   override readonly name = "Malformed";
 }
+
+/**
+ * A retained policy document names a steps version or an evaluator profile
+ * this verifier does not carry (R-DECL-14, R-DECL-22). A limit of the
+ * verifier, not a finding against the log.
+ */
+export class Unsupported extends Error {
+  override readonly name = "Unsupported";
+  readonly reason: "steps-unsupported" | "profile-unsupported";
+  readonly version: string;
+  constructor(reason: "steps-unsupported" | "profile-unsupported", version: string) {
+    super(`${reason === "steps-unsupported" ? "the steps version" : "the evaluator profile"} ${version} is not one this verifier carries`);
+    this.reason = reason;
+    this.version = version;
+  }
+}
+
+/** The versions a verifier carries (R-DECL-14, R-DECL-22): by default, this platform's. */
+export interface Carried {
+  readonly steps: readonly string[];
+  readonly profiles: readonly string[];
+}
+
+export const CARRIED: Carried = { steps: STEPS_VERSIONS, profiles: ["artroom-jsonata-v1"] };
 
 /** A line that was not UTF-8. It keeps the bytes, so two different bad lines never compare equal. */
 const NOT_UTF8 = "\u0000not-utf8:";
@@ -70,9 +101,13 @@ type Field =
   // amendment 2: checker configurations, checks and onboarding grants
   | "createdAt" | "checkers" | "name" | "config" | "check" | "onboarding" | "grant" | "repo" | "operator" | "notAfter"
   // amendment 3: check carry
-  | "lane" | "obligation" | "carried" | "notCarried";
+  | "lane" | "obligation" | "carried" | "notCarried"
+  // amendment 6: declared acts (R-DECL-16, R-DECL-17, R-DECL-20, R-DECL-21)
+  | "binding" | "acts" | "session" | "owner" | "preview" | "integration" | "base" | "tree" | "snapshots" | "digest"
+  | "generation" | "reservedFor" | "leaseGeneration";
 type Obj = { readonly [K in Field]?: unknown } & Readonly<Record<string, unknown>>;
 
+const isObject = (v: unknown): v is Readonly<Record<string, unknown>> => typeof v === "object" && v !== null && !Array.isArray(v);
 const bad = (path: string, what: string): never => {
   throw new Malformed(`${path} ${what}`);
 };
@@ -93,7 +128,14 @@ const starOr = (v: unknown, path: string, item: (v: unknown, path: string) => un
 // ------------------------------------------------------------ the contract
 
 const FORMAT = ["artroom-log-v1"] as const;
-const ENVELOPE_KINDS = ["claim", "propose", "note", "review", "check", "land", "release", "renew", "roster"] as const;
+/** The legacy vocabulary's kinds: what a `v1`-shape grant may name (R-ADM-5, R-DECL-1). */
+const ENVELOPE_KINDS = ARTROOM_LEGACY_V1.envelope.kinds as readonly string[];
+/** A kind's name (R-SIG-4 as amended, R-DECL-2). */
+export const KIND_GRAMMAR = /^[a-z][a-z0-9-]{0,31}$/;
+const DIGEST = /^sha256:[0-9a-f]{64}$/;
+/** Platform kinds a grant may name plainly; `roster` and `recover` never (R-DECL-17). */
+const DELEGABLE_PLATFORM = ["renew"] as const;
+const RECOVER_OPS = ["open", "take", "version", "approve", "land", "release", "note"] as const;
 const ROLES = ["admin", "maintainer", "member", "agent", "checker"] as const;
 const CUSTODY = ["client", "room"] as const;
 const REVOCATION = ["retired", "compromised"] as const;
@@ -113,6 +155,9 @@ const SYSTEM_EVENTS = [
   "revert-lane",
   "notified",
   "checkpoint",
+  // R-LOG-5 as amended (R-DECL-10, R-DECL-20)
+  "prepared",
+  "reservation-ended",
 ] as const;
 
 function decision(v: unknown, path: string): void {
@@ -197,10 +242,51 @@ function systemEvent(v: unknown, path: string): void {
       str(ev.hash, `${path}.hash`);
       str(ev.commit, `${path}.commit`);
       break;
+    case "prepared": {
+      const o = obj(ev.owner, `${path}.owner`);
+      if ("preview" in o) {
+        const p = obj(o.preview, `${path}.owner.preview`);
+        str(p.lane, `${path}.owner.preview.lane`);
+        seqOf(p.generation, `${path}.owner.preview.generation`); // V:d-prepared-owner
+      } else {
+        str(o.op, `${path}.owner.op`);
+        str(o.lane, `${path}.owner.lane`);
+        seqOf(o.generation, `${path}.owner.generation`);
+      }
+      for (const k of ["integration", "base", "tree"] as const) str(ev[k], `${path}.${k}`); // V:d-prepared
+      arr(ev.snapshots, `${path}.snapshots`).forEach((x, i) => {
+        const q = `${path}.snapshots[${i}]`;
+        for (const k of ["check", "commit", "digest"] as const) str(obj(x, q)[k], `${q}.${k}`);
+      });
+      break;
+    }
+    case "reservation-ended":
+      str(ev.lane, `${path}.lane`); // V:d-reservation
+      break;
     default:
       // The other events carry nothing verify reads.
       break;
   }
+}
+
+/** A signed map from declared kind to binding (R-DECL-17): grammar keys, digest values. */
+function grantMap(v: unknown, path: string): void {
+  for (const [k, b] of Object.entries(obj(v, path))) {
+    if (!KIND_GRAMMAR.test(k)) bad(`${path}.${k}`, "is not a kind name"); // V:d-map-key
+    if (!DIGEST.test(str(b, `${path}.${k}`))) bad(`${path}.${k}`, "is not a binding"); // V:d-map-value
+  }
+}
+
+/**
+ * The kinds a grant names. With `acts` it has the `v2` shape: platform kinds
+ * by name and declared kinds by binding (R-DECL-17). Without, the legacy
+ * shape: legacy kinds, or `*`.
+ */
+function grantKinds(b: Obj, path: string): void {
+  if ("acts" in b) {
+    arr(b.kinds, `${path}.kinds`).forEach((x, i) => oneOf(x, `${path}.kinds[${i}]`, DELEGABLE_PLATFORM)); // V:d-map-kinds
+    grantMap(b.acts, `${path}.acts`);
+  } else starOr(b.kinds, `${path}.kinds`, (x, q) => oneOf(x, q, ENVELOPE_KINDS));
 }
 
 function rosterOp(v: unknown, path: string): void {
@@ -214,6 +300,7 @@ function rosterOp(v: unknown, path: string): void {
       oneOf(b.custody, p("custody"), CUSTODY);
       time(b.expiresAt, p("expiresAt"));
       str(b.secretHash, p("secretHash"));
+      if ("session" in b) grantKinds(obj(b.session, p("session")), p("session")); // V:d-session
       break;
     case "join":
       str(b.invitation, p("invitation"));
@@ -236,8 +323,8 @@ function rosterOp(v: unknown, path: string): void {
       break;
     case "delegate":
       str(b.to, p("to"));
-      // Any kind is well formed here; R-ADM-5 (roster, or beyond the role) is judged by the roster replay.
-      starOr(b.kinds, p("kinds"), (x, q) => oneOf(x, q, ENVELOPE_KINDS));
+      // Any kind is well formed here; R-ADM-5 (roster, or beyond the role) and R-DECL-17 are judged by the roster replay.
+      grantKinds(b, path);
       starOr(b.lanes, p("lanes"), str);
       time(b.expiresAt, p("expiresAt"));
       break;
@@ -255,16 +342,24 @@ function signedEnvelope(v: unknown, path: string): void {
   str(s.sig, `${path}.sig`);
   const env = obj(s.envelope, `${path}.envelope`);
   const p = (k: string) => `${path}.envelope.${k}`;
-  if (env.v !== 1) bad(p("v"), "is not 1");
+  if (env.v !== 1 && env.v !== 2) bad(p("v"), "is not 1 or 2"); // V:d-v
   str(env.room, p("room"));
   str(env.actor, p("actor"));
-  const kind = oneOf(env.kind, p("kind"), ENVELOPE_KINDS);
+  const kind = str(env.kind, p("kind"));
+  if (!KIND_GRAMMAR.test(kind)) bad(p("kind"), "is not a kind name: [a-z][a-z0-9-]{0,31}"); // V:d-kind
+  if (env.v === 2) {
+    // R-DECL-16: platform kinds are signed in v: 1; a declared kind's v: 2 envelope carries its binding.
+    if (PLATFORM_KINDS.includes(kind)) bad(p("v"), `is 2, but ${kind} is a platform kind, signed in v: 1`); // V:d-platform-v2
+    if (!DIGEST.test(str(env.binding, p("binding")))) bad(p("binding"), "is not a binding"); // V:d-binding
+  } else if ("binding" in env) bad(p("binding"), "is only in a v: 2 envelope"); // V:d-binding-v1
   if (!("target" in env)) bad(p("target"), "is missing");
   if (!("body" in env)) bad(p("body"), "is missing");
   str(env.idempotencyKey, p("idempotencyKey"));
   optional(env, "delegation", str, `${path}.envelope`);
   if (kind === "roster") rosterOp(env.body, p("body"));
-  if (kind === "check") {
+  if (kind === "recover") oneOf(obj(env.body, p("body")).op, p("body.op"), RECOVER_OPS); // V:d-recover-op
+  // A legacy check's binding fields; a declared act's step fields are judged against its declaration (declared.ts).
+  if (kind === "check" && env.v === 1) {
     const b = obj(env.body, p("body"));
     str(b.obligation, p("body.obligation"));
     str(b.check, p("body.check"));
@@ -366,15 +461,21 @@ export function decodeChunkedLine(line: string): ChunkedLine | null {
 
 export function decodeRetained(kind: "json", bytes: Uint8Array): unknown;
 export function decodeRetained(kind: "input", bytes: Uint8Array): ReplayContext;
-export function decodeRetained(kind: "policy", bytes: Uint8Array): PolicyDocument;
-export function decodeRetained(kind: "checker", bytes: Uint8Array): CheckerConfig;
+export function decodeRetained(kind: "policy", bytes: Uint8Array, carried?: Carried): AnyPolicyDocument;
+export function decodeRetained(kind: "checker", bytes: Uint8Array): CheckerConfig | CheckerConfigV2;
 /**
  * A retained file. Under `inputs/` it is a replay context. Under
- * `policies/` it is a policy document or a checker configuration, which
- * only the `policy-activated` event naming it tells apart; `json` checks
- * only that it is strict JSON.
+ * `policies/` it is a policy document (`v1` or `v2`) or a checker
+ * configuration (`v1` or `v2`), which only the `policy-activated` event
+ * naming it tells apart; `json` checks only that it is strict JSON.
+ *
+ * A policy document that names a steps version or evaluator profile the
+ * verifier does not carry throws `Unsupported` (R-DECL-14, R-DECL-22). A
+ * `v2` document is checked here as a document; what only the room knows
+ * (its historical opening kinds and its checker configurations) is checked
+ * when it is activated (verify.ts).
  */
-export function decodeRetained(kind: "json" | "input" | "policy" | "checker", bytes: Uint8Array): unknown {
+export function decodeRetained(kind: "json" | "input" | "policy" | "checker", bytes: Uint8Array, carried: Carried = CARRIED): unknown {
   const text = textOf(bytes);
   if (text === null) throw new Malformed(`the retained ${kind} is not UTF-8`);
   let v: unknown;
@@ -387,12 +488,24 @@ export function decodeRetained(kind: "json" | "input" | "policy" | "checker", by
     case "json":
       return v;
     case "policy": {
+      const d: Readonly<Record<string, unknown>> = isObject(v) ? v : {};
+      // The versions first: a document this verifier cannot read is a limit, not a malformed file.
+      if (typeof d["profile"] === "string" && !carried.profiles.includes(d["profile"])) throw new Unsupported("profile-unsupported", d["profile"]); // V:d-profile
+      if (d["format"] === "artroom-policy-v2") {
+        if (typeof d["steps"] === "string" && !carried.steps.includes(d["steps"])) throw new Unsupported("steps-unsupported", d["steps"]); // V:d-steps
+        // A steps version the verifier carries but the policy package does not (a registered one) validates as the first.
+        const doc = typeof d["steps"] === "string" && !STEPS_VERSIONS.includes(d["steps"]) ? { ...d, steps: STEPS_VERSIONS[0] } : d;
+        const names = Object.values(isObject(doc["acts"]) ? doc["acts"] : {}).flatMap((a) => (isObject(a) && Array.isArray(a["threads"]) ? a["threads"] : []));
+        const checked = validatePolicyV2(doc, { historicalOpeningKinds: names.filter((n): n is string => typeof n === "string") });
+        if (!checked.ok) throw new Malformed(`the retained policy is not a policy document: ${checked.problems[0]}`); // V:d-policy-v2
+        return v;
+      }
       const checked = validatePolicy(v);
       if (!checked.ok) throw new Malformed(`the retained policy is not a policy document: ${checked.problems[0]}`);
       return checked.value;
     }
     case "checker": {
-      const checked = validateCheckerConfig(v);
+      const checked = isObject(v) && v["format"] === "artroom-checker-v2" ? validateCheckerConfigV2(v) : validateCheckerConfig(v);
       if (!checked.ok) throw new Malformed(`the retained checker configuration is not one: ${checked.problems[0]}`);
       return checked.value;
     }

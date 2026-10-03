@@ -16,6 +16,21 @@
  *   event, when the act it names was admitted; for a `check-carried` event,
  *   the version the event names (R-CARRY-13).
  *
+ * Declared acts (R-DECL-25, stage 3). Each act and recorded refusal is
+ * judged under `D(s)`, the document in force at its seq: under a `v1`
+ * document by the legacy vocabulary `artroom-legacy-v1`, exactly as before;
+ * under a `v2` document by its declarations and the steps version it names
+ * (declared.ts): kind (`kind-undeclared`), binding (`binding-stale`), body
+ * and target (`body-invalid`) and who may sign. For entries judged under a
+ * `v2` document verify derives the evaluation calls the room had to make and
+ * rebuilds their inputs from the fold (calls.ts, fold.ts, obligations.ts):
+ * `decision-missing`, `decision-extra`, `context-mismatch`. The fold keeps
+ * each version's obligations, evidence and carried verdicts through `v1`
+ * intervals too, by making the same calls without comparing them. A document
+ * naming a steps version or evaluator profile this verifier does not carry
+ * stops verification at the first entry that needs it (`steps-unsupported`,
+ * `profile-unsupported`): a limit of the verifier, reported, not a failure.
+ *
  * Untrusted content is decoded at one boundary (`decode.ts`) before any field
  * is read. Malformed content is a named failure, `malformed`, and the
  * verified prefix ends before it. Only reading the repository can throw.
@@ -42,16 +57,50 @@ import type {
   Sha,
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
-import { replay } from "@generalbusiness/artroom-policy";
+import type {
+  AnyPolicyDocument,
+  Authority,
+  Carried,
+  CheckerConfig,
+  DeclaredVerifyFailure,
+  Envelope,
+  Flag,
+  LaneId,
+  ObligationId,
+  PathChange,
+  RepoPath,
+  ReviewBody,
+  Step,
+  Verdict,
+  VerifyProofLimit,
+  VerifyUnsupported,
+} from "@generalbusiness/artroom-contract";
+import { STEPS_VERSIONS, checkerInputs, replay, validatePolicyV2, type InputOf } from "@generalbusiness/artroom-policy";
 import { canonicalize } from "./canonical.ts";
 import { digestJson, sha256Hex, verifySig } from "./crypto.ts";
 import { LOG_REF, ROOT, contentOf, entryId, roomIdOf } from "./entries.ts";
 import { parseCommit, type GitReader } from "./git.ts";
-import { decodeCheckpoint, decodeEntry, decodeRetained, textOf } from "./decode.ts";
+import { Unsupported, decodeCheckpoint, decodeEntry, decodeRetained, textOf } from "./decode.ts";
 import { CHUNK_MISMATCH, commitLines, readLogCommit } from "./tree.ts";
 import { OBJECT_BOUND } from "./layout.ts";
 import { checkedTime } from "./time.ts";
 import { RosterReplay, type AuthorityFailure } from "./roster.ts";
+import { CARRIED_STEPS, LEGACY, bodyProblem, kindProblem, stepsOf, vocabularyOf, whoOf, type StepsSemantics, type Vocabulary } from "./declared.ts";
+import { Fold, carryKey, changedPaths, gitChanges, missingChanges, treeOf, type EvidenceRow, type Made as VersionMade, type Thread, type Version, type Witness } from "./fold.ts";
+import { CallSession, actorOf, landInput, memberActor, refuseInput, requireInput, stoppedAt, type CallFailure, type World } from "./calls.ts";
+import {
+  carryCandidates,
+  checkEvidence,
+  invalidity,
+  landEvidence,
+  patchLand,
+  reviewersOf,
+  revokedFact,
+  specsOf,
+  verdictEvidence,
+  withAdvisory,
+  type Judging,
+} from "./obligations.ts";
 
 export type VerifyReason =
   // the ref and its commits
@@ -101,7 +150,9 @@ export type VerifyReason =
   | "input-missing"
   | "policy-version-mismatch"
   | "stamp-mismatch"
-  | "policy-decision-mismatch";
+  | "policy-decision-mismatch"
+  // declared acts (R-DECL-25)
+  | DeclaredVerifyFailure;
 
 export interface VerifyFailure {
   readonly reason: VerifyReason;
@@ -131,6 +182,16 @@ export interface VerifyReport {
   readonly publishedThrough: Seq;
   readonly decisionsReplayed: number;
   readonly failures: readonly VerifyFailure[];
+  /**
+   * Set when a document names a steps version or evaluator profile this
+   * verifier does not carry (R-DECL-14, R-DECL-22): verification stopped at
+   * `seq`, and `verifiedThrough` is the entry before it. A limit of this
+   * verifier, not a finding against the log; `ok` is false, because the log
+   * was not verified to its end.
+   */
+  readonly unsupported: { readonly reason: VerifyUnsupported; readonly seq: Seq; readonly detail: string } | null;
+  /** Proof limits met at named entries (R-DECL-25): reported, not failures. */
+  readonly limits: readonly { readonly reason: VerifyProofLimit; readonly seq: Seq; readonly detail: string }[];
   /** Plain statements of what this verification cannot prove. */
   readonly cannotProve: readonly string[];
 }
@@ -151,6 +212,14 @@ export interface VerifyOptions {
   readonly ref?: string;
   /** Replay recorded policy decisions with the policy package. Default true. */
   readonly replayDecisions?: boolean;
+  /**
+   * The steps versions this verifier carries, by name (R-DECL-14). Default:
+   * this platform's (`CARRIED_STEPS`). A platform release adds a version; a
+   * test may register one to show a log judged across two.
+   */
+  readonly steps?: Readonly<Record<string, StepsSemantics>>;
+  /** The evaluator profiles this verifier carries (R-DECL-22). Default: `artroom-jsonata-v1`. */
+  readonly profiles?: readonly string[];
 }
 
 /**
@@ -182,6 +251,13 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     "Whether any act was admitted after the last published entry: unpublished acts cannot be proven to exist or not to exist.",
     "Lanes, leases, obligations and landings (R-LOG-15): verify checks each act's authority and replays every policy decision, but does not re-derive lane, lease, obligation or landing transitions, or the effects in receipts.",
     "The room clock: expiry checks use each entry's recorded `at`, which only the room key vouches for.",
+    "Refusals that are never recorded (R-ADM-8): kind-undeclared, binding-stale and the other refusals of admission steps 1 to 6 leave no entry, so verify can neither see nor prove them.",
+    "Under a v1 document, entries are judged by the legacy vocabulary as before declared acts: the decisions present are replayed, but the calls the room had to make are not derived (R-DECL-1).",
+    "Under a v2 document, the required evaluation calls are derived and their inputs rebuilt from the thread, roster, obligation and evidence fold, which takes receipt effects as recorded: lane, lease and landing transitions, the obligations effects, and the platform guards behind a recorded refusal are not re-derived (stage 6).",
+    "A version's changed paths are checked against Git objects, from the base its context names to its head, when the objects are present; without them they are the retained context's, reported as git-unwitnessed. That the base is the merge base of main and the head needs main's history, which the log does not carry.",
+    "The paths changed since an earlier verdict's head, which decide whether it carries, are read from Git objects. Without them they are the retained carry context's, where one is recorded; where none is, whether the verdict carried is undecided, and so is each land input that depends on it. Each is reported as git-unwitnessed.",
+    "Whether the room prepared a check's integration, for a version or landing with no prepared event: rooms seal prepared events from stage 4 (R-DECL-20); verify checks a check against them where they are present. Until then a check on a filtered snapshot does not name the integration it counts for, and a check carry's new tree and snapshot are not in the log: verify takes them from the retained context and reports git-unwitnessed.",
+    "Whether a check-carried judgement was owed: the room judges carrying a check when a landing is prepared, which the log does not time. Verify checks each judgement that is recorded, and a carry that is not recorded meets no obligation.",
   ];
   const empty = (extra: Partial<VerifyReport> = {}): VerifyReport => ({
     ok: false,
@@ -195,6 +271,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     publishedThrough: -1,
     decisionsReplayed: 0,
     failures,
+    unsupported: null,
+    limits: [],
     cannotProve,
     ...extra,
   });
@@ -341,7 +419,9 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     return bytes !== undefined && sha256Hex(bytes) === RETAINED.exec(path)?.[2];
   };
   type Contract = "input" | "json" | "policy" | "checker";
-  type Decoded = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly detail: string };
+  type Decoded = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly detail: string; readonly unsupported?: VerifyUnsupported };
+  const stepsCarried = opts.steps ?? CARRIED_STEPS;
+  const carried = { steps: Object.keys(stepsCarried), profiles: opts.profiles ?? ["artroom-jsonata-v1"] };
   const decodings = new Map<`${Contract} ${Digest}`, Decoded>();
   /** `bytes`, named by `digest`, decoded under `contract`; once per contract and digest. */
   const decodeAs = (contract: Contract, digest: Digest, bytes: Uint8Array): Decoded => {
@@ -349,9 +429,9 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     let d = decodings.get(key);
     if (!d) {
       try {
-        d = { ok: true, value: contract === "input" ? decodeRetained("input", bytes) : contract === "json" ? decodeRetained("json", bytes) : contract === "policy" ? decodeRetained("policy", bytes) : decodeRetained("checker", bytes) };
+        d = { ok: true, value: contract === "input" ? decodeRetained("input", bytes) : contract === "json" ? decodeRetained("json", bytes) : contract === "policy" ? decodeRetained("policy", bytes, carried) : decodeRetained("checker", bytes) };
       } catch (e) {
-        d = { ok: false, detail: (e as Error).message };
+        d = { ok: false, detail: (e as Error).message, ...(e instanceof Unsupported ? { unsupported: e.reason } : {}) };
       }
       decodings.set(key, d);
     }
@@ -384,26 +464,41 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
    */
   const lookup = (contract: "input" | "policy" | "checker", digest: Digest, missing: "input-missing" | "policy-missing" | "checker-missing"):
     | { readonly ok: true; readonly value: unknown }
-    | { readonly ok: false; readonly reason: VerifyReason; readonly detail: string } => {
+    | { readonly ok: false; readonly reason: VerifyReason | VerifyUnsupported; readonly detail: string } => {
     const path = contract === "input" ? inputPath(digest) : policyPath(digest);
     const what = contract === "input" ? "the replay context" : contract === "policy" ? "policy" : "checker configuration";
     if (!holds(top, path)) return { ok: false, reason: missing, detail: `${what} ${digest} is not published` };
     const d = decodeAs(contract, digest, top.files.get(path)!);
-    return d.ok ? d : { ok: false, reason: "malformed", detail: `${path}: ${d.detail}` };
+    return d.ok ? d : { ok: false, reason: d.unsupported ?? "malformed", detail: `${path}: ${d.detail}` };
   };
 
   // -------------------------------------------------------------- entries
   const roster = new RosterReplay(genesis);
+  const fold = new Fold();
   let operator: KeyId | null = null;
   const idem = new Map<string, Seq>();
   const notified = new Set<string>();
-  /** Each activated version: its document, and its checker configurations' digests by checker name (R-POL-9). */
-  const policyByVersion = new Map<PolicyVersion, { doc: PolicyDocument; digest: Digest; checkers: ReadonlyMap<string, Digest> }>();
+  type Lacking = { readonly unsupported: VerifyUnsupported; readonly detail: string };
+  /**
+   * Each activated version: its document, its checker configurations'
+   * digests by checker name (R-POL-9), and the vocabulary it means
+   * (R-DECL-1), or the version this verifier lacks (R-DECL-14, R-DECL-22).
+   */
+  const policyByVersion = new Map<
+    PolicyVersion,
+    { doc: AnyPolicyDocument | null; digest: Digest; checkers: ReadonlyMap<string, Digest>; configs: ReadonlyMap<string, CheckerConfig>; vocab: Vocabulary | Lacking }
+  >();
   let activePolicy: PolicyVersion | null = null;
   /** The policy in force when each entry was admitted, by seq. */
   const policyAt: (PolicyVersion | null)[] = [];
   let decisionsReplayed = 0;
+  let unsupported: VerifyReport["unsupported"] = null;
+  const limits: { reason: VerifyProofLimit; seq: Seq; detail: string }[] = [];
   const checkpointsByCommit = new Map(views.slice(0, basis + 1).map((v) => [v.sha, v.checkpoint] as const));
+
+  /** The vocabulary of a version: the legacy one before any activation (R-POL-7 as amended). */
+  const vocabAt = (version: PolicyVersion | null): Vocabulary | Lacking => (version === null ? LEGACY : policyByVersion.get(version)!.vocab);
+  const lacking = (v: Vocabulary | Lacking): v is Lacking => "unsupported" in v; // V:unsupported
 
   /**
    * Replay `decisions` under `version`, the one policy they must name. The
@@ -435,14 +530,14 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       }
       const context = lookup("input", digest, "input-missing");
       if (!context.ok) {
-        fail({ seq, reason: context.reason, detail: context.detail });
+        fail({ seq, reason: context.reason as VerifyReason, detail: context.detail });
         return false;
       }
       needs.push({ seq, path: inputPath(digest), reason: "input-missing" });
       const policy = policyByVersion.get(version!)!;
       let replayed: readonly Decision[];
       try {
-        const result = await replay({ doc: policy.doc, version: version! }, context.value as ReplayContext);
+        const result = await replay({ doc: policy.doc as PolicyDocument, version: version! }, context.value as ReplayContext);
         replayed = result.evaluations.map((e) => e.decision);
       } catch (e) {
         fail({ reason: "policy-decision-mismatch", seq, detail: `replay failed: ${(e as Error).message}` });
@@ -457,10 +552,430 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     return true;
   };
 
+  /** The retained replay context for a digest, recording that entry `seq` needs it (R-LOG-9). */
+  const retainedFor = (seq: Seq) => (digest: Digest) => {
+    const c = lookup("input", digest, "input-missing");
+    if (c.ok) needs.push({ seq, path: inputPath(digest), reason: "input-missing" });
+    return c.ok ? c : { ok: false as const, reason: c.reason as "input-missing" | "malformed", detail: c.detail };
+  };
+
+  /** What judging obligations reads under `version` (obligations.ts). */
+  const judgingAt = (version: PolicyVersion): Judging => {
+    const p = policyByVersion.get(version)!;
+    return { fold, roster, doc: p.doc as PolicyDocument, version, checkers: p.checkers };
+  };
+
+  /**
+   * Open the call session of an entry judged under `version` (calls.ts).
+   * Under a `v2` document its calls are compared with the entry's
+   * decisions. Under a `v1` document they are only made, so the fold keeps
+   * each version's obligations and carried verdicts (R-DECL-1).
+   */
+  const openSession = (seq: Seq, recorded: readonly Decision[], version: PolicyVersion, compare: boolean) => {
+    const doc = policyByVersion.get(version)!.doc as PolicyDocument;
+    return CallSession.open(recorded, {
+      policy: { doc, version },
+      retained: retainedFor(seq),
+      // R-DECL-22: the stamp names the profile of the document in force, with the genesis's pinned jsonata.
+      stampOk: (d) => d.stamp.profile === doc.profile && d.stamp.jsonata === genesis.profile.jsonata,
+      compare,
+    });
+  };
+
+  /** Report a proof limit once per entry and detail. */
+  const reported = new Set<string>();
+  const limit = (seq: Seq, detail: string) => {
+    const k = `${seq}\u0000${detail}`;
+    if (reported.has(k)) return;
+    reported.add(k);
+    limits.push({ reason: "git-unwitnessed", seq, detail });
+  };
+
+  /**
+   * A version's witness (note 4.3): the base and changed paths of the first
+   * retained context in `recorded` that carries a proposal, checked against
+   * Git objects when they are present. Changes Git shows that the context
+   * leaves out make the witness Git's, so that context fails as
+   * `context-mismatch`. Without the objects the context's are taken, and the
+   * entry is reported `git-unwitnessed`, unless `quiet` (a `v1` entry, which
+   * reports as it did before declared acts).
+   */
+  const witnessOf = async (seq: Seq, recorded: readonly Decision[], head: Sha, quiet = false): Promise<Witness | null> => {
+    let from: { base: Sha; changed: readonly PathChange[] } | null = null;
+    for (const d of recorded) {
+      const c = lookup("input", d.input, "input-missing");
+      const p = c.ok ? (c.value as { input?: { proposal?: { base?: unknown; changed?: unknown } | null } }).input?.proposal : null;
+      if (p && typeof p.base === "string" && Array.isArray(p.changed)) {
+        from = { base: p.base as Sha, changed: p.changed as PathChange[] };
+        break;
+      }
+    }
+    if (!from) return null;
+    const git = await gitChanges(reader, from.base, head);
+    if (git === null) {
+      if (!quiet) limit(seq, `the Git objects of ${from.base} and ${head} are not present, so the version's changed paths are the retained context's`);
+      return from;
+    }
+    const missing = missingChanges(from.changed, git);
+    return missing.length ? { base: from.base, changed: git } : from; // V:git-witness
+  };
+
+  /** Find a version's witness, from its own act's decisions or else from `recorded`, if it has none yet. */
+  const resolve = async (seq: Seq, v: Version, recorded: readonly Decision[]): Promise<void> => {
+    if (v.witness) return;
+    const own = entries[Number(v.act.split("_")[1])];
+    const first = own && own.entry.type === "act" ? own.entry.receipt.decisions : [];
+    v.witness = (await witnessOf(seq, first, v.head)) ?? (await witnessOf(seq, recorded, v.head));
+  };
+
+  /**
+   * The paths changed between two heads (the room's `changedBetween`), which
+   * decide whether a verdict on the first carries to the second (R-CARRY-1
+   * to 3); or null when the Git objects are absent.
+   */
+  const sinceOf = async (from: Sha, to: Sha): Promise<RepoPath[] | null> => {
+    if (from === to) return [];
+    const git = await gitChanges(reader, from, to);
+    return git === null ? null : changedPaths(git);
+  };
+
+  /** The thread an act names, by its target (R-DECL-4): none for `none`, the anchored entry's for `entry`. */
+  const threadOf = (env: Envelope): Thread | null | undefined => {
+    const t = env.target as { lane?: unknown; act?: unknown } | null;
+    if (t === null) return null;
+    if (typeof t.lane === "string") return fold.thread(t.lane) ?? undefined;
+    if (typeof t.act === "string") return fold.entryLane.has(t.act as ActId) ? fold.thread(fold.entryLane.get(t.act as ActId)) : undefined;
+    return undefined;
+  };
+
+  type Failed = { readonly ok: false; readonly reason: VerifyReason; readonly detail: string };
+  const failed = (f: CallFailure): Failed => ({ ok: false, reason: f.reason, detail: f.detail });
+  const NOTHING_MADE: VersionMade = { policy: null, required: [], carried: [], maybe: [] };
+
+  /**
+   * The `carry` calls owed when a version is made from `previous`, or when
+   * `previous` itself is recomputed (R-CARRY-1 to 5, R-POL-9): one for each
+   * verdict in `owed`, in order, with the paths changed since its head. A
+   * verdict that carries does so for each of its obligations that the new
+   * obligations still hold. When the paths changed cannot be read and no
+   * call is recorded for a verdict, its carry is undecided (`maybe`).
+   */
+  const carryCalls = async (
+    seq: Seq,
+    session: CallSession,
+    thread: Thread,
+    owed: readonly { readonly row: EvidenceRow; readonly obligations: readonly ObligationId[]; readonly from: Carried["from"]; readonly maybe: boolean }[],
+    head: Sha,
+    proposal: InputOf<"carry">["proposal"],
+    same: (row: EvidenceRow) => boolean,
+    holds: (o: ObligationId) => boolean,
+    quiet: boolean,
+  ): Promise<{ readonly ok: true; readonly carried: VersionMade["carried"]; readonly maybe: VersionMade["maybe"] } | Failed> => {
+    const carried: { obligation: ObligationId; evidence: Carried }[] = [];
+    const maybe: { obligation: ObligationId; act: ActId }[] = [];
+    for (const c of owed) {
+      const since = await sinceOf(c.from.head, head);
+      const revoked = revokedFact(roster, c.row);
+      const r = await session.carry({
+        act: c.row.act,
+        purpose: thread.purpose,
+        optional: c.maybe,
+        input: (from) => {
+          const changedSince = since ?? from?.input.changedSince;
+          return changedSince ? { kind: "carry", evidence: verdictEvidence(roster, c.row, c.from), changedSince: [...changedSince], proposal, policy: { same: same(c.row) } } : null;
+        },
+        facts: () => (revoked ? { revoked } : {}),
+      });
+      if (!r.ok) return failed(r.failure);
+      if (since === null && !quiet) limit(seq, `the Git objects of ${c.from.head} and ${head} are not present, so the paths changed since ${c.row.act} are the retained context's${r.result ? "" : ", and no carry call is recorded for it: whether it carried is undecided"}`);
+      for (const o of c.obligations) {
+        if (!holds(o)) continue; // V:carry-holds
+        if (r.result === null) maybe.push({ obligation: o, act: c.row.act });
+        else if (r.result.carried) carried.push({ obligation: o, evidence: r.result.carried });
+      }
+    }
+    return { ok: true, carried, maybe };
+  };
+
+  /**
+   * The calls admission had to make for an act (R-ADM-1 steps 8 and 9 as
+   * amended; note 4.4), made in order and stopped where admission stops:
+   * `cut` is `none` for a recorded platform refusal decided before any
+   * policy call, `refuse` for one decided after a version's `refuse` rules,
+   * and `policy` otherwise, where the calls run until one refuses. `made`
+   * is what a version the act makes keeps: its obligations and the verdicts
+   * carried onto it. An act that names a thread or entry the log never had
+   * is `guard-failed`: the room refuses it `lane-unknown`.
+   */
+  const actCalls = async (
+    seq: Seq,
+    env: Envelope,
+    by: Authority,
+    steps: readonly Step[],
+    version: PolicyVersion,
+    declared: boolean,
+    recorded: readonly Decision[],
+    cut: "none" | "refuse" | "policy",
+    witness: Witness | null,
+    adminOpened: boolean,
+  ): Promise<{ readonly ok: true; readonly refusal: CallSession["refusal"]; readonly made: VersionMade } | Failed> => {
+    const opened = openSession(seq, recorded, version, declared);
+    if (!opened.ok) return failed(opened.failure);
+    const session = opened.result;
+    const p = policyByVersion.get(version)!;
+    const doc = p.doc as PolicyDocument;
+    const w: World = { fold, roster, declared };
+    const j = judgingAt(version);
+    let made = NOTHING_MADE;
+    const done = () => {
+      const extra = session.finish();
+      if (extra) return failed(extra);
+      decisionsReplayed += session.replayed;
+      return { ok: true as const, refusal: session.refusal, made };
+    };
+    const recoveryKey = by.via === "recovery";
+    if (cut === "none" || (env.kind as string) === "recover") return done(); // R-DECL-21: no policy rules on configuration recovery
+    if (env.kind === "roster") {
+      const r = await session.refuse(refuseInput(w, env, by, null, null), recoveryKey);
+      return r.ok ? done() : failed(r.failure);
+    }
+    const thread = threadOf(env);
+    const unknown: Failed = { ok: false, reason: "guard-failed", detail: "the act names a thread or entry the log never had, which the room refuses as lane-unknown" };
+    if (thread === undefined) return unknown; // V:thread-known
+    if (steps.includes("version")) {
+      if (!thread) return unknown;
+      const head = (env.body as { head: Sha }).head;
+      const generation = thread.generation + 1;
+      const proposal = Fold.proposal(doc, { generation, head, witness });
+      const refuse = await session.refuse(refuseInput(w, env, by, thread, proposal), recoveryKey);
+      if (!refuse.ok) return failed(refuse.failure);
+      if (refuse.result.refusal || cut === "refuse") return done();
+      const require = await session.require(requireInput(w, actorOf(roster, by), thread, proposal));
+      if (!require.ok) return failed(require.failure);
+      if (require.result.refusal) return done();
+      const required = withAdvisory(require.result.obligations, p.configs);
+      const specs = specsOf({ witness, required, specPolicy: version, adminOpened });
+      // Carrying earlier verdicts (R-CARRY): none on a configuration-recovery thread, or for a first version.
+      const previous = thread.purpose !== "config-recovery" && thread.generation > 0 ? fold.version(thread.id, thread.generation) : null;
+      const owed = previous ? carryCandidates(j, previous).map((c) => ({ ...c, from: { generation: c.row.generation, head: c.row.head } })) : [];
+      const carries = await carryCalls(
+        seq,
+        session,
+        thread,
+        owed,
+        head,
+        proposal,
+        (row) => fold.version(thread.id, row.generation)?.policy === version,
+        (o) => specs.some((s) => s.id === o),
+        !declared,
+      );
+      if (!carries.ok) return carries;
+      made = { policy: version, required, carried: carries.carried, maybe: carries.maybe };
+      if (steps.includes("land")) {
+        // `version` then `land` in one act (R-DECL-4): land rules at stage `land`, on the version just made.
+        const provisional: Version = { lane: thread.id, generation, head, witness, proposer: by.member!, act: "act_0_00000000" as ActId, blocked: null, policy: version, required, specPolicy: version, adminOpened, carried: carries.carried, maybe: carries.maybe };
+        const evidence = landEvidence(j, provisional, null);
+        const land = await session.land((from) => landInput(w, actorOf(roster, by), thread, proposal, patchLand(evidence, from?.input ?? null), "land"));
+        if (!land.ok) return failed(land.failure);
+      }
+      return done();
+    }
+    if (steps.includes("land")) {
+      const target = env.target as { lane: LaneId; generation: number };
+      const v = fold.version(target.lane, target.generation);
+      if (!thread || !v) return unknown;
+      const refuse = await session.refuse(refuseInput(w, env, by, thread, null), recoveryKey);
+      if (!refuse.ok) return failed(refuse.failure);
+      if (refuse.result.refusal) return done();
+      const evidence = landEvidence(j, v, null);
+      if (evidence.unwitnessed.length || evidence.maybeReviews.length) limit(seq, `whether an earlier verdict carried onto ${v.lane} generation ${v.generation} is undecided without Git objects, so that part of the land input is the retained context's`);
+      const land = await session.land((from) => landInput(w, actorOf(roster, by), thread, Fold.proposal(doc, v), patchLand(evidence, from?.input ?? null), "land"));
+      return land.ok ? done() : failed(land.failure);
+    }
+    const r = await session.refuse(refuseInput(w, env, by, thread, null), recoveryKey);
+    return r.ok ? done() : failed(r.failure);
+  };
+
+  /** Close a session: a recorded call left over is `decision-extra`; otherwise its decisions count as replayed. */
+  const closed = (session: CallSession): Failed | null => {
+    const extra = session.finish();
+    if (extra) return failed(extra);
+    decisionsReplayed += session.replayed;
+    return null;
+  };
+
+  /**
+   * An `obligations-recomputed` event's calls (R-POL-9, the room's
+   * `recomputeOne`): `require` for the version, by its proposer, under the
+   * new document; then a `carry` call for each verdict carried onto it,
+   * with `policy.same` false, whose obligation the new obligations still
+   * hold. A failed `require` keeps the earlier obligations and blocks
+   * landing; the carry calls follow it all the same. The version then keeps
+   * the new obligations and carries.
+   */
+  const recompute = async (seq: Seq, ev: Extract<SystemEvent, { readonly type: "obligations-recomputed" }>, t: Thread, v: Version, declared: boolean): Promise<{ readonly ok: true } | Failed> => {
+    if (declared) await resolve(seq, v, ev.decisions);
+    // A v1 entry reports as it did before declared acts: its witness is read quietly, and not kept.
+    const witness = v.witness ?? (declared ? null : await witnessOf(seq, ev.decisions, v.head, true));
+    const p = policyByVersion.get(ev.policy)!;
+    const doc = p.doc as PolicyDocument;
+    const w: World = { fold, roster, declared };
+    const proposal = Fold.proposal(doc, { generation: v.generation, head: v.head, witness });
+    const opened = openSession(seq, ev.decisions, ev.policy, declared);
+    if (!opened.ok) return failed(opened.failure);
+    const session = opened.result;
+    const require = await session.require(requireInput(w, memberActor(roster, v.proposer), t, proposal));
+    if (!require.ok) return failed(require.failure);
+    const blocked = require.result.refusal !== null;
+    const required = blocked ? v.required : withAdvisory(require.result.obligations, p.configs); // V:recompute-keeps
+    const specPolicy = blocked ? v.specPolicy : ev.policy;
+    const specs = specsOf({ witness, required, specPolicy, adminOpened: v.adminOpened });
+    const owed: { row: EvidenceRow; obligations: ObligationId[]; from: Carried["from"]; maybe: boolean }[] = [];
+    if (t.purpose !== "config-recovery")
+      for (const c of [...v.carried.map((x) => ({ obligation: x.obligation, act: x.evidence.act, from: x.evidence.from as Carried["from"] | null, maybe: false })), ...v.maybe.map((x) => ({ ...x, from: null, maybe: true }))]) {
+        if (!specs.some((s) => s.id === c.obligation)) continue;
+        const row = fold.evidenceByAct(c.act);
+        if (row) owed.push({ row, obligations: [c.obligation], from: c.from ?? { generation: row.generation, head: row.head }, maybe: c.maybe });
+      }
+    const carries = await carryCalls(seq, session, t, owed, v.head, proposal, () => false, () => true, !declared);
+    if (!carries.ok) return carries;
+    const extra = closed(session);
+    if (extra) return extra;
+    if (declared && (session.refusal?.rule ?? null) !== (ev.blocked?.rule ?? null))
+      return { ok: false, reason: "refusal-mismatch", detail: `the require call ${session.refusal ? `refuses with ${session.refusal.rule}` : "refuses nothing"}, and the event records ${ev.blocked ? `blocked ${ev.blocked.rule}` : "no block"}` }; // V:recompute-blocked
+    v.required = required;
+    v.specPolicy = specPolicy;
+    v.carried = carries.carried;
+    v.maybe = carries.maybe;
+    return { ok: true };
+  };
+
+  /**
+   * The integration a check counts for (R-CARRY-15 step 5, fold.ts
+   * `EvidenceRow.canonical`): its own for a whole-tree check; for a check on
+   * a filtered snapshot, the integration whose `prepared` event names the
+   * snapshot commit it ran on, or its own when a `prepared` event names it
+   * as an integration. Undefined when no `prepared` event says.
+   */
+  const canonicalOf = (lane: LaneId, generation: number, b: CheckBody): Sha | undefined => {
+    if (b.input.kind === "tree") return b.integration;
+    const events = fold.prepared.filter((p) => {
+      const mine = "preview" in p.owner ? p.owner.preview.lane === lane && p.owner.preview.generation === generation : p.owner.lane === lane && p.owner.generation === generation;
+      return mine && (b.landOp === undefined || ("op" in p.owner && p.owner.op === b.landOp));
+    });
+    const bySnapshot = [...new Set(events.filter((p) => p.snapshots.some((x) => x.check === b.check && x.commit === b.integration)).map((p) => p.integration))];
+    if (bySnapshot.length === 1) return bySnapshot[0]; // V:canonical-snapshot
+    return events.some((p) => p.integration === b.integration) ? b.integration : undefined;
+  };
+
+  /**
+   * A `check-carried` event under a `v2` document (R-CARRY-6 to 14, the
+   * room's `carryChecks`): the judgement is owed only for an earlier passing
+   * check of the obligation and its checker on this thread, on another
+   * integration, not judged before under this policy; the call's evidence,
+   * policy comparison and facts are rebuilt; and the outcome recorded is the
+   * one the evaluator gives. The new integration's tree comes from a
+   * `prepared` event or its Git commit, and its filtered snapshot from a
+   * `prepared` event; without them they are the retained context's.
+   */
+  const checkCarry = async (seq: Seq, ev: Extract<SystemEvent, { readonly type: "check-carried" }>, judgedKey: string): Promise<{ readonly ok: true } | Failed> => {
+    const extra = (detail: string): Failed => ({ ok: false, reason: "decision-extra", detail: `no carry judgement is owed for ${ev.act}: ${detail}` });
+    const op = fold.landOps.get(ev.op);
+    const t = fold.thread(ev.lane);
+    const v = fold.version(ev.lane, ev.generation);
+    const row = fold.evidenceByAct(ev.act);
+    if (!op || op.lane !== ev.lane || op.generation !== ev.generation || !t || !v || !row) return extra(`${ev.op} is not a landing of ${ev.lane} generation ${ev.generation}`); // V:carried-op
+    const p = policyByVersion.get(ev.policy)!;
+    const doc = p.doc as PolicyDocument;
+    await resolve(seq, v, ev.decisions);
+    const spec = specsOf(v).find((s) => s.id === ev.obligation);
+    const b = row.body as CheckBody;
+    const cfg = spec && spec.kind === "check" ? p.configs.get(spec.check) : undefined;
+    if (!spec || spec.kind !== "check" || !cfg) return extra(`${ev.obligation} is not a check obligation of the version with a configured checker`); // V:carried-obligation
+    if (b.check !== spec.check || !b.ok || row.generation > ev.generation) return extra("it is not a passing check of the obligation's checker on this or an earlier version"); // V:carried-passing
+    if (row.canonical === ev.integration) return extra("it already counts for this integration"); // V:carried-other-integration
+    if (fold.checkJudged.has(judgedKey)) return extra("it was already judged for this integration under this policy"); // V:carried-once
+    const opened = openSession(seq, ev.decisions, ev.policy, true);
+    if (!opened.ok) return failed(opened.failure);
+    const session = opened.result;
+    let expected: Extract<SystemEvent, { readonly type: "check-carried" }>["outcome"] | null;
+    const runner = cfg.runner;
+    if (!runner) {
+      // R-CARRY-14: a checker with no pinned runner never carries, and no rule is asked.
+      expected = { carried: false, notCarried: { act: ev.act, code: "runner-changed", text: "No runner environment is pinned" } };
+    } else {
+      const prepared = fold.prepared.find((x) => "op" in x.owner && x.owner.op === ev.op && x.integration === ev.integration) ?? fold.prepared.find((x) => x.integration === ev.integration);
+      const tree = prepared?.tree ?? (await treeOf(reader, ev.integration));
+      const inputs = checkerInputs(cfg.inputs, doc.carry);
+      const snapshot = inputs === null ? null : (prepared?.snapshots.find((x) => x.check === spec.check)?.digest as Digest | undefined);
+      if (tree === null || snapshot === undefined) limit(seq, `no prepared event or Git object gives the new integration ${ev.integration}'s ${tree === null ? "tree" : "filtered snapshot"}, so it is the retained context's`);
+      const from = fold.version(ev.lane, row.generation);
+      const revoked = invalidity(roster, row, doc.retiredEvidence);
+      const r = await session.carry({
+        act: row.act,
+        purpose: t.purpose,
+        ownBudget: true,
+        input: () => ({ kind: "carry", evidence: checkEvidence(roster, row, from?.head ?? v.head), changedSince: [], proposal: Fold.proposal(doc, v), policy: { same: from?.policy === ev.policy } }),
+        facts: (recorded) => {
+          const now = recorded?.facts.check?.now;
+          const newTree = tree ?? now?.tree;
+          const newSnapshot = snapshot !== undefined ? snapshot : now?.snapshot;
+          if (!newTree || newSnapshot === undefined) return null;
+          return {
+            ...(revoked ? { revoked } : {}),
+            check: { before: { integration: b.integration, config: b.config, runner: b.runner, input: b.input }, now: { integration: ev.integration, tree: newTree, snapshot: newSnapshot, config: p.checkers.get(spec.check)!, runner }, volatile: cfg.volatile },
+          };
+        },
+      });
+      if (!r.ok) return failed(r.failure);
+      expected = r.result === null ? null : r.result.carried ? { carried: true, reason: r.result.carried.reason } : { carried: false, notCarried: r.result.notCarried! };
+    }
+    const left = closed(session);
+    if (left) return left;
+    if (expected && !same(expected, ev.outcome)) return { ok: false, reason: "carried-outcome-mismatch", detail: `check-carried for ${ev.act}: recorded ${canonicalize(ev.outcome)}, rebuilt ${canonicalize(expected)}` }; // V:carried-outcome
+    return { ok: true };
+  };
+
+  /**
+   * The notify input the room builds when it seals an act (R-LOG-13): after
+   * the act's own effects, on its thread, with the version it made or acts
+   * on. The proposal is resolved when the `notified` event is read, once the
+   * version's witness is known. The directory's reviewers are those of the
+   * thread's latest version as it stood then (obligations.ts `reviewersOf`):
+   * its obligations are kept here, and its evidence is the rows up to this
+   * seq.
+   */
+  const notifySnapshot = (seq: Seq, id: ActId, env: Envelope, by: Authority, steps: readonly Step[]) => {
+    const t = env.target as { lane?: unknown; generation?: unknown } | null;
+    const lane = fold.threads.get(id) ?? threadOf(env) ?? null;
+    const op = (env.kind as string) === "recover" ? (env.body as { op?: unknown }).op : null;
+    let version: { lane: string; generation: number } | null = null;
+    if ((steps.includes("version") || op === "version") && lane) version = { lane: lane.id, generation: lane.generation };
+    else if ((steps.some((s) => s === "review" || s === "check" || s === "land") || op === "approve" || op === "land") && typeof t?.lane === "string" && typeof t.generation === "number")
+      version = { lane: t.lane, generation: t.generation };
+    const input: InputOf<"notify"> = {
+      kind: "notify",
+      act: { id, kind: env.kind as never, target: env.target as never, body: env.body as never },
+      actor: actorOf(roster, by),
+      lane: lane ? fold.policyLane(lane, true) : null,
+      proposal: null,
+    };
+    const latest = lane && lane.generation > 0 ? fold.version(lane.id, lane.generation) : null;
+    const reviewed = latest ? { version: latest, required: latest.required, specPolicy: latest.specPolicy, seq } : null;
+    return { input, roles: roster.roles(), version, reviewed };
+  };
+  /** For each accepted act under a v2 document, the notify input the room built when it sealed it (R-LOG-13). */
+  const notifyInputs = new Map<string, ReturnType<typeof notifySnapshot>>();
+
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i]!;
     const bad = (reason: VerifyReason, detail: string) => {
       fail({ reason, seq: i, detail });
+      firstBad = Math.min(firstBad, i);
+    };
+    /** Stop at an entry that needs a version this verifier lacks: a limit, not a failure (R-DECL-25). */
+    const stop = (v: Lacking) => {
+      unsupported = { reason: v.unsupported, seq: i, detail: v.detail };
       firstBad = Math.min(firstBad, i);
     };
     policyAt[i] = activePolicy;
@@ -512,33 +1027,122 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         }
       } else if (ev.type === "policy-activated") {
         const doc = lookup("policy", ev.policy, "policy-missing");
+        if (!doc.ok && (doc.reason === "steps-unsupported" || doc.reason === "profile-unsupported")) {
+          // A document this verifier cannot read: entries under it stop verification (R-DECL-14, R-DECL-22).
+          needs.push({ seq: i, path: policyPath(ev.policy), reason: "policy-missing" });
+          policyByVersion.set(id, { doc: null, digest: ev.policy, checkers: new Map(), configs: new Map(), vocab: { unsupported: doc.reason, detail: `policy ${ev.policy}, activated at ${i}: ${doc.detail}` } });
+          activePolicy = id;
+          fold.applySystem(id, ev);
+          continue;
+        }
         if (!doc.ok) {
-          bad(doc.reason, doc.detail);
+          bad(doc.reason as VerifyReason, doc.detail);
           break;
         }
         // Every checker configuration it names is published, and is one (R-POL-9, R-LOG-9).
-        const missing = ev.checkers.map((c) => ({ c, r: lookup("checker", c.config, "checker-missing") })).find((x) => !x.r.ok);
+        const configs = ev.checkers.map((c) => ({ c, r: lookup("checker", c.config, "checker-missing") }));
+        const missing = configs.find((x) => !x.r.ok);
         if (missing && !missing.r.ok) {
-          bad(missing.r.reason, `checker ${missing.c.name}: ${missing.r.detail}`);
+          bad(missing.r.reason as VerifyReason, `checker ${missing.c.name}: ${missing.r.detail}`);
           break;
+        }
+        const d = doc.value as AnyPolicyDocument;
+        let vocab: Vocabulary = LEGACY;
+        if (d.format === "artroom-policy-v2") {
+          // R-DECL-8, R-DECL-18, R-DECL-24: valid in this room, with its historical opening kinds and its checkers.
+          const named = STEPS_VERSIONS.includes(d.steps) ? d : { ...d, steps: STEPS_VERSIONS[0]! };
+          const checked = validatePolicyV2(named, { historicalOpeningKinds: [...fold.openingKinds], checkers: Object.fromEntries(configs.map(({ c, r }) => [c.name, (r as { value: unknown }).value])) });
+          if (!checked.ok) {
+            bad("malformed", `the activated document is not valid in this room: ${checked.problems[0]}`); // V:activation-valid
+            break;
+          }
+          vocab = await vocabularyOf(d, stepsCarried[d.steps]!);
+        } else {
+          // A v1 document's checkers are artroom-checker-v1, as R-POL-1 has always required.
+          const v2 = configs.find(({ r }) => (r as { value: { format?: unknown } }).value.format !== "artroom-checker-v1");
+          if (v2) {
+            bad("malformed", `checker ${v2.c.name}: a v1 document's checker configuration must be artroom-checker-v1`); // V:checker-format-v1
+            break;
+          }
         }
         needs.push({ seq: i, path: policyPath(ev.policy), reason: "policy-missing" });
         for (const c of ev.checkers) needs.push({ seq: i, path: policyPath(c.config), reason: "checker-missing" });
-        policyByVersion.set(id, { doc: doc.value as PolicyDocument, digest: ev.policy, checkers: new Map(ev.checkers.map((c) => [c.name, c.config])) });
+        policyByVersion.set(id, {
+          doc: d,
+          digest: ev.policy,
+          checkers: new Map(ev.checkers.map((c) => [c.name, c.config])),
+          configs: new Map(configs.map(({ c, r }) => [c.name, (r as { value: CheckerConfig }).value])),
+          vocab,
+        });
         activePolicy = id;
       } else if (ev.type === "obligations-recomputed") {
         if (ev.policy !== activePolicy) {
           bad("policy-version-mismatch", `obligations-recomputed names policy ${ev.policy}; the active policy is ${activePolicy ?? "none"}`);
           break;
         }
-        if (!(await replayDecisions(i, ev.decisions, ev.policy, "the policy it was recomputed under"))) {
+        const vocab = vocabAt(ev.policy);
+        if (lacking(vocab)) {
+          stop(vocab);
+          break;
+        }
+        const declared = vocab.kind === "declared";
+        if (!declared && !(await replayDecisions(i, ev.decisions, ev.policy, "the policy it was recomputed under"))) {
           firstBad = Math.min(firstBad, i);
           break;
         }
-      } else if (ev.type === "land-evaluated") {
-        if (!(await replayDecisions(i, ev.decisions, activePolicy, "the active policy"))) {
-          firstBad = Math.min(firstBad, i);
+        const t = fold.thread(ev.lane);
+        const v = fold.version(ev.lane, ev.generation);
+        if (declared && (!t || !v)) {
+          bad("guard-failed", `obligations-recomputed names ${ev.lane} generation ${ev.generation}, which the log never proposed`); // V:recompute-version
           break;
+        }
+        if (t && v && opts.replayDecisions !== false) {
+          // Under a v1 document the calls are made, not judged: the fold follows the recomputation (R-DECL-1).
+          const r = declared ? await recompute(i, ev, t, v, true) : await recompute(i, ev, t, v, false).catch(() => null);
+          if (declared && r && !r.ok) {
+            bad(r.reason, r.detail);
+            break;
+          }
+        }
+      } else if (ev.type === "land-evaluated") {
+        const vocab = vocabAt(activePolicy);
+        if (lacking(vocab)) {
+          stop(vocab);
+          break;
+        }
+        if (vocab.kind === "legacy") {
+          if (!(await replayDecisions(i, ev.decisions, activePolicy, "the active policy"))) {
+            firstBad = Math.min(firstBad, i);
+            break;
+          }
+        } else {
+          // R-LAND-4: land rules at stage reservation, for the operation's version, as its initiator.
+          const op = fold.landOps.get(ev.op);
+          const t = op ? fold.thread(op.lane) : null;
+          const v = op ? fold.version(op.lane, op.generation) : null;
+          if (!op || !t || !v) {
+            bad("guard-failed", `land-evaluated names ${ev.op}, which no land act on a known version started`); // V:land-op
+            break;
+          }
+          await resolve(i, v, ev.decisions);
+          if (opts.replayDecisions !== false) {
+            const opened = openSession(i, ev.decisions, activePolicy!, true);
+            if (!opened.ok) {
+              bad(opened.failure.reason, opened.failure.detail);
+              break;
+            }
+            // The obligations count for the integration the landing built (R-OBL-3); the reviews are the version's.
+            const evidence = landEvidence(judgingAt(activePolicy!), v, ev.integration);
+            if (evidence.unwitnessed.length || evidence.maybeReviews.length)
+              limit(i, `the log does not say whether ${evidence.unwitnessed.join(", ") || "a carried verdict"} counts for ${ev.integration}: a check on a filtered snapshot with no prepared event, or a verdict whose carry is undecided without Git objects; that part of the land input is the retained context's`);
+            const w: World = { fold, roster, declared: true };
+            const land = await opened.result.land((from) => landInput(w, actorOf(roster, op.authority), t, Fold.proposal(vocab.doc as unknown as PolicyDocument, v), patchLand(evidence, from?.input ?? null), "reservation"));
+            const left = land.ok ? closed(opened.result) : failed(land.failure);
+            if (left) {
+              bad(left.reason, left.detail);
+              break;
+            }
+          }
         }
       } else if (ev.type === "check-carried") {
         // R-CARRY-13: `act` is an earlier accepted check of the same lane and obligation.
@@ -559,14 +1163,43 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           bad("policy-version-mismatch", `check-carried names policy ${ev.policy}, which no earlier policy-activated event activated`);
           break;
         }
-        if (!(await replayDecisions(i, ev.decisions, ev.policy, "the policy the check-carried event names"))) {
-          firstBad = Math.min(firstBad, i);
+        const vocab = vocabAt(ev.policy);
+        if (lacking(vocab)) {
+          stop(vocab);
           break;
+        }
+        const judgedKey = `${carryKey(ev.lane, ev.generation, ev.integration, ev.obligation)}/${ev.act}/${ev.policy}`;
+        if (vocab.kind === "legacy" || opts.replayDecisions === false) {
+          if (!(await replayDecisions(i, ev.decisions, ev.policy, "the policy the check-carried event names"))) {
+            firstBad = Math.min(firstBad, i);
+            break;
+          }
+        } else {
+          const r = await checkCarry(i, ev, judgedKey);
+          if (!r.ok) {
+            bad(r.reason, r.detail);
+            break;
+          }
         }
         const problem = carryOutcomeProblem(ev);
         if (problem) {
           bad("carried-outcome-mismatch", `check-carried for ${ev.act}: ${problem}`);
           break;
+        }
+        // The judgement is made once; a carry counts on its integration, under the policy that judged it (R-CARRY-13).
+        fold.checkJudged.add(judgedKey);
+        if (ev.outcome.carried) {
+          const row = fold.evidenceByAct(ev.act);
+          const head = fold.version(ev.lane, row?.generation ?? ev.generation)?.head ?? (body as CheckBody).integration;
+          fold.addCheckCarry({
+            lane: ev.lane,
+            generation: ev.generation,
+            integration: ev.integration,
+            obligation: ev.obligation,
+            act: ev.act,
+            evidence: { basis: "carried", act: ev.act, kind: "check", from: { generation: row?.generation ?? ev.generation, head }, reason: ev.outcome.reason, rules: ev.decisions.map((d) => d.rule) },
+            policy: ev.policy,
+          });
         }
       } else if (ev.type === "notified") {
         const m = /^act_(0|[1-9][0-9]*)_([0-9a-f]{8})$/.exec(ev.entry);
@@ -580,9 +1213,49 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           break;
         }
         notified.add(ev.entry);
-        if (!(await replayDecisions(i, ev.decisions, policyAt[target.seq] ?? null, `the policy pinned when ${ev.entry} was admitted`))) {
-          firstBad = Math.min(firstBad, i);
+        const pinned = policyAt[target.seq] ?? null;
+        const vocab = vocabAt(pinned);
+        if (lacking(vocab)) {
+          stop(vocab);
           break;
+        }
+        const snap = notifyInputs.get(ev.entry);
+        if (vocab.kind === "legacy") {
+          if (!(await replayDecisions(i, ev.decisions, pinned, `the policy pinned when ${ev.entry} was admitted`))) {
+            firstBad = Math.min(firstBad, i);
+            break;
+          }
+        } else {
+          // R-POL-5, R-LOG-13: notify rules on the act, with the input the room built when it sealed it; none for a roster act.
+          const v = snap?.version ? fold.version(snap.version.lane as LaneId, snap.version.generation) : null;
+          if (v) await resolve(i, v, ev.decisions);
+          if (opts.replayDecisions !== false) {
+            const opened = openSession(i, ev.decisions, pinned!, true);
+            if (!opened.ok) {
+              bad(opened.failure.reason, opened.failure.detail);
+              break;
+            }
+            let left: Failed | null = null;
+            if (snap) {
+              const doc = vocab.doc as unknown as PolicyDocument;
+              // The reviewers of the thread's latest version when the act was sealed: its obligations then, its evidence up to then.
+              const rv = snap.reviewed;
+              const reviewers = rv
+                ? reviewersOf(
+                    doc,
+                    specsOf({ witness: rv.version.witness, required: rv.required, specPolicy: rv.specPolicy, adminOpened: rv.version.adminOpened }),
+                    fold.evidenceOn(rv.version.lane, rv.version.generation).filter((e) => e.seq <= rv.seq), // V:reviewers-then
+                  )
+                : [];
+              const r = await opened.result.notify({ ...snap.input, proposal: v ? Fold.proposal(doc, v) : null }, { roles: snap.roles, reviewers });
+              if (!r.ok) left = failed(r.failure);
+            }
+            left ??= closed(opened.result);
+            if (left) {
+              bad(left.reason, left.detail);
+              break;
+            }
+          }
         }
       } else if (ev.type === "checkpoint") {
         const cp = checkpointsByCommit.get(ev.commit);
@@ -594,6 +1267,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
         bad("self-reference", "a revert-lane event names its own lane");
         break;
       }
+      fold.applySystem(id, ev);
       continue;
     }
 
@@ -608,7 +1282,23 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       bad("actor-signature", `the envelope is not signed by ${env.actor}`);
       break;
     }
-    const judged = roster.judge(env, checkedTime(e.at, "at"));
+    // R-DECL-1, R-DECL-16: the kind, its binding and its body, under the document in force at this seq.
+    const vocab = vocabAt(activePolicy);
+    if (lacking(vocab)) {
+      stop(vocab);
+      break;
+    }
+    const kind = kindProblem(env, vocab);
+    if (kind) {
+      bad(kind.reason, kind.detail);
+      break;
+    }
+    const shape = bodyProblem(env, vocab, (lane) => fold.thread(lane)?.scopeSource);
+    if (shape) {
+      bad("body-invalid", shape);
+      break;
+    }
+    const judged = roster.judge(env, checkedTime(e.at, "at"), whoOf(vocab));
     if (!judged.ok) {
       bad(judged.reason, judged.detail);
       break;
@@ -627,12 +1317,26 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       break;
     }
     idem.set(key, i);
-    if (body.type === "act" && env.kind === "check") {
+    const steps = stepsOf(env, vocab);
+    if (body.type === "act" && (vocab.kind === "legacy" ? env.kind === "check" : steps.includes("check"))) {
       // R-OBL-3: an accepted check names its checker's configuration digest in the active version.
-      const { check, config } = env.body as CheckBody;
+      const { check, config, integration, input, landOp } = env.body as CheckBody;
       const expected = activePolicy === null ? undefined : policyByVersion.get(activePolicy)!.checkers.get(check);
       if (config !== expected) {
         bad("check-config-mismatch", `the check names config ${config} for ${check}; the active policy ${activePolicy ?? "none"} names ${expected ?? "no such checker"}`);
+        break;
+      }
+      // R-DECL-20, where the log has them: the room prepared the integration the check names.
+      const t = env.target as { lane?: unknown; generation?: unknown } | null;
+      const prepared = typeof t?.lane === "string" && typeof t.generation === "number" ? fold.preparedFor(t.lane as LaneId, t.generation, landOp) : [];
+      // A whole-tree check names the integration and its tree. A check on a filtered snapshot names the checker's
+      // snapshot digest, and either the snapshot commit the event records or the integration itself (R-CARRY-15).
+      const bound = (p: (typeof prepared)[number]) =>
+        input?.kind === "filtered"
+          ? p.snapshots.some((x) => x.check === check && x.digest === input.snapshot && (x.commit === integration || p.integration === integration))
+          : p.integration === integration && p.tree === (input as { tree?: unknown } | undefined)?.tree;
+      if (prepared.length && !prepared.some(bound)) {
+        bad("guard-failed", `the check names integration ${integration}, which no prepared event for its ${landOp ? `operation ${landOp}` : "version"} names with its input`); // V:prepared
         break;
       }
     }
@@ -640,11 +1344,92 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
       bad("self-reference", "an opened effect names its own lane");
       break;
     }
-    if (!(await replayDecisions(i, body.receipt.decisions, activePolicy, "the active policy"))) {
-      firstBad = Math.min(firstBad, i);
-      break;
+    let witness: Witness | null = null;
+    let made: VersionMade = NOTHING_MADE;
+    const adminOpened = body.type === "act" && body.receipt.effects.some((x) => x.type === "obligations" && x.opened.includes("obl_admin-approval" as ObligationId));
+    if (vocab.kind === "legacy") {
+      if (!(await replayDecisions(i, body.receipt.decisions, activePolicy, "the active policy"))) {
+        firstBad = Math.min(firstBad, i);
+        break;
+      }
+      // Under a v1 document a proposal's calls are made, not judged, so the fold keeps the version's obligations and
+      // carried verdicts for a later v2 document to read (R-DECL-1). Its witness is read quietly, and not kept.
+      if (body.type === "act" && env.kind === "propose" && activePolicy !== null && opts.replayDecisions !== false) {
+        try {
+          const quiet = await witnessOf(i, body.receipt.decisions, (env.body as { head: Sha }).head, true);
+          const r = await actCalls(i, env, judged.authority, ["version"], activePolicy, false, body.receipt.decisions, "policy", quiet, adminOpened);
+          if (r.ok) made = r.made;
+        } catch {
+          // A v1 entry is judged by replay alone.
+        }
+      }
+    } else {
+      // Note 4.4: the calls admission had to make, rebuilt from the fold, against the decisions recorded.
+      const target = env.target as { lane?: unknown; generation?: unknown } | null;
+      if (steps.includes("version")) witness = await witnessOf(i, body.receipt.decisions, (env.body as { head: Sha }).head);
+      else if (steps.includes("land") && typeof target?.lane === "string" && typeof target.generation === "number") {
+        const v = fold.version(target.lane as LaneId, target.generation);
+        if (v) await resolve(i, v, body.receipt.decisions);
+      }
+      const refusal = body.type === "refusal" ? body.receipt.refusal : null;
+      const blocked = typeof target?.lane === "string" && typeof target.generation === "number" ? (fold.version(target.lane as LaneId, target.generation)?.blocked?.rule ?? null) : null;
+      const cut = refusal ? stoppedAt(refusal.rule, steps, blocked) : "policy";
+      if (opts.replayDecisions !== false) {
+        const r = await actCalls(i, env, judged.authority, steps, activePolicy!, true, body.receipt.decisions, cut, witness, adminOpened);
+        if (!r.ok) {
+          bad(r.reason, r.detail);
+          break;
+        }
+        made = r.made;
+        if (!refusal && r.refusal) {
+          bad("guard-failed", `the act was accepted, but the rule ${r.refusal.rule} refuses it`); // V:accepted-refused
+          break;
+        }
+        if (refusal && cut === "policy" && r.refusal?.rule !== refusal.rule) {
+          bad("refusal-mismatch", `the recorded refusal is ${refusal.rule}, but the rules ${r.refusal ? `refuse with ${r.refusal.rule}` : "refuse nothing"}`); // V:refusal-rule
+          break;
+        }
+        if (refusal && cut === "refuse" && r.refusal) {
+          bad("refusal-mismatch", `the recorded refusal is ${refusal.rule}, decided after the refuse rules, but the rule ${r.refusal.rule} refuses it first`); // V:refusal-after
+          break;
+        }
+      }
     }
-    if (body.type === "act") roster.apply(env, id, judged.authority);
+    if (body.type === "act") {
+      // An accepted review or check is evidence, with the facts fixed at its admission (R-REV-1): the member's teams,
+      // and whether the member was the version's proposer or the thread's holder.
+      const recoverOp = (env.kind as string) === "recover" ? (env.body as { op?: unknown }).op : null;
+      const evidenceKind =
+        vocab.kind === "legacy" ? (env.kind === "review" || env.kind === "check" ? env.kind : null) : steps.includes("review") || recoverOp === "approve" ? "review" : steps.includes("check") ? "check" : null;
+      const at = env.target as { lane?: unknown; generation?: unknown } | null;
+      const member = judged.authority.member;
+      if (evidenceKind && member && typeof at?.lane === "string" && typeof at.generation === "number") {
+        const thread = fold.thread(at.lane);
+        const v = fold.version(at.lane as LaneId, at.generation);
+        if (thread && v)
+          fold.addEvidence({
+            act: id,
+            seq: i,
+            kind: evidenceKind,
+            lane: v.lane,
+            generation: v.generation,
+            head: v.head,
+            member,
+            key: env.actor,
+            grantor: judged.authority.via === "delegation" ? judged.authority.grantor : null,
+            verdict: evidenceKind === "review" ? ((env.body as ReviewBody).verdict as Verdict) : null,
+            flags: body.receipt.flags as readonly Flag[],
+            authority: judged.authority,
+            teams: roster.teamsOf(member),
+            author: member === v.proposer || (thread.state === "held" && thread.holder === member), // V:evidence-author
+            body: env.body as ReviewBody | CheckBody,
+            canonical: evidenceKind === "check" ? canonicalOf(v.lane, v.generation, env.body as CheckBody) : null,
+          });
+      }
+      roster.apply(env, id, judged.authority);
+      fold.applyAct(id, env, body.receipt, vocab, witness, made);
+      if (vocab.kind === "declared" && env.kind !== "roster") notifyInputs.set(id, notifySnapshot(i, id, env, judged.authority, steps));
+    } else fold.applyRefusal(id, env);
   }
 
   const verifiedThrough = Math.min(entries.length - 1, firstBad - 1);
@@ -668,7 +1453,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   }
   const lastEntry = verifiedThrough >= 0 ? entries[verifiedThrough]! : null;
   return {
-    ok: failures.length === 0,
+    ok: failures.length === 0 && unsupported === null,
     ref,
     head,
     room,
@@ -679,6 +1464,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     publishedThrough: views.at(-1)!.checkpoint?.through ?? -1,
     decisionsReplayed,
     failures,
+    unsupported,
+    limits,
     cannotProve,
   };
 }
