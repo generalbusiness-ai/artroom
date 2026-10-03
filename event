@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/room/README.md at exact 3d1223a1e06271fe6911598a716379de653e1fd6 on request/fork-token, under promise git:sha1…f0c9fd0 on request git:sha1…a1206c2","body":{"commit":"3d1223a1e06271fe6911598a716379de653e1fd6","path":"packages/room/README.md"}}
+{"kind":"artifact","text":"packages/room/src/artifacts.ts at exact 3d1223a1e06271fe6911598a716379de653e1fd6 on request/fork-token, under promise git:sha1…f0c9fd0 on request git:sha1…a1206c2","body":{"commit":"3d1223a1e06271fe6911598a716379de653e1fd6","path":"packages/room/src/artifacts.ts"}}
