@@ -45,6 +45,7 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     expect(await pinDone(r, p.pinnedRef)).toBe(1);
     expect(await dueRows(r)).toEqual([]);
     expect(await inDO(r, (room) => room.core.nextPinDue())).toBeNull();
+    expect(await inDO(r, (room) => [...room.core.loopPendingKinds()])).not.toContain("pins");
   });
 
   it("set: the commit leaves the pin; the alarm wakes for it when due, not before, and cleans up its due time", async () => {
@@ -180,11 +181,97 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     setPinDelay(null);
     const r = await restarted(before);
     expect(await inDO(r, (room) => room.core.pinDelayMs)).toBe(0);
-    expect(await inDO(r, (room) => room.core.nextPinDue())).toBe(clock.now);
+    // Off: the ordinary path, which reads no due time; the pin is pending loop work at once.
+    expect(await inDO(r, (room) => room.core.nextPinDue())).toBeNull();
+    expect(await inDO(r, (room) => [...room.core.loopPendingKinds()])).toContain("pins");
     // Pending now: the ordinary 5-second loop.
     expect(await inDO(r, (room) => room.core.nextAlarm())).toBe(clock.now + 5_000);
     await tick(r);
     expect(r.world.artifacts.refs.get(p.pinnedRef)).toBe(head);
     expect(await dueRows(r)).toEqual([]);
+  });
+
+  describe("bounded reads for a pending backlog (the checker's control on 48b1fee9)", () => {
+    const backlog = (room: Room, n: number, dated: boolean) => {
+      room.core.sql.all(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < ${n}) INSERT INTO pins (ref, head, done) SELECT 'refs/artroom/heads/lane_probe/' || x, '${"a".repeat(40)}', 0 FROM n`);
+      if (dated) room.core.sql.all(`INSERT INTO meta (k, v) SELECT 'pin_due:' || ref, ? FROM pins WHERE done = 0`, String(clock.now + DELAY));
+    };
+    /** Rows read by the pin and pin-due queries of one call, with the queries made. */
+    const pinReads = (room: Room, state: DurableObjectState, fn: () => unknown) => {
+      const original = room.core.sql.all;
+      let rows = 0;
+      const queries: string[] = [];
+      (room.core.sql as { all: unknown }).all = (q: string, ...b: SqlStorageValue[]) => {
+        const c = state.storage.sql.exec(q, ...b);
+        const out = c.toArray();
+        if (/FROM pins|pin_due/.test(q)) {
+          rows += c.rowsRead;
+          queries.push(q);
+        }
+        return out;
+      };
+      try {
+        fn();
+      } finally {
+        (room.core.sql as { all: unknown }).all = original;
+      }
+      return { rows, queries };
+    };
+
+    it("unset: nextAlarm reads each pending pin once, by the ordinary scan alone", async () => {
+      const r = await makeRoom();
+      const seen = await inDO(r, async (room, state) => {
+        await room.core.idle();
+        room.core.run = () => {};
+        backlog(room, 5_000, false);
+        return pinReads(room, state, () => room.core.nextAlarm());
+      });
+      expect(seen.queries).toEqual(["SELECT 1 AS x FROM pins WHERE done = 0"]);
+      expect(seen.rows).toBe(5_000);
+    });
+
+    it("set: nextAlarm reads one due-time row per pending pin, by one aggregate, and no pins scan", async () => {
+      setPinDelay(DELAY);
+      const r = await makeRoom();
+      const seen = await inDO(r, async (room, state) => {
+        await room.core.idle();
+        room.core.run = () => {};
+        backlog(room, 5_000, true);
+        return { reads: pinReads(room, state, () => room.core.nextAlarm()), next: room.core.nextAlarm() };
+      });
+      expect(seen.reads.queries).toEqual(["SELECT MIN(CAST(v AS INTEGER)) AS t FROM meta WHERE k >= 'pin_due:' AND k < 'pin_due;'"]);
+      // One row per pending pin's due time, plus the index's end-of-range row.
+      expect(seen.reads.rows).toBeLessThanOrEqual(5_001);
+      expect(seen.next).toBeLessThanOrEqual(clock.now + DELAY);
+    });
+
+    it("150,000 pending pins: scheduling neither throws nor spreads them, switch unset or set", async () => {
+      for (const delay of [null, DELAY]) {
+        setPinDelay(delay);
+        const r = await makeRoom();
+        const out = await inDO(r, async (room) => {
+          await room.core.idle();
+          room.core.run = () => {};
+          backlog(room, 150_000, delay !== null);
+          return { pending: [...room.core.loopPendingKinds()], next: room.core.nextAlarm() };
+        });
+        if (delay === null) expect(out.pending).toContain("pins");
+        else expect(out.pending).not.toContain("pins");
+        expect(out.next).not.toBeNull();
+      }
+    });
+
+    it("set: a pending pin with no due time (admitted before the switch) is given one at start, due now", async () => {
+      const before = await makeRoom();
+      await inDO(before, async (room) => {
+        await room.core.idle();
+        backlog(room, 3, false);
+      });
+      setPinDelay(DELAY);
+      const r = await restarted(before);
+      expect((await dueRows(r)).length).toBe(3);
+      expect(await inDO(r, (room) => room.core.nextPinDue())).toBe(clock.now);
+      expect(await inDO(r, (room) => [...room.core.loopPendingKinds()])).toContain("pins");
+    });
   });
 });

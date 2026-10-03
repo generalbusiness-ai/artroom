@@ -289,6 +289,7 @@ export class RoomCore {
       for (const w of [...this.waiters]) w();
     };
     createSchema(this.sql);
+    this.datePendingPins();
     const r = this.remotes;
     const sleep = r.sleep ? { sleep: r.sleep } : {};
     // The public namespace's binding, or the import namespace's (R-GEN-12): whichever holds the room's repository.
@@ -1465,10 +1466,28 @@ export class RoomCore {
     return Number(getMeta(this.sql, `pin_due:${ref}`) ?? this.now());
   }
 
-  /** The earliest time a pending pin is due, or null when none is pending. */
+  /**
+   * With the spike's PIN_DELAY_MS on, the earliest due time of a pending pin,
+   * or null when none is pending: one aggregate over the pins' due-time rows
+   * (`datePendingPins` gives every pending pin one), reading one row per
+   * pending pin and never spreading them into a call. With the switch off it
+   * is null and reads nothing: scheduling takes the ordinary path.
+   */
   nextPinDue(): number | null {
-    const refs = this.sql.all("SELECT ref FROM pins WHERE done = 0").map((r) => str(r, "ref")!);
-    return refs.length ? Math.min(...refs.map((ref) => this.pinDue(ref))) : null;
+    if (this.pinDelayMs <= 0) return null;
+    return num(one(this.sql, "SELECT MIN(CAST(v AS INTEGER)) AS t FROM meta WHERE k >= 'pin_due:' AND k < 'pin_due;'"), "t");
+  }
+
+  /**
+   * With PIN_DELAY_MS on, give every pending pin that has no due time (one
+   * admitted before the switch was set) a due time of now, so `nextPinDue`'s
+   * aggregate sees every pending pin. Run when the room starts; writes nothing
+   * when every pending pin already has one, and nothing at all with the
+   * switch off.
+   */
+  datePendingPins(): void {
+    if (this.pinDelayMs <= 0) return;
+    this.sql.all("INSERT INTO meta (k, v) SELECT 'pin_due:' || ref, ? FROM pins WHERE done = 0 ON CONFLICT (k) DO NOTHING", String(this.now()));
   }
 
   // ------------------------------------------------------------ notify (R-LOG-13)
@@ -1883,12 +1902,14 @@ export class RoomCore {
   }
 
   /** The kinds of loop work that are pending now. Landing's own work is timed by the engine, and the mint ledger's by the ledger (`nextAlarm`). */
-  loopPendingKinds(): Set<LoopKind> {
+  loopPendingKinds(pinDue: number | null = this.nextPinDue()): Set<LoopKind> {
     const kinds = new Set<LoopKind>();
     if (this.endedWorkspaces().length > 0) kinds.add("tokens");
-    // A pin is loop work once due: at once, unless the spike's PIN_DELAY_MS recorded a later due time.
-    const pin = this.nextPinDue();
-    if (pin !== null && pin <= this.now()) kinds.add("pins");
+    // A pin is loop work once due: with the switch off, any pending pin (one scan, as before the switch); with the
+    // spike's PIN_DELAY_MS on, once its recorded due time has come (`pinDue`, computed by the caller or here).
+    if (this.pinDelayMs <= 0) {
+      if (one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0")) kinds.add("pins");
+    } else if (pinDue !== null && pinDue <= this.now()) kinds.add("pins");
     if (one(this.sql, "SELECT 1 AS x FROM previews WHERE state = 'pending'")) kinds.add("previews");
     if (one(this.sql, "SELECT 1 AS x FROM generations WHERE recompute IS NOT NULL")) kinds.add("recompute");
     if (one(this.sql, "SELECT 1 AS x FROM land_reeval")) kinds.add("landing");
@@ -1973,10 +1994,11 @@ export class RoomCore {
     // Ended job tokens whose revocation Artifacts has not confirmed yet.
     const revoke = num(one(this.sql, "SELECT MIN(next_ms) AS t FROM job_tokens"), "t");
     if (revoke !== null) times.push(revoke);
-    // The 5-second loop, while its work makes progress; each kind on its own backoff after a failure (budgets.ts `ALARM`).
-    for (const kind of this.loopPendingKinds()) if (this.loopAllowed(kind)) times.push(backoff[kind]?.next ?? now + ALARM.pendingIntervalMs);
-    // A pin the spike's PIN_DELAY_MS left for later (assert 66a41558) is a due time, under the pins loop's fence and backoff.
+    // A pin the spike's PIN_DELAY_MS left for later (assert 66a41558) is a due time, under the pins loop's fence and
+    // backoff. Read once, and only with the switch on (null otherwise, with no read).
     const pinDue = this.nextPinDue();
+    // The 5-second loop, while its work makes progress; each kind on its own backoff after a failure (budgets.ts `ALARM`).
+    for (const kind of this.loopPendingKinds(pinDue)) if (this.loopAllowed(kind)) times.push(backoff[kind]?.next ?? now + ALARM.pendingIntervalMs);
     if (pinDue !== null && pinDue > now && this.loopAllowed("pins")) times.push(Math.max(pinDue, backoff.pins?.next ?? pinDue));
     // Log publication: when due, never sooner than the loop's interval from now.
     const publication = this.publicationDueAt();

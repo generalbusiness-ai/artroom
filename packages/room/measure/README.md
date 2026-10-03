@@ -378,6 +378,29 @@ Hugh approved this as a spike-only switch (assert 66a41558).
 
   `test/node/config.test.ts` covers parsing; any value that is not a whole
   number of milliseconds stops the Room from starting.
+- **Rows read when scheduling a backlog of pending pins** (the checker's
+  control on `48b1fee9`).
+
+  | Code | Switch | Pending pins | Rows `nextAlarm` reads for pins | 150,000 pending |
+  |---|---|---|---|---|
+  | main (`df22d771`) | — | 5,000 | 5,000 (one scan) | no error |
+  | this lane at `48b1fee9` | unset | 5,000 | 10,000 (two scans) | `RangeError` (`Math.min(...)` over every row) |
+  | this lane now | unset | 5,000 | 5,000: the same single scan as main | no error |
+  | this lane now | set | 5,000 | 5,001: one aggregate (`MIN`) over the pins' due-time rows, plus the index's end-of-range row; no pins scan | no error |
+
+  With the switch unset, scheduling now takes exactly main's path:
+  `nextPinDue` is null and reads nothing. With it set, `nextAlarm` reads the
+  due time once and passes it to `loopPendingKinds`. When the room starts,
+  `datePendingPins` gives each pending pin with no due time (one admitted
+  before the switch was set) a due time of now, so the aggregate sees every
+  pending pin.
+
+  Tests: `test/workerd/pin-backlog.test.ts` uses only main's interfaces and
+  passes on main and on this lane. `test/workerd/pin-delay.test.ts` covers
+  the bounded reads with the switch set. Each of five mutants went red:
+  restoring the spread, reading due times with the switch off, a second
+  scan in `nextAlarm`, the off path using due times, and no dating at
+  start.
 - **Its window on the spike.**
 
   | Deploy | Time (UTC) | Room version |
