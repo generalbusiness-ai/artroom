@@ -127,3 +127,47 @@ export function repoPathOf(remote: string, host: string, namespaces: readonly (s
   }
   return u.pathname;
 }
+
+/** What the gateway may do for one repository: add this token, and allow these ref updates (null: no push). */
+export interface RepoGrant {
+  readonly token: string;
+  readonly updates: AllowedUpdates | null;
+}
+
+export interface GatewayProps {
+  readonly host: string;
+  /** By repository path, for example `/git/<namespace>/<repo>.git`. */
+  readonly repos: Readonly<Record<string, RepoGrant>>;
+}
+
+const forbidden = (why: string) => new Response(`Forbidden by gateway: ${why}\n`, { status: 403 });
+
+/**
+ * What the gateway does with one HTTPS request the container makes
+ * (`ArtifactsGateway` in container.ts): only the Artifacts host and a
+ * repository this operation was granted; the repository's token is added;
+ * a push goes through only with a grant for exactly its ref updates. A
+ * refusal is answered here, and nothing reaches `upstream`.
+ */
+export async function gatewayFetch(p: GatewayProps, request: Request, upstream: typeof fetch = fetch): Promise<Response> {
+  const url = new URL(request.url);
+  if (url.protocol !== "https:" || url.hostname !== p.host) return forbidden("host");
+  const entry = Object.entries(p.repos).find(([path]) => url.pathname.startsWith(`${path}/`));
+  if (!entry) return forbidden("repository");
+  const grant = entry[1];
+  const headers = new Headers(request.headers);
+  headers.set("Authorization", `Bearer ${grant.token}`);
+  if (!isReceivePack(url)) return upstream(new Request(request, { headers }));
+  if (grant.updates === null) return forbidden("this operation may not push");
+  if (request.method !== "POST") return upstream(new Request(request, { headers })); // discovery: info/refs
+  if (request.headers.has("content-encoding")) return forbidden("compressed push");
+  if (!request.body) return forbidden("empty push");
+  try {
+    const { commands, replay } = await readCommands(request.body);
+    checkUpdates(commands, grant.updates);
+    return upstream(url.toString(), { method: "POST", headers, body: replay });
+  } catch (e) {
+    if (e instanceof FenceError) return forbidden(e.message);
+    throw e;
+  }
+}

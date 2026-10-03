@@ -273,11 +273,11 @@ test("F2 a failed wake-up sends nothing and leaves no record; a failed record wr
 });
 
 test("F3 a fork that cannot be looked up (absent, not ours, or no answer in time) gets no request and no record", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.foreign.add("f-x");
   await assert.rejects(r.ledger.mint("f-x", "pin-objects:h1", TTL), /not this room's fork/);
   r.lookupHangs = true;
-  await assert.rejects(r.ledger.mint("f-a", "pin-objects:h1", TTL), /not reached within 30 ms; nothing was sent/);
+  await assert.rejects(r.ledger.mint("f-a", "pin-objects:h1", TTL), /not reached within 10 ms; nothing was sent/);
   assert.equal(r.fork("f-x").creates.length + r.fork("f-a").creates.length, 0);
   assert.equal(rows(r.sql).length, 0);
 });
@@ -354,10 +354,10 @@ test("F6 a refusal that changed nothing deletes the record, with no retry", asyn
 // ------------------------------------------------------------------ late apply
 
 test("F7 late apply: the create answers after the caller gave up; no caller gets the text, the record goes unknown then owed by the late ID, and it is revoked by that ID", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   const f = r.fork("f-a");
   f.plans = ["hold"];
-  await assert.rejects(r.ledger.mint("f-a", "pin-objects:h1", TTL), /did not answer the fork token request within 30 ms/);
+  await assert.rejects(r.ledger.mint("f-a", "pin-objects:h1", TTL), /did not answer the fork token request within 10 ms/);
   assert.equal(only(r.sql)["state"], "unknown");
   f.held[0]!.answer();
   await r.ledger.idle();
@@ -373,7 +373,7 @@ test("F7 late apply: the create answers after the caller gave up; no caller gets
 });
 
 test("F7 late apply with a late refusal: the record is deleted; with the late answer lost: it stays unknown, and the late-applied token is never revoked", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   const f = r.fork("f-a");
   f.plans = ["hold", "hold"];
   await assert.rejects(r.ledger.mint("f-a", "pin-objects:a", TTL));
@@ -471,7 +471,7 @@ test("F9 failed revoke: the release's revocation fails; the record is owed by ID
 });
 
 test("F9 failed revoke: a late revocation answer is not taken as success; the record stays owed and the next pass revokes again", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   const f = r.fork("f-a");
   const t = await r.ledger.mint("f-a", "pin-objects:h1", TTL);
   f.holdRevokes = true;
@@ -675,7 +675,7 @@ test("F13 watching: each alarm observes at most one fork, the one due earliest, 
   await assert.rejects(r.ledger.mint("f-a", "pin-objects:c", TTL));
   assert.ok(r.ledger.watch("f-a")!.nextAt! >= last + OBSERVE_WAIT.firstMs);
   // A fork with no unknown records (a late answer settled the only one) is not observed.
-  const s = room({ waitMs: 30 });
+  const s = room({ waitMs: 10 });
   s.fork("f-c").plans = ["hold"];
   await assert.rejects(s.ledger.mint("f-c", "pin-objects:d", TTL));
   s.fork("f-c").held[0]!.refuse();
