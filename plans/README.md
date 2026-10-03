@@ -2243,6 +2243,37 @@ Nothing here needs the planner or hugh to decide.
 
 ## MCP core runtime (request 9ca1d290)
 
+### State at `8b46e825` (written after the section below)
+
+The rest of this section describes `b359e278` and is no longer current. It is kept until the head for review exists. This note says what changed since, and what was stopped.
+
+**Done at this head**
+
+- **Recomposed on stage 5's head `bdc35c53`.** Two merges of `request/decl-stage5`: `575caa60` (at `624dbb9f`) and `3a33b1c6` (at `bdc35c53`). One conflict, in `docs/protocol.md` at the end of section 33.10: stage 5's open point 52 is kept as it now reads, and section 34 follows it unchanged. No rule is renumbered.
+- **The planner's five decisions (`3d8a74a9`)**, in `ca9cd4c1`:
+  1. The caller seam is kept and written down in R-API-14, section 34.2 and the MCP README. It is not a `RoomApi` or `RoomWire` method. `artroom redeem` now keeps the redemption's delegation ID, and `artroom mcp` reads the list under exactly that delegation. `callerFromRoster` refuses a session that names a delegation another key granted, and a key that names a delegation not granted to it. A credential saved before the ID was kept still uses its key's latest delegation.
+  2. R-API-14 says a caller may select another named toolset, any of the four. The override decides the default only, and every selected list has the same filter.
+  3. Section 34.2's command-line item names the caller wiring and `--toolset` as required work.
+  4. Section 23's row "MCP descriptors" gives both vectors: sixteen tools for an admin under a `v2` document, fifteen, with no generic `act`, under `v1`.
+  5. No provisional head closes the runtime scope `9ca1d290` or the contract scope `a9788a59`.
+- **Checker finding `48765af0`** (P2, condition 5), in `dbcf3a7f` and `8b46e825`: an attention wait cancelled a native update stream while its own reader held the lock, which the stream refuses, so the source was never cancelled. The wait now cancels a native stream through its reader and releases the lock. The client's decoded stream is cancelled as before.
+- **Checker caveat `18438fd0`**, in `dbcf3a7f`: the stdio revocation test now asks one server for a second list after the revocation, with the command line's own callback and no fallback to an earlier roster.
+- **Controls the decision lists as owed**, added against the real Room in `ca9cd4c1` and `acd6917a`: adapter parity for a `v2` bearer, a `v1` bearer and a member's own key; revocation by undelegate, by revoke-key and by removing the member; a checker's own key; the admin list under both documents; selecting a larger toolset with no gain.
+
+**Checked at this head**
+
+- Root `npm run typecheck`: exit 0.
+- MCP package tests: 149 node and 5 workerd passed. The command line's `mcp-core` and `cli` test files: 14 passed. The Room's `mcp-core` and `mcp` test files, legacy run: 31 passed. The client's AGENTS.md test: 3 passed.
+
+**Stopped, and owed**
+
+- **The mutation run is partial.** The inventory is now 76 mutants: the 61 of `b359e278`, of which nine did not pass the workspace typecheck and were rewritten as compiling faults, and fifteen new ones. A run of all 76 at `8b46e825` was stopped after 39, on the planner's request `ecbc722a`. All 39 pass the root typecheck with the mutant applied, are red by a named assertion, and were restored. The other 37 have no result at this head. An earlier complete run of the then 71 at `acd6917a` had the same outcome for all 71; that head is two source commits and one merge behind this one. Runner, inventory and results are in the session scratch directory `mutmcp` (`run2.py`, `mutants.py`, `results2.json`, `results2-acd6917a.json`).
+- **Root `npm ci` and `npm test` were not run at this head.** They last passed at `09651d3e`, before the stream repair and the second merge.
+- **The mutation table and gates below are those of `b359e278`.** They are not evidence for this head.
+- **The guard-by-guard audit** of this lane's source diff against the inventory has not been done.
+- **Not shown by any test here:** the real `artroom mcp` binary against the real Room, and an expired bearer over stdio.
+- The final integration still follows reviewed stage 5 on main.
+
 Status: implemented, provisional, not yet for review. Gitseq request `9ca1d290` (planner to builder): the runtime of the adopted MCP core, composed with the planner's contract (`request/mcp-core-current`, `1d9ac5ad`) and with stage 5's generic surfaces. Branch `request/mcp-core-runtime`. Code head `217f01f6`; the commit that adds this section changes only this file. Nothing was pushed or deployed, and no Cloudflare credential was used.
 
 Two things are true of this head and must change before review:
