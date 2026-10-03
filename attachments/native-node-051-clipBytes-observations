@@ -1,0 +1,3 @@
+{"name":"leading-U+FEFF-clipped-prefix","passed":false,"inputBytes":8195,"outputBytes":8189,"firstCodePoint":100,"error":"Expected values to be strictly equal:\n\n100 !== 65279\n","code":"ERR_ASSERTION","actual":100,"expected":65279}
+{"name":"leading-U+FEFF-exact-cap","passed":true,"inputBytes":8192,"outputBytes":8192}
+{"name":"ordinary-multibyte-boundary","passed":true,"inputBytes":8195,"outputBytes":8191}
