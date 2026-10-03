@@ -1953,10 +1953,11 @@ export class RoomCore {
   loopPendingKinds(pinDue: number | null = this.nextPinDue()): Set<LoopKind> {
     const kinds = new Set<LoopKind>();
     if (this.endedWorkspaces().length > 0) kinds.add("tokens");
-    // A pin is loop work once due: with the switch off, any pending pin (one scan, as before the switch); with the
-    // spike's PIN_DELAY_MS on, once its recorded due time has come (`pinDue`, computed by the caller or here).
+    // A pin is loop work once due: with the switch off, any pending pin (a bounded existence check, which stops at
+    // the first one); with the spike's PIN_DELAY_MS on, once its recorded due time has come (`pinDue`, computed once
+    // by the caller, or here).
     if (this.pinDelayMs <= 0) {
-      if (one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0")) kinds.add("pins");
+      if (one(this.sql, "SELECT 1 AS x FROM pins WHERE done = 0 LIMIT 1")) kinds.add("pins");
     } else if (pinDue !== null && pinDue <= this.now()) kinds.add("pins");
     if (one(this.sql, "SELECT 1 AS x FROM previews WHERE state = 'pending'")) kinds.add("previews");
     if (one(this.sql, "SELECT 1 AS x FROM generations WHERE recompute IS NOT NULL")) kinds.add("recompute");

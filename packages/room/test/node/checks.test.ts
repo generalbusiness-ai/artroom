@@ -230,4 +230,3 @@ describe("the manual check of the isolated check measurement (request 8bd623cc)"
     expect(spike.services.map((x) => x.binding)).not.toContain("CHECKER_MANUAL");
   });
 });
-

@@ -54,8 +54,10 @@ export const REQUIRED_CLASSES = {
  *
  * SMOKE_BUDGET is for one full smoke run, from its start to two minutes
  * after its cleanup. The clean run spike-smoke-2026-10-03T00-54-30-069Z
- * wrote 1,270 rows in total, all by its own three rooms (idle rooms now
- * write nothing), and at most 489 in one object. Headroom 4: 5,080 -> 5,100
+ * wrote 1,270 rows in total: 1,258 by its own three rooms and 12 by the
+ * registry (idle rooms now write nothing), and at most 489 in one object.
+ * The totals assume storage samples cover at most 120 s (the lookback, an
+ * assumption about the provider). Headroom 4: 5,080 -> 5,100
  * and 1,956 -> 2,000. (Before the fix: 2,284 and 508, of which 983 were the
  * idle rooms' background; the ceilings were 9,200 and 2,100.)
  *

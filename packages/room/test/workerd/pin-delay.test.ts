@@ -143,6 +143,43 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
     expect(fenced).not.toBe(due);
   });
 
+  it("set, composed with the mint ledger and the error upgrade (main df22d771): the earliest wins; the repository-gone fence holds the pin and the ledger but not the upgrade", async () => {
+    setPinDelay(DELAY);
+    const r = await makeRoom();
+    await proposed(r);
+    const due = clock.now + DELAY;
+    await inDO(r, (room) => room.core.idle());
+    await tick(r, 2);
+    const next = (mints: number | null) => inDO(r, (room) => {
+      (room.core.mints as unknown as { nextDue: () => number | null }).nextDue = () => mints;
+      return room.core.nextAlarm();
+    });
+    const meta = (k: string, v: string | null) => inDO(r, (room) => (v === null ? room.core.sql.all("DELETE FROM meta WHERE k = ?", k) : room.core.sql.all("INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", k, v)));
+    // Pin and ledger alone: the earliest of the two.
+    expect(await next(due + 5_000)).toBe(due);
+    // The error upgrade still running: due at once, ahead of both.
+    await meta("error_scrub", "0");
+    expect(await next(due - 5_000)).toBe(clock.now);
+    // The repository gone: the pin and the ledger are fenced, the upgrade still drains (request d29c09fa).
+    await meta("canonical_gone", JSON.stringify({ since: new Date(clock.now).toISOString(), head: 0 }));
+    expect(await next(due - 5_000)).toBe(clock.now);
+    await meta("error_scrub", null);
+    const fenced = await next(due - 5_000);
+    expect(fenced).not.toBe(due - 5_000);
+    expect(fenced).not.toBe(due);
+  });
+
+  it("set, before founding: the room's start dates no pins and the unfounded schedule (founding debt and error upgrade) is unchanged", async () => {
+    setPinDelay(DELAY);
+    const stub = env.ROOMS.get(env.ROOMS.idFromName(`room_unfounded_pin_${clock.now}`)) as unknown as DurableObjectStub<Room>;
+    const seen = await runInDurableObject(stub, (room: Room) => {
+      const before = { founded: room.core.founded, pinDue: room.core.nextPinDue(), rows: room.core.sql.all("SELECT k FROM meta WHERE k LIKE 'pin_due:%'").length, due: room.core.unfoundedDue() };
+      room.core.sql.all("INSERT INTO meta (k, v) VALUES ('error_scrub', '0')");
+      return { ...before, scrub: room.core.unfoundedDue(), now: clock.now };
+    });
+    expect(seen).toMatchObject({ founded: false, pinDue: null, rows: 0, due: null, scrub: seen.now });
+  });
+
   it("set: a read of the proposal still finds its pinned ref (R-PROP-1)", async () => {
     setPinDelay(DELAY);
     const r = await makeRoom();
@@ -218,7 +255,7 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
       return { rows, queries };
     };
 
-    it("unset: nextAlarm reads each pending pin once, by the ordinary scan alone", async () => {
+    it("unset: nextAlarm makes one bounded existence check for pins, which stops at the first pending pin", async () => {
       const r = await makeRoom();
       const seen = await inDO(r, async (room, state) => {
         await room.core.idle();
@@ -226,8 +263,8 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
         backlog(room, 5_000, false);
         return pinReads(room, state, () => room.core.nextAlarm());
       });
-      expect(seen.queries).toEqual(["SELECT 1 AS x FROM pins WHERE done = 0"]);
-      expect(seen.rows).toBe(5_000);
+      expect(seen.queries).toEqual(["SELECT 1 AS x FROM pins WHERE done = 0 LIMIT 1"]);
+      expect(seen.rows).toBe(1);
     });
 
     it("set: nextAlarm reads one due-time row per pending pin, by one aggregate, and no pins scan", async () => {
@@ -259,6 +296,17 @@ describe("PIN_DELAY_MS (spike measurement only)", () => {
         else expect(out.pending).not.toContain("pins");
         expect(out.next).not.toBeNull();
       }
+    });
+
+    it("unset: a restart with pending pins writes no due times (the default-off start writes nothing)", async () => {
+      const before = await makeRoom();
+      await inDO(before, async (room) => {
+        await room.core.idle();
+        backlog(room, 3, false);
+      });
+      const r = await restarted(before);
+      expect(await dueRows(r)).toEqual([]);
+      expect(await inDO(r, (room) => [...room.core.loopPendingKinds()])).toContain("pins");
     });
 
     it("set: a pending pin with no due time (admitted before the switch) is given one at start, due now", async () => {

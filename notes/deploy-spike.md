@@ -1101,15 +1101,19 @@ in [packages/room/measure/results/row-costs-2026-10-02.md](../packages/room/meas
 |---|---|---|
 | An alarm tick with one pending pin | 2 (including the switch's own due-time row) | 136 |
 | An alarm tick with nothing pending | 0 | 202 |
-| A check, admitted on its own | 17 (two runs) | 320 and 349 |
+| A check, admitted on its own | 17 in each run's raw window (16.6 and 17 less the baseline) | 349 in each raw window (319.6 and 346.8 less the baseline) |
 | Policy activation, N = 0 | 12.7 (2 to 20) | 823 |
 | Policy activation, N = 3 | 33.3 (31 to 37), about 6.9 for each open proposal | 905 |
 
-Every quiet control window wrote 0 rows, and idle rooms wrote nothing.
+Every quiet control window wrote 0 rows except one: the first `check`
+run's "before" window, which held that run's pin tick (2 written). Idle
+rooms wrote nothing. The run files do not keep invocation rows, so
+invocations per minute cannot be rebuilt from them. The 120-second
+lookback behind the gate's totals is an assumption about the provider.
 
 **Clean smoke** (00:54, `ARTROOM_ROW_GATE=1`): ok. The gate passed with
-1,270 rows written, all of them by the run's own three rooms; the largest
-object wrote 489. Before the fix the same run wrote 2,284.
+1,270 rows written: 1,258 by the run's own three rooms and 12 by the
+registry. The largest object wrote 489. Before the fix the same run wrote 2,284.
 
 **Ceilings re-grounded**, because the smoke run's total fell by 44%:
 - `SMOKE_BUDGET` is now 5,100 total and 2,000 per object (was 9,200 and
@@ -1126,4 +1130,3 @@ by hand.
 lands, a failing publication mints 11 canonical tokens on each retry, at 4
 ledger records each: about 44 rows per retry, or about 528 rows an hour at
 12 retries an hour. Measure it when lanes B and C are deployed.
-

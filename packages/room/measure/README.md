@@ -168,13 +168,23 @@ from those figures.
 
 | Budget | Used by | Measured (total / per object) | Headroom | Ceiling (total / per object) | Before the fix |
 |---|---|---|---|---|---|
-| `SMOKE_BUDGET` | One full smoke run, from its start to 2 minutes after cleanup | 1,270 / 489 (spike-smoke-2026-10-03T00-54-30-069Z) | 4 | 5,100 / 2,000 | 9,200 / 2,100, from 2,284 / 508 |
+| `SMOKE_BUDGET` | One full smoke run, from its start to 2 minutes after cleanup | 1,270 / 489 (spike-smoke-2026-10-03T00-54-30-069Z: 1,258 by its three rooms, 12 by the registry) | 4 | 5,100 / 2,000 | 9,200 / 2,100, from 2,284 / 508 |
 | `HOURLY_BUDGET` | The scheduled check's hour, by default | 2,514 / 1,780 (23:50 to 00:50: the activation measurement, six landings and three open lanes in one room) | 2 | 5,100 / 3,600 | 23,000 / 2,100, from 11,285 / 1,034 |
 
-**Why re-ground.** The smoke run's total fell by 44%, from 2,284 to 1,270.
-The 983 rows that used to come from idle rooms are gone: in the clean run,
-only the run's own three rooms wrote anything. Ceilings left at the old
-values would no longer catch a regression of that size.
+**Why re-ground.** The smoke run's total fell by 44%, from 2,284 to 1,270:
+1,258 by the run's own three rooms and 12 by the registry.
+The 983 rows that used to come from idle rooms are gone. In the clean run,
+no other room wrote anything. Ceilings left at the old values would no
+longer catch a regression of that size.
+
+Two limits apply to every figure here:
+- **The lookback is an assumption.** These totals assume that no storage
+  sample covers more than 120 s, which is how far the gate looks back.
+  That is an assumption about the provider, not a measurement ("The
+  sample-interval assumption").
+- **Invocations per minute cannot be rebuilt.** The run files do not keep
+  the invocation rows, so those figures cannot be checked again from the
+  saved data.
 
 **Why 4 for a smoke run.** The same act measured within 6 rows across runs.
 The margin also covers the run's variable timing, such as landing retries.
@@ -284,9 +294,18 @@ figures, the run files and the evidence are in
 [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md),
 "Isolated measurements".
 
+How to read the table:
+- **Raw or adjusted.** "Raw window" is the room's total in the act's
+  window. "Less the baseline" subtracts the room's mean per sample in the
+  quiet control windows.
+- **Invocations per minute** cannot be rebuilt: the run files do not keep
+  the invocation rows.
+- **The 120-second lookback** is an assumption about the provider, not a
+  measurement.
+
 | Measurement | Rows written | Rows read | Controls |
 |---|---|---|---|
-| A check, admitted on its own | 17 (two runs: 17, 17) | 320, 349 | Quiet windows of 5 minutes before and after: 0 written. |
+| A check, admitted on its own | Raw window: 17 in both runs. Less the quiet-control baseline: 16.6 and 17. | Raw window: 349 in both runs. Less the baseline: 319.6 and 346.8. | Quiet windows of 5 minutes before and after. They wrote 0, except the first run's "before" window, which held that run's pin tick (2 written, 147 read). |
 | An idle alarm tick (nothing pending) | 0 | 202 | Quiet windows before and after: 0 written and 0 read. |
 | An alarm tick with one pending pin | 2 (including deleting the switch's due-time row) | 136 | Quiet windows before and after: 0. |
 | Policy activation with N open proposals, measured as policy landing minus plain landing in the same room | N = 0: 12.7 on average (2 to 20). N = 3: 33.3 on average (31 to 37). So about 7 for each open proposal. | N = 0: 823 (581 to 1,021). N = 3: 905 (617 to 1,102). | The plain landing next to each policy landing, three repetitions each. |
@@ -385,22 +404,40 @@ Hugh approved this as a spike-only switch (assert 66a41558).
   |---|---|---|---|---|
   | main (`df22d771`) | — | 5,000 | 5,000 (one scan) | no error |
   | this lane at `48b1fee9` | unset | 5,000 | 10,000 (two scans) | `RangeError` (`Math.min(...)` over every row) |
-  | this lane now | unset | 5,000 | 5,000: the same single scan as main | no error |
+  | this lane now | unset | 5,000 | 1: one bounded existence check (`LIMIT 1`), which stops at the first pending pin | no error |
   | this lane now | set | 5,000 | 5,001: one aggregate (`MIN`) over the pins' due-time rows, plus the index's end-of-range row; no pins scan | no error |
 
-  With the switch unset, scheduling now takes exactly main's path:
-  `nextPinDue` is null and reads nothing. With it set, `nextAlarm` reads the
-  due time once and passes it to `loopPendingKinds`. When the room starts,
+  With the switch unset, scheduling takes main's path with its existence
+  check bounded (`LIMIT 1`): `nextPinDue` is null and reads nothing, and no
+  pins are scanned twice. With it set, `nextAlarm` reads the due time once
+  and passes it to `loopPendingKinds`. When the room starts,
   `datePendingPins` gives each pending pin with no due time (one admitted
   before the switch was set) a due time of now, so the aggregate sees every
   pending pin.
 
-  Tests: `test/workerd/pin-backlog.test.ts` uses only main's interfaces and
-  passes on main and on this lane. `test/workerd/pin-delay.test.ts` covers
-  the bounded reads with the switch set. Each of five mutants went red:
-  restoring the spread, reading due times with the switch off, a second
-  scan in `nextAlarm`, the off path using due times, and no dating at
-  start.
+  Tests:
+  - `test/workerd/pin-backlog.test.ts` uses only main's interfaces, so it
+    runs on main (one full scan) and on this lane (bounded).
+  - `test/workerd/pin-delay.test.ts` covers:
+    - the reads, with the switch unset and set;
+    - 150,000 pending pins;
+    - dating at start, and that a start with the switch off writes nothing;
+    - the composition of the delayed pin, the mint ledger and the error
+      upgrade (main `df22d771`): the earliest wins, and the
+      repository-gone fence holds the pin and the ledger but not the
+      upgrade;
+    - a room before founding, whose start dates no pins and whose
+      founding schedule is unchanged.
+
+  Each of nine mutants went red:
+  - an unbounded existence check;
+  - restoring the spread;
+  - reading due times with the switch off;
+  - a second scan in `nextAlarm`;
+  - the off path using due times;
+  - dating with the switch off;
+  - no error-upgrade due time;
+  - each repository-gone fence (two mutants).
 - **Its window on the spike.**
 
   | Deploy | Time (UTC) | Room version |

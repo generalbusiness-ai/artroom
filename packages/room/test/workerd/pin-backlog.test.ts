@@ -15,7 +15,7 @@ const inDO = <T>(r: Awaited<ReturnType<typeof makeRoom>>, fn: (room: Room, state
 const backlog = (room: Room, n: number) =>
   room.core.sql.all(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < ${n}) INSERT INTO pins (ref, head, done) SELECT 'refs/artroom/heads/lane_probe/' || x, '${"a".repeat(40)}', 0 FROM n`);
 
-it("nextAlarm reads each of 5,000 pending pins once, by one scan", async () => {
+it("nextAlarm reads each of 5,000 pending pins at most once, by one pins query", async () => {
   const r = await makeRoom();
   const seen = await inDO(r, async (room, state) => {
     await room.core.idle();
@@ -40,8 +40,10 @@ it("nextAlarm reads each of 5,000 pending pins once, by one scan", async () => {
     }
     return { rows, queries };
   });
-  expect(seen.queries).toEqual(["SELECT 1 AS x FROM pins WHERE done = 0"]);
-  expect(seen.rows).toBe(5_000);
+  // Main makes one full scan (5,000 rows); this lane's bounded check stops at the first pending pin. Never two scans.
+  expect(seen.queries).toHaveLength(1);
+  expect(seen.queries[0]).toMatch(/^SELECT 1 AS x FROM pins WHERE done = 0( LIMIT 1)?$/);
+  expect(seen.rows).toBeLessThanOrEqual(5_000);
 });
 
 it("150,000 pending pins: loopPendingKinds and nextAlarm do not overflow the call stack", async () => {
