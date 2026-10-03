@@ -1028,6 +1028,187 @@ Run at the exact head that carries this section, serially; the exit codes are in
 
 How the Durable Object runtime delivers trace events. Sending diagnoses from the stateless Worker as well, so they show at once, would need the Room to pass them over RPC; that is a separate request if wanted.
 
+## Declared acts stage 1 (request 245986cb)
+
+Status: implemented, pending review. Gitseq request `245986cb` (planner to builder), stage 1 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), approved as design in review `1808ae17`, under hugh's assert `4e4134b4` as corrected by `b2cdc44a`. Branch `request/decl-stage1`, cut from main `b44601dd`. The head for review is the commit that carries this section. Nothing was pushed or deployed, and no Cloudflare credential was used.
+
+The request cited some sections by an earlier revision's numbers. As the coordinator corrected: the acts validator is the note's section 3.4, the recovery decision 3.5, the evaluator decision 3.8, and the amendment inventory 8.2. This work follows those sections.
+
+### What was added
+
+- **Protocol.** [docs/protocol.md](../docs/protocol.md) section 33, contract amendment 6: rules R-DECL-1 to R-DECL-26 (33.2); every "Amend" of the note's section 8.2, plus R-SIG-1, R-SIG-5, R-ADM-3, R-CRED-10 and R-POL-12, in one table (33.3); every new refusal code, event and outcome in one table (33.4), including `kind-undeclared`, `binding-stale`, `wrong-thread`, `scope-fixed`, `reserved`, `check-unroutable`, `prepared`, `reservation-ended`, `handed-over`, `hold-unending`, the verify failures, `git-unwitnessed`, and the verifier's unsupported-version outcomes `steps-unsupported` and `profile-unsupported`; acceptance cases by stage (33.5); the stage-2 suite criterion (33.6); the types and data (33.7); conditions and stages (33.8); open points 46 to 48 (33.9). Assert `e7307f81`'s two passages are quoted in the section's opening and stated as rules in R-DECL-17 (intersection, never acquisition) and 33.6 (the four fixture conversions, none permission to weaken an assertion).
+- **The note.** The wording of commit `d126b9d2` (branch `declared-acts-wording`) is applied to the landed note, unchanged: the `v1`-era grant intersection rule in section 2.3.2, and the four listed fixture conversions in sections 6 and 8.5. The note and the protocol now agree.
+- **Contract.** `packages/contract/src/declarations.ts`: the declaration types (`ActDeclaration` and its parts: targets and steps, `threads`, `body` fields, `who`, `hold`, refusal wording and slots, `help`), `PolicyDocumentV2` with `acts`, `steps` and `profile`, `CheckerConfigV2` with `act`, the binding (`Binding`, `BindingSubject`, `BindingField`, `BindingHold`), grant maps (`GrantMap`, `DelegateOpV2`, `InvitationSessionV2`, `DelegationV2`), `DeclaredEnvelope` (`v: 2` with `binding`), `DeclaredBearerAct`, the platform kinds and `RecoverOp`, `CheckJobV2`, `DeclaredPolicyLane`, `PreparedEvent`, `ReservationEndedEvent`, `HandedOverEffect`, `CheckUnroutable` and its attention item, `ActsCatalogue`, and the verify outcome names. `packages/contract/src/legacy.ts`: `ARTROOM_LEGACY_V1`, the legacy vocabulary as deep-frozen data, and `ARTROOM_LEGACY_V1_DIGEST` (`sha256:ea4361a697d1c7e1bf7ecdfe6576b81ecbad48aee78b857e0a7958dfa14b3937`). `PlatformRule` gains the five new refusal codes. The seven typed records and every existing type are unchanged.
+- **Policy.** `packages/policy/src/acts.ts`: the acts validator `validatePolicyV2` (with the room's historical opening kinds and the head's checker configurations as context) and `validateCheckerConfigV2`, 73 guards, each one statement marked `// G:<id>`. `binding.ts`: `bindingSubject`, `bindingOf`, `bindingsOf`. `codereview.ts`: `CODE_REVIEW_ACTS`, the note's section 6 declarations as deep-frozen data. All are exported; nothing at runtime calls them. `validate.ts` now exports its helpers (`Problems`, `documentFields`, `checkerFields`, `result`) so the two validators share one implementation; `validatePolicy` and `validateCheckerConfig` check the same things in the same order with the same messages.
+- **Tests.** `packages/policy/test/declared-acts.test.ts`, 104 tests (in workerd one node-only test is skipped), and the jam fixture `packages/policy/test/support/jam.ts`, copied from note section 7.1.
+
+### Decisions for hugh (note 3.5 and 3.8)
+
+Written as the note recommends, since hugh has not decided otherwise: a platform kind `recover` for configuration recovery in `v2` rooms (R-DECL-21), and a policy document that names its evaluator profile, changed only by activation, with the genesis naming the initial profile (R-DECL-22, amending R-GEN-1, R-GEN-10 and R-EVAL-4). If hugh decides otherwise before review, only those two rules change.
+
+### Where this departs from the note, and why
+
+1. **`recover` has a seventh op, `take`.** The note lists six. R-ADMIN-5 and R-LANE-7 let an admin take over a recovery lane today, and a legacy recovery lane still open at the first `v2` activation needs that path once its holder's lease expires.
+2. **`kind-undeclared` is decided first in step 4a, not at step 5** (open point 47). The note puts the binding check between steps 4 and 5, and a binding can be compared only with a declared kind. Both steps are unrecorded.
+3. **An absent `leaseSeconds` binds to the string `"room"`** (point 46, now settled). The room's lease is deployment configuration (`LEASE_SECONDS`); resolving it to a number in the binding would let a deploy change bindings, which note 3.9 forbids. After the checker's question in review, the numeric value is resolved when a thread opens and recorded on the thread, and R-DECL-6 and R-DECL-9 use that recorded value for the thread's life, so a deployment lease change affects only threads opened afterwards. The binding still excludes the number; the test "the subject resolves every default" pins `leaseSeconds: "room"`, and mutant `B:lease-default` turns it red.
+4. **The binding resolves required-ness.** A body field's `optional` and `requiredFor` become one list, `required`, of the act's targets where the field is required, so writing a default out never changes a binding. Lists otherwise keep their written order.
+5. **`threads` exactly when needed.** The validator also refuses `threads` on an act with no `thread`, `version` or `line` target, where it would mean nothing.
+6. **Reservation lengths.** An absent `reserveSeconds` means the thread cannot be handed over, and a `hand-over` naming a declared opening kind without one is refused (guard `handover-reserve`). The note gave no default.
+7. **Bounds the note left to the amendment** (R-DECL-26): at most 64 kinds and 32 fields per act; label, help and wording lengths; field-name and enum-value grammars (an enum value must be able to fill a scope slot).
+8. **Scope slots** must name a `segment` or `enum` field that is required on target `none`, so a slot is never empty at `open`.
+9. **"Body field names do not reuse a step's field names"** is read per act, for the act's own steps. Read across all steps, it would refuse the note's jam `signal`, whose `to` field is also `hand-over`'s.
+10. **New types sit beside the existing unions.** `SystemEvent`, `LaneEffect`, `FailReason`, `AttentionWhy`, `RosterOp`, `Envelope` and `CheckJob` are unchanged: the UI and CLI switch exhaustively over some of them, so widening them now would force code changes that stage 1 excludes. Each new type names the stage that joins it. `PlatformRule` was widened, because nothing switches over it.
+11. **The legacy description is of main `b44601dd`**, not `df22d771`. Between the two, admission differs only by the spike-only `PIN_DELAY_MS` switch (request `8bd623cc`), which admits the same acts.
+12. **The contract package has no test runner,** so the digest test lives in the policy package, which depends on the contract. The digest uses the same `digestJson` that records decision inputs.
+
+### Rule map
+
+| Rule | Contract | Validator guards and functions | Tests (`declared-acts.test.ts`) |
+|---|---|---|---|
+| R-DECL-1 | `ARTROOM_LEGACY_V1`, `ARTROOM_LEGACY_V1_DIGEST`, `PolicyDocumentV2` | `doc-format`, `doc-object`, `doc-keys` | the legacy digest; frozen to the leaves; `G:doc-*` |
+| R-DECL-2 | `KindName`, `PlatformKind` | `kind-grammar`, `kind-reserved` (`RESERVED_KINDS`) | `G:kind-grammar`; `G:kind-reserved` (`prepared`, `recover`) |
+| R-DECL-3 | `ActDeclaration` | `decl-object`, `decl-keys`, `label`, `help` | `G:decl-*`, `G:label`, `G:help` |
+| R-DECL-4 | `TargetShape`, `Step`, `StepList` | `targets-nonempty`, `target-shape`, `target-steps` (`STEPS_FOR_TARGET`) | `G:target-*` (wrong target, third step, pair on `version`) |
+| R-DECL-5 | `Step` | `field-reserved` (`STEP_FIELDS`) | `G:field-reserved` |
+| R-DECL-6, R-DECL-23 | `ThreadKind` | none (stage 2) | none |
+| R-DECL-7 | `HoldDeclaration.scope` | `hold-scope`, `template-chars`, `slot-field`, `template-glob` | `G:hold-scope`, `G:template-*`, `G:slot-field` |
+| R-DECL-8 | `ActDeclaration.threads` | `threads-required`, `threads-unused`, `threads-list`, `threads-known` | `G:threads-*`; a historical opening kind is valid |
+| R-DECL-9 | `HoldDeclaration` | `hold-required`, `hold-unused`, `hold-object`, `hold-keys`, `hold-conflict`, `hold-lease`, `hold-workspace` | `G:hold-*` |
+| R-DECL-10 | `reserveSeconds`, `HandedOverEffect`, `ReservationEndedEvent` | `hold-reserve`, `handover-reserve` | `G:hold-reserve`, `G:handover-reserve` |
+| R-DECL-11 | `ActDeclaration.who` | `who-object`, `who-keys`, `roles-list`, `roles-admin`, `roles-known`, `roles-checker`, `delegable` | `G:who-*`, `G:roles-*`, `G:delegable` |
+| R-DECL-12 | `DeclaredField` | `body-object`, `body-count`, `field-name`, `field-reserved`, `field-object`, `field-type`, `field-keys`, `text-max`, `globs-max`, `int-range`, `enum-values`, `optional-bool`, `optional-and-requiredfor`, `requiredfor-targets` | `G:body-*`, `G:field-*`, one test per type limit |
+| R-DECL-13 | `RefusalWording`, `RefusalSlot` | `refusals-object`, `refusal-code`, `wording-object`, `refusal-keys`, `wording-length`, `wording-slot`, `wording-brace` | `G:refusal*`, `G:wording-*` |
+| R-DECL-14 | `StepsVersion` | `doc-steps`; the binding's `steps` | `G:doc-steps`; the steps version changes the binding |
+| R-DECL-15 | `Binding`, `BindingSubject`, `BindingField`, `BindingHold` | `bindingSubject`, `bindingOf` | the subject resolves every default; label, help, wording and `who` leave it unchanged; writing a default out leaves it unchanged; each change of meaning changes it; an explicit conflict ignores `lanes`; one kind's change leaves the others unchanged; it is the SHA-256 of canonical JSON |
+| R-DECL-16, R-DECL-17 | `DeclaredEnvelope`, `DeclaredBearerAct`, `GrantMap`, `DelegateOpV2`, `InvitationSessionV2`, `DelegationV2`; `PlatformRule` | types only (stage 2) | typecheck |
+| R-DECL-18 | `CheckerConfigV2`, `CheckJobV2` | `checker-shape`, `checker-object`, `checker-keys`, `checker-format`, `checker-act`, `checker-declared`, `checker-step`, `checker-role`, `checker-body` | `G:checker-*` (no `act`, undeclared, `signal`, `review`, roles, a required field, the v1 format); the code-review `check` act may be named |
+| R-DECL-19, R-DECL-20 | `CheckUnroutable`, `CheckUnroutableAttention`, `PreparedEvent` | types only (stage 4) | typecheck |
+| R-DECL-21 | `RecoverOp`, `RecoverTargets`, `RecoverEnvelope` | `recover` reserved; rules may name it | `G:kind-reserved` (`recover`); rules may name platform kinds |
+| R-DECL-22 | `ProfileVersion`, `PolicyDocumentV2.profile` | `doc-profile` | `G:doc-profile` |
+| R-DECL-24 | none | all of `validatePolicyV2`, including `acts-object`, `acts-count`, `rule-on`, `sound-version`, `sound-handover` and the warning `warn-unending` | the code-review and jam documents validate; one `G:` test per guard; a node-only test fails if any guard marker lacks a test |
+| R-DECL-25 | `DeclaredVerifyFailure`, `VerifyProofLimit`, `VerifyUnsupported` | none (stages 3 and 6) | typecheck |
+| R-DECL-26 | `DECLARATION_BOUNDS` (policy) | the bound guards above | the bound tests above |
+
+### Mutation table
+
+Each mutant was applied alone by `/private/tmp/claude-501/-Users-hughpyle-play-gitseq/3a928963-7b06-44e6-b22a-1b24ab3c0e34/scratchpad/mutate.py`, after the implementation was committed (`21260cac`). It edits one call site, runs `npx vitest run --config vitest.config.ts test/declared-acts.test.ts` in `packages/policy` (node), records the failing tests from the JSON reporter, and writes the file's original bytes back; it never runs `git checkout`. `git status --porcelain` was empty afterwards. A `G:` mutant turns the guard's report (`p.add`, `p.keys` or `warnings.push`) into `void`, so the guard still decides but reports nothing; `G:rule-on` makes the `on` predicate accept any string. `B:` mutants are in `binding.ts`, `L:` in `legacy.ts`, `C:` in `codereview.ts`.
+
+**91 mutants, all red.** Every `G:` mutant turned its own named test red. None survived, and none broke the test file's loading.
+
+| # | Mutant | Mutation | Tests turned red |
+|---|---|---|---|
+| 1 | `G:doc-object` | `p.add` at the guard becomes `void` | G:doc-object refuses a document that is not an object |
+| 2 | `G:doc-keys` | `p.keys` at the guard becomes `void` | G:doc-keys refuses an unknown document field |
+| 3 | `G:doc-format` | `p.add` at the guard becomes `void` | G:doc-format refuses format v1 with acts |
+| 4 | `G:doc-profile` | `p.add` at the guard becomes `void` | G:doc-profile refuses an unknown profile |
+| 5 | `G:doc-steps` | `p.add` at the guard becomes `void` | G:doc-steps refuses an unknown steps version |
+| 6 | `G:acts-object` | `p.add` at the guard becomes `void` | G:acts-object refuses acts that are not an object |
+| 7 | `G:acts-count` | `p.add` at the guard becomes `void` | G:acts-count refuses 65 kinds |
+| 8 | `G:rule-on` | the `on` predicate accepts any string | G:rule-on refuses a rule on an undeclared kind |
+| 9 | `G:kind-grammar` | `p.add` at the guard becomes `void` | G:kind-grammar refuses a kind with a capital letter |
+| 10 | `G:kind-reserved` | `p.add` at the guard becomes `void` | G:kind-reserved refuses a reserved kind; G:kind-reserved refuses the platform kind recover |
+| 11 | `G:decl-object` | `p.add` at the guard becomes `void` | G:decl-object refuses a declaration that is not an object |
+| 12 | `G:threads-known` | `p.add` at the guard becomes `void` | G:threads-known refuses a misspelt thread kind; G:threads-known refuses a kind that never opened a thread here |
+| 13 | `G:handover-reserve` | `p.add` at the guard becomes `void` | G:handover-reserve refuses a hand-over onto a hold without reserveSeconds |
+| 14 | `G:decl-keys` | `p.keys` at the guard becomes `void` | G:decl-keys refuses an unknown declaration field |
+| 15 | `G:label` | `p.add` at the guard becomes `void` | G:label refuses an empty label |
+| 16 | `G:help` | `p.add` at the guard becomes `void` | G:help refuses help over 4,096 bytes |
+| 17 | `G:targets-nonempty` | `p.add` at the guard becomes `void` | G:targets-nonempty refuses no targets |
+| 18 | `G:target-shape` | `p.add` at the guard becomes `void` | G:target-shape refuses an unknown target shape |
+| 19 | `G:target-steps` | `p.add` at the guard becomes `void` | G:target-steps refuses a step on the wrong target; G:target-steps refuses a third step; G:target-steps refuses version then land on a version target |
+| 20 | `G:threads-required` | `p.add` at the guard becomes `void` | G:threads-required refuses a thread act without threads |
+| 21 | `G:threads-unused` | `p.add` at the guard becomes `void` | G:threads-unused refuses threads on an act with no thread target |
+| 22 | `G:threads-list` | `p.add` at the guard becomes `void` | G:threads-list refuses a repeated thread kind |
+| 23 | `G:body-object` | `p.add` at the guard becomes `void` | G:body-object refuses a body that is not an object |
+| 24 | `G:body-count` | `p.add` at the guard becomes `void` | G:body-count refuses 33 body fields |
+| 25 | `G:who-object` | `p.add` at the guard becomes `void` | G:who-object refuses no who |
+| 26 | `G:who-keys` | `p.keys` at the guard becomes `void` | G:who-keys refuses an unknown who field |
+| 27 | `G:roles-list` | `p.add` at the guard becomes `void` | G:roles-list refuses roles that are not a list |
+| 28 | `G:roles-admin` | `p.add` at the guard becomes `void` | G:roles-admin refuses admin listed explicitly |
+| 29 | `G:roles-known` | `p.add` at the guard becomes `void` | G:roles-known refuses an unknown role |
+| 30 | `G:roles-checker` | `p.add` at the guard becomes `void` | G:roles-checker refuses checker on an act with step version |
+| 31 | `G:delegable` | `p.add` at the guard becomes `void` | G:delegable refuses delegable that is not a boolean |
+| 32 | `G:hold-required` | `p.add` at the guard becomes `void` | G:hold-required refuses an opening act without a hold |
+| 33 | `G:hold-unused` | `p.add` at the guard becomes `void` | G:hold-unused refuses a hold on an act without step open |
+| 34 | `G:refusals-object` | `p.add` at the guard becomes `void` | G:refusals-object refuses refusals that are not an object |
+| 35 | `G:refusal-code` | `p.add` at the guard becomes `void` | G:refusal-code refuses wording for an unknown refusal code |
+| 36 | `G:wording-object` | `p.add` at the guard becomes `void` | G:wording-object refuses wording that is not an object |
+| 37 | `G:refusal-keys` | `p.keys` at the guard becomes `void` | G:refusal-keys refuses wording with an unknown field |
+| 38 | `G:field-name` | `p.add` at the guard becomes `void` | G:field-name refuses a field name with a capital first letter |
+| 39 | `G:field-reserved` | `p.add` at the guard becomes `void` | G:field-reserved refuses a field named like its step's field; G:field-reserved refuses a field named because |
+| 40 | `G:field-object` | `p.add` at the guard becomes `void` | G:field-object refuses a field that is not an object |
+| 41 | `G:field-type` | `p.add` at the guard becomes `void` | G:field-type refuses an unknown field type |
+| 42 | `G:field-keys` | `p.keys` at the guard becomes `void` | G:field-keys refuses a parameter its type does not have |
+| 43 | `G:text-max` | `p.add` at the guard becomes `void` | G:text-max refuses text over 16 KiB |
+| 44 | `G:globs-max` | `p.add` at the guard becomes `void` | G:globs-max refuses globs over 64 |
+| 45 | `G:int-range` | `p.add` at the guard becomes `void` | G:int-range refuses an int with min over max |
+| 46 | `G:enum-values` | `p.add` at the guard becomes `void` | G:enum-values refuses a repeated enum value; G:enum-values refuses an enum value that cannot fill a scope |
+| 47 | `G:optional-bool` | `p.add` at the guard becomes `void` | G:optional-bool refuses optional that is not a boolean |
+| 48 | `G:optional-and-requiredfor` | `p.add` at the guard becomes `void` | G:optional-and-requiredfor refuses both optional and requiredFor |
+| 49 | `G:requiredfor-targets` | `p.add` at the guard becomes `void` | G:requiredfor-targets refuses requiredFor naming a target the act lacks |
+| 50 | `G:hold-object` | `p.add` at the guard becomes `void` | G:hold-object refuses a hold that is not an object |
+| 51 | `G:hold-keys` | `p.keys` at the guard becomes `void` | G:hold-keys refuses an unknown hold field |
+| 52 | `G:hold-conflict` | `p.add` at the guard becomes `void` | G:hold-conflict refuses an unknown conflict mode |
+| 53 | `G:hold-lease` | `p.add` at the guard becomes `void` | G:hold-lease refuses a lease under 10 seconds; G:hold-lease refuses a lease over 24 hours |
+| 54 | `G:hold-reserve` | `p.add` at the guard becomes `void` | G:hold-reserve refuses a reservation over 10 minutes; G:hold-reserve refuses a reservation of 0 seconds |
+| 55 | `G:hold-workspace` | `p.add` at the guard becomes `void` | G:hold-workspace refuses workspace that is not a boolean |
+| 56 | `G:hold-scope` | `p.add` at the guard becomes `void` | G:hold-scope refuses an empty template; G:hold-scope refuses a scope source naming another body field |
+| 57 | `G:template-chars` | `p.add` at the guard becomes `void` | G:template-chars refuses a template glob over 256 characters |
+| 58 | `G:slot-field` | `p.add` at the guard becomes `void` | G:slot-field refuses a slot naming a text field; G:slot-field refuses a slot naming an optional field |
+| 59 | `G:template-glob` | `p.add` at the guard becomes `void` | G:template-glob refuses a template that is not a glob once filled |
+| 60 | `G:wording-length` | `p.add` at the guard becomes `void` | G:wording-length refuses an empty reason; G:wording-length refuses a fix over 512 bytes |
+| 61 | `G:wording-slot` | `p.add` at the guard becomes `void` | G:wording-slot refuses a slot that is not a refusal slot |
+| 62 | `G:wording-brace` | `p.add` at the guard becomes `void` | G:wording-brace refuses a brace that opens no slot |
+| 63 | `G:sound-version` | `p.add` at the guard becomes `void` | G:sound-version refuses reviews with no act that makes versions |
+| 64 | `G:sound-handover` | `p.add` at the guard becomes `void` | G:sound-handover refuses a hand-over with no act that can take the thread |
+| 65 | `G:warn-unending` | `warnings.push` at the guard becomes `void` | the jam's declarations validate with in-key.json; propose-rules holds end only by expiry; G:warn-unending reports an opening kind no act can end, without refusing |
+| 66 | `G:checker-shape` | `p.add` at the guard becomes `void` | G:checker-shape refuses a v1 checker configuration in a v2 document; G:checker-act refuses a checker configuration with no act |
+| 67 | `G:checker-declared` | `p.add` at the guard becomes `void` | G:checker-declared refuses a checker naming an undeclared kind |
+| 68 | `G:checker-step` | `p.add` at the guard becomes `void` | G:checker-step refuses a checker naming signal; G:checker-step refuses a checker naming review |
+| 69 | `G:checker-role` | `p.add` at the guard becomes `void` | G:checker-role refuses a check act checkers may not sign |
+| 70 | `G:checker-body` | `p.add` at the guard becomes `void` | G:checker-body refuses a check act with a required body field |
+| 71 | `G:checker-object` | `p.add` at the guard becomes `void` | G:checker-object refuses a configuration that is not an object |
+| 72 | `G:checker-keys` | `p.keys` at the guard becomes `void` | G:checker-keys refuses an unknown configuration field |
+| 73 | `G:checker-format` | `p.add` at the guard becomes `void` | G:checker-shape refuses a v1 checker configuration in a v2 document; G:checker-format refuses artroom-checker-v1 directly |
+| 74 | `G:checker-act` | `p.add` at the guard becomes `void` | G:checker-act refuses a checker configuration with no act |
+| 75 | `B:label` | the subject includes `label` | the subject resolves every default; label, help, refusal wording and who leave the binding unchanged |
+| 76 | `B:who` | the subject includes `who` | the subject resolves every default; label, help, refusal wording and who leave the binding unchanged |
+| 77 | `B:kind` | the subject drops the kind's name | the subject resolves every default; a step list, body field, scope source, hold setting, threads, kind or steps version changes it |
+| 78 | `B:steps` | the subject ignores the document's steps version | a step list, body field, scope source, hold setting, threads, kind or steps version changes it |
+| 79 | `B:targets` | the subject drops the step lists | the subject resolves every default; a step list, body field, scope source, hold setting, threads, kind or steps version changes it |
+| 80 | `B:threads` | the subject drops `threads` | the subject resolves every default; a step list, body field, scope source, hold setting, threads, kind or steps version changes it |
+| 81 | `B:body` | the subject drops the body fields | the subject resolves every default; a step list, body field, scope source, hold setting, threads, kind or steps version changes it |
+| 82 | `B:hold` | the subject drops the hold | the subject resolves every default; writing a default out leaves the binding unchanged; a step list, body field, scope source, hold setting, threads, kind or steps version changes it |
+| 83 | `B:conflict-default` | an absent conflict ignores the policy's lanes | a step list, body field, scope source, hold setting, threads, kind or steps version changes it |
+| 84 | `B:lease-default` | an absent lease resolves to the deployment default | the subject resolves every default |
+| 85 | `B:reserve-default` | an absent reservation resolves to 0 | the subject resolves every default |
+| 86 | `B:workspace-default` | an absent workspace resolves to true | writing a default out leaves the binding unchanged |
+| 87 | `B:optional` | `optional` no longer clears `required` | the subject resolves every default; a step list, body field, scope source, hold setting, threads, kind or steps version changes it |
+| 88 | `B:required-for` | `requiredFor` is ignored | the subject resolves every default |
+| 89 | `L:data` | one value of the legacy description changes | the legacy vocabulary's digest is the one the contract states |
+| 90 | `L:freeze` | the legacy description is not frozen | the legacy vocabulary is frozen, to the leaves |
+| 91 | `C:freeze` | the code-review declarations are not frozen | the code-review declarations are frozen, to the leaves |
+
+### Gates
+
+Run under bash at the implementation commit `21260cac`, serially, with exit codes checked. The branch then merged main `a6fcce54` (request `df6ff8d3`: R-MINT-3 amended in place in section 32, which does not touch section 33 or its numbering). The gates were run again at the merge head, which is the head for review; its counts are in the delivery report, since main's merge adds tests to the git and room packages. Main `b44601dd`'s counts were measured in the same worktree before any change.
+
+| Gate | Exit | Result | Main `b44601dd` |
+|---|---|---|---|
+| `npm ci` (root) | 0 | installed | 0 |
+| `npm run typecheck` (root) | 0 | every workspace | 0 |
+| `npm test` (root) | 0 | 2,275 passed, 2 skipped | 2,068 passed, 1 skipped |
+| `npm run typecheck` in `packages/contract` | 0 | | |
+| `npm run typecheck` in `packages/policy` | 0 | src and tests | |
+| `npm test` in `packages/policy` | 0 | node 303 passed; workerd 301 passed, 2 skipped | node 199; workerd 198, 1 skipped |
+| `git diff --check origin/main` | 0 | clean | |
+
+Per package, root `npm test` (node, then workerd where a package has both): checkers 43; cli 162; client 88 and 2; log 198 and 193; mcp 73 and 5; policy 303 and 301 (+2 skipped); room 237 and 529; ui 141. Every count except policy's equals main's. Policy's difference is exactly the 104 new tests; the extra workerd skip is the node-only guard-coverage test. No existing test was changed.
+
+### Not changed here
+
+The room, log, client, MCP, CLI, checkers and UI packages, and `examples/`, are unchanged: nothing reads the new types or data yet. The version witness type (note 4.3, stage 6) is not defined here; its shape belongs to that stage. `LICENSE`, `NOTICE` and `AGENTS.md` are untouched.
+
 ## Mint lane F (request 02836f9a)
 
 Status: DONE, pending checker exact-head review. Gitseq request `02836f9a`, branch `request/fork-token`, cut from main `965c911a`, with main `58a2f0a0` merged in (merge `31ec8a77`; see [The merge with main 58a2f0a0](#the-merge-with-main-58a2f0a0)), then request `df6ff8d3`'s branch at `6e585cf9` (merge `012ea686`) and, once that landed, main `a6fcce54` (merge `f2421024`, no further content). This revision answers the checker's preliminary findings C1 to C4 on `3d1223a1`: see [Review findings C1 to C4](#review-findings-c1-to-c4-on-3d1223a1). The approved mint ownership design ([notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), "Out of scope", review `ad6cc052`) left one token outside every ledger: the 600-second read token that `Pinning.pinObjects` mints on the lane's fork. It had a hidden retry (`withRetry` around a create that may have applied) and a dropped revocation. This lane gives it a ledger owned by the fork's owner, and applies [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-2 to R-MINT-7) to it by analogy. The head for review is the commit that carries this section.

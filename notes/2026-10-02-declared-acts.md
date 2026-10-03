@@ -358,17 +358,26 @@ it.
   every binding still equals the active one. Otherwise the redemption is
   refused, unrecorded, with `binding-stale`; the invitation stays unused,
   and an admin invites again. Today an invitation with no `session`
-  becomes a `*` delegation (`room/requests.ts@df22d771:258`); in a `v2`
-  room it covers `renew` only.
+  becomes a `*` delegation (`room/requests.ts@df22d771:258`). In a `v2`
+  room, a new invitation with no `session` grants no declared kind; it
+  covers only the delegable platform kinds its role may sign, which today
+  is `renew`.
 - **Read sessions** (R-CRED-7) grant no acts, so they carry no bindings.
 - **Exact retries.** An exact retry of an admitted `delegate` returns its
   original receipt (R-IDEM), even after a meaning changed. It does not
   re-pin anything; acts under it are judged at their own admission.
 - **Grants from before declared acts.** A delegation or invitation
   admitted under a `v1` document carries no bindings. After the room
-  activates a `v2` document, it covers no declared kind, only `renew`. It
-  is never upgraded silently. Acts under it are refused
-  `delegation-invalid`, with the fix "ask the grantor to delegate again".
+  activates a `v2` document it covers exactly the intersection of what it
+  covered when signed with the platform kinds: the platform kinds it
+  named explicitly, or that `*` covered as expanded against the `v1`
+  vocabulary for the grantor's role (`log/roster.ts@df22d771:78-79`;
+  because the `v1` vocabulary never changes, that is the set the grantor
+  signed for). It covers no declared kind. So it keeps `renew` only if it
+  covered `renew` before, and a grant limited to `review` and `check`
+  covers nothing at all after activation. It never gains a kind. Acts of a
+  declared kind under it are refused `delegation-invalid`, with the fix
+  "ask the grantor to delegate again".
 
 Acceptance cases, in stage 2: an explicit-kind grant signed before an
 activation that changes one of its kinds, and submitted after it, is
@@ -377,8 +386,9 @@ activation that adds a kind is admitted, and does not cover the new kind;
 an exact retry of an admitted grant after a meaning change returns the
 original receipt, and acts under it are then refused
 `delegation-invalid`; an invitation signed before a meaning change and
-redeemed after it is refused; a `v1`-era delegation covers no declared
-kind after the first `v2` activation.
+redeemed after it is refused; after the first `v2` activation a
+`v1`-era `*` delegation covers `renew` and no declared kind, and a `v1`-era
+delegation limited to `review` and `check` covers nothing.
 
 #### 2.3.3 Check jobs choose their act from the checker's configuration
 
@@ -1021,13 +1031,22 @@ Three things apply to all seven:
 maps to a step (section 2.1), a declaration field, or a platform rule that
 applies to all acts. The executable proof is stage 2 in section 8.5: the
 room's whole existing suite passes unchanged against the legacy
-vocabulary. Against the code-review `v2` declarations it passes with two
-kinds of change, and no others: envelopes carry bindings; and, under
-option (a) of section 3.5, the configuration-recovery tests are rewritten
-from `claim` with `purpose` to `recover` ops. Bindings alone cannot turn
-the one into the other, so that rewrite is an intended change of
-behaviour, and stage 2's report lists each rewritten test for review. A
-mutation of each declaration field turns a test red.
+vocabulary. Against the code-review `v2` declarations it passes with
+these fixture format conversions, and no others:
+1. envelopes carry bindings (`v: 2`, section 3.6);
+2. under option (a) of section 3.5, the configuration-recovery tests are
+   rewritten from `claim` with `purpose` to `recover` ops. Bindings alone
+   cannot turn the one into the other, so this is an intended change of
+   behaviour;
+3. checker configurations use `artroom-checker-v2` and name their act,
+   `"act": "check"` (section 2.3.3);
+4. `delegate` ops and room-custody invitations carry signed maps from
+   kind to binding instead of kind lists or `*` (section 2.3.2).
+
+Stage 2's report lists every converted test, one by one, with the
+conversion applied, for review. A conversion changes the form of a
+fixture only; none is permission to weaken, remove or loosen an
+assertion. A mutation of each declaration field turns a test red.
 
 ### 6.1 `claim`
 
@@ -1661,7 +1680,7 @@ At most two implementation lanes run at once until the slice passes
 | # | Request | Depends on | Done when |
 |---|---|---|---|
 | 1 | **Protocol amendment and contract types.** R-DECL in `docs/protocol.md` and every "Amend" of section 8.2; the contract types; the legacy vocabulary's description and digest; the `steps` field and the signed grant maps; checker configurations naming their act; the code-review `v2` declarations as data; the `acts` validator and the binding identity. No change in behaviour. Includes hugh's decisions on sections 3.5 and 3.8 | this note | the declarations validate; every existing test passes; checker approves the amendment |
-| 2 | **Room admission by declaration.** The legacy path frozen; `v2` declarations; the binding step, delegation pins and check-job bindings; thread kinds and `wrong-thread`; `kind-undeclared`; refusal wording | 1 | the room's whole existing suite passes unchanged against the legacy vocabulary, and with bindings added against the `v2` declarations; the six binding cases of section 3.6 and the cases of sections 2.3.1 and 2.3.2 pass; a mutation of each declaration field turns a test red; row-writes' measure shows no new rows per act |
+| 2 | **Room admission by declaration.** The legacy path frozen; `v2` declarations; the binding step, delegation pins and check-job bindings; thread kinds and `wrong-thread`; `kind-undeclared`; refusal wording | 1 | the room's whole existing suite passes unchanged against the legacy vocabulary, and against the `v2` declarations with only the four listed fixture conversions of section 6, each reported test by test and none weakening an assertion; the six binding cases of section 3.6 and the cases of sections 2.3.1 and 2.3.2 pass; a mutation of each declaration field turns a test red; row-writes' measure shows no new rows per act |
 | 3 | **Log and verify, first part.** Decoding by grammar; the legacy vocabulary for `v1`-era entries; kind, binding, body and `who` judged under `D(s)` | 1 | the legacy recovery fixture of section 3.2 passes on a fresh clone, and fails under the mutated verifier; verify passes on a log that activates a document adding a kind, and fails `kind-undeclared` and `binding-stale` on forged entries |
 | 4 | **New primitives.** Thread settings, the overlap rule, scope slots and `scope-fixed`, `hand-over` with `reservation-ended`, `version` then `land`, unanchored comments, check jobs choosing their act and the `prepared` event; the Room migration | 2 | acceptance cases for each, including a reservation that ends while a `take` is in flight, and the check-mapping cases of section 2.3.3 |
 | 5 | **Client, MCP, CLI, UI.** Generic act with binding; declarations read; generic rendering | 2 | an agent performs a declared act it was not built for, over HTTPS and MCP |
