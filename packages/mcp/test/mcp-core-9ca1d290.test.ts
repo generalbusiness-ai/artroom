@@ -906,6 +906,19 @@ describe("an attention wait ends the subscription it opened (R-API-15; checker f
     expect(second.out.isError).toBe(false);
     expect(second.out.structuredContent).toEqual(FULL);
     expect(d.seen.cancels).toBe(1);
+    // A stream of the contract's own shape, whose reader has no cancel and whose own cancel rejects.
+    const seen = { cancels: 0, released: 0 };
+    const structural = {
+      getReader: () => ({ read: () => new Promise<never>(() => {}), releaseLock: () => void seen.released++ }),
+      cancel: async () => {
+        seen.cancels++;
+        throw new Error("the subscription could not be cancelled");
+      },
+    };
+    const third = await wait(structural, [FULL], 30_000);
+    expect(third.out.isError).toBe(false);
+    expect(third.out.structuredContent).toEqual(FULL);
+    expect(seen).toEqual({ cancels: 1, released: 1 });
   });
 });
 
