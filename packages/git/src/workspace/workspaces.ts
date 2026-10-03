@@ -40,10 +40,10 @@
  *
  * The read tokens that pinning mints on a fork have their own ledger,
  * which this object owns and builds (`forkTokens`, request 02836f9a; see
- * fork-tokens.ts). A fork's sweep leaves every token that ledger may own (a
- * token it holds for a pin in progress, or, while one of its creates on the
- * fork is unsettled, any read token), asking immediately before each
- * revocation.
+ * fork-tokens.ts). A fork's sweep keeps a token that ledger holds for a pin
+ * in progress, and while one of its creates on the fork is unsettled it
+ * revokes only tokens whose IDs a record names, asking immediately before
+ * each revocation. No time ends that: only the create's own answer does.
  *
  * A workspace becomes ready only after an inventory that started after its
  * token was recorded has succeeded, so every attempt that answered (even
@@ -649,12 +649,17 @@ export class Workspaces {
       try {
         // Only a complete inventory settles anything (plan 001): an incomplete or malformed one throws, and the debt stays scheduled.
         const tokens = completeInventory(await withRetry(() => fork.listTokens(), this.retryOpts()), `the token inventory of ${name}`);
-        // Keep tokens a ready or installing lease has recorded on this fork, and tokens the fork token ledger may own: one
-        // it holds for a pin in progress, or, while a create of its on this fork is still unsettled, any read token
-        // (request 02836f9a). Asked for each token immediately before its revocation, after every earlier await.
+        // Keep tokens a ready or installing lease has recorded on this fork, and a token the fork token ledger holds for a
+        // pin in progress. While a fork token create on this fork is unsettled (sent or unknown), revoke only tokens whose
+        // IDs a record names: the ledger's records, or this object's owed token duties; every other active token is left
+        // (R-WS-3 suspended, never inferred around; request 02836f9a). Asked for each token immediately before its
+        // revocation, after every earlier await.
         const kept = (t: TokenInfo) =>
           this.sql.all("SELECT 1 AS x FROM artroom_ws WHERE token_id = ? AND fork = ? AND state IN ('ready', 'pending') LIMIT 1", t.id, name).length > 0 ||
-          this.forkTokens.mayOwn(name, t);
+          this.forkTokens.holds(name, t.id) ||
+          (this.forkTokens.unsettled(name) &&
+            !this.forkTokens.names(name, t.id) &&
+            this.sql.all("SELECT 1 AS x FROM artroom_ws_duty WHERE token_id = ? AND fork = ? AND state != 'done' LIMIT 1", t.id, name).length === 0);
         for (const t of tokens) {
           if (t.state !== "active" || kept(t)) continue;
           try {

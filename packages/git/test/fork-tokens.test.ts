@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ForkTokens, type ForkRepo } from "../src/workspace/fork-tokens.ts";
 import { Workspaces, forkName } from "../src/workspace/workspaces.ts";
-import { MINT_REVOKE_BACKOFF, MINT_REVOKE_BATCH, OBSERVE_WAIT, OVERDUE_STEP_MS, TAKEOVER_AHEAD_MS } from "../src/mints.ts";
+import { MINT_CLOCK_ALLOWANCE_MS, MINT_REVOKE_BACKOFF, MINT_REVOKE_BATCH, OBSERVE_WAIT, OVERDUE_STEP_MS, TAKEOVER_AHEAD_MS } from "../src/mints.ts";
 import type { ArtifactsNamespace, MintedToken, RepoHandle, TokenInfo } from "../src/artifacts.ts";
 import type { Sql, SqlRow } from "../src/sql.ts";
 import { Clock, deferred, echoNote, echoing, everyRow, noEcho, nodeSql } from "./support.ts";
@@ -852,6 +852,8 @@ test("F17 the owner's known lookups and the ledger's due queries use indexes, an
   assert.match(plan("SELECT 1 AS x FROM artroom_ws WHERE token_id = 'x' AND fork = 'f' AND state IN ('ready', 'pending') LIMIT 1"), /USING INDEX artroom_ws_token/);
   assert.match(plan("SELECT 1 AS x FROM artroom_fork_mint WHERE token = 'x' AND state = 'held' AND fork = 'f' LIMIT 1"), /^SEARCH artroom_fork_mint USING (COVERING )?INDEX artroom_fork_mint_(token|open) /);
   assert.match(plan("SELECT 1 AS x FROM artroom_fork_mint WHERE fork = 'f' AND state IN ('sent', 'unknown') LIMIT 1"), /USING (COVERING )?INDEX artroom_fork_mint_open/);
+  assert.match(plan("SELECT 1 AS x FROM artroom_fork_mint WHERE token = 'x' AND fork = 'f' LIMIT 1"), /^SEARCH artroom_fork_mint USING (COVERING )?INDEX artroom_fork_mint_(token|open) /);
+  assert.match(plan("SELECT 1 AS x FROM artroom_ws_duty WHERE token_id = 'x' AND fork = 'f' AND state != 'done' LIMIT 1"), /USING INDEX artroom_ws_duty_token/);
   assert.equal(sql.all("SELECT COUNT(*) AS n FROM artroom_ws_duty")[0]!["n"], 1, "the stored rows are kept");
 });
 
@@ -926,7 +928,7 @@ test("F21 a failed handoff: the answer cannot be recorded as held; the record is
   assert.equal(rows(r.sql).length, 0);
 });
 
-test("F23 a failed handoff when the first owed write fails too: after the failed revocation, the owed record is written once more, with the ID", async () => {
+test("F23 a failed handoff when the first owed write fails too: the write is retried, with the ID in hand, before the revocation at once", async () => {
   const r = room();
   const real = r.sql.all.bind(r.sql);
   const failing = new Set(["held", "owed"]);
@@ -1001,30 +1003,45 @@ test("F22 expiry is checked again before each revocation: a record already past 
 
 // ------------------------------------------------------------------ the checker's controls on 3d1223a1 (C1 to C3)
 
-test("F24 (checker C1) the fork's sweep never revokes a token whose create's answer was lost: while the record is unknown with no ID, the sweep leaves every read token on that fork and still revokes the rest; on a fork with no open create it revokes an unrecorded read token", async () => {
+test("F24 (checker C1, as corrected) while a fork token create on the fork is unsettled, the fork's sweep revokes only tokens whose IDs a record names and leaves every other active token, whatever the time; once the record is settled by its own late answer, the next sweep resumes", async () => {
   const o = owner();
   const lane = "act_21_aaaaaaaa" as never;
   const name = forkName("canon", lane);
   const f = o.ns.add(name, "artifacts:ns/canon");
   o.ws.open(lane, 1 as never, o.clock.t + 3600_000);
-  const write = f.apply("write", 3600); // a token no lease records: the sweep revokes it (R-WS-3)
-  f.plans = ["lose"];
-  await assert.rejects(o.ws.forkTokens.mint(name, "pin-objects:checker", TTL));
-  assert.equal(only(o.sql)["state"], "unknown");
-  assert.equal(only(o.sql)["token"], null);
-  const lost = f.tokens.at(-1)!;
-  await o.ws.revoke(lane, 1 as never);
-  assert.deepEqual(f.revokes, [write.id], "only the token no open create could own");
-  assert.equal(f.live(lost.id), true);
+  const lease = f.apply("write", 3600);
+  o.sql.all("UPDATE artroom_ws SET token_id = ? WHERE lane = ?", lease.id, lane);
+  const strayWrite = f.apply("write", 3600);
+  const strayRead = f.apply("read", 3600);
+  // The pin's create applies, and the host stops before its answer: a fresh host keeps the record unknown, with no ID.
+  f.plans = ["hold"];
+  const old = o.ws.forkTokens.mint(name, "pin-objects:checker", TTL);
+  old.catch(() => undefined);
+  await until(() => f.held.length === 1, "the create is out");
+  const pin = f.held[0]!.apply();
+  const ws = o.make();
+  assert.deepEqual([only(o.sql)["state"], only(o.sql)["token"]], ["unknown", null]);
+  // The lease ends: its token is owed by its ID and revoked; the sweep leaves every token no record names.
+  await ws.revoke(lane, 1 as never);
+  assert.deepEqual(f.revokes, [lease.id]);
+  for (const t of [strayWrite, strayRead, pin]) assert.equal(f.live(t.id), true);
+  // No time resumes it: two hours on (past the pin's lifetime and any allowance), another lease's sweep still leaves them.
+  o.clock.advance(2 * 3600_000);
+  const later = [f.apply("write", 3600 * 4), f.apply("read", 3600 * 4)];
+  assert.equal(ws.open(lane, 2 as never, o.clock.t + 3600_000).hasOwnProperty("refused"), false);
+  await ws.revoke(lane, 2 as never);
+  assert.deepEqual(f.revokes, [lease.id]);
+  for (const t of later) assert.equal(f.live(t.id), true);
   assert.equal(only(o.sql)["state"], "unknown", "the sweep settles nothing in the ledger");
-  // Another lane's fork, with no create open: an unrecorded read token there is swept as before.
-  const lane2 = "act_23_cccccccc" as never;
-  const name2 = forkName("canon", lane2);
-  const g = o.ns.add(name2, "artifacts:ns/canon");
-  o.ws.open(lane2, 1 as never, o.clock.t + 3600_000);
-  const stray = g.apply("read", TTL);
-  await o.ws.revoke(lane2, 1 as never);
-  assert.deepEqual(g.revokes, [stray.id]);
+  // The create's own answer arrives late: the record is settled (owed by its ID), and the next sweep resumes.
+  f.held[0]!.answer();
+  await assert.rejects(old);
+  assert.deepEqual([only(o.sql)["state"], only(o.sql)["token"]], ["owed", pin.id]);
+  assert.equal(ws.open(lane, 3 as never, o.clock.t + 3600_000).hasOwnProperty("refused"), false);
+  await ws.revoke(lane, 3 as never);
+  // The unrecorded tokens still active are revoked now; the pin's and the earlier strays have expired by their own lifetimes.
+  assert.deepEqual(new Set(f.revokes), new Set([lease.id, ...later.map((t) => t.id)]));
+  for (const t of [...later, strayWrite, strayRead, pin]) assert.equal(f.live(t.id), false);
 });
 
 test("F25 (checker C2) a known create answer survives one failed write and a failed revocation: the ID is kept as owed, and a later alarm on a new host revokes it", async () => {
@@ -1051,13 +1068,17 @@ test("F25 (checker C2) a known create answer survives one failed write and a fai
   assert.equal(r.ledger.duties().unknown, 0, "the known answer is never demoted to unknown");
 });
 
-test("F26 (checker C3) the sweep asks again before each revocation: a pin token that becomes held while an earlier revocation waits is kept", async () => {
+test("F26 (checker C3) the sweep asks again before each revocation: while it waits on revoking a token the ledger names, the pin's answer arrives and its token becomes held; the sweep then keeps it", async () => {
   const o = owner();
   const lane = "act_22_bbbbbbbb" as never;
   const name = forkName("canon", lane);
   const f = o.ns.add(name, "artifacts:ns/canon");
   o.ws.open(lane, 1 as never, o.clock.t + 3600_000);
-  f.apply("write", TTL);
+  // A token the ledger names: an earlier pin's, owed after its release failed.
+  const earlier = await o.ws.forkTokens.mint(name, "pin-objects:earlier", TTL);
+  f.revokeError = () => internal();
+  await earlier.release();
+  f.revokeError = null;
   f.plans = ["hold"];
   const mint = o.ws.forkTokens.mint(name, "pin-objects:checker", TTL);
   await until(() => f.held.length === 1, "the create is out");
@@ -1065,10 +1086,11 @@ test("F26 (checker C3) the sweep asks again before each revocation: a pin token 
   h.apply();
   f.holdRevokes = true;
   const sweep = o.ws.revoke(lane, 1 as never);
-  await until(() => f.heldRevokes.length === 1, "the sweep's first revocation");
+  await until(() => f.heldRevokes.length === 1, "the sweep's revocation of the named token");
+  assert.equal(f.heldRevokes[0]!.id, earlier.id);
   h.answer();
   const token = await mint;
-  assert.equal(only(o.sql)["state"], "held");
+  assert.equal(rows(o.sql).find((x) => x["token"] === token.id)?.["state"], "held");
   f.holdRevokes = false;
   f.heldRevokes[0]!.gate.resolve();
   await sweep;
@@ -1094,5 +1116,28 @@ test("F27 a failed handoff writes the known ID before the revocation at once: a 
   assert.equal(only(r.sql)["state"], "owed");
   await alarm(r);
   assert.equal(f.live(id), false);
+  assert.equal(rows(r.sql).length, 0);
+});
+
+test("F28 (checker C4) the expiry upper bound allows for Artifacts' clock (R-MINT-3, MINT_CLOCK_ALLOWANCE_MS): 67 ms and 5,000 ms ahead of the lifetime asked are used; 5,001 ms ahead is owed and never returned", async () => {
+  assert.equal(MINT_CLOCK_ALLOWANCE_MS, 5_000);
+  const r = room();
+  const f = r.fork("f-a");
+  const ahead = (ms: number) => (t: Tok) => ({ ...(full(t) as object), expiresAt: new Date(t.expiresAt + ms).toISOString() });
+  f.plans = [ahead(67), ahead(5_000), ahead(5_001)];
+  const a = await r.ledger.mint("f-a", "pin-objects:67", TTL);
+  const b = await r.ledger.mint("f-a", "pin-objects:5000", TTL);
+  await assert.rejects(r.ledger.mint("f-a", "pin-objects:5001", TTL), /an expiry later than the lifetime asked/);
+  assert.deepEqual(
+    rows(r.sql).map((x) => [x["purpose"], x["state"]]),
+    [
+      ["pin-objects:67", "held"],
+      ["pin-objects:5000", "held"],
+      ["pin-objects:5001", "owed"],
+    ],
+  );
+  await a.release();
+  await b.release();
+  await alarm(r);
   assert.equal(rows(r.sql).length, 0);
 });

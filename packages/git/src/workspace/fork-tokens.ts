@@ -31,11 +31,11 @@
  *   observes at most one fork, the one due earliest.
  * - The fork's owner may still sweep the fork (R-WS-3, plans 001 and 002:
  *   revoke every active token no lease records). The sweep asks this ledger
- *   about each token immediately before revoking it (`mayOwn`), and leaves
- *   every token a record holds for a caller, and, while a create on that
- *   fork is still `sent` or `unknown`, every read token. So
- *   neither the sweep nor this ledger revokes a token that one of its open
- *   creates may own, and a sweep never cuts a pin short.
+ *   about each token immediately before revoking it: it keeps every token a
+ *   record holds for a caller (`holds`), and while a create on that fork is
+ *   still `sent` or `unknown` (`unsettled`) it revokes only tokens whose IDs
+ *   a record names. So neither the sweep nor this ledger revokes a token
+ *   that one of its creates may own, and a sweep never cuts a pin short.
  *
  * Construct one ledger per host start: the constructor takes over what a
  * stopped host left. `sent` records become `unknown`, and `held` records
@@ -48,6 +48,8 @@
 import { type Sql, type SqlRow, text } from "../sql.ts";
 import { type RepoHandle, completeInventory, refusedUnchanged, retriable } from "../artifacts.ts";
 import {
+  MINT_CLOCK_ALLOWANCE_MS,
+  MINT_ID_WRITE_ATTEMPTS,
   MINT_LISTING_MAX,
   MINT_RETRY,
   MINT_REVOKE_BACKOFF,
@@ -390,7 +392,12 @@ export class ForkTokens {
     return { ok: false, error, retry: "e" in first && retriable(first.e) && applied === "unknown" };
   }
 
-  /** Classify an answer. Usable only with text, read scope, and a readable expiry within the lifetime asked, for a waiting caller. */
+  /**
+   * Classify an answer. Usable only with text, read scope, and a readable
+   * expiry no later than the answer's arrival plus the lifetime asked plus
+   * `MINT_CLOCK_ALLOWANCE_MS` (R-MINT-3: Artifacts sets the expiry by its own
+   * clock), for a waiting caller. A fork token has no absolute deadline.
+   */
   private classify(answer: unknown, ttlS: number, waiting: boolean): Outcome {
     const a = answer as { id?: unknown; plaintext?: unknown; scope?: unknown; expiresAt?: unknown } | null;
     if (typeof a?.id !== "string" || a.id.length === 0) return { kind: "unknown", why: "an answer without a token ID" };
@@ -403,7 +410,7 @@ export class ForkTokens {
           ? "another scope"
           : expiresAt === null
             ? "an unreadable expiry"
-            : expiresAt > this.now() + ttlS * 1000
+            : expiresAt > this.now() + ttlS * 1000 + MINT_CLOCK_ALLOWANCE_MS
               ? "an expiry later than the lifetime asked"
               : !waiting
                 ? "no caller is waiting"
@@ -466,24 +473,27 @@ export class ForkTokens {
   /**
    * The answer gave a token ID, but it could not be recorded as the answer
    * (as `held`, say: a write failed), or its record was in no state to take
-   * it. The ID is in memory, so the record is written again, as the record
-   * of a known token owed revocation, before anything else. Then the token
-   * is revoked by its ID at once. An answer ends the record; a failure
-   * leaves it owed, with its ID, for the alarm's passes, and if the first
-   * write failed it is tried once more. Only if storage refuses both writes
-   * and Artifacts the revocation does the record keep its earlier state
-   * (`sent`, which the next host's takeover makes `unknown`).
+   * it. The ID is in hand, so before any revocation is attempted the record
+   * is written again, as the record of that token owed revocation, up to
+   * `MINT_ID_WRITE_ATTEMPTS` times (R-MINT-3, as amended for request
+   * 02836f9a). Then the token is revoked by its ID at once. An answer ends
+   * the record; a failure leaves it owed, with its ID, for the alarm's
+   * passes. If storage refused every write, the Room cannot guarantee that
+   * the duty survives: the record keeps its earlier state (`sent`, which the
+   * next host's takeover makes `unknown`), and only the revocation at once
+   * remains.
    */
   private async handoffFailed(id: number, fork: string, repo: ForkRepo, o: Outcome): Promise<void> {
     if (o.kind !== "token") return;
-    const owe = (): boolean => {
+    let recorded = false;
+    for (let attempt = 0; attempt < MINT_ID_WRITE_ATTEMPTS && !recorded; attempt++) {
       try {
-        return this.sql.transaction(() => this.oweKnown(id, fork, o));
+        recorded = this.sql.transaction(() => this.oweKnown(id, fork, o));
+        if (!recorded) break; // the record is in neither state: nothing to write it to
       } catch {
-        return false;
+        recorded = false;
       }
-    };
-    const recorded = owe();
+    }
     const answered = await within(repo.revokeToken(o.id).then(() => true), this.waitMs, false).catch(() => false);
     if (answered) {
       try {
@@ -497,7 +507,6 @@ export class ForkTokens {
       }
       return;
     }
-    if (!recorded) owe();
     await this.wake(this.now() + MINT_REVOKE_BACKOFF.firstMs).catch(() => undefined);
   }
 
@@ -516,19 +525,27 @@ export class ForkTokens {
     return false;
   }
 
+  /** Does a record hold this token for a caller on `fork` (a pin in progress)? The fork's sweep keeps it. */
+  holds(fork: string, tokenId: string): boolean {
+    return this.sql.all("SELECT 1 AS x FROM artroom_fork_mint WHERE token = ? AND state = 'held' AND fork = ? LIMIT 1", tokenId, fork).length > 0;
+  }
+
+  /** Does a record on `fork` name this token by its ID, in any state? */
+  names(fork: string, tokenId: string): boolean {
+    return this.sql.all("SELECT 1 AS x FROM artroom_fork_mint WHERE token = ? AND fork = ? LIMIT 1", tokenId, fork).length > 0;
+  }
+
   /**
-   * May this ledger own a token listed on `fork`? Yes if a record holds it
-   * for a caller, or if it is a read token while any create on this fork is
-   * still `sent` or `unknown`: the listing does not say which create made a
-   * token (open points 42 and 43), and a lifetime or creation time cannot
-   * tell concurrent creates apart, so every read token is one such a create
-   * could have made. The fork's sweep (R-WS-3) leaves these; only the
-   * create's own answer, through this ledger, settles its record. Two
-   * indexed lookups, whatever the number of records kept.
+   * Is a create on `fork` unsettled: still `sent`, or `unknown`? Its token,
+   * if it applied, is on the fork with an ID no record holds, and nothing
+   * tells it apart (open points 42 and 43): no label, no fence, and no
+   * bound on when it applies (R-MINT-6), so no time ends this. While it
+   * holds, the fork's sweep revokes only tokens whose IDs a record names
+   * (R-WS-3 suspended, not inferred around); it ends only when the record
+   * is settled by its own answer.
    */
-  mayOwn(fork: string, token: { readonly id: string; readonly scope: string }): boolean {
-    if (this.sql.all("SELECT 1 AS x FROM artroom_fork_mint WHERE token = ? AND state = 'held' AND fork = ? LIMIT 1", token.id, fork).length > 0) return true;
-    return token.scope === "read" && this.sql.all("SELECT 1 AS x FROM artroom_fork_mint WHERE fork = ? AND state IN ('sent', 'unknown') LIMIT 1", fork).length > 0;
+  unsettled(fork: string): boolean {
+    return this.sql.all("SELECT 1 AS x FROM artroom_fork_mint WHERE fork = ? AND state IN ('sent', 'unknown') LIMIT 1", fork).length > 0;
   }
 
   private track(p: Promise<unknown>): void {

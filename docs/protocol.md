@@ -3355,9 +3355,19 @@ record became unknown:
   failure, `INTERNAL_ERROR`, an answer without a token ID, a caller's
   bounded wait running out, and a host that stopped before it recorded
   the answer.
-- If the transaction that records an answer fails, the record keeps its
-  earlier state. A token ID from that answer may be revoked at once; the
-  record closes only when that revocation is answered.
+- Once an answer has given a token ID, the ID is written durably before
+  any revocation of that token is attempted. If the transaction that
+  records the answer fails, the write is retried with the ID still in
+  hand, as the record of that token owed revocation (R-MINT-4). These
+  retries are bounded: at most 3 writes. Then the token is revoked at once
+  by its ID; an answered revocation closes the record, and a failed one
+  leaves it owed, with its ID, for later attempts. If storage refuses
+  every bounded write, the Room cannot guarantee that the duty survives:
+  the record keeps its earlier state, and only the revocation at once
+  remains. (Request 02836f9a, checker finding C2; planner assert 66f8b350
+  and its two corrections.)
+- Before a token ID is known, if the transaction that records an answer
+  fails, the record keeps its earlier state.
 
 **R-MINT-4. A known token has one owner.**
 - From the moment its ID is recorded, a known token is owned by exactly

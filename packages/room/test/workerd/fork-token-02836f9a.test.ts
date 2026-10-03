@@ -321,4 +321,24 @@ describe("mint lane F: the fork read token through the fork's own ledger, in the
       expect((await forkRecords(r)).owed).toBe(0);
       expect(await inDO(r, (room) => room.core.loopBackoff().forkTokens)).toBeUndefined();
     }));
+
+  it("R8 (checker C4) Artifacts stamps both of pinning's tokens 67 ms ahead of the Room's clock (request df6ff8d3): the fork read token and the canonical write token are both used, the propose is admitted with its head pinned, and no record is left in either ledger", () =>
+    ahead(async () => {
+      const { r, a, lane, head, fork } = await laneRoom();
+      const skew = (repo: FakeRepo) => {
+        const real = repo.mint.bind(repo);
+        repo.mint = (scope, ttl) => {
+          const t = real(scope, ttl);
+          return { ...t, expiresAt: new Date(Date.parse(t.expiresAt) + 67).toISOString() };
+        };
+      };
+      skew(fork);
+      skew(a.canonicalRepo());
+      await r.admin.ok("propose", { lane }, { lease: 1, expectedGeneration: 0, head, summary: "a lane" });
+      await settle(r);
+      expect(a.refs.get(`refs/artroom/objects/${head}`)).toBe(head);
+      expect(readTokens(fork).map((t) => t.revoked)).toEqual([true]);
+      expect((await forkRecords(r)).records).toEqual([]);
+      expect((await inDO(r, (room) => room.core.mints.duties({ limit: 1000 }))).records.filter((x) => x.purpose.startsWith("pin-objects:"))).toEqual([]);
+    }));
 });
