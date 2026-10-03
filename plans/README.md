@@ -1396,3 +1396,333 @@ The tree was clean before and after the gates.
 - The protocol text, apart from R-MINT-3's amendment for C2. Section 32 stays about canonical mints; this section records the analogy. If the checker wants R-MINT-1 to name the fork ledger, that is a contract change for its own request.
 - The lease token mint in `workspaces.ts`, and snapshot repository tokens.
 - Showing the fork ledger's records to admins: `forkTokens.duties()` pages them, as `mints.duties()` does, for the cleanup projection request (`8d249233`).
+
+
+## Declared acts stage 5 (request a5d64b35)
+
+Status: implemented except the UI, provisional, not yet for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used.
+
+Three things are true of this head and must change before review:
+
+- **It is provisional.** The branch was cut from the stage 2 candidate `2cd97b88`, which is not yet reviewed. If stage 2 changes in review, this work is redone against it. The head for review will be composed on main after stage 2 lands, with every gate and every acceptance test run again there.
+- **The UI is not in it.** A companion lane built the UI against this API on branch `request/decl-stage5-ui`, head `5dc0d044`, from the API commit `2eeb7e72`. It changes `packages/ui` only, and this branch does not touch `packages/ui`. The coordinator joins the two before review. Condition 1's UI part, and the UI part of historical rendering, are open on this head until then.
+- **Stage 3 is not in it.** `packages/log` is unchanged. `artroom verify` does not read a `v2` room's log until stage 3 lands.
+
+### What was built
+
+- **The declarations read.** `ReadQuery` `{ q: "acts" }` over RPC and `GET /v1/rooms/:room/declarations` over HTTPS, in `packages/room/src/reads.ts` (`catalogue`) and `http.ts`. With no selector it answers with the active policy version. `at` is an entry's seq and answers with the version in force there, `D(s)`. `policy` names a version. A `v2` version answers with each declared kind's declaration and binding, the steps version and `lanes`. A `v1` version answers with the legacy catalogue, which has no declarations and no bindings. Each declared kind carries `retired`, the seq of the first later activation that dropped it.
+- **A record's meaning at its own seq.** `meaningOf(catalogue, kind)` gives the label, declaration, binding and retirement in force for a record. The Room's `explain` read carries it as `Explanation.meaning`.
+- **The generic act.** `RoomApi.act(kind, target, body, { binding, idempotencyKey })` in `packages/client/src/room.ts`. It signs envelope `v: 2` with exactly what the caller gave. It refuses a missing or malformed binding and a platform kind before sending.
+- **The named methods in a `v2` room.** With a key, the handle reads the catalogue once, then signs each code-review act as `v: 2` with the binding of the declaration it was built for, under the room's steps version and `lanes`. In a `v1` room they sign `v: 1` as before.
+- **Bearer acts.** Over RPC the caller's binding goes to `bearerAct` unchanged. Over HTTPS the generic act is one call of the MCP tool `act`. The HTTPS bearer client's `check` and `roster` methods stay refused.
+- **Grants.** `delegateOp` and `invitationSession` (`packages/client/src/grants.ts`) build the op in the room's active vocabulary. `expandGrant` turns `*` or a list of kinds into platform kinds and a signed map of the active bindings.
+- **MCP.** The tools `acts` and `act`, in their own block of `packages/mcp/src/tools.ts`, beside the ten named tools, which are unchanged.
+- **CLI.** `artroom acts [KIND] [--at SEQ | --policy VERSION]` and `artroom act KIND --binding B …`, journaled like the other act commands. `artroom log` and `artroom explain` show a declared kind with the label of the record's own seq.
+- **A table of the steps' fields.** `STEP_FIELD_SPECS` in `packages/policy/src/steps.ts`: each step's own body fields with their types, so a form or the CLI can ask for them. `fieldsOf(declaration, shape)` lists an act's fields on a target.
+- **What a handle keeps.** `actsAt` answers from an ended version the handle read before. A later activation can still set `retired` on that version's kinds, so the handle drops what it kept when it sees a later activation. `actsAt(at, { fresh: true })` always reads the room.
+- **A thread's kind.** `Lane.kind`, on the `lane` and `lanes` reads: the kind of the act that opened the thread.
+- **A thread's name.** `titleOf` and `threadTitle` in `packages/policy/src/catalogue.ts`. The CLI and the MCP tool `act` print the name when an act opens a thread.
+- **A typed envelope accessor.** `envelopeOf(entry)` in `packages/contract/src/guards.ts`.
+- **Protocol.** [docs/protocol.md](../docs/protocol.md) section 33.10, appended. It amends R-API-3, R-API-9, R-CRED-10, R-DECL-16, R-DECL-17 and R-DECL-23, adds the stage 5 acceptance cases and the types, and adds open points 49 to 52. No rule is renumbered and no earlier text is edited.
+
+The API the UI lane builds on is summarized in the session scratch file `stage5-api.md`; everything it names is in the files above.
+
+### Conditions
+
+| Condition of `a5d64b35` | State | Where and how shown |
+|---|---|---|
+| (1) Every stage 5 surface | Part met | Read, client, HTTPS, MCP and CLI: built and tested. The ten named MCP tools remain. **Open: the UI**, in the companion lane. The MCP core (`a9788a59`) is separately owed; see "Composing with the MCP core" |
+| (2) Signed meaning preserved | Met | The client, the MCP tool and the CLI never read a binding to act, never replace one and never sign again. Tests: "signed meaning is never changed by the client" (Room, 6), "a changed meaning is shown, never adopted for the user" (CLI, 3), the stale test of the MCP suite. Exact retries after an activation return the original record. Grants carry the grantor's bindings and are expanded before signing. Credential custody and redaction are unchanged |
+| (3) An honest act unknown to the client, and the listed cases | Met for HTTPS, MCP and CLI; **open for the UI** | See "Acceptance cases" |
+| (4) Ownership and the read-route seam | Met | See "Edits to files other stages own" |
+| (5) Mutations, tests, gates, one composed head | Part met | Mutations and gates below, at this head. **Open: the one exact composed head**, which needs stage 2 on main and the UI |
+
+| Point of `fa120186` | State | Where and how shown |
+|---|---|---|
+| Historical readers use `D(s)` | Met for the client, MCP and CLI; **open for the UI** | "old records are read under the declarations of their own seq" (Room, 5 tests): activation, retirement, later name reuse with a changed shape, a label-only change, legacy records, exact old retries |
+| The generic bound check over the MCP endpoint | Met | "a declared check step under another name" (Room, 3 tests), "the generic act over the MCP endpoint" (Room, 4 tests). R-CRED-10 and R-API-9 are amended at this head in section 33.10 |
+| The first jam task need not use this path | Not a code matter | Nothing here makes it depend on it |
+
+### Acceptance cases
+
+All of these run the real client package and the real MCP endpoint against the Worker and its Durable Object, in [packages/room/test/workerd/declared-stage5-a5d64b35.test.ts](../packages/room/test/workerd/declared-stage5-a5d64b35.test.ts) (36 tests). Nothing in them is a double.
+
+| Case of section 33.10 | Tests |
+|---|---|
+| Generic act, over HTTPS | "the client signs v: 2 with the binding the caller read; the room admits it and records the act's own kind" |
+| Generic act, over MCP | "a bearer reads the declarations with acts, and performs a kind that has no named tool with act, signed under its delegation" |
+| Changed meaning: body, targets | "a changed body field limit …", "a new required body field …", "a changed target …" |
+| Changed meaning: hold | "a changed hold: an opening act prepared before its hold changed is binding-stale; the caller reads again and resubmits deliberately" |
+| Label-only edit | "a label-only or help-only edit leaves the binding equal, and the act prepared before it is admitted" |
+| Lost result; exact retry | "a lost result is retried with the same bytes, and an exact retry after a meaning change returns the original record" |
+| Undeclared kind | "an undeclared kind is kind-undeclared; a body the declaration does not allow is invalid-body; neither is recorded" |
+| Role and grant | "a role the declaration does not list is role-forbids; …"; "a grant that does not name the kind, names an earlier binding, or whose grantor's role lost the kind does not cover the act; …" |
+| Expanded grant; delayed grant | "a grant is expanded before signing: …"; "a grant signed before a meaning change and sent after it is binding-stale; …" |
+| Legacy controls | "a v1 room: the named methods sign v: 1 as before; the generic act is bad-request and records nothing"; "a v1 room answers with the legacy catalogue …" |
+| Named methods in a `v2` room | "a v2 room with the code-review declarations: each named method signs v: 2 with the binding it was built for; renew stays v: 1"; "a room whose claim means something else: …" |
+| Generic check | "a bearer whose grant names verify meets the obligation through act; one without it, or with a stale binding, does not"; "the holder and proposer cannot meet their own check obligation through act; …"; "the HTTPS bearer client: its fixed check method stays forbidden; its generic act goes to the MCP endpoint; a key-signed check over HTTPS still works" |
+| Excluded on the generic path | "platform kinds, acts without a binding, and every act in a v1 room are refused on the generic path; nothing is recorded"; "a bearer act is never taken on POST /acts: …" |
+| Old records | the five tests of "old records are read under the declarations of their own seq" |
+| Dropped twice | "each version that declared the kind is marked with the first later version that did not: an earlier version is not moved to the second drop" |
+| Retired after the read | Client: "with no sign of a later activation the handle answers what it kept; { fresh: true } reads again and replaces it", and eight tests "after …, the handle drops what it kept and the next answer has the room's marks", one for each sign. MCP: "a kind retired after the server first read its version is shown retired on the next call, with nothing else read in between" |
+| Thread kind | "the lane reads give each thread's kind: claim in a v1 room; in a v2 room the kind of the act that opened it" |
+| Thread name | "a thread with no goal is named by its opening act, in the words in force when it opened: label and first field"; "the act tool names the thread it opened the same way; a thread with a goal is named by its goal"; CLI: "an act that opens a thread names it as every reader does: its goal, or the act's label and first field" |
+
+Unit tests beside them, against the fake room in its declared mode: client 28 ([declared-a5d64b35.test.ts](../packages/client/test/declared-a5d64b35.test.ts)), MCP 10 and 4 schema tests, CLI 18. A Room node test, 11 tests, checks that `STEP_FIELD_SPECS` agrees with admission's step 5 for every step: [declared-steps-a5d64b35.test.ts](../packages/room/test/node/declared-steps-a5d64b35.test.ts).
+
+### Choices where the design left room
+
+1. **The route is `/declarations`, not `/acts`.** `POST /v1/rooms/:room/acts` submits an act. A `GET` on the same path for a different thing would share its path in logs and in tests that count submissions. The read query and the MCP tool are still named `acts`, as R-API-9 has them.
+2. **A `v1` version answers with a legacy catalogue.** Section 33.7's `ActsCatalogue` had a `steps` field and no `v1` form. The read returns `{ vocabulary: "artroom-legacy-v1", policy, since, until }`, so a client learns the room's vocabulary from the same read.
+3. **`retired` is the first later activation that dropped the kind, and reuse does not clear it.** A record made under a version keeps that version's meaning. The binding and policy version tell a reused name's two meanings apart.
+4. **The Room computes `explain`'s meaning.** One implementation serves the client, the CLI, the MCP tool and the UI.
+5. **The named methods read the catalogue once per handle.** A handle cannot know the room's vocabulary without asking, and it must not sign `v: 1`, be refused, and sign again by itself. So the first named act of a handle with a key costs a session request and one read, in every room. `renew` and `roster` cost nothing more. After a `binding-stale` or `kind-undeclared` refusal, or a `bad-request`, the handle forgets what it read; the caller's next call reads again.
+6. **The client depends on the policy package, through an export that loads no evaluator.** The binding identity lives in `packages/policy`. The client imports `@generalbusiness/artroom-policy/declared`, which pulls in the binding functions, the code-review declarations, the vocabulary functions and the catalogue helpers, and not the expression engine. The client, MCP and CLI TypeScript configurations move from `ES2022` to `ES2024`, which the policy sources need.
+7. **A table of step fields for clients, checked against the Room.** Admission's step checks are code. A form needs data. `STEP_FIELD_SPECS` is that data, and the Room node test fails if the two drift.
+8. **`artroom act` requires `--binding`.** The CLI could read the active binding for the user. It does not: a user who read a declaration yesterday would then act under today's meaning without being told. `artroom acts KIND` prints the binding and the command.
+9. **A binding that is not the active one is refused by the CLI before signing**, with the refusal the room would give. The room still judges every act it is sent, including one whose meaning changes between the CLI's read and its send; that case is tested.
+10. **What the room knows is read for the user**: the lease, the lane's generation, and a version's head, as the named commands read them. The binding is never among them.
+11. **After `binding-stale` the CLI lists what changed** when one of the last eight policy versions holds the kind under the binding the user gave. Otherwise it says the change cannot be listed.
+12. **`expandGrant` refuses; it does not narrow.** A listed kind the role may not grant is an error naming it. `*` means what the role may grant, and says so by what it lists.
+13. **`LogEntry` is unchanged.** Widening it would change `packages/log`, which stage 3 owns. Readers call `envelopeOf(entry)`, which gives the envelope as `AnyEnvelope`. Open point 51.
+14. **No Room change was needed for the bearer transport.** Stage 2's `bearerAct` already signs a caller's binding as given. The exclusions follow from step 1: a platform kind in `v: 2` and a `v: 2` envelope in a `v1` room are `bad-request`. The tests pin both.
+15. **An MCP tool error is now a plain object.** A failure the Room throws over RPC reaches the MCP server as an `Error` instance, which MCP rejects as structured content. Before the generic `act`, no tool reached a thrown `bad-request` from the Room. `errorResult` now copies the error's own fields.
+16. **The AGENTS.md block is unchanged.** It is pinned by a snapshot and teaches the named loop. The MCP server's instructions gain one sentence about `acts` and `act`, within their 512 characters.
+17. **A handle drops kept catalogues on evidence, not on a timer.** It cannot know of an activation it has not seen. Every answer that shows one drops the kept versions: `acts()`, another `actsAt()` answer, a `log()` page, an update, and a refusal that names the active policy version. A handle that has seen nothing may answer old marks, and `fresh` is the way to be sure.
+18. **The MCP tool `acts` always reads fresh.** A stdio server keeps one handle for its life, and an agent's call is a question to the room.
+19. **"First field" is by name.** The room keeps bodies and policy documents as canonical JSON with sorted keys. Neither the order a caller typed nor the order a declaration lists its fields is recorded. `titleOf` sorts, so the typed body and the record give one name. Open point 52.
+20. **The CLI names a new thread from the catalogue it read for the act.** It read that catalogue in the same command and the act carried its binding. After a lost answer that is finished from the journal, the first line is printed and the thread line is not.
+21. **The MCP tool `act` reads the declarations only for a thread with no goal**, and only at the record's seq. If that read fails, the act is still reported as done and the thread is named by its ID.
+
+### Edits to files other stages own
+
+- **Stage 2's files.** Two. `packages/policy/src/index.ts`: two added export lines, for the catalogue helpers and the steps table. `packages/room/src/model.ts`: one added line in `laneView`, `kind: row.kind`, with its comment. No other file stage 2 changed is edited. This work reads stage 2's `vocabulary.ts` and its test helpers (`declared-support.ts`).
+- **Stage 3's files.** None. `packages/log` is byte-identical to the stage 2 candidate's.
+- **The MCP core's files** (`a9788a59`, the planner's). `packages/contract/src/transports.ts`: additive, apart from six lines that had to change in place (`Explanation.kind`, the end of the `ReadQuery` union, `RoomWire.submit`, `RoomWire.bearerAct` and its comment, and the body of `POST /acts`). The two new `McpTools` entries are in their own block after the ten. The contract index gains four names in its transports export list: `ActsNotFound`, `AnyBearerAct`, `CatalogueAt` and `GenericActOptions`, and `envelopeOf` in its guards list. Its MCP exports are otherwise untouched.
+- **Main's Room files.** `packages/room/src/reads.ts` (the read and `explain`'s meaning) and `packages/room/src/http.ts` (the route). No migration.
+- **The UI lane's files.** None. `packages/ui` is byte-identical to the stage 2 candidate's.
+
+### The UI lane's four questions
+
+The UI lane finished at `5dc0d044` and asked four things of this lane.
+
+| Question | Answer | What was done |
+|---|---|---|
+| An ended catalogue is not final: a later activation can set `retired`. Is the handle's cache correct? | It was not. The handle kept an ended version for good. | The handle now drops what it kept when it sees a later activation, and `actsAt` takes `{ fresh: true }`. Ten client tests and one MCP test. The UI reads `acts()` on each snapshot, which is one of the signs, so its next `actsAt` is current |
+| The `Lane` read carries no thread kind. | A small additive change. | `Lane.kind` added to the contract and to the Room's `laneView`. One Room test, which also shows the room refusing an act whose `threads` omits the kind. The full Room suite passes with it |
+| A thread opened by an application's act has an empty `goal`. What do readers show? | One rule for every reader: the goal, else the opening act's label and first field, else the lane's ID. | `threadTitle` and `titleOf`. The CLI and the MCP tool `act` print it when an act opens a thread. Neither prints a thread's goal anywhere else. Three Room tests, one CLI test, one MCP test, two client tests |
+| Log entry envelopes are typed as `v: 1`. | A typed accessor is a small additive change. Widening `LogEntry` is not: it reaches `packages/log`. | `envelopeOf(entry)`. One client test. The CLI's log uses it |
+
+One difference from the UI remains. The UI's `laneGoal` takes the first field in the order `Object.entries` gives. Against a live room that is name order, the same as `titleOf`. Against the UI's mock room it is the order typed. The UI should call `threadTitle` after the two branches join.
+
+### Composing with the MCP core
+
+`a9788a59` adds four read tools and a descriptor shape with titles, annotations and toolsets. It is on branch `request/mcp-amendment` and not on main. This stage does not merge it. To compose:
+
+- `acts` and `act` are written in today's descriptor shape. The core's merge adds its fields to them as to the ten. Which toolsets list `act` and `acts` is the core's contract to say, not this stage's.
+- The tests that pinned exactly ten tools now pin the ten named tools and these two by name, so four more reads do not break them. They are listed below.
+- The core makes `idempotencyKey` required on act tools. `act` already requires it.
+- The core's branch calls itself amendment 4 and uses section 30.2, which on main are the log-objects amendment. It needs renumbering before it meets section 33.
+
+### Existing tests changed
+
+Each is a change of a pinned tool list, made as the coordinator asked. No other existing test file changed.
+
+- `packages/mcp/test/schema.test.ts`, "exactly the contract's ten names, each calling the method of the same name": the list equality becomes "each of the ten is listed once, and no name is listed twice". "required fields are the contract's required fields": the same exact table, taken over the ten.
+- `packages/mcp/test/stage0.test.ts`: the list of tools that can refuse gains `act`.
+- `packages/cli/test/cli.test.ts`, "artroom mcp serves the ten tools over stdio from the real bin": the list equality becomes "each of the ten once, and `acts` and `act`".
+- `packages/room/test/workerd/mcp.test.ts`: two `toHaveLength(10)` become "contains the ten and the two".
+- `packages/client/test/support/fake-room.ts`, the test double: policy versions, `activate`, the `acts` read, `v: 2` envelopes with step 4a, grant maps, a bearer act's binding, a lane's `kind`, and a declared kind of the room's own that opens a thread.
+
+### Mutation table
+
+121 mutants, each one text edit to one guard, run against five test sets: the client, MCP and CLI node suites, the Room's steps test, and the Room's stage 5, MCP and HTTP workerd tests. 120 fail at least one test by an assertion. 1 survives. No mutant failed only by a timeout, a load failure or a missing report. The runner writes each file's original bytes back in a `finally`, and `git status --porcelain` was empty after the run.
+
+The run was made at commit `477dda2f`. It left seven survivors. Six had no test, and commit `b9ecd3af` adds one for each; those six mutants were run again and are red. Only tests changed between the two commits, so the other results stand.
+
+| Part | File | Mutants | Red | Survive |
+|---|---|---|---|---|
+| The Room's read and explain | `packages/room/src/reads.ts` | 11 | 11 | 0 |
+| The Room's route | `packages/room/src/http.ts` | 3 | 3 | 0 |
+| The MCP runners | `packages/mcp/src/run.ts` | 13 | 13 | 0 |
+| The MCP descriptors | `packages/mcp/src/tools.ts` | 2 | 2 | 0 |
+| The client handle | `packages/client/src/room.ts` | 25 | 25 | 0 |
+| The client's envelope | `packages/client/src/envelope.ts` | 2 | 2 | 0 |
+| The client's bearer paths | `packages/client/src/bearer.ts` | 3 | 3 | 0 |
+| The client's grant builders | `packages/client/src/grants.ts` | 2 | 2 | 0 |
+| The catalogue helpers | `packages/policy/src/catalogue.ts` | 24 | 24 | 0 |
+| The steps' field table | `packages/policy/src/steps.ts` | 3 | 3 | 0 |
+| The CLI commands | `packages/cli/src/main.ts` | 20 | 19 | 1 |
+| The CLI's fields and text | `packages/cli/src/declared.ts` | 9 | 9 | 0 |
+| The CLI's output | `packages/cli/src/format.ts` | 2 | 2 | 0 |
+| The Room's lane view | `packages/room/src/model.ts` | 1 | 1 | 0 |
+| The envelope accessor | `packages/contract/src/guards.ts` | 1 | 1 | 0 |
+| **Total** | | **121** | **120** | **1** |
+
+**The survivor.** `G5:cli-binding-given`: `artroom act` sends the active binding in place of the one the user gave. It is an equivalent mutant. The statement before it (`G5:cli-stale`) returns a refusal unless the two are equal, so no input reaches the send with different values. The mutant of that earlier guard is red.
+
+**A mutant that was replaced.** `G5:cli-field-unknown` first kept an unknown `--set` field as text. That is also equivalent: the check of the whole body two lines later refuses the same field with the same words. The mutant now drops the unknown field without a word, and is red.
+
+<details><summary>Every mutant</summary>
+
+| Mutant | What it does | Tests that fail |
+|---|---|---|
+| `G5:read-one-selector` | The read accepts at and policy together | 1 |
+| `G5:read-policy-format` | A malformed policy version is looked up, not refused | 1 |
+| `G5:read-at-format` | A negative or fractional seq is looked up, not refused | 1 |
+| `G5:read-at` | At always answers with the latest version | 7 |
+| `G5:read-at-order` | At answers with the first version at or before the seq, not the last | 5 |
+| `G5:read-until` | Every version says it is still active | 5 |
+| `G5:read-legacy` | A v1 version answers as a declared catalogue with no acts | 8 |
+| `G5:read-retired` | No kind is ever marked retired | 5 |
+| `G5:read-retired-first` | Retired is the last version that dropped the kind, not the first | 1 |
+| `G5:read-binding` | The catalogue's binding is the digest of the declaration, not of the binding subject | 18 |
+| `G5:explain-at-seq` | Explain reads a record's meaning under the active version | 4 |
+| `G5:route-acts-missing` | A version the room does not retain is 200 with null | 1 |
+| `G5:route-at` | The route ignores ?at | 2 |
+| `G5:route-policy` | The route ignores ?policy | 1 |
+| `G5:acts-not-found` | Acts answers a missing version with another shape | 2 |
+| `G5:acts-both` | The acts tool accepts at and policy together | 2 |
+| `G5:acts-at` | The acts tool ignores at | 3 |
+| `G5:act-binding` | The act tool replaces the agent's binding with the active one | 6 |
+| `G5:act-key` | The act tool drops the agent's idempotency key | 3 |
+| `G5:headline-stale` | A stale refusal's text does not name the active binding | 2 |
+| `G5:headline-meaning` | Explain's text shows the kind, never the label of its seq | 2 |
+| `G5:headline-retired` | Explain's text does not say a kind was retired | 2 |
+| `G5:error-plain` | A tool error's structured content is the thrown object itself | 2 |
+| `G5:tool-binding-required` | The act tool's schema does not require a binding | 3 |
+| `G5:tool-key-required` | The act tool's schema does not require an idempotency key | 3 |
+| `G5:named-platform-v1` | Renew and roster get a binding in a v2 room | 1 |
+| `G5:named-legacy-v1` | The named methods sign v: 2 in a v1 room | 101 |
+| `G5:named-forget` | The handle keeps a catalogue the room said was stale | 3 |
+| `G5:named-forget-vocabulary` | The handle keeps a vocabulary the room no longer uses | 1 |
+| `G5:named-v2` | The named methods sign v: 1 in a v2 room | 20 |
+| `G5:named-once` | The named methods read the catalogue for every act | 5 |
+| `G5:generic-platform` | The generic act sends a platform kind | 5 |
+| `G5:generic-binding` | The generic act signs the active binding in place of the caller's | 10 |
+| `G5:replay-binding` | A bearer's prepared act is sent without its binding | 14 |
+| `G5:catalogue-cache` | ActsAt answers every question with the first version it kept | 5 |
+| `G5:catalogue-keep-ended` | ActsAt keeps the active version too | 1 |
+| `G5:binding-required` | A missing or malformed binding is signed | 3 |
+| `G5:declared-v2` | The declared envelope says v: 1 | 49 |
+| `G5:mcp-bearer-generic` | The HTTPS bearer client's generic act goes to a named tool | 4 |
+| `G5:mcp-bearer-unnamed` | A kind with no named tool and no binding is sent to the act tool | 1 |
+| `G5:rpc-bearer-binding` | Over RPC a bearer's generic act drops its binding | 14 |
+| `G5:grant-problems` | A grant with a problem is built as an empty grant | 2 |
+| `G5:grant-legacy-shape` | In a v1 room the grant is built in the v2 shape | 2 |
+| `G5:meaning-legacy` | A legacy record does not say where the v1 era ended | 3 |
+| `G5:meaning-legacy-kinds` | Any kind is a legacy kind under a v1 version | 1 |
+| `G5:meaning-platform` | A platform kind is read as unknown | 2 |
+| `G5:meaning-own` | An inherited property name is read as a declared kind | 1 |
+| `G5:meaning-label` | A declared record shows its kind's name, not its label | 6 |
+| `G5:meaning-retired` | A declared record does not say its kind was retired | 5 |
+| `G5:governs` | A version governs the seq of the next activation | 3 |
+| `G5:governs-since` | A version governs entries before it began | 3 |
+| `G5:fields-fixed-scope` | An open with a scope template still asks for a scope | 1 |
+| `G5:fields-step` | Every step field is required | 17 |
+| `G5:fields-required` | RequiredFor is ignored | 1 |
+| `G5:fields-once` | A field two steps share is listed twice | 1 |
+| `G5:built-for` | A named method carries the room's own declaration's binding | 2 |
+| `G5:built-for-lanes` | The built-for binding ignores the room's lanes | 1 |
+| `G5:grant-star` | * asks for every declared kind, grantable or not | 3 |
+| `G5:grant-binding` | The grant map names a fixed binding | 4 |
+| `G5:grant-refuse` | A kind the role may not grant is dropped without a word | 2 |
+| `G5:grant-platform` | Renew is never granted | 3 |
+| `G5:steps-lease-optional` | The table says take requires a lease | 2 |
+| `G5:steps-note-max` | The table says release requires a note | 1 |
+| `G5:steps-review-scope` | The table says a review's scope is optional | 1 |
+| `G5:cli-binding-required` | Artroom act runs without --binding | 1 |
+| `G5:cli-binding-format` | A malformed --binding is used | 1 |
+| `G5:cli-legacy` | Artroom act runs in a v1 room | 1 |
+| `G5:cli-undeclared` | An undeclared kind is a usage error, not a refusal | 1 |
+| `G5:cli-stale` | A binding that is not the active one is signed and sent | 1 |
+| `G5:cli-target` | A target the declaration does not accept is sent | 1 |
+| `G5:cli-lease` | The lease read for the user is wrong | 1 |
+| `G5:cli-generation` | The generation read for the user is wrong | 1 |
+| `G5:cli-head` | A version's head is not read for the user | 1 |
+| `G5:cli-not-holder` | Someone who does not hold the lane gets a usage error, not the refusal | 1 |
+| `G5:cli-missing` | An act with a required field missing is sent | 1 |
+| `G5:cli-binding-given` | Artroom act sends the active binding, not the one given | none: equivalent, see above |
+| `G5:cli-acts-one` | Artroom acts accepts --at and --policy together | 1 |
+| `G5:cli-log-version` | The log reads every entry under the first version it fetched | 1 |
+| `G5:cli-log-meaning` | The log shows no labels | 1 |
+| `G5:cli-stale-old` | What changed is listed against the previous version, whatever the user read | 1 |
+| `G5:cli-stale-help` | After binding-stale the active meaning is not printed | 2 |
+| `G5:cli-int` | A whole number out of its range is sent | 1 |
+| `G5:cli-bool` | Anything but true is false | 1 |
+| `G5:cli-enum` | An enum value outside its list is sent | 1 |
+| `G5:cli-field-unknown` | --set with an unknown field is dropped without a word | 1 |
+| `G5:cli-body-unknown` | --body with an unknown field is sent | 1 |
+| `G5:cli-kind-label` | A legacy record prints a label too | 3 |
+| `G5:cli-kind-retired` | The log does not say a kind was retired | 2 |
+| `G5:cli-refusal-current` | A stale refusal does not print the active binding | 2 |
+| `G5:cli-explain-meaning` | Explain does not print the meaning's policy version and binding | 1 |
+| `G5:cli-changes-body` | A changed field is not listed | 1 |
+| `G5:cli-changes-hold` | A changed hold is not listed | 1 |
+| `G5:cache-drop` | A later activation drops nothing the handle kept | 8 |
+| `G5:cache-later` | An activation the handle already knew drops what it kept | 2 |
+| `G5:cache-refusal` | A refusal that names the active version is not a sign of an activation | 2 |
+| `G5:cache-update` | An update with an activation is not a sign | 3 |
+| `G5:cache-log` | A log page with an activation is not a sign | 1 |
+| `G5:cache-active` | A read of the active catalogue is not a sign | 1 |
+| `G5:cache-read` | A read of another version is not a sign | 3 |
+| `G5:cache-fresh` | Fresh answers from what the handle kept | 2 |
+| `G5:cache-replace` | A fresh answer does not replace the kept one | 1 |
+| `G5:cache-saw-named` | A named act's refusal is not looked at for an activation | 1 |
+| `G5:cache-saw-generic` | A generic act's refusal is not looked at for an activation | 1 |
+| `G5:cache-saw-poll` | A long-poll update is not looked at | 1 |
+| `G5:cache-saw-watch` | A watched update is not looked at | 1 |
+| `G5:cache-saw-stream` | An update on the RPC stream is not looked at | 1 |
+| `G5:title-order` | The first field is the first one typed, not the first by name | 3 |
+| `G5:title-first` | Scope may name a record | 5 |
+| `G5:title-first-because` | Because may name a record | 1 |
+| `G5:title-bool` | A yes or no value is shown as true or false | 1 |
+| `G5:title-goal` | A thread with a goal is named by its opening act | 5 |
+| `G5:title-opening` | A thread with no goal is named by its ID | 5 |
+| `G5:lane-kind` | Every thread reads as a claim thread | 1 |
+| `G5:envelope-of` | A recorded refusal has no envelope | 1 |
+| `G5:cli-thread` | Artroom act does not name the thread it opened | 1 |
+| `G5:cli-thread-goal` | Artroom act names a thread that has a goal by the act | 1 |
+| `G5:cli-thread-opened` | Artroom act prints a thread line for an act that opened nothing | 1 |
+| `G5:mcp-thread` | The act tool names a thread with no goal by its ID | 2 |
+| `G5:mcp-thread-opened` | The act tool says an act opened a thread when it did not | 1 |
+| `G5:mcp-thread-goal` | The act tool names a thread that has a goal by the act | 2 |
+| `G5:acts-fresh` | The acts tool answers an earlier version from what the handle kept | 1 |
+
+</details>
+
+### Gates
+
+Run one after another at commit `b9ecd3af`, in the worktree, with nothing else running there. The commit that adds this section changes `plans/README.md` only; `git diff --check` and `git status` were run again after it.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm run typecheck` (root, every package) | 0 | |
+| `npm test` (root, every package) | 0 | checkers 43; CLI 180; client 116 and 2; log 198 and 193; MCP 87 and 5; policy 313, and 311 with 2 skipped; Room 269, 615, and 533 with 82 skipped; UI 141 |
+| client `npm run typecheck` | 0 | |
+| client `npm test` | 0 | 116 in node, 2 in workerd |
+| MCP `npm run typecheck` | 0 | |
+| MCP `npm test` | 0 | 87 in node, 5 in workerd |
+| CLI `npm run typecheck` | 0 | |
+| CLI `npm test` | 0 | 180 |
+| Room `npm run typecheck` | 0 | |
+| Room `npm test` | 0 | node 269; workerd, legacy run 615; workerd, declared run 533 passed and 82 skipped |
+| `git diff --check 2cd97b88` | 0 | no whitespace errors |
+| `git status --porcelain` | | empty |
+
+No test failed and none was skipped that the stage 2 candidate does not skip. The declared run skips the files that found their own rooms, as stage 2's own tests do; the stage 5 integration file is one of them.
+
+The UI count is the stage 2 candidate's UI. The UI lane's branch is not in this head.
+
+### Not changed here
+
+`packages/log`, `packages/git`, `packages/checkers` and `packages/ui`; the Room's admission, schema, authority, store and migrations; the design note; the Worker entry and wrangler configuration; the deployed spike. `LICENSE`, `NOTICE` and `AGENTS.md` are untouched.
+
+### For the planner or hugh
+
+1. **`recover` has no client surface** (open point 49). The request does not name it. Without it, configuration recovery in a `v2` room needs a hand-signed envelope.
+2. **The checker service still signs `v: 1`**, and its notes are `v: 1` too. That is stage 4's, as `fa120186` says. Until then a `v2` room gets checks from members' own keys or from a bearer through `act`.
+3. **The cost of the catalogue read for the named methods** (choice 5): two requests per handle before its first named act, in every room. If that is too much for the CLI, the vocabulary could be kept in its room configuration; that is a small follow-up, not done here.
+4. **Which field names a thread** (open point 52). The name of a thread with no goal uses the opening act's first field by name. An application cannot choose the field. A declaration could name it, which would be a new member of the declaration and a change to R-DECL rules. It is not made here.
+5. **The UI should call `threadTitle`**, so that one rule names a thread everywhere. That is a change in `packages/ui`, which this lane does not edit.
+6. **Toolsets for `acts` and `act`** come from the planner's MCP core contract. This stage does not assign them.
