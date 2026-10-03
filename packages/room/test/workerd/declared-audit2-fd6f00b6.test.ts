@@ -14,7 +14,7 @@ import { adminOwnKey } from "../../src/authority.ts";
 import { JOB_RETRY_MS } from "../../src/jobs.ts";
 import { redeem } from "../../src/requests.ts";
 import { activate, act, bindingIn, declaredRoom, inDO, ok, signed, v2 } from "./declared-support.ts";
-import { addMember, advance, b64url, call, Client, clock, day, DECLARED, digestBytes, expectOk, expectRefusal, iso, makeRoom, newKeyPair, pushChange, randomBytes, sign, tick, until, type TestRoom } from "./support.ts";
+import { addMember, advance, b64url, call, Client, clock, day, DECLARED, digestBytes, expectOk, expectRefusal, failure, iso, makeRoom, newKeyPair, pushChange, randomBytes, sign, tick, until, type TestRoom } from "./support.ts";
 
 const R = `sha256:${"0".repeat(64)}` as const;
 const reviewed = () => policy(requireReview({ paths: "src/**", from: "role:admin", id: "rv" }));
@@ -648,5 +648,39 @@ describe.skipIf(DECLARED)("a recover op is read only as text (R-DECL-21)", () =>
     for (const who of [ci, bob, r.admin]) expectRefusal(await act(r, who, "recover", null, body(["open"]), { binding: null }), "invalid-body");
     expectRefusal(await act(r, ci, "recover", null, body("nope"), { binding: null }), "invalid-body");
     expect(await inDO(r, (room) => room.core.headSeq())).toBe(before);
+  });
+});
+
+describe.skipIf(DECLARED)("a value with no text form is refused as a shape, never an internal failure", () => {
+  // `{ toString: 1 }` is plain JSON, crosses every boundary, and cannot be turned into text: a lookup keyed by it throws.
+  const noText = { toString: 1 };
+
+  it("the retry lookup answers only for an actor and an idempotency key that are text (R-SIG-4)", async () => {
+    const d = await declaredRoom();
+    const accepted = await signed(d, d.admin, "claim", null, { goal: "g", scope: ["src/**"] });
+    expectOk(await call<ActRecord | Refusal>(d.stub.submit(accepted)));
+    // The room returns to v1, where step 1 refuses a v: 2 envelope and the retry lookup runs.
+    await activate(d, policy());
+    expect(await call(d.stub.submit(accepted))).toMatchObject({ kind: "claim" });
+    for (const field of ["actor", "idempotencyKey"] as const) {
+      const bent = { envelope: { ...(accepted.envelope as object), [field]: noText }, sig: accepted.sig };
+      const answer = await failure(d.stub.submit(bent as never));
+      expect(answer.code, field).toBe("bad-request");
+    }
+  });
+
+  it("a bearer act whose idempotency key or kind is not text is bad-request (R-CRED-10)", async () => {
+    const d = await declaredRoom();
+    const bytes = randomBytes(32);
+    const op = { op: "invite", member: "@agent", role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(bytes), session: { kinds: ["renew"], acts: { claim: (await bindingIn(d, "claim"))! }, lanes: "*", ttlSeconds: 3600 } };
+    const inv = await ok<RosterRecord>(d, d.admin, "roster", null, op, { binding: null });
+    const b = await call<Redeemed>(d.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(bytes) }, "x"));
+    const claim = { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "k-9" };
+    for (const field of ["idempotencyKey", "kind"] as const) {
+      const answer = await failure(d.stub.bearerAct(b.bearer, { ...claim, [field]: noText } as never));
+      expect(answer.code, field).toBe("bad-request");
+    }
+    // The same act with text in both is admitted.
+    expectOk(await call<Claim | Refusal>(d.stub.bearerAct(b.bearer, claim as never)));
   });
 });
