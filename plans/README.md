@@ -601,7 +601,7 @@ Lane C's sites keep their own mints: the publisher client's `withToken` (integra
 
 ## Request d29c09fa: safe error metadata at durable sinks
 
-Status: DONE, pending checker review. Gitseq request `d29c09fa`, branch `request/land-errors`, cut from main `574568b2`. The head for review is the commit that carries this section.
+Status: DONE, pending checker review. Gitseq request `d29c09fa`, branch `request/land-errors`, cut from main `574568b2`. Revised for review `f80d6692` (changes requested: legacy rows): see [Review f80d6692](#review-f80d6692). The head for review is the commit that carries this section.
 
 **The rule** (review `0ab6dac3`, lane A's standard). A durable or projected error field keeps lane A's `errorNote(stage, error)` and nothing more: a fixed stage phrase, the error's name if it is in a fixed list, an Artifacts code if `artifacts.ts` classifies it, and an integer numeric code or HTTP status. It never keeps the provider's message, even redacted: no token format in the contract lets a pattern find every credential. Operator logs are different. The Room's `diagnose` (`src/diag.ts`, request `d268d249`) logs the error's name and its redacted, bounded message; that is unchanged.
 
@@ -637,7 +637,7 @@ Left as they are, with the reason:
 | `notify_queue.last_error` | Fixed phrases: `policy runtime failure`, `runtime failure` |
 | `check_jobs.outcome` | `not-needed`, `unbound`, `refused: <rule>`, or a report's ID |
 | `reason` and `done_reason` of `artroom_ws_duty` and `artroom_snap_duty`; a refused first commit (`the first commit was refused`) | Fixed codes and phrases |
-| A workspace failure from `CleanupOwed` or `NotOurFork` | The Room's own messages: a count, repository names |
+| A workspace failure from `CleanupOwed` or `NotOurFork` | The Room's own messages: a count, and (since review `f80d6692`) a fixed sentence with no repository names |
 | Landing `reason` and `fix`, `land-outcome` events; a `policy-invalid` refusal naming the first configuration problem | Retry and failure codes and the Room's fix text. A configuration problem comes from parsing and validating `.artroom/*.json` in the integration: repository content the members wrote, not provider text |
 | Previews' `failed` body | A fixed `ArtroomError` ("The preview could not be computed.") |
 | Attention and admin items | Built from fixed templates with IDs, lanes, generations and times; none from an error. `log-publication-stalled` names `NOT_FOUND` and the repository, in fixed text |
@@ -648,7 +648,7 @@ Left as they are, with the reason:
 ### Choices for the checker
 
 1. **The publishers return safe metadata**, and the engine stores `IntegrateResult.detail` as it comes. Both publishers and the engine's own catch use `errorNote`; the type says the field is safe metadata only.
-2. **No migration.** A row written before this change keeps its text until that field is next written (every sink above overwrites it) or the row ends.
+2. **Rows written before the rule are upgraded** (review `f80d6692`, which rejected leaving them): every projection checks its value first, and a one-time upgrade rewrites the stored fields in bounded batches. See [Review f80d6692](#review-f80d6692).
 3. **Names.** `errorNote`'s list of allowed names is unchanged, so an Artifacts binding error (`ArtifactsError`) reads `an error of another kind`, with its code and numbers.
 4. **A publication code that is not known becomes `transport`.** The alarm's backoff and the gone-repository probe (`NOT_FOUND`, a known Artifacts code) are unchanged.
 5. **Request `d268d249`'s job-token test** now expects metadata only at its three sinks, and also checks every row of every table and `jobTokenDuties()`.
@@ -663,6 +663,7 @@ Each test makes the provider throw (or answer) with a message echoing an `art_v1
 | `packages/git/test/workspaces.test.ts` (3 new) | provisioning that keeps failing (the view, `artroom_ws`, the steps), a refused step (`answered`), failed cleanup (`defer`) | every row, `view`, `duties`, the returned view |
 | `packages/git/test/snapshots.test.ts` (2 new) | a failed create, then its check; failed retirement (revoke and delete) | every row, `duties` |
 | `packages/room/test/workerd/safe-errors-d29c09fa.test.ts` (new, 5) | the production Room: integration through `ContainerPublisher` then readiness; an answered push with main not read back, then an unanswered push; a publication failing with a credential as its code, with no code, and with a known Artifacts code | every row of every table, the `log`, `attention`, `lanes` and `op` reads, `PublicationStatus`, the operator diagnoses, the caller's error |
+| Review `f80d6692` (Node 7 more in the three files above; Room 2 more) | stored rows with old text, reopened; terminal rows; batches; see [Review f80d6692](#review-f80d6692) | every row, the projections before the upgrade, and after it |
 | `packages/room/test/workerd/request-d268d249.test.ts` (1 changed) | the lost mint, the unreadable inventory, the failed revocation of job tokens | `job_tokens`, every row of every table, `jobTokenDuties()` |
 
 ### Mutation table
@@ -694,6 +695,57 @@ Each mutant was applied alone by a script (`/private/tmp/claude-501/landerr/muta
 | M21 | `publicationCode` keeping any code | Room: a code that is provider text |
 
 Lane A's mutants guard `errorNote` itself (F7: `errorNote` keeping the message).
+
+### Review f80d6692
+
+Report `f80d6692` on `f81a102d` (changes requested) found one P2. New writes were safe, but rows stored before the rule kept the provider's text. Two reopen controls showed it through `PublicationStatus.lastError` and a failed `WorkspaceOp.error.message`, before any retry overwrote them. Ending a row does not erase it: a revoked workspace keeps its error, and a terminal landing record keeps its body.
+
+**One validator** (`packages/git/src/safe-errors.ts`). `isSafeErrorText(text)` accepts exactly the text the sinks now write: `errorNote`'s output, `outcomeNote`'s, lane B's `token not minted (…)`, the job tokens' forms and state words (`held`, `ended`, `minting`, `refused`, `malformed answer`), `CleanupOwed`'s sentence, `NotOurFork`'s sentence, and the replacement phrase. The language has no free-text part: every part is a fixed phrase, a name or code from a fixed list, a bounded integer or a timestamp. So the validator does not try to clean old text. It accepts only text that cannot hold a credential, and anything else is replaced whole. To keep it that way, `NotOurFork`'s message no longer names repositories. `safeErrorText(text, stage)` returns the text if it is safe, else `<stage>: legacy error withheld`, using the stage the text starts with, if any.
+
+**At read.** `PublicationStatus.lastError`, `WorkspaceOp.error.message` (the workspace view, and so the `op` read) and `jobTokenDuties().status` show only what the validator passes. So nothing stored before the rule is shown, from the moment the object opens, whether or not the upgrade has reached that row. Attention and admin items, and the landing views, show no error field.
+
+**At rest.** Room migration 2 starts a one-time upgrade. In its transaction, in O(1), it stores a cursor (`meta.error_scrub`) if any table that could hold an old error has rows, and makes a `publication_error` that is not a known code `transport`. Each alarm then runs one batch (`RoomCore.scrubErrors`, the `errors` step; `nextAlarm` is due at once while the cursor is stored). A batch reads at most `SCRUB_BATCH` (500) rows of one table after the cursor, by its key. It rewrites only the unsafe values, in one transaction with the new cursor. The last batch deletes the cursor. After that the step reads one meta row and writes nothing, and a run over upgraded rows changes nothing. The tables, in order: `artroom_land_op` (every record, terminal ones too: `lastError` and each push's `detail` in the JSON body), `artroom_ws` (`error`, revoked rows too), `artroom_ws_duty` and `artroom_snap_duty` (`last_error`, done rows too), and `job_tokens` (`last_error`). Nothing else changes: ownership, token IDs, expiry and deadlines, `next_ms` and backoff, attempts, unknown and known effects (`mint:` rows stay unknown mints), `held`, cleanup duties and their state. Signed history (entries, records, acts) is never touched. A host without an alarm (tests, the Git harness) can run every batch at once with `scrubLegacyErrors(sql)`.
+
+| Control | What it shows |
+|---|---|
+| Node: the validator | Every form the sinks write passes; the provider's text, with or without a stage, a known note with text after it, an unknown name or code, a repository name, and the empty string do not |
+| Node: reopen a landing record | A held record's `lastError` and push `detail` written with the provider's text; a new engine on the same storage shows `main could not be read: legacy error withheld` in `PublicationStatus` before any step; the upgrade rewrites both fields, and a second run changes nothing |
+| Node: a terminal landing record | A landed record's body with old text: the upgrade changes only `lastError` and the push details; state, receipt, tokens, outcomes and timing are as they were |
+| Node: safe values stay | A record with safe metadata only is not changed |
+| Node: reopen a workspace | A failed workspace's error and its steps' errors with old text: the reopened view shows `could not provision the workspace: legacy error withheld`; after it is revoked, the upgrade still rewrites its row and steps |
+| Node: reopen snapshot steps | One old step and one safe step: only the old one changes |
+| Node: batches | Seven rows, a batch limit of 3, and a table that does not exist: the cursor moves 3 rows at a time, the missing table is skipped, and the last batch ends the upgrade |
+| Room: reopen a stored room | A room put back at version 1 with old text in every field above (landing record and push, failed workspace, a done workspace step, a done snapshot step, three job tokens, `publication_error`) and safe values beside them, then aborted and reopened. Before any batch, `PublicationStatus`, the workspace `op` read and `jobTokenDuties` show only the withheld phrase, and the log, attention and lanes reads hold none of the text. The cursor is stored and the alarm is due. The batches then end with the cursor deleted. Every field is rewritten, the safe ones are unchanged, and the job tokens' expiry, `next_ms`, attempts and kinds are as before. A further run writes nothing, and no row of any table holds the text |
+| Room: the job-token view | Rows written with old text after the upgrade are shown withheld; `held` stays `held` |
+
+| Mutant | Mutation | Red tests |
+|---|---|---|
+| V1 | the validator accepting any string | Node: validator, every reopen control, terminal record, batches; Room: reopen, job-token view |
+| V2 | a note's name followed by any text | Node: validator |
+| V3 | `answer lost: ` followed by any text | Node: validator; Room: reopen, job-token view |
+| V4 | `NotOurFork`'s old sentence, with repository names | Node: validator |
+| V5 | the withheld phrase always the fallback stage, never the text's own | Node: validator, landing reopen, snapshot reopen, terminal record; Room: reopen |
+| V6 | `PublicationStatus.lastError` shown as stored | Node: landing reopen; Room: reopen |
+| V7 | the workspace view's message shown as stored | Node: workspace reopen; Room: reopen |
+| V8 | `jobTokenDuties().status` shown as stored | Room: reopen, job-token view |
+| S1 | no migration 2 | Room: reopen |
+| S2 | migration 2 storing no cursor | Room: reopen |
+| S3 | `publication_error` left as stored | Room: reopen |
+| S4 | a batch skipping the next table | Room: reopen |
+| S5 | the last batch starting again instead of ending | Room: reopen |
+| S6 | `nextAlarm` leaving out the upgrade | Room: reopen |
+| S7 | a full batch moving to the next table (rows after the limit never reached) | Node: batches |
+| S8 | a batch reading with no limit | Node: batches |
+| S9 | a landing record's `lastError` not upgraded | Node: landing reopen, terminal record; Room: reopen |
+| S10 | push details not upgraded | Node: landing reopen, terminal record; Room: reopen |
+| S11 | workspaces' `error` not upgraded | Node: workspace reopen; Room: reopen |
+| S12 | workspace steps not upgraded | Node: workspace reopen; Room: reopen |
+| S13 | snapshot steps not upgraded | Node: snapshot reopen; Room: reopen |
+| S14 | job tokens not upgraded | Room: reopen |
+| S15 | every string rewritten, safe or not (the same text, written again) | Node: safe values stay (it counts writes) |
+| S16 | a job token's status checked only in parts, never whole | Room: reopen (a safe `outcome unknown; N live token(s)` observation) |
+
+24 mutants, all red, each applied alone by `/private/tmp/claude-501/landerr/mutants/run2.py` at `e5a2efb3` (logs beside it). S15 and S16 were green there. The commit after it adds the write count and the safe observation, and both are red at `a1176a89`.
 
 ### Gates
 
