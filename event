@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-02-positioning-exploration.md","body":{"commit":"344656705140d9bf6539fe44de889d1e21dd2482","path":"notes/2026-10-02-positioning-exploration.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:715452b6666403f554005f179f57f026ebac88f4","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-02-positioning-exploration.md."}
