@@ -1,0 +1,76 @@
+{
+  "utc": "2026-10-03T23:02:17.218890+00:00",
+  "files": [
+    {
+      "path": "/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut2/results-f0.json",
+      "rows": 29,
+      "bytes": 2592629,
+      "sha256": "27924148a32163db7e66f3f4cd6c59cc514b42dc5afb19aad39cda6f72ca9b64",
+      "recordedSeconds": 4479
+    },
+    {
+      "path": "/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut2/results-f1.json",
+      "rows": 29,
+      "bytes": 1764325,
+      "sha256": "04473a6c0606694f133d01a96760d21acd8d62b1bb214c2bba4b18cd72b96332",
+      "recordedSeconds": 4495
+    },
+    {
+      "path": "/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut2/results-f2.json",
+      "rows": 30,
+      "bytes": 3269035,
+      "sha256": "459abd7e6afdd262b2a416b50de40323a7fcaa8ec74838fd86da2503e62d55d5",
+      "recordedSeconds": 4579
+    },
+    {
+      "path": "/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut2/results-f3.json",
+      "rows": 29,
+      "bytes": 1354563,
+      "sha256": "d13d77f681bd3e708b8e825dea3cde926d521e31e3004d19a9d199ff09c498dc",
+      "recordedSeconds": 4588
+    },
+    {
+      "path": "/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut2/results-f4.json",
+      "rows": 29,
+      "bytes": 2340558,
+      "sha256": "6ac1ec82c746c48b9c54ec5708fadf8ad333a198eca2c828e1500a4d863a2113",
+      "recordedSeconds": 4568
+    },
+    {
+      "path": "/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut2/results-f5.json",
+      "rows": 29,
+      "bytes": 1621865,
+      "sha256": "fc99431a85bccc4344c5089a56536d766e37db2e7889ecceedbe614d89a34b00",
+      "recordedSeconds": 4500
+    },
+    {
+      "path": "/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut2/results-f6.json",
+      "rows": 12,
+      "bytes": 132578,
+      "sha256": "e6b3ebfeed313359289b44b60659dc741e3f9add31ffd110f5d5d839f785ae7b",
+      "recordedSeconds": 1970
+    },
+    {
+      "path": "/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut2/results-f7.json",
+      "rows": 12,
+      "bytes": 141147,
+      "sha256": "6a55040ed72aeb035e57a270ad085901e518f74b9280f7bb39568c61a5197b0a",
+      "recordedSeconds": 1985
+    }
+  ],
+  "rows": 199,
+  "distinctIds": 199,
+  "recordedHeads": [
+    "35797f844b55fea9439ac852451fd062c5177b73"
+  ],
+  "recordedSerialPipelineSeconds": 31164,
+  "medianSeconds": 158,
+  "minSeconds": 112,
+  "maxSeconds": 216,
+  "compileNonzeroRows": 0,
+  "notRestoredRows": 0,
+  "nonemptyRecordedStatusRows": 0,
+  "runnerSHA256": "95fcc78c5d7346a8e765b98ba104f9b907237a8b090e1a4fa47eb57afe22a902",
+  "retryBlockSHA256": "216ed43c398f5627b3f4a7dab704baebc6e1b892439874ecba905bae3a3e768a",
+  "scope": "Existing partial pipeline cost signal; not complete gate/editcycle baseline, CPU measurement or independently validated semantic evidence."
+}

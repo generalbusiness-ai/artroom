@@ -1,0 +1,24 @@
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Retries `attempt` after retryable failures, then says how to retry safely. */
+export async function withRetries<T>(attempt: () => Promise<T>, retries: number, idempotencyKey: string | undefined): Promise<T> {
+  for (let n = 0; ; n++) {
+    try {
+      return await attempt();
+    } catch (e) {
+      if (!isArtroomError(e) || !e.retryable) throw e;
+      if (n >= retries) {
+        if (idempotencyKey === undefined) throw e;
+        throw {
+          ...e,
+          maybeRecorded: e.maybeRecorded ?? false,
+          message: `${e.message} Retry with idempotency key ${idempotencyKey}: if the act was recorded, the room returns the original result (R-IDEM-2).`,
+        } satisfies ArtroomError;
+      }
+      await sleep(Math.min(e.retryAfterMs ?? 200 * 2 ** n, 5_000));
+    }
+  }
+}
+

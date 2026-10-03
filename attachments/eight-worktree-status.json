@@ -1,0 +1,58 @@
+[
+  {
+    "worktree": "decl-s2-gA",
+    "result": {
+      "exit": 0,
+      "status": ""
+    }
+  },
+  {
+    "worktree": "decl-s2-gB",
+    "result": {
+      "exit": 0,
+      "status": ""
+    }
+  },
+  {
+    "worktree": "decl-s2-gC",
+    "result": {
+      "exit": 0,
+      "status": ""
+    }
+  },
+  {
+    "worktree": "decl-s2-gD",
+    "result": {
+      "exit": 0,
+      "status": ""
+    }
+  },
+  {
+    "worktree": "decl-s2-gE",
+    "result": {
+      "exit": 0,
+      "status": ""
+    }
+  },
+  {
+    "worktree": "decl-s2-gF",
+    "result": {
+      "exit": 0,
+      "status": ""
+    }
+  },
+  {
+    "worktree": "decl-stage2-mut",
+    "result": {
+      "exit": 0,
+      "status": ""
+    }
+  },
+  {
+    "worktree": "decl-stage2-mut2",
+    "result": {
+      "exit": 0,
+      "status": ""
+    }
+  }
+]
