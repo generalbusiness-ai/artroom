@@ -1,1 +1,0 @@
-ok, thought that was likely the case. we need to reduce the test overhead 10x. Remove all tests that don't actually prove useful invariants, and optimize the heavy tests too. Task for builder, highest priority.
