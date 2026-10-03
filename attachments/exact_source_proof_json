@@ -1,0 +1,30 @@
+{
+  "head": "20fdd82e1598fbab970a3d8e8af2dcfa8b7598ea",
+  "sources": [
+    {
+      "file": "packages/log/test/amendment-4-large.test.ts",
+      "bytes": 30359,
+      "sha256": "2604d3286b536ff152d0dd190b8c1b2e2da478966302efea1b61de2835f01e4d",
+      "gitBlob": "f5229a22a51f9a9f76c9b132b1391b0496e958bd"
+    },
+    {
+      "file": "packages/contract/examples/log-layout.ts",
+      "bytes": 3962,
+      "sha256": "94e553fa02618d9e10a2aff60c5c184cad14fda310a7826af34555139e419718",
+      "gitBlob": "02bf985c78a7c34b119245b978448759b826a8da"
+    },
+    {
+      "file": "packages/log/test/amendment-4.test.ts",
+      "bytes": 34749,
+      "sha256": "b4e2b148fa322452c8295c5ee36aa9d98a51a2d16612a0a6876b858786a309b8",
+      "gitBlob": "ceab8e31c23a472782539065b2d0dbe793a2ecd1"
+    },
+    {
+      "file": "packages/log/package.json",
+      "bytes": 1027,
+      "sha256": "07e14302f2d20d7050294684465698e2ac85d51feee7d167ce2030224ccb1efb",
+      "gitBlob": "c33f69b2707dcfbdc64fd28927fc6bcb3e1650a8"
+    }
+  ],
+  "scope": "Source strings read directly via git show exact head; no runtime or fixture writes."
+}
