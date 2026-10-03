@@ -13,6 +13,8 @@ The improve skill supplied the handoff format. Four verified fixes were selected
 
 Plans 001 and 002 touch the same workspace cleanup function; serialize their edits or explicitly reconcile the second head. Plan 004 also touches workspaces.ts and should follow that reconciliation. Plan 003 can proceed independently. Every executor must use a gitseq request/promise, preserve unrelated work, run the stated gates and deliver all artifacts at one exact head for checker review.
 
+Design note for review under request `a2cbd459`, following assert `4e4134b4` as corrected by `b2cdc44a` (acts are declared by each application): [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md).
+
 ## Evidence and limits
 
 Parent read every cited production path and test pattern. Read-only synthetic provider controls using actual exported Workspaces/SnapshotRepos classes and in-memory SQLite reproduced incomplete inventory acceptance and unknown-duty closure on foreign provenance. They do not establish live provider behavior. Terminal revocation and founding interruption were verified by source control-flow analysis; their plans require meaningful regression tests, including actual DO recovery for founding. No new whole-repository gates, live inference, deployments, remote deletions or credential creation were run as part of the audit. A7's separate exact-head review ran its own gates and fault controls; those are not claimed as audit repros.
@@ -951,7 +953,7 @@ The fork read token in `pinObjects` (request `02836f9a`). `MintLedger`'s behavio
 
 ## Live propose 503 after lanes B and C (request df6ff8d3)
 
-Status: DONE, pending checker exact-head review. Gitseq request `df6ff8d3` (planner to builder), branch `request/live503`, cut from main `d3f7d3a8`, whose source equals `965c911a`. The head for review is the commit that carries this section.
+Status: DONE, pending checker exact-head review. Gitseq request `df6ff8d3` (planner to builder), branch `request/live503`, cut from main `d3f7d3a8`, whose source equals `965c911a`. The head for review is the commit that carries this section. Main `b44601dd` (row writes `58a2f0a0`, the declared-acts note) was merged in afterwards. Only `notes/deploy-spike.md` conflicted, and both sides' sections are kept. The merge touches none of this fix's files. The spike still runs the build of `0753d7de`, which does not have the row-write changes.
 
 **The defect.** After the spike was redeployed from main `965c911a` (Room version `5ad0e3f2`), every `propose` failed in under a second with 503 `unavailable`, "The repository could not be read. Nothing was recorded; retry with the same idempotency key." The log was never published either. Reproduced at 03:03 UTC on `5ad0e3f2`: the full smoke failed 12 steps, the same 12 as the planner's run (all four proposes, the landings after them, and both log publications and verifications). Cleanup was `ok`.
 
