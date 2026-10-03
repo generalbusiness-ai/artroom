@@ -1,7 +1,7 @@
 {
   "name": "@generalbusiness/artroom-contract",
   "version": "0.0.0",
-  "description": "Artroom's shared contract: types, the signed envelope, and type guards. No runtime beyond guards.",
+  "description": "Artroom's shared contract: types, the signed envelope, and type guards. No runtime beyond guards and the frozen legacy vocabulary.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

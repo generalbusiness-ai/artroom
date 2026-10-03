@@ -58,7 +58,13 @@ export type PlatformRule =
   | "recovery-only"
   // Policy evaluation (R-EVAL)
   | "policy-budget-exceeded"
-  | "policy-type-error";
+  | "policy-type-error"
+  // Declared acts (R-DECL, contract amendment 6). Raised from stage 2 (the first two) and stage 4.
+  | "kind-undeclared" //        the active document does not declare the kind (R-DECL-16); not recorded
+  | "binding-stale" //          the act's binding is not the active declaration's (R-DECL-16, R-DECL-17); not recorded
+  | "wrong-thread" //           the thread's kind is not in the act's `threads` (R-DECL-8)
+  | "scope-fixed" //            a rescope of a thread whose scope is a template (R-DECL-7)
+  | "reserved"; //              a take of a thread reserved for another member (R-DECL-10)
 
 /** A refusal. `act` is present when the refusal was recorded in the log (R-ADM-8). */
 export interface Refusal {
