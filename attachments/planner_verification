@@ -1,0 +1,37 @@
+{
+  "manifest_sha256": "8692f63b731261e43741c3433182c5d0f0c640549fcffc6de345e40fc1abd4ed",
+  "matched_entries": 37,
+  "source_proofs": [
+    {
+      "path": "packages/ui/src/room/live/live-room.ts",
+      "sha256": "d95ed7bfc73c82a0d83637c303caf26a3b76cfd1e47930363fe58a95dbf16855",
+      "blob": "85212f289a5d482e73d3853fd55c0b4f850410da"
+    },
+    {
+      "path": "packages/ui/test/review-0fd98c41.test.ts",
+      "sha256": "916d984c3e2f5036f71842505932e7873c34357a1a867032017f8d5349e20e38",
+      "blob": "b88acd6c2f1a34136dd1987061ce2fd292b17290"
+    }
+  ],
+  "actual_json": {
+    "numTotalTests": 274,
+    "numPassedTests": 273,
+    "numFailedTests": 1,
+    "numPendingTests": 0
+  },
+  "all_nonpassing_cases": [
+    {
+      "file": "/private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo/packages/ui/test/checker-ui-624-observations.test.ts",
+      "test": "checker624 availability after a completed equal-catalogue read an earlier error cannot blank a successful later answer, reuseEqualResult=true",
+      "status": "failed",
+      "messages": [
+        "AssertionError: a successful later read must remain available after an earlier error completes: expected null to deeply equal { vocabulary: 'declared', \u2026(6) }\n    at /private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo/packages/ui/test/checker-ui-624-observations.test.ts:49:107\n    at file:///private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo/packages/ui/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20",
+        "AssertionError: completed-read ordering must not depend on object identity: expected null to deeply equal { vocabulary: 'declared', \u2026(6) }\n    at /private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo/packages/ui/test/checker-ui-624-observations.test.ts:50:110\n    at file:///private/tmp/artroom-checker-ui-624d-x3tfvfj8/repo/packages/ui/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20"
+      ]
+    }
+  ],
+  "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
+  "status": "",
+  "diff": "",
+  "compiled_before_runtime": true
+}

@@ -1,8 +1,0 @@
-{
-  "head": "624dbb9fc961caabc42e6e66e8a8f906e40fe0ba",
-  "status": "",
-  "tracked_diff": "",
-  "status_before_restoration": " M packages/ui/screenshots/declared-form-light.png\n?? packages/ui/test/checker-ui-624-observations.test.ts\n?? packages/ui/test/checker-ui-catalogue-cache.test.ts\n?? packages/ui/test/checker-ui-f606-intents.test.tsx\n?? packages/ui/test/checker-ui-f606-races.test.ts\n?? packages/ui/test/checker-ui-preflight.test.tsx\n?? packages/ui/test/planner-ui-unavailable.test.ts\n",
-  "saved_then_restored_only_generated_screenshot": "packages/ui/screenshots/declared-form-light.png",
-  "removed_only_owned_byte_verified_private_fixtures": 6
-}
