@@ -1,0 +1,13 @@
+diff --git a/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/fixtures-baseline/packages/cli/test/planner-6bc-saved-kind.test.ts b/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/fixtures-diagnostic/packages/cli/test/planner-6bc-bdc-warning-adapted.test.ts
+index 14f83da..cae4655 100644
+--- a/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/fixtures-baseline/packages/cli/test/planner-6bc-saved-kind.test.ts
++++ b/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/fixtures-diagnostic/packages/cli/test/planner-6bc-bdc-warning-adapted.test.ts
+@@ -44,7 +44,7 @@ describe("a saved receipt is shown as its saved kind, regardless of newer comman
+           return fetch(input, init);
+         },
+       });
+-      expect(again.code).toBe(0); expect(again.err).toBe("");
++      expect(again.code).toBe(0); expect(again.err).toBe(changedKind ? "This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no draft-poster act was made." : "");
+       expect(sent).toHaveLength(5); expect(new Set(sent).size).toBe(1);
+       const signed = JSON.parse(sent[0]!);
+       expect(signed.envelope).toMatchObject({ kind: "start-song", binding: songBinding, body: { key: "c", title: "Footprints" }, idempotencyKey: "saved-song" });

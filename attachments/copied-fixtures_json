@@ -1,0 +1,30 @@
+[
+  {
+    "oldSource": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/fixtures/packages/cli/test/checker-title-era-624.test.ts",
+    "copiedTo": "packages/cli/test/checker-title-era-624.test.ts",
+    "bytes": 4668,
+    "sha256": "006783aaae16bfa6da24cd41bf9fc34568d692a47015058d908441591c9942ff",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/fixtures/packages/cli/test/planner-title-retry-era.test.ts",
+    "copiedTo": "packages/cli/test/planner-title-retry-era.test.ts",
+    "bytes": 3753,
+    "sha256": "6169736fb97d47357bc9d18a52b74e8e2d2e80496e5c82a56cff524284fec95d",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-c74f3696-ngehusq3/fixtures/packages/cli/test/checker-c74-journal-kind.test.ts",
+    "copiedTo": "packages/cli/test/checker-c74-journal-kind.test.ts",
+    "bytes": 6303,
+    "sha256": "f003608abee061ea2f9671e9f95eddd6b96cc34ed25b23a0b796619006807733",
+    "byteIdentical": true
+  },
+  {
+    "oldSource": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-planner-c74-journal-kind-p9duu78x/fixture.test.ts",
+    "copiedTo": "packages/cli/test/planner-6bc-saved-kind.test.ts",
+    "bytes": 4857,
+    "sha256": "592f95f4c73c48a95dd3739ecef547b862232900fc5fb09576921a2b955f9ec6",
+    "byteIdentical": true
+  }
+]

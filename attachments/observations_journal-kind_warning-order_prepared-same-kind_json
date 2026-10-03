@@ -1,0 +1,72 @@
+{
+  "state": "prepared",
+  "alternateKind": false,
+  "savedKind": "start-song",
+  "savedBinding": "sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6",
+  "originalSeq": 4,
+  "posts": 5,
+  "uniqueSignedBytes": 1,
+  "uniqueSignatures": 1,
+  "actSigningCalls": 1,
+  "signedBodySHA256": "cb444eea592999b6902801f33d5316526b281f2805cbc65441e81dbc0d24a4a4",
+  "events": [
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/requests"
+    },
+    {
+      "run": "first",
+      "method": "GET",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/log?limit=1"
+    },
+    {
+      "run": "first",
+      "method": "GET",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/declarations"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"
+    },
+    {
+      "run": "finish",
+      "method": "POST",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"
+    },
+    {
+      "run": "finish",
+      "method": "POST",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/requests"
+    },
+    {
+      "run": "finish",
+      "method": "GET",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/log?limit=1"
+    },
+    {
+      "run": "finish",
+      "method": "GET",
+      "path": "/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/declarations?at=4"
+    }
+  ],
+  "actualOutput": "Done: Start a song (start-song), recorded as act_4_31c6c470.\nThread: Start a song: Footprints (lane act_4_31c6c470).",
+  "actualStderr": "",
+  "finishingActPosts": 1
+}

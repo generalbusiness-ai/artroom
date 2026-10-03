@@ -1,0 +1,17 @@
+import sys,json,hashlib,tarfile,subprocess
+from pathlib import Path
+root=Path(sys.argv[1]); repo=root/"repo"
+initial=json.loads((root/"tracked-initial.json").read_text())
+raw=subprocess.check_output(["git","ls-tree","-r","-z","HEAD"],cwd=repo)
+objects={}
+for line in raw.split(b"\0"):
+ if not line: continue
+ meta,name=line.split(b"\t",1);objects[name.decode()]=meta.split()[2].decode()
+checks=[]
+with tarfile.open(root/"head-tree.tar","r:") as t:
+ for m in t:
+  if not m.isfile(): continue
+  b=t.extractfile(m).read();rec=initial.get(m.name)
+  obj=hashlib.sha1(("blob "+str(len(b))+"\0").encode()+b).hexdigest()
+  checks.append({"file":m.name,"bytesMatch":rec is not None and len(b)==rec["bytes"],"sha256Match":rec is not None and hashlib.sha256(b).hexdigest()==rec["sha256"],"gitBlobMatch":obj==objects.get(m.name)})
+print(json.dumps({"count":len(checks),"fileSetEqual":set(c["file"] for c in checks)==set(initial)==set(objects),"bad":[c for c in checks if not all(c[k] for k in ["bytesMatch","sha256Match","gitBlobMatch"])]}))

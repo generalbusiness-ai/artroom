@@ -1,0 +1,72 @@
+{
+  "state": "prepared",
+  "alternateKind": true,
+  "savedKind": "start-song",
+  "savedBinding": "sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6",
+  "originalSeq": 4,
+  "posts": 5,
+  "uniqueSignedBytes": 1,
+  "uniqueSignatures": 1,
+  "actSigningCalls": 1,
+  "signedBodySHA256": "cdba2358ec5e0ec01a5ab3b2ca2ce5540f631416837021af0808f21d28507426",
+  "events": [
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/requests"
+    },
+    {
+      "run": "first",
+      "method": "GET",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/log?limit=1"
+    },
+    {
+      "run": "first",
+      "method": "GET",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/declarations"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"
+    },
+    {
+      "run": "finish",
+      "method": "POST",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"
+    },
+    {
+      "run": "finish",
+      "method": "POST",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/requests"
+    },
+    {
+      "run": "finish",
+      "method": "GET",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/log?limit=1"
+    },
+    {
+      "run": "finish",
+      "method": "GET",
+      "path": "/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/declarations?at=4"
+    }
+  ],
+  "actualOutput": "Done: Start a song (start-song), recorded as act_4_41be2c60.\nThread: Start a song: Footprints (lane act_4_41be2c60).",
+  "actualStderr": "This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made.",
+  "finishingActPosts": 1
+}

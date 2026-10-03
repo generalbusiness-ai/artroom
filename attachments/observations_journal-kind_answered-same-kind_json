@@ -1,0 +1,50 @@
+{
+  "state": "answered",
+  "alternateKind": false,
+  "savedKind": "start-song",
+  "savedBinding": "sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6",
+  "originalSeq": 4,
+  "posts": 1,
+  "uniqueSignedBytes": 1,
+  "uniqueSignatures": 1,
+  "actSigningCalls": 1,
+  "signedBodySHA256": "ae12098d30f4dbb5c5a8ebdb7cb276e1fea516179e5dd4cd93f90c0462623187",
+  "events": [
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_dc1e8864fa4aabff3bc039a1f4b198b9/requests"
+    },
+    {
+      "run": "first",
+      "method": "GET",
+      "path": "/v1/rooms/room_dc1e8864fa4aabff3bc039a1f4b198b9/log?limit=1"
+    },
+    {
+      "run": "first",
+      "method": "GET",
+      "path": "/v1/rooms/room_dc1e8864fa4aabff3bc039a1f4b198b9/declarations"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_dc1e8864fa4aabff3bc039a1f4b198b9/acts"
+    },
+    {
+      "run": "finish",
+      "method": "POST",
+      "path": "/v1/rooms/room_dc1e8864fa4aabff3bc039a1f4b198b9/requests"
+    },
+    {
+      "run": "finish",
+      "method": "GET",
+      "path": "/v1/rooms/room_dc1e8864fa4aabff3bc039a1f4b198b9/log?limit=1"
+    },
+    {
+      "run": "finish",
+      "method": "GET",
+      "path": "/v1/rooms/room_dc1e8864fa4aabff3bc039a1f4b198b9/declarations?at=4"
+    }
+  ],
+  "actualOutput": "Done: Start a song (start-song), recorded as act_4_140a1adf.\nThread: Start a song: Footprints (lane act_4_140a1adf)."
+}

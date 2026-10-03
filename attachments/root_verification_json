@@ -1,0 +1,5456 @@
+{
+  "head": "bdc35c5362d604092f70905c727b012aad1ec5d2",
+  "tree": "eb7ef6605bf411a7370ac28af67e7e78ac699584",
+  "parent": "c74f36965cc90049ad8fc44256a94974de5deb81",
+  "reportSha256": "e20dd8627f799cde0cc68dfe22ef9282cf298a30af7f48f2c618dbb52c0504be",
+  "manifestSha256": "992c7354e3fca252f10c3cfa8480a0df53cd37bb9c93439658de6ed389faae15",
+  "manifestChecks": [
+    {
+      "file": "adopted-title-decision.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "answered-warning-probe.diff",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "c74-bdc-full.diff",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "c74-bdc-stat.txt",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "cli-diagnostics.command.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "cli-diagnostics.independent-summary.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "cli-diagnostics.log",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "cli-diagnostics.vitest.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "cli-full-baseline.command.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "cli-full-baseline.independent-summary.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "cli-full-baseline.log",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "cli-full-baseline.vitest.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "clone.log",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "copied-fixtures.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "diagnostic-fixtures.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "final-outcomes.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "fixtures-baseline/packages/cli/test/checker-c74-journal-kind.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "fixtures-baseline/packages/cli/test/checker-title-era-624.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "fixtures-baseline/packages/cli/test/planner-6bc-saved-kind.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "fixtures-baseline/packages/cli/test/planner-title-retry-era.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "fixtures-diagnostic/packages/cli/test/checker-bdc-warning-order.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "fixtures-diagnostic/packages/cli/test/planner-6bc-bdc-warning-adapted.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "head-tree.tar",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "heads.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "independent-baseline-additions.diff",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "independent-diagnostic-additions.diff",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "npm-ci.command.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "npm-ci.log",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/journal-kind/answered-different-kind.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/journal-kind/answered-same-kind.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/journal-kind/prepared-different-kind.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/journal-kind/prepared-same-kind.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/journal-kind/warning-order/answered-different-kind.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/journal-kind/warning-order/answered-same-kind.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/journal-kind/warning-order/prepared-different-kind.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/journal-kind/warning-order/prepared-same-kind.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/title-retained/after-admission-control.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/title-retained/before-admission-era.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "observations/title-retained/before-read-control.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "original-stage5-request.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "planner-warning-expectation-only.diff",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "restoration-proof.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "review-bdc35c53.md",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "root-typecheck-baseline.command.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "root-typecheck-baseline.log",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "root-typecheck-diagnostics.command.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "root-typecheck-diagnostics.log",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "run_command.py",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "runtime-context.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/docs/protocol.md",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/notes/2026-10-02-declared-acts.md",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/package-lock.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/checkers/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/checkers/test/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/checkers/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/checkers/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/README.md",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/src/config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/src/main.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/test/declared-a5d64b35.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/test/harness.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/test/review-0b9119de.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/test/saved-kind-a5d64b35.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/cli/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/client/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/client/src/index.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/client/src/room.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/client/test/support/fake-room.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/client/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/client/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/client/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/contract/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/contract/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/git/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/git/test/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/git/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/git/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/log/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/log/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/log/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/log/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/mcp/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/mcp/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/mcp/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/mcp/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/policy/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/policy/src/declared.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/policy/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/policy/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/policy/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/room/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/room/test/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/room/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/src/room/acts.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/src/room/adapter.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/src/room/contract.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/src/room/live/describe.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/src/room/live/live-room.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/src/room/mock/memory-room.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/src/room/mock/setlist.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/test/review-8df737b8.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/packages/ui/vite.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/plans/README.md",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/pi-durable/package-lock.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/pi-durable/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/pi-durable/test/check/tsconfig.broken.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/pi-durable/test/check/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/pi-durable/test/check/tsconfig.unpinned.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/pi-durable/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/pi-durable/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/room-core/package-lock.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/room-core/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/room-core/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/sandbox-git/package-lock.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/sandbox-git/package.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/spikes/sandbox-git/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-initial/tsconfig.base.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "source-snapshots.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "tracked-final.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "tracked-initial.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "tracked-runtime.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "unchanged-ui-proof.json",
+      "bytesMatch": true,
+      "sha256Match": true
+    },
+    {
+      "file": "unchanged-ui-tree.txt",
+      "bytesMatch": true,
+      "sha256Match": true
+    }
+  ],
+  "trackedChecks": [
+    {
+      "file": ".github/workflows/row-writes.yml",
+      "bytes": 1670,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": ".gitignore",
+      "bytes": 61,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "AGENTS.md",
+      "bytes": 549,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "CLAUDE.md",
+      "bytes": 11,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "LICENSE",
+      "bytes": 11366,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "NOTICE",
+      "bytes": 53,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "docs/policy-pack.md",
+      "bytes": 15478,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "docs/protocol.md",
+      "bytes": 290699,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "examples/demo-repo/.artroom/policy.json",
+      "bytes": 4915,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "examples/demo-repo/.artroom/policy.ts",
+      "bytes": 1414,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/.gitkeep",
+      "bytes": 0,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-01-artroom-plan.md",
+      "bytes": 54726,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-01-docs-plan.md",
+      "bytes": 33146,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-01-laneB-git.md",
+      "bytes": 20196,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-01-laneB-token-inflight.md",
+      "bytes": 6294,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-01-laneG-checkers.md",
+      "bytes": 50109,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-01-pi-durable.md",
+      "bytes": 45532,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-01-spike-room-core.md",
+      "bytes": 19356,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-01-spike-sandbox-git.md",
+      "bytes": 20166,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-02-canonical-mint-ownership.md",
+      "bytes": 35331,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-02-declared-acts.md",
+      "bytes": 117003,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-03-planner-direction.md",
+      "bytes": 9362,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/amendment4-log.md",
+      "bytes": 23130,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/deploy-spike.md",
+      "bytes": 70034,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/laneF-carry.md",
+      "bytes": 9387,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/laneL-carry.md",
+      "bytes": 5971,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/log-bounded.md",
+      "bytes": 19577,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/mcp-stage0.md",
+      "bytes": 22413,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "package-lock.json",
+      "bytes": 307463,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "package.json",
+      "bytes": 360,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/.gitignore",
+      "bytes": 35,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/README.md",
+      "bytes": 14570,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/config/llm-review.json",
+      "bytes": 102,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/config/tests.json",
+      "bytes": 83,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/config/types.json",
+      "bytes": 83,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/container/Dockerfile",
+      "bytes": 189,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/container/image.sh",
+      "bytes": 1168,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/harness/harness.ts",
+      "bytes": 19045,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/harness/wrangler.jsonc",
+      "bytes": 2427,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/live.mjs",
+      "bytes": 13156,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/results/live-2026-10-01T18-33-28-281Z.json",
+      "bytes": 16477,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/results/live-2026-10-01T19-02-24-529Z.json",
+      "bytes": 16481,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/results/live-2026-10-01T23-16-27-377Z.json",
+      "bytes": 84320,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/results/live-2026-10-02T01-06-30-089Z.json",
+      "bytes": 89071,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/results/live-2026-10-02T01-47-35-267Z.json",
+      "bytes": 89114,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/measure/results/live-2026-10-02T02-25-28-613Z.json",
+      "bytes": 89113,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/package.json",
+      "bytes": 885,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/checker.ts",
+      "bytes": 10605,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/checkers.ts",
+      "bytes": 2380,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/container.ts",
+      "bytes": 2425,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/index.ts",
+      "bytes": 1332,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/job.ts",
+      "bytes": 7654,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/llm.ts",
+      "bytes": 6677,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/runner.ts",
+      "bytes": 6252,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/sandbox.ts",
+      "bytes": 10595,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/signing.ts",
+      "bytes": 3499,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/snapshot-commit.ts",
+      "bytes": 3116,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/src/worker.ts",
+      "bytes": 6686,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/carry.test.ts",
+      "bytes": 13390,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/checkers.test.ts",
+      "bytes": 19513,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/cloudflare-workers-stub.ts",
+      "bytes": 411,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/fake-container.ts",
+      "bytes": 6798,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/isolation.test.ts",
+      "bytes": 23701,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/ledger.ts",
+      "bytes": 4131,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/snapshot-isolation.test.ts",
+      "bytes": 12331,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/support.ts",
+      "bytes": 13457,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/tsconfig.json",
+      "bytes": 309,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/tsconfig.json",
+      "bytes": 188,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/vitest.config.ts",
+      "bytes": 404,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/wrangler.jsonc",
+      "bytes": 2879,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/wrangler.spike.jsonc",
+      "bytes": 2282,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/README.md",
+      "bytes": 8924,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/bin/artroom.js",
+      "bytes": 448,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/package.json",
+      "bytes": 1106,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/cli.ts",
+      "bytes": 352,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/config.ts",
+      "bytes": 14688,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/declared.ts",
+      "bytes": 8711,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/format.ts",
+      "bytes": 7558,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/git.ts",
+      "bytes": 16536,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/link.ts",
+      "bytes": 1762,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/main.ts",
+      "bytes": 64736,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/__snapshots__/cli.test.ts.snap",
+      "bytes": 7187,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/__snapshots__/review-f47a509c.test.ts.snap",
+      "bytes": 2375,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/checker-hygiene-marker.test.ts",
+      "bytes": 1702,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/cli.test.ts",
+      "bytes": 11496,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/declared-a5d64b35.test.ts",
+      "bytes": 29080,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/harness.ts",
+      "bytes": 4018,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/hygiene-55be0661.test.ts",
+      "bytes": 17062,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-0b9119de.test.ts",
+      "bytes": 14299,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-17013617.test.ts",
+      "bytes": 11365,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-4758945b.test.ts",
+      "bytes": 17858,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-7040317d.test.ts",
+      "bytes": 10654,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-744a018a.test.ts",
+      "bytes": 7736,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-80d3710c.test.ts",
+      "bytes": 8141,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-c033fb54.test.ts",
+      "bytes": 6168,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-f30be7f6.test.ts",
+      "bytes": 13757,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-f47a509c.test.ts",
+      "bytes": 14738,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-f7c79158.test.ts",
+      "bytes": 6516,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/saved-kind-a5d64b35.test.ts",
+      "bytes": 9642,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/tsconfig.json",
+      "bytes": 213,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/tsconfig.test.json",
+      "bytes": 136,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/vitest.config.ts",
+      "bytes": 182,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/README.md",
+      "bytes": 28842,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/package.json",
+      "bytes": 958,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/agents-md.ts",
+      "bytes": 2956,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/bearer.ts",
+      "bytes": 10631,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/canonical.ts",
+      "bytes": 3143,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/connect.ts",
+      "bytes": 11586,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/envelope.ts",
+      "bytes": 3984,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/errors.ts",
+      "bytes": 2855,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/grants.ts",
+      "bytes": 3623,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/index.ts",
+      "bytes": 2290,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/keys.ts",
+      "bytes": 4929,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/room.ts",
+      "bytes": 38848,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/wire.ts",
+      "bytes": 11441,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/agents-md.test.ts",
+      "bytes": 969,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/amendment-2.test.ts",
+      "bytes": 7883,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/contract.test.ts",
+      "bytes": 983,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/declared-a5d64b35.test.ts",
+      "bytes": 39821,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/loop.test.ts",
+      "bytes": 1526,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/redeem.test.ts",
+      "bytes": 13920,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/review-17013617.test.ts",
+      "bytes": 5208,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/review-43e8fe3b.test.ts",
+      "bytes": 14330,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/review-f47a509c.test.ts",
+      "bytes": 8195,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/room.test.ts",
+      "bytes": 13165,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/signing.test.ts",
+      "bytes": 9398,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/support/fake-room.ts",
+      "bytes": 71308,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/support/setup.ts",
+      "bytes": 1176,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/thread-names-c37653e1.test.ts",
+      "bytes": 9556,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/tokens.test.ts",
+      "bytes": 5262,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/workerd/signing.test.ts",
+      "bytes": 1916,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/tsconfig.json",
+      "bytes": 164,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/tsconfig.test.json",
+      "bytes": 161,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/vitest.config.ts",
+      "bytes": 216,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/vitest.workers.config.ts",
+      "bytes": 457,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/examples/check-job.ts",
+      "bytes": 2964,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/examples/config-recovery.ts",
+      "bytes": 3433,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/examples/demo-loop.ts",
+      "bytes": 13123,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/examples/lifecycle.ts",
+      "bytes": 4397,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/examples/log-construction.ts",
+      "bytes": 4755,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/examples/log-layout.ts",
+      "bytes": 3962,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/examples/onboarding.ts",
+      "bytes": 3894,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/examples/workspace-visibility.ts",
+      "bytes": 1246,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/package.json",
+      "bytes": 511,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/acts.ts",
+      "bytes": 11540,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/checker.ts",
+      "bytes": 5105,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/declarations.ts",
+      "bytes": 22522,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/envelope.ts",
+      "bytes": 3882,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/errors.ts",
+      "bytes": 6025,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/evidence.ts",
+      "bytes": 6864,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/guards.ts",
+      "bytes": 3753,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/ids.ts",
+      "bytes": 3978,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/index.ts",
+      "bytes": 2393,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/landing.ts",
+      "bytes": 8093,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/lanes.ts",
+      "bytes": 5155,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/legacy.ts",
+      "bytes": 7836,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/log.ts",
+      "bytes": 12777,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/pagination.ts",
+      "bytes": 4562,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/policy.ts",
+      "bytes": 17433,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/roster.ts",
+      "bytes": 6795,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/src/transports.ts",
+      "bytes": 27984,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/tsconfig.json",
+      "bytes": 125,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/.gitignore",
+      "bytes": 74,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/README.md",
+      "bytes": 29007,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/container/Dockerfile",
+      "bytes": 154,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/container/image.sh",
+      "bytes": 1163,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/harness/worker.ts",
+      "bytes": 26082,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/harness/wrangler.jsonc",
+      "bytes": 1666,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/jj-change-id.mjs",
+      "bytes": 11255,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/live.mjs",
+      "bytes": 11789,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/jj-change-id-2026-10-01T21-57-04-695Z.json",
+      "bytes": 8383,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/live-2026-10-01T17-46-13-779Z.json",
+      "bytes": 20859,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/live-2026-10-01T18-07-50-408Z.json",
+      "bytes": 20858,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/live-2026-10-01T18-59-32-142Z.json",
+      "bytes": 23278,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/live-2026-10-01T19-59-43-334Z.json",
+      "bytes": 20858,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/live-2026-10-01T20-38-29-477Z.json",
+      "bytes": 20864,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/live-2026-10-01T21-00-05-876Z.json",
+      "bytes": 21131,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/live-2026-10-01T22-25-43-669Z.json",
+      "bytes": 19674,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/log-live-2026-10-01T22-35-39-993Z.json",
+      "bytes": 5348,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/log-live-2026-10-01T23-30-21-256Z.json",
+      "bytes": 5529,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/log-live-2026-10-02T00-39-26-184Z.json",
+      "bytes": 15521,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/log-live-2026-10-02T01-23-21-083Z.json",
+      "bytes": 15522,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/pushlog-live-2026-10-01T22-23-49-940Z.json",
+      "bytes": 6181,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/pushlog-live-2026-10-01T23-29-57-349Z.json",
+      "bytes": 6995,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/pushlog-live-2026-10-02T00-39-45-682Z.json",
+      "bytes": 6998,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/token-inflight-2026-10-01T17-50-26-760Z.json",
+      "bytes": 6304,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/results/token-inflight-2026-10-01T17-57-54-534Z.json",
+      "bytes": 6306,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/measure/token-inflight.mjs",
+      "bytes": 13525,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/package.json",
+      "bytes": 1079,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/artifacts.ts",
+      "bytes": 5609,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/diff/treediff.ts",
+      "bytes": 17691,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/first-commit.ts",
+      "bytes": 6242,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/index.ts",
+      "bytes": 4277,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/landing/core.ts",
+      "bytes": 41162,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/landing/engine.ts",
+      "bytes": 22941,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/landing/types.ts",
+      "bytes": 7334,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/mints.ts",
+      "bytes": 43209,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/publisher/client.ts",
+      "bytes": 8711,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/publisher/container.ts",
+      "bytes": 14693,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/publisher/git-publisher.ts",
+      "bytes": 2167,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/publisher/gitops.ts",
+      "bytes": 35985,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/publisher/log-push.ts",
+      "bytes": 8003,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/publisher/push-outcome.ts",
+      "bytes": 4996,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/publisher/ref-fence.ts",
+      "bytes": 5444,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/safe-errors.ts",
+      "bytes": 7902,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/snapshot/repos.ts",
+      "bytes": 25479,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/sql.ts",
+      "bytes": 1332,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/workspace/fork-tokens.ts",
+      "bytes": 39996,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/src/workspace/workspaces.ts",
+      "bytes": 55626,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test-log/pushlog.test.ts",
+      "bytes": 23846,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test-workers/landing-do.test.ts",
+      "bytes": 16697,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test-workers/worker.ts",
+      "bytes": 11122,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test-workers/wrangler.jsonc",
+      "bytes": 538,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/first-commit.test.ts",
+      "bytes": 5701,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/fork-tokens.test.ts",
+      "bytes": 53206,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/gitops.test.ts",
+      "bytes": 46095,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/jj-change-id.test.ts",
+      "bytes": 7800,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/landing.test.ts",
+      "bytes": 87517,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/mints.test.ts",
+      "bytes": 65053,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/push-outcome.test.ts",
+      "bytes": 4763,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/push-samples.json",
+      "bytes": 4124,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/ref-fence.test.ts",
+      "bytes": 4647,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/safe-errors.test.ts",
+      "bytes": 15518,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/snapshots.test.ts",
+      "bytes": 31729,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/support.ts",
+      "bytes": 23780,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/treediff.test.ts",
+      "bytes": 18011,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/tsconfig.json",
+      "bytes": 404,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/workspaces.test.ts",
+      "bytes": 79960,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/tsconfig.json",
+      "bytes": 162,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/vitest.config.ts",
+      "bytes": 291,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/vitest.log.config.ts",
+      "bytes": 311,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/README.md",
+      "bytes": 39198,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/package.json",
+      "bytes": 1027,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/scripts/live-roundtrip.sh",
+      "bytes": 2575,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/scripts/live-roundtrip.ts",
+      "bytes": 1452,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/scripts/memory.ts",
+      "bytes": 10721,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/scripts/results/memory-2026-10-02T02-25-36-938Z.json",
+      "bytes": 1057,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/scripts/results/memory-2026-10-02T02-26-02-597Z.json",
+      "bytes": 867,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/scripts/results/memory-2026-10-02T02-26-24Z-417a1618-heap128.txt",
+      "bytes": 918,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/canonical.ts",
+      "bytes": 5464,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/cli.ts",
+      "bytes": 1891,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/crypto.ts",
+      "bytes": 3852,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/decode.ts",
+      "bytes": 16489,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/entries.ts",
+      "bytes": 4211,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/git.ts",
+      "bytes": 14332,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/gitcli.ts",
+      "bytes": 5211,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/index.ts",
+      "bytes": 1882,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/layout.ts",
+      "bytes": 9916,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/publisher.ts",
+      "bytes": 56287,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/roster.ts",
+      "bytes": 11228,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/time.ts",
+      "bytes": 1618,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/tree.ts",
+      "bytes": 15465,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/verify.ts",
+      "bytes": 32005,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/src/web.d.ts",
+      "bytes": 620,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/amendment-2.test.ts",
+      "bytes": 12495,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/amendment-3.test.ts",
+      "bytes": 11679,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/amendment-4-large.test.ts",
+      "bytes": 30359,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/amendment-4.test.ts",
+      "bytes": 34749,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/bounded.test.ts",
+      "bytes": 25635,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/env.d.ts",
+      "bytes": 127,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/gitcli.node.test.ts",
+      "bytes": 5834,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/golden.test.ts",
+      "bytes": 7783,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/review-07d3150e.test.ts",
+      "bytes": 13181,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/review-a454cbaf.test.ts",
+      "bytes": 10289,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/review-ea4a9bd0.test.ts",
+      "bytes": 20518,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/staging.test.ts",
+      "bytes": 9577,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/support/layout2.ts",
+      "bytes": 7393,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/support/logs.ts",
+      "bytes": 4523,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/support/publisher-417a1618.ts",
+      "bytes": 18308,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/support/room-sim.ts",
+      "bytes": 15329,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/tamper.test.ts",
+      "bytes": 9431,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/test/transfer.test.ts",
+      "bytes": 6537,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/tsconfig.json",
+      "bytes": 271,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/tsconfig.test.json",
+      "bytes": 283,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/vitest.config.ts",
+      "bytes": 226,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/vitest.workers.config.ts",
+      "bytes": 500,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/README.md",
+      "bytes": 5512,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/package.json",
+      "bytes": 1021,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/src/index.ts",
+      "bytes": 475,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/src/run.ts",
+      "bytes": 14341,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/src/server.ts",
+      "bytes": 1663,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/src/stdio.ts",
+      "bytes": 668,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/src/tools.ts",
+      "bytes": 20619,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/src/validate.ts",
+      "bytes": 2957,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/src/worker.ts",
+      "bytes": 4115,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/amendment-2.test.ts",
+      "bytes": 4073,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/declared-a5d64b35.test.ts",
+      "bytes": 16409,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/review-f47a509c.test.ts",
+      "bytes": 4910,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/schema.test.ts",
+      "bytes": 9161,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/server.test.ts",
+      "bytes": 10948,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/stage0.test.ts",
+      "bytes": 6123,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/stdio.test.ts",
+      "bytes": 2747,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/support.ts",
+      "bytes": 2672,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/workerd/body-cap.test.ts",
+      "bytes": 2816,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/test/workerd/worker.test.ts",
+      "bytes": 2413,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/tsconfig.json",
+      "bytes": 213,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/tsconfig.test.json",
+      "bytes": 136,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/vitest.config.ts",
+      "bytes": 216,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/vitest.workers.config.ts",
+      "bytes": 459,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/README.md",
+      "bytes": 20121,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/package.json",
+      "bytes": 982,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/scripts/compile-policy.ts",
+      "bytes": 1311,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/activation.ts",
+      "bytes": 4344,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/acts.ts",
+      "bytes": 22635,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/admin.ts",
+      "bytes": 7137,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/binding.ts",
+      "bytes": 3357,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/carry.ts",
+      "bytes": 9662,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/catalogue.ts",
+      "bytes": 10996,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/codereview.ts",
+      "bytes": 2334,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/context.ts",
+      "bytes": 2696,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/declared.ts",
+      "bytes": 842,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/errors.ts",
+      "bytes": 3942,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/evaluator.ts",
+      "bytes": 14649,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/explain.ts",
+      "bytes": 1802,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/glob.ts",
+      "bytes": 5548,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/helpers.ts",
+      "bytes": 5479,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/index.ts",
+      "bytes": 3704,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/inputs.ts",
+      "bytes": 953,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/integrity.ts",
+      "bytes": 2201,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/pack.ts",
+      "bytes": 12534,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/profile.ts",
+      "bytes": 2305,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/rules.ts",
+      "bytes": 26725,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/steps.ts",
+      "bytes": 2781,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/validate.ts",
+      "bytes": 10702,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/values.ts",
+      "bytes": 10872,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/vocabulary.ts",
+      "bytes": 7571,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/web.d.ts",
+      "bytes": 410,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/admin.test.ts",
+      "bytes": 12489,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/carry.test.ts",
+      "bytes": 15201,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/declared-acts.test.ts",
+      "bytes": 26131,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/env.d.ts",
+      "bytes": 127,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/faults.test.ts",
+      "bytes": 3743,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/helpers.test.ts",
+      "bytes": 5700,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/integrity.test.ts",
+      "bytes": 2589,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/pack.test.ts",
+      "bytes": 22070,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/profile-corpus.test.ts",
+      "bytes": 10649,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/review-09c01bf9.test.ts",
+      "bytes": 3306,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/review-4df45987.test.ts",
+      "bytes": 10020,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/review-dd2a995b.test.ts",
+      "bytes": 8686,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/rules.test.ts",
+      "bytes": 16381,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/support/assert.ts",
+      "bytes": 754,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/support/fixtures.ts",
+      "bytes": 3583,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/support/jam.ts",
+      "bytes": 4581,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/test/vocabulary.test.ts",
+      "bytes": 8444,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/tsconfig.json",
+      "bytes": 188,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/tsconfig.test.json",
+      "bytes": 261,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/vitest.config.ts",
+      "bytes": 294,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/vitest.workers.config.ts",
+      "bytes": 513,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/.gitignore",
+      "bytes": 57,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/README.md",
+      "bytes": 169466,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/README.md",
+      "bytes": 26837,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/checks.d.mts",
+      "bytes": 3206,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/checks.mjs",
+      "bytes": 9382,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/cleanup.d.mts",
+      "bytes": 1758,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/cleanup.mjs",
+      "bytes": 7432,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/object-limit.mjs",
+      "bytes": 4475,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-2026-10-02T02-47-47-450Z.json",
+      "bytes": 19292,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-2026-10-02T02-52-36-597Z.json",
+      "bytes": 7535,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-over64-2026-10-02T03-05-39-537Z.json",
+      "bytes": 6657,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-over64-2026-10-02T03-07-24-727Z.json",
+      "bytes": 12442,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-over64-2026-10-02T03-12-22-931Z.json",
+      "bytes": 6881,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-over64-2026-10-02T03-14-06-002Z.json",
+      "bytes": 13792,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-under32-2026-10-02T02-57-56-937Z.json",
+      "bytes": 10068,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-under32-2026-10-02T03-00-07-677Z.json",
+      "bytes": 9893,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/logbig-under32-2026-10-02T03-03-22-033Z.json",
+      "bytes": 11663,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/object-limit-2026-10-02T02-55-14-470Z.json",
+      "bytes": 2562,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/results/tail-summary-2026-10-02.json",
+      "bytes": 2429,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/run.mjs",
+      "bytes": 13337,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/worker.ts",
+      "bytes": 11232,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/logbig/wrangler.jsonc",
+      "bytes": 1645,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/mcp-stage0.d.mts",
+      "bytes": 1483,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/mcp-stage0.mjs",
+      "bytes": 40424,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/mcp-stage0-2026-10-02T03-59-42-473Z.json",
+      "bytes": 9526,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/mcp-stage0-2026-10-02T04-00-07-005Z.json",
+      "bytes": 16680,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/mcp-stage0-2026-10-02T06-40-59-778Z.json",
+      "bytes": 18260,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/mcp-stage0-checks-2026-10-02T11-47-36-135Z.json",
+      "bytes": 10315,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/mcp-stage0-claude-2026-10-02T04-00-07-005Z.jsonl",
+      "bytes": 65644,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/mcp-stage0-claude-2026-10-02T06-40-59-778Z.jsonl",
+      "bytes": 55690,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/row-costs-2026-10-02.md",
+      "bytes": 17985,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/row-costs-2026-10-02T17-23-45-894Z.md",
+      "bytes": 2700,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/row-costs-2026-10-02T18-23-46-213Z.md",
+      "bytes": 1631,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/row-costs-2026-10-02T22-02-57-989Z.md",
+      "bytes": 2384,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/row-costs-2026-10-02T22-39-41-909Z.md",
+      "bytes": 1627,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/row-costs-2026-10-02T23-12-52-412Z.md",
+      "bytes": 1422,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/row-costs-2026-10-02T23-33-53-924Z.md",
+      "bytes": 6101,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/rows-idle-after-2026-10-02T19-44.json",
+      "bytes": 2491,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/rows-idle-after-2026-10-02T19-47.json",
+      "bytes": 1860,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/rows-idle-before-2026-10-02T19-00.json",
+      "bytes": 6160,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/rows-idle-deploy-2026-10-02T19-35.json",
+      "bytes": 6085,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T02-47-43-672Z.json",
+      "bytes": 12809,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T02-49-37-604Z.json",
+      "bytes": 13708,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T03-23-17-901Z.json",
+      "bytes": 14332,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T03-55-25-370Z.json",
+      "bytes": 22707,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T04-03-51-743Z.json",
+      "bytes": 23042,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T04-21-13-851Z.json",
+      "bytes": 25393,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T06-37-51-694Z.json",
+      "bytes": 25698,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T11-42-51-651Z.json",
+      "bytes": 44654,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T11-49-37-449Z.json",
+      "bytes": 19838,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T15-59-44-105Z.json",
+      "bytes": 31922,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T16-04-47-640Z.json",
+      "bytes": 19853,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T16-06-45-754Z.json",
+      "bytes": 45232,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T16-22-10-598Z.json",
+      "bytes": 45226,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T16-27-36-022Z.json",
+      "bytes": 19855,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T16-29-50-841Z.json",
+      "bytes": 19849,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T16-35-35-412Z.json",
+      "bytes": 170817,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T17-23-45-894Z.json",
+      "bytes": 91517,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T18-23-46-213Z.json",
+      "bytes": 52119,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T18-47-09-470Z.json",
+      "bytes": 52738,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T19-39-56-933Z.json",
+      "bytes": 45211,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T22-02-57-989Z.json",
+      "bytes": 37348,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T22-39-41-909Z.json",
+      "bytes": 23872,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T23-12-52-412Z.json",
+      "bytes": 24718,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-02T23-33-53-924Z.json",
+      "bytes": 150397,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-03T00-54-30-069Z.json",
+      "bytes": 48796,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-03T02-23-15-764Z.json",
+      "bytes": 19846,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/results/spike-smoke-2026-10-03T03-35-10-310Z.json",
+      "bytes": 45201,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/rows.d.mts",
+      "bytes": 6533,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/rows.mjs",
+      "bytes": 29777,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/spike-smoke.d.mts",
+      "bytes": 664,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/measure/spike-smoke.mjs",
+      "bytes": 66277,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/package.json",
+      "bytes": 1661,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/scripts/deploy-spike.sh",
+      "bytes": 4224,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/scripts/spike-checker-key.d.mts",
+      "bytes": 421,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/scripts/spike-checker-key.mjs",
+      "bytes": 3331,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/admission.ts",
+      "bytes": 95529,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/artifacts.ts",
+      "bytes": 11719,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/authority.ts",
+      "bytes": 13683,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/budgets.ts",
+      "bytes": 4061,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/canonical.ts",
+      "bytes": 7477,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/config.ts",
+      "bytes": 8424,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/core.ts",
+      "bytes": 109562,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/crypto.ts",
+      "bytes": 6507,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/declared.ts",
+      "bytes": 4217,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/diag.ts",
+      "bytes": 6115,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/errors.ts",
+      "bytes": 2626,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/founding.ts",
+      "bytes": 13402,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/glob.ts",
+      "bytes": 4951,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/http.ts",
+      "bytes": 9446,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/ids.ts",
+      "bytes": 2233,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/index.ts",
+      "bytes": 979,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/jobs.ts",
+      "bytes": 25270,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/log.ts",
+      "bytes": 4527,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/logremote.ts",
+      "bytes": 6822,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/mcp.ts",
+      "bytes": 3403,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/memory/artifacts.ts",
+      "bytes": 35335,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/model.ts",
+      "bytes": 10403,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/obligations.ts",
+      "bytes": 13220,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/policy.ts",
+      "bytes": 2676,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/ports.ts",
+      "bytes": 16052,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/ratelimit.ts",
+      "bytes": 2786,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/reads.ts",
+      "bytes": 19664,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/registry.ts",
+      "bytes": 4080,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/requests.ts",
+      "bytes": 28553,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/room.ts",
+      "bytes": 13607,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/roster.ts",
+      "bytes": 8765,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/schema.ts",
+      "bytes": 36502,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/secrets.ts",
+      "bytes": 4375,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/snapshot.ts",
+      "bytes": 2830,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/store.ts",
+      "bytes": 18886,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/src/worker.ts",
+      "bytes": 4405,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/env.d.ts",
+      "bytes": 340,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/budgets.test.ts",
+      "bytes": 1457,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/canonical.test.ts",
+      "bytes": 2998,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/checks.test.ts",
+      "bytes": 14136,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/config.test.ts",
+      "bytes": 3334,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/crypto.test.ts",
+      "bytes": 3397,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/declared-equivalence.test.ts",
+      "bytes": 17437,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/declared-steps-a5d64b35.test.ts",
+      "bytes": 5420,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/deploy.test.ts",
+      "bytes": 7471,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/diag.test.ts",
+      "bytes": 11344,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/fixtures/create-token-forms.ts",
+      "bytes": 2790,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/glob.test.ts",
+      "bytes": 3353,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/hygiene-55be0661.test.ts",
+      "bytes": 2326,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/ids.test.ts",
+      "bytes": 1580,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/logremote.test.ts",
+      "bytes": 1042,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/mcp-stage0.test.ts",
+      "bytes": 14827,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/mint-sites-scan.test.ts",
+      "bytes": 13110,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/rows.test.ts",
+      "bytes": 39639,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/schema.test.ts",
+      "bytes": 6258,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/secrets.test.ts",
+      "bytes": 3310,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/node/spike-smoke.test.ts",
+      "bytes": 17901,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/tsconfig.json",
+      "bytes": 543,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/admission.test.ts",
+      "bytes": 13433,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/amendment-66d6fb14.test.ts",
+      "bytes": 2797,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/amendment2.test.ts",
+      "bytes": 13107,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/amendment3.test.ts",
+      "bytes": 34429,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/checker-join-recovery.test.ts",
+      "bytes": 4266,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/concurrency.test.ts",
+      "bytes": 6711,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/declared-audit-fd6f00b6.test.ts",
+      "bytes": 22669,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/declared-fd6f00b6.test.ts",
+      "bytes": 65913,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/declared-rows-fd6f00b6.test.ts",
+      "bytes": 6478,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/declared-stage5-a5d64b35.test.ts",
+      "bytes": 61326,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/declared-stage5-support.ts",
+      "bytes": 5465,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/declared-support.ts",
+      "bytes": 4257,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/followup-c9cd4cd8.test.ts",
+      "bytes": 2581,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/fork-token-02836f9a.test.ts",
+      "bytes": 17974,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/founding-gaps.test.ts",
+      "bytes": 35729,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/founding.test.ts",
+      "bytes": 16180,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/http.test.ts",
+      "bytes": 5870,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/hygiene-55be0661.test.ts",
+      "bytes": 3735,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/idle-writes-3da1d82b.test.ts",
+      "bytes": 34559,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/job-token-mint.test.ts",
+      "bytes": 18744,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/landing.test.ts",
+      "bytes": 24366,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/lanes.test.ts",
+      "bytes": 18876,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/live-propose-df6ff8d3.test.ts",
+      "bytes": 5117,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/log-bounded.test.ts",
+      "bytes": 3687,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/log-transfer.test.ts",
+      "bytes": 5441,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/log.test.ts",
+      "bytes": 16950,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/mcp.test.ts",
+      "bytes": 12287,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/mint-publication-78f0971c.test.ts",
+      "bytes": 33676,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/mint-sites-5ff58c9a.test.ts",
+      "bytes": 57485,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/obligations.test.ts",
+      "bytes": 18310,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/phase2b.test.ts",
+      "bytes": 36100,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/pin-backlog.test.ts",
+      "bytes": 2437,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/pin-delay.test.ts",
+      "bytes": 24515,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/request-c657d4ba.test.ts",
+      "bytes": 15954,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/request-d268d249.test.ts",
+      "bytes": 27514,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-0f9739dc.test.ts",
+      "bytes": 19496,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-1249097f.test.ts",
+      "bytes": 11952,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-271dbd53.test.ts",
+      "bytes": 12770,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-786e9606.test.ts",
+      "bytes": 14330,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-8faa2ef9.test.ts",
+      "bytes": 18123,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-90f30a3b.test.ts",
+      "bytes": 12746,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-95323c2b.test.ts",
+      "bytes": 13131,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-a711f7b6.test.ts",
+      "bytes": 19805,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-aabda1ed.test.ts",
+      "bytes": 35870,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/review-f060871b.test.ts",
+      "bytes": 8043,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/roster.test.ts",
+      "bytes": 21868,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/safe-errors-d29c09fa.test.ts",
+      "bytes": 21873,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/snapshot-repos.test.ts",
+      "bytes": 23030,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/support.ts",
+      "bytes": 23193,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/workerd/vocabulary.ts",
+      "bytes": 10751,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/tsconfig.json",
+      "bytes": 786,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/vitest.node.config.ts",
+      "bytes": 287,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/vitest.workers.config.ts",
+      "bytes": 861,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/vitest.workers.declared.config.ts",
+      "bytes": 2671,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/wrangler.jsonc",
+      "bytes": 3068,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/wrangler.spike.jsonc",
+      "bytes": 3681,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/wrangler.test.jsonc",
+      "bytes": 1219,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/.gitignore",
+      "bytes": 41,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/README.md",
+      "bytes": 35519,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/e2e/smoke.spec.ts",
+      "bytes": 12183,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/index.html",
+      "bytes": 463,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/package.json",
+      "bytes": 986,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/playwright.config.ts",
+      "bytes": 739,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/public/favicon.svg",
+      "bytes": 252,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/declared-acts-light.png",
+      "bytes": 104632,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/declared-form-light.png",
+      "bytes": 89772,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/declared-room-light.png",
+      "bytes": 232627,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/needs-you-dark.png",
+      "bytes": 103693,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/needs-you-light.png",
+      "bytes": 105959,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/needs-you-phone.png",
+      "bytes": 100367,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/policy-dark.png",
+      "bytes": 527078,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/policy-light.png",
+      "bytes": 537487,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/proposal-carry-light.png",
+      "bytes": 733229,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/proposal-changes-dark.png",
+      "bytes": 614080,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/proposal-changes-light.png",
+      "bytes": 624474,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/proposal-dark.png",
+      "bytes": 643770,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/proposal-light.png",
+      "bytes": 652615,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/proposal-phone.png",
+      "bytes": 624670,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/room-dark.png",
+      "bytes": 386343,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/screenshots/room-light.png",
+      "bytes": 391159,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/app.tsx",
+      "bytes": 10542,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/main.tsx",
+      "bytes": 1548,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/acts.ts",
+      "bytes": 17864,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/adapter.ts",
+      "bytes": 14001,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/changes.ts",
+      "bytes": 19012,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/checks.ts",
+      "bytes": 2614,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/contract.ts",
+      "bytes": 1547,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/dryrun.ts",
+      "bytes": 7559,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/glob.ts",
+      "bytes": 1070,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/live/describe.ts",
+      "bytes": 9952,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/live/live-room.ts",
+      "bytes": 21103,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/commits.ts",
+      "bytes": 7479,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/declared-room.ts",
+      "bytes": 4176,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/diffs.ts",
+      "bytes": 10659,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/ids.ts",
+      "bytes": 1303,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/memory-room.ts",
+      "bytes": 20177,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/mock-room.ts",
+      "bytes": 6886,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/policy.ts",
+      "bytes": 4131,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/repo.ts",
+      "bytes": 2979,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/scenario.ts",
+      "bytes": 12316,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/setlist.ts",
+      "bytes": 2709,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/world.ts",
+      "bytes": 52313,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/recovery.ts",
+      "bytes": 802,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/refuse-claim.ts",
+      "bytes": 3585,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/screens/Acts.tsx",
+      "bytes": 20512,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/screens/NeedsYou.tsx",
+      "bytes": 10293,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/screens/Policy.tsx",
+      "bytes": 18167,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/screens/Proposal.tsx",
+      "bytes": 34869,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/screens/Room.tsx",
+      "bytes": 15324,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/styles.css",
+      "bytes": 25768,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/ChangeHistory.tsx",
+      "bytes": 8682,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/DevBar.tsx",
+      "bytes": 1710,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/WhyDialog.tsx",
+      "bytes": 7840,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/bits.tsx",
+      "bytes": 5606,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/context.ts",
+      "bytes": 932,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/format.ts",
+      "bytes": 3435,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/icons.tsx",
+      "bytes": 2926,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/landing.tsx",
+      "bytes": 7397,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/ui/router.ts",
+      "bytes": 1819,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/acts-fields.test.ts",
+      "bytes": 13720,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/acts-screen.test.tsx",
+      "bytes": 20143,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/amendment-3.test.tsx",
+      "bytes": 18210,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/change-history.test.tsx",
+      "bytes": 10344,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/declared-rendering.test.tsx",
+      "bytes": 22476,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/glob-diff.test.ts",
+      "bytes": 1804,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/helpers.tsx",
+      "bytes": 967,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/live-room.test.tsx",
+      "bytes": 5309,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/mock-room.test.ts",
+      "bytes": 5092,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/policy-runtime.test.ts",
+      "bytes": 7510,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-0fd98c41.test.ts",
+      "bytes": 9166,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-125ee638.test.tsx",
+      "bytes": 14995,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-82f2743b.test.tsx",
+      "bytes": 16565,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-88a20f74.test.tsx",
+      "bytes": 9243,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-8df737b8.test.ts",
+      "bytes": 6731,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-f3fff92c.test.tsx",
+      "bytes": 8587,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-fb27de86.test.tsx",
+      "bytes": 19542,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-fcd7391d.test.ts",
+      "bytes": 15612,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/screens.test.tsx",
+      "bytes": 9960,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/thread-names-c37653e1.test.ts",
+      "bytes": 4171,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/tsconfig.json",
+      "bytes": 676,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/vite.config.ts",
+      "bytes": 453,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/wrangler.jsonc",
+      "bytes": 380,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "plans/001-complete-token-inventories.md",
+      "bytes": 6633,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "plans/002-retain-unknown-fork-effects.md",
+      "bytes": 5493,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "plans/003-retry-terminal-publication-tokens.md",
+      "bytes": 5552,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "plans/004-persist-founding-wake.md",
+      "bytes": 7035,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "plans/README.md",
+      "bytes": 366922,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "plans/declared-stage2-conversions.md",
+      "bytes": 116229,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/.gitignore",
+      "bytes": 57,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/README.md",
+      "bytes": 12098,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/package-lock.json",
+      "bytes": 186780,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/package.json",
+      "bytes": 677,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/results/live-2026-10-01.json",
+      "bytes": 2828,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/results/live-runs-2026-10-02.txt",
+      "bytes": 4343,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/results/live-workers-ai-2026-10-02.json",
+      "bytes": 1849,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/results/scripted-2026-10-01.txt",
+      "bytes": 9704,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/scripts/check-test.sh",
+      "bytes": 2553,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/scripts/check.sh",
+      "bytes": 3369,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/scripts/setup.sh",
+      "bytes": 911,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/scripts/vendor-diagnostics.txt",
+      "bytes": 676,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/src/agent.ts",
+      "bytes": 27663,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/src/do-sqlite.ts",
+      "bytes": 4605,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/src/live.ts",
+      "bytes": 2672,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/src/models.ts",
+      "bytes": 4817,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/src/scratch.ts",
+      "bytes": 1372,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/src/worker.ts",
+      "bytes": 292,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/agent.test.ts",
+      "bytes": 6654,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/check/checker-missing-compiler.ts",
+      "bytes": 61,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/check/tsconfig.broken.json",
+      "bytes": 214,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/check/tsconfig.json",
+      "bytes": 308,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/check/tsconfig.unpinned.json",
+      "bytes": 1194,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/do-sqlite.test.ts",
+      "bytes": 1683,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/env.d.ts",
+      "bytes": 645,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/live.test.ts",
+      "bytes": 3527,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/models.test.ts",
+      "bytes": 8990,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/review-6d392973.test.ts",
+      "bytes": 1915,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/review-f2212c63.test.ts",
+      "bytes": 10307,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/support.ts",
+      "bytes": 4813,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/tsconfig.json",
+      "bytes": 1918,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/vitest.config.ts",
+      "bytes": 3126,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/wrangler.jsonc",
+      "bytes": 1487,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/.gitignore",
+      "bytes": 39,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/README.md",
+      "bytes": 5200,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/package-lock.json",
+      "bytes": 51014,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/package.json",
+      "bytes": 549,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/results/deploy.txt",
+      "bytes": 126,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/results/deployed-cpu-limit.jsonl",
+      "bytes": 772,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/results/deployed-difflimit.json",
+      "bytes": 2321,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/results/deployed-string-doubling.jsonl",
+      "bytes": 423,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/results/deployed-tail-cpu.jsonl",
+      "bytes": 1166,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/results/deployed.json",
+      "bytes": 31401,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/results/local-workerd.json",
+      "bytes": 29715,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/results/repo.json",
+      "bytes": 3907,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/scripts/driver.mjs",
+      "bytes": 14961,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/scripts/setup_repo.sh",
+      "bytes": 5139,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/scripts/summarize.mjs",
+      "bytes": 3080,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/src/canonical.ts",
+      "bytes": 1545,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/src/glob.ts",
+      "bytes": 1637,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/src/index.ts",
+      "bytes": 4289,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/src/policy.json",
+      "bytes": 2953,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/src/profile.ts",
+      "bytes": 14268,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/src/room.ts",
+      "bytes": 22847,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/src/treediff.ts",
+      "bytes": 3285,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/test/build.mjs",
+      "bytes": 1843,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/test/profile.test.mjs",
+      "bytes": 4414,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/test/room.test.mjs",
+      "bytes": 8891,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/test/workerd-concurrency.mjs",
+      "bytes": 1471,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/tsconfig.json",
+      "bytes": 351,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/wrangler.jsonc",
+      "bytes": 523,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/.gitignore",
+      "bytes": 93,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/Dockerfile",
+      "bytes": 234,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/README.md",
+      "bytes": 4649,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/driver/results/10011212-121331.raw.json",
+      "bytes": 72422,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/driver/results/10011212-121331.summary.json",
+      "bytes": 4656,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/driver/results/10011212-iso-121752.raw.json",
+      "bytes": 41193,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/driver/results/10011212-iso-121752.summary.json",
+      "bytes": 3911,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/driver/spike.py",
+      "bytes": 23096,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/image.sh",
+      "bytes": 1122,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/package-lock.json",
+      "bytes": 79409,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/package.json",
+      "bytes": 486,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/src/index.ts",
+      "bytes": 11745,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/src/iso-op.ts",
+      "bytes": 7483,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/src/iso.ts",
+      "bytes": 1201,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/src/memory-fs.ts",
+      "bytes": 5086,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/src/push-outcome.ts",
+      "bytes": 4187,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/test/capture_push_samples.py",
+      "bytes": 10049,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/test/gitbox-exception.test.mjs",
+      "bytes": 3431,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/test/iso-concurrency.test.mjs",
+      "bytes": 5688,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/test/push-outcome.test.mjs",
+      "bytes": 3098,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/test/push-samples.json",
+      "bytes": 4124,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/tsconfig.json",
+      "bytes": 321,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/wrangler.iso.jsonc",
+      "bytes": 466,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/wrangler.jsonc",
+      "bytes": 1112,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "tsconfig.base.json",
+      "bytes": 602,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    }
+  ],
+  "sourceSnapshotChecks": [
+    {
+      "file": "docs/protocol.md",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "notes/2026-10-02-declared-acts.md",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "package-lock.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/test/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/checkers/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/README.md",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/src/main.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/declared-a5d64b35.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/harness.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/review-0b9119de.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/test/saved-kind-a5d64b35.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/cli/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/index.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/src/room.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/test/support/fake-room.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/client/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/contract/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/test/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/git/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/log/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/mcp/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/src/declared.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/tsconfig.test.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/policy/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/test/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/room/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/acts.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/adapter.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/contract.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/live/describe.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/live/live-room.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/memory-room.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/src/room/mock/setlist.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/test/review-8df737b8.test.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "packages/ui/vite.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "plans/README.md",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/package-lock.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/check/tsconfig.broken.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/check/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/test/check/tsconfig.unpinned.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/pi-durable/vitest.config.ts",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/package-lock.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/room-core/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/package-lock.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/package.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "spikes/sandbox-git/tsconfig.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    },
+    {
+      "file": "tsconfig.base.json",
+      "bytesMatch": true,
+      "sha256Match": true,
+      "gitBlobMatch": true
+    }
+  ],
+  "allInitialRuntimeFinalEqual": true,
+  "immutableArchiveProof": {
+    "count": 716,
+    "fileSetEqual": true,
+    "bad": []
+  },
+  "copiedFixtureChecks": [
+    {
+      "file": "packages/cli/test/checker-title-era-624.test.ts",
+      "oldAndFrozenEqual": true,
+      "sha256Match": true
+    },
+    {
+      "file": "packages/cli/test/planner-title-retry-era.test.ts",
+      "oldAndFrozenEqual": true,
+      "sha256Match": true
+    },
+    {
+      "file": "packages/cli/test/checker-c74-journal-kind.test.ts",
+      "oldAndFrozenEqual": true,
+      "sha256Match": true
+    },
+    {
+      "file": "packages/cli/test/planner-6bc-saved-kind.test.ts",
+      "oldAndFrozenEqual": true,
+      "sha256Match": true
+    }
+  ],
+  "rawStatusNameMessageChecks": [
+    {
+      "run": "baseline",
+      "count": 213,
+      "allNameStatusMessagesEqual": true
+    },
+    {
+      "run": "diagnostic",
+      "count": 8,
+      "allNameStatusMessagesEqual": true
+    }
+  ],
+  "compilerBeforeRuntime": {
+    "baselineCompilerExit": 0,
+    "baselineCompilerEndedBeforeRuntime": true,
+    "diagnosticCompilerExit": 0,
+    "diagnosticCompilerEndedBeforeRuntime": true,
+    "diagnosticAddedAfterBaselineRuntime": true,
+    "runnerHashes": true
+  },
+  "trackedUiCount": 85,
+  "uiObjectsExactlyEqual": true,
+  "wholeDeltaPaths": [
+    "packages/cli/README.md",
+    "packages/cli/src/main.ts",
+    "packages/cli/test/saved-kind-a5d64b35.test.ts"
+  ],
+  "cleanStatus": "",
+  "rootReading": "Full exact3-path repair delta, full supplied159-line test, full diagnostic warning and unchanged planner fixtures, both compiler logs, complete CLI logs, exact commands/runner/report, all private names and all3 actual failed-message arrays read. All221 raw assertion rows compared to supplied name/status/message indexes. Original planner hard stderr failures stop before later receipt checks; adapted one-line stderr expectation retains every original later semantic assertion. No new root semantic execution.",
+  "judgment": "Bounded accepted-kind P2 closure at exact bdc; separate P3 actual false-resend event claim at CLI main.ts1186, with answered journal return446 and actual zero finishing act POST. Prior c74 UI/browser remains prior evidence, not a bdc run. No mutants/composed-head/whole-stage approval/new Jam gate."
+}

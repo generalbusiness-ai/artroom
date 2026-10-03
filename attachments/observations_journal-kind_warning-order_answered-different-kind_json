@@ -1,0 +1,52 @@
+{
+  "state": "answered",
+  "alternateKind": true,
+  "savedKind": "start-song",
+  "savedBinding": "sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6",
+  "originalSeq": 4,
+  "posts": 1,
+  "uniqueSignedBytes": 1,
+  "uniqueSignatures": 1,
+  "actSigningCalls": 1,
+  "signedBodySHA256": "b634067a0623f4914811fff30fed17b7c4fb9be25077c885e17e167bda450202",
+  "events": [
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/requests"
+    },
+    {
+      "run": "first",
+      "method": "GET",
+      "path": "/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/log?limit=1"
+    },
+    {
+      "run": "first",
+      "method": "GET",
+      "path": "/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/declarations"
+    },
+    {
+      "run": "first",
+      "method": "POST",
+      "path": "/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/acts"
+    },
+    {
+      "run": "finish",
+      "method": "POST",
+      "path": "/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/requests"
+    },
+    {
+      "run": "finish",
+      "method": "GET",
+      "path": "/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/log?limit=1"
+    },
+    {
+      "run": "finish",
+      "method": "GET",
+      "path": "/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/declarations?at=4"
+    }
+  ],
+  "actualOutput": "Done: Start a song (start-song), recorded as act_4_4dadb4aa.\nThread: Start a song: Footprints (lane act_4_4dadb4aa).",
+  "actualStderr": "This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made.",
+  "finishingActPosts": 0
+}

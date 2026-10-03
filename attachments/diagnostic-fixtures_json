@@ -1,0 +1,12 @@
+[
+  {
+    "path": "packages/cli/test/planner-6bc-bdc-warning-adapted.test.ts",
+    "sha256": "f81cda776c0b1c3daf222855332533cb2493c11de3a90f72c5d757547c6bb108",
+    "bytes": 5002
+  },
+  {
+    "path": "packages/cli/test/checker-bdc-warning-order.test.ts",
+    "sha256": "f6338532eda39223bdb974a5001121a7ec280d463ad1f7b6f33907ced17bd062",
+    "bytes": 7204
+  }
+]

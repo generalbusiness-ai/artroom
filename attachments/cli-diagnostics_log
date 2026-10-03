@@ -1,0 +1,69 @@
+
+> @generalbusiness/artroom-cli@0.0.0 test
+> vitest run test/checker-bdc-warning-order.test.ts test/planner-6bc-bdc-warning-adapted.test.ts --reporter=default --reporter=json --outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/cli-diagnostics.vitest.json
+
+
+ RUN  v4.1.11 /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/repo/packages/cli
+
+stdout | test/checker-bdc-warning-order.test.ts > checker bdc saved journal warning matches the actual sends > saved prepared, alternateKind=false: original intent, one effect and original historical display
+CHECKER_C74_JOURNAL {"name":"prepared-same-kind","value":{"state":"prepared","alternateKind":false,"savedKind":"start-song","savedBinding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","originalSeq":4,"posts":5,"uniqueSignedBytes":1,"uniqueSignatures":1,"actSigningCalls":1,"signedBodySHA256":"cb444eea592999b6902801f33d5316526b281f2805cbc65441e81dbc0d24a4a4","events":[{"run":"first","method":"POST","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/requests"},{"run":"first","method":"GET","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/log?limit=1"},{"run":"first","method":"GET","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/declarations"},{"run":"first","method":"POST","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/requests"},{"run":"finish","method":"GET","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/log?limit=1"},{"run":"finish","method":"GET","path":"/v1/rooms/room_e5179f8f6bb2cf6781bbb3c64b4d2f2f/declarations?at=4"}],"actualOutput":"Done: Start a song (start-song), recorded as act_4_31c6c470.\nThread: Start a song: Footprints (lane act_4_31c6c470).","actualStderr":"","finishingActPosts":1}}
+
+stdout | test/planner-6bc-bdc-warning-adapted.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=false, metadataUnavailable=false
+{"changedKind":false,"metadataUnavailable":false,"acceptedKind":"start-song","binding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"ad21a197c726062df738afa1c6e85a1fac874c81593267690990aadf5b47f5e7","actual":"Done: Start a song (start-song), recorded as act_4_92f21945.\nThread: Start a song: Footprints (lane act_4_92f21945).","expectedDone":"Done: Start a song (start-song), recorded as act_4_92f21945.","expectedThread":"Thread: Start a song: Footprints (lane act_4_92f21945)."}
+
+stdout | test/checker-bdc-warning-order.test.ts > checker bdc saved journal warning matches the actual sends > saved prepared, alternateKind=true: original intent, one effect and original historical display
+CHECKER_C74_JOURNAL {"name":"prepared-different-kind","value":{"state":"prepared","alternateKind":true,"savedKind":"start-song","savedBinding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","originalSeq":4,"posts":5,"uniqueSignedBytes":1,"uniqueSignatures":1,"actSigningCalls":1,"signedBodySHA256":"cdba2358ec5e0ec01a5ab3b2ca2ce5540f631416837021af0808f21d28507426","events":[{"run":"first","method":"POST","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/requests"},{"run":"first","method":"GET","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/log?limit=1"},{"run":"first","method":"GET","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/declarations"},{"run":"first","method":"POST","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"},{"run":"first","method":"POST","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/requests"},{"run":"finish","method":"GET","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/log?limit=1"},{"run":"finish","method":"GET","path":"/v1/rooms/room_bf7532711eb91a5aa59784a3cead09d8/declarations?at=4"}],"actualOutput":"Done: Start a song (start-song), recorded as act_4_41be2c60.\nThread: Start a song: Footprints (lane act_4_41be2c60).","actualStderr":"This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made.","finishingActPosts":1}}
+
+stdout | test/checker-bdc-warning-order.test.ts > checker bdc saved journal warning matches the actual sends > saved answered, alternateKind=false: original intent, one effect and original historical display
+CHECKER_C74_JOURNAL {"name":"answered-same-kind","value":{"state":"answered","alternateKind":false,"savedKind":"start-song","savedBinding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","originalSeq":4,"posts":1,"uniqueSignedBytes":1,"uniqueSignatures":1,"actSigningCalls":1,"signedBodySHA256":"bb09a2eddaea8254d11232255d8a1c6c2120e67d36ae07ed49a3600cc37d8a40","events":[{"run":"first","method":"POST","path":"/v1/rooms/room_2595c52bf56236a973163daa07d69152/requests"},{"run":"first","method":"GET","path":"/v1/rooms/room_2595c52bf56236a973163daa07d69152/log?limit=1"},{"run":"first","method":"GET","path":"/v1/rooms/room_2595c52bf56236a973163daa07d69152/declarations"},{"run":"first","method":"POST","path":"/v1/rooms/room_2595c52bf56236a973163daa07d69152/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_2595c52bf56236a973163daa07d69152/requests"},{"run":"finish","method":"GET","path":"/v1/rooms/room_2595c52bf56236a973163daa07d69152/log?limit=1"},{"run":"finish","method":"GET","path":"/v1/rooms/room_2595c52bf56236a973163daa07d69152/declarations?at=4"}],"actualOutput":"Done: Start a song (start-song), recorded as act_4_fb2bda31.\nThread: Start a song: Footprints (lane act_4_fb2bda31).","actualStderr":"","finishingActPosts":0}}
+
+stdout | test/planner-6bc-bdc-warning-adapted.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=false, metadataUnavailable=true
+{"changedKind":false,"metadataUnavailable":true,"acceptedKind":"start-song","binding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"90a2c81c6b4085e40db1e2385c55ca8360c2087ae11304e1477b02ddbf66179b","actual":"Done: start-song, recorded as act_4_ea0e4c97.\nThread: act_4_ea0e4c97 (lane act_4_ea0e4c97).","expectedDone":"Done: start-song, recorded as act_4_ea0e4c97.","expectedThread":"Thread: act_4_ea0e4c97 (lane act_4_ea0e4c97)."}
+
+stdout | test/checker-bdc-warning-order.test.ts > checker bdc saved journal warning matches the actual sends > saved answered, alternateKind=true: original intent, one effect and original historical display
+CHECKER_C74_JOURNAL {"name":"answered-different-kind","value":{"state":"answered","alternateKind":true,"savedKind":"start-song","savedBinding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","originalSeq":4,"posts":1,"uniqueSignedBytes":1,"uniqueSignatures":1,"actSigningCalls":1,"signedBodySHA256":"b634067a0623f4914811fff30fed17b7c4fb9be25077c885e17e167bda450202","events":[{"run":"first","method":"POST","path":"/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/requests"},{"run":"first","method":"GET","path":"/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/log?limit=1"},{"run":"first","method":"GET","path":"/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/declarations"},{"run":"first","method":"POST","path":"/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/acts"},{"run":"finish","method":"POST","path":"/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/requests"},{"run":"finish","method":"GET","path":"/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/log?limit=1"},{"run":"finish","method":"GET","path":"/v1/rooms/room_bdf7bcc18efc67aca023125a5e3edecc/declarations?at=4"}],"actualOutput":"Done: Start a song (start-song), recorded as act_4_4dadb4aa.\nThread: Start a song: Footprints (lane act_4_4dadb4aa).","actualStderr":"This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made.","finishingActPosts":0}}
+
+ ❯ test/checker-bdc-warning-order.test.ts (4 tests | 1 failed) 3086ms
+     ✓ saved prepared, alternateKind=false: original intent, one effect and original historical display  1563ms
+     ✓ saved prepared, alternateKind=true: original intent, one effect and original historical display  1456ms
+     ✓ saved answered, alternateKind=false: original intent, one effect and original historical display 32ms
+     × saved answered, alternateKind=true: original intent, one effect and original historical display 33ms
+stdout | test/planner-6bc-bdc-warning-adapted.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=true, metadataUnavailable=false
+{"changedKind":true,"metadataUnavailable":false,"acceptedKind":"start-song","binding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"6c2851ee0dca2cc241065154af0457c623ee6e4eedb0dba565db413cd165645e","actual":"Done: Start a song (start-song), recorded as act_4_d15690fa.\nThread: Start a song: Footprints (lane act_4_d15690fa).","expectedDone":"Done: Start a song (start-song), recorded as act_4_d15690fa.","expectedThread":"Thread: Start a song: Footprints (lane act_4_d15690fa)."}
+
+stdout | test/planner-6bc-bdc-warning-adapted.test.ts > a saved receipt is shown as its saved kind, regardless of newer command arguments > original receipt identity, changedKind=true, metadataUnavailable=true
+{"changedKind":true,"metadataUnavailable":true,"acceptedKind":"start-song","binding":"sha256:29b7bd9477711597a659d813639999b9ce3e9716602727eebb5ddd40f42ec6f6","seq":4,"posts":5,"uniqueSignedBodies":1,"signedBodySHA256":"473161df8b999ff3c0f10dd8d77fa7a1523a039865dd41b245374b84344b297d","actual":"Done: start-song, recorded as act_4_fda0a6c9.\nThread: act_4_fda0a6c9 (lane act_4_fda0a6c9).","expectedDone":"Done: start-song, recorded as act_4_fda0a6c9.","expectedThread":"Thread: act_4_fda0a6c9 (lane act_4_fda0a6c9)."}
+
+ ✓ test/planner-6bc-bdc-warning-adapted.test.ts (4 tests) 5941ms
+     ✓ original receipt identity, changedKind=false, metadataUnavailable=false  1579ms
+     ✓ original receipt identity, changedKind=false, metadataUnavailable=true  1473ms
+     ✓ original receipt identity, changedKind=true, metadataUnavailable=false  1441ms
+     ✓ original receipt identity, changedKind=true, metadataUnavailable=true  1447ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/checker-bdc-warning-order.test.ts > checker bdc saved journal warning matches the actual sends > saved answered, alternateKind=true: original intent, one effect and original historical display
+AssertionError: an answered journal must not claim the act was sent again when it returns its saved result without a finishing POST: expected 'This idempotency key belongs to a sav…' not to contain 'That act was sent again as it was sav…'
+
+Expected: "That act was sent again as it was saved"
+Received: "This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made."
+
+ ❯ test/checker-bdc-warning-order.test.ts:70:182
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 7 passed (8)
+   Start at  18:43:25
+   Duration  7.11s (transform 727ms, setup 0ms, import 1.31s, tests 9.03s, environment 0ms)
+
+JSON report written to /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/cli-diagnostics.vitest.json
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/repo/packages/cli
+npm error workspace @generalbusiness/artroom-cli@0.0.0
+npm error location /private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/repo/packages/cli
+npm error command failed
+npm error command sh -c vitest run test/checker-bdc-warning-order.test.ts test/planner-6bc-bdc-warning-adapted.test.ts --reporter=default --reporter=json --outputFile=/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-stage5-bdc35c53-x_9tje0l/cli-diagnostics.vitest.json
