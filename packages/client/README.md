@@ -114,6 +114,24 @@ label, and `retired` when a later policy version dropped the kind. The
 handle keeps ended versions, so entries of one version cost one read. The
 `explain` read already carries `meaning`.
 
+An ended version's declarations never change, but its `retired` marks can:
+a later activation may drop one of its kinds. The handle drops the versions
+it kept when it sees a later activation, in `acts()`, another `actsAt()`
+answer, a `log()` page, an update, or a refusal that names the active
+policy version. A handle that has seen nothing since may answer the marks
+it read. `actsAt(at, { fresh: true })` always reads the room.
+
+`envelopeOf(entry)` gives a log entry's envelope in either version, with a
+declared act's `binding`, or null for a system entry.
+
+A `Lane` has `kind`: the kind of the act that opened the thread. The acts
+that may act on it are those whose declaration's `threads` names that kind.
+A thread opened by an application's own act may have no goal.
+`threadTitle(lane, { meaning, body })` gives the name every reader uses:
+the goal, or else the opening act's label and its first field by name
+(`titleOf`). The opening act's ID is the lane's ID, so one `explain(lane.lane)`
+gives both the `meaning` and, through `envelopeOf`, the body.
+
 To grant in a `v2` room, build the op with `delegateOp(room, role, { to,
 kinds, lanes, expiresAt })` or the session with `invitationSession(room,
 role, { kinds, ttlSeconds })`. `*` or a list of kinds becomes platform

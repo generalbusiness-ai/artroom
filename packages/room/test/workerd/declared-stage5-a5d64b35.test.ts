@@ -10,9 +10,9 @@
 
 import { describe, expect, it } from "vitest";
 import { exports } from "cloudflare:workers";
-import type { ActDeclaration, ActsCatalogue, AnyEnvelope, Catalogue, Claim, DeclaredRecord, LegacyCatalogue, LogEntry, Proposal, Refusal, RosterRecord } from "@generalbusiness/artroom-contract";
-import { isArtroomError, isRefusal } from "@generalbusiness/artroom-contract";
-import { delegateOp, expandGrant, meaningOf } from "@generalbusiness/artroom-client";
+import type { ActDeclaration, ActsCatalogue, AnyEnvelope, Catalogue, Claim, DeclaredRecord, Lane, LegacyCatalogue, LogEntry, Proposal, Refusal, RosterRecord } from "@generalbusiness/artroom-contract";
+import { envelopeOf, isArtroomError, isRefusal } from "@generalbusiness/artroom-contract";
+import { delegateOp, expandGrant, meaningOf, threadTitle } from "@generalbusiness/artroom-client";
 import { CODE_REVIEW_ACTS, bindingOf, policy, requireCheck, requireReview } from "@generalbusiness/artroom-policy";
 import { digestJson } from "../../src/crypto.ts";
 import { activate, bindingIn, declaredRoom, headSeq, ok, signed, v2 } from "./declared-support.ts";
@@ -714,5 +714,107 @@ describe.skipIf(DECLARED)("old records are read under the declarations of their 
     expect((await mcpTool(r, b.bearer, "acts", { at: 0 })).structuredContent).toEqual({ outcome: "not-found" });
     const both = await mcpTool(r, b.bearer, "acts", { at: 1, policy: then.structuredContent.policy });
     expect(both.isError).toBe(true);
+  });
+});
+
+/** A kind of the room's own that opens a thread and takes no goal: the thread is named by this act. */
+const SONG: ActDeclaration = {
+  label: "Start a song",
+  targets: { none: ["open"] },
+  body: { title: { type: "text", max: 80 }, key: { type: "text", max: 8, optional: true }, year: { type: "text", max: 4, optional: true } },
+  who: { roles: ["member", "agent"] },
+  hold: { scope: "body.scope", workspace: true },
+};
+/** The code-review acts, `start-song`, and a `leave` that releases a song thread and no other. */
+const withSong = (song: ActDeclaration = SONG) =>
+  v2((a) => {
+    a["start-song"] = song;
+    a["leave"] = { label: "Leave", targets: { thread: ["release"] }, threads: ["start-song"], who: { roles: ["member", "agent"] } };
+  });
+
+describe.skipIf(DECLARED)("a thread's kind and what readers call it (R-DECL-6, R-DECL-8, R-DECL-23; section 33.10)", () => {
+  it("the lane reads give each thread's kind: claim in a v1 room; in a v2 room the kind of the act that opened it", async () => {
+    const old = await makeRoom();
+    const ann = await addMember(old, "@ann", "member");
+    const first = await ann.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
+    expect(await old.admin.read({ q: "lane", lane: first.lane })).toMatchObject({ lane: first.lane, kind: "claim" });
+
+    const r = await declaredRoom(withSong());
+    const bob = await addMember(r, "@bob", "member");
+    const api = await httpClient(r, bob.keys);
+    const c = (await api.acts()) as ActsCatalogue;
+    const claim = expectOk(await api.claim({ goal: "Rate-limit login", scope: ["src/**"] }));
+    const song = (await api.act("start-song", null, { title: "Blue Bossa", key: "c", scope: ["songs/blue-bossa/**"] }, { binding: c.acts["start-song"]!.binding })) as DeclaredRecord;
+    expect(song).toMatchObject({ kind: "start-song", effect: { type: "opened" } });
+    const lanes = new Map((await api.lanes()).items.map((l) => [l.lane, l]));
+    expect(lanes.get(claim.lane)).toMatchObject({ kind: "claim", goal: "Rate-limit login" });
+    expect(lanes.get(song.id)).toMatchObject({ kind: "start-song", goal: "" });
+    expect(await api.lane(song.id)).toEqual(lanes.get(song.id));
+    // A reader can tell which declared acts may act on a thread: those whose `threads` name its kind (R-DECL-8).
+    const actsOn = (lane: Lane) => Object.keys(c.acts).filter((k) => c.acts[k]!.declaration.threads?.includes(lane.kind!)).sort();
+    expect(actsOn(lanes.get(song.id)!)).toEqual(["leave"]);
+    expect(actsOn(lanes.get(claim.lane)!)).toEqual(["check", "claim", "land", "note", "propose", "release", "review"]);
+    // And the room agrees: release does not act on the song thread, leave does.
+    refusedAs(await api.act("release", { lane: song.id }, { lease: 1 }, { binding: c.acts["release"]!.binding }), "wrong-thread");
+    expect(await api.act("leave", { lane: song.id }, { lease: 1 }, { binding: c.acts["leave"]!.binding })).toMatchObject({ kind: "leave" });
+    expect(await api.lane(song.id)).toMatchObject({ kind: "start-song", state: "unheld" });
+  });
+
+  it("a thread with no goal is named by its opening act, in the words in force when it opened: label and first field", async () => {
+    const r = await declaredRoom(withSong());
+    const bob = await addMember(r, "@bob", "member");
+    const api = await httpClient(r, bob.keys);
+    const binding = ((await api.acts()) as ActsCatalogue).acts["start-song"]!.binding;
+    const song = (await api.act("start-song", null, { year: "1963", scope: ["songs/blue-bossa/**"], title: "Blue Bossa" }, { binding })) as DeclaredRecord;
+    const claim = expectOk(await api.claim({ goal: "Rate-limit login", scope: ["src/**"] }));
+    // The label changes. The binding does not, and the thread keeps the name it opened with.
+    await activate(r, withSong({ ...SONG, label: "Begin a tune" }));
+    expect(await bindingIn(r, "start-song")).toBe(binding);
+    const title = async (id: string) => {
+      const lane = (await api.lane(id as never))!;
+      const opening = (await api.explain(lane.lane))!;
+      return threadTitle(lane, { meaning: opening.meaning!, body: envelopeOf(opening.entry)!.body });
+    };
+    expect(await title(song.id)).toBe("Start a song: Blue Bossa");
+    expect(await title(claim.lane)).toBe("Rate-limit login");
+    // A thread opened after the change is named in the new words.
+    const next = (await api.act("start-song", null, { title: "Footprints", scope: ["songs/footprints/**"] }, { binding })) as DeclaredRecord;
+    expect(await title(next.id)).toBe("Begin a tune: Footprints");
+    // "First" is by name: the room records a body with its keys sorted, whatever order the caller typed.
+    const keyed = (await api.act("start-song", null, { title: "So What", key: "d", scope: ["songs/so-what/**"] }, { binding })) as DeclaredRecord;
+    expect(Object.keys(envelopeOf((await api.explain(keyed.id as never))!.entry)!.body as object)).toEqual(["key", "scope", "title"]);
+    expect(await title(keyed.id)).toBe("Begin a tune: d");
+  });
+
+  it("the act tool names the thread it opened the same way; a thread with a goal is named by its goal", async () => {
+    const r = await declaredRoom(withSong());
+    const c = (await r.admin.read({ q: "acts" })) as ActsCatalogue;
+    const b = await bearer(r, "@agent", "agent", { kinds: [], acts: { "start-song": c.acts["start-song"]!.binding, claim: c.acts["claim"]!.binding, leave: c.acts["leave"]!.binding } });
+    const song = await mcpTool(r, b.bearer, "act", { kind: "start-song", target: null, body: { scope: ["songs/blue-bossa/**"], title: "Blue Bossa" }, binding: c.acts["start-song"]!.binding, idempotencyKey: "song-1" });
+    const id = song.structuredContent.id as string;
+    expect(song.structuredContent).toMatchObject({ kind: "start-song", lane: id });
+    expect(song.content[0]!.text.split("\n")[0]).toBe(`Done: ${id}. It opened thread ${id}: Start a song: Blue Bossa.`);
+    const claim = await mcpTool(r, b.bearer, "act", { kind: "claim", target: null, body: { goal: "Rate-limit login", scope: ["src/**"] }, binding: c.acts["claim"]!.binding, idempotencyKey: "claim-1" });
+    expect(claim.content[0]!.text.split("\n")[0]).toBe(`Done: ${claim.structuredContent.id}. It opened thread ${claim.structuredContent.id}: Rate-limit login.`);
+    // An act that opens nothing says nothing about a thread.
+    const leave = await mcpTool(r, b.bearer, "act", { kind: "leave", target: { lane: id }, body: { lease: 1 }, binding: c.acts["leave"]!.binding, idempotencyKey: "leave-1" });
+    expect(leave.content[0]!.text.split("\n")[0]).toBe(`Done: ${leave.structuredContent.id}.`);
+  });
+});
+
+describe.skipIf(DECLARED)("a kind dropped more than once (R-DECL-23)", () => {
+  it("each version that declared the kind is marked with the first later version that did not: an earlier version is not moved to the second drop", async () => {
+    const r = await declaredRoom(withAsk());
+    await activate(r, v2());
+    await activate(r, withAsk({ ...ASK, label: "Ask again" }));
+    await activate(r, v2());
+    await activate(r, v2((a) => void (a["tell"] = ASK)));
+    const [first, drop1, again, drop2, last] = (await log(r)).filter((e) => e.entry.type === "system" && e.entry.event.type === "policy-activated").map((e) => e.seq) as [number, number, number, number, number];
+    const at = async (seq: number) => (await r.admin.read({ q: "acts", at: seq })) as ActsCatalogue;
+    expect((await at(first)).acts["ask"]).toMatchObject({ retired: drop1, declaration: { label: "Ask" } });
+    expect((await at(again)).acts["ask"]).toMatchObject({ retired: drop2, declaration: { label: "Ask again" } });
+    // A kind every later version declares has no mark, in any version.
+    for (const seq of [first, drop1, again, drop2, last]) expect((await at(seq)).acts["claim"]).not.toHaveProperty("retired");
+    expect((await at(last)).acts["tell"]).not.toHaveProperty("retired");
   });
 });

@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import type { ActDeclaration, ActsCatalogue, ArtroomError, Binding, Claim, DeclaredRecord, RoomWire } from "@generalbusiness/artroom-contract";
+import { envelopeOf, type ActDeclaration, type ActsCatalogue, type ArtroomError, type Binding, type Claim, type DeclaredRecord, type Room, type RoomApi, type RoomWire } from "@generalbusiness/artroom-contract";
 import { CODE_REVIEW_ACTS, bindingOf } from "@generalbusiness/artroom-policy/declared";
 import {
   buildDeclaredEnvelope,
@@ -25,6 +25,8 @@ import {
   redeem,
   signEnvelope,
   targetsOf,
+  threadTitle,
+  titleOf,
   verifyValue,
   type HttpRoomClient,
   type PreparedAct,
@@ -152,6 +154,206 @@ describe("the catalogue reads", () => {
     // Two steps in one act: each step's fields once.
     const add: ActDeclaration = { label: "Add", targets: { thread: ["version", "land"] }, threads: ["take-part"], who: { roles: ["member"] } };
     expect(fieldsOf(add, "thread")!.map((f) => f.name)).toEqual(["lease", "expectedGeneration", "head"]);
+  });
+});
+
+describe("an ended version is not final: a later activation can retire its kinds (R-DECL-23)", () => {
+  const TELL: ActDeclaration = { label: "Tell", targets: { entry: ["comment"] }, body: { text: { type: "text", max: 200 } }, who: { roles: ["member", "agent"] } };
+  const OLD = { ...withAsk(), tell: TELL };
+
+  /**
+   * A handle that read version A after it ended, while `tell` was still
+   * declared, and kept it. `drop` then activates a version without `tell`,
+   * with another `ask` and another `claim`, and returns its seq.
+   */
+  async function kept(rpc = false) {
+    const alice = await joinAs(room, "@alice");
+    const api: RoomApi = rpc ? await connect(service(), room.id, { kind: "key", signer: alice.signer }) : alice.api;
+    const a = await room.activate(OLD);
+    const askA = (await room.bindingOf("ask"))!;
+    await room.activate({ ...OLD, more: TELL });
+    const first = (await api.actsAt({ policy: a })) as ActsCatalogue;
+    expect(first.until).not.toBeNull();
+    expect(first.acts["tell"]).not.toHaveProperty("retired");
+    const drop = async () => {
+      const claim = CODE_REVIEW_ACTS["claim"]!;
+      await room.activate({ ...withAsk({ ...ASK, body: { text: { type: "text", max: 100 } } }), claim: { ...claim, body: { ...claim.body, extra: { type: "text", max: 5, optional: true } } } });
+      return room.entries.at(-1)!.seq;
+    };
+    const tellNow = async () => ((await api.actsAt({ policy: a })) as ActsCatalogue).acts["tell"];
+    return { alice, api, a, askA, first, drop, tellNow };
+  }
+  type Kept = Awaited<ReturnType<typeof kept>>;
+  const until = async (test: () => boolean) => {
+    for (let i = 0; i < 200 && !test(); i++) await new Promise((r) => setTimeout(r, 10));
+  };
+
+  test("with no sign of a later activation the handle answers what it kept; { fresh: true } reads again and replaces it", async () => {
+    const s = await kept();
+    // Reading the active catalogue again, with no new activation, keeps what the handle has.
+    await s.api.acts();
+    const reads = gets("/declarations");
+    expect(await s.api.actsAt({ policy: s.a })).toBe(s.first);
+    const dropped = await s.drop();
+    // The handle has seen nothing since: it answers the marks it read, and reads nothing.
+    expect(await s.api.actsAt({ policy: s.a })).toBe(s.first);
+    expect(gets("/declarations")).toBe(reads);
+    const fresh = (await s.api.actsAt({ policy: s.a }, { fresh: true })) as ActsCatalogue;
+    expect(fresh.acts["tell"]).toMatchObject({ retired: dropped });
+    expect(fresh.acts["ask"]).not.toHaveProperty("retired");
+    expect(gets("/declarations")).toBe(reads + 1);
+    // The fresh answer is the one kept from now on, by policy version and by seq.
+    expect(await s.api.actsAt({ policy: s.a })).toBe(fresh);
+    expect(await s.api.actsAt({ seq: s.first.since })).toBe(fresh);
+    expect(gets("/declarations")).toBe(reads + 1);
+  });
+
+  const SIGNS: readonly [string, boolean, (s: Kept) => Promise<void>][] = [
+    ["a read of the active catalogue", false, async (s) => void (await s.drop(), await s.api.acts())],
+    ["a log page that holds the activation", false, async (s) => void (await s.drop(), await s.api.log())],
+    [
+      "a read of another version that the activation ended",
+      false,
+      async (s) => {
+        const dropped = await s.drop();
+        expect(await s.api.actsAt({ seq: dropped - 1 })).toMatchObject({ until: dropped });
+      },
+    ],
+    [
+      "a long-poll update that holds the activation",
+      false,
+      async (s) => {
+        const start = (await s.alice.api.subscribe(undefined, { waitMs: 0 })).cursor;
+        await s.drop();
+        expect((await s.alice.api.subscribe(start, { waitMs: 1000 })).entries.map((e) => e.kind)).toContain("policy-activated");
+      },
+    ],
+    [
+      "a watched update that holds the activation",
+      false,
+      async (s) => {
+        const start = (await s.alice.api.subscribe(undefined, { waitMs: 0 })).cursor;
+        const kinds: string[] = [];
+        const sub = s.alice.api.watch(start, (u) => kinds.push(...u.entries.map((e) => e.kind)));
+        await until(() => room.socketCount === 1);
+        await s.drop();
+        await until(() => kinds.includes("policy-activated"));
+        sub.close();
+        expect(kinds).toContain("policy-activated");
+      },
+    ],
+    [
+      "an update on the RPC stream that holds the activation",
+      true,
+      async (s) => {
+        const stream = await (s.api as unknown as Room).subscribe();
+        const reader = stream.getReader();
+        const pending = reader.read();
+        await s.drop();
+        expect((await pending).done).toBe(false);
+        reader.releaseLock();
+        await stream.cancel();
+      },
+    ],
+    [
+      "a binding-stale refusal of a generic act, which names the active version",
+      false,
+      async (s) => {
+        await s.drop();
+        const out = await s.api.act("ask", { act: s.a }, { text: "x" }, { binding: s.askA });
+        expect(isRefusal(out) && out.rule).toBe("binding-stale");
+      },
+    ],
+    [
+      "a binding-stale refusal of a named act",
+      false,
+      async (s) => {
+        // The handle already read the vocabulary for an earlier named act, so it reads nothing before it signs this one.
+        expect(isRefusal(await s.api.claim({ goal: "g", scope: ["docs/**"] }))).toBe(false);
+        await s.drop();
+        const reads = gets("/declarations");
+        const out = await s.api.claim({ goal: "g", scope: ["src/**"] });
+        expect(isRefusal(out) && out.rule).toBe("binding-stale");
+        expect(gets("/declarations")).toBe(reads);
+      },
+    ],
+  ];
+
+  test.each(SIGNS)("after %s, the handle drops what it kept and the next answer has the room's marks", async (_name, rpc, sign) => {
+    const s = await kept(rpc);
+    expect(await s.tellNow()).not.toHaveProperty("retired");
+    await sign(s);
+    const dropped = room.entries.findLast((e) => e.entry.type === "system" && e.entry.event.type === "policy-activated")!.seq;
+    expect(await s.tellNow()).toMatchObject({ retired: dropped });
+    // The answer it read now is kept in turn.
+    expect(await s.api.actsAt({ policy: s.a })).toBe(await s.api.actsAt({ seq: s.first.since }));
+  });
+
+  test("a refusal or an update that names no later activation drops nothing", async () => {
+    const s = await kept();
+    const bob = await joinAs(room, "@bob");
+    const start = (await s.alice.api.subscribe(undefined, { waitMs: 0 })).cursor;
+    const refused = await s.api.act("ask", { act: s.a }, { text: "x" }, { binding: B("0") });
+    expect(isRefusal(refused) && refused.rule).toBe("binding-stale");
+    await bob.api.claim({ goal: "g", scope: ["docs/**"] });
+    expect((await s.alice.api.subscribe(start, { waitMs: 1000 })).entries.length).toBeGreaterThan(0);
+    await s.api.log();
+    expect(await s.api.actsAt({ policy: s.a })).toBe(s.first);
+  });
+});
+
+describe("what readers call a record and a thread (R-DECL-23)", () => {
+  test("titleOf: the label at the record's seq and its first field by name, the order the room records, other than scope and because", async () => {
+    await room.activate(withAsk());
+    const alice = await joinAs(room, "@alice");
+    const c = (await alice.api.acts()) as ActsCatalogue;
+    const ask = meaningOf(c, "ask");
+    expect(titleOf(ask, { text: "Which key?", urgency: "high" })).toBe("Ask: Which key?");
+    expect(titleOf(ask, { scope: ["songs/**"], because: [{ act: "act_1_00000000" }], title: "Blue Bossa" })).toBe("Ask: Blue Bossa");
+    // The body a caller typed and the record the room keeps (keys sorted) give one title: the first field by name.
+    expect(titleOf(ask, { title: "Blue Bossa", key: "c" })).toBe("Ask: c");
+    expect(titleOf(ask, { key: "c", title: "Blue Bossa" })).toBe("Ask: c");
+    expect(titleOf(ask, { scope: ["songs/**"], because: [] })).toBe("Ask");
+    expect(titleOf(ask, {})).toBe("Ask");
+    expect(titleOf(ask, null)).toBe("Ask");
+    expect(titleOf(ask, ["a"])).toBe("Ask");
+    // A value is shown as it is: text, yes or no, a number, a list of text, anything else as JSON.
+    expect(titleOf(ask, { swing: true })).toBe("Ask: yes");
+    expect(titleOf(ask, { swing: false })).toBe("Ask: no");
+    expect(titleOf(ask, { tempo: 132 })).toBe("Ask: 132");
+    expect(titleOf(ask, { parts: ["bass", "keys"] })).toBe("Ask: bass, keys");
+    expect(titleOf(ask, { at: { bar: 4 } })).toBe('Ask: {"bar":4}');
+    // A kind with no meaning there is still named, by its kind.
+    expect(titleOf(meaningOf(c, "shout"), { text: "x" })).toBe("shout: x");
+  });
+
+  test("threadTitle: the goal when the thread has one; else the opening act's title; else the thread's ID", async () => {
+    await room.activate(withAsk());
+    const alice = await joinAs(room, "@alice");
+    const ask = meaningOf((await alice.api.acts()) as ActsCatalogue, "ask");
+    const opening = { meaning: ask, body: { title: "Blue Bossa" } };
+    expect(threadTitle({ lane: "act_7_00000000", goal: "Rate-limit login" }, opening)).toBe("Rate-limit login");
+    expect(threadTitle({ lane: "act_7_00000000", goal: "" }, opening)).toBe("Ask: Blue Bossa");
+    expect(threadTitle({ lane: "act_7_00000000", goal: "" })).toBe("act_7_00000000");
+    expect(threadTitle({ lane: "act_7_00000000", goal: "g" })).toBe("g");
+  });
+
+  test("envelopeOf gives a log entry's envelope in either version, with a declared act's binding, and null for a system entry", async () => {
+    const alice = await joinAs(room, "@alice");
+    await alice.api.claim({ goal: "g", scope: ["src/**"] });
+    await room.activate(withAsk());
+    const binding = (await room.bindingOf("ask"))!;
+    // A recorded refusal has its envelope too.
+    const refused = await alice.api.act("claim", null, { goal: "g", scope: ["/bad"] }, { binding: (await room.bindingOf("claim"))! });
+    expect(isRefusal(refused) && refused.act).toBeTruthy();
+    await alice.api.act("ask", { act: FakeRoom.idOf(room.entries[1]!) }, { text: "x" }, { binding });
+    const page = await alice.api.log();
+    const envelopes = page.acts.map(envelopeOf);
+    expect(envelopes.filter((e) => e === null)).toHaveLength(page.acts.filter((e) => e.entry.type === "system").length);
+    expect(envelopeOf(page.acts.find((e) => e.entry.type === "refusal")!)).toMatchObject({ v: 2, kind: "claim", body: { scope: ["/bad"] } });
+    expect(envelopes.find((e) => e?.kind === "claim")).toMatchObject({ v: 1, kind: "claim" });
+    expect(envelopes.find((e) => e?.kind === "claim")).not.toHaveProperty("binding");
+    expect(envelopes.at(-1)).toMatchObject({ v: 2, kind: "ask", binding });
   });
 });
 

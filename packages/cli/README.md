@@ -99,6 +99,10 @@ artroom act take-part --binding sha256:… --set part=bass
   `--idempotency-key`: the journal holds the act with its binding, and
   sends the same bytes.
 
+When an act opens a thread, `artroom act` prints a second line that names
+the thread as every reader does: by its goal, or by the act's label and its
+first field by name.
+
 `artroom log` and `artroom explain` show a declared act with the label its
 kind had at that entry's own seq, and say where a kind was retired.
 `artroom acts --at SEQ` shows the declarations in force at an entry.

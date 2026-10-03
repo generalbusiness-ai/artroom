@@ -34,6 +34,8 @@ export {
   meaningOf,
   shapeOf,
   targetsOf,
+  threadTitle,
+  titleOf,
   type ActField,
   type ExpandedGrant,
   type GrantExpansion,

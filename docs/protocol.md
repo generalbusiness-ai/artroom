@@ -4473,6 +4473,47 @@ Readers are the UI, the client, the CLI and the MCP tools.
 - The `explain` read carries the entry's `meaning`, computed by the room
   under the same rule.
 
+#### A thread's kind and its name
+
+- A `Lane` carries `kind`: the kind of the act that opened the thread
+  (R-DECL-6), `room` for a revert lane, `recover` for a
+  configuration-recovery thread in a `v2` room. It is the value the room
+  compares with a declaration's `threads` (R-DECL-8). A reader uses it to
+  tell which declared acts may act on a thread. The field is optional in
+  the type, so that an older reader still fits. The room always gives it.
+- A thread that `claim` opened has a `goal`. A thread that an application
+  opened with its own act may have none: its `goal` is the empty text.
+- Every reader names a thread by one rule, `threadTitle`:
+  1. its `goal`, when that is not empty;
+  2. else the title of its opening act, `titleOf`: the label in force at
+     that act's seq, then `: ` and the value of the act's first body field
+     other than `scope` and `because`, when it has one;
+  3. else the thread's ID, when the opening act is not at hand.
+- "First" is by field name. The room keeps a body as canonical JSON, whose
+  keys are sorted, so the order a caller typed is not recorded. Sorting
+  gives one title from the typed body and from the record.
+- A thread's ID is its opening act's ID. One `explain` read of that ID
+  gives the `meaning` and the entry, and `envelopeOf(entry).body` is the
+  body.
+- The CLI prints this name when `artroom act` opens a thread. The MCP tool
+  `act` says it in the first line of its result. Neither prints a thread's
+  goal anywhere else.
+
+#### What a handle keeps
+
+- `actsAt` may answer from an ended version the handle read before. An
+  ended version's declarations and bindings never change. Its `retired`
+  marks can: a later activation may drop one of its kinds.
+- So a handle drops every ended version it kept when it sees an activation
+  later than any it knew. It sees one in a read of the active catalogue, a
+  read of another version, a log page, an update, and a refusal whose
+  `current` names the active policy version.
+- A reader that follows the room's updates therefore shows current marks.
+  A handle that has seen nothing since may answer the marks it read.
+  `actsAt(at, { fresh: true })` reads from the room and replaces what the
+  handle kept. The MCP tool `acts` always reads this way.
+- The active version is never kept by `acts()`.
+
 #### Acceptance cases (stage 5)
 
 Each is normative, and each has a test in the stage 5 report
@@ -4492,6 +4533,10 @@ Each is normative, and each has a test in the stage 5 report
 | **Generic check.** A bearer whose map names a declared check act under another name, with its binding; one whose map lacks it; one with a stale binding; the version's proposer | Admitted and the obligation met; `delegation-invalid`; `delegation-invalid` or `binding-stale`; `not-authorized-checker` | R-CRED-10, R-OBL-3 |
 | **Excluded on the generic path.** A platform kind; an act with no binding; any act in a `v1` room; a bearer act on `POST /acts` | Each refused before anything is recorded | R-CRED-10 |
 | **Old records.** A room that was `v1`, then declared a kind, relabelled it, retired it and declared the name again with another shape | Each record explains with the label and binding of its own seq; the retired kind's records name the retirement seq; the legacy record names where the `v1` era ended | R-DECL-23 |
+| **Dropped twice.** A kind declared, dropped, declared again and dropped again | Each version that declared it is marked with the first later version that did not | R-DECL-23 |
+| **Retired after the read.** A handle keeps an ended version; a later activation drops one of its kinds; the handle then sees that activation | The next `actsAt` answer carries the mark. With no sign of the activation the kept answer is given, and `fresh` reads again | R-DECL-23 |
+| **Thread kind.** A thread opened by `claim` and one opened by an application's own act | The lane reads give `claim` and the opening kind; an act whose `threads` omits that kind is `wrong-thread` | R-DECL-6, R-DECL-8 |
+| **Thread name.** A thread with no goal, read after its opening kind's label changed | Named by the label of the opening act's seq and its first field by name; the CLI and the MCP tool `act` print the same name | R-DECL-23 |
 
 #### Types
 
@@ -4500,7 +4545,9 @@ Each is normative, and each has a test in the stage 5 report
 | `Catalogue`, `ActsCatalogue`, `LegacyCatalogue`, `CatalogueAct`, `RecordMeaning`, `AnyEnvelope`, `AnySignedEnvelope`, `DeclaredRecord` | `packages/contract/src/declarations.ts` |
 | `ReadQuery` and `ReadResults` (`acts`), `RoomApi.act`, `acts`, `actsAt`, `GenericActOptions`, `CatalogueAt`, `AnyBearerAct`, `ActsNotFound`, the `acts` and `act` entries of `McpTools`, the route `GET /v1/rooms/:room/declarations`, `Explanation.meaning` | `packages/contract/src/transports.ts` |
 | Each step's own fields with their types, `STEP_FIELD_SPECS` | `packages/policy/src/steps.ts` |
-| `meaningOf`, `governs`, `fieldsOf`, `targetsOf`, `builtForBinding`, `expandGrant` | `packages/policy/src/catalogue.ts`; also the export `@generalbusiness/artroom-policy/declared`, which loads no evaluator |
+| `meaningOf`, `governs`, `fieldsOf`, `targetsOf`, `builtForBinding`, `expandGrant`, `titleOf`, `threadTitle` | `packages/policy/src/catalogue.ts`; also the export `@generalbusiness/artroom-policy/declared`, which loads no evaluator |
+| `Lane.kind` | `packages/contract/src/lanes.ts` |
+| `envelopeOf`, a log entry's envelope as `AnyEnvelope`, or null for a system entry | `packages/contract/src/guards.ts` |
 
 `ActsCatalogue` was `{ policy, steps, acts }` in section 33.7. It gains
 `vocabulary`, `since`, `until`, `lanes` and the `retired` mark. `LogEntry`
@@ -4524,5 +4571,13 @@ These continue section 33.9's list.
     stored at activation.
 51. **`LogEntry` and declared envelopes.** `LogEntry` keeps its `v: 1`
     envelope type so that this stage changes no file of `packages/log`,
-    which stage 3 owns. Readers cast to `AnyEnvelope`. The type should
+    which stage 3 owns. Readers call `envelopeOf(entry)`, which gives the
+    envelope as `AnyEnvelope` without a cast of their own. The type should
     widen when stage 3's decoder lands.
+52. **Which field names a thread.** The name of a thread with no goal
+    uses the opening act's first body field by name, because the room
+    does not record the order a caller typed or the order a declaration
+    lists its fields: both are kept as canonical JSON. An application that
+    wants a chosen field in the name has no way to say so. A declaration
+    could name that field. That would be a new member of the declaration,
+    and this stage does not add one.

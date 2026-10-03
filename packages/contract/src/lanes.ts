@@ -65,6 +65,14 @@ interface LaneBase {
   readonly landing?: OpId;
   /** Set on a revert lane the room opened (R-REV-6). */
   readonly revertOf?: OpId;
+  /**
+   * The thread's kind: the kind of the act that opened it, or `room` for a
+   * revert lane (R-DECL-6). An act may act on this thread only if its
+   * declaration's `threads` names this kind (R-DECL-8). The room always
+   * gives it; it is optional here so that older readers and test doubles
+   * that build a lane without it still fit.
+   */
+  readonly kind?: string;
 }
 
 export type Lane =

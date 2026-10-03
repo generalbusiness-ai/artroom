@@ -95,7 +95,7 @@ export {
 } from "./acts.ts";
 export { TARGET_ORDER, bindingOf, bindingSubject, bindingsOf } from "./binding.ts";
 // Declared acts stage 5: reading a catalogue as a client does. Also at `@generalbusiness/artroom-policy/declared`, without the evaluator.
-export { builtForBinding, expandGrant, fieldsOf, governs, meaningOf, targetsOf, type ActField, type ExpandedGrant, type GrantExpansion } from "./catalogue.ts";
+export { builtForBinding, expandGrant, fieldsOf, governs, meaningOf, targetsOf, threadTitle, titleOf, type ActField, type ExpandedGrant, type GrantExpansion } from "./catalogue.ts";
 export { STEP_FIELD_SPECS, type StepFieldSpec, type StepFieldType } from "./steps.ts";
 export { CODE_REVIEW_ACTS } from "./codereview.ts";
 export {

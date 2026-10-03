@@ -72,6 +72,43 @@ export function governs(catalogue: Catalogue, seq: Seq): boolean {
   return catalogue.since <= seq && (catalogue.until === null || seq < catalogue.until); // G5:governs
 }
 
+/** A recorded value as a reader shows it: text as it is, yes or no, a number, a list of text joined, anything else as JSON. */
+function valueText(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "boolean") return v ? "yes" : "no"; // G5:title-bool
+  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v.join(", ");
+  return JSON.stringify(v);
+}
+
+/**
+ * A short title for a record: its label at its own seq, then the value of
+ * its first body field other than `scope` and `because`, when it has one.
+ * `Start a song: Blue Bossa`.
+ *
+ * "First" is by name, which is the order the room records a body in: the
+ * log keeps canonical JSON, whose keys are sorted. Sorting here gives the
+ * same title from the body a caller typed and from the record a reader
+ * reads back.
+ */
+export function titleOf(meaning: RecordMeaning, body: unknown): string {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return meaning.label;
+  const names = Object.keys(body).sort(); // G5:title-order
+  const name = names.find((n) => n !== "scope" && n !== "because"); // G5:title-first
+  const first = name === undefined ? undefined : ([name, (body as Record<string, unknown>)[name]] as const);
+  return first ? `${meaning.label}: ${valueText(first[1])}` : meaning.label;
+}
+
+/**
+ * What a reader calls a thread. A thread a `claim` opened has a goal. A
+ * thread an application opened with its own act may have none: it is then
+ * named by that act, in the words in force when it opened (`titleOf`), and
+ * by its ID when the opening act is not at hand.
+ */
+export function threadTitle(lane: { readonly lane: string; readonly goal: string }, opening?: { readonly meaning: RecordMeaning; readonly body: unknown }): string {
+  if (lane.goal !== "") return lane.goal; // G5:title-goal
+  return opening ? titleOf(opening.meaning, opening.body) : lane.lane;
+}
+
 // ------------------------------------------------------------ fields of an act
 
 /** One body field of an act on a target, as a form shows it. */

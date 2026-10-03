@@ -62,6 +62,25 @@ describe("acts: the declarations an agent reads before it acts", () => {
   });
 });
 
+describe("acts on a long-lived server: an earlier version is read from the room each time", () => {
+  test("a kind retired after the server first read its version is shown retired on the next call, with nothing else read in between", async () => {
+    const first = await room.activate(withAsk());
+    await room.activate({ ...withAsk(), tell: ASK });
+    const b = await agent({});
+    // One handle for the life of the server, as the stdio server has.
+    const handle = await connect({ url }, room.id, { kind: "bearer", token: b.bearer });
+    const before = await callTool(handle, "acts", { policy: first });
+    expect(before.structuredContent!["until"]).not.toBeNull();
+    expect((before.structuredContent!["acts"] as Record<string, object>)["ask"]).not.toHaveProperty("retired");
+    await room.activate({ ...CODE_REVIEW_ACTS });
+    const dropped = room.entries.at(-1)!.seq;
+    const after = await callTool(handle, "acts", { policy: first });
+    expect((after.structuredContent!["acts"] as Record<string, object>)["ask"]).toMatchObject({ retired: dropped });
+    const bySeq = await callTool(handle, "acts", { at: before.structuredContent!["since"] as number });
+    expect(bySeq.structuredContent).toEqual(after.structuredContent);
+  });
+});
+
 describe("act: any declared act, with the binding the agent read", () => {
   test("it passes kind, target, body, binding and key to the room unchanged; a retry with the same key is the same record", async () => {
     await room.activate(withAsk());
@@ -117,6 +136,38 @@ describe("act: any declared act, with the binding the agent read", () => {
       expect(res.structuredContent.message).toContain("platform kind");
     }
     expect(room.entries.length).toBe(entries);
+  });
+});
+
+describe("act: a thread it opened is named as every reader names it", () => {
+  const SONG: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { title: { type: "text", max: 80 }, year: { type: "text", max: 4, optional: true } }, who: { roles: ["member", "agent"] }, hold: { scope: "body.scope", workspace: true } };
+
+  test("by its goal; with no goal, by the act's label at its own seq and its first field; by its ID alone if the declarations cannot be read", async () => {
+    await room.activate({ ...CODE_REVIEW_ACTS, "start-song": SONG });
+    const binding = (await room.bindingOf("start-song"))!;
+    const b = await agent({ "start-song": binding, claim: (await room.bindingOf("claim"))!, note: (await room.bindingOf("note"))! });
+    const song = await tool(b, "act", { kind: "start-song", target: null, body: { year: "1963", title: "Blue Bossa", scope: ["songs/blue-bossa/**"] }, binding, idempotencyKey: "s1" });
+    const id = song.structuredContent.id as string;
+    expect(first(song)).toBe(`Done: ${id}. It opened thread ${id}: Start a song: Blue Bossa.`);
+    const claim = await tool(b, "act", { kind: "claim", target: null, body: { goal: "Rate-limit login", scope: ["src/**"] }, binding: (await room.bindingOf("claim"))!, idempotencyKey: "c1" });
+    expect(first(claim)).toBe(`Done: ${claim.structuredContent.id}. It opened thread ${claim.structuredContent.id}: Rate-limit login.`);
+    const note = await tool(b, "act", { kind: "note", target: { act: id }, body: { text: "Nice" }, binding: (await room.bindingOf("note"))!, idempotencyKey: "n1" });
+    expect(first(note)).toBe(`Done: ${note.structuredContent.id}.`);
+
+    // The act is recorded even if the words for its thread cannot be read: the result is the record, and the thread is named by its ID.
+    const alice = await connect({ url }, room.id, { kind: "bearer", token: b.bearer });
+    const blind = {
+      act: (...a: Parameters<RoomApi["act"]>) => alice.act(...a),
+      actsAt: async () => {
+        throw new Error("unreachable");
+      },
+    } as unknown as RoomApi;
+    const dark = await callTool(blind, "act", { kind: "start-song", target: null, body: { title: "Footprints", scope: ["songs/footprints/**"] }, binding, idempotencyKey: "s2" });
+    expect(dark.isError).toBe(false);
+    expect(first(dark)).toBe(`Done: ${String(dark.structuredContent!["id"])}. It opened thread ${String(dark.structuredContent!["id"])}.`);
+    // With a goal there is nothing to read.
+    const lit = await callTool(blind, "act", { kind: "claim", target: null, body: { goal: "g", scope: ["docs/**"] }, binding: (await room.bindingOf("claim"))!, idempotencyKey: "c2" });
+    expect(first(lit)).toMatch(/It opened thread act_\d+_[0-9a-f]{8}: g\.$/);
   });
 });
 

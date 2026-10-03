@@ -16,6 +16,8 @@ export {
   governs,
   meaningOf,
   targetsOf,
+  threadTitle,
+  titleOf,
   type ActField,
   type ExpandedGrant,
   type GrantExpansion,

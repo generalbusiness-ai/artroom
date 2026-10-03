@@ -281,8 +281,12 @@ export interface RoomApi {
   members(): Promise<Roster>;
   /** The active policy version's declarations and bindings; a `v1` room answers with the legacy catalogue. */
   acts(): Promise<Catalogue>;
-  /** A retained policy version's declarations: `D(s)` for an entry's seq (R-DECL-23), or null when there is none. */
-  actsAt(at: CatalogueAt): Promise<Catalogue | null>;
+  /**
+   * A retained policy version's declarations: `D(s)` for an entry's seq (R-DECL-23), or null when there is none.
+   * A handle may keep an ended version it read. Its `retired` marks can still change, so the handle drops what it
+   * kept when it sees a later activation; `fresh` reads from the room whatever it kept.
+   */
+  actsAt(at: CatalogueAt, opts?: { readonly fresh?: boolean }): Promise<Catalogue | null>;
 }
 
 /**

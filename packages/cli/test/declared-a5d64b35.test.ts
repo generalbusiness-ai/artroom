@@ -109,6 +109,23 @@ describe("artroom act: any declared act, under the binding the user read", () =>
     expect(JSON.parse(json.out)).toMatchObject({ kind: "ask", text: "again" });
   });
 
+  test("an act that opens a thread names it as every reader does: its goal, or the act's label and first field", async () => {
+    const alice = join(h.tmp, "alice");
+    await login(alice, "@alice");
+    const song: ActDeclaration = { label: "Start a song", targets: { none: ["open"] }, body: { title: { type: "text", max: 80 }, year: { type: "text", max: 4, optional: true } }, who: { roles: ["member"] }, hold: { scope: "body.scope", workspace: true } };
+    await h.room.activate({ ...CODE_REVIEW_ACTS, "start-song": song });
+    const res = await cli(alice, ["act", "start-song", "--binding", (await h.room.bindingOf("start-song"))!, "--set", "year=1963", "--set", "title=Blue Bossa", "--set", "scope=songs/blue-bossa/**"]);
+    expect(res.code).toBe(0);
+    const id = /recorded as (act_\d+_[0-9a-f]{8})\.$/m.exec(res.out)![1]!;
+    expect(res.out.split("\n")).toEqual([`Done: Start a song (start-song), recorded as ${id}.`, `Thread: Start a song: Blue Bossa (lane ${id}).`]);
+    // A thread that has a goal is named by it.
+    const claim = await cli(alice, ["act", "claim", "--binding", (await h.room.bindingOf("claim"))!, "--set", "goal=Rate-limit login", "--set", "scope=src/**"]);
+    expect(claim.out.split("\n")[1]).toMatch(/^Thread: Rate-limit login \(lane act_\d+_[0-9a-f]{8}\)\.$/);
+    // An act that opens nothing prints no thread line.
+    const ask = await cli(alice, ["act", "note", "--binding", (await h.room.bindingOf("note"))!, "--entry", id, "--set", "text=Nice"]);
+    expect(ask.out).toMatch(/^Done: Note \(note\), recorded as act_\d+_[0-9a-f]{8}\.$/);
+  });
+
   test("without --binding, or with a malformed one, nothing is read or sent: the CLI never chooses the meaning", async () => {
     const { alice, claim } = await ready();
     const before = h.room.requests.length;

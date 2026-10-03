@@ -252,6 +252,8 @@ export function laneView(sql: Sql, row: LaneRow, landing: OpId | undefined): Lan
     overlaps: overlapsFor(sql, row.id, row.scope),
     ...(landing ? { landing } : {}),
     ...(row.revertOf ? { revertOf: row.revertOf } : {}),
+    // The thread's kind (R-DECL-6), so a reader can tell which acts' `threads` name it (declared acts stage 5).
+    kind: row.kind, // G5:lane-kind
   };
   if (row.state === "held")
     return { ...base, state: "held", lease: { holder: row.holder!, generation: row.leaseGen, expiresAt: iso(row.expiresMs!) } };

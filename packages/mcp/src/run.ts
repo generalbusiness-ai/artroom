@@ -23,6 +23,7 @@ import {
   type RecordMeaning,
   type RoomApi,
 } from "@generalbusiness/artroom-contract";
+import { meaningOf, threadTitle } from "@generalbusiness/artroom-client";
 import { TOOLS } from "./tools.ts";
 import { validate } from "./validate.ts";
 
@@ -151,7 +152,10 @@ const RUN: { readonly [T in McpToolName]: Runner<T> } = {
     if (input.at !== undefined && input.policy !== undefined) throw error("bad-request", "Give at or policy, not both.");
     if (input.at === undefined && input.policy === undefined) return room.acts();
     // MCP structured content must be an object, so a version the room does not retain is `ActsNotFound`.
-    return (await room.actsAt(input.at !== undefined ? { seq: input.at } : { policy: input.policy! })) ?? { outcome: "not-found" as const }; // G5:acts-not-found
+    // Read from the room each time: a long-lived server's handle may have kept this version before a later activation retired one of its kinds.
+    const at = input.at !== undefined ? { seq: input.at } : { policy: input.policy! };
+    const opts = { fresh: true }; // G5:acts-fresh
+    return (await room.actsAt(at, opts)) ?? { outcome: "not-found" as const }; // G5:acts-not-found
   },
 
   async act(room, input) {
@@ -206,8 +210,31 @@ function headline(name: McpToolName, out: unknown): string {
   }
 }
 
-export function toolResult(name: McpToolName, out: unknown): ToolResult {
-  const text = `${headline(name, out)}\n${JSON.stringify(out)}`;
+/**
+ * When an act opened a thread: one sentence that names the thread as every
+ * reader does, by its goal, or by the act's label at its own seq and its
+ * first field (R-DECL-23). The declarations are read only when the thread
+ * has no goal; if that read fails the thread is named by its ID alone.
+ */
+async function openedThread(room: RoomApi, input: McpInput<"act">, out: unknown): Promise<string | undefined> {
+  if (out === null || typeof out !== "object" || isRefusal(out)) return undefined;
+  const o = out as { lane?: unknown; goal?: unknown; seq?: unknown; effect?: { type?: unknown } };
+  if (o.effect?.type !== "opened" || typeof o.lane !== "string") return undefined;
+  const lane = { lane: o.lane, goal: typeof o.goal === "string" ? o.goal : "" };
+  let title = threadTitle(lane);
+  if (lane.goal === "" && typeof o.seq === "number") {
+    try {
+      const c = await room.actsAt({ seq: o.seq });
+      if (c !== null) title = threadTitle(lane, { meaning: meaningOf(c, input.kind), body: input.body }); // G5:mcp-thread
+    } catch {
+      // The act is recorded. Only the words for its thread could not be read.
+    }
+  }
+  return title === lane.lane ? `It opened thread ${lane.lane}.` : `It opened thread ${lane.lane}: ${title}.`;
+}
+
+export function toolResult(name: McpToolName, out: unknown, note?: string): ToolResult {
+  const text = `${headline(name, out)}${note !== undefined ? ` ${note}` : ""}\n${JSON.stringify(out)}`;
   if (out === null || typeof out !== "object") return { content: [{ type: "text", text }] };
   return { content: [{ type: "text", text }], structuredContent: out as Record<string, unknown>, isError: false };
 }
@@ -248,7 +275,8 @@ export async function callTool(room: RoomApi | (() => Promise<RoomApi>), name: u
     const problems = validate(TOOLS[name].inputSchema, input);
     if (problems.length > 0) return errorResult(error("bad-request", `The input does not fit the ${name} tool: ${problems.join("; ")}.`));
     const api = typeof room === "function" ? await room() : room;
-    return toolResult(name, await (RUN[name] as Runner<McpToolName>)(api, input as never));
+    const out = await (RUN[name] as Runner<McpToolName>)(api, input as never);
+    return toolResult(name, out, name === "act" ? await openedThread(api, input as McpInput<"act">, out) : undefined);
   } catch (e) {
     return errorResult(isArtroomError(e) ? e : error("internal", "The tool failed.", true));
   }

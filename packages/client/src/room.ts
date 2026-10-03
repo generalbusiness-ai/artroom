@@ -164,8 +164,15 @@ abstract class RoomCore {
   #sessionPending: Promise<Session> | undefined;
   /** The active catalogue the named methods sign under, read once and kept until the room says it is stale. */
   #vocabulary: Catalogue | undefined;
-  /** Retained catalogues of ended policy versions, by interval, for `actsAt`. */
+  /**
+   * Catalogues of ended policy versions this handle read, for `actsAt`. An
+   * ended version is not final: a later activation can set `retired` on its
+   * kinds. So every one is dropped when the handle sees a later activation
+   * than the latest it knew.
+   */
   readonly #ended: Catalogue[] = [];
+  /** The seq of the latest `policy-activated` entry this handle has seen, by any read. */
+  #activation = -1;
 
   constructor(wire: Wire & { redactor: import("./errors.ts").Redactor }, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActor) {
     this.wire = wire;
@@ -262,6 +269,33 @@ abstract class RoomCore {
   }
 
   /**
+   * Note an activation at `seq`. If it is later than any this handle knew,
+   * the ended catalogues it kept are dropped: their `retired` marks were
+   * read before it (R-DECL-23).
+   */
+  #sawActivation(seq: number): void {
+    if (seq <= this.#activation) return; // G5:cache-later
+    this.#activation = seq;
+    this.#ended.length = 0; // G5:cache-drop
+  }
+
+  /** The seq inside an entry ID, `act_<seq>_<hash>`: a policy version is its `policy-activated` entry's ID. */
+  static #seqOf(id: unknown): number | undefined {
+    const m = typeof id === "string" ? /^act_(\d+)_/.exec(id) : null;
+    return m ? Number(m[1]) : undefined;
+  }
+
+  /** Activations named by what the room just answered: a refusal's current policy version, an update's or a log page's entries. */
+  protected sawRefusal(out: unknown): void {
+    const seq = isRefusal(out) ? RoomCore.#seqOf(out.current?.policy) : undefined;
+    if (seq !== undefined) this.#sawActivation(seq); // G5:cache-refusal
+  }
+
+  protected sawUpdate(update: Update): void {
+    for (const e of update.entries) if (e.type === "system" && e.kind === "policy-activated") this.#sawActivation(e.seq); // G5:cache-update
+  }
+
+  /**
    * Forget the catalogue the named methods sign under. Called when the room
    * says an act's vocabulary or binding is not the active one, so the
    * caller's next call reads again. The refused act itself is never sent
@@ -296,6 +330,7 @@ abstract class RoomCore {
       throw e;
     }
     this.#vocabularyStale(out);
+    this.sawRefusal(out);
     return out as Result<T>;
   }
 
@@ -330,7 +365,9 @@ abstract class RoomCore {
             signed: await signEnvelope(buildDeclaredEnvelope(this.id, this.identity, kind, binding, target, body, idempotencyKey), this.identity.signer),
           };
     await opts.onPrepared?.(prepared);
-    return (await this.replay(prepared)) as Result<DeclaredRecord>;
+    const out = await this.replay(prepared);
+    this.sawRefusal(out);
+    return out as Result<DeclaredRecord>;
   }
 
   /**
@@ -462,8 +499,10 @@ abstract class RoomCore {
     return this.read(page === undefined ? { q: "attention" } : { q: "attention", page });
   }
 
-  log(req?: LogRequest): Promise<LogPage> {
-    return this.read(req === undefined ? { q: "log" } : { q: "log", req });
+  async log(req?: LogRequest): Promise<LogPage> {
+    const page = await this.read(req === undefined ? { q: "log" } : { q: "log", req });
+    for (const e of page.acts) if (e.entry.type === "system" && e.entry.event.type === "policy-activated") this.#sawActivation(e.seq); // G5:cache-log
+    return page;
   }
 
   explain(act: ActId): Promise<Explanation | null> {
@@ -483,6 +522,7 @@ abstract class RoomCore {
   async acts(): Promise<Catalogue> {
     const c = await this.read({ q: "acts" });
     if (c === null) throw artroomError("internal", "The room has no active policy version.");
+    this.#sawActivation(c.since); // G5:cache-active
     return c;
   }
 
@@ -490,15 +530,29 @@ abstract class RoomCore {
    * The declarations in force at an entry's seq, `D(s)`, or of a named
    * policy version (R-DECL-23). Readers show a record with these labels and
    * fields, never the active ones. Null when the room retains no such
-   * version. An ended version's declarations never change, so the handle
-   * keeps it and answers later seqs of its interval without a read; its
-   * `retired` marks are those of the time it was read.
+   * version.
+   *
+   * The handle keeps an ended version it read and answers later questions
+   * about its interval without a read. An ended version's declarations and
+   * bindings never change, but its `retired` marks can: a later activation
+   * may drop one of its kinds. So the kept versions are dropped whenever
+   * the handle sees a later activation: in a read of the active catalogue,
+   * a log page, an update, or a refusal that names the active policy
+   * version. A reader that follows the room therefore sees current marks.
+   * `{ fresh: true }` reads from the room whatever the handle kept.
    */
-  async actsAt(at: CatalogueAt): Promise<Catalogue | null> {
-    const kept = this.#ended.find((c) => (at.seq !== undefined ? governs(c, at.seq) : c.policy === at.policy)); // G5:catalogue-cache
+  async actsAt(at: CatalogueAt, opts: { readonly fresh?: boolean } = {}): Promise<Catalogue | null> {
+    const kept = opts.fresh === true ? undefined : this.#ended.find((c) => (at.seq !== undefined ? governs(c, at.seq) : c.policy === at.policy)); // G5:catalogue-cache
     if (kept) return kept;
     const c = await this.read(at.seq !== undefined ? { q: "acts", at: at.seq } : { q: "acts", policy: at.policy });
-    if (c !== null && c.until !== null && !this.#ended.some((k) => k.policy === c.policy)) this.#ended.push(c);
+    if (c === null) return null;
+    // What this answer says about activations: its own, and the one that ended it.
+    this.#sawActivation(c.until ?? c.since); // G5:cache-read
+    if (c.until !== null) {
+      const i = this.#ended.findIndex((k) => k.policy === c.policy);
+      if (i >= 0) this.#ended[i] = c; // G5:cache-replace
+      else this.#ended.push(c);
+    }
     return c;
   }
 
@@ -522,14 +576,15 @@ export class HttpRoomClient extends RoomCore implements HttpRoom {
   /** The HTTPS long poll: the next update after `cursor`, or an empty one after `waitMs` (R-API-8). */
   async subscribe(cursor?: Cursor, opts?: { readonly waitMs?: number }): Promise<Update> {
     const waitMs = Math.min(Math.max(opts?.waitMs ?? 25_000, 0), WAIT_MAX_MS);
+    let update: Update;
     try {
-      return await this.#http.subscribe(await this.auth(), cursor, waitMs);
+      update = await this.#http.subscribe(await this.auth(), cursor, waitMs);
     } catch (e) {
-      if (isArtroomError(e) && e.code === "unauthenticated" && this.creds.kind !== "bearer") {
-        return await this.#http.subscribe(await this.auth(true), cursor, waitMs);
-      }
-      throw e;
+      if (!(isArtroomError(e) && e.code === "unauthenticated" && this.creds.kind !== "bearer")) throw e;
+      update = await this.#http.subscribe(await this.auth(true), cursor, waitMs);
     }
+    this.sawUpdate(update);
+    return update;
   }
 
   /**
@@ -556,7 +611,10 @@ export class HttpRoomClient extends RoomCore implements HttpRoom {
       check: async () => {
         await this.read({ q: "log", req: { limit: 1 } });
       },
-      onUpdate,
+      onUpdate: (update) => {
+        this.sawUpdate(update);
+        onUpdate(update);
+      },
       onError: onError ?? (() => {}),
       onClose: () => this.#watches.delete(sub),
     });
@@ -703,7 +761,22 @@ export class RpcRoomClient extends RoomCore implements Room {
 
   /** The room's newline-delimited JSON bytes, decoded into updates (R-API-8). */
   async subscribe(cursor?: Cursor): Promise<UpdateStream> {
-    return decodeUpdates(await this.#rpc.subscribe(await this.auth(), cursor));
+    const updates = decodeUpdates(await this.#rpc.subscribe(await this.auth(), cursor));
+    // Each update is looked at for a later activation as it is read (see `actsAt`).
+    return {
+      getReader: () => {
+        const reader = updates.getReader();
+        return {
+          read: async () => {
+            const r = await reader.read();
+            if (!r.done) this.sawUpdate(r.value);
+            return r;
+          },
+          releaseLock: () => reader.releaseLock(),
+        };
+      },
+      cancel: (reason) => updates.cancel(reason),
+    };
   }
 }
 

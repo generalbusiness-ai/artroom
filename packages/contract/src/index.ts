@@ -100,6 +100,7 @@ export type {
   UpdateStream,
 } from "./transports.ts";
 export {
+  envelopeOf,
   holdsSlot,
   isActId,
   isArtroomError,

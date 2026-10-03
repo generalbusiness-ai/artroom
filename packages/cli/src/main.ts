@@ -29,6 +29,7 @@ import {
   meaningOf,
   shapeOf,
   targetsOf,
+  threadTitle,
   LOST_REDEMPTION,
   newIdempotencyKey,
   redeem,
@@ -39,7 +40,7 @@ import {
   type HttpRoomClient,
   type PreparedAct,
 } from "@generalbusiness/artroom-client";
-import { isActId } from "@generalbusiness/artroom-contract";
+import { envelopeOf, isActId } from "@generalbusiness/artroom-contract";
 import type {
   ActId,
   ActsCatalogue,
@@ -1039,7 +1040,7 @@ const COMMANDS: Record<string, Command> = {
           versions.push(read);
           c = read;
         }
-        meanings.set(e.seq, meaningOf(c, e.entry.act.envelope.kind)); // G5:cli-log-meaning
+        meanings.set(e.seq, meaningOf(c, envelopeOf(e)!.kind)); // G5:cli-log-meaning
       }
       return print(ctx, page, () => logText(page.acts, page.head, page.publishedThrough, page.more, page.cursor, meanings));
     },
@@ -1104,6 +1105,7 @@ const COMMANDS: Record<string, Command> = {
       const because = list(ctx.values, "because").map(parseReason);
       let active: ActsCatalogue | undefined;
       let reader: HttpRoomClient | undefined;
+      let sent: Record<string, Json> | undefined;
       const { out } = await journaled<DeclaredRecord>(ctx, {
         command: "act",
         async start(api, room, opts) {
@@ -1153,6 +1155,7 @@ const COMMANDS: Record<string, Command> = {
           }
           const lacks = missing(fields, body);
           if (lacks.length > 0) throw new UsageError(`${kind} on target ${shape} also needs: ${lacks.map((n) => `--set ${n}=…`).join(" ")}. See: artroom acts ${kind}`); // G5:cli-missing
+          sent = body;
           return api.act(kind, target, body, { binding: given as Binding, ...opts }); // G5:cli-binding-given
         },
       });
@@ -1162,7 +1165,14 @@ const COMMANDS: Record<string, Command> = {
         return code;
       }
       const label = active?.acts[kind]?.declaration.label;
-      return print(ctx, out, () => [`Done: ${label !== undefined ? `${label} (${kind})` : kind}, recorded as ${out.id}.`]);
+      const lines = [`Done: ${label !== undefined ? `${label} (${kind})` : kind}, recorded as ${out.id}.`];
+      // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and first field.
+      const opened = out as { lane?: unknown; goal?: unknown; effect?: { type?: unknown } };
+      if (active !== undefined && opened.effect?.type === "opened" && typeof opened.lane === "string") {
+        const title = threadTitle({ lane: opened.lane, goal: typeof opened.goal === "string" ? opened.goal : "" }, { meaning: meaningOf(active, kind), body: sent }); // G5:cli-thread
+        lines.push(`Thread: ${title} (lane ${opened.lane}).`);
+      }
+      return print(ctx, out, () => lines);
     },
   },
 

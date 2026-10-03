@@ -51,6 +51,11 @@ acts again. The tool does not act again by itself.
 
 `explain` shows an act with the label its kind had at the act's own seq.
 
+When `act` opens a thread, the first line of its text names the thread as
+every reader does: by its goal, or by the act's label and its first field
+by name. `acts` with `at` or `policy` reads the room each time, so a kind
+retired since the last call is shown as retired.
+
 The descriptor shape (titles, annotations, toolsets) and the further read
 tools of the MCP core (`a9788a59`) are not part of this change. `acts` and
 `act` are written in the existing shape, in their own block of

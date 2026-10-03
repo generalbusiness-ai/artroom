@@ -266,8 +266,9 @@ engine:
 - `src/catalogue.ts`: `meaningOf` and `governs` (a record under the
   declarations of its own seq), `fieldsOf` and `targetsOf` (the fields of
   an act), `builtForBinding` (the binding a named code-review method
-  carries in a room), and `expandGrant` (a grant as the signed map its
-  grantor signs).
+  carries in a room), `expandGrant` (a grant as the signed map its
+  grantor signs), and `titleOf` and `threadTitle` (what readers call a
+  record and a thread).
 
 These decide nothing. The room judges every act again at admission.
 

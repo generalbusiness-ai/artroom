@@ -138,6 +138,8 @@ interface Reader {
 interface LaneState {
   readonly lane: LaneId;
   readonly seq: number;
+  /** The kind of the act that opened it (R-DECL-6). */
+  readonly kind: string;
   goal: string;
   plan?: string;
   scope: readonly string[];
@@ -404,6 +406,7 @@ export class FakeRoom {
   #held(lane: LaneState): Lane {
     const base = {
       lane: lane.lane,
+      kind: lane.kind,
       purpose: "ordinary" as const,
       goal: lane.goal,
       ...(lane.plan !== undefined ? { plan: lane.plan } : {}),
@@ -496,6 +499,7 @@ export class FakeRoom {
           const state: LaneState = {
             lane,
             seq: e.seq,
+            kind: "claim",
             goal: body["goal"] as string,
             ...(body["plan"] !== undefined ? { plan: body["plan"] as string } : {}),
             scope,
@@ -682,7 +686,18 @@ export class FakeRoom {
       default: {
         // A declared kind beyond the code-review seven: recorded, with its body's fields on the record. The fake runs
         // no step; the real Room's steps are tested in packages/room.
-        if (this.policies.at(-1)!.acts === null) return refusal("role-forbids", `The fake room does not accept ${env.kind}.`);
+        const declared = this.policies.at(-1)!.acts;
+        if (declared === null) return refusal("role-forbids", `The fake room does not accept ${env.kind}.`);
+        // The one step it does run: a kind of the room's own that opens a thread, with no goal unless its body has one.
+        if (target === null && (declared[env.kind]?.targets.none as readonly string[] | undefined)?.includes("open")) {
+          const scope = (body["scope"] as string[] | undefined) ?? [];
+          const lease = { holder: member, generation: 1, expiresAt: this.iso(this.now() + LEASE_MS) };
+          const effect = { type: "opened", purpose: "ordinary", lease };
+          const e = await this.#record(signed, by, [effect]);
+          const lane = FakeRoom.idOf(e);
+          this.lanes.set(lane, { lane, seq: e.seq, kind: env.kind, goal: (body["goal"] as string | undefined) ?? "", scope, holder: member, leaseGeneration: 1, expiresAt: this.now() + LEASE_MS, generations: [] });
+          return { ...body, ...this.#base(e, env.kind, by), kind: env.kind, lane, purpose: "ordinary", scope, lease, overlaps: [], effect } as unknown as ActRecord;
+        }
         const e = await this.#record(signed, by);
         return { ...body, ...this.#base(e, env.kind, by), kind: env.kind } as unknown as ActRecord;
       }
