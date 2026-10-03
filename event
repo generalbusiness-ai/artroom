@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/room/src/reads.ts at exact 48b1fee9a1071f3fa4afed62025c470acc160c10 on request/row-writes, under promise git:sha1…239fba7 on request git:sha1…dc18d10","body":{"commit":"48b1fee9a1071f3fa4afed62025c470acc160c10","path":"packages/room/src/reads.ts"}}
+{"kind":"artifact","text":"packages/room/src/room.ts at exact 48b1fee9a1071f3fa4afed62025c470acc160c10 on request/row-writes, under promise git:sha1…239fba7 on request git:sha1…dc18d10","body":{"commit":"48b1fee9a1071f3fa4afed62025c470acc160c10","path":"packages/room/src/room.ts"}}
