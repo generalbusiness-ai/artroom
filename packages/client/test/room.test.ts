@@ -328,6 +328,7 @@ describe("no credential in any output (R-WS-4)", () => {
   test("tokens appear only in the grant and the join result: not in reads, updates, explain, errors or debug lines", async () => {
     const lines: string[] = [];
     const a = await joinAs(room, "@alice", "member", { log: (l) => lines.push(l) });
+    const session = room.exposure.sessions.at(-1)!; // the read session of alice's handle
     const b = await joinAs(room, "@bob");
     const outputs: unknown[] = [];
     const claim = ok(await a.api.claim({ goal: "g", scope: ["src/**"] }));
@@ -339,8 +340,8 @@ describe("no credential in any output (R-WS-4)", () => {
     outputs.push(await a.api.log({ limit: 500 }), await a.api.attention(), await b.api.attention(), await a.api.members());
     outputs.push(await a.api.explain(p.id), await a.api.subscribe(undefined, { waitMs: 0 }), await a.api.lanes());
     outputs.push(await a.api.op({ id: op.id, kind: "workspace" }));
-    // A room that misbehaves and echoes the token in an error message: the client redacts it.
-    room.faults.push({ route: "GET /members", kind: "status", status: 500, body: { name: "ArtroomError", code: "internal", message: `failed with ${grant.token}`, retryable: false } });
+    // A room that misbehaves and echoes the handle's tokens in an error message: the client redacts both.
+    room.faults.push({ route: "GET /members", kind: "status", status: 500, body: { name: "ArtroomError", code: "internal", message: `failed with ${grant.token} for ${session}`, retryable: false } });
     try {
       await a.api.members();
     } catch (e) {
@@ -350,7 +351,7 @@ describe("no credential in any output (R-WS-4)", () => {
     const text = JSON.stringify(outputs) + lines.join("\n");
     expect(room.secrets().length).toBeGreaterThan(3);
     for (const secret of room.secrets()) expect(text).not.toContain(secret);
-    expect(text).toContain("[redacted]");
+    expect(text).toContain("failed with [redacted] for [redacted]");
     expect(lines.length).toBeGreaterThan(5);
     for (const line of lines) expect(line).toMatch(/^(GET|POST) \/[a-z/%_0-9A-Z-]* (\d{3}|no response) \d+ms$/);
   });
