@@ -67,7 +67,11 @@ describe("request df6ff8d3: a propose with Artifacts' clock ahead of the Room's"
     expect(err).toMatchObject({ code: "unavailable", maybeRecorded: false });
     const diag = r.world.diagnoses.filter((d) => d.event === "pre-admission-failed");
     expect(diag.map((d) => [d.step, d.message])).toEqual([["propose.pinObjects", expect.stringContaining("an expiry later than the lifetime asked")]]);
+    // Since mint lane F (request 02836f9a), pinning mints the fork's read token first, through the fork's own ledger, with
+    // the same bound and allowance (R-MINT-3): that token is the one refused and owed, and the canonical half is never sent.
+    const fork = await inDO(r, (room) => room.core.workspaces.forkTokens.duties({ limit: 1000 }));
+    expect(fork.records.map((x) => [x.purpose.split(":")[0], x.state])).toEqual([["pin-objects", "owed"]]);
     const duties = await inDO(r, (room) => room.core.mints.duties({ limit: 1000 }));
-    expect(duties.records.map((x) => [x.purpose.split(":")[0], x.state])).toEqual([["pin-objects", "owed"]]);
+    expect(duties.records).toEqual([]);
   });
 });
