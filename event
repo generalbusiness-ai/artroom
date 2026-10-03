@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f603b8d536829bd4bed1884c1cda37edfa3dab28","text":"Replaced by the review request for exact head 31ee9b1142ba7e277662245d5a9898e23937c938; any review promised on this request is released, and a verdict filed against it would bind to nothing."}
+{"kind":"promise","text":"Checker takes the exact 31ee9b1142ba7e277662245d5a9898e23937c938 combined-head review: validate migration 3, upgrades from v1 and landed v2 including mid-scrub restart, retained mint ownership guards and safe-error composition."}
