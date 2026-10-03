@@ -1,0 +1,4370 @@
+{
+  "run": "2026-10-02T16-35-35-412Z",
+  "url": "https://artroom-spike-room.inguz.workers.dev",
+  "namespace": "gitseq-spike",
+  "importNamespace": "gitseq-spike-import",
+  "steps": [
+    {
+      "step": "rows: throwaway repository created in gitseq-spike-import",
+      "ok": true,
+      "atMs": 3170,
+      "detail": {
+        "name": "95808bd77805d471d62cae7569b0dae2",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/95808bd77805d471d62cae7569b0dae2.git"
+      }
+    },
+    {
+      "step": "rows: one commit pushed; its creation token revoked",
+      "ok": true,
+      "atMs": 3170,
+      "detail": {
+        "main": "7758ec1ab2783e82b1023d0980429170b0d0c28e",
+        "revoked": 1,
+        "active": 0
+      }
+    },
+    {
+      "step": "rows: draft",
+      "ok": true,
+      "atMs": 3328,
+      "detail": {
+        "status": 200,
+        "repo": "gitseq-spike-import/95808bd77805d471d62cae7569b0dae2",
+        "operator": "key_YPyqnnYvpoDxlDj_8mTlI4IHzyZ8002lmXgrV7NuylE"
+      }
+    },
+    {
+      "step": "rows: found",
+      "ok": true,
+      "atMs": 4594,
+      "detail": {
+        "status": 200,
+        "ms": 1265,
+        "room": "room_1741490181aa074e9337b16af80dbe9d"
+      }
+    },
+    {
+      "step": "rows: main is the imported commit; the Room wrote nothing",
+      "ok": true,
+      "atMs": 5294,
+      "detail": {
+        "main": "7758ec1ab2783e82b1023d0980429170b0d0c28e",
+        "imported": "7758ec1ab2783e82b1023d0980429170b0d0c28e"
+      }
+    },
+    {
+      "step": "rows: session",
+      "ok": true,
+      "atMs": 5376,
+      "detail": {
+        "status": 200,
+        "member": "@author"
+      }
+    },
+    {
+      "step": "rows: invite",
+      "ok": true,
+      "atMs": 433305,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "rows: join",
+      "ok": true,
+      "atMs": 646990,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "rows: @checker joins as checker",
+      "ok": true,
+      "atMs": 647739,
+      "detail": {
+        "key": "key__5Feafe6dIDQmeA8IHuU-IyPQFWaQ8MnzskJMmfY11Y",
+        "invite": 200,
+        "join": 200,
+        "session": 200
+      }
+    },
+    {
+      "step": "lane 10: claim",
+      "ok": true,
+      "atMs": 860291,
+      "detail": {
+        "status": 200,
+        "ms": 121,
+        "lane": "act_19_e7edd7ec",
+        "seq": 19
+      }
+    },
+    {
+      "step": "lane 10: workspace requested",
+      "ok": true,
+      "atMs": 1074059,
+      "detail": {
+        "status": 200,
+        "ms": 136,
+        "op": "op_ws_act_19_e7edd7ec_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 10: workspace ready",
+      "ok": true,
+      "atMs": 1076360,
+      "detail": {
+        "state": "ready",
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec.git",
+        "leaseGeneration": 1
+      }
+    },
+    {
+      "step": "lane 10: workspace token",
+      "ok": true,
+      "atMs": 1076463,
+      "detail": {
+        "status": 200,
+        "remote": "https://6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net/git/gitseq-spike-import/95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec.git",
+        "expiresAt": "2026-10-02T17:19:50.603Z",
+        "token": "<token>"
+      }
+    },
+    {
+      "step": "lane 10: clone fork",
+      "ok": true,
+      "atMs": 1077317,
+      "detail": {
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 10: push to fork",
+      "ok": true,
+      "atMs": 1078224,
+      "detail": {
+        "head": "42f1382c05f1704e8189aa300260656144c4d555",
+        "code": 0
+      }
+    },
+    {
+      "step": "lane 10: propose",
+      "ok": true,
+      "atMs": 1292920,
+      "detail": {
+        "status": 200,
+        "ms": 2176,
+        "generation": 1,
+        "preview": {
+          "id": "op_preview_27",
+          "kind": "preview",
+          "updatedAt": "2026-10-02T16:57:08.143Z",
+          "lane": "act_19_e7edd7ec",
+          "generation": 1,
+          "state": "pending"
+        },
+        "changed": [
+          {
+            "status": "added",
+            "path": "docs/d0/a.md"
+          }
+        ],
+        "obligations": []
+      }
+    },
+    {
+      "step": "lane 10: preview",
+      "ok": true,
+      "atMs": 1293160,
+      "detail": {
+        "state": "clean",
+        "integration": "42f1382c05f1704e8189aa300260656144c4d555",
+        "base": "7758ec1ab2783e82b1023d0980429170b0d0c28e"
+      }
+    },
+    {
+      "step": "rows: note",
+      "ok": true,
+      "atMs": 1718624,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "step": "lane 10: land accepted",
+      "ok": true,
+      "atMs": 1718887,
+      "detail": {
+        "status": 200,
+        "ms": 126,
+        "op": "op_land_35",
+        "state": "accepted"
+      }
+    },
+    {
+      "step": "lane 10: landed",
+      "ok": true,
+      "atMs": 1721071,
+      "detail": {
+        "op": "op_land_35",
+        "state": "landed",
+        "integration": "42f1382c05f1704e8189aa300260656144c4d555"
+      }
+    },
+    {
+      "step": "lane 11: claim",
+      "ok": true,
+      "atMs": 2148029,
+      "detail": {
+        "status": 200,
+        "ms": 73,
+        "lane": "act_46_77d0f45f",
+        "seq": 46
+      }
+    },
+    {
+      "step": "lane 11: workspace requested",
+      "ok": true,
+      "atMs": 2148133,
+      "detail": {
+        "status": 200,
+        "ms": 102,
+        "op": "op_ws_act_46_77d0f45f_1",
+        "state": "pending"
+      }
+    },
+    {
+      "step": "lane 11: workspace ready",
+      "ok": false,
+      "atMs": 2328357,
+      "detail": {}
+    }
+  ],
+  "gaps": [],
+  "cleanup": {
+    "releases": {
+      "lane 11": {
+        "status": 200
+      }
+    },
+    "ok": false,
+    "duties": [
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "inventory",
+        "repos": [
+          "95808bd77805d471d62cae7569b0dae2",
+          "95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec"
+        ],
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "95808bd77805d471d62cae7569b0dae2",
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "95808bd77805d471d62cae7569b0dae2",
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec",
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec",
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "final-inventory",
+        "repos": [
+          "95808bd77805d471d62cae7569b0dae2",
+          "95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec"
+        ],
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      }
+    ],
+    "unresolved": [
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "inventory",
+        "repos": [
+          "95808bd77805d471d62cae7569b0dae2",
+          "95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec"
+        ],
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "95808bd77805d471d62cae7569b0dae2",
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "95808bd77805d471d62cae7569b0dae2",
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "list-tokens",
+        "repo": "95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec",
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "delete-repo",
+        "repo": "95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec",
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      },
+      {
+        "namespace": "gitseq-spike-import",
+        "duty": "final-inventory",
+        "repos": [
+          "95808bd77805d471d62cae7569b0dae2",
+          "95808bd77805d471d62cae7569b0dae2--act_19_e7edd7ec"
+        ],
+        "outcome": "refused",
+        "detail": "10000 Authentication error"
+      }
+    ],
+    "reposLeft": null
+  },
+  "rows": {
+    "room": "room_1741490181aa074e9337b16af80dbe9d",
+    "open": 3,
+    "windows": [
+      {
+        "name": "found one room (draft, found, first session)",
+        "kind": "act",
+        "from": "2026-10-02T16:35:38.582Z",
+        "to": "2026-10-02T16:35:55.789Z"
+      },
+      {
+        "name": "found one room (draft, found, first session): its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:35:55.789Z",
+        "to": "2026-10-02T16:39:15.446Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "invite",
+        "kind": "act",
+        "from": "2026-10-02T16:39:15.630Z",
+        "to": "2026-10-02T16:39:30.743Z"
+      },
+      {
+        "name": "invite: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:39:30.743Z",
+        "to": "2026-10-02T16:42:48.717Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "join",
+        "kind": "act",
+        "from": "2026-10-02T16:42:48.918Z",
+        "to": "2026-10-02T16:43:04.022Z",
+        "note": "the log was published inside this window"
+      },
+      {
+        "name": "join: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:43:04.022Z",
+        "to": "2026-10-02T16:46:22.402Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "setup: the reviewer's session; the checker joins",
+        "kind": "setup",
+        "from": "2026-10-02T16:46:22.757Z",
+        "to": "2026-10-02T16:46:38.152Z"
+      },
+      {
+        "name": "setup: the reviewer's session; the checker joins: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:46:38.152Z",
+        "to": "2026-10-02T16:49:55.352Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "claim",
+        "kind": "act",
+        "from": "2026-10-02T16:49:55.581Z",
+        "to": "2026-10-02T16:50:10.703Z",
+        "note": "the log was published inside this window"
+      },
+      {
+        "name": "claim: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:50:10.703Z",
+        "to": "2026-10-02T16:53:29.130Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "setup: workspace, workspace token, push",
+        "kind": "setup",
+        "from": "2026-10-02T16:53:29.334Z",
+        "to": "2026-10-02T16:53:48.636Z"
+      },
+      {
+        "name": "setup: workspace, workspace token, push: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:53:48.636Z",
+        "to": "2026-10-02T16:57:05.955Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "propose (with its pin and preview)",
+        "kind": "act",
+        "from": "2026-10-02T16:57:06.155Z",
+        "to": "2026-10-02T16:57:23.573Z"
+      },
+      {
+        "name": "propose (with its pin and preview): its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:57:23.573Z",
+        "to": "2026-10-02T17:00:41.119Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "note",
+        "kind": "act",
+        "from": "2026-10-02T17:00:41.311Z",
+        "to": "2026-10-02T17:00:56.460Z"
+      },
+      {
+        "name": "note: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T17:00:56.460Z",
+        "to": "2026-10-02T17:04:14.036Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "land (no other open preview)",
+        "kind": "act",
+        "from": "2026-10-02T17:04:14.172Z",
+        "to": "2026-10-02T17:04:31.484Z"
+      },
+      {
+        "name": "land (no other open preview): its publication",
+        "kind": "publication",
+        "from": "2026-10-02T17:04:31.484Z",
+        "to": "2026-10-02T17:07:50.016Z",
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "name": "release",
+        "kind": "act",
+        "from": "2026-10-02T17:07:50.253Z",
+        "to": "2026-10-02T17:08:05.405Z"
+      },
+      {
+        "name": "release: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T17:08:05.405Z",
+        "to": "2026-10-02T17:11:23.257Z",
+        "note": "the log was not published within 3 minutes"
+      }
+    ],
+    "table": [
+      {
+        "window": "found one room (draft, found, first session)",
+        "kind": "act",
+        "from": "2026-10-02T16:35:38.582Z",
+        "to": "2026-10-02T16:35:55.789Z",
+        "state": "incomplete",
+        "roomWritten": 179,
+        "roomRead": 183,
+        "registryWritten": 4,
+        "registryRead": 2,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 24,
+        "failures": [
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "found one room (draft, found, first session): its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:35:55.789Z",
+        "to": "2026-10-02T16:39:15.446Z",
+        "state": "pass",
+        "roomWritten": 31,
+        "roomRead": 702,
+        "registryWritten": 0,
+        "registryRead": 8,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 485,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "invite",
+        "kind": "act",
+        "from": "2026-10-02T16:39:15.630Z",
+        "to": "2026-10-02T16:39:30.743Z",
+        "state": "incomplete",
+        "roomWritten": 0,
+        "roomRead": 0,
+        "registryWritten": 0,
+        "registryRead": 2,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 24,
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "invite: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:39:30.743Z",
+        "to": "2026-10-02T16:42:48.717Z",
+        "state": "pass",
+        "roomWritten": 41,
+        "roomRead": 1020,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 409,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "join",
+        "kind": "act",
+        "from": "2026-10-02T16:42:48.918Z",
+        "to": "2026-10-02T16:43:04.022Z",
+        "state": "incomplete",
+        "roomWritten": 0,
+        "roomRead": 0,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 60,
+        "note": "the log was published inside this window",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "join: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:43:04.022Z",
+        "to": "2026-10-02T16:46:22.402Z",
+        "state": "pass",
+        "roomWritten": 52,
+        "roomRead": 903,
+        "registryWritten": 0,
+        "registryRead": 8,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 444,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "setup: the reviewer's session; the checker joins",
+        "kind": "setup",
+        "from": "2026-10-02T16:46:22.757Z",
+        "to": "2026-10-02T16:46:38.152Z",
+        "state": "incomplete",
+        "roomWritten": 0,
+        "roomRead": 0,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 12,
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "setup: the reviewer's session; the checker joins: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:46:38.152Z",
+        "to": "2026-10-02T16:49:55.352Z",
+        "state": "pass",
+        "roomWritten": 37,
+        "roomRead": 1237,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 409,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "claim",
+        "kind": "act",
+        "from": "2026-10-02T16:49:55.581Z",
+        "to": "2026-10-02T16:50:10.703Z",
+        "state": "incomplete",
+        "roomWritten": 0,
+        "roomRead": 0,
+        "registryWritten": 0,
+        "registryRead": 2,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 85,
+        "note": "the log was published inside this window",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "claim: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:50:10.703Z",
+        "to": "2026-10-02T16:53:29.130Z",
+        "state": "pass",
+        "roomWritten": 44,
+        "roomRead": 1230,
+        "registryWritten": 0,
+        "registryRead": 7,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 434,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "setup: workspace, workspace token, push",
+        "kind": "setup",
+        "from": "2026-10-02T16:53:29.334Z",
+        "to": "2026-10-02T16:53:48.636Z",
+        "state": "incomplete",
+        "roomWritten": 0,
+        "roomRead": 0,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 12,
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "setup: workspace, workspace token, push: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:53:48.636Z",
+        "to": "2026-10-02T16:57:05.955Z",
+        "state": "pass",
+        "roomWritten": 54,
+        "roomRead": 1618,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 466,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "propose (with its pin and preview)",
+        "kind": "act",
+        "from": "2026-10-02T16:57:06.155Z",
+        "to": "2026-10-02T16:57:23.573Z",
+        "state": "incomplete",
+        "roomWritten": 0,
+        "roomRead": 0,
+        "registryWritten": 0,
+        "registryRead": 2,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 25,
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "propose (with its pin and preview): its publication",
+        "kind": "publication",
+        "from": "2026-10-02T16:57:23.573Z",
+        "to": "2026-10-02T17:00:41.119Z",
+        "state": "pass",
+        "roomWritten": 42,
+        "roomRead": 1457,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 422,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "note",
+        "kind": "act",
+        "from": "2026-10-02T17:00:41.311Z",
+        "to": "2026-10-02T17:00:56.460Z",
+        "state": "incomplete",
+        "roomWritten": 0,
+        "roomRead": 0,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 0,
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "note: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T17:00:56.460Z",
+        "to": "2026-10-02T17:04:14.036Z",
+        "state": "pass",
+        "roomWritten": 91,
+        "roomRead": 2335,
+        "registryWritten": 0,
+        "registryRead": 8,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 494,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "land (no other open preview)",
+        "kind": "act",
+        "from": "2026-10-02T17:04:14.172Z",
+        "to": "2026-10-02T17:04:31.484Z",
+        "state": "incomplete",
+        "roomWritten": 0,
+        "roomRead": 0,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 24,
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "land (no other open preview): its publication",
+        "kind": "publication",
+        "from": "2026-10-02T17:04:31.484Z",
+        "to": "2026-10-02T17:07:50.016Z",
+        "state": "pass",
+        "roomWritten": 42,
+        "roomRead": 1708,
+        "registryWritten": 0,
+        "registryRead": 6,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 408,
+        "note": "the log was not published within 3 minutes"
+      },
+      {
+        "window": "release",
+        "kind": "act",
+        "from": "2026-10-02T17:07:50.253Z",
+        "to": "2026-10-02T17:08:05.405Z",
+        "state": "incomplete",
+        "roomWritten": 7,
+        "roomRead": 470,
+        "registryWritten": 0,
+        "registryRead": 0,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 72,
+        "failures": [
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "window": "release: its publication",
+        "kind": "publication",
+        "from": "2026-10-02T17:08:05.405Z",
+        "to": "2026-10-02T17:11:23.257Z",
+        "state": "pass",
+        "roomWritten": 44,
+        "roomRead": 1558,
+        "registryWritten": 0,
+        "registryRead": 10,
+        "publisherWritten": 0,
+        "publisherRead": 0,
+        "otherWritten": 429,
+        "note": "the log was not published within 3 minutes"
+      }
+    ],
+    "reports": [
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:35:38.582Z",
+        "to": "2026-10-02T16:35:55.789Z",
+        "totalRowsWritten": 207,
+        "totalRowsRead": 4793,
+        "totalRequests": 39,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 4,
+            "rowsRead": 2,
+            "requests": 2,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 179,
+            "rowsRead": 183,
+            "requests": 2,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:35:55.789Z",
+        "to": "2026-10-02T16:39:15.446Z",
+        "totalRowsWritten": 516,
+        "totalRowsRead": 102266,
+        "totalRequests": 494,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 7,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 8,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 48,
+            "rowsRead": 13152,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 47,
+            "rowsRead": 12878,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 47,
+            "rowsRead": 12878,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 47,
+            "rowsRead": 9024,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 31,
+            "rowsRead": 702,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 28,
+            "rowsRead": 5376,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 4,
+            "rowsRead": 728,
+            "requests": 4,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:39:15.630Z",
+        "to": "2026-10-02T16:39:30.743Z",
+        "totalRowsWritten": 24,
+        "totalRowsRead": 4656,
+        "totalRequests": 35,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 2,
+            "requests": 1,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 12,
+            "rowsRead": 2350,
+            "requests": 2,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 2,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:39:30.743Z",
+        "to": "2026-10-02T16:42:48.717Z",
+        "totalRowsWritten": 450,
+        "totalRowsRead": 86026,
+        "totalRequests": 485,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 6,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 6,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 47,
+            "rowsRead": 9024,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 41,
+            "rowsRead": 1020,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 35,
+            "rowsRead": 5950,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 3,
+            "rowsRead": 546,
+            "requests": 3,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:42:48.918Z",
+        "to": "2026-10-02T16:43:04.022Z",
+        "totalRowsWritten": 60,
+        "totalRowsRead": 12960,
+        "totalRequests": 43,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 2,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 12,
+            "rowsRead": 2040,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 12,
+            "rowsRead": 3288,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 12,
+            "rowsRead": 3288,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 12,
+            "rowsRead": 2040,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:43:04.022Z",
+        "to": "2026-10-02T16:46:22.402Z",
+        "totalRowsWritten": 496,
+        "totalRowsRead": 93281,
+        "totalRequests": 487,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 6,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 8,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 52,
+            "rowsRead": 903,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 48,
+            "rowsRead": 13152,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 47,
+            "rowsRead": 9024,
+            "requests": 43,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 35,
+            "rowsRead": 5950,
+            "requests": 38,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 35,
+            "rowsRead": 9590,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 35,
+            "rowsRead": 5950,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 4,
+            "rowsRead": 728,
+            "requests": 4,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:46:22.757Z",
+        "to": "2026-10-02T16:46:38.152Z",
+        "totalRowsWritten": 12,
+        "totalRowsRead": 2304,
+        "totalRequests": 41,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 5,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:46:38.152Z",
+        "to": "2026-10-02T16:49:55.352Z",
+        "totalRowsWritten": 446,
+        "totalRowsRead": 86243,
+        "totalRequests": 483,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 6,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 6,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 47,
+            "rowsRead": 9024,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 37,
+            "rowsRead": 1237,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 35,
+            "rowsRead": 5950,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 3,
+            "rowsRead": 546,
+            "requests": 3,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:49:55.581Z",
+        "to": "2026-10-02T16:50:10.703Z",
+        "totalRowsWritten": 85,
+        "totalRowsRead": 17488,
+        "totalRequests": 39,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 2,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 2,
+            "requests": 1,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 12,
+            "rowsRead": 2040,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 12,
+            "rowsRead": 3288,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 12,
+            "rowsRead": 3288,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 12,
+            "rowsRead": 2040,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 12,
+            "rowsRead": 2040,
+            "requests": 2,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 1,
+            "rowsRead": 182,
+            "requests": 1,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:50:10.703Z",
+        "to": "2026-10-02T16:53:29.130Z",
+        "totalRowsWritten": 478,
+        "totalRowsRead": 91999,
+        "totalRequests": 491,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 7,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 7,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 48,
+            "rowsRead": 13152,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 47,
+            "rowsRead": 9024,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 44,
+            "rowsRead": 1230,
+            "requests": 37,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 41,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 41,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 41,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 3,
+            "rowsRead": 546,
+            "requests": 3,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:53:29.334Z",
+        "to": "2026-10-02T16:53:48.636Z",
+        "totalRowsWritten": 12,
+        "totalRowsRead": 2304,
+        "totalRequests": 43,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:53:48.636Z",
+        "to": "2026-10-02T16:57:05.955Z",
+        "totalRowsWritten": 520,
+        "totalRowsRead": 98580,
+        "totalRequests": 478,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 6,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 6,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 54,
+            "rowsRead": 1618,
+            "requests": 35,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 47,
+            "rowsRead": 12878,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 47,
+            "rowsRead": 12878,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 47,
+            "rowsRead": 7990,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 47,
+            "rowsRead": 9024,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 35,
+            "rowsRead": 6720,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 3,
+            "rowsRead": 546,
+            "requests": 3,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:57:06.155Z",
+        "to": "2026-10-02T16:57:23.573Z",
+        "totalRowsWritten": 25,
+        "totalRowsRead": 5776,
+        "totalRequests": 41,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 2,
+            "requests": 1,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 12,
+            "rowsRead": 3288,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 1,
+            "rowsRead": 182,
+            "requests": 1,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 2,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T16:57:23.573Z",
+        "to": "2026-10-02T17:00:41.119Z",
+        "totalRowsWritten": 464,
+        "totalRowsRead": 88855,
+        "totalRequests": 487,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 6,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 6,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 42,
+            "rowsRead": 1457,
+            "requests": 36,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 42,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 41,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 35,
+            "rowsRead": 9590,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 3,
+            "rowsRead": 546,
+            "requests": 3,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T17:00:41.311Z",
+        "to": "2026-10-02T17:00:56.460Z",
+        "totalRowsWritten": 0,
+        "totalRowsRead": 0,
+        "totalRequests": 35,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Room",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 2,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T17:00:56.460Z",
+        "to": "2026-10-02T17:04:14.036Z",
+        "totalRowsWritten": 585,
+        "totalRowsRead": 105709,
+        "totalRequests": 483,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 6,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 8,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 91,
+            "rowsRead": 2335,
+            "requests": 35,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 48,
+            "rowsRead": 13152,
+            "requests": 41,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 41,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 48,
+            "rowsRead": 13152,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 48,
+            "rowsRead": 8160,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 47,
+            "rowsRead": 12878,
+            "requests": 38,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 38,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 35,
+            "rowsRead": 6720,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 4,
+            "rowsRead": 728,
+            "requests": 4,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T17:04:14.172Z",
+        "to": "2026-10-02T17:04:31.484Z",
+        "totalRowsWritten": 24,
+        "totalRowsRead": 4608,
+        "totalRequests": 41,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 2,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 4,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 2,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 4,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T17:04:31.484Z",
+        "to": "2026-10-02T17:07:50.016Z",
+        "totalRowsWritten": 450,
+        "totalRowsRead": 86522,
+        "totalRequests": 489,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 6,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 6,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 42,
+            "rowsRead": 1708,
+            "requests": 36,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 43,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 35,
+            "rowsRead": 5950,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 35,
+            "rowsRead": 6720,
+            "requests": 41,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 35,
+            "rowsRead": 6720,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 3,
+            "rowsRead": 546,
+            "requests": 3,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T17:07:50.253Z",
+        "to": "2026-10-02T17:08:05.405Z",
+        "totalRowsWritten": 79,
+        "totalRowsRead": 15470,
+        "totalRequests": 35,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 12,
+            "rowsRead": 2040,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 12,
+            "rowsRead": 3288,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 12,
+            "rowsRead": 3288,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 12,
+            "rowsRead": 2040,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 12,
+            "rowsRead": 2304,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 12,
+            "rowsRead": 2040,
+            "requests": 3,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 7,
+            "rowsRead": 470,
+            "requests": 2,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          },
+          {
+            "className": "Room",
+            "object": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 3,
+            "periodicSamples": 0
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "incomplete",
+        "failures": [
+          "artroom-spike-room_Room/345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81 had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e had invocations but no periodic storage sample",
+          "artroom-spike-room_Room/ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c had invocations but no periodic storage sample"
+        ]
+      },
+      {
+        "worker": "artroom-spike-room",
+        "from": "2026-10-02T17:08:05.405Z",
+        "to": "2026-10-02T17:11:23.257Z",
+        "totalRowsWritten": 473,
+        "totalRowsRead": 91346,
+        "totalRequests": 488,
+        "namespaces": [
+          {
+            "id": "3388b66bd8f345438705519a063d6bd7",
+            "name": "artroom-spike-room_Publisher",
+            "className": "Publisher"
+          },
+          {
+            "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+            "name": "artroom-spike-room_Registry",
+            "className": "Registry"
+          },
+          {
+            "id": "fd8efe823eb6430bb910ee34d469681b",
+            "name": "artroom-spike-room_Room",
+            "className": "Room"
+          }
+        ],
+        "objects": [
+          {
+            "className": "Publisher",
+            "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+            "rowsWritten": 0,
+            "rowsRead": 0,
+            "requests": 6,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Registry",
+            "object": "registry",
+            "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+            "rowsWritten": 0,
+            "rowsRead": 10,
+            "requests": 5,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+            "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+            "rowsWritten": 48,
+            "rowsRead": 13152,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a490b23ca538a208de5528469b2a9689",
+            "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+            "rowsWritten": 48,
+            "rowsRead": 9216,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_5c1bb798d5da946c048160c51b321bfc",
+            "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+            "rowsWritten": 47,
+            "rowsRead": 9024,
+            "requests": 42,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_1741490181aa074e9337b16af80dbe9d",
+            "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+            "rowsWritten": 44,
+            "rowsRead": 1558,
+            "requests": 36,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_a81dc2db9888ec46487f56097aa249f2",
+            "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+            "rowsWritten": 36,
+            "rowsRead": 9864,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_3a6011559c193fd7f90b8d2392516840",
+            "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+            "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_fe9913737e6a034530cc430b92b2ff83",
+            "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+            "rowsWritten": 36,
+            "rowsRead": 6120,
+            "requests": 39,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+            "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+            "rowsWritten": 36,
+            "rowsRead": 6912,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+            "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+            "rowsWritten": 35,
+            "rowsRead": 5950,
+            "requests": 40,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+            "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+            "rowsWritten": 35,
+            "rowsRead": 9590,
+            "requests": 41,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+            "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+            "rowsWritten": 32,
+            "rowsRead": 6190,
+            "requests": 38,
+            "periodicSamples": 1
+          },
+          {
+            "className": "Room",
+            "object": "room_c79f08919e5fb4263c76265750ae1f99",
+            "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+            "rowsWritten": 4,
+            "rowsRead": 728,
+            "requests": 4,
+            "periodicSamples": 1
+          }
+        ],
+        "budget": {
+          "maxRowsWritten": 250000,
+          "maxRowsWrittenPerObject": 50000
+        },
+        "provisional": true,
+        "state": "pass",
+        "failures": []
+      }
+    ]
+  },
+  "error": "Error: lane 11 was not proposed\n    at measured.kind (file:///Users/hughpyle/play/artroom-worktrees/row-writes/packages/room/measure/spike-smoke.mjs:758:32)\n    at async measured (file:///Users/hughpyle/play/artroom-worktrees/row-writes/packages/room/measure/spike-smoke.mjs:689:13)\n    at async rowsPhase (file:///Users/hughpyle/play/artroom-worktrees/row-writes/packages/room/measure/spike-smoke.mjs:755:3)\n    at async file:///Users/hughpyle/play/artroom-worktrees/row-writes/packages/room/measure/spike-smoke.mjs:872:5",
+  "rowGate": {
+    "worker": "artroom-spike-room",
+    "from": "2026-10-02T16:35:35.414Z",
+    "to": "2026-10-02T17:16:24.856Z",
+    "totalRowsWritten": 5978,
+    "totalRowsRead": 1113659,
+    "totalRequests": 5995,
+    "namespaces": [
+      {
+        "id": "3388b66bd8f345438705519a063d6bd7",
+        "name": "artroom-spike-room_Publisher",
+        "className": "Publisher"
+      },
+      {
+        "id": "f6903a57a2324d94a1e6c4b0c0b8a6db",
+        "name": "artroom-spike-room_Registry",
+        "className": "Registry"
+      },
+      {
+        "id": "fd8efe823eb6430bb910ee34d469681b",
+        "name": "artroom-spike-room_Room",
+        "className": "Room"
+      }
+    ],
+    "objects": [
+      {
+        "className": "Publisher",
+        "object": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+        "objectId": "4f0bd33ee6cd29ee4218adf785c1bec6497e040bf33d071fd6088eaff21c1207",
+        "rowsWritten": 0,
+        "rowsRead": 0,
+        "requests": 77,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Registry",
+        "object": "registry",
+        "objectId": "f7459eed225b3cc89fd2cb2da93a58e77aa08f88723a1d96ccc44faad2ed8499",
+        "rowsWritten": 4,
+        "rowsRead": 89,
+        "requests": 45,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_1741490181aa074e9337b16af80dbe9d",
+        "objectId": "0084112db238635c06c965ef55f4029160bb473a44834a511babffd568367a27",
+        "rowsWritten": 706,
+        "rowsRead": 16496,
+        "requests": 486,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_a81dc2db9888ec46487f56097aa249f2",
+        "objectId": "7e1448865df0f1a439d011f90a9b8e72aea1599d837e78632adde019afdc4a7a",
+        "rowsWritten": 479,
+        "rowsRead": 131246,
+        "requests": 490,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_fe9913737e6a034530cc430b92b2ff83",
+        "objectId": "9e38762e470b4cca005e16b5e48b1f921ffcbb9a5a5bffba65956a46756f26fc",
+        "rowsWritten": 479,
+        "rowsRead": 81430,
+        "requests": 486,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_96b40809212f6ea0a39e9aa57f25d370",
+        "objectId": "345544816e72b89597c519d8a99e044f2aaf4d7489a519ed19b93885ab8785cf",
+        "rowsWritten": 478,
+        "rowsRead": 130972,
+        "requests": 489,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_a490b23ca538a208de5528469b2a9689",
+        "objectId": "a786bf1df6cb223fa3ffd04cbab3253c67b67c23c4f8f79703f8321a78f48b81",
+        "rowsWritten": 478,
+        "rowsRead": 91776,
+        "requests": 489,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_4f2634111841476d7a38fc3b8e5e3035",
+        "objectId": "3b13e58937dfd63a9b53f2fe01c9988e883dbbe627c79d0933b1d48950b41878",
+        "rowsWritten": 477,
+        "rowsRead": 81090,
+        "requests": 488,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_3a6011559c193fd7f90b8d2392516840",
+        "objectId": "7e79d820cb40f2da65d1bf1bb49ba637149dca862afdcaff7d0210f96f066c9a",
+        "rowsWritten": 477,
+        "rowsRead": 81090,
+        "requests": 484,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_4cbb2b196fce26e0dd77952876ec66a4",
+        "objectId": "80a984febe91bb12b05f1fbe96ceb7cca3cf217f791e8989ca5732e9dc0a8b6e",
+        "rowsWritten": 477,
+        "rowsRead": 91584,
+        "requests": 486,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_58ef2f5b36ea80f1ceb7c82084b20131",
+        "objectId": "48ad8b30a57eaed58182627ba6f77f9fe664973b8e509d2e8180db8fecc559bf",
+        "rowsWritten": 474,
+        "rowsRead": 129876,
+        "requests": 481,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_e769e7fb387b3f3d25348e0904ce670a",
+        "objectId": "6ddb68853e97aa9fad6d8e20d753cad60bc6b0079855c86382ca806981643baf",
+        "rowsWritten": 472,
+        "rowsRead": 90670,
+        "requests": 484,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_5c1bb798d5da946c048160c51b321bfc",
+        "objectId": "b361b86c577af381c0039f033aa679417f34b0d4eebde13fb5571e27f3c2261e",
+        "rowsWritten": 470,
+        "rowsRead": 90396,
+        "requests": 484,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_b03a1668bb0f91026dac5f1465b2b423",
+        "objectId": "ced896062d53160e06cbd5577834dc11a5140ce766899144fc92a6c1ebc6fa7c",
+        "rowsWritten": 467,
+        "rowsRead": 89664,
+        "requests": 485,
+        "periodicSamples": 1
+      },
+      {
+        "className": "Room",
+        "object": "room_c79f08919e5fb4263c76265750ae1f99",
+        "objectId": "7da45f6c5a309e1a666ce9cdfbc4d2b8cafed89b5f38679331a56277bb6c6fcf",
+        "rowsWritten": 40,
+        "rowsRead": 7280,
+        "requests": 41,
+        "periodicSamples": 1
+      }
+    ],
+    "budget": {
+      "maxRowsWritten": 250000,
+      "maxRowsWrittenPerObject": 50000
+    },
+    "provisional": true,
+    "state": "pass",
+    "failures": []
+  },
+  "ok": false,
+  "ms": 2473745
+}

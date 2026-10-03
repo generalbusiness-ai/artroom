@@ -57,9 +57,21 @@ echo "deploy-spike: deploying $CONFIG"
 # The first deploy (2026-10-02) uploaded the Worker but stopped applying the
 # container application with a 401; the same deploy again finished it, as
 # wrangler's own message advises. So one failure is retried once.
-"${WRANGLER[@]}" deploy --config "$CONFIG" || {
+# PIN_DELAY_MS (request 8bd623cc; hugh's approval, assert 66a41558) is a
+# measurement step only: set it in this script's environment to deploy the
+# Room with the pin left to the alarm, then run this script again without it
+# to unset it. No config file sets it, and production never has it.
+room_vars=()
+if [[ -n ${PIN_DELAY_MS:-} ]]; then
+	[[ $PIN_DELAY_MS =~ ^[0-9]+$ ]] || { echo "deploy-spike: PIN_DELAY_MS must be a whole number of milliseconds" >&2; exit 2; }
+	echo "deploy-spike: MEASUREMENT: deploying the Room with PIN_DELAY_MS=$PIN_DELAY_MS; redeploy without it after the window"
+	room_vars=(--var "PIN_DELAY_MS:$PIN_DELAY_MS")
+else
+	echo "deploy-spike: PIN_DELAY_MS is not set (the default)"
+fi
+"${WRANGLER[@]}" deploy --config "$CONFIG" ${room_vars[@]+"${room_vars[@]}"} || {
 	echo "deploy-spike: deploy failed; retrying once"
-	"${WRANGLER[@]}" deploy --config "$CONFIG"
+	"${WRANGLER[@]}" deploy --config "$CONFIG" ${room_vars[@]+"${room_vars[@]}"}
 }
 
 # A smoke read: an unknown room is a 404 ArtroomError from the Room's router.
