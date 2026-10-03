@@ -1,8 +1,24 @@
 /**
  * Declared acts in the CLI (request a5d64b35; docs/protocol.md section
- * 33.10): `artroom acts` and `artroom act`, the journal, and the label a
- * record's kind had at its own seq. The fake room runs in its declared mode;
- * the real Room's admission is tested in packages/room.
+ * 33.10): `artroom acts` and `artroom act`, the journal, and the words a
+ * recorded act is printed in.
+ *
+ * - `artroom act` signs under the binding the user gives, never one it read
+ *   for them (R-DECL-16), and a changed meaning is shown, never adopted.
+ * - A receipt is in the words of the declarations in force at the act's own
+ *   seq, D(seq) (R-DECL-23): not those read while the act was prepared, and
+ *   not the latest. The read is for display only: when it fails, the receipt
+ *   is still given, with the kind and the thread's ID in place of the words
+ *   (the checker's act 0b9119de and the planner's acts b22d29ee, 23ae8924
+ *   and c6f6ad78).
+ * - A run that finishes a saved act finishes that act, with the saved bytes,
+ *   whatever kind its command line names (R-IDEM-2). The receipt names the
+ *   saved act's own kind and label, and the run is told which act it
+ *   finished (both reviewers reproduced the earlier behaviour at c74f3696).
+ *
+ * The room is the fake room over its local HTTPS routes, in its declared
+ * mode. Nothing here shows a real Room's admission: that is tested in
+ * packages/room.
  */
 
 import { join } from "node:path";
@@ -14,7 +30,18 @@ import { FieldError, meaningChanges, missing, parseValue } from "../src/declared
 import { invitationLink } from "../src/link.ts";
 import { useHarness } from "./harness.ts";
 
-const { h, cli, login } = useHarness();
+const { h, cli, login, acts: recorded } = useHarness();
+
+type Fetch = typeof fetch;
+const isSend = (input: Parameters<Fetch>[0], init: Parameters<Fetch>[1]) => init?.method === "POST" && new URL(String(input)).pathname.endsWith("/acts");
+/** The query of a read of the declarations, or null for any other request. */
+const declarationsRead = (input: Parameters<Fetch>[0]) => {
+  const url = new URL(String(input));
+  return url.pathname.endsWith("/declarations") ? url.search : null;
+};
+const THREAD = (words: string) => new RegExp(`^Thread: ${words} \\(lane act_\\d+_[0-9a-f]{8}\\)\\.$`);
+/** The room answers that the session ended, and must not be asked again in this run. */
+const SESSION_ENDED = () => new Response(JSON.stringify({ name: "ArtroomError", code: "unauthenticated", message: "The session ended.", retryable: false }), { status: 401, headers: { "content-type": "application/json" } });
 
 const ASK: ActDeclaration = {
   label: "Ask",
@@ -420,5 +447,343 @@ describe("the log and explain show the label a kind had at the record's own seq"
       "  Fix: f",
       `  Active binding: sha256:${"c".repeat(64)}, in policy version act_5_bbbbbbbb.`,
     ]);
+  });
+});
+
+describe("the receipt of artroom act (the checker's act 0b9119de)", () => {
+  const SONG: ActDeclaration = {
+    label: "Start a song",
+    targets: { none: ["open"] },
+    body: { key: { type: "enum", values: ["c", "d"] }, title: { type: "text", max: 80 } },
+    who: { roles: ["member"] },
+    hold: { scope: "body.scope", workspace: true },
+  };
+  const acts = (label: string) => ({ ...CODE_REVIEW_ACTS, "start-song": { ...SONG, label } });
+  const songs = () => recorded("start-song");
+
+
+  /** A member logged in, a room that declares `start-song`, and the command that starts one. */
+  async function ready() {
+    const home = join(h.tmp, "alice");
+    await login(home, "@alice");
+    await h.room.activate(acts("Start a song"));
+    const binding = (await h.room.bindingOf("start-song"))!;
+    const argv = (...more: string[]) => ["act", "start-song", "--binding", binding, "--set", "key=c", "--set", "title=Footprints", "--set", "scope=songs/footprints/**", ...more];
+    return { home, binding, argv };
+  }
+
+  describe("artroom act prints the act as recorded, in the words of its own seq (R-DECL-23)", () => {
+    test("a label changed after the act was prepared and before it was admitted: the act is printed under the new label, which governs it", async () => {
+      const { home, binding, argv } = await ready();
+      let changed = false;
+      const out = await cli(home, argv(), h.tmp, {
+        fetch: async (input, init) => {
+          if (!changed && isSend(input, init)) {
+            changed = true;
+            await h.room.activate(acts("Begin a tune"));
+          }
+          return fetch(input, init);
+        },
+      });
+      expect(out.code).toBe(0);
+      // The label is no part of the binding: the act the user prepared is admitted, once, under the later document.
+      expect(await h.room.bindingOf("start-song")).toBe(binding);
+      expect(songs()).toHaveLength(1);
+      const governing = h.room.policies.filter((p) => p.since <= songs()[0]!.seq).at(-1)!;
+      expect(governing.acts!["start-song"]!.label).toBe("Begin a tune");
+      const lines = out.out.split("\n");
+      expect(lines[0]).toMatch(/^Done: Begin a tune \(start-song\), recorded as act_\d+_[0-9a-f]{8}\.$/);
+      expect(lines[1]).toMatch(THREAD("Begin a tune: Footprints"));
+    });
+
+    test("a label changed after the act was admitted: the act keeps the label it was admitted under, not the latest", async () => {
+      const { home, argv } = await ready();
+      let changed = false;
+      const out = await cli(home, argv(), h.tmp, {
+        fetch: async (input, init) => {
+          const sending = isSend(input, init);
+          const answer = await fetch(input, init);
+          // The room has answered; the activation takes effect before the CLI reads anything more.
+          if (!changed && sending) {
+            changed = true;
+            await h.room.activate(acts("Begin a tune"));
+          }
+          return answer;
+        },
+      });
+      expect(out.code).toBe(0);
+      expect(changed).toBe(true);
+      expect(h.room.policies.at(-1)!.acts!["start-song"]!.label).toBe("Begin a tune");
+      const lines = out.out.split("\n");
+      expect(lines[0]).toMatch(/^Done: Start a song \(start-song\), recorded as act_\d+_[0-9a-f]{8}\.$/);
+      expect(lines[1]).toMatch(THREAD("Start a song: Footprints"));
+    });
+
+    test("the words are read once, after the answer, at the record's seq; --json prints the record and reads no words", async () => {
+      const { home, argv } = await ready();
+      const reads: (string | null)[] = [];
+      const watch = { fetch: ((input, init) => (reads.push(declarationsRead(input)), fetch(input, init))) as Fetch };
+      const out = await cli(home, argv(), h.tmp, watch);
+      expect(out.code).toBe(0);
+      const seq = songs()[0]!.seq;
+      // One read of the active declarations to prepare the act, then one of the declarations at its seq.
+      expect(reads.filter((r) => r !== null)).toEqual(["", `?at=${seq}`]);
+      reads.length = 0;
+      const json = await cli(home, ["act", "start-song", "--binding", (await h.room.bindingOf("start-song"))!, "--set", "key=d", "--set", "title=So What", "--set", "scope=songs/so-what/**", "--json"], h.tmp, watch);
+      expect(json.code).toBe(0);
+      expect(JSON.parse(json.out)).toMatchObject({ kind: "start-song", seq: songs()[1]!.seq });
+      expect(reads.filter((r) => r !== null)).toEqual([""]);
+    });
+  });
+
+  describe("the words cannot be read: the receipt is still given (R-DECL-23, R-IDEM-2)", () => {
+    const refuse = (match: (search: string) => boolean): Fetch => async (input, init) => {
+      const read = declarationsRead(input);
+      if (read !== null && match(read)) return SESSION_ENDED();
+      return fetch(input, init);
+    };
+
+    test("a failed read after the answer leaves the act done: the kind and the thread's ID are printed, and nothing is sent again", async () => {
+      const { home, argv } = await ready();
+      const out = await cli(home, argv("--idempotency-key", "song-once"), h.tmp, { fetch: refuse((search) => search.startsWith("?at=")) });
+      expect(out.code).toBe(0);
+      expect(songs()).toHaveLength(1);
+      const id = /recorded as (act_\d+_[0-9a-f]{8})\.$/m.exec(out.out)![1]!;
+      expect(out.out.split("\n")).toEqual([`Done: start-song, recorded as ${id}.`, `Thread: ${id} (lane ${id}).`]);
+      expect(out.err).toBe("");
+      // The command is finished: the same command again is the same act to the room, and its original record.
+      const again = await cli(home, argv("--idempotency-key", "song-once", "--json"));
+      expect(JSON.parse(again.out)).toMatchObject({ id });
+      expect(songs()).toHaveLength(1);
+    });
+
+    test("a room that has no declarations to give for that seq: the kind is printed, never the latest label", async () => {
+      const { home, argv } = await ready();
+      let changed = false;
+      const out = await cli(home, argv(), h.tmp, {
+        fetch: async (input, init) => {
+          const read = declarationsRead(input);
+          // The answer "there is none" for the record's seq, while the active label has become another.
+          if (read !== null && read.startsWith("?at=")) return new Response("null", { status: 200, headers: { "content-type": "application/json" } });
+          const sending = isSend(input, init);
+          const answer = await fetch(input, init);
+          if (!changed && sending) {
+            changed = true;
+            await h.room.activate(acts("Begin a tune"));
+          }
+          return answer;
+        },
+      });
+      expect(out.code).toBe(0);
+      const id = /recorded as (act_\d+_[0-9a-f]{8})\.$/m.exec(out.out)![1]!;
+      expect(out.out.split("\n")).toEqual([`Done: start-song, recorded as ${id}.`, `Thread: ${id} (lane ${id}).`]);
+    });
+
+    test("a thread that has a goal is named by it, with or without the words", async () => {
+      const home = join(h.tmp, "alice");
+      await login(home, "@alice");
+      await h.room.activate(acts("Start a song"));
+      const out = await cli(home, ["act", "claim", "--binding", (await h.room.bindingOf("claim"))!, "--set", "goal=Rate-limit login", "--set", "scope=src/**"], h.tmp, { fetch: refuse((search) => search.startsWith("?at=")) });
+      expect(out.code).toBe(0);
+      expect(out.out.split("\n")[0]).toMatch(/^Done: claim, recorded as act_\d+_[0-9a-f]{8}\.$/);
+      expect(out.out.split("\n")[1]).toMatch(THREAD("Rate-limit login"));
+    });
+  });
+
+  describe("an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23)", () => {
+    /** The answer to the act is lost, so the first command fails with the act recorded; the second finishes it. */
+    async function lostThenFinished(between: () => Promise<void>, extra: (sent: string[], reads: string[]) => Fetch) {
+      const { home, binding, argv } = await ready();
+      const sent: string[] = [];
+      const reads: string[] = [];
+      const watch: Fetch = (input, init) => {
+        if (isSend(input, init)) sent.push(String(init!.body));
+        return fetch(input, init);
+      };
+      h.room.faults.push({ route: "POST /acts", kind: "drop" });
+      const first = await cli(home, argv("--idempotency-key", "song-once"), h.tmp, { fetch: watch });
+      expect(first.code).toBe(1);
+      expect(first.err).toContain("--idempotency-key song-once");
+      expect(songs()).toHaveLength(1);
+      await between();
+      const finished = await cli(home, argv("--idempotency-key", "song-once"), h.tmp, { fetch: extra(sent, reads) });
+      return { finished, sent, reads, binding, seq: songs()[0]!.seq };
+    }
+    const counting = (sent: string[], reads: string[]): Fetch => (input, init) => {
+      if (isSend(input, init)) sent.push(String(init!.body));
+      const read = declarationsRead(input);
+      if (read !== null) reads.push(read);
+      return fetch(input, init);
+    };
+
+    test("after a later label-only activation the finished act still has the label it was admitted under", async () => {
+      const { finished, sent, reads, seq } = await lostThenFinished(async () => void (await h.room.activate(acts("Begin a tune"))), counting);
+      expect(finished.code).toBe(0);
+      expect(h.room.policies.at(-1)!.acts!["start-song"]!.label).toBe("Begin a tune");
+      const lines = finished.out.split("\n");
+      expect(lines[0]).toMatch(/^Done: Start a song \(start-song\), recorded as /);
+      expect(lines[1]).toMatch(THREAD("Start a song: Footprints"));
+      expect(new Set(sent).size).toBe(1);
+      expect(songs()).toHaveLength(1);
+      expect(reads).toEqual([`?at=${seq}`]);
+    });
+
+    test("when no session can be opened to read the words, the saved act is still finished and its receipt given", async () => {
+      // Every read session is refused on the finishing run: the signed act needs none (R-IDEM-2); the words do.
+      const noSession = (sent: string[], reads: string[]): Fetch => (input, init) => {
+        const url = new URL(String(input));
+        if (isSend(input, init)) sent.push(String(init!.body));
+        if (init?.method === "POST" && url.pathname.endsWith("/requests"))
+          return Promise.resolve(SESSION_ENDED());
+        const read = declarationsRead(input);
+        if (read !== null) reads.push(read);
+        return fetch(input, init);
+      };
+      const { finished, sent, reads, seq } = await lostThenFinished(async () => {}, noSession);
+      expect(finished.code).toBe(0);
+      const id = new RegExp(`recorded as (act_${seq}_[0-9a-f]{8})\\.$`, "m").exec(finished.out)![1]!;
+      expect(finished.out.split("\n")).toEqual([`Done: start-song, recorded as ${id}.`, `Thread: ${id} (lane ${id}).`]);
+      expect(new Set(sent).size).toBe(1);
+      expect(songs()).toHaveLength(1);
+      expect(reads).toEqual([]);
+      // The journal holds nothing more for that key.
+      const again = await cli(join(h.tmp, "alice"), ["act", "start-song", "--binding", (await h.room.bindingOf("start-song"))!, "--set", "key=c", "--set", "title=Footprints", "--set", "scope=songs/footprints/**", "--idempotency-key", "song-once", "--json"]);
+      expect(JSON.parse(again.out)).toMatchObject({ id });
+      expect(songs()).toHaveLength(1);
+    });
+  });
+});
+
+describe("a saved act finished under another kind's name (reproduced at c74f3696)", () => {
+  const OPENING = (label: string, max = 80): ActDeclaration => ({
+    label,
+    targets: { none: ["open"] },
+    body: { key: { type: "enum", values: ["c", "d"] }, title: { type: "text", max } },
+    who: { roles: ["member"] },
+    hold: { scope: "body.scope", workspace: true },
+  });
+  const acts = (songMax = 80) => ({ ...CODE_REVIEW_ACTS, "start-song": OPENING("Start a song", songMax), "start-tune": OPENING("Begin a different tune") });
+  const ofKind = recorded;
+  const TOLD = "This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made.";
+
+  /** A member logged in, a room that declares both kinds, and a command line for each. */
+  async function ready() {
+    const home = join(h.tmp, "alice");
+    await login(home, "@alice");
+    await h.room.activate(acts());
+    const song = (await h.room.bindingOf("start-song"))!;
+    const tune = (await h.room.bindingOf("start-tune"))!;
+    const args = (kind: string, binding: string, title: string, ...more: string[]) => ["act", kind, "--binding", binding, "--set", "key=c", "--set", `title=${title}`, "--set", "scope=songs/footprints/**", "--idempotency-key", "song-once", ...more];
+    return { home, song, tune, args };
+  }
+
+  const counting = (sent: string[]): Fetch => (input, init) => {
+    if (isSend(input, init)) sent.push(String(init!.body));
+    return fetch(input, init);
+  };
+
+  /** `start-song` is recorded but its answer is lost; then `finish` runs with the same key, through `wrap`. */
+  async function lostThenFinished(finish: (r: Awaited<ReturnType<typeof ready>>) => string[], wrap: (sent: string[]) => Fetch = counting) {
+    const r = await ready();
+    const sent: string[] = [];
+    h.room.faults.push({ route: "POST /acts", kind: "drop" });
+    const first = await cli(r.home, r.args("start-song", r.song, "Footprints"), h.tmp, { fetch: counting(sent) });
+    expect(first.code).toBe(1);
+    expect(ofKind("start-song")).toHaveLength(1);
+    const finished = await cli(r.home, finish(r), h.tmp, { fetch: wrap(sent) });
+    return { ...r, finished, sent, seq: ofKind("start-song")[0]!.seq };
+  }
+
+  describe("a saved act finished by a run that names another kind is printed as the saved act (R-IDEM-2, R-DECL-23)", () => {
+    test("the receipt has the saved act's label, kind and thread name, and the run is told which act it finished", async () => {
+      const { finished, sent, song, seq } = await lostThenFinished((r) => r.args("start-tune", r.tune, "So What"));
+      expect(finished.code).toBe(0);
+      const lines = finished.out.split("\n");
+      expect(lines[0]).toMatch(new RegExp(`^Done: Start a song \\(start-song\\), recorded as act_${seq}_[0-9a-f]{8}\\.$`));
+      expect(lines[1]).toMatch(THREAD("Start a song: Footprints"));
+      expect(finished.out).not.toContain("tune");
+      expect(finished.err.split("\n")).toContain(TOLD);
+      // The saved bytes went back unchanged: two sends, one act, one thread, and no act of the kind typed.
+      expect(sent).toHaveLength(2);
+      expect(new Set(sent).size).toBe(1);
+      expect(JSON.parse(sent[0]!).envelope).toMatchObject({ kind: "start-song", binding: song, body: { key: "c", title: "Footprints" }, idempotencyKey: "song-once" });
+      expect(ofKind("start-song")).toHaveLength(1);
+      expect(ofKind("start-tune")).toHaveLength(0);
+      expect(h.room.lanes.size).toBe(1);
+    });
+
+    test("when the words cannot be read, the receipt names the saved act's kind, not the kind typed, and the run is still told", async () => {
+      // Every read session is refused on the finishing run: the signed act needs none (R-IDEM-2); the words do.
+      const noSession = (sent: string[]): Fetch => (input, init) => {
+        if (isSend(input, init)) sent.push(String(init!.body));
+        if (init?.method === "POST" && new URL(String(input)).pathname.endsWith("/requests"))
+          return Promise.resolve(SESSION_ENDED());
+        return fetch(input, init);
+      };
+      const { finished, sent, seq } = await lostThenFinished((r) => r.args("start-tune", r.tune, "So What"), noSession);
+      expect(finished.code).toBe(0);
+      const id = new RegExp(`recorded as (act_${seq}_[0-9a-f]{8})\\.$`, "m").exec(finished.out)![1]!;
+      expect(finished.out.split("\n")).toEqual([`Done: start-song, recorded as ${id}.`, `Thread: ${id} (lane ${id}).`]);
+      expect(finished.err.split("\n")).toContain(TOLD);
+      expect(new Set(sent).size).toBe(1);
+      expect(ofKind("start-tune")).toHaveLength(0);
+    });
+
+    test("with --json the record is the saved act's, and the run is told on the error stream", async () => {
+      const { finished, seq } = await lostThenFinished((r) => r.args("start-tune", r.tune, "So What", "--json"));
+      expect(finished.code).toBe(0);
+      expect(JSON.parse(finished.out)).toMatchObject({ kind: "start-song", seq });
+      expect(finished.err.split("\n")).toContain(TOLD);
+    });
+
+    test("control: the same kind with another body finishes the saved act with the saved body, and nothing more is said", async () => {
+      const { finished, sent, seq } = await lostThenFinished((r) => r.args("start-song", r.song, "So What"));
+      expect(finished.code).toBe(0);
+      const lines = finished.out.split("\n");
+      expect(lines[0]).toMatch(new RegExp(`^Done: Start a song \\(start-song\\), recorded as act_${seq}_[0-9a-f]{8}\\.$`));
+      expect(lines[1]).toMatch(THREAD("Start a song: Footprints"));
+      expect(finished.err).not.toContain("saved");
+      expect(new Set(sent).size).toBe(1);
+      expect(ofKind("start-song")).toHaveLength(1);
+    });
+
+    test("control: a new act of the other kind, under its own key, is that kind's, and nothing more is said", async () => {
+      const r = await ready();
+      const out = await cli(r.home, [...r.args("start-tune", r.tune, "So What").slice(0, -2), "--idempotency-key", "tune-once"]);
+      expect(out.code).toBe(0);
+      expect(out.out.split("\n")[0]).toMatch(/^Done: Begin a different tune \(start-tune\), recorded as /);
+      expect(out.out.split("\n")[1]).toMatch(THREAD("Begin a different tune: So What"));
+      expect(out.err).not.toContain("saved");
+    });
+  });
+
+  describe("a saved act that the room refuses when it is sent again is explained as the saved act (R-DECL-16)", () => {
+    test("the saved act's meaning changed before it reached the room: the refusal's explanation is of the saved kind and the binding it was prepared under", async () => {
+      const r = await ready();
+      // The room is not reached at all: the act is saved, and not recorded.
+      h.room.faults.push({ route: "POST /acts", kind: "status", status: 503, body: { name: "ArtroomError", code: "unavailable", message: "no", retryable: false }, times: 5 });
+      const first = await cli(r.home, r.args("start-song", r.song, "Footprints"));
+      expect(first.code).not.toBe(0);
+      expect(ofKind("start-song")).toHaveLength(0);
+      h.room.faults.length = 0;
+      // The meaning of start-song changes; start-tune's does not.
+      await h.room.activate(acts(40));
+      const now = (await h.room.bindingOf("start-song"))!;
+      expect(now).not.toBe(r.song);
+      expect(await h.room.bindingOf("start-tune")).toBe(r.tune);
+      const finished = await cli(r.home, r.args("start-tune", r.tune, "So What"));
+      expect(finished.code).toBe(3);
+      const err = finished.err.split("\n");
+      expect(err).toContain(TOLD);
+      expect(err).toContain("Refused: binding-stale");
+      expect(finished.err).toContain(`  Active binding: ${now}, in policy version `);
+      expect(finished.err).toMatch(/ {2}Nothing was done\. In policy version act_\d+_[0-9a-f]{8}, start-song now means:/);
+      expect(finished.err).not.toContain("start-tune now means");
+      // The change is listed from the meaning the saved act was prepared under, found by the saved binding.
+      expect(finished.err).toContain("  What changed since the meaning you read:");
+      expect(finished.err).toContain(`  If this is still what you intend, act under it: artroom act start-song --binding ${now} …`);
+      expect(ofKind("start-song")).toHaveLength(0);
+      expect(ofKind("start-tune")).toHaveLength(0);
+    });
   });
 });
