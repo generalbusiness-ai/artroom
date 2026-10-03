@@ -848,6 +848,10 @@ test("F17 the owner's known lookups and the ledger's due queries use indexes, an
   assert.doesNotMatch(plan("SELECT id, fork, token, expires_at, backoff FROM artroom_fork_mint WHERE state = 'owed' AND due <= 5 ORDER BY due, id LIMIT 20"), /TEMP B-TREE/);
   assert.match(plan("SELECT fork, observe_wait FROM artroom_fork_mint_watch WHERE observe_due <= 5 ORDER BY observe_due, fork LIMIT 1"), /USING (COVERING )?INDEX artroom_fork_mint_watch_due/);
   assert.doesNotMatch(plan("SELECT fork, observe_wait FROM artroom_fork_mint_watch WHERE observe_due <= 5 ORDER BY observe_due, fork LIMIT 1"), /TEMP B-TREE/);
+  // The sweep's questions, for each token (checker C1, C3): the lease's token, a held pin token, an open create.
+  assert.match(plan("SELECT 1 AS x FROM artroom_ws WHERE token_id = 'x' AND fork = 'f' AND state IN ('ready', 'pending') LIMIT 1"), /USING INDEX artroom_ws_token/);
+  assert.match(plan("SELECT 1 AS x FROM artroom_fork_mint WHERE token = 'x' AND state = 'held' AND fork = 'f' LIMIT 1"), /^SEARCH artroom_fork_mint USING (COVERING )?INDEX artroom_fork_mint_(token|open) /);
+  assert.match(plan("SELECT 1 AS x FROM artroom_fork_mint WHERE fork = 'f' AND state IN ('sent', 'unknown') LIMIT 1"), /USING (COVERING )?INDEX artroom_fork_mint_open/);
   assert.equal(sql.all("SELECT COUNT(*) AS n FROM artroom_ws_duty")[0]!["n"], 1, "the stored rows are kept");
 });
 
@@ -899,19 +903,48 @@ test("F20 the owner's known tokens: the observation does not count the fork's le
   assert.deepEqual(fork.revokes, []);
 });
 
-test("F21 a failed handoff: the answer cannot be recorded; the record keeps its state, the token is revoked by its ID at once, and the record ends only when that revocation is answered", async () => {
+test("F21 a failed handoff: the answer cannot be recorded as held; the record is written again as owed by the token's ID, the token is revoked at once, and the record ends only when that revocation is answered; a failed revocation leaves it owed with the ID, revoked by a later alarm (checker C2)", async () => {
   const r = room();
   r.sql.all("CREATE TRIGGER no_held BEFORE UPDATE ON artroom_fork_mint WHEN NEW.state = 'held' BEGIN SELECT RAISE(ABORT, 'storage failure'); END");
   await assert.rejects(r.ledger.mint("f-a", "pin-objects:h1", TTL), /storage failure/);
   assert.deepEqual(r.fork("f-a").revokes, [r.fork("f-a").tokens[0]!.id], "revoked by its ID at once");
   assert.equal(rows(r.sql).length, 0, "the answered revocation ended the record");
-  // The revocation fails: the record stays, and the next host keeps it as unknown, never settled by guesswork.
+  // The revocation fails: the record keeps the ID, owed, through a restart, and a later alarm revokes it.
   r.fork("f-a").revokeError = () => internal();
   await assert.rejects(r.ledger.mint("f-a", "pin-objects:h2", TTL), /storage failure/);
-  assert.equal(only(r.sql)["state"], "sent");
+  const id = r.fork("f-a").tokens[1]!.id;
+  assert.equal(only(r.sql)["state"], "owed");
+  assert.equal(only(r.sql)["token"], id, "the known ID is kept");
+  assert.equal(summary(r.sql)["unknown"], 0);
   r.sql.all("DROP TRIGGER no_held");
+  r.fork("f-a").revokeError = null;
   r.start();
-  assert.equal(only(r.sql)["state"], "unknown");
+  assert.equal(only(r.sql)["state"], "owed");
+  r.clock.advance(MINT_REVOKE_BACKOFF.firstMs);
+  await alarm(r);
+  assert.equal(r.fork("f-a").live(id), false);
+  assert.equal(rows(r.sql).length, 0);
+});
+
+test("F23 a failed handoff when the first owed write fails too: after the failed revocation, the owed record is written once more, with the ID", async () => {
+  const r = room();
+  const real = r.sql.all.bind(r.sql);
+  const failing = new Set(["held", "owed"]);
+  (r.sql as { all: Sql["all"] }).all = (q, ...b) => {
+    for (const state of failing)
+      if (q.startsWith(`UPDATE artroom_fork_mint SET state = '${state}'`)) {
+        failing.delete(state);
+        throw new Error(`one transient write failure (${state})`);
+      }
+    return real(q, ...b);
+  };
+  r.fork("f-a").revokeError = () => internal();
+  await assert.rejects(r.ledger.mint("f-a", "pin-objects:h1", TTL), /one transient write failure \(held\)/);
+  const id = r.fork("f-a").tokens[0]!.id;
+  assert.deepEqual(r.fork("f-a").revokes, [id]);
+  assert.equal(only(r.sql)["state"], "owed");
+  assert.equal(only(r.sql)["token"], id);
+  (r.sql as { all: Sql["all"] }).all = real;
 });
 
 test("F22 expiry is checked again before each revocation: a record already past its readable expiry is settled with no lookup and no call; records whose expiry passes during the fork lookup are settled with no call", async () => {
@@ -964,4 +997,82 @@ test("F22 expiry is checked again before each revocation: a record already past 
   r.clock.advance(OVERDUE_STEP_MS);
   await alarm(r);
   assert.equal(rows(r.sql).length, 0);
+});
+
+// ------------------------------------------------------------------ the checker's controls on 3d1223a1 (C1 to C3)
+
+test("F24 (checker C1) the fork's sweep never revokes a token whose create's answer was lost: while the record is unknown with no ID, the sweep leaves every read token on that fork and still revokes the rest; on a fork with no open create it revokes an unrecorded read token", async () => {
+  const o = owner();
+  const lane = "act_21_aaaaaaaa" as never;
+  const name = forkName("canon", lane);
+  const f = o.ns.add(name, "artifacts:ns/canon");
+  o.ws.open(lane, 1 as never, o.clock.t + 3600_000);
+  const write = f.apply("write", 3600); // a token no lease records: the sweep revokes it (R-WS-3)
+  f.plans = ["lose"];
+  await assert.rejects(o.ws.forkTokens.mint(name, "pin-objects:checker", TTL));
+  assert.equal(only(o.sql)["state"], "unknown");
+  assert.equal(only(o.sql)["token"], null);
+  const lost = f.tokens.at(-1)!;
+  await o.ws.revoke(lane, 1 as never);
+  assert.deepEqual(f.revokes, [write.id], "only the token no open create could own");
+  assert.equal(f.live(lost.id), true);
+  assert.equal(only(o.sql)["state"], "unknown", "the sweep settles nothing in the ledger");
+  // Another lane's fork, with no create open: an unrecorded read token there is swept as before.
+  const lane2 = "act_23_cccccccc" as never;
+  const name2 = forkName("canon", lane2);
+  const g = o.ns.add(name2, "artifacts:ns/canon");
+  o.ws.open(lane2, 1 as never, o.clock.t + 3600_000);
+  const stray = g.apply("read", TTL);
+  await o.ws.revoke(lane2, 1 as never);
+  assert.deepEqual(g.revokes, [stray.id]);
+});
+
+test("F25 (checker C2) a known create answer survives one failed write and a failed revocation: the ID is kept as owed, and a later alarm on a new host revokes it", async () => {
+  const r = room();
+  const f = r.fork("f-a");
+  const real = r.sql.all.bind(r.sql);
+  let failed = false;
+  (r.sql as { all: Sql["all"] }).all = (q, ...b) => {
+    if (!failed && q.startsWith("UPDATE artroom_fork_mint SET state = 'held'")) {
+      failed = true;
+      throw new Error("one transient write failure");
+    }
+    return real(q, ...b);
+  };
+  f.revokeError = () => internal();
+  await assert.rejects(r.ledger.mint("f-a", "pin-objects:checker", TTL), /one transient write failure/);
+  const id = f.tokens[0]!.id;
+  assert.deepEqual(f.revokes, [id]);
+  f.revokeError = null;
+  r.start();
+  r.clock.advance(1000);
+  await alarm(r);
+  assert.equal(f.live(id), false, "the known token is revoked by its ID after the restart");
+  assert.equal(r.ledger.duties().unknown, 0, "the known answer is never demoted to unknown");
+});
+
+test("F26 (checker C3) the sweep asks again before each revocation: a pin token that becomes held while an earlier revocation waits is kept", async () => {
+  const o = owner();
+  const lane = "act_22_bbbbbbbb" as never;
+  const name = forkName("canon", lane);
+  const f = o.ns.add(name, "artifacts:ns/canon");
+  o.ws.open(lane, 1 as never, o.clock.t + 3600_000);
+  f.apply("write", TTL);
+  f.plans = ["hold"];
+  const mint = o.ws.forkTokens.mint(name, "pin-objects:checker", TTL);
+  await until(() => f.held.length === 1, "the create is out");
+  const h = f.held[0]!;
+  h.apply();
+  f.holdRevokes = true;
+  const sweep = o.ws.revoke(lane, 1 as never);
+  await until(() => f.heldRevokes.length === 1, "the sweep's first revocation");
+  h.answer();
+  const token = await mint;
+  assert.equal(only(o.sql)["state"], "held");
+  f.holdRevokes = false;
+  f.heldRevokes[0]!.gate.resolve();
+  await sweep;
+  const live = f.live(token.id);
+  await token.release();
+  assert.equal(live, true, "the sweep never revokes a token held by pinning");
 });

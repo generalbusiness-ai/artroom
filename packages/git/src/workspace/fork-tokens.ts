@@ -30,9 +30,12 @@
  *   fork's count of unknown records and its observation. Each alarm
  *   observes at most one fork, the one due earliest.
  * - The fork's owner may still sweep the fork (R-WS-3, plans 001 and 002:
- *   revoke every active token no lease records). Tokens this ledger holds
- *   are exempt (`held`), so a sweep never cuts a pin short. This ledger
- *   itself never revokes a token that none of its records names by ID.
+ *   revoke every active token no lease records). The sweep asks this ledger
+ *   about each token immediately before revoking it (`mayOwn`), and leaves
+ *   every token a record holds for a caller, and, while a create on that
+ *   fork is still `sent` or `unknown`, every read token. So
+ *   neither the sweep nor this ledger revokes a token that one of its open
+ *   creates may own, and a sweep never cuts a pin short.
  *
  * Construct one ledger per host start: the constructor takes over what a
  * stopped host left. `sent` records become `unknown`, and `held` records
@@ -165,6 +168,8 @@ export class ForkTokens {
     );
     this.sql.all("CREATE INDEX IF NOT EXISTS artroom_fork_mint_state ON artroom_fork_mint (state, due, id)");
     this.sql.all("CREATE INDEX IF NOT EXISTS artroom_fork_mint_token ON artroom_fork_mint (token)");
+    // The fork's sweep asks whether a create on the fork is still open: by fork and state.
+    this.sql.all("CREATE INDEX IF NOT EXISTS artroom_fork_mint_open ON artroom_fork_mint (fork, state)");
     this.sql.all(
       "CREATE TABLE IF NOT EXISTS artroom_fork_mint_watch (fork TEXT PRIMARY KEY, unknown INTEGER NOT NULL, observed_at INTEGER, observation TEXT, " +
         "unaccounted INTEGER, observe_due INTEGER, observe_wait INTEGER NOT NULL)",
@@ -459,22 +464,71 @@ export class ForkTokens {
   }
 
   /**
-   * The answer could not be recorded. A token ID from it is revoked at once;
-   * only when Artifacts answers that is the record deleted, by its row ID
-   * and in its earlier state.
+   * The answer gave a token ID, but it could not be recorded as the answer
+   * (as `held`, say: a write failed), or its record was in no state to take
+   * it. The ID is in memory, so the record is written again, as the record
+   * of a known token owed revocation, before anything else. Then the token
+   * is revoked by its ID at once. An answer ends the record; a failure
+   * leaves it owed, with its ID, for the alarm's passes, and if the first
+   * write failed it is tried once more. Only if storage refuses both writes
+   * and Artifacts the revocation does the record keep its earlier state
+   * (`sent`, which the next host's takeover makes `unknown`).
    */
   private async handoffFailed(id: number, fork: string, repo: ForkRepo, o: Outcome): Promise<void> {
     if (o.kind !== "token") return;
+    const owe = (): boolean => {
+      try {
+        return this.sql.transaction(() => this.oweKnown(id, fork, o));
+      } catch {
+        return false;
+      }
+    };
+    const recorded = owe();
     const answered = await within(repo.revokeToken(o.id).then(() => true), this.waitMs, false).catch(() => false);
-    if (!answered) return;
-    try {
-      this.sql.transaction(() => {
-        if (this.drop(id, "unknown")) this.count(fork, 0, -1);
-        else this.drop(id, "sent");
-      });
-    } catch {
-      // The record stays as it was: still open, never settled by guesswork.
+    if (answered) {
+      try {
+        this.sql.transaction(() => {
+          if (this.drop(id, "owed")) this.count(fork, -1, 0);
+          else if (this.drop(id, "unknown")) this.count(fork, 0, -1);
+          else this.drop(id, "sent");
+        });
+      } catch {
+        // The record stays owed, or as it was: its revocation is tried again, never settled by guesswork.
+      }
+      return;
     }
+    if (!recorded) owe();
+    await this.wake(this.now() + MINT_REVOKE_BACKOFF.firstMs).catch(() => undefined);
+  }
+
+  /**
+   * In the caller's transaction: the record, still `sent` or `unknown`, becomes
+   * the record of a known token owed revocation, by its ID and reported
+   * expiry. False if it was in neither state.
+   */
+  private oweKnown(id: number, fork: string, o: Extract<Outcome, { kind: "token" }>): boolean {
+    for (const from of ["sent", "unknown"] as const) {
+      if (this.move(id, from, "state = 'owed', token = ?, expires_at = ?, due = ?, backoff = NULL, last_error = ?", o.id, o.expiresAt, this.now(), "the answer could not be recorded; owed revocation by its ID")) {
+        this.count(fork, 1, from === "unknown" ? -1 : 0);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * May this ledger own a token listed on `fork`? Yes if a record holds it
+   * for a caller, or if it is a read token while any create on this fork is
+   * still `sent` or `unknown`: the listing does not say which create made a
+   * token (open points 42 and 43), and a lifetime or creation time cannot
+   * tell concurrent creates apart, so every read token is one such a create
+   * could have made. The fork's sweep (R-WS-3) leaves these; only the
+   * create's own answer, through this ledger, settles its record. Two
+   * indexed lookups, whatever the number of records kept.
+   */
+  mayOwn(fork: string, token: { readonly id: string; readonly scope: string }): boolean {
+    if (this.sql.all("SELECT 1 AS x FROM artroom_fork_mint WHERE token = ? AND state = 'held' AND fork = ? LIMIT 1", token.id, fork).length > 0) return true;
+    return token.scope === "read" && this.sql.all("SELECT 1 AS x FROM artroom_fork_mint WHERE fork = ? AND state IN ('sent', 'unknown') LIMIT 1", fork).length > 0;
   }
 
   private track(p: Promise<unknown>): void {
@@ -507,14 +561,6 @@ export class ForkTokens {
   }
 
   // ---------------------------------------------------------------- the fork's owner
-
-  /** The token IDs this ledger holds for callers on `fork`: the fork's sweep keeps them (R-WS-3). */
-  held(fork: string): string[] {
-    return this.sql
-      .all("SELECT token FROM artroom_fork_mint WHERE state = 'held' AND fork = ?", fork)
-      .map((r) => text(r, "token"))
-      .filter((t): t is string => t !== null);
-  }
 
   // ---------------------------------------------------------------- the alarm
 
