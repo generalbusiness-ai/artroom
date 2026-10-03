@@ -82,195 +82,149 @@ A recorded refusal supplies context without applying the requested effect. A lan
 
 ## Q6. The picture survives; rulebook-only generality does not
 
-Source shorthand in Q6–Q8: P = `docs/protocol.md`; A = `notes/2026-10-02-acts-review.md`, revision 4; J = `notes/2026-10-01-jam-room.md`, revision 5, all at the Artroom baseline named above. C = `chess.go` and CA = `docs/reference/architecture.md` in `github.com/generalbusiness-ai/gitseq-chess` at `b97c6a82ef7e3618721696f5a69efef13da10a79`. Source line ranges identify evidence rather than presentation wording.
+Source shorthand in Q6–Q11: P = `docs/protocol.md`; A = `notes/2026-10-02-acts-review.md`, revision 4; J = `notes/2026-10-01-jam-room.md`, revision 5, all at the approved Artroom baseline. C = `chess.go` and CA = `docs/reference/architecture.md` in `github.com/generalbusiness-ai/gitseq-chess` at `b97c6a82ef7e3618721696f5a69efef13da10a79`. Ranges below are exact source lines, not presentation wording.
 
-**Judgment: sharpen H6.** Rules, a retained record, and a current board are a useful explanation. The strong claim that changing only the room's rulebook yields an arbitrary new application fails the breadth test. Room declarations select from fixed, versioned platform steps; policy can refuse, require evidence, narrow carrying, block landing, or notify. Neither mechanism provides arbitrary application state transitions, an audio engine, a deployment adapter, or a new provider guarantee. That boundary is a strength if stated clearly: the application supplies its business code while the platform supplies common guards and recorded decisions. It becomes a misleading promise if those two responsibilities are merged.
+**Judgment: sharpen H6.** Rules, a record and a board explain the shared mechanism. Changing only a rulebook cannot supply arbitrary application transitions, an audio engine or a deployment adapter. Declarations choose names, fields and permissions within fixed platform steps; policy gates those steps. Application code supplies business judgment and outside work. Signatures, recovery, custody, evaluation limits, historical binding and publication remain platform rules the room cannot repeal. Q11 gives the authoritative room-by-room counterexamples and readiness/trust boundaries.
 
-**Sharpened H6 wording, for hypothesis evaluation:** A room has rules, a record and a board. The platform checks actions using its fixed rules and the room's rules in force, and records decisions and later outcomes. The board shows what follows from that record at a stated point. Declarations choose names, fields and permissions within the platform's steps; application code and adapters supply work those steps do not perform.
-
-This costs more words than the original. The shorter explanation can introduce the three objects first, but must retain the application-code and external-effect boundary when claiming generality. The rulebook should not be drawn as solely a file owned by the room: recovery, signatures, custody, evaluation limits, historical binding and publication are platform rules the application cannot repeal.
-
-### Alternatives considered
-
-| Explanation | Disposition and cost |
+| Alternative | Disposition and strongest objection |
 |---|---|
-| Change only the rulebook and get any application | Reject. Neither the fixed steps nor the supplied policy input contains an arbitrary application fold or external-effect implementation. Chess is a concrete counterexample to the claimed mechanism. |
-| Three parts, with platform rules and application code explicit | Keep. Best compact conceptual bridge, but requires one visible boundary around application code and outside systems. |
-| Everything is a code-review workflow with renamed verbs | Reject as the general explanation. It erases the distinct musical live layer and the missing request/completion lifecycle; it makes typed declarations look like labels only. |
-| A record plus any application fold | Keep as an architectural explanation of gitseq chess; do not equate it with the delivered Artroom declared-steps runtime. It shifts useful work to the application and raises version-retention and identity questions. |
-| A complete programmable application host, including effects | Leave open as a possible future platform scope, not evidence from this snapshot. It would require new semantics, delivery and trust boundaries. This research adopts no API or design. |
+| Change only the rulebook and get any application | Reject: fixed steps and supplied inputs do not implement an arbitrary application fold or outside effect. |
+| Three parts, with platform rules and application code explicit | Keep: a compact bridge, provided the application/outside-system boundary is visible. |
+| Code-review workflow with renamed verbs | Reject as the general explanation: it erases musical live work and the missing request/completion lifecycle. |
+| A record plus an application fold | Keep for gitseq chess, not as delivered Artroom declared runtime; the application must retain semantics and judge identity. |
+| Complete programmable host, including effects | Leave open as future scope; new semantics, implementation and trust boundaries are not established here. |
 
-### Every act and non-act path
+### Complete act and non-act coverage
 
-The current admission dispatch is explicitly `claim`, `propose`, `note`, `review`, `check`, `land`, `release`, `renew`, and `roster` (`packages/room/src/admission.ts:486–505`). The code-review declarations are delivered as data, not used by that dispatch (`packages/policy/src/codereview.ts:23–74`). `recover` is a proposed platform path for v2, not a tenth delivered legacy act. The following table covers all these paths and the paths that the three-part picture tends to hide.
+Current dispatch is `claim`, `propose`, `note`, `review`, `check`, `land`, `release`, `renew`, `roster` (`packages/room/src/admission.ts:486–505`). Code-review declarations are data (`packages/policy/src/codereview.ts:23–74`); v2 `recover` is proposed, not a tenth legacy act. In this table, `admission.ts` and `core.ts` mean `packages/room/src/`; `codereview.ts` means `packages/policy/src/`.
 
-| Path | What the record/board picture explains | What room rules alone do not supply; delivery boundary | Source |
-|---|---|---|---|
-| `claim`, opening | Attributed holder, scope, generation and lease | A held resource lane is not an unheld issue, an addressed request, or a promise accepting another actor's conditions. Current legacy code supplies the transition; v2 `open`/`take` runtime is owed. | P:762–814; A:463–505; `admission.ts:487–488` |
-| `claim`, rescope/takeover | A guarded change to a reusable resource hold | Release/expiry leaves a resource available; it does not say a work item is open, declined, satisfied or closed. Rescope's known `obligationsRecomputed: false` behavior is preserved by this steps version. | P:3546–3571, 3608–3634; A:471–505 |
-| `propose` | An exact head, actual changed paths, obligations, retained versions and preview | A branch push is only preparation. Git reachability, diff bounds, pinning, integration and preview use platform code and provider access. No conversation closure or business effect follows merely from pushing. | P:837–926; `admission.ts:489–490` |
-| `note` | Attributed commentary, entry or source-line anchor | Text cannot create a protected work-item transition by convention. Unanchored declared comments are owed, not a delivered legacy-note capability. | P:3590–3634, 4284–4304; `codereview.ts:42–48`; A:473–484 |
-| `review` | A qualified judgment bound to exact version/head, retained as history | Qualification, self-review restrictions, actual authority and count are platform guards. A review is evidence for configured obligations, not every requester's acceptance or a universally authorized adoption. | P:875–926, 1290–1308; A:490–529 |
-| `check` | Signed evidence tied to integration, checker configuration and observed runner inputs | The checker runs application/test code; the signature records a result, not independent proof that the code or provider told the truth. An obligation is a requirement; a check is evidence that may satisfy it. v2 job kind/binding routing is owed. | P:897–911, 985–1022, 2486–2648, 3914–3953 |
-| `land` | A request for a guarded operation followed by reservation and later outcome | The operation is not complete merely because the request was accepted. Preparation can run in parallel; only publication is single-slot. External Git effects require adapters and outcome resolution. A landing is not every kind of work completion. | P:1047–1219; A:461–510; `core.ts:1340–1369` |
-| `release` | Holder relinquishes a lease; history retains the handover note | It does not close or retire a work item, accept a result, or release an already reserved publication. Current code sets the lane to `unheld` and increases its lease generation. | P:799–814, 1136–1155; `admission.ts:1281–1308` |
-| `renew` | Current holder extends a lease under platform authority | The platform clock and lease guards are not an arbitrary room policy or a business timer service. In v2 it remains a platform kind. | P:785–798, 3540–3544, 4147–4149 |
-| `roster`, all ops | Versioned membership, invitations, role/team changes, key revocation, delegation, undelegation and recovery-key rotation | Authority floors, custody and emergency recovery are fixed. Admin/recovery roster acts intentionally bypass policy refusals; app rules are not the sole judge. | P:193–258, 406–449, 1290–1360; `admission.ts:331–389, 535–559` |
-| v2 `recover` | A separately identified protected configuration-recovery workflow | Proposed platform kind, active admin's own key only, not a declaration that can be renamed or delegated. Legacy config-recovery behavior continues under v1. | P:3954–3990, 4154, 4297 |
-| Signed unrecorded requests | Workspace operation/token and read session retrieval | These are explicitly not acts and leave no room-log entry for the request. Nonces, credentials and grants have an operational store/trust boundary outside a board derived only from effective acts. | P:578–631; `packages/room/src/requests.ts:1–93` |
-| Invalid/unauthorized early submissions | Failure/refusal to the caller | Parse/signature/authority/body/secret failures are unrecorded; a claim that the log contains every attempted action is false. Runtime failure records nothing. Late deterministic refusals are recorded. | P:374–400, 455–491 |
-| System events | Lease expiry, policy activation, obligation recomputation, carried evidence, preparation evaluation, reservation, abort attempt, unresolved publication, outcome, revert lane, notification and checkpoint | These are not actor-signed application acts. Room signatures and recorded observations are part of the record. `prepared` and `reservation-ended` are additions owed by declared stage 4. | P:1648–1663, 2457–2485, 4177–4191 |
-| Reading, watch/subscribe, attention, waiting | Clients see a cursor/prefix and operation status | Same rules and same prefix can yield the same projection; disconnected clients need not have the same current prefix. A wait timeout does not cancel an operation. Attention delivery and provider results can lag. Generic v2 clients/catalogue are owed. | P:1828–1951, 4169, 4297–4303 |
-
-`admission.ts` and `core.ts` in this table mean `packages/room/src/`; `codereview.ts` means `packages/policy/src/`.
-
-### All fixed declared steps
-
-These are the nine `artroom-steps-v1` primitives, not arbitrary code hooks. Declaration data can choose only the listed target/step combinations; the sole compound combination is `version` then `land` on a thread. Every step retains the platform's guards. Names and typed fields cannot add a transition the step does not perform. Source: P:3583–3634.
-
-| Step | Expressible choice in room data | Still fixed or supplied elsewhere |
+| Path | Record/board contribution and limit | Source |
 |---|---|---|
-| `open` | Opening kind, roles, typed fields, fixed/template/body scope, lease/conflict/workspace settings | Opens a held resource thread. No unheld filing, business-object constructor, requester acceptance or arbitrary state update. |
-| `take` | Which opening thread kinds are addressable | Guarded takeover or rescope; expected generation, lease, fixed-scope and reservation checks. No reassignment of an independent addressed conversation. |
-| `version` | Application act name/fields/roles; policy obligations and refusals | Exact reachable Git head, bounded diff, scope, administrative configuration rule, pin, preview and generation. Application-specific validators/checkers supply content judgments. |
-| `review` | Name/fields, permitted thread kinds and roles; configured principals/count | Exact-head binding, qualifying evidence and self-review floor. No automatic acceptance of every business condition. |
-| `check` | Application check name and declared binding selected by job configuration | Check/result contract, author exclusion and runner evidence; service implementation and dispatch are code/deployment dependencies. |
-| `land` | Name/fields and room gating rules | Code publication operation and global publication guards, not arbitrary side effects. Compound version/land cannot acquire an independent review inside the same act. |
-| `release` | Name and optional declared metadata | Holder's resource release; reusable unheld thread, not item/conversation closure. |
-| `hand-over` | Typed target member and opening-kind compatibility | Release plus reserved named takeover with recorded duration; not a general transferable business transaction. |
-| `comment` | Typed signal/comment body; permitted anchor shapes | Records commentary/attention. Application rendering/timing or interpreting a typed signal is separate application code. |
+| `claim`, opening | Holder/scope/generation/lease. A held resource is not an unheld issue, addressed request or accepted promise; declared `open`/`take` runtime is owed. | P:762–814; A:463–505; `admission.ts:487–488` |
+| `claim`, rescope/takeover | Guarded reusable hold. Release/expiry does not establish work status; this steps version preserves rescope's `obligationsRecomputed: false`. | P:3546–3571, 3608–3634; A:471–505 |
+| `propose` | Exact head, bounded actual changes, obligations and retained preview. Push alone is preparation; reachability, diff, pins and integration require Git/provider code. | P:837–926; `admission.ts:489–490` |
+| `note` | Attributed entry/line commentary, not a protected business transition. Unanchored declared comments remain owed. | P:3590–3634, 4284–4304; `codereview.ts:42–48`; A:473–484 |
+| `review` | Qualified exact-head judgment. Platform authority, independence, scope and count determine whether it meets an obligation; it is not every requester's acceptance. | P:875–926, 1290–1308; A:490–529 |
+| `check` | Evidence bound to integration, config and runner inputs. A requirement is an obligation; a check may satisfy it. Runner truth is trusted; declared job routing is owed. | P:897–911, 985–1022, 2486–2648, 3914–3953 |
+| `land` | Guarded request, preparation, reservation and later outcome. Preparation may be parallel; publication is single-slot and needs external resolution. Not general completion. | P:1047–1219; A:461–510; `core.ts:1340–1369` |
+| `release` | Relinquishes the holder's lease, retaining handover text; sets `unheld` and advances lease generation. Does not close work, accept results or cancel reserved publication. | P:799–814, 1136–1155; `admission.ts:1281–1308` |
+| `renew` | Holder's lease extension under room-clock/authority guards, not a business timer. Remains a platform kind in v2. | P:785–798, 3540–3544, 4147–4149 |
+| `roster`, all nine ops | `invite`, `join`, `set-role`, `remove`, `revoke-key`, `team`, `delegate`, `undelegate`, `rotate-recovery`. Membership/custody/authority floors are fixed; admin/recovery roster acts bypass policy refusals. | P:193–258, 406–449, 1290–1360; `admission.ts:331–389, 535–559` |
+| v2 `recover` | Protected configuration recovery, active admin's own key only; cannot be renamed/delegated. Legacy config-recovery continues under v1. | P:3954–3990, 4154, 4297 |
+| Signed non-act requests | Workspace/token/read-session retrieval uses an operational nonce/credential/grant store; the requests are unrecorded. | P:578–631; `packages/room/src/requests.ts:1–93` |
+| Early failures | Parse/signature/authority/body/secret and runtime failures record nothing. Late deterministic refusals are recorded; the log is not every attempt. | P:374–400, 455–491 |
+| System events | Room-signed expiry, activation, recomputation, carry, preparation evaluation, reservation, abort, unresolved/outcome/revert, notification and checkpoint. `prepared` is owed by stage 2; `reservation-ended` by stage 4. | P:1648–1663, 2457–2485, 4177–4191 |
+| Reads, watch, attention, waits | Prefix/cursor and operation state; disconnected clients may differ. A timeout does not cancel work, and attention/provider outcomes can lag. Generic v2 access remains owed. | P:1828–1951, 4169, 4297–4303 |
 
-All nine are delivered in stage-1 contract/data/validation form. The table does not assert that their declared runtime has landed. Existing analogous legacy behavior does not make new `hand-over`, fixed scopes, per-thread conflict/lease settings, unanchored comments or compound acts delivered. The exact stage map is P:4293–4304.
+### Nine fixed declared steps and five policy kinds
 
-### All configurable rule kinds
+`artroom-steps-v1` permits only these nine primitives and their specified target combinations. The sole compound act is `version` then `land` on a thread (P:3583–3634). All are stage-1 contract/data/validation, not declared runtime delivery; stage ownership is P:4293–4304.
 
-| Rule kind | What room policy alone changes | Bound that remains |
+| Step | Room-data choice | Fixed or application-supplied work |
 |---|---|---|
-| `refuse` | Add deterministic reasons and fixes over supplied act/actor/lane/proposal/room input | Cannot waive platform guards or introduce arbitrary effect code; admin/recovery exceptions are fixed. |
-| `require` | Path-based review/check obligations, principal/count choices and conditional application | Configures evidence requirements, not a runner, reviewer, external service or new business-object state. |
-| `carry` | Narrow whether otherwise eligible evidence carries | Cannot widen the platform's exact-input, global-input, revocation or runner/environment conditions. |
-| `land` | Block at request or reservation evaluation based on supplied input | Cannot turn code landing into a general deployment or access-grant adapter; no live provider reads or trusted current clock in these inputs. |
-| `notify` | Add attention targets and reason | Runs after commit, records its outcome later, never rewrites the act, and is not an arbitrary outbound webhook. |
+| `open` | Kind, fields, roles, scope, lease/conflict/workspace | Held resource thread, not unheld filing or arbitrary object/state creation. |
+| `take` | Addressable opening kinds | Guarded takeover/rescope, expected generation, lease, scope and reservation; not separate-conversation reassignment. |
+| `version` | Kind/fields/roles, obligations and refusals | Reachable exact head, bounded diff/scope/admin guards, pins/preview/generation; content validators are application code. |
+| `review` | Kind/fields/thread kinds/roles and principals/count | Exact-head qualification and self-review floor; not universal acceptance. |
+| `check` | Check kind/binding in job configuration | Result contract, author exclusion and runner evidence; services and dispatch must be deployed. |
+| `land` | Kind/fields and gating rules | Canonical code publication, not arbitrary effects; a compound act cannot obtain independent review inside itself. |
+| `release` | Kind and metadata | Holder release of a reusable resource, not work/conversation closure. |
+| `hand-over` | Named member and compatible thread kind | Release plus time-bounded reserved takeover, not an arbitrary transferable transaction. |
+| `comment` | Typed signal and permitted anchors | Commentary/attention; application code interprets timing and renders results. |
 
-Sources: P:1363–1466; `packages/contract/src/policy.ts:37–98, 204–266`; `packages/policy/src/profile.ts:10–29`; `packages/policy/src/evaluator.ts:64–80`. A freeze window is not justified merely by mentioning JSONata: the current `RuleInput` has no clock, randomness or I/O. An application/checker may attest a bounded external observation, or a future reviewed interface may supply it; an actor's body timestamp is not trusted current time. This is a missing implementation/trust choice for a rollout candidate, not a commission to add an API.
+| Policy kind | Room policy can change | Fixed limit |
+|---|---|---|
+| `refuse` | Deterministic reasons/fixes on supplied input | No waived platform guard or arbitrary effect; admin/recovery exceptions remain. |
+| `require` | Path/condition/principal/count review or check obligations | Requirements do not supply evidence, a runner or business-object state. |
+| `carry` | Narrow eligible evidence reuse | Cannot widen scope/global-input/revocation/config/runner floors. |
+| `land` | Block at request or reservation evaluation | No external deployment/access effect, provider read or trusted live clock. |
+| `notify` | Attention targets/reasons after commit | Later recorded outcome, not an outbound webhook or a rewritten act. |
 
-### Complete numbered-rule coverage
+Sources: P:1363–1466; `packages/contract/src/policy.ts:37–98, 204–266`; `packages/policy/src/profile.ts:10–29`; `packages/policy/src/evaluator.ts:64–80`. `RuleInput` has no clock, randomness or I/O. An actor's timestamp is not trusted current time; a rollout freeze needs a specified application observation/time mechanism (Q10), not merely a policy expression.
 
-The inventory contains **247 distinct numbered rules in 24 families**. Every number is included below; amendments are read with earlier rules. The inclusive family ranges below enumerate every distinct numbered rule; the inventory was independently generated from the pinned protocol and checked against this table. The rows are grouped for comprehension, not a seven-act subset.
+### All 247 numbered rules in 24 families
 
-**Delivery notation:** **L** means the existing legacy protocol/source boundary, not fresh validation of every rule or provider effect. **D** means stage-1 declared contract/types/data/validator functions are present. **O** means additional declared runtime/replay/client/fixture behavior remains owed. Every L row retains the platform floor when the O amendments eventually become effective. None means deployed applications were tested in this research.
+The following inclusive ranges cover every distinct numbered rule, independently counted from the pinned protocol. Amendments apply with the earlier rules; non-numbered acceptance cases and open points still matter. **L** denotes the existing legacy contract/source boundary, not fresh validation of each runtime rule. **D** denotes delivered stage-1 types/data/validator functions. **O** denotes owed declared runtime/replay/client/fixture behavior. None means a deployed application was tested in this research. All rows retain the fixed platform floors described above.
 
-| Rules, inclusive | Record/board contribution | Room-rule-only boundary and delivery | Exact P source lines |
+| Rules, inclusive | Contribution | Distinct boundary and delivery | Exact P source lines |
 |---|---|---|---|
-| R-ID-1–10 (10) | Stable entry/resource/operation/evidence identities | Fixed hash/sequence/name formats; declarations cannot replace identity arithmetic. L; declared names/bindings D/O. | 85–128; amendments 4132–4170 |
-| R-SIG-1–6 (6) | Attributed, bounded, canonical signed intents | Cryptographic/domain/body guards are platform code; early failures are absent from record. L; v2 kind/binding/body extensions D/O. | 131–176; 4133–4136 |
-| R-GEN-1–13 (13) | Founding identity, membership, invitations, recovery, canonical repository and registry | Room/operator/provider trust and authority floor cannot be inferred from a user field or repealed by policy. L; profile/declaration authority changes D/O. | 179–371; 4137–4139 |
-| R-ADM-1–12 (12) | Atomic decision, exact authority, sealed receipts, recorded late refusals | Fixed validation order, room clock, recovery and custody; not every attempted act appears in log. L; v2 binding and `who` judgment O. | 374–517; 4140–4142 |
-| R-IDEM-1–6 (6) | Same signed retry returns same committed outcome | Durable key/bytes lookup; a newly signed retry or different bytes is not equivalent. Unrecorded failures do not acquire a logged outcome. L. | 520–539 |
-| R-CRED-1–11 (11) | Actor custody, delegated/bearer permissions and separated read/write access | Sessions, workspace retrieval and token secrets are not recorded acts; signer service/browser/operator are trust boundaries. L; binding-aware declared bearer/client paths O. | 549–708; 4143–4146 |
-| R-WS-1–5 (5) | Workspace operation and public safe view | Provider fork/token operations, secret retrieval and revocation need operational code; board/log never includes token values. L; declaration workspace choice D/O. | 711–747; 3697–3715 |
-| R-LANE-1–10 (10) | Reusable resource scope, holder, lease and generation | Resource hold is not request/conversation/completion; reservations and per-thread settings require fixed-step code. L; thread-kind/fixed-scope/hand-over runtime O. | 762–814; 4147–4149 |
-| R-PATH-1–3 (3) | Deterministic scope/path match and conservative overlap | Fixed glob algorithm, not arbitrary business-key mutual exclusion. Declaration scope templates select inputs to it. L; templates O. | 817–836; 3660–3676 |
-| R-PROP-1–7 (7) | Exact proposed head, actual bounded paths and preview | Git adapters/integration code; a push alone is not proposal. Pinned proposal head survives later fork force-push. L; declared `version` and witnesses O. | 837–872; 3608–3634; 4165–4166 |
-| R-OBL-1–7 (7) | Exact qualifying review/check evidence and required/advisory status | Platform qualification, principal independence, count and check-input guards; policy configures requirements, does not produce evidence. L; declared job bindings O. | 875–926; 2634–2648; 4150 |
-| R-CARRY-1–16 (16) | Retained history distinguished from evidence valid in a new generation | Fixed scope/global-input/policy/config/runner/snapshot conditions and sealed carry events; room policy only narrows. L; declared binding-aware jobs O. | 934–1022; 2457–2504; 2516–2583; 4163 |
-| R-LAND-1–11 (11) | Guarded preparation, latest generation, reservation and recorded outcome | Serial publication is only part of parallel work; reservation fixes authorization and later loss of hold is not cancellation. Git/check adapters remain. L; declared compound act and prepared events O. | 1047–1163; 4151–4152 |
-| R-PUB-1–10 (10) | One publication slot, complete-forward resolution and policy activation | Outside-ref observations and exclusive publisher assumption; token expiry alone does not prove an old push stopped. Authorized `force-with-lease` publication exists. L; application effects beyond Git require adapters. | 1166–1219 |
-| R-REV-1–8 (8) | Later evidence invalidation, reopenings, emergency abort/revert history | Immutable historical admission is distinct from evidence currently counting. Retired/compromised are not interchangeable; after-reservation emergency boundary is fixed. L; declared revert thread vocabulary O. | 1222–1287; 4153 |
-| R-ADMIN-1–9 (9) | Protected configuration change, flagged sole-admin exception and recovery | Application rulebook is not sole authority: recovery deliberately bypasses broken policy; special sole-admin permission is not every custom review. L; v2 `recover` O. | 1290–1360; 4154 |
-| R-POL-1–12 (12) | Versioned application gating, obligation/carry/attention/landing decisions and activation | Exactly five rule kinds over supplied bounded input, no arbitrary state/effect code and no self-authorizing proposed policy. L; v2 document additions D/O. | 1363–1466; 4155–4160 |
-| R-EVAL-1–9 (9) | Pinned pure evaluation, budgets, retained replay inputs and deterministic errors | Restricted engine is platform code; timeout/failure is not a logged deterministic refusal; replayed input is not independent proof that an outside observation is true. L; new profile activation/retention when implemented O. | 1469–1558; 4161–4162 |
-| R-EXEC-1–11 (11) | Exact isolated job/commit/input/environment result provenance | Runner/service/provider trust, untrusted repository execution and measured environment remain outside policy expressions; dispatch is service binding. L; declared kind/binding jobs O. | 1561–1588; 2505–2515; 2584–2633; 4163 |
-| R-SEC-1–6 (6) | Refuse detected secrets before permanent/public recording | Detection expressly incomplete; no confidentiality/per-fact visibility claim. Credentials never belong in the record. L. | 1591–1619 |
-| R-LOG-1–20 (20) | Signed chained entries, retained replay material, checkpoints, layout and resolution of publication | Record includes accepted acts, late refusals and system events. Verification covers an available published prefix, not missing unpublished acts, trusted clock, all current transitions or provider truth. L; declared full fold/witness/version proof O. | 1622–1825; 2884–3104; 4164–4168 |
-| R-API-1–12 (12) | Refusal values, cursors/status, replayable public views and updates | Transport, credentials and operational waits are code; equal projection needs equal prefix. Wait timeout is not cancellation, generic declared tools/catalogue remain O; L fixed clients. | 1828–1951; 4169 |
-| R-MINT-1–7 (7) | Durable accounting for token creates, known ownership and unresolved external outcomes | Operational ledger, provider clock/create/revoke and exclusive writer assumption are not a pure board fold. Unknown outcomes must remain unknown, not promoted to success by time. L. | 3311–3461 |
-| R-DECL-1–26 (26) | Application names/targets/typed fields/roles/holds, meaning identities, retirement/reuse, retained step/profile semantics, replay requirements | No code or reference to code in declarations; only nine fixed steps. Platform kinds and authority floors remain fixed. D functions/data/types; all runtime stage ownership explicit O. | 3546–4124; 4284–4304 |
+| R-ID-1–10 (10) | Stable act, resource, operation and evidence IDs | Fixed identity arithmetic. L; declared names/bindings D/O. | 85–128; amendments 4132–4170 |
+| R-SIG-1–6 (6) | Canonical signed intents | Cryptography, size/domain/body guards are fixed; early failures are unrecorded. L; v2 extensions D/O. | 131–176; 4133–4136 |
+| R-GEN-1–13 (13) | Founding, roster, recovery, repository and registry | Operator/provider authority remains a trust boundary. L; profile/declaration authority D/O. | 179–371; 4137–4139 |
+| R-ADM-1–12 (12) | Atomic judgment, sealed receipts and late refusals | Validation order, room clock, recovery and custody are fixed. L; binding/`who` runtime O. | 374–517; 4140–4142 |
+| R-IDEM-1–6 (6) | Original outcome for identical signed retries | Changed bytes or a newly signed act are not equivalent; unrecorded failures have no logged outcome. L. | 520–539 |
+| R-CRED-1–11 (11) | Custody, delegation, bearer and read/write authority | Sessions and secrets remain operational, outside acts. L; binding-aware declared access O. | 549–708; 4143–4146 |
+| R-WS-1–5 (5) | Safe workspace operation views | Forks, tokens and revocation require provider code; secrets stay outside records. L; declared workspace choice D/O. | 711–747; 3697–3715 |
+| R-LANE-1–10 (10) | Scope, holder, generation and lease | Reusable resource hold, not request/conversation closure. L; thread settings, fixed scopes and handover O. | 762–814; 4147–4149 |
+| R-PATH-1–3 (3) | Deterministic path matches and conservative overlaps | Fixed glob algorithm, not arbitrary business-key exclusion. L; scope templates O. | 817–836; 3660–3676 |
+| R-PROP-1–7 (7) | Exact pinned head, bounded changes and preview | Git/provider code supplies reachability, integration and pins; a push alone is not a proposal. L; version witnesses O. | 837–872; 3608–3634; 4165–4166 |
+| R-OBL-1–7 (7) | Qualified required/advisory evidence | Independence, count and check-input floors are fixed; policy configures requirements. L; declared job bindings O. | 875–926; 2634–2648; 4150 |
+| R-CARRY-1–16 (16) | Evidence that still counts on a later version | Fixed scope/global-input/policy/config/runner/snapshot/revocation conditions; policy only narrows. L; binding-aware jobs O. | 934–1022; 2457–2504; 2516–2583; 4163 |
+| R-LAND-1–11 (11) | Preparation, latest version, reservation and outcome | Reservation fixes authority; later hold loss is not cancellation. L; `prepared` O in stage 2, compound acts O in stage 4. | 1047–1163; 4151–4152 |
+| R-PUB-1–10 (10) | One slot, forward resolution and policy activation | Provider observations and exclusive publisher assumed; token expiry alone does not stop a push. Authorized `force-with-lease` exists. L. | 1166–1219 |
+| R-REV-1–8 (8) | Invalidated evidence, reopened obligations and abort/revert history | Historical decisions remain; retired/compromised and post-reservation emergency rules differ. L; declared revert vocabulary O. | 1222–1287; 4153 |
+| R-ADMIN-1–9 (9) | Protected configuration, sole-admin exception and recovery | Recovery bypasses broken policy; sole-admin permission is not every custom review. L; v2 `recover` O. | 1290–1360; 4154 |
+| R-POL-1–12 (12) | Versioned gating, requirements, carry, landing and attention | Five bounded rule kinds; no arbitrary effects or self-authorizing proposed policy. L; v2 document D/O. | 1363–1466; 4155–4160 |
+| R-EVAL-1–9 (9) | Pure evaluation, budgets and retained inputs | Runtime failure is unrecorded; replay does not prove observation truth. L; new profile activation/retention O. | 1469–1558; 4161–4162 |
+| R-EXEC-1–11 (11) | Isolated job/input/environment provenance | Runner/service/provider trusted; repository execution remains untrusted and dispatch uses service bindings. L; declared jobs O. | 1561–1588; 2505–2515; 2584–2633; 4163 |
+| R-SEC-1–6 (6) | Detection before permanent/public recording | Secret detection is incomplete; no per-fact confidentiality guarantee. Credentials never belong in the record. L. | 1591–1619 |
+| R-LOG-1–20 (20) | Chained signed entries, replay material and checkpoints | Verification covers a published prefix; full transition/effect derivation, unpublished acts and room clock are proof limits. L; fuller declared proof O. | 1622–1825; 2884–3104; 4164–4168 |
+| R-API-1–12 (12) | Refusal values, cursors, operations and updates | Equal projection needs equal prefix; wait timeout is not cancellation. L fixed clients; generic declared access O. | 1828–1951; 4169 |
+| R-MINT-1–7 (7) | Durable token ownership and unresolved outcomes | Operational ledger/provider clock/create/revoke and exclusive writer are not a pure fold; elapsed time is not success. L. | 3311–3461 |
+| R-DECL-1–26 (26) | Names, fields, targets, roles, holds, bindings, retirement and historical semantics | Only nine fixed steps; no code references in declarations. Platform authority remains fixed. D types/data/functions; runtime stages O. | 3546–4124; 4284–4304 |
 
-Existing implementation anchors include `packages/room/src/admission.ts:486–559`, `packages/policy/src/validate.ts:140–154` (only v1 document validation on the existing path), `packages/policy/src/acts.ts:183–207` (separate v2 validator), `packages/policy/src/profile.ts:10–29`, `packages/room/src/core.ts:1340–1378`, and `packages/log/src/verify.ts:176–185`. Supporting existing modules are the room authority/requests/jobs code, `packages/git/src/landing/`, `packages/git/src/mints.ts`, and `packages/log/src/layout.ts`; their existence is not offered as a fresh correctness proof. Searching production `packages/` finds no caller of `validatePolicyV2` other than its export; test calls are in `packages/policy/test/declared-acts.test.ts`. Thus contract tests are not runtime declared-acts delivery.
+Implementation anchors: `packages/room/src/admission.ts:486–559`; `packages/policy/src/validate.ts:140–154` (active v1 path); `packages/policy/src/acts.ts:183–207` (separate v2 validator); `packages/policy/src/profile.ts:10–29`; `packages/room/src/core.ts:1340–1378`; `packages/log/src/verify.ts:176–185`. Room authority/requests/jobs, `packages/git/src/landing/`, `packages/git/src/mints.ts` and `packages/log/src/layout.ts` supply operational code. Production `packages/` has no `validatePolicyV2` caller beyond its export; tests call it in `packages/policy/test/declared-acts.test.ts`. Contract tests therefore do not establish runtime delivery. Protocol sections 29–32 specify checker/snapshot/log-layout/mint machinery; section 33.8 assigns the declared stages.
 
-The protocol also has required edits, acceptance cases and open points outside numbered families. They clarify the bounds; they do not supply additional application primitives. In particular, sections 29–32 cover fixed checker/snapshot/log-layout/mint work rather than user-defined effect code; section 33.8 owns the declared stages rather than making every clause deployed by publication of the specification. The acts note retains the complete D1 lifecycle as owed and unadopted (A:461–510).
+### Where the software shorthand breaks
 
-### What changing room data can and cannot do
-
-**Delivered legacy room data:** require different qualified reviewers/checkers for actual changed paths; change a deterministic refusal; tighten evidence carry; add landing vetoes or attention; select overlap mode; make retired evidence reopen; add checker input/environment/advisory configuration. All retain fixed platform guards and use code already implementing the associated operation. Changing a checker command or service also changes code/deployment, not only the room's decision rule.
-
-**Declared contract, runtime owed:** give application acts their own bounded names/fields, target shapes, thread restrictions, roles, refusal wording and help; choose among platform steps; choose fixed scope templates, holds, conflict/lease/workspace/reservation settings; combine version and landing where no independent review is required. Meaning changes have explicit bindings; signed grants acquire no new authority. Historical meanings and old thread settings survive retirement and reuse (P:3636–3747, 3784–3913).
-
-**Needs application/host/effect code or a separately reviewed new platform capability:** a chess move engine; jam musical scheduling and synthesis; arbitrary work-item status/closure; real deployment or access provisioning; reconciliation of unknown external outcomes; reading a current provider or clock outside supplied input; checker distribution beyond deployed service bindings; UI/client rendering. Files plus reviews can implement useful practices for some of these, but a label such as `close` or a field such as `outcome` does not itself add an enforced transition.
-
-### Where the software lifecycle mapping breaks
-
-| Original shorthand | Correction and implication |
+| Original shorthand | Correction |
 |---|---|
-| Opening an issue is a claim | A claim opens a held scoped resource. Unheld addressed filing, promise conditions, decline, re-address, requester withdrawal, performer cancellation, non-landing report, result acceptance/rejection, closure and supersession remain complete owed D1 scope. Do not present a resource hold as a delivered conversation lifecycle. |
-| Pushing a branch is a proposal | Proposal requires a signed act naming an exact reachable head; the room computes bounded actual changes and pins it. A fork push precedes this and may never be proposed. |
-| Approving is a verdict bound to one head | Keep, qualified by eligible principal, reviewed scope, independence and current evidence validity. Historical approval remains visible even when it no longer satisfies an obligation. |
-| Checks are obligations | Correct to checks provide evidence for check obligations. Requested, advisory, failed, stale, unroutable or noncarrying checks do not all have the same standing. |
-| A merge queue is the single publication slot | Explain preparation and disjoint work in parallel, one external publication at a time. The slot is not a queue of every act or every task; unresolved publication can hold it indefinitely. |
-| A force push never takes effect | Reject unqualified wording. Pinned proposed heads never move (P:850–852); the publisher itself uses `force-with-lease` (P:1179–1181). An unexpected writer at canonical main produces unresolved state under the single-writer assumption rather than being made impossible by room data. |
-| Landing completes the work | Landing records a Git publication outcome. It neither releases the lane nor asserts requester satisfaction; current code updates the generation and previews, leaving holder/resource state distinct (`core.ts:1353–1369`). |
+| Opening an issue is a claim | Claim opens a hold. Complete D1 scope remains owed and unadopted: unheld filing, optional scope, addressed performer/conditions, acceptance, decline, reassignment, requester withdrawal, performer cancellation, non-landing report, result acceptance/rejection, closure and replacement. Fields cannot create these guards (A:461–510). |
+| Pushing a branch is a proposal | A signed act names an exact reachable head; the room computes/pins its changes. A push may never be proposed. |
+| Approving is a verdict bound to one head | Keep with principal, scope, independence and present evidence validity; the historical approval can remain while no longer counting. |
+| Checks are obligations | Checks provide evidence for obligations; requested/advisory/failed/stale/unroutable/noncarrying results differ. |
+| Merge queue is the publication slot | Preparation/disjoint work can be parallel; one external publication uses the slot, and an unresolved write can hold it indefinitely. |
+| A force push never takes effect | Reject unqualified wording: pinned proposal heads stay fixed (P:850–852), but the publisher uses `force-with-lease` (P:1179–1181). Another canonical writer causes unresolved state. |
+| Landing completes work | Confirmed Git outcome does not release the lane or assert requester satisfaction; it updates generation/config/preview state (`core.ts:1353–1369`). |
 
-### Chess: the actual mechanism and bounded proof
+Delivered room data can choose reviewer/checker requirements, refusal/landing gates, attention, overlap mode, retired-evidence reopening and checker input/environment/advisory settings. Proposed declarations add bounded names, fields, targets, threads, roles, wording/help and hold/compound settings. Meaning bindings prevent a signed grant gaining new authority; retirement/reuse preserves historical meanings and old thread settings (P:3636–3747, 3784–3913). New business transitions, provider reconciliation, live clock reads, checker distribution, scheduling and rendering need application code or a separately reviewed platform change.
 
-The pinned gitseq chess application has eight schemas and a native Go fold dispatch (C:31–42, 191–225). A move must name the exact accepted predecessor, have the correct seat at that record's identity state, and pass the `notnil/chess` engine's `MoveStr`; only then does it update the accepted game and seat binding (C:388–432). `go.mod:5–8` pins gitseq host `7152e79a741e` and chess engine `v1.10.0`. Refused chess decisions remain in the host history; the projection holds a bounded refusal tail, and querying an older decision re-folds the prefix rather than guessing (C:551–560, 831–883).
+### Chess: concrete mechanism, bounded proof
 
-Three existing tests passed in the isolated exact checkout with `go test . -run 'Test(MoveRequiresTheRightTurnAndExactPriorMove|IllegalMoveCannotUpgradeAnUnanchoredSeat|LegalDestinationsComeFromTheFoldEngine)$' -count=1`: `ok`, 1.443 s. These test turn/predecessor guards, actual move legality and illegal-move refusal not changing seat authority (`chess_test.go:166–209, 1264–1319`). They support the narrow example of recorded refusal with no game effect. They do not prove a hosted deployment, public exposure, multi-host failover, complete chess correctness or Artroom declared runtime.
+The pinned chess application has eight schemas and native Go dispatch (C:31–42, 191–225). Exact accepted predecessor and seat authority are checked before `notnil/chess` `MoveStr` changes game/seat state (C:388–432). `go.mod:5–8` pins host `7152e79a741e` and engine `v1.10.0`. Refusals remain in history; a bounded refusal tail and older-decision prefix re-fold support queries (C:551–560, 831–883). It demonstrates application judgment over a verified log, not arbitrary chess semantics from Artroom declarations.
 
-Chess is evidence for **application judgment over a verified log**, not evidence that Artroom's application declarations supply arbitrary chess rules. Its architecture also trusts the service serving prepared bytes and browser JavaScript (CA:24–40), and constrains forge writes to one local POSIX writer/confirmed prefix. The OS lock does not fence independent clones or administrators; public exposure and multi-host failover are outside the stated delivery boundary (CA:73–101). The separate gitseq DDL chess migration note is unadopted design, not a delivered replacement of this native fold.
-
-The guarantee assumptions and falsifiers are stated in Q3; Q11 applies them to each worked room and the leading deferred candidate. Current main proves only the published-prefix and retained-policy boundary named in F4, while broader declared replay/full-fold behavior remains owed.
+In the isolated exact checkout, three existing tests passed with `go test . -run 'Test(MoveRequiresTheRightTurnAndExactPriorMove|IllegalMoveCannotUpgradeAnUnanchoredSeat|LegalDestinationsComeFromTheFoldEngine)$' -count=1`: `ok`, 1.443 s (`chess_test.go:166–209, 1264–1319`). They establish the narrow turn/predecessor/legality and refused-move authority checks, not public deployment, full chess correctness or Artroom runtime. The service/browser-code and one-local-POSIX-writer trust limits are in CA:24–40, 73–101 and summarized in Q11. The separate DDL chess migration remains unadopted design. Current Artroom verification's own proof boundary is F4.
 
 ## Q7. Table, diagram or repeated sentence
 
-**Judgment: keep all three for different jobs; prefer a small diagram to introduce the mechanism, then a table to compare the rooms.** This is an explanation recommendation, not an asset commission or a claim of tested audience comprehension. The repeated sentence is a mnemonic; it cannot alone carry the guarantee's bounds.
+**Judgment: use a small diagram to introduce the mechanism, then a table to audit the rooms; keep the repeated sentence as a mnemonic.** These are untested explanation choices, not assets. Q11 supplies the authoritative room comparison.
 
-| Form, sketched in words | What survives | Strongest objection / cost |
-|---|---|---|
-| Table: rows for code, jam and the chosen-or-candidate middle room; columns rules, retained decisions, current board, and application/outside work | Easiest way to audit generality and prevent different meanings being hidden behind the same three nouns. Candidate/owed cells can be explicit. | A three-column table alone hides time, refusal, asynchronous effects and an older versus current prefix. The fourth boundary column adds width and interrupts a very short spoken opening. |
-| Diagram: an actor's action enters a box containing fixed platform rules plus room declarations/policy; its outcome enters a retained record; a board is drawn from a labeled prefix. A side branch sends approved work to application/provider code and records its later observation back in the record. Jam live notes remain outside this authoritative path. | Shows judgment, refusals, history-to-state, and decision-versus-effect without pretending an outside system changed in the same atomic step. A new rule version also enters the record at a specific point. | Too many arrows overwhelm the first minute. Keep one code example initially and reveal the external-effect arrow only when needed; do not draw one magical box promising arbitrary application correctness. |
-| Repeated sentence: for each room, name which action is checked, what decision is retained, and what current result the board shows | Best spoken rhythm and fast recall. Reuse the same grammatical roles while changing concrete nouns, rather than repeating an abstract slogan unchanged. | It invites the false universal rulebook-only inference and can equate current state with historical decision. Needs a nearby statement that application code and outside systems supply their own effects and observations. |
+| Form, sketched in words | Why keep it; strongest objection |
+|---|---|
+| Table: rooms as rows; rules, recorded decisions, current board and application/outside work as columns | Makes generality and candidate/owed status inspectable. Width and detail cost spoken time; three columns alone hide asynchronous effects and different prefixes. |
+| Diagram: action enters fixed platform rules plus room declarations/policy; outcome enters the record; a board follows a labelled prefix. A side branch invokes application/provider work and records its later observation. Jam live notes stay outside authority. | Shows refusals and decision-versus-effect. Reveal the outside branch after one code example; too many arrows can suggest a magical universal application box. Show rule activation at a specific recorded point. |
+| Repeated sentence: name each room's checked action, retained decision and current result in the same grammatical roles | Gives spoken rhythm and recall. Alone it invites rulebook-only generality and equates historical decision with current standing; retain the application/outside boundary nearby. |
 
-A minimal concept table would identify these objects, without adopting a room design:
-
-| Example | Rules | Record | Board/application boundary |
-|---|---|---|---|
-| Code | Who qualifies, which exact changes need evidence, when publication may proceed | Signed proposals/reviews/checks, late refusals, reservations and outcomes | Current lanes/generations/evidence/operations; Git/checker adapters supply file/integration/provider work. |
-| Jam, planned | Parts/solo holds, permitted signals, exact pattern/song versions and evidence | Commitments, signals and landed files with historical timing inputs | Application computes musical effect bars and renders audio; live previews are outside durable authority. |
-| Rollout, candidate | Authorized desired version split and required evidence; freeze rule needs a specified time/observation mechanism | Reviewed desired state and adapter reports | Desired/observed/unresolved deployment state must be separate. No adapter is established by this research. |
-| Access request, alternative candidate | Qualified requester/approver, target resource and bounded grant conditions | Requests/approvals/adapter observations | Current authorization/expiry needs provisioning and clock semantics; sensitive credentials stay outside log. |
-| Case management, alternative candidate | Who may assign, amend, accept, close or reopen a case | Attributed changes and decisions | Case state needs a file/application fold or new reviewed lifecycle semantics; current lane release is not closure. |
-
-If Q9 defers a middle room, label its diagram/table row as a candidate or omit it from an eventual demonstration. The candidate row does not adopt a design; the owner’s existing permission to build rollout before submission if time permits remains intact. Choosing a middle room and testing spoken comprehension remain root-round judgments, not established facts from this contribution.
+A middle row remains labelled candidate or is omitted from a future demonstration while Q9 defers it. Representation and spoken comprehension remain research judgments.
 
 ## Q8. The paving image strains at current state and external effects
 
-**Judgment: sharpen H8; reject the original literal explanation of the entire system.** Paving is a usable image for append-only history if a brick means a **record entry**, including accepted acts, recorded refusals and system observations. A brick cannot mean only an act that took effect, because the actual record contains the other categories. The fixed road also cannot stand for unchanging present validity or an outside effect that can be rolled back.
+**Judgment: sharpen H8; reject paving as a literal explanation of the whole system.** A brick must mean a **record entry**, including accepted acts, recorded refusals and system observations. Past history can remain while an approval stops counting, traffic changes or an outside outcome remains unresolved. Paving also suggests guaranteed progress, which append-only safety does not provide (P:1182–1213).
 
-**Sharpened H8 wording, for hypothesis evaluation:** The record is laid one entry at a time. Past entries remain; later entries can change the current state. The image must attach the permanence claim to the retained record, not to every approval still counting or every external effect remaining in force.
+Q11 gives each room's full counterexample, assumptions, readiness and trust boundary. The particular strains are:
 
-| Room / alternative | Where paving helps | Counterexample to the overbroad H3/H6/H8; assumptions, readiness and trust boundary |
-|---|---|---|
-| Code | A proposal/review/refusal/reservation/outcome joins a permanent chronology; a later recut does not erase the earlier head. | A compromised approval remains historically recorded but ceases to count; an unresolved publication cannot be described as the next road already laid. Same-prefix board assumes correct platform/projection and retained rule/input history. Existing legacy code is the evidence; declared stage-2 admission, stage-3 replay and stage-5 clients remain owed. Git/checker/provider/operator and canonical single-writer assumptions remain; verification of current full lane/landing effects is limited. D1 lifecycle is still owed, not folded away by the metaphor. |
-| Jam, planned | Recorded count-in, exact historical tempo/lookahead/song versions and commitments preserve a common musical plan. | A late listener plays a change late even though replay assigns the same effect bar; transient MIDI/audio previews are not durable bricks. Current key/tempo/solo change without erasing earlier decisions. Assumes retained origin/timing/file versions and application scheduling, not listener arrival time or latest settings. Musical scheduling/rendering/live transport/harness and musical-session primitives remain unbuilt/untested at the note's evidence base. Builder's concrete development-task judgment is separate; no added jam gate follows. J:143–199, 266–279, 390–395, 435–455, 607–637. |
-| Rollout, candidate | Desired split, independent sign-offs and reports form a clear decision trail. | The adapter times out after submitting; provider may have applied the change while the board only knows it is unresolved. A later rollback changes traffic while old authorization remains recorded. Assumes scoped deployment credentials, trusted bounded observation and reconciliation; these are application/adapter duties, not policy expression effects. Current Cloudflare traffic-split capability is factual; this research establishes no Artroom rollout adapter or tested freeze mechanism. |
-| Production access requests, alternative candidate | Approvals and grant/revocation observations create accountability. | An approval remains in history while access expires/revokes; an outside administrator may bypass the adapter. A signature is not proof that access was enforced or removed. Requires provisioning adapter, clock/expiry rules, resource identity and private credential handling; no per-fact visibility guarantee. No delivered access application is established here. |
-| Case management, alternative candidate | Amendments, declined assignments and acceptance/rejection can remain visible without overwriting an earlier decision. | Closing a case and later reopening/correcting it reverses the current status; releasing a resource hold does not establish either event. Assumes specified lifecycle/actor authority and application projection or reviewed file practice. D1 requester/performer/race/closure semantics are still owed, so rulebook-only case management is not established. |
-| Chess, boundary control | Legal/refused attempts remain in the verified history and determine an accepted game position. | A pure declaration cannot calculate legal chess moves using Artroom's fixed steps; native application code and pinned engine do so. A client reading another prefix shows another valid position. The local application/tests support the narrow recorded-refusal example, not a public service or generalized Artroom runtime. C:191–225, 388–432; CA:73–101. |
+- **Code:** compromised evidence stays recorded without still qualifying; unresolved publication is not a completed road ahead.
+- **Jam:** a common effect bar does not make a late listener play on time; transient MIDI/audio previews are not durable bricks.
+- **Rollout/access candidates:** rollback or expiry changes outside standing without removing historical authorization; a timeout can leave the actual effect unknown.
+- **Case candidate:** closing/reopening changes status; resource release alone implements neither. **Chess:** another prefix gives another valid position, and native move code remains necessary.
 
-The Cloudflare-specific fact is narrow: gradual deployments can divide Worker requests between versions, upload creates a version without deploying it, and deployment selects the traffic split. The same documentation warns of version skew. That makes rollout a plausible external-effect candidate, not a proven room implementation or a guarantee that all requests observe one version. [Cloudflare gradual-deployment documentation](https://developers.cloudflare.com/workers/versions-and-deployments/gradual-deployments/) (checked 2026-10-03, body lines 590, 621–634, 677–692).
+Sharpened wording: “The record is laid one entry at a time. Past entries remain; later entries can change the current state.” Attach permanence to retained history, not guaranteed storage forever, current eligibility, low latency or successful outside work.
 
-“Lays the next step ahead of you” also suggests guaranteed progress. The actual protocol preserves an unresolved publication until it can be resolved (P:1182–1213); a rulebook can refuse, wait for evidence, or fail. Append-only safety does not by itself promise liveness, low latency, musical quality, an approved deployment, or successful outside provisioning. The paving machine should not be used as proof of those properties.
+**Alternative to keep: a shared signed logbook beside a current status board.** Entries retain who asked, rules, decisions and reported outcomes; the board shows the result at a stated point. An outside instrument reports provider observations; jam's live performance happens beside the logbook. This handles refusal, correction, reopened evidence and unknown effects. Its costs are less motion, an audit-paperwork association, and the need to explain that signed reports are attributable rather than automatically true.
 
-### Alternative image and costs
+Other images considered: chessboard—concrete but suggests discrete turns and overweights the unbuilt Artroom chess interpretation; score/conductor—fits music but poorly explains refusal history, code publication and unknown outcomes; ledger—stresses history but can imply stronger transaction/business guarantees. Keep logbook/status-board for consideration; visual choice and audience response remain open.
 
-**Keep for consideration: a shared signed logbook beside a current status board.** The logbook retains who asked, which rules were in force, what decision was made and what later outcome was reported. The board shows the current result at a stated point. A new log entry can change status without tearing out the old page. For rollout/access, a distinct outside instrument reports what the provider observed; for jam, the live performance happens beside the logbook rather than being every mark on the page.
-
-This image fits code, music and either middle-room alternative more evenly than permanent roadway. It directly accommodates refusals, corrections, reopened evidence, unresolved effects and prefix boundaries. Its costs are less motion/visual spectacle, potential “audit paperwork” associations, and a need to explain that signed reports are attributable claims, not automatically true measurements. These are judgments, not audience-test findings.
-
-Other considered images: a chessboard is concrete but makes simultaneity/playing look like discrete turns and overweights the unbuilt Artroom chess interpretation; a score and conductor suits the jam but poorly explains refusal history, code publication and unknown effects; a ledger stresses history but can imply transactions or business correctness stronger than this platform establishes. None removes the application-code or external-state boundary. The three-part logbook/status-board image survives this first factual test; visual choice should remain open until the integrated positioning design is reviewed.
-
-## Q9. choose a middle example for its proof, not its place in the story
+## Q9. Choose a middle example for its proof, not its place in the story
 
 **Judgment.** Rollout is the strongest candidate, but defer selecting a
 middle room for the submission. None of the inspected source establishes
@@ -339,123 +293,40 @@ not retire an item. A case-room estimate must include these distinctions
 or an explicit application implementation of them; none is waived here.
 Source: `notes/2026-10-02-acts-review.md:461`–`:510`.
 
-## Q10. leave the chosen rulebook open
+## Q10. Leave the chosen rulebook open
 
-**Judgment.** Q9 defers the choice, so no chosen twelve-line rulebook or
-appendix is supplied. A candidate mapping is useful evidence for a later
-choice, but is not an adopted rulebook. These are the boundaries a rollout
-implementation would have to resolve:
+**Judgment: Q9 defers selection, so the chosen twelve-line rulebook/appendix stays open.** The following unadopted candidate map identifies what a rollout build would need; it is not a new API or delivered application.
 
-| Candidate requirement | Actual available act, policy or declared step | Support boundary |
+| Candidate requirement | Act/policy/step mapping and unsupported work |
+|---|---|
+| One service's exact plan | Current `claim`/workspace; proposed `plan-release` → `open`, `service` segment and `releases/{service}/**`. Fixed lifetime template scope is stage 4. Application files/checker must validate provider version IDs and traffic proportions. |
+| One holder with fresh authority | Current lease/fencing; proposed `take-release` → `take` with exclusive hold. New declared conflict/fixed-scope settings are stage 4. Room lease expiry does not revoke provider credentials. |
+| Reviewable exact version | Current `propose`; `propose-release` → `version`. Declared admission/replay/generic access remain stages 2/3/5. |
+| Independent sign-off | `review`, `require` with `allowSelf: false`; `approve-release` → `review`. Eligible independent member/agent/admin, not proof of competence or provider authority. |
+| Plan validation | Checker plus required check; `validate-release` → `check`. Application code validates content; automated declared jobs need stage 4 binding/kind support. Live health is volatile evidence. |
+| Reassess changed plans | Generation binding and `carry`; disable reuse or narrow it on recorded inputs. No timeless reuse of arbitrary health observations. |
+| Effective desired plan | `land`; `adopt-release` → `land`. Confirms repository publication, not a Worker deployment or current traffic. |
+| Time freeze | `refuse`/`land` on supplied facts, with a specified application time/observation mechanism. Policy has no live clock/I/O; submitted time cannot prove an autonomous calendar window. |
+| Execute, confirm, recover | Application adapter with its own scoped external authority; `report-release` → `comment` can record attributable observations. Exact execution, durable retries, read-back, competing writers, unknown outcomes and credentials require application code. |
+| Roll back traffic | New reviewed plan and landing request an earlier version. History remains; already-served requests, database writes and incompatible migrations are not undone. |
+
+Sources: `packages/contract/src/declarations.ts:7,79,85,102,142,159`; `packages/contract/src/policy.ts:59,204`; J:97–109; `notes/2026-10-03-planner-direction.md:21,34`. Q6 explains the fixed-step boundary; Q11 distinguishes recorded reports from provider proof. All unsupported application work remains owed.
+
+## Q11. Each room's proof, counterexample and trust boundary
+
+This is the authoritative room-boundary table for Q6–Q10. **Existing source**, **planned application** and **candidate** distinguish delivery from judgment; no new live workflow or application benchmark was run for this research. Historical decisions can remain while current standing changes. Same-prefix replay of recorded observations is distinct from independently establishing outside truth.
+
+| Room and distinct proof | Counterexample to overbroad H3/H6 | Readiness, assumptions and trust boundary |
 |---|---|---|
-| Work on one service's release plan | Current `claim` and workspace; a proposed `plan-release` kind would use `open`, with a `service` segment and fixed scope such as `releases/{service}/**` | Current legacy claims can choose a scope. A lifetime-fixed templated scope is planned stage 4, not delivered main. The application must store exact provider version IDs and traffic proportions in reviewed files. |
-| Keep one holder and require fresh authority | Current leases and fencing; proposed `take-release` uses `take`, and a declared hold uses exclusive conflict mode | Lifetime-fixed scopes and the new declared conflict behaviour remain stage 4 work. Losing a room lease does not revoke a provider credential. |
-| Make the exact plan a reviewable version | Current `propose`; proposed `propose-release` uses `version` | Current proposals pin heads. Declared runtime admission, generic access and declared replay remain unfinished stages 2, 5 and 3. |
-| Require an independent sign-off | Current `review` plus a `require` rule with `allowSelf: false`; proposed `approve-release` uses `review` | A named independent member, agent or admin can review. The platform establishes the signed review and its binding, not the reviewer's competence or provider authority. |
-| Require plan validation | Current checker configuration and `require` check obligation; proposed `validate-release` uses `check` | File validation requires application checker code. Automated declared jobs need stage 4's kind and binding support. A live health check is volatile and must not be carried as timeless evidence. |
-| Reassess sign-offs when a plan changes | Current generation-bound evidence and `carry` policy | The candidate can disable verdict and check carry, or narrow it using the actual recorded inputs. A changed plan cannot silently reuse arbitrary health evidence. |
-| Make an approved desired plan effective | Current `land`; proposed `adopt-release` uses `land` | Landing confirms the canonical repository update. It does not deploy a Worker or establish current provider traffic. |
-| Freeze releases by time | A `refuse` or `land` rule can judge supplied room facts; an application can record a freeze state | The policy profile has no wall clock or external reads. An autonomous calendar window cannot be guaranteed by a rule that merely trusts a submitted time. A trusted application mechanism and recorded inputs are required; no new clock primitive is adopted here. |
-| Execute, confirm and recover a provider change | An application adapter can act under its own external authority and submit signed reports, for example a declared `report-release` using `comment` | No current platform step deploys a Worker. Durable retries, provider read-back, competing provider writers, unknown outcomes and credential handling need application code. A signed report proves who reported it, not its independent truth. |
-| Undo a traffic change | A new reviewed plan and landing can request an earlier version | This preserves the historical decision. It does not reverse requests already served, database writes or incompatible migrations. |
+| **Code, existing legacy source:** exact concurrent versions, evidence across changes and publication recovery | Approval stays in history after a relevant edit/key compromise makes it stop counting. Another provider-authorized writer changes canonical state; a rulebook cannot eliminate that authority. A signed check need not judge code correctly. | Correct platform/projection, retained versions/inputs, qualified principals, Git/checker/provider/operator trust and canonical single-writer assumption are required. Room coordinates acts, leases, pins, obligations and outcomes; adapters supply Git/check work. Declared admission/replay/generic clients remain unfinished. Current UI entry is a mock; full transition/effect verification is limited (F4). Source: Room README:63–72,108–127; P:850–852,1179–1213; A:461–510. |
+| **Jam, planned:** non-code commitments, handover and timed effects alongside ordinary live playing | A late listener plays a change late despite the same recorded effect bar. Neither sound engine nor live clock appears by replacing policy. Latest song settings or listener arrival time cannot reconstruct past scheduling. | Requires retained count-in origin, exact tempo/lookahead/song history, platform times and application scheduling/rendering/live transport. Musical timing/audio/agent spikes and full harness are untested here; stage-4 primitives/check jobs remain owed. Builder's concrete first development task is not ready pending 2/3/5, separately from a complete musical session. No extra gate follows. Sources: J:11–19,84–109,143–199,147–176,266–279,390–395,435–455,507–518,607–637; planner direction:21–41. |
+| **Rollout, leading deferred candidate:** an effective plan causing an observed effect outside the room | Approved 10% plan times out; the provider may have applied 10%, 0% or another change. Later provider administration/rollback changes traffic while old approval remains. Provider credentials and reconciliation are not a rulebook. | No Artroom adapter/freeze mechanism is established. Application must use scoped authority, execute exact versions/split, persist/reconcile unknown replies and record bounded read-back. Replay reproduces decisions/reports, not every historical request's routing. One version response proves that response, not the statistical split. Read back configuration and separate sampled observations. Use a stateless Worker for a precise first example; retain Durable Object migrations, dependencies, competing writers and irreversible side effects in full scope (F10). |
+| **Production access, alternative candidate:** qualified, bounded authorization with observable enforcement | Room lease ends while provider session still accepts requests; historical approval does not prove grant/revocation. An outside administrator can bypass the adapter. | No application integration is established. Requires real identity/resource mapping, provisioning authority, trusted clock/expiry, session reconciliation and private credentials. No per-fact visibility guarantee follows (F11). |
+| **Case management, alternative candidate:** distinct assignment, response and requester acceptance | Recorded response is not delivery or customer satisfaction. Closure followed by reopening changes status; holder release implements neither. | No working integration is established. Define lifecycle/actor/race rules, delivery and file/application projection; complete D1 authority/conditions/withdrawal/closure scope remains owed and unadopted (A:461–510). |
+| **Tool lending, dropped from leading set:** attributable borrower/lender confirmations | Recorded return leaves the tool with the borrower. Record agreement is not physical custody. | Requires application holds/confirmation and trusted human observation; no working custody integration is established. |
+| **Chess, boundary control:** refused/legal attempts in history determine a game position | Artroom declarations alone cannot calculate legal moves; native application and pinned engine do. Another prefix shows another valid position. | Local source/three tests support the narrow refusal/no-game-effect example. Service/browser JavaScript and one local POSIX writer are trusted; OS lock does not fence independent clones/admins. Public exposure, multi-host failover, full chess correctness and generalized Artroom runtime are not proved. Sources: C:191–225,388–432; CA:24–40,73–101. |
 
-**Sources.** `packages/contract/src/declarations.ts:7` explicitly limits
-delivered stage 1 to types. The fixed step set is at line 79; body field
-types at 85; fixed hold templates, lease and workspace declarations at
-102; `who` at 142; declared rules at 159. Current `require`, `carry`,
-`land` and `notify` structures are in
-`packages/contract/src/policy.ts:59`; the no-clock/no-I/O input boundary
-is at 204. Jam revision 5 lines 97–109 assigns fixed scopes, conflict
-settings, compound acts and automated declared jobs to stage 4. The
-current priority/readiness record is
-`notes/2026-10-03-planner-direction.md:21` and `:34`.
-
-Unsupported requirements are explicit above. Renaming acts is not an
-implementation of provider truth, time-window enforcement, identity
-mapping, external credential revocation or business-specific lifecycle
-rules. Those remain full application work, rather than grounds to weaken
-the platform's scope or invent more readiness approvals.
-
-## Q11. three different proofs, with three different limits
-
-**Source and judgment: code room.** The delivered legacy Room coordinates
-signed acts, roles, leases, pinned heads, generation-bound reviews,
-obligations, canonical publication and its recovery. That is the best
-existing source basis for the required concurrent-code demonstration.
-The broad H3 counterexample is an approval whose current standing later
-changes after a relevant edit or key compromise: its historical decision
-is retained, while it may no longer count toward landing. The H6
-counterexample is an unrelated writer changing the canonical repository
-through provider authority outside the room: changing the rulebook does
-not remove that external power, and the Room must detect and reconcile
-the changed provider state. A signed check also does not prove that its
-program correctly judges the code.
-
-The unique proof is exact code versions and evidence surviving changes,
-with concurrent work and publication recovery. Current legacy source is
-delivered; the proposed universal declared path is not. A live connected
-browser demonstration is also not established by the current UI entry
-point. The Room README lines 63–72 and 108–127 describe the source
-mechanisms; its tests and deployed run evidence must be distinguished
-from this research, which ran no new live workflow.
-
-**Source and judgment: jam room.** The unique proposed proof is that a
-non-code application can coordinate musical commitments, handover and
-timed effects while leaving ordinary live playing outside the record.
-The H3 counterexample is already in the approved design: a late listener
-plays a recorded change late and hears different live audio. Identical
-recorded inputs can establish the same assigned effect bars; they cannot
-establish identical sound at every listener. The H6 counterexample is
-the sound engine and live clock layer: neither appears just by replacing
-a policy document. Replay additionally needs the complete retained
-history and referenced file versions, not only the latest song file.
-
-The source contract exists, but declared admission, replay and generic
-clients are still unfinished on this baseline. The actual musical
-features need the listed stage 4 primitives and application code; the
-musical timing and agent spikes remain untested here. Builder's dated
-judgment is not ready for the named first development task, pending
-stages 2, 3 and 5. That task is distinct from a completed musical session;
-stage 4 and full later proof remain owed without becoming new start
-conditions. Sources: jam revision 5 lines 11–19, 84–109, 147–176 and
-507–518; planner direction lines 21–41.
-
-**Judgment: rollout, leading deferred candidate.** Its unique proposed
-proof is an effective decision causing an independently observed change
-outside the room. The H3 counterexample is an approved 10% rollout
-followed by a timeout: the adapter cannot infer from the room's record
-whether the provider applied 10%, 0% or a different change. Even after a
-confirmed deployment, a later provider administrator can change it.
-Historical approval survives; current provider traffic is an observation
-that may change. The H6 counterexample is provider credentials and an
-adapter that uploads a version, deploys the exact split, reconciles an
-unknown answer and records its evidence. They are not supplied by a new
-rulebook.
-
-A useful demonstration would show approved plan, provider confirmation
-and a real request returning a version, with clear provenance for each.
-One returned version proves that request's response, not the statistical
-traffic split; read back the deployment configuration and identify any
-sampled-request observation separately.
-Replaying the room can reproduce the decision and the recorded report;
-it cannot independently re-run history to prove every request's routing.
-No rollout application or that proof is established on the inspected
-baseline. Begin a future worked example with a stateless Worker so that
-its shown effect is precise; retain Durable Object migrations,
-dependencies, other provider writers and irreversible side effects in
-the complete application's requirements. This is a research/example
-choice, not a reduction of scope. Sources: the two official deployment
-pages above and the explicit current step set.
-
-**Other candidates' counterexamples.** Production access: a room records
-that a lease ended, while a provider session still accepts requests. The
-record cannot prove revocation; the application must reconcile the real
-identity, authorization and session. Case management: the room records a
-response, while an external delivery fails or the customer disputes
-closure. The room establishes the recorded decision, not satisfaction or
-receipt. Tool lending: a recorded return leaves the physical tool in the
-borrower's possession. Each needs application verification beyond policy
-and no working integration is established by this research.
+If rollout only changes a file, it adds no outside-effect proof beyond code and should remain deferred. Current hosting capability is factual, application readiness is not: gradual deployments can split versions, uploads can remain undeployed, requests can have version skew and Durable Objects follow a different model. [Gradual deployments](https://developers.cloudflare.com/workers/versions-and-deployments/gradual-deployments/) (checked 2026-10-03, body lines 590,621–634,677–692); F10/F11 identify the other primary sources. Candidate selection and demonstration remain research judgments, independent of builder-owned jam readiness.
 
 ## Q12. What can be shown for developer experience
 
@@ -490,7 +361,7 @@ Sale, Booking and Club received progressively more examples (`spike/REPORT.md:24
 
 The strongest objection to H5 is concrete: the platform can preserve agreement while the application enforces the wrong business policy. The narrow positive claim survives because reusable authority, retry and recorded-reason machinery is inspectable. Cold newcomer comprehension, time-to-first-success, total effort saved and an agent's successful recovery after a refusal remain unmeasured. Q13 turns those into an experience to establish without claiming it already happened.
 
-## Q13. what the first five minutes should establish
+## Q13. What the first five minutes should establish
 
 **Judgment.** Use the plan's install/import/invite/connect path to get to
 one real refusal and one real, explainable approval quickly. The value is
@@ -525,7 +396,7 @@ workflows. Relevant timings need workload, location, count, cold/warm
 state, retries and cost; do not promote the plan's p50/p99 thresholds to
 achieved behaviour. This research ran no user study or fresh benchmark.
 
-## Q14. rough eight-minute cut, with the code room doing the work
+## Q14. Rough eight-minute cut, with the code room doing the work
 
 **Source.** The official submission deadline is **2026-10-14 at 11:59 PM
 PDT**; October 13 is the project's earlier target. The rules require a
@@ -535,7 +406,7 @@ concurrently. Judges weight prototype originality/quality **50%**,
 concurrency/coordination/context/review/conflict **25%**, and ease of
 use/experience **25%**. Ties favor the first criterion.
 [Official competition rules](https://www.cloudflare.com/documents/build-next-gen-git-platform-competition-terms.pdf),
-§§1, 4 and 6, checked 2026-10-03.
+§§2, 4 and 6, checked 2026-10-03.
 
 **Judgment.** Use a concrete software situation first, expose the shared
 record within the first minute, and spend most of the demonstration on
@@ -564,7 +435,7 @@ external effect. Those are changes to editorial emphasis, not application
 scope. Do not spend a quarter of the film on abstract platform parts
 merely because the infrastructure audience is secondary.
 
-## Q15. decisions needed before outlining assets
+## Q15. Decisions needed before outlining assets
 
 **Judgment.** The round must settle the following in the independently
 reviewed research and subsequent approved positioning design note before
@@ -625,27 +496,27 @@ These are research verdicts, with proposed wording for each sharpened hypothesis
 ## The three weakest parts, ranked
 
 1. **The guarantee and rulebook-only inference outrun their conditions.** H3/H6 can imply unchanged current eligibility, arbitrary application semantics and provider truth. This affects trust in every example. Q3 gives falsifiers and assumptions; Q6 inventories every rule/step and Q11 keeps decision, standing and outside observation distinct.
-2. **The cost and self-correction argument lacks the required evidence.** H5's “every repair” and “never the business rule” description misses the preserved Club business defect; the later declaration candidate also fails an independent check. Literal size is not total effort saved. Use the bounded positive mechanisms and retain the negative results in Q12.
+2. **The cost and self-correction argument lacks the required evidence.** Club's unrepaired business guard shows that shared agreement is not business correctness; it does not show a recorded non-visibility repair. The original repair-class finding does not establish broader authoring costs. The declaration candidate also fails an independent check, and literal size is not total effort saved. Keep Q12's bounded mechanisms and negative results.
 3. **The first-use and three-room story are ahead of working proof.** Bootstrap/import/admin/UI connection, cold newcomer comprehension, jam timing and a real middle-room adapter remain concrete gaps. A mock board and renamed acts cannot demonstrate them. Q13 names the current source gaps and Q14 reserves most time for actual code work. These are work to complete, not new jam-start conditions or scope cuts.
 
 ## Sourced facts used
 
-All Artroom paths below mean exact approved baseline `344656705140d9bf6539fe44de889d1e21dd2482`, unless a dated deployment or separate repository is explicitly identified. A source specification describes a contract; an implementation/test demonstrates only its stated boundary. Research judgments above are separate.
+Artroom references mean approved baseline `344656705140d9bf6539fe44de889d1e21dd2482`, except explicit dated deployments/separate repositories. Specifications state contracts; source, tests and observations establish their named bounds. The judgments above are separate.
 
-- **F1. Plan and competition.** [Artroom plan](2026-10-01-artroom-plan.md), sections 1, 12 and 13, retains full scope and planned ease/scale. The official deadline is **2026-10-14, 11:59 PM PDT**; October 13 is the project's earlier aim. Entries need a 5–10 minute video, permissively licensed source/run instructions, Workers and Artifacts, and multiple concurrent agents. Scoring is 50% prototype originality/quality, 25% coordination/context/review/conflict, 25% ease/experience, with the first criterion breaking ties. Checked 2026-10-03 against [official rules, sections 1/4/6](https://www.cloudflare.com/documents/build-next-gen-git-platform-competition-terms.pdf) and [announcement](https://blog.cloudflare.com/next-git-platform-on-cloudflare/); these supersede the old draft's unchecked-weights caveat.
-- **F2. Current acts and mechanism.** [Protocol](../docs/protocol.md), R-ADM, R-IDEM, R-LANE, R-PROP, R-OBL, R-ADMIN, R-POL and R-LOG; Room admission.ts:486–559. Current legacy dispatch has seven software acts plus renew/roster. Signed non-act requests, early unrecorded failures and room-signed system events also matter. Q6's inventory covers all 247 numbered rules in 24 families, all nine declared steps and five policy kinds.
-- **F3. Outcomes and standing.** Protocol R-LAND/R-PUB/R-REV preserves reservations, unresolved/confirmed outcomes and later evidence invalidation/reopening/revert. A request taking effect is distinct from confirmed publication; current eligibility is distinct from the original decision. The pinned-head rule and the publisher's force-with-lease show why an unqualified “force push never takes effect” is inaccurate.
-- **F4. Current replay boundary.** [Log verification](../packages/log/README.md), “Verification”, and verify.ts:176–185,421–454. It checks an available published prefix and replays retained policy decisions. It states limits on transition/effect derivation, unpublished acts and room clock. The historical smoke's green verifier does not remove those limits. Declared fuller replay and end-to-end proof remain staged work.
-- **F5. Jam and declared delivery.** [Jam note](2026-10-01-jam-room.md), approved revision 5, separates durable musical commitments from transient live playing, requires historical timing/file versions and lists both musical/agent spikes. [Planner direction](2026-10-03-planner-direction.md):21–41,65 and protocol:4284–4304 separate concrete builder-owned readiness from complete platform/jam proof. Stage-1 contract/data/validators are delivered; runtime admission/replay/generic-client and later platform/fixture stages are still owed at this baseline. Preliminary candidates are not delivery approvals. No fresh jam result is claimed here.
-- **F6. Developer surfaces.** Client/CLI README, client tests and reads.ts identified in Q12; UI main.tsx:22 always creates MockRoom although LiveRoom and client connect() exist. Main.ts:78–107 and its complete explicit command table/own-key dispatcher have no create/import/admin-invite command. Founding.ts:179–214 supplies an actual signed import API. This is a pinned source finding, not a claim that no deployment/package exists anywhere.
-- **F7. Dated deployed loop.** [Deployment spike](deploy-spike.md):1213–1219 and [retained smoke result](../packages/room/measure/results/spike-smoke-2026-10-03T03-35-10-310Z.json) identify source `0753d7de` and 91 successful steps with cleanup ok/no unresolved cleanup or repositories left. Source/report links in Q12 identify the exact Room/checker deployment. The record includes actual canonical-head and published-prefix observations. No fresh provider call, deployment or credential exercise was performed for this research.
-- **F8. Workload and performance bounds.** [Room-core spike](2026-10-01-spike-room-core.md) and [sandbox Git spike](2026-10-01-spike-sandbox-git.md) retain dated workload-specific warm/cold results; both are unchanged from the old draft's inspected source to this baseline. They do not establish the plan's current full-workflow targets. Section 12 explicitly leaves these unmeasured until their lane reports: act answers with 10 concurrent full workflows at p50 ≤300 ms/p99 ≤1 s; claim overlap ≤300 ms; workspace p50 ≤5 s; preview p50 ≤10 s; at least 10 disjoint ready landings/minute; UI updates ≤1 s; 100 simulated agents/1,000 claims with gapless/no-lost-update results, expressly distinct from 100 coding workflows; and zero approvals spent on already-known conflicting heads in the controlled serialized-recut scenario, with reviewer waiting and throughput reported. Reports must identify location/workload/sample counts/retries/cold-warm/fork time/Artifacts-container cost. Estimates do not constrain functionality.
-- **F9. Authoring and correctness evidence.** dap `9d738e2e71b84ec85cd321bd4d87623ea3fad355`: spike/REPORT.md:74–90,183–221,240–246; 2026-09-18 directions:374–377,658–659,732–752; exact model ledgers/source identities in Q12. T1 candidate `22444f8536a8932fc758d77bb614a1424635fec3` and spike/lang/REPORT.md:3–71,130–170 retain its negative result and separate line/byte counts from total authoring cost. Numbered excerpts and source hashes were checked against immutable files; these reports were read, not their historical campaigns rerun.
-- **F10. Middle-room hosting capability.** Workers can upload versions separately from deployment and route percentages to versions; connected resources and version skew complicate an application's desired/observed state. Gradual deployments treat Durable Objects differently. See [versions/deployments](https://developers.cloudflare.com/workers/versions-and-deployments/) and [gradual deployments](https://developers.cloudflare.com/workers/versions-and-deployments/gradual-deployments/), checked 2026-10-03. The deployment-management page's body was available through the provider's documentation preview while its canonical URL returned an error; its upload/percentage/resource statements were corroborated against the main overview and gradual-deployment page. They establish provider capability, not an Artroom adapter.
-- **F11. Alternative hosting capability.** Provider [temporary authentication](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/temporary-auth/) supports purpose/approval and access for up to 24 hours. [Session management](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/session-management/) distinguishes ending sessions from preventing new ones. [Workflows](https://developers.cloudflare.com/workflows/) persists steps, retries and waits for external events. Checked 2026-10-03. These facts support the candidate ranking; they do not establish identity mapping, external revocation, receipt or correctness in an Artroom application.
-- **F12. Actual chess mechanism.** gitseq-chess `b97c6a82ef7e3618721696f5a69efef13da10a79`, chess.go:191–225,388–432 and docs/reference/architecture.md:24–40,73–101, uses native application code and a pinned legal-move engine. Three targeted existing local tests independently passed as described in Q6. No public deployment, full chess correctness, multi-host failover or Artroom declaration-based chess claim follows.
+- **F1. Competition and plan.** [Plan](2026-10-01-artroom-plan.md), §§1,12,13, retains full scope and planned ease/scale. Deadline **2026-10-14,11:59 PM PDT**, earlier project aim October 13; required video **5–10 minutes**, licensed source/run instructions, Workers/Artifacts and concurrent agents; weights **50/25/25**, first criterion breaks ties. Q14 uses these checked facts. [Official rules §§2/4/6](https://www.cloudflare.com/documents/build-next-gen-git-platform-competition-terms.pdf), [announcement](https://blog.cloudflare.com/next-git-platform-on-cloudflare/), checked 2026-10-03.
+- **F2. Acts and fixed rules.** [Protocol](../docs/protocol.md) R-ADM/IDEM/LANE/PROP/OBL/ADMIN/POL/LOG and Room admission.ts:486–559; Q6 covers all **247 rules/24 families**, **nine** steps, **five** policy kinds, seven software acts plus renew/roster and all non-act paths. This is source inventory, not fresh rule-by-rule runtime validation.
+- **F3. Standing and outcomes.** Protocol R-LAND/PUB/REV and Q6 separate request, reservation and confirmed/unresolved outcome, and historical approval from present eligibility. Pinned heads stay fixed; authorized publisher `force-with-lease` exists. Q11 applies these limits per room.
+- **F4. Replay.** [Log verification](../packages/log/README.md), “Verification”; verify.ts:176–185,421–454. Checks available published prefix and retained policy decisions; cannot derive every lane/lease/obligation/landing transition or receipt effect, establish unpublished acts or prove room-clock truth. Fuller declared replay remains owed.
+- **F5. Jam/delivery.** [Jam](2026-10-01-jam-room.md), approved rev5, and [direction](2026-10-03-planner-direction.md):21–41,65; protocol:4284–4304. Stage-1 contract/data/validators are delivered, later runtime/replay/access/fixtures owed. Q11 lists concrete readiness and musical/live/historical-input limits; no fresh jam result is claimed.
+- **F6. Developer surfaces.** Exact client/CLI/Room/UI sources are in Q12/Q13. Four screens exist but main.tsx:22 constructs MockRoom; LiveRoom/client connect() exist with the listed live read gaps. CLI lacks create/import/admin-invite; founding.ts:179–214 supplies a signed import API. This does not assert absence of every deployment/package.
+- **F7. Deployed legacy evidence.** [Deployment spike](deploy-spike.md):1213–1219 and [smoke JSON](../packages/room/measure/results/spike-smoke-2026-10-03T03-35-10-310Z.json): source `0753d7de`, Room `6d15d828`, checker `c18342a3`, **91** successful steps and cleanup complete. Q12 names the observations; F4's verifier limits remain. No fresh provider execution occurred here.
+- **F8. Workload limits.** [Room-core spike](2026-10-01-spike-room-core.md) and [sandbox-Git spike](2026-10-01-spike-sandbox-git.md) are unchanged dated warm/cold evidence, not current full-workflow targets. Plan §12 targets: 10 concurrent full workflows, act p50 ≤300 ms/p99 ≤1 s; overlap ≤300 ms; workspace p50 ≤5 s; preview p50 ≤10 s; ≥10 disjoint ready landings/minute; UI update after an act ≤1 s; 100 simulated agents/1,000 claims with a gapless log/no lost update, **not** 100 coding workflows; zero approvals spent on already-known conflicting heads in controlled recut, with waiting/throughput. Reports need workload/location/counts/retries/cold-warm/fork time/Artifacts-container cost. Q13 treats these as targets until matching reports exist.
+- **F9. Authoring/correctness.** dap `9d738e2e71b84ec85cd321bd4d87623ea3fad355`, spike/REPORT.md:74–90,183–221,240–246; 2026-09-18 directions:374–377,658–659,732–752. T1 `22444f8536a8932fc758d77bb614a1424635fec3`, spike/lang/REPORT.md:3–71,130–170. Q12 preserves model identities, negative results, counts and unequal trials. Immutable files were checked; historical campaigns were not rerun.
+- **F10. Rollout hosting.** [Workers versions/deployments](https://developers.cloudflare.com/workers/versions-and-deployments/) and [gradual deployments](https://developers.cloudflare.com/workers/versions-and-deployments/gradual-deployments/), checked 2026-10-03: separate version upload/deployment, traffic percentages, connected-resource limits, version skew and different Durable Object behavior. Q9–Q11 use provider capability, not a proven Artroom adapter.
+- **F11. Other hosting.** [Temporary authentication](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/temporary-auth/) supports purpose/approval and ≤24-hour access; [session management](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/session-management/) separates session termination from preventing new sessions; [Workflows](https://developers.cloudflare.com/workflows/) persists steps/retries/external-event waits. Checked 2026-10-03; none establishes an Artroom identity/revocation/delivery integration.
+- **F12. Chess.** gitseq-chess `b97c6a82ef7e3618721696f5a69efef13da10a79`, chess.go:191–225,388–432; docs/reference/architecture.md:24–40,73–101. Native move engine/local source and Q6's **three** tests support bounded legality/refusal checks, not public deployment, multi-host failover or Artroom declaration-based chess.
 
-Internal repositories for F9/F12 are `/Users/hughpyle/play/dap` and `/Users/hughpyle/play/gitseq-chess`, respectively. Exact identifiers and source paths are research provenance under the approved exception; they do not carry into presentation assets.
+Internal repositories F9/F12 are `/Users/hughpyle/play/dap` and `/Users/hughpyle/play/gitseq-chess`. Their exact identities/paths are research provenance under the approved naming exception, not asset names.
 
 ## What this round could not settle
 
@@ -653,12 +524,10 @@ Internal repositories for F9/F12 are `/Users/hughpyle/play/dap` and `/Users/hugh
 - **General authoring economics:** the experiments lack equal fresh-agent trials and complete effort/cost accounting. They do not settle which segments spend more on certainty than code, or how much shared machinery saves overall.
 - **Agent recovery:** refusal/retry mechanisms and assertions exist; no causal success rate for an agent following a fix or a cold five-minute experience was measured.
 - **Complete current/deployed general platform behavior:** approved main and dated legacy deployments do not establish unfinished declared stages, arbitrary applications, every rule's implementation, complete full-state replay, or every provider failure path.
-- **Jam evidence:** musical/live timing, audio quality, agent collaboration and the full historical replay harness need their own results. Their absence here does not change the builder's concrete readiness authority.
+- **Jam evidence:** musical/live timing, audio quality, agent collaboration and the full historical replay harness need their own results. Their absence here does not change builder's concrete readiness authority.
 - **Middle-room selection and implementation:** rollout leads the ranking, but no working inspected candidate supplies its external-effect proof. Freeze/clock, provider writers, unknown answers and recovery are application work; selection stays deferred and pre-submission rollout permission stays intact.
 - **Final demonstration and call to action:** exact participants, connected UI/setup, source/deployed identities, shown outcome, owned original media and measured timings must be established before a positioning design can choose assets. The allocation in Q14 is a rough cut, not a script.
 
-Naming exceptions and the official deadline/weights are settled in the current sources; they are not carried forward as unresolved items from the older draft.
-
 ## Validation of this research note
 
-This is a note-only change in an isolated request worktree based on the approved baseline above. The full Q1–Q15 and H1–H8 inventory, commissioned numerical breadth, source identities, name/visibility/comparison limits, per-room counterexamples and full-scope/readiness boundaries were checked. The protocol inventory independently counts 247 unique rules across 24 families. Immutable source hashes/excerpt ranges for 31 evidence files match. Primary competition/hosting documentation was rechecked on 2026-10-03. The research used source reads and retained results; apart from the three narrow local chess tests described in Q6, it performed no new application benchmark or provider execution. No runtime test suite is needed for this note-only implementation; the exact final research head still requires another actor's Architecture/Security/Simplification review and landing through gitseq.
+This is a note-only change in an isolated request worktree based on the approved baseline above. The full Q1–Q15 and H1–H8 inventory, commissioned numerical breadth, source identities, name/visibility/comparison limits, per-room counterexamples and full-scope/readiness boundaries were checked. The protocol inventory independently counts 247 unique rules across 24 families. Exact source identities, excerpt ranges and immutable evidence were checked. Primary competition/hosting documentation was rechecked on 2026-10-03. The research used source reads and retained results; apart from the three narrow local chess tests described in Q6, it performed no new application benchmark or provider execution. No runtime test suite is needed for this note-only implementation; the exact final research head still requires another actor's Architecture/Security/Simplification review and landing through gitseq.
