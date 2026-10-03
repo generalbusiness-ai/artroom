@@ -1,0 +1,10 @@
+{
+  "head": "b359e2787da33937809bb52d3c65441eb8983e9b",
+  "tree": "e62230977df83a44839e9d5925a8e51dda7befa0",
+  "trackedDiff": "",
+  "statusPorcelain": "",
+  "sourceHashesMatchHead": true,
+  "privateFixturesRemoved": true,
+  "nativeSourceCleanedInEachFixtureFinally": true,
+  "runTsSha256": "6ecffca9d1edd951c6d311cbcc32a5a997048a70557ec0883982cfcf9c2d222a"
+}

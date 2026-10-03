@@ -1,0 +1,53 @@
+gs: resolved bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0 -> git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0
+{
+  "frontier": {
+    "genesis": "589bca982736a2361d15d53f7572375ef2f7aaf3",
+    "head": "3d8a74a92c46c4e4df752383be256523d6f2b77e",
+    "depth": 11327
+  },
+  "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0",
+  "statement": {
+    "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0",
+    "sequence": 11112,
+    "timestamp": 1791035043,
+    "actor": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+    "kind": "promise",
+    "lifecycle": "promise",
+    "satisfier": "none",
+    "text": "Builder: I will implement the MCP-core runtime under request 9ca1d290: the fourteen named tools plus act and acts, titles, output schemas, fixed annotations and length limits, the four toolsets with their filtering and the toolset query, required idempotency keys with lost-result retries, the bounded waits, and every section 34.2 edit, composed with the planner's contract head b22b6dce and with stage 5's generic surfaces, with tests, mutations and gates at one exact head. I start it when stage 5's MCP work is committed; its final integration follows reviewed stage 5 on main. It is not a jam start condition."
+  },
+  "decision": {
+    "event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0",
+    "sequence": 11112,
+    "verdict": "effective",
+    "reason": "statement recorded"
+  },
+  "commitment": {
+    "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9ca1d290b7f01fe713b46668e2d4ab949d289787",
+    "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+    "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+    "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bac4bb0e7dc0c788949e82ce18c1445cbadcd8b0",
+    "status": "promised",
+    "waiting_on": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+    "target_repo": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3",
+    "target_ref": "refs/heads/main"
+  },
+  "landing": {
+    "target_repo": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3",
+    "target_ref": "refs/heads/main",
+    "git": {
+      "measured_at": 1791060885,
+      "state": "unknown",
+      "target_head": "e6e6782830e0ca8a68f0d11c4d4ece5e4e98c967",
+      "ref_incorporated": null,
+      "remote": "origin",
+      "remote_ref": "refs/remotes/origin/main",
+      "remote_head": "e6e6782830e0ca8a68f0d11c4d4ece5e4e98c967",
+      "remote_contains": null,
+      "reason": "no witnessed merge head was supplied; ancestry is unknown"
+    }
+  },
+  "provenance_bases": [
+    "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9ca1d290b7f01fe713b46668e2d4ab949d289787"
+  ]
+}
