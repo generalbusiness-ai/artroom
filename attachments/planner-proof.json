@@ -1,0 +1,17 @@
+{
+  "verifiedBy": "planner",
+  "head": "acd6917a8f9a1b8fbbbf48886e28f367dae96554",
+  "base": "b359e2787da33937809bb52d3c65441eb8983e9b",
+  "tree": "768f6b32a2e7fab77c18ead7dbb2a54645931024",
+  "manifestCount": 97,
+  "manifestSha256": "ae4d5c2876c8dc411e7277b926fd8a7a395e2054452ac0b2475aa97e98cfc436",
+  "currentSnapshots": 44,
+  "baseSnapshots": 38,
+  "allManifestBytesAndImmutableSnapshotsMatch": true,
+  "currentSnapshotCheckoutBytesMatch": true,
+  "status": "",
+  "nativeWatcherAndActualDecoderBlocksIdenticalToBase": true,
+  "readScope": "full report, full unchanged boundary blocks and current source/test/authentication increments; no new full 2847-line delta read claim",
+  "noCompileRuntimeMutationCredit": true,
+  "notInitialWholeTrackedHashInventory": true
+}
