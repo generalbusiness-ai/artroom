@@ -314,7 +314,9 @@ describe("guards", () => {
     // Segment 0 is reused by ID and not read; entry 9, which the parent's checkpoint names, is, by its hash.
     const changed9 = sourceOf(sim.entries, { swap: (seq, e) => (seq === 9 ? { ...e, hash: `sha256:${"0".repeat(64)}` as never } : e) }).source;
     await expect(p.publish(changed9, sim.checkpoint(), [])).rejects.toMatchObject({ code: "would-rewrite" });
-    expect((await p.publish(sourceOf(sim.entries).source, sim.checkpoint(), [])).through).toBe(10);
+    const honest = sourceOf(sim.entries);
+    expect((await p.publish(honest.source, sim.checkpoint(), [])).through).toBe(10);
+    expect(new Set(honest.reads.flatMap((r) => Array.from({ length: r.limit }, (_, i) => r.from + i)).filter((seq) => seq < 10))).toEqual(new Set([9]));
   }));
 
   test("would-rewrite: a changed published entry in the last segment, a changed entry at the checkpoint, a shorter log", async () => {
