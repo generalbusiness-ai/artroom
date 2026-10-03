@@ -57,7 +57,18 @@ import { checkpoint, entryAt, idOf, logSource, seal } from "./log.ts";
 import { changedPaths, evidenceByAct, evidenceOn, generationRow, laneRow, type GenerationRow, type LaneRow } from "./model.ts";
 import { adminObligation, blocking, invalidity, latestReviews, obligationsFor, qualification, statusesOf, transitions, withAdvisory } from "./obligations.ts";
 import type { ActivePolicy, Evaluation, LandingHost, LandRecord, ObligationSpec, Ports, PublisherPort, Readiness, Remotes, RetainedRef, RoomServices, SnapshotPort, Sql } from "./ports.ts";
-import { ContainerPublisher, Landing, MintLedger, SnapshotRepos, Workspaces, knownArtifactsCode, publicationTokens, scrubBatch, type ScrubCursor } from "@generalbusiness/artroom-git";
+import {
+  ContainerPublisher,
+  Landing,
+  MintLedger,
+  SnapshotRepos,
+  Workspaces,
+  knownArtifactsCode,
+  publicationTokens,
+  scrubBatch,
+  type ForkTokens,
+  type ScrubCursor,
+} from "@generalbusiness/artroom-git";
 import { LogPublisher } from "@generalbusiness/artroom-log";
 import { ArtifactsAdapter, locate, type ArtifactsBinding, type RepoLocation } from "./artifacts.ts";
 import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
@@ -143,7 +154,7 @@ export interface Recomputation {
  * durable backoff after a failure (request 3da1d82b): an alarm that fires
  * early for other work skips a kind whose backoff has not ended.
  */
-export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing", "mints", "jobTokens"] as const;
+export const LOOP_KINDS = ["tokens", "pins", "previews", "provision", "recompute", "landing", "mints", "jobTokens", "forkTokens"] as const;
 export type LoopKind = (typeof LOOP_KINDS)[number];
 /** Whether a kind of loop work may run now. */
 export type LoopDue = (kind: LoopKind) => boolean;
@@ -151,11 +162,11 @@ export type LoopDue = (kind: LoopKind) => boolean;
 const NEEDS_REPOSITORY: ReadonlySet<LoopKind> = new Set(["pins", "previews", "provision", "landing", "mints", "jobTokens"]);
 /**
  * Loop work timed by its own durable due times (`nextAlarm`), never pending
- * by the 5-second loop: the landing engine, the canonical mint ledger and
- * ended job tokens' revocations.
+ * by the 5-second loop: the landing engine, the canonical mint ledger,
+ * ended job tokens' revocations and the forks' read-token ledger.
  * Its backoff, after a failure of the step itself, ends only when it runs.
  */
-const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints", "jobTokens"]);
+const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints", "jobTokens", "forkTokens"]);
 
 let faultHook: ((point: string) => void) | null = null;
 
@@ -311,7 +322,19 @@ export class RoomCore {
     });
     // A room stored before mint lane C: its check jobs' own mint records move into the ledger, once.
     moveJobMints(this.sql, this.mints, this.now());
-    const adapter = new ArtifactsAdapter({ binding: this.artifacts, stub: r.publisher, location: () => this.location(), mints: this.mints, ...(r.bounds ? { bounds: r.bounds } : {}), ...sleep });
+    // The forks' read-token ledger is the workspaces' (request 02836f9a), built with them once the room is founded.
+    const forkTokens: Pick<ForkTokens, "withToken"> = {
+      withToken: (fork, purpose, ttl, fn) => this.workspaces.forkTokens.withToken(fork, purpose, ttl, fn),
+    };
+    const adapter = new ArtifactsAdapter({
+      binding: this.artifacts,
+      stub: r.publisher,
+      location: () => this.location(),
+      mints: this.mints,
+      forkTokens,
+      ...(r.bounds ? { bounds: r.bounds } : {}),
+      ...sleep,
+    });
     this.ports = {
       policy: opts.services.policy,
       artifacts: r.wrapArtifacts ? r.wrapArtifacts(adapter) : adapter,
@@ -1802,6 +1825,11 @@ export class RoomCore {
     mints: async (due: LoopDue = this.loopAllowed) => {
       if (due("mints")) await this.reconcileMints();
     },
+    // The forks' read-token ledger (request 02836f9a): its own kind of loop work, fenced like the canonical ledger's; the
+    // ledger's own durable due times are checked inside. Forks are not the canonical repository: it runs while that is gone.
+    forkTokens: async (due: LoopDue = this.loopAllowed) => {
+      if (this.founded && due("forkTokens")) await this.workspaces.forkTokens.reconcile();
+    },
     // The one-time upgrade of error fields stored before request d29c09fa: one bounded batch per run.
     errors: async () => this.scrubErrors(),
   } as const;
@@ -1986,6 +2014,11 @@ export class RoomCore {
     }
     const wsDue = ws?.nextDue() ?? null;
     if (wsDue !== null) times.push(wsDue);
+    // The forks' read-token ledger (request 02836f9a), as the canonical one: the takeover time while anything is in
+    // flight, owed revocations and the next fork observation, overdue work 1 s ahead; after a failure of its step, not
+    // before that step's backoff ends.
+    const forkTokens = ws?.forkTokens.nextDue() ?? null;
+    if (forkTokens !== null) times.push(Math.max(forkTokens, backoff.forkTokens?.next ?? forkTokens));
     // Snapshot repositories' durable duties: unknown creates, deletions and revocations (R-CARRY-16).
     let snap: number | null = null;
     try {

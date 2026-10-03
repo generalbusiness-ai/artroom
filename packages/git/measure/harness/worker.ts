@@ -77,21 +77,22 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
   private wire(repo: string, remote: string): void {
     const stub = this.env.PUBLISHER.getByName(repo) as unknown as PublisherStub;
     const artifacts = this.env.ARTIFACTS as unknown as ArtifactsNamespace;
-    this.workspaces = new Workspaces({ sql: this.sql, artifacts, canonical: repo, namespace: this.env.ARTIFACTS_NAMESPACE });
+    const wake = async (at: number) => {
+      const stored = await this.ctx.storage.getAlarm();
+      if (stored === null || stored > at) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 50));
+    };
+    this.workspaces = new Workspaces({ sql: this.sql, artifacts, canonical: repo, namespace: this.env.ARTIFACTS_NAMESPACE, wake });
     const canonical = () => withRetry(() => artifacts.get(repo));
     const mints = new MintLedger({
       sql: this.sql,
       repo: canonical,
       now: () => Date.now(),
-      wake: async (at) => {
-        const stored = await this.ctx.storage.getAlarm();
-        if (stored === null || stored > at) await this.ctx.storage.setAlarm(Math.max(at, Date.now() + 50));
-      },
+      wake,
       known: (id) => this.landing?.core.knownToken(id) ?? false,
     });
     this.mints = mints;
     const opts = { stub, artifacts, canonical: { name: repo, remote }, mints };
-    this.pinning = new Pinning(opts);
+    this.pinning = new Pinning({ ...opts, forkTokens: this.workspaces.forkTokens });
     this.landing = new Landing({
       sql: this.sql,
       room: this,
@@ -143,19 +144,21 @@ export class HarnessRoom extends DurableObject<Env> implements LandingRoom {
   /**
    * The alarm contract a hosting Room follows: each firing reconciles the
    * landing engine (a held publication first, R-PUB-7), the mint ledger
-   * (takeover, owed revocations, the observation) and workspace cleanup
-   * (tokens owed revocation), then sets the next alarm to the earliest of
+   * (takeover, owed revocations, the observation), the forks' read-token
+   * ledger (the same, per fork) and workspace cleanup (tokens owed
+   * revocation), then sets the next alarm to the earliest of
    * their `nextDue()`.
    */
   override async alarm(): Promise<void> {
     if (this.landing) await this.landing.reconcile();
     if (this.mints) await this.mints.reconcile();
+    if (this.workspaces) await this.workspaces.forkTokens.reconcile();
     if (this.workspaces) await this.workspaces.reconcile();
     await this.schedule();
   }
 
   private async schedule(): Promise<void> {
-    const dues = [this.landing?.nextDue(), this.mints?.nextDue(), this.workspaces?.nextDue()].filter((d): d is number => d != null);
+    const dues = [this.landing?.nextDue(), this.mints?.nextDue(), this.workspaces?.forkTokens.nextDue(), this.workspaces?.nextDue()].filter((d): d is number => d != null);
     if (dues.length > 0) await this.ctx.storage.setAlarm(Math.max(Math.min(...dues), Date.now() + 50));
   }
 

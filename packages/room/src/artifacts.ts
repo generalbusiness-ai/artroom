@@ -25,6 +25,7 @@ import {
   withRetry,
   type ArtifactsNamespace,
   type DiffBounds,
+  type ForkTokens,
   type MintLedger,
   type PublisherStub,
   type RepoHandle,
@@ -65,6 +66,8 @@ export interface ArtifactsAdapterOptions {
   readonly location: () => RepoLocation;
   /** The Room's canonical mint ledger, through which pinning and previews mint and revoke their canonical tokens (R-MINT-1). */
   readonly mints: Pick<MintLedger, "withToken">;
+  /** The lane forks' read-token ledger, which the workspaces own: pinning mints and revokes its fork read token through it (request 02836f9a). */
+  readonly forkTokens: Pick<ForkTokens, "withToken">;
   readonly bounds?: Partial<DiffBounds>;
   readonly sleep?: (ms: number) => Promise<void>;
 }
@@ -110,7 +113,14 @@ export class ArtifactsAdapter implements ArtifactsPort {
 
   private async pinning(): Promise<Pinning> {
     const remote = await this.canonicalRemote();
-    return new Pinning({ stub: this.o.stub, artifacts: this.o.binding, canonical: { name: this.name, remote }, mints: this.o.mints, ...(this.o.sleep ? { sleep: this.o.sleep } : {}) });
+    return new Pinning({
+      stub: this.o.stub,
+      artifacts: this.o.binding,
+      canonical: { name: this.name, remote },
+      mints: this.o.mints,
+      forkTokens: this.o.forkTokens,
+      ...(this.o.sleep ? { sleep: this.o.sleep } : {}),
+    });
   }
 
   async readMain(): Promise<Sha | null> {

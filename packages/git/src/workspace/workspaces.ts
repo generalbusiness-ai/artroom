@@ -38,6 +38,11 @@
  * Every retry is its own step, because an earlier failed attempt may still
  * apply.
  *
+ * The read tokens that pinning mints on a fork have their own ledger,
+ * which this object owns and builds (`forkTokens`, request 02836f9a; see
+ * fork-tokens.ts). A fork's sweep keeps the read tokens that ledger holds
+ * for a pin in progress.
+ *
  * A workspace becomes ready only after an inventory that started after its
  * token was recorded has succeeded, so every attempt that answered (even
  * with a retryable error after it applied) has been swept. The in-memory
@@ -68,6 +73,7 @@ import { type Sql, type SqlRow, text } from "../sql.ts";
 import { type ArtifactsNamespace, type RepoHandle, type TokenInfo, artifactsCode, completeInventory, refusedUnchanged, withRetry } from "../artifacts.ts";
 import { errorNote } from "../mints.ts";
 import { safeErrorText } from "../safe-errors.ts";
+import { type ForkRepo, ForkTokens } from "./fork-tokens.ts";
 
 /** Artifacts' shortest token lifetime. */
 export const MIN_TOKEN_TTL_S = 60;
@@ -85,7 +91,9 @@ export interface WorkspacesOptions {
    * Persist a wake-up at or before `at` (ms), for example the Room's alarm,
    * which then calls `settleCanonical()` before founding. Public founding
    * awaits it after recording each repository create and before sending it
-   * (plan 004); a rejection sends nothing.
+   * (plan 004); a rejection sends nothing. The forks' read-token ledger
+   * (`forkTokens`) awaits it before every create; without it, that ledger
+   * sends nothing.
    */
   readonly wake?: (at: number) => Promise<void>;
 }
@@ -150,6 +158,14 @@ export class Workspaces {
   private readonly wake: ((at: number) => Promise<void>) | undefined;
   private readonly inFlight = new Map<LaneId, Promise<WorkspaceOp>>();
   private readonly locks = new Map<string, Promise<unknown>>();
+  /**
+   * The forks' read-token ledger (request 02836f9a): every read token minted
+   * on a lane fork for pinning, from before its create is sent until its
+   * revocation is answered. Built with this object, so it takes over what a
+   * stopped host left. The Room's alarm runs it through its own `reconcile`
+   * and `nextDue` (the Room's `forkTokens` step), not through this object's.
+   */
+  readonly forkTokens: ForkTokens;
 
   constructor(opts: WorkspacesOptions) {
     this.sql = opts.sql;
@@ -173,6 +189,20 @@ export class Workspaces {
         "token_id TEXT, reason TEXT NOT NULL, state TEXT NOT NULL, started_at INTEGER NOT NULL, answered_at INTEGER, expires_at INTEGER, " +
         "attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, last_error TEXT, done_at INTEGER, done_reason TEXT)",
     );
+    // Token IDs the workspaces record, for the fork token ledger's observation: point lookups (request 02836f9a). Made at
+    // every start, so a stored room gains them at its first start after this change.
+    this.sql.all("CREATE INDEX IF NOT EXISTS artroom_ws_token ON artroom_ws (token_id)");
+    this.sql.all("CREATE INDEX IF NOT EXISTS artroom_ws_duty_token ON artroom_ws_duty (token_id)");
+    this.forkTokens = new ForkTokens({
+      sql: this.sql,
+      fork: (name) => this.ourFork(name),
+      now: this.now,
+      wake: opts.wake ?? (() => Promise.reject(new Error("no wake-up can be stored; no fork token is sent"))),
+      known: (fork, id) =>
+        this.sql.all("SELECT 1 AS x FROM artroom_ws WHERE token_id = ? AND fork = ? LIMIT 1", id, fork).length > 0 ||
+        this.sql.all("SELECT 1 AS x FROM artroom_ws_duty WHERE token_id = ? AND fork = ? AND state != 'done' LIMIT 1", id, fork).length > 0,
+      ...(opts.sleep ? { sleep: opts.sleep } : {}),
+    });
   }
 
   // ---------------------------------------------------------------- storage
@@ -524,6 +554,13 @@ export class Workspaces {
     throw lastError ?? new Error(`the fork ${name} is not ready`);
   }
 
+  /** The fork by name, only if it is ours: absent, busy or not ours, it throws, and nothing is sent to it. */
+  private async ourFork(name: string): Promise<ForkRepo> {
+    const state = await this.forkState(name);
+    if (state.kind === "ours") return state.fork;
+    throw new Error(state.kind === "absent" ? "the lane's fork does not exist" : "the lane's fork is being created");
+  }
+
   /** The fork by name: ours (a fork of exactly this canonical repo), absent, busy, or not ours (thrown). */
   private async forkState(name: string): Promise<{ kind: "ours"; fork: RepoHandle; remote: string } | { kind: "absent" } | { kind: "busy" }> {
     try {
@@ -610,12 +647,14 @@ export class Workspaces {
       try {
         // Only a complete inventory settles anything (plan 001): an incomplete or malformed one throws, and the debt stays scheduled.
         const tokens = completeInventory(await withRetry(() => fork.listTokens(), this.retryOpts()), `the token inventory of ${name}`);
-        // Keep only tokens a ready or installing lease has recorded on this fork.
-        const keep = new Set(
-          this.sql
+        // Keep only tokens a ready or installing lease has recorded on this fork, and the read tokens the fork token
+        // ledger holds for a pin in progress (request 02836f9a).
+        const keep = new Set([
+          ...this.sql
             .all("SELECT token_id FROM artroom_ws WHERE fork = ? AND state IN ('ready', 'pending') AND token_id IS NOT NULL", name)
             .map((r) => text(r, "token_id")!),
-        );
+          ...this.forkTokens.held(name),
+        ]);
         for (const t of tokens) {
           if (t.state !== "active" || keep.has(t.id)) continue;
           try {

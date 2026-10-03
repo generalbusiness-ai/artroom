@@ -7,7 +7,9 @@
  * - bounded, hash-cached path diffs through the Artifacts binding
  *   (`changedPaths`, `previewPlan`);
  * - the durable landing operation (`Landing`);
- * - the canonical mint ledger (`MintLedger`, protocol section 32).
+ * - the canonical mint ledger (`MintLedger`, protocol section 32);
+ * - the lane forks' read-token ledger (`ForkTokens`, request 02836f9a),
+ *   which `Workspaces` owns.
  *
  * The publisher's Durable Object and gateway classes are in `./publisher`
  * (`Publisher`, `ArtifactsGateway`), because they need the Workers runtime.
@@ -29,6 +31,8 @@ export type {
 } from "./landing/types.ts";
 export { Workspaces, forkName, MIN_TOKEN_TTL_S } from "./workspace/workspaces.ts";
 export type { WorkspacesOptions } from "./workspace/workspaces.ts";
+export { ForkTokens } from "./workspace/fork-tokens.ts";
+export type { ForkRepo, ForkToken, ForkTokenDuties, ForkTokenDuty, ForkTokenState, ForkTokensOptions, ForkWatch } from "./workspace/fork-tokens.ts";
 export { MAX_RETAIN_MS, PREPARE_WINDOW_MS, SnapshotRepos } from "./snapshot/repos.ts";
 export type { SnapshotRepo, SnapshotReposOptions, SnapshotToken, SnapshotWriter } from "./snapshot/repos.ts";
 export {
@@ -44,7 +48,7 @@ export {
 } from "./diff/treediff.ts";
 export type { DiffBounds, DiffResult, DiffStats, TreeEntry, TreeReader } from "./diff/treediff.ts";
 export { ContainerPublisher, Pinning } from "./publisher/client.ts";
-export type { LogRemoteStub, PublisherClientOptions, PublisherStub } from "./publisher/client.ts";
+export type { LogRemoteStub, PinningOptions, PublisherClientOptions, PublisherStub } from "./publisher/client.ts";
 export { GitOps, HARDENING, LOG_REF, SNAPSHOT_AUTHOR, SNAPSHOT_REF, integrationMessage, integrationRef, objectsRef, pinnedRef } from "./publisher/gitops.ts";
 export { decodeLogPush, decodeLogStage, fromB64url, toB64url, toLogOutcome, LOG_PUSH_LIMITS } from "./publisher/log-push.ts";
 export type { LogPushOutcome, LogPushRequest, LogStageRequest } from "./publisher/log-push.ts";
@@ -56,6 +60,7 @@ export { checkUpdates, readCommands, FenceError } from "./publisher/ref-fence.ts
 export { completeInventory, readMainVia, withRetry } from "./artifacts.ts";
 export {
   MINT_LISTING_MAX,
+  MINT_RETRY,
   MINT_REVOKE_BACKOFF,
   MINT_REVOKE_BATCH,
   MINT_WAIT_MS,

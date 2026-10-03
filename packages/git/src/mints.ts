@@ -115,7 +115,7 @@ export const MINT_REVOKE_BATCH = 20;
 /** A listing with more records than this counts nothing. */
 export const MINT_LISTING_MAX = 1_000;
 /** Retries of a transient create error, as `withRetry`: 5 attempts, from 0.5 s. Each is a new record. */
-const RETRY = { attempts: 5, firstMs: 500 } as const;
+export const MINT_RETRY = { attempts: 5, firstMs: 500 } as const;
 /** Most records one `duties` page returns. */
 const PAGE_MAX = 1_000;
 
@@ -375,11 +375,11 @@ export class MintLedger {
   async mint(purpose: string, scope: MintScope, ttl: (sentAt: number) => number, opts: { readonly notAfter?: number } = {}): Promise<LedgerToken> {
     const repo = await this.lookup();
     if (!repo) throw new Error(`the canonical repository was not reached within ${this.waitMs} ms; nothing was sent`);
-    let wait: number = RETRY.firstMs;
+    let wait: number = MINT_RETRY.firstMs;
     for (let attempt = 1; ; attempt++) {
       const r = await this.once(repo, purpose, scope, ttl, opts.notAfter ?? null);
       if (r.ok) return r.token;
-      if (!r.retry || attempt >= RETRY.attempts) throw r.error;
+      if (!r.retry || attempt >= MINT_RETRY.attempts) throw r.error;
       await this.sleep(wait);
       wait *= 2;
     }

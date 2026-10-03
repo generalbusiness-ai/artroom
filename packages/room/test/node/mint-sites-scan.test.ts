@@ -3,7 +3,10 @@
  * a source scan. Outside the harnesses, `measure/` and tests, only the files
  * below reach Artifacts' token creation (R-MINT-1). Every canonical mint goes
  * through the mint ledger (`mints.ts`); the others mint on repositories that
- * are not the canonical one.
+ * are not the canonical one. Since request 02836f9a, the lane fork's read
+ * token for pinning is minted by the fork's own ledger
+ * (`workspace/fork-tokens.ts`), and `publisher/client.ts` reaches
+ * `createToken` nowhere.
  *
  * The scan is syntactic (review b84aead9): each production source file is
  * parsed with Babel's TypeScript parser (TypeScript 7, the native compiler,
@@ -32,13 +35,13 @@ const ALLOWED: Readonly<Record<string, { readonly reaches: number; readonly why:
   "packages/git/src/mints.ts": { reaches: 1, why: "the canonical mint ledger: every canonical mint (R-MINT-1)" },
   "packages/git/src/workspace/workspaces.ts": { reaches: 1, why: "a lane fork's workspace lease token (R-CRED-8), not a canonical mint" },
   "packages/git/src/snapshot/repos.ts": { reaches: 1, why: "a snapshot repository's job token (R-CARRY-16), not a canonical mint" },
-  "packages/git/src/publisher/client.ts": {
+  "packages/git/src/workspace/fork-tokens.ts": {
     reaches: 1,
-    why: "pending exception, request 02836f9a: the lane fork's read token for pinning, inside `withForkToken` only, until the fork has its own ledger; never a canonical token",
+    why: "the lane forks' read-token ledger, which the workspaces own (request 02836f9a): a lane fork's read token for pinning, not a canonical mint",
   },
 };
-/** In an allowed file, the function each reach must be inside, when it is fixed. */
-const INSIDE: Readonly<Record<string, string>> = { "packages/git/src/publisher/client.ts": "withForkToken" };
+/** In an allowed file, the function each reach must be inside, when it is fixed. None is, since request 02836f9a removed `withForkToken`. */
+const INSIDE: Readonly<Record<string, string>> = {};
 
 type AstNode = { readonly type: string; readonly loc?: { readonly start: { readonly line: number } } } & Record<string, unknown>;
 
@@ -208,20 +211,29 @@ function sources(): { path: string; text: string }[] {
 }
 
 describe("mint lane C (6): who reaches createToken", () => {
-  it("outside the harnesses, measure/ and tests, only the ledger, workspaces, snapshot repositories and the fork token in publisher/client.ts reach createToken, each once", () => {
+  it("outside the harnesses, measure/ and tests, only the canonical ledger, workspaces, snapshot repositories and the fork token ledger reach createToken, each once", () => {
     const files = sources();
     // The scan reaches the former canonical sites, every allowed file, the declaration and the fake, and every package's source.
-    for (const f of ["packages/room/src/core.ts", "packages/room/src/logremote.ts", "packages/room/src/jobs.ts", "packages/git/src/landing/engine.ts", "packages/git/src/artifacts.ts", "packages/room/src/memory/artifacts.ts", ...Object.keys(ALLOWED)])
+    for (const f of [
+      "packages/room/src/core.ts",
+      "packages/room/src/logremote.ts",
+      "packages/room/src/jobs.ts",
+      "packages/git/src/landing/engine.ts",
+      "packages/git/src/artifacts.ts",
+      "packages/git/src/publisher/client.ts",
+      "packages/room/src/memory/artifacts.ts",
+      ...Object.keys(ALLOWED),
+    ])
       expect(files.map((x) => x.path)).toContain(f);
     expect(files.length).toBeGreaterThan(100);
     expect(violations(files)).toEqual([]);
   });
 
-  it("publisher/client.ts: its one reach is inside withForkToken, used once, for the lane's fork; its canonical tokens go through the ledger", () => {
+  it("publisher/client.ts reaches createToken nowhere (request 02836f9a): its canonical tokens go through the canonical ledger, and the fork's read token through the fork token ledger", () => {
     const text = readFileSync(join(ROOT, "packages/git/src/publisher/client.ts"), "utf8");
-    expect(reaches(text).map((r) => r.inside)).toEqual(["withForkToken"]);
-    expect([...text.matchAll(/withForkToken\s*(?:<[^>]*>)?\(/g)]).toHaveLength(2); // its definition and one use
-    expect(text).toMatch(/withForkToken\(\s*forkRepo,/);
+    expect(reaches(text)).toEqual([]);
+    expect(text).not.toContain("withForkToken");
+    expect(text).toMatch(/this\.o\.forkTokens\.withToken\(fork\.name, `pin-objects:/);
     for (const purpose of ["integrate:", "pin-objects:", "pin-ref:", "preview:"]) expect(text).toContain(`\`${purpose}`);
   });
 
@@ -240,11 +252,11 @@ describe("mint lane C (6): who reaches createToken", () => {
     expect(violations([{ path: "packages/room/src/checker-mint-scan-probe.ts", text }])).toEqual(["packages/room/src/checker-mint-scan-probe.ts:3: reaches createToken outside the allowed files"]);
   });
 
-  it("the same file at an allowed path fails on its count, and a reach outside withForkToken in publisher/client.ts fails", () => {
+  it("the same file at an allowed path fails on its count, and a reach put back into publisher/client.ts (the old fork token) fails", () => {
     const text = readFileSync(join(ROOT, "packages/room/test/node/fixtures/create-token-forms.ts"), "utf8");
     expect(violations([{ path: "packages/git/src/snapshot/repos.ts", text }])).toEqual(["packages/git/src/snapshot/repos.ts: 20 reaches of createToken, allowed 1"]);
     const client = readFileSync(join(ROOT, "packages/git/src/publisher/client.ts"), "utf8");
-    const swapped = client.replace("repo.createToken(\"read\", TOKEN_TTL.pin)", "repo.revokeToken(\"read\")") + "\nexport const sneaky = (r: RepoHandle) => r.createToken(\"write\", 60);\n";
-    expect(violations([{ path: "packages/git/src/publisher/client.ts", text: swapped }])).toEqual([expect.stringMatching(/^packages\/git\/src\/publisher\/client\.ts:\d+: reaches createToken outside withForkToken$/)]);
+    const old = client + "\nasync function withForkToken(repo: RepoHandle) {\n  return repo.createToken(\"read\", TOKEN_TTL.pin);\n}\n";
+    expect(violations([{ path: "packages/git/src/publisher/client.ts", text: old }])).toEqual([expect.stringMatching(/^packages\/git\/src\/publisher\/client\.ts:\d+: reaches createToken outside the allowed files$/)]);
   });
 });
