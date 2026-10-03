@@ -29,7 +29,7 @@ describe.skipIf(DECLARED)("check jobs in a v2 room name the kind and binding to 
   type Sent = { job: CheckJob & { kind?: string; binding?: string }; out: unknown };
 
   /** A v2 room whose `src/**` needs the check `unit`, and a checker that signs exactly what its job names, as packages/checkers does. */
-  async function checked(before: (job: Sent["job"], n: number) => Promise<void> | undefined = async () => {}, signAs?: (job: Sent["job"]) => { v: number; kind: string; binding?: string }, settle = true) {
+  async function checked(before: (job: Sent["job"], n: number) => Promise<void> | undefined = async () => {}, signAs?: (job: Sent["job"]) => { v: number; kind: string; binding?: string }, settle = true, prepare: (r: TestRoom) => void = () => {}) {
     const base = () => policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
     const doc = v2(() => {}, base());
     const cfg = { format: "artroom-checker-v2", act: "check", volatile: false, timeoutSeconds: 60, runner: R };
@@ -55,6 +55,7 @@ describe.skipIf(DECLARED)("check jobs in a v2 room name the kind and binding to 
     r.world.checkers["unit"] = service;
     const c = await ok<Claim>(r, alice, "claim", null, { goal: "work", scope: ["src/**"] });
     const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
+    prepare(r);
     await ok(r, alice, "propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head, summary: "change" });
     // A test that holds the checker's answer cannot wait for the room to be idle.
     if (settle) await inDO(r, (room) => room.core.idle());
@@ -110,6 +111,31 @@ describe.skipIf(DECLARED)("check jobs in a v2 room name the kind and binding to 
     expect(later.length).toBeGreaterThan(0);
     expect((later[later.length - 1]!.out as ActRecord).kind).toBe("check");
     expect((await jobs(s.r)).every((j) => j.state === "done")).toBe(true);
+  });
+
+  it("a job prepared while an activation replaced the binding names the binding in force when it is sent", async () => {
+    // The job's read token is held at Artifacts, so the job is being prepared when the meaning of `check` changes.
+    let calls = 0;
+    const s = await checked(undefined, undefined, false, (r) => {
+      const a = r.world.artifacts;
+      calls = a.remoteCalls.get("createToken") ?? 0;
+      a.holdToken = (repo, scope) => scope === "read" && repo === a.canonical;
+    });
+    const a = s.r.world.artifacts;
+    await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls);
+    expect(s.seen.length).toBe(0);
+    const old = (await bindingIn(s.r, "check"))!;
+    await activate(s.r, v2((x) => void (x["check"] = { ...x["check"]!, body: { remark: { type: "text", max: 10, optional: true } } }), s.base()));
+    const now = (await bindingIn(s.r, "check"))!;
+    expect(now).not.toBe(old);
+    a.holdToken = null;
+    await until(async () => s.seen.length > 0 && s.seen[0]!.out !== undefined);
+    await inDO(s.r, (room) => room.core.idle());
+    // The same attempt, sent once, with the binding of the document now in force; its check is admitted.
+    expect(s.seen[0]!.job.binding).toBe(now);
+    expect((s.seen[0]!.out as ActRecord).kind).toBe("check");
+    expect(s.seen.length).toBe(1);
+    expect(await jobs(s.r)).toMatchObject([{ state: "done", attempt: 1 }]);
   });
 
   it("a checker that was given the binding in force and is still refused binding-stale is not asked again", async () => {

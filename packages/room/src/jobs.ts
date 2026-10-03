@@ -457,7 +457,8 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
     await end();
     return;
   }
-  if (!current(core, mine)) {
+  const fresh = current(core, mine);
+  if (!fresh) {
     move(core, mine, "state = 'done', outcome = 'not-needed', token = NULL");
     await end();
     return;
@@ -486,8 +487,8 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
     // The token expires no later than the job's deadline (R-EXEC-9).
     deadline: iso(deadline),
     // R-DECL-18: in a v2 room the job names the kind its check is signed as and that kind's binding, from the
-    // policy version judged current just above, as it names that version's configuration digest.
-    ...signedAs(policy, cfg.config), // G2:job-binding
+    // policy judged current just above, with no await since: an activation while the job was prepared is seen here.
+    ...signedAs(fresh.policy, fresh.cfg.config), // G2:job-binding
   };
   const sent: JobRow = { ...mine, token: tokenId };
   core.kick(`job:${job.id}`, async () => {
