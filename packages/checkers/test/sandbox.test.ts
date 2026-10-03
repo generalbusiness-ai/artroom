@@ -113,13 +113,13 @@ test("G1: a runner never reuses a container: reopening after close, or over a le
   });
   const { c, host } = fleet.make();
   const grant = { repoPath: "/git/ns/canon.git", token: tok("a0123456789"), registry: [] };
-  // What the image's own npm answers.
+  // What the image's own npm answers, and what a replaced one does: a link to `true` answers nothing.
   const pristine = "--version";
+  const replace = "ln -s /usr/bin/true tools/npm";
   // A job replaces a trusted tool in its container, and leaves a process running.
   const a = await host.open(grant);
-  const poison = 'printf "#!/bin/sh\\necho 0.0.0-poisoned\\n" > tools/npm && chmod +x tools/npm && npm --version && { sleep 60 >/dev/null 2>&1 & echo $!; }';
-  const [version, pid] = (await host.exec(a.owner, ["sh", "-c", poison])).stdout.trim().split("\n");
-  assert.equal(version, "0.0.0-poisoned");
+  const pid = (await host.exec(a.owner, ["sh", "-c", `${replace} && { sleep 60 >/dev/null 2>&1 & echo $!; }`])).stdout.trim();
+  assert.deepEqual(await host.exec(a.owner, ["npm", "--version"]), { exitCode: 0, stdout: "", stderr: "" }, "the job's npm is the replaced one");
   assert.doesNotThrow(() => process.kill(Number(pid), 0), "the process the job left is running");
   assert.equal(await host.close(a.owner), true);
   assert.equal(c.running, false);
@@ -132,7 +132,7 @@ test("G1: a runner never reuses a container: reopening after close, or over a le
   // A container left running by anything earlier is destroyed, not adopted.
   c.start();
   const leftover = c.root!;
-  const left = await c.exec(["sh", "-c", 'printf "#!/bin/sh\\necho 0.0.0-poisoned\\n" > tools/npm && chmod +x tools/npm'], { env: {}, signal: new AbortController().signal });
+  const left = await c.exec(["sh", "-c", replace], { env: {}, signal: new AbortController().signal });
   assert.equal((await left.output()).exitCode, 0);
   const d = await host.open(grant);
   assert.notEqual(c.root, leftover);
