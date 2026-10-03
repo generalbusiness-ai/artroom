@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will independently review exact head 3d1223a1e06271fe6911598a716379de653e1fd6 for fork mint request 02836f9a, inspect all 15 artifacts, reproduce the required failure and restart controls, mutate runtime guards, and report Architecture, Security and Simplification conclusions."}
+{"kind":"artifact","text":"docs/protocol.md at exact 6e585cf99cf76bf377f46dc114a3f8e16f616f91 on request/live503, under promise git:sha1…8608987 on request git:sha1…001ffca","body":{"commit":"6e585cf99cf76bf377f46dc114a3f8e16f616f91","path":"docs/protocol.md"}}
