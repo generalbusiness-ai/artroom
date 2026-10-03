@@ -1,0 +1,42 @@
+[
+  {
+    "source": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/probes/checker-ui-preflight.test.tsx",
+    "copy": "/private/tmp/artroom-checker-ui-5590-su95jyc2/repo/packages/ui/test/checker-ui-preflight.test.tsx",
+    "lines": 119,
+    "bytes": 6355,
+    "sha256": "27b74170c93db4e135c5e364bd79d03d8570ed4d55ed671dc873eb51131c490a",
+    "byte_identical": true
+  },
+  {
+    "source": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/probes/checker-ui-catalogue-cache.test.ts",
+    "copy": "/private/tmp/artroom-checker-ui-5590-su95jyc2/repo/packages/ui/test/checker-ui-catalogue-cache.test.ts",
+    "lines": 61,
+    "bytes": 3236,
+    "sha256": "0a3cf3b77c9e3a0ba392910ad95ed57a80ecee8451dfe3ee360bb5973bae58e8",
+    "byte_identical": true
+  },
+  {
+    "source": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/probes/checker-ui-f606-races.test.ts",
+    "copy": "/private/tmp/artroom-checker-ui-5590-su95jyc2/repo/packages/ui/test/checker-ui-f606-races.test.ts",
+    "lines": 158,
+    "bytes": 8188,
+    "sha256": "b58e94872c699b49fa48a108e34b26ac7c723211783509c9de41cc14a9caed57",
+    "byte_identical": true
+  },
+  {
+    "source": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/artroom-checker-ui-f606-r1mf81ul/probes/checker-ui-f606-intents.test.tsx",
+    "copy": "/private/tmp/artroom-checker-ui-5590-su95jyc2/repo/packages/ui/test/checker-ui-f606-intents.test.tsx",
+    "lines": 112,
+    "bytes": 6023,
+    "sha256": "724cc4a15a6ce70b403fc4836dcf3fc3ffc049c9fdb57c5a2f680c95b47cb7df",
+    "byte_identical": true
+  },
+  {
+    "source": "/tmp/artroom-planner-ui-4567-ajquzk40/planner-ui-unavailable.test.ts",
+    "copy": "/private/tmp/artroom-checker-ui-5590-su95jyc2/repo/packages/ui/test/planner-ui-unavailable.test.ts",
+    "lines": 68,
+    "bytes": 5624,
+    "sha256": "8cf82744551421b1cb72887f273009f84316aa56cd4d75b26fd4bd05c03717d8",
+    "byte_identical": true
+  }
+]

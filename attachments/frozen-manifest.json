@@ -1,0 +1,172 @@
+[
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/browser-declared-error-context.md",
+    "bytes": 14716,
+    "sha256": "3646f0233f834b1811dc44fc1267f5808826dc8b7614fe2850a4a524facabc6d"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/checker-independent-report.md",
+    "bytes": 7832,
+    "sha256": "fb7a052eef810fc85add4f4c0476b4e18e6595551f79398b2bf2c495d5738958"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/checkout.log",
+    "bytes": 116,
+    "sha256": "0e67959d010f3584741e48b22c2134ab0135b7bd75374a0606e63c71d41ba79f"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/clone.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/copied-fixtures.json",
+    "bytes": 1988,
+    "sha256": "28cd7e92c251cd005f63b745524e82ab2e4817a3e86bd3b6ac782213fe0d527c"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/final-commands.json",
+    "bytes": 1945,
+    "sha256": "c82030bff0b0742eec6f3d22163924cadb9bb251dbd91a617c19ac17826432ad"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/gitseq-inspect-0fd98c41.json",
+    "bytes": 4157,
+    "sha256": "64a782ee82eb6765dc3afdec35569110a9b4097d83cfcd6e4aa842b23a1c5b3c"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/gitseq-inspect-fcd7391d.json",
+    "bytes": 4093,
+    "sha256": "5769649cbe51b409c1d5dc59e0fb7393c7e213a0b6348c36e94729febd748bbd"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/immutable-source-after.json",
+    "bytes": 581,
+    "sha256": "b93855940f7c86a733b13e2ff9be873c0152acd99874ce3c3b090f5dd8a16090"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/immutable-source-before.json",
+    "bytes": 501,
+    "sha256": "2644280f275c8e1b992422567da325149c08866edba19f25fed209c412b96c97"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/install.log",
+    "bytes": 1073,
+    "sha256": "a553b7017082b31ebc89afd48facad5bfec3209f0c88e637ed6400c34062fa77"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/probes/checker-ui-catalogue-cache.test.ts",
+    "bytes": 3236,
+    "sha256": "0a3cf3b77c9e3a0ba392910ad95ed57a80ecee8451dfe3ee360bb5973bae58e8"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/probes/checker-ui-f606-intents.test.tsx",
+    "bytes": 6023,
+    "sha256": "724cc4a15a6ce70b403fc4836dcf3fc3ffc049c9fdb57c5a2f680c95b47cb7df"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/probes/checker-ui-f606-races.test.ts",
+    "bytes": 8188,
+    "sha256": "b58e94872c699b49fa48a108e34b26ac7c723211783509c9de41cc14a9caed57"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/probes/checker-ui-preflight.test.tsx",
+    "bytes": 6355,
+    "sha256": "27b74170c93db4e135c5e364bd79d03d8570ed4d55ed671dc873eb51131c490a"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/probes/planner-ui-unavailable.test.ts",
+    "bytes": 5624,
+    "sha256": "8cf82744551421b1cb72887f273009f84316aa56cd4d75b26fd4bd05c03717d8"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/provenance.json",
+    "bytes": 182,
+    "sha256": "c5e7dfd3b1484aa6ece5c98dcd7ca759228d429a9d079df97133a208222897e6"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/restoration.json",
+    "bytes": 153,
+    "sha256": "77a2f7708e7d7036aa7444a95c1950f72b504eb3dd2f381db2539ab900dc93da"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/root-typecheck.command.json",
+    "bytes": 407,
+    "sha256": "88ba5e7de7300c4bb8c4a2eb0ecd348d491622404c4ab3a2f74e49c559171388"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/root-typecheck.log",
+    "bytes": 1882,
+    "sha256": "a102d4a044fa5ec6aef465728bd0e9b458bd32d122649fb78d359f47fa905168"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/run_command.py",
+    "bytes": 757,
+    "sha256": "c7a330ed0e527cd55432dd0cb68610404cbca725645e2417b81745e8eab05c54"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/runtime-identity.json",
+    "bytes": 389,
+    "sha256": "7d6cd1d34b2ae39719507b96aa1aa93240c035b3631432b19f000678bb266e5d"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/test-helper-only.diff",
+    "bytes": 7573,
+    "sha256": "b6272c07190a5f3e4a53ce82156e3b183f98fecbd56327037ef6e95800db3890"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/tracked-ui-tree.txt",
+    "bytes": 7282,
+    "sha256": "88e6dc2390dccd37d8838d3abcbb5162087463e2e9a097ccbaf47a5ca8b5f107"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/two-path-repair.diff",
+    "bytes": 21540,
+    "sha256": "75821479508f3c501a1c790c77e1845a4ccc999bddf6941ce28f8762ac2e94ff"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/ui-build.command.json",
+    "bytes": 438,
+    "sha256": "18f0f8c699c227e8144cc051982cc7a2cf4f797438dd062eea3dd053c00b47a1"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/ui-build.log",
+    "bytes": 429,
+    "sha256": "0537d65ede24a15651bd06531de3ad0bbea147500d0d43ea3ff2b5f620a48244"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/ui-e2e.command.json",
+    "bytes": 431,
+    "sha256": "490c0872ff3ef21bd5ddbded392837c13b015fa1da987dc22cba0125a4d1b0d8"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/ui-e2e.log",
+    "bytes": 3566,
+    "sha256": "006b6a137ac6e8ee782c1f0f021ede482d423910bfbddaace0b5fb1e4cd27933"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/ui-tests-summary.json",
+    "bytes": 4106,
+    "sha256": "380b5090b4eeb0269e8275f9bdab39962e00044656843c6399c0108c7bf5aed7"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/ui-tests.command.json",
+    "bytes": 532,
+    "sha256": "94883dca8982f842d22238b7d239f1374372f08a59ff2aae8212fb78cffc2d63"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/ui-tests.log",
+    "bytes": 46293,
+    "sha256": "c742cec454adf8695b9a31434d48319742d7dc1479e74cb8905360786da2ae8f"
+  },
+  {
+    "path": "/private/tmp/artroom-checker-ui-5590-su95jyc2/ui-tests.vitest.json",
+    "bytes": 108715,
+    "sha256": "bbac4f305f8f27bc75344ca962014dda5bf1c6a8019deac58368e7b7a1aa0df0"
+  },
+  {
+    "path": "/tmp/artroom-checker-ui-5590-independent-report.md",
+    "bytes": 7832,
+    "sha256": "fb7a052eef810fc85add4f4c0476b4e18e6595551f79398b2bf2c495d5738958"
+  }
+]

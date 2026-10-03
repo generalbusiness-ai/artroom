@@ -1,0 +1,14 @@
+
+> @generalbusiness/artroom-ui@0.0.0 build
+> vite build
+
+vite v8.3.2 building client environment for production...
+transforming...
+✓ 90 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.50 kB │ gzip:   0.30 kB
+dist/assets/index-BK__XFgb.css   21.30 kB │ gzip:   5.16 kB
+dist/assets/index-d86Gb0gx.js   335.31 kB │ gzip: 104.72 kB │ map: 1,266.37 kB
+
+✓ built in 256ms

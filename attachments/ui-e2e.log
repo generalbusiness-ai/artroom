@@ -1,0 +1,63 @@
+
+> @generalbusiness/artroom-ui@0.0.0 e2e
+> playwright test
+
+[WebServer] (node:28076) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:28356) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:29013) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:29079) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 9 tests using 1 worker
+
+(node:29166) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/smoke.spec.ts:41:1 › the scenario plays end to end and each screen shows its idea (1.4s)
+  ✓  2 e2e/smoke.spec.ts:91:1 › a reviewer clears their queue (248ms)
+  ✓  3 e2e/smoke.spec.ts:105:1 › keyboard: skip link, number keys, and visible focus (131ms)
+  ✓  4 e2e/smoke.spec.ts:117:3 › screenshots, light (577ms)
+  ✓  5 e2e/smoke.spec.ts:117:3 › screenshots, dark (589ms)
+  ✓  6 e2e/smoke.spec.ts:140:1 › the per-change history of a jj recut (443ms)
+  ✓  7 e2e/smoke.spec.ts:165:1 › screenshot, check carry and an advisory check (246ms)
+  ✓  8 e2e/smoke.spec.ts:179:1 › screenshot, phone width (246ms)
+  ✘  9 e2e/smoke.spec.ts:195:1 › a room that declares its own acts: the feed, the acts and a form, in its own words (5.1s)
+
+
+  1) e2e/smoke.spec.ts:195:1 › a room that declares its own acts: the feed, the acts and a form, in its own words 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('a.lane-goal').filter({ hasText: 'Start a song: Footprints' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('a.lane-goal').filter({ hasText: 'Start a song: Footprints' }) with timeout 5000ms
+      - waiting for locator('a.lane-goal').filter({ hasText: 'Start a song: Footprints' })
+
+
+      197 |   await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+      198 |   await page.goto("/?app=setlist#/room");
+    > 199 |   await expect(page.locator("a.lane-goal", { hasText: "Start a song: Footprints" })).toBeVisible();
+          |                                                                                      ^
+      200 |   await expect(page.locator("[data-record='wrap-up']")).toContainText("Retired at seq");
+      201 |   await capture(page, "declared-room-light");
+      202 |
+        at /private/tmp/artroom-checker-ui-5590-su95jyc2/repo/packages/ui/e2e/smoke.spec.ts:199:86
+
+    Error Context: test-results/smoke-a-room-that-declares-5a35e-and-a-form-in-its-own-words/error-context.md
+
+  1 failed
+    e2e/smoke.spec.ts:195:1 › a room that declares its own acts: the feed, the acts and a form, in its own words 
+  8 passed (10.2s)
+npm error Lifecycle script `e2e` failed with error:
+npm error code 1
+npm error path /private/tmp/artroom-checker-ui-5590-su95jyc2/repo/packages/ui
+npm error workspace @generalbusiness/artroom-ui@0.0.0
+npm error location /private/tmp/artroom-checker-ui-5590-su95jyc2/repo/packages/ui
+npm error command failed
+npm error command sh -c playwright test
