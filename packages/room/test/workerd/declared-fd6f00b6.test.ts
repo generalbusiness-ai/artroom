@@ -268,6 +268,44 @@ describe.skipIf(DECLARED)("grants carry the bindings their grantor signed (R-DEC
     expect(expectRefusal(await call(r.stub.bearerAct(b.bearer, { kind: "claim", target: null, body: { goal: "g", scope: ["src/**"] }, idempotencyKey: "b1" })), "delegation-invalid").reason).toContain("does not cover claim");
   });
 
+  it("an invitation's session map is judged when the invitation is admitted (R-DECL-17): a stale binding is binding-stale, an undeclared kind kind-undeclared, a kind the invited role may not sign invalid-body; nothing is recorded", async () => {
+    const r = await declaredRoom();
+    const invite = async (acts: Record<string, string>) =>
+      act(
+        r,
+        r.admin,
+        "roster",
+        null,
+        { op: "invite", member: "@agent", role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(randomBytes(32)), session: { kinds: ["renew"], acts, lanes: "*", ttlSeconds: 3600 } },
+        { binding: null },
+      );
+    const seq = await headSeq(r);
+    const stale = expectRefusal(await invite({ claim: `sha256:${"3".repeat(64)}` }), "binding-stale");
+    expect(stale.current?.binding).toBe(await bindingIn(r, "claim"));
+    expectRefusal(await invite({ merge: `sha256:${"3".repeat(64)}` }), "kind-undeclared");
+    expect(expectRefusal(await invite({ check: (await bindingIn(r, "check"))! }), "invalid-body").reason).toBe("The role agent may not sign every kind the session lists.");
+    expect(await headSeq(r)).toBe(seq);
+    expectOk(await invite({ claim: (await bindingIn(r, "claim"))! }));
+  });
+
+  it("an invitation from before declared acts, redeemed after the first v2 activation, grants only the delegable platform kinds its session covered: one limited to claim and propose grants nothing, one that lists renew grants renew (intersection, never acquisition)", async () => {
+    const r = await makeRoom();
+    const invite = async (member: string, kinds: readonly string[]) => {
+      const bytes = randomBytes(32);
+      const inv = await r.admin.ok<RosterRecord>("roster", null, { op: "invite", member, role: "agent", custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(bytes), session: { kinds, lanes: "*", ttlSeconds: 3600 } });
+      return { id: inv.id, secret: b64url(bytes) };
+    };
+    const narrow = await invite("@one", ["claim", "propose"]);
+    const wide = await invite("@two", ["claim", "renew"]);
+    await activate(r, v2());
+    const grantOf = async (i: { id: RosterRecord["id"]; secret: string }) => {
+      const b = await call<Redeemed>(r.stub.redeem({ custody: "room", invitation: i.id as never, secret: i.secret }, "x"));
+      return (await r.admin.read({ q: "members" })).delegations.find((x) => x.id === b.delegation)!;
+    };
+    expect(await grantOf(narrow)).toMatchObject({ kinds: [], acts: {} });
+    expect(await grantOf(wide)).toMatchObject({ kinds: ["renew"], acts: {} });
+  });
+
   it("bearer acts: the named tools' code-review binding is admitted where claim means the code-review claim, and binding-stale where it does not", async () => {
     const grantFor = async (r: TestRoom) => {
       const bytes = randomBytes(32);

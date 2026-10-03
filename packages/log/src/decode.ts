@@ -14,7 +14,7 @@
  */
 
 import type { CheckerConfig, Checkpoint, ChunkedLine, LogEntry, LogLayout, PolicyDocument, ReplayContext } from "@generalbusiness/artroom-contract";
-import { LEGACY_KINDS, validateCheckerConfig, validatePolicy } from "@generalbusiness/artroom-policy";
+import { validateCheckerConfig, validatePolicy } from "@generalbusiness/artroom-policy";
 import { canonicalize, fromUtf8, parseStrict } from "./canonical.ts";
 import { hex } from "./crypto.ts";
 import { parseTime } from "./time.ts";
@@ -93,8 +93,7 @@ const starOr = (v: unknown, path: string, item: (v: unknown, path: string) => un
 // ------------------------------------------------------------ the contract
 
 const FORMAT = ["artroom-log-v1"] as const;
-/** The legacy vocabulary's kinds, from the one source (policy vocabulary.ts); stage 3 decodes by grammar. */
-const ENVELOPE_KINDS = LEGACY_KINDS;
+const ENVELOPE_KINDS = ["claim", "propose", "note", "review", "check", "land", "release", "renew", "roster"] as const;
 const ROLES = ["admin", "maintainer", "member", "agent", "checker"] as const;
 const CUSTODY = ["client", "room"] as const;
 const REVOCATION = ["retired", "compromised"] as const;

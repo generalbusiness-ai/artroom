@@ -8,8 +8,10 @@
  * - a `v2` document means its own declarations, with the platform kinds
  *   `renew`, `roster` and `recover` beside them.
  *
- * The room's schema, roster and authority, the policy validator and the
- * log's decoder and roster replay all read their kinds from here.
+ * The room's schema, roster and authority and the policy validator read
+ * their kinds from here. The log's decoder and roster replay keep their own
+ * lists until declared acts stage 3 (request 1e8fee4b), which owns
+ * packages/log and replaces them (planner's assert 869d9aad).
  * `codeReviewPolicy` gives the built-in default declarations, the
  * code-review application's (`CODE_REVIEW_ACTS`), as a `v2` document.
  */
