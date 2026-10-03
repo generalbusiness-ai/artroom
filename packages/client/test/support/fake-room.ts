@@ -361,7 +361,9 @@ export class FakeRoom {
       // As the Room (R-DECL-16): an exact retry of an accepted act gets its original result, even when the document
       // now in force no longer admits its version or kind. Only that exact envelope, with its signature.
       const before = typeof env === "object" && env !== null ? this.#idem.get(`${env.actor}|${env.idempotencyKey}`) : undefined;
-      if (before && before.bytes === canonicalize(env) && (await verifyValue("artroom-envelope-v1", env, signed.sig, env.actor))) return before.result;
+      // The closed outer shape, exactly `envelope` and `sig`, as the Room's lookup requires.
+      const closed = Object.keys(signed).sort().join() === "envelope,sig";
+      if (closed && before && before.bytes === canonicalize(env) && (await verifyValue("artroom-envelope-v1", env, signed.sig, env.actor))) return before.result;
       throw e;
     }
     if (env.room !== this.id) throw artroomError("unauthenticated", "The envelope is for another room.");
