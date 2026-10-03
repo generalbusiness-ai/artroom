@@ -30,8 +30,11 @@ type Acts = Readonly<Record<string, ActDeclaration>>;
 /** The setlist's acts with another label on `start-song`: a new policy version with the same kinds. */
 const relabelled = (label: string): Acts => ({ ...SETLIST_ACTS, "start-song": { ...SETLIST_ACTS["start-song"]!, label } });
 
+/** A catalogue's policy version; null for no catalogue, so that a missing one fails an expectation, not a property read. */
+const policyOf = (c: Catalogue | null) => (c === null ? null : c.policy);
+
 /** The label a catalogue gives `start-song`. */
-const labelOf = (c: Catalogue | null) => (c as ActsCatalogue).acts["start-song"]!.declaration.label;
+const labelOf = (c: Catalogue | null) => (c !== null && c.vocabulary === "declared" ? c.acts["start-song"]!.declaration.label : null);
 
 function gate<T = void>() {
   let open!: (v: T) => void;
@@ -128,11 +131,11 @@ describe("an explicit read of the declarations that is answered late (R-DECL-23)
     expect(later.seq).toBeGreaterThan(fresh.since);
     held.release();
     // The late caller is given the catalogue the page holds, not the one its own question read.
-    expect((await early)!.policy).toBe(version);
-    expect(adapter.snapshot()!.catalogue!.policy).toBe(version);
+    expect(policyOf(await early)).toBe(version);
+    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
     expect(adapter.snapshot()!.policy).toMatchObject({ version, activatedAt: fresh.since });
     // A record accepted after the activation is read under the policy that governs it.
-    expect((await adapter.catalogueAt(later.seq))!.policy).toBe(version);
+    expect(policyOf(await adapter.catalogueAt(later.seq))).toBe(version);
     expect(labelOf(await adapter.catalogueAt(later.seq))).toBe("Begin a tune");
   });
 
@@ -147,11 +150,11 @@ describe("an explicit read of the declarations that is answered late (R-DECL-23)
       return read();
     };
     const early = adapter.readCatalogue();
-    expect((await adapter.readCatalogue())!.policy).toBe(first.policy);
+    expect(policyOf(await adapter.readCatalogue())).toBe(first.policy);
     const version = await room.activate({ acts: relabelled("Begin a tune") });
     wait.open();
-    expect((await early)!.policy).toBe(version);
-    expect(adapter.snapshot()!.catalogue!.policy).toBe(version);
+    expect(policyOf(await early)).toBe(version);
+    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
   });
 
   test("a lost answer that arrives after a later activation was confirmed does not blank the catalogue", async () => {
@@ -160,10 +163,10 @@ describe("an explicit read of the declarations that is answered late (R-DECL-23)
     const early = adapter.readCatalogue();
     await held.asked;
     const version = await room.activate({ acts: relabelled("Begin a tune") });
-    expect((await adapter.readCatalogue())!.policy).toBe(version);
+    expect(policyOf(await adapter.readCatalogue())).toBe(version);
     held.release();
-    expect((await early)!.policy).toBe(version);
-    expect(adapter.snapshot()!.catalogue!.policy).toBe(version);
+    expect(policyOf(await early)).toBe(version);
+    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
   });
 
   test("a lost answer with nothing confirmed in between still means the declarations are not available", async () => {
@@ -202,15 +205,15 @@ describe("a load of the room whose catalogue is answered late (R-DECL-23)", () =
     expect((await held.asked).policy).toBe(first.policy);
     const version = await room.activate({ acts: relabelled("Begin a tune") });
     const fresh = (await adapter.readCatalogue()) as ActsCatalogue;
-    expect(adapter.snapshot()!.catalogue!.policy).toBe(version);
+    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
     const later = await song(room, fresh, "two");
     const before = seen.count();
     held.release();
     await waitFor(() => expect(seen.count()).toBeGreaterThan(before));
     seen.off();
-    expect(adapter.snapshot()!.catalogue!.policy).toBe(version);
+    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
     expect(adapter.snapshot()!.policy).toMatchObject({ version, activatedAt: fresh.since });
-    expect((await adapter.catalogueAt(later.seq))!.policy).toBe(version);
+    expect(policyOf(await adapter.catalogueAt(later.seq))).toBe(version);
     // The record from before the activation is still read under its own version.
     const one = adapter.snapshot()!.feed.find((e) => e.type === "act")!;
     expect(one.meaning!.label).toBe("Start a song");
@@ -228,7 +231,7 @@ describe("a load of the room whose catalogue is answered late (R-DECL-23)", () =
     held.release();
     await waitFor(() => expect(seen.count()).toBeGreaterThan(before));
     seen.off();
-    expect(adapter.snapshot()!.catalogue!.policy).toBe(version);
+    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(version);
     expect(adapter.snapshot()!.source.status).toBe("live");
   });
 
@@ -244,15 +247,15 @@ describe("a load of the room whose catalogue is answered late (R-DECL-23)", () =
     // This act starts a load. It reads the second version as active, then waits on the held question.
     await adapter.act("start-song", null, { scope: ["songs/two/**"], title: "Two", key: "c", tempo: 120 }, mid.acts["start-song"]!.binding);
     await tail.asked;
-    expect(adapter.snapshot()!.catalogue!.policy).toBe(second);
+    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(second);
     const third = await room.activate({ acts: relabelled("Call a tune") });
-    expect((await adapter.readCatalogue())!.policy).toBe(third);
+    expect(policyOf(await adapter.readCatalogue())).toBe(third);
     const before = seen.count();
     tail.release();
     await waitFor(() => expect(seen.count()).toBeGreaterThan(before));
     await waitFor(() => expect(adapter.snapshot()!.feed.filter((e) => e.type === "act")).toHaveLength(2));
     seen.off();
-    expect(adapter.snapshot()!.catalogue!.policy).toBe(third);
+    expect(policyOf(adapter.snapshot()!.catalogue)).toBe(third);
     expect(adapter.snapshot()!.policy.version).toBe(third);
     expect(labelOf(adapter.snapshot()!.catalogue)).toBe("Call a tune");
   });
@@ -271,7 +274,7 @@ describe("a load of the room whose catalogue is answered late (R-DECL-23)", () =
     const seen = notices(adapter);
     await adapter.act("start-song", null, { scope: ["songs/two/**"], title: "Two", key: "c", tempo: 120 }, first.acts["start-song"]!.binding);
     await tail.asked;
-    expect((await adapter.readCatalogue())!.policy).toBe(first.policy);
+    expect(policyOf(await adapter.readCatalogue())).toBe(first.policy);
     const before = seen.count();
     tail.release();
     await waitFor(() => expect(seen.count()).toBeGreaterThan(before));
@@ -311,7 +314,7 @@ describe("an earlier version's declarations answered late: the page keeps none o
     const later = await song(room, fresh, "after");
     held.release();
     expect(await pending).toEqual(ended);
-    expect((await adapter.catalogueAt(later.seq))!.policy).toBe(fresh.policy);
+    expect(policyOf(await adapter.catalogueAt(later.seq))).toBe(fresh.policy);
     const again = (await adapter.catalogueAt(first.since)) as ActsCatalogue;
     expect(again.acts["cue"]!.retired).toBe(fresh.since);
     expect(held.count()).toBe(2);
