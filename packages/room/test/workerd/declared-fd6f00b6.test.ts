@@ -214,6 +214,9 @@ describe.skipIf(DECLARED)("step 4a: kind-undeclared and binding-stale, unrecorde
     const other = await signed(r, r.admin, "claim", null, { goal: "other", scope: ["docs/**"] }, { binding, ikey: (claim.envelope as unknown as { idempotencyKey: string }).idempotencyKey });
     expect((await failure(r.stub.submit(other))).code).toBe("bad-request");
     expect((await failure(r.stub.submit({ envelope: claim.envelope, sig: late.sig } as never))).code).toBe("bad-request");
+    // Nor the exact envelope and signature with an extra outer field: the outer shape is closed for a retry as for a new act.
+    expect((await failure(r.stub.submit({ ...claim, extra: 1 } as never))).code).toBe("bad-request");
+    expect(await call(r.stub.submit(claim))).toEqual(accepted);
     expect(seq1).toBeGreaterThan(seq);
     expect(await headSeq(r)).toBe(seq1);
   });
