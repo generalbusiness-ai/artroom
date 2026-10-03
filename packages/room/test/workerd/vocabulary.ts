@@ -23,7 +23,6 @@
  *   per test, so the report lists every converted test from the run itself.
  */
 
-import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { expect } from "vitest";
 import type { PolicyDocument, Role, RoomId } from "@generalbusiness/artroom-contract";
@@ -32,7 +31,15 @@ import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
 
 /** True in the declared run. */
-export const DECLARED = (env as unknown as { ARTROOM_TEST_VOCABULARY?: string }).ARTROOM_TEST_VOCABULARY === "code-review";
+export let DECLARED = false;
+
+/** Start the declared run in this test file. Call it before the witness files are loaded. */
+export function runDeclared(): void {
+  DECLARED = true;
+}
+
+/** How many tests each conversion was applied in, so far in this test file. */
+export const applied: Record<Conversion, number> = { documents: 0, bindings: 0, recover: 0, "checker-v2": 0, "grant-maps": 0 };
 
 export type Conversion = "documents" | "bindings" | "recover" | "checker-v2" | "grant-maps";
 
@@ -44,7 +51,7 @@ export function converted(c: Conversion): void {
   const key = `${c}\u0000${test}`;
   if (logged.has(key)) return;
   logged.add(key);
-  console.log(`[declared-conversion] ${c} :: ${test}`);
+  applied[c]++;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
