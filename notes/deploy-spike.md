@@ -867,9 +867,18 @@ and `npm test` and passed), the lane landed, the log was published and
 no repository left. Record:
 [spike-smoke-2026-10-03T02-23-15-764Z.json](../packages/room/measure/results/spike-smoke-2026-10-03T02-23-15-764Z.json).
 So both services answered, through the Room's own service binding, with
-the four resources gone. Nothing else
-on the account was touched: no other Worker, application, namespace,
-registry image or token. The before and after listings and the four
+the four resources gone.
+
+Two separate things happened on the account, and they are bounded
+differently. The deletions removed the four resources named above and
+nothing else: no other Worker, application, namespace, registry image or
+token (condition (2) of request 167a8ae6). The verification run, as every
+smoke run does, created one throwaway repository and its short-lived
+tokens in the spike namespace `gitseq-spike-import` and removed all of
+them before it ended (`cleanup ok`, `repositories left []`, `unresolved
+0`); that fixture lifecycle is the agreed way to verify the spike at
+runtime and is covered by the standing instruction for spike work
+(planner amendment `42168fff` on request 167a8ae6). The before and after listings and the four
 deletion receipts, with account identifiers reduced to Worker names,
 created and modified times, are kept outside the repository for the
 review at `/tmp/artroom-builder-orphans-f77ebf20/`.
