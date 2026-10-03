@@ -951,7 +951,7 @@ The fork read token in `pinObjects` (request `02836f9a`). `MintLedger`'s behavio
 
 ## Mint lane F (request 02836f9a)
 
-Status: DONE, pending checker exact-head review. Gitseq request `02836f9a`, branch `request/fork-token`, cut from main `965c911a`. The approved mint ownership design ([notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), "Out of scope", review `ad6cc052`) left one token outside every ledger: the 600-second read token that `Pinning.pinObjects` mints on the lane's fork. It had a hidden retry (`withRetry` around a create that may have applied) and a dropped revocation. This lane gives it a ledger owned by the fork's owner, and applies [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-2 to R-MINT-7) to it by analogy. The head for review is the commit that carries this section.
+Status: DONE, pending checker exact-head review. Gitseq request `02836f9a`, branch `request/fork-token`, cut from main `965c911a`, with main `58a2f0a0` merged in (merge `31ec8a77`; see [The merge with main 58a2f0a0](#the-merge-with-main-58a2f0a0)). The approved mint ownership design ([notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md), "Out of scope", review `ad6cc052`) left one token outside every ledger: the 600-second read token that `Pinning.pinObjects` mints on the lane's fork. It had a hidden retry (`withRetry` around a create that may have applied) and a dropped revocation. This lane gives it a ledger owned by the fork's owner, and applies [docs/protocol.md](../docs/protocol.md) section 32 (R-MINT-2 to R-MINT-7) to it by analogy. The head for review is the commit that carries this section.
 
 **Scope.** New: `packages/git/src/workspace/fork-tokens.ts` (the ledger), `packages/git/test/fork-tokens.test.ts` (28 Node tests) and `packages/room/test/workerd/fork-token-02836f9a.test.ts` (7 Durable Object tests). Changed: `packages/git/src/workspace/workspaces.ts` (builds and owns the ledger, checks provenance for it, keeps its held tokens in the fork's sweep, two token indexes), `publisher/client.ts` (`withForkToken` removed; `Pinning` takes the ledger), `mints.ts` (exports `MINT_RETRY`, the retry limits, unchanged), `index.ts` (exports), the Git harness (`measure/harness/worker.ts`), `packages/room/src/artifacts.ts` and `core.ts` (the adapter passes the ledger; a `forkTokens` step and loop kind; `nextAlarm`), the source scan (`test/node/mint-sites-scan.test.ts`), and the two package READMEs. No Room migration. Nothing was deployed, no live Cloudflare call was made, and no credential was created, rotated or used.
 
@@ -1021,9 +1021,15 @@ Node: `packages/git/test/fork-tokens.test.ts`, 28 tests (F1 to F22), against a f
 | Safe metadata at the sinks | F9, R2 |
 | Duties pageable, without token text (R-MINT-5) | F14 |
 
+### The merge with main 58a2f0a0
+
+Main `58a2f0a0` (request `8bd623cc`, row-write measurements, after the orphan retirement record `d3f7d3a8`) changed `nextAlarm()` in `packages/room/src/core.ts`: one bounded existence check for pins on the default path, and one delayed-pin due read, passed into `loopPendingKinds`, when `PIN_DELAY_MS` is set. The merge was textually clean (merge `31ec8a77`; `git diff --check origin/main` is clean). In the merged `nextAlarm()`, the fork token ledger is its own term of the same earliest-first minimum, beside the delayed pin, the mint ledger, the error upgrade, the job-token pass and the check jobs.
+
+The composed scheduler is tested in `packages/room/test/workerd/pin-delay.test.ts`, "set, composed with mint lane F (request 02836f9a) …", beside main's lane C composition test. With each ledger's due time set directly: the fork token ledger wins when it is earliest; each of the other five wins when earlier than it; its own `forkTokens` backoff holds it, and only it (the pins', mint ledger's and job-token pass's backoffs do not); and the repository-gone fence (`canonical_gone`) holds the pin, the mint ledger and the job-token pass but not the fork token ledger, whose own backoff still holds it while the repository is gone. So two things hold the fork token ledger's candidate back: its own backoff after a failure of its step, and a room not yet founded (`nextAlarm()` reads no workspaces then; before founding the Room schedules `unfoundedDue()` instead). Mutants K1 to K5 were run again against both Room files, with K6 and K7 added (below).
+
 ### Mutation table
 
-Each mutant was applied alone by a script (`/private/tmp/claude-501/-Users-hughpyle-play-gitseq/3a928963-7b06-44e6-b22a-1b24ab3c0e34/scratchpad/mutants.py`) to the committed tree, the named suites were run (N: the Node file; R: the Room file; S: the source scan), and the file was restored from its saved text; the tree was clean after each run. 45 mutants, all red. Every test in both new files is red under at least one. A first run at `adceb503` had 44 mutants and one survivor, L30: the pass's own expiry check already avoided a lookup, so F22 did not show what the settle-only pass is for. F22 now holds another record's revocation and checks that the expired record is settled at once. The 44 were run again at `873b5044`, and L34 was added for F6.
+Each mutant was applied alone by a script (`/private/tmp/claude-501/-Users-hughpyle-play-gitseq/3a928963-7b06-44e6-b22a-1b24ab3c0e34/scratchpad/mutants.py`) to the committed tree, the named suites were run (N: the Node file; R: the Room file; S: the source scan), and the file was restored from its saved text; the tree was clean after each run. 47 mutants, all red. Every test in both new files is red under at least one. A first run at `adceb503` had 44 mutants and one survivor, L30: the pass's own expiry check already avoided a lookup, so F22 did not show what the settle-only pass is for. F22 now holds another record's revocation and checks that the expired record is settled at once. The 44 were run again at `873b5044`, and L34 was added for F6. After the merge with main `58a2f0a0`, K1 to K5 were run again at `ab936154` against the lane's Room file (R) and `pin-delay.test.ts` (P), and K6 and K7 were added; K2 is the mutant that drops the fork token ledger's candidate from `nextAlarm()`.
 
 | Mutant | File | Mutation | Suites | Red tests |
 |---|---|---|---|---|
@@ -1067,30 +1073,33 @@ Each mutant was applied alone by a script (`/private/tmp/claude-501/-Users-hughp
 | O4 | `workspaces.ts` | the owner: its token indexes not made | N, R | F17 |
 | O5 | `workspaces.ts` | the owner: with no wake-up store, the fork token is still sent | N, R | F18 |
 | C1 | `client.ts` | pinObjects mints the fork token directly, outside the ledger (as before) | S, R | R1, R2, R3, R4, R5, R6, source scan (3) |
-| K1 | `core.ts` | the Room: the forkTokens step does nothing | R | R1, R2, R3, R4, R6, R7 |
-| K2 | `core.ts` | the Room: nextAlarm leaves out the fork ledger | R | R1, R7 |
-| K3 | `core.ts` | the Room: the step ignores its fence | R | R7 |
-| K4 | `core.ts` | the Room: nextAlarm ignores the fence | R | R7 |
-| K5 | `core.ts` | the Room: the fork ledger's kind not self-timed | R | R7 |
+| K1 | `core.ts` | the Room: the forkTokens step does nothing | R, P | R1, R2, R3, R4, R6, R7 |
+| K2 | `core.ts` | the Room: nextAlarm leaves out the fork ledger (its candidate dropped) | R, P | R1, R7, P (composed with mint lane F) |
+| K3 | `core.ts` | the Room: the step ignores its fence | R, P | R7 |
+| K4 | `core.ts` | the Room: nextAlarm ignores the fence | R, P | R7, P (composed with mint lane F) |
+| K5 | `core.ts` | the Room: the fork ledger's kind not self-timed | R, P | R7 |
+| K6 | `core.ts` | the Room: the fork ledger's candidate fenced while the canonical repository is gone | R, P | P (composed with mint lane F) |
+| K7 | `core.ts` | the Room: the fork ledger's candidate takes another kind's backoff (the mint ledger's) | R, P | R7, P (composed with mint lane F) |
 
 ### Gates
 
-Run serially under bash at `873b5044` (the code head; this head differs from it only in this file), by `gates.sh` in the scratch directory, each exit code recorded. The same gates run again at this head; their exit codes are in the delivery report.
+Run serially under bash at `ab936154` (the code head after the merge; this head differs from it only in this file), by `gates.sh` in the scratch directory, each exit code recorded. The same gates run again at this head; their exit codes are in the delivery report. Before the merge, the same gates passed at `873b5044` (Git Node 332, Room node 202, Room workerd 518).
 
 | Gate | Exit | Tests |
 |---|---|---|
 | `npm ci` | 0 | |
 | `npm run typecheck` (root) | 0 | |
-| `npm test` (root) | 0 | every workspace's `test`: Git Node 332; Room node 202 and workerd 518; the other packages as on main |
+| `npm test` (root) | 0 | every workspace's `test` |
 | `npm run typecheck -w @generalbusiness/artroom-git` | 0 | |
-| `npm test -w @generalbusiness/artroom-git` (Node) | 0 | 332 passed, 0 failed (304 on main plus the 28 of `fork-tokens.test.ts`) |
+| `npm test -w @generalbusiness/artroom-git` (Node) | 0 | 332 passed, 0 failed (the 28 of `fork-tokens.test.ts` among them) |
 | `npm run test:workers -w @generalbusiness/artroom-git` | 0 | 11 passed |
 | `npm run typecheck -w @generalbusiness/artroom-room` | 0 | |
-| `npm run test:node -w @generalbusiness/artroom-room` | 0 | 202 passed (15 files) |
-| `npm run test:workerd -w @generalbusiness/artroom-room` | 0 | 518 passed (39 files; 511 on main plus the 7 of `fork-token-02836f9a.test.ts`) |
+| `npm run test:node -w @generalbusiness/artroom-room` | 0 | 237 passed (17 files) |
+| `npm run test:workerd -w @generalbusiness/artroom-room` | 0 | 537 passed (41 files; the 7 of `fork-token-02836f9a.test.ts` and the composed `pin-delay.test.ts` test among them) |
 | `npm exec -w @generalbusiness/artroom-room -- wrangler deploy --dry-run` | 0 | bundles only; nothing uploaded |
 | The Git harness: `tsc` with a scratch tsconfig over `src` and `measure/harness/worker.ts` | 0 | |
 | The Git harness: `wrangler deploy --dry-run -c measure/harness/wrangler.jsonc` | 0 | bundles only; nothing uploaded |
+| `git diff --check origin/main` | 0 | |
 
 The tree was clean before and after the gates.
 
