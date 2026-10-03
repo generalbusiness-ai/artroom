@@ -1,6 +1,0 @@
-{
-  "head": "acd6917a8f9a1b8fbbbf48886e28f367dae96554",
-  "base": "b359e2787da33937809bb52d3c65441eb8983e9b",
-  "tree": "768f6b32a2e7fab77c18ead7dbb2a54645931024",
-  "source": "local immutable git clone --no-hardlinks; no dependency install or runtime execution"
-}
