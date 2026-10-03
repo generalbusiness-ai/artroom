@@ -48,29 +48,26 @@ export const REQUIRED_CLASSES = {
 };
 
 /**
- * Ceilings grounded on the spike, 2026-10-02 (measure/README.md, "Ceilings").
- * Each is the measured value times a headroom factor, rounded up to two
- * significant figures.
+ * Ceilings grounded on the spike after the idle-write fix (request 3da1d82b),
+ * 2026-10-03 (measure/README.md, "Ceilings"). Each is the measured value
+ * times a headroom factor, rounded up to two significant figures.
  *
  * SMOKE_BUDGET is for one full smoke run, from its start to two minutes
- * after its cleanup. The clean run spike-smoke-2026-10-02T18-47-09-470Z
- * wrote 2,284 rows in total (1,301 by its three rooms, 983 by 15 older idle
- * rooms) and at most 508 in one object. Headroom 4: 9,136 -> 9,200 and
- * 2,032 -> 2,100.
+ * after its cleanup. The clean run spike-smoke-2026-10-03T00-54-30-069Z
+ * wrote 1,270 rows in total, all by its own three rooms (idle rooms now
+ * write nothing), and at most 489 in one object. Headroom 4: 5,080 -> 5,100
+ * and 1,956 -> 2,000. (Before the fix: 2,284 and 508, of which 983 were the
+ * idle rooms' background; the ceilings were 9,200 and 2,100.)
  *
- * HOURLY_BUDGET is for the scheduled check's hour. The hour 17:50-18:50
- * wrote 11,285 rows in total, 1,034 at most in one object, while measured
- * runs were active and 17 rooms existed. Headroom 2: 22,570 -> 23,000 and
- * 2,068 -> 2,100.
- *
- * Both totals include the idle rooms' background (about 720 rows an hour
- * each; see the README), which grows with every room made. Until that
- * background is removed, the totals are exceeded once enough rooms exist:
- * that is the alert working, not a ceiling to raise.
+ * HOURLY_BUDGET is for the scheduled check's hour. The busiest hour measured
+ * after the fix, 2026-10-02T23:50 to 00:50 (the activation measurement: six
+ * landings and three open lanes in one room), wrote 2,514 rows in total and
+ * 1,780 in one object. Headroom 2: 5,028 -> 5,100 and 3,560 -> 3,600.
+ * (Before: 23,000 and 2,100, grounded on an hour with the idle storm.)
  */
 export const HEADROOM = Object.freeze({ smoke: 4, hourly: 2 });
-export const SMOKE_BUDGET = Object.freeze({ maxRowsWritten: 9_200, maxRowsWrittenPerObject: 2_100 });
-export const HOURLY_BUDGET = Object.freeze({ maxRowsWritten: 23_000, maxRowsWrittenPerObject: 2_100 });
+export const SMOKE_BUDGET = Object.freeze({ maxRowsWritten: 5_100, maxRowsWrittenPerObject: 2_000 });
+export const HOURLY_BUDGET = Object.freeze({ maxRowsWritten: 5_100, maxRowsWrittenPerObject: 3_600 });
 /** Wait this long after the last act before closing a billing window: samples are stamped when emitted, after the writes. */
 export const SETTLE_MS = 120_000;
 /** GraphQL's per-query row limit; a result this long may be truncated. */
@@ -398,7 +395,7 @@ export async function querySamples({ accountId, token, worker, from, to, require
       invocations.push({ className: ns.className, objectId: d.objectId, minute: d.datetimeMinute, requests: billed(g.sum?.requests, "requests", label) });
     }
   }
-  return { worker, from, to, sampledFrom: start, samples, invocations };
+  return { worker, from, to, sampledFrom: start, namespaces: namespaces.map(({ id, name, className }) => ({ id, name, className })), samples, invocations };
 }
 
 const median = (xs) => {
@@ -431,14 +428,20 @@ export function windowTable(windows, { samples, invocations }, room) {
     return end > Date.parse(w.from) && end <= Date.parse(w.to);
   };
   const sum = (xs, k) => xs.reduce((a, x) => a + x[k], 0);
+  // Quiet control windows (kind "quiet"), when the run has them, give the baseline: the room's mean per sample in
+  // them. Without controls (the first runs, with a background of 7 rows a minute), the smallest non-empty sample in
+  // the window stands in for a quiet minute.
+  const controls = own.filter((s) => windows.some((w) => w.kind === "quiet" && endIn(w)(s)));
+  const mean = (k) => (controls.length ? sum(controls, k) / controls.length : null);
+  const controlled = controls.length > 0 ? { w: mean("rowsWritten"), r: mean("rowsRead") } : null;
   return windows.map((w) => {
     const inW = endIn(w);
     const mine = own.filter(inW);
     const all = samples.filter(inW);
     // An empty interval (an eviction restarted the cadence) is not a quiet minute.
-    const quiet = mine.filter((s) => s.rowsWritten > 0 || s.rowsRead > 0);
-    const bw = quiet.length ? Math.min(...quiet.map((s) => s.rowsWritten)) : null;
-    const br = quiet.length ? Math.min(...quiet.map((s) => s.rowsRead)) : null;
+    const quiet = controlled ? mine : mine.filter((s) => s.rowsWritten > 0 || s.rowsRead > 0);
+    const bw = controlled ? controlled.w : quiet.length ? Math.min(...quiet.map((s) => s.rowsWritten)) : null;
+    const br = controlled ? controlled.r : quiet.length ? Math.min(...quiet.map((s) => s.rowsRead)) : null;
     const perMinute = invocations.filter((i) => roomIds.has(i.objectId) && Date.parse(i.minute) >= Date.parse(w.from) && Date.parse(i.minute) < Date.parse(w.to)).map((i) => i.requests);
     const other = all.filter((s) => !(s.className === "Room" && s.name === room) && s.className !== "Registry" && s.className !== "Publisher");
     return {
@@ -460,7 +463,8 @@ export function windowTable(windows, { samples, invocations }, room) {
       publisherRead: sum(all.filter((s) => s.className === "Publisher"), "rowsRead"),
       otherWritten: sum(other, "rowsWritten"),
       ...(w.note ? { note: w.note } : {}),
-      ...(quiet.length < 2 ? { caution: "fewer than two non-empty samples of the room: no quiet baseline in the window" } : {}),
+      baseline: controlled ? "quiet controls" : "smallest sample in the window",
+      ...(!controlled && quiet.length < 2 ? { caution: "fewer than two non-empty samples of the room: no quiet baseline in the window" } : {}),
     };
   });
 }

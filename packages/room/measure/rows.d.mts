@@ -69,7 +69,8 @@ export interface GateResult extends Decision {
 
 export interface Window {
   readonly name: string;
-  readonly kind: "act" | "setup" | "idle";
+  readonly kind: "act" | "setup" | "idle" | "quiet";
+  readonly room?: string;
   readonly from: string;
   readonly to: string;
   readonly note?: string;
@@ -97,6 +98,7 @@ export interface Samples {
   readonly from: string;
   readonly to: string;
   readonly sampledFrom: string;
+  readonly namespaces: readonly { readonly id: string; readonly name: string; readonly className: string }[];
   readonly samples: readonly Sample[];
   readonly invocations: readonly MinuteInvocations[];
 }
@@ -114,6 +116,8 @@ export interface TableRow {
   readonly actWritten: number | null;
   readonly actRead: number | null;
   readonly roomInvocationsPerMinute: number | null;
+  /** Where the baseline came from: the run's quiet control windows, or the smallest sample in the window. */
+  readonly baseline: "quiet controls" | "smallest sample in the window";
   readonly registryWritten: number;
   readonly registryRead: number;
   readonly publisherWritten: number;

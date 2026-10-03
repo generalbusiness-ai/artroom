@@ -919,8 +919,10 @@ file):
 | policy activation alone, with 3 open | not yet measured (one subtraction gave about 40) |
 | one publication | 7 |
 
-Four isolated measurements are **not yet measured**: a check, an idle
-alarm tick, an alarm tick with a pending pin, and policy activation alone.
+Four isolated measurements were **not yet measured** at the time of this
+section: a check, an idle alarm tick, an alarm tick with a pending pin, and
+policy activation alone. They are measured in "Isolated measurements"
+below.
 Review 28615b74 asked for them, with billing evidence and controls. They
 will be measured after the idle-write fix is deployed. The methods are in
 `packages/room/measure/README.md`, "Not yet measured".
@@ -1071,3 +1073,57 @@ Logs could not be read to confirm it.
 | root `npm ci` | 0 | — |
 | root `npm run typecheck` | 0 | — |
 | root `npm test` | 0 | checkers 43; cli 162; client 88 Node and 2 workerd; git 225; log 198 Node and 193 workerd; mcp 73 Node and 5 workerd; policy 199 Node and 198 workerd (1 skipped); room 138 Node and 411 workerd; ui 141 |
+
+## Isolated measurements, the pin switch window, and re-grounded ceilings (request 8bd623cc, 2026-10-02 and 03)
+
+The merge of this lane with main `25a7b837` (the idle-write fix,
+`e50e062a`) passed its gates before it was deployed. I was the only user
+of the spike.
+
+**Deploys** (`deploy-spike.sh`, with hugh's OAuth):
+
+| Time (UTC) | Room version | Checkers version | `PIN_DELAY_MS` |
+|---|---|---|---|
+| 2026-10-02 22:02:51 | `474f4529` | `8a144b6b` | 360000 (measurement window) |
+| 2026-10-02 23:12:45 | `59636ae9` | `bb94561a` | unset |
+
+The switch was set for 70 minutes. The full smoke at 00:54 checked that it
+was off: "the propose wrote its pinned ref itself (PIN_DELAY_MS unset)"
+passed. Under the switch, a landing did not finish within 300 s, so the
+first `activation` run (23:00) was stopped. Its repositories were deleted
+by hand. `check` and `activation` were then run again after the unset.
+
+**Results.** Each is in a room of its own, with controls. The details are
+in [packages/room/measure/results/row-costs-2026-10-02.md](../packages/room/measure/results/row-costs-2026-10-02.md),
+"Isolated measurements".
+
+| Measurement | Written | Read |
+|---|---|---|
+| An alarm tick with one pending pin | 2 (including the switch's own due-time row) | 136 |
+| An alarm tick with nothing pending | 0 | 202 |
+| A check, admitted on its own | 17 (two runs) | 320 and 349 |
+| Policy activation, N = 0 | 12.7 (2 to 20) | 823 |
+| Policy activation, N = 3 | 33.3 (31 to 37), about 6.9 for each open proposal | 905 |
+
+Every quiet control window wrote 0 rows, and idle rooms wrote nothing.
+
+**Clean smoke** (00:54, `ARTROOM_ROW_GATE=1`): ok. The gate passed with
+1,270 rows written, all of them by the run's own three rooms; the largest
+object wrote 489. Before the fix the same run wrote 2,284.
+
+**Ceilings re-grounded**, because the smoke run's total fell by 44%:
+- `SMOKE_BUDGET` is now 5,100 total and 2,000 per object (was 9,200 and
+  2,100).
+- `HOURLY_BUDGET` is now 5,100 and 3,600 (was 23,000 and 2,100), from the
+  busiest hour after the fix: 2,514 and 1,780.
+- The idempotency quota in `src/budgets.ts` follows the hourly ceiling:
+  16,384 per room (was 8,192).
+
+**All cleanups reported ok.** The stopped run's repositories were deleted
+by hand.
+
+**Known, not yet measured:** lane C's publication tokens. Once lane C
+lands, a failing publication mints 11 canonical tokens on each retry, at 4
+ledger records each: about 44 rows per retry, or about 528 rows an hour at
+12 retries an hour. Measure it when lanes B and C are deployed.
+

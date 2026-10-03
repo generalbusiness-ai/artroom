@@ -5,21 +5,22 @@ for the table plus one row for each secondary index the write touches. No
 counter in the application sees that, so the gate asks Cloudflare's billing
 datasets. This follows woo's gate (woo commits 6d2c425a and 50163fc1).
 
-Where each part stands (review 28615b74 asked for changes):
+Where each part stands:
 
 - **Part 2 is built.** That is the gate, its use in the smoke run, the
   scheduled check, and the part 1 driver. Review 28615b74's code findings
   are fixed.
-- **Part 1 is partly done.** The driver ran against the spike on
-  2026-10-02. The acts measured are in
-  [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md). Four
-  isolated measurements are **not yet measured**: a check, an idle alarm
-  tick, an alarm tick with a pending pin, and policy activation alone. See
-  "Not yet measured".
-- **Part 3 is provisional.** The budgets in
-  [../src/budgets.ts](../src/budgets.ts) come from the acts that were
-  measured. The alarm budget will be checked again once the idle tick is
-  measured after the idle-write fix.
+- **Part 1 is measured.** The acts are in
+  [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md).
+  That includes the four isolated measurements that review 28615b74 asked
+  for: a check, an idle alarm tick, an alarm tick with a pending pin, and
+  policy activation alone. They were measured on 2026-10-02 and 03, after
+  the idle-write fix.
+- **One cost is known but not yet measured.** Lane C makes a failing log
+  publication mint canonical tokens (see "What remains").
+- **Part 3 is set from the table.** The budgets are in
+  [../src/budgets.ts](../src/budgets.ts). The idempotency quota follows
+  the re-grounded hourly ceiling.
 
 See "What remains".
 
@@ -160,26 +161,26 @@ when it sends it, which can be after the write. This is woo's fix in
 
 ## Ceilings
 
-The ceilings come from a clean measured run on the spike, 2026-10-02. Each
-is the measured value times a headroom factor, rounded up to two
-significant figures. `rows.test.ts` derives them again from those figures.
+The ceilings were re-grounded on 2026-10-03, after the idle-write fix
+(request 3da1d82b). Each is the measured value times a headroom factor,
+rounded up to two significant figures. `rows.test.ts` derives them again
+from those figures.
 
-| Budget | Used by | Measured | Headroom | Ceiling (total / per object) |
-|---|---|---|---|---|
-| `SMOKE_BUDGET` | One full smoke run, from its start to 2 minutes after cleanup | 2,284 / 508 (spike-smoke-2026-10-02T18-47-09-470Z) | 4 | 9,200 / 2,100 |
-| `HOURLY_BUDGET` | The scheduled check's hour, by default | 11,285 / 1,034 (17:50 to 18:50, with measured runs active and 17 rooms) | 2 | 23,000 / 2,100 |
+| Budget | Used by | Measured (total / per object) | Headroom | Ceiling (total / per object) | Before the fix |
+|---|---|---|---|---|---|
+| `SMOKE_BUDGET` | One full smoke run, from its start to 2 minutes after cleanup | 1,270 / 489 (spike-smoke-2026-10-03T00-54-30-069Z) | 4 | 5,100 / 2,000 | 9,200 / 2,100, from 2,284 / 508 |
+| `HOURLY_BUDGET` | The scheduled check's hour, by default | 2,514 / 1,780 (23:50 to 00:50: the activation measurement, six landings and three open lanes in one room) | 2 | 5,100 / 3,600 | 23,000 / 2,100, from 11,285 / 1,034 |
+
+**Why re-ground.** The smoke run's total fell by 44%, from 2,284 to 1,270.
+The 983 rows that used to come from idle rooms are gone: in the clean run,
+only the run's own three rooms wrote anything. Ceilings left at the old
+values would no longer catch a regression of that size.
 
 **Why 4 for a smoke run.** The same act measured within 6 rows across runs.
-Most of the margin is for the idle rooms' background: 983 of the 2,284
-rows. Every smoke run adds three rooms to it.
+The margin also covers the run's variable timing, such as landing retries.
 
-**Why 2 for an hour.** That hour already holds the background of 17 rooms
-(about 720 rows an hour each). A smaller factor alerts sooner as the
-background grows.
-
-Both totals will be exceeded once enough idle rooms exist, until the
-background is removed (results, Findings 1 and 2). That is the alert
-working; it is not a reason to raise the ceiling.
+**Why 2 for an hour.** That hour was a deliberately busy one. An ordinary
+hour on the spike is now 0 rows when it is idle.
 
 ## The smoke run
 
@@ -273,31 +274,36 @@ table in the run's JSON.
 The table and its method are in
 [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md).
 
-### Not yet measured
+### Isolated measurements
 
 Review 28615b74 asked for four isolated measurements, each with billing
-evidence: rows written and read, the windows and namespaces it recorded,
-and controls. None of the four is done yet:
+evidence: rows written and read, the windows and namespaces recorded, and
+controls. All four were measured on the spike from 2026-10-02 22:02 to
+2026-10-03 00:52 UTC, after the idle-write fix (Room code `e50e062a`). The
+figures, the run files and the evidence are in
+[results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md),
+"Isolated measurements".
 
-| Measurement | Status | What blocks it |
-|---|---|---|
-| A check | **not yet measured** | The checker service admitted its check 9 s after the propose, inside the same one-minute sample, so its cost could not be separated. |
-| An idle alarm tick (nothing pending) | **not yet measured** | Alarms do not appear in the invocations dataset. Every idle minute holds a checkpoint publication, so no quiet minute exists to compare with. The idle-write fix changes this figure. |
-| An alarm tick with one pending pin | **not yet measured** | On the deployed code, the commit that admits a propose writes the pin itself, so no alarm tick ever finds a pin pending. The approved switch, `PIN_DELAY_MS` (below), is built and tested, but not yet deployed. |
-| Policy activation alone, with N open proposals | **not yet measured** | Activation is sealed in the landing's own transaction. Its only figure so far (about 40 written) is one subtraction across two rooms. It has no repetition and no control. |
+| Measurement | Rows written | Rows read | Controls |
+|---|---|---|---|
+| A check, admitted on its own | 17 (two runs: 17, 17) | 320, 349 | Quiet windows of 5 minutes before and after: 0 written. |
+| An idle alarm tick (nothing pending) | 0 | 202 | Quiet windows before and after: 0 written and 0 read. |
+| An alarm tick with one pending pin | 2 (including deleting the switch's due-time row) | 136 | Quiet windows before and after: 0. |
+| Policy activation with N open proposals, measured as policy landing minus plain landing in the same room | N = 0: 12.7 on average (2 to 20). N = 3: 33.3 on average (31 to 37). So about 7 for each open proposal. | N = 0: 823 (581 to 1,021). N = 3: 905 (617 to 1,102). | The plain landing next to each policy landing, three repetitions each. |
 
-All four will be measured on the spike after the idle-write fix is
-deployed. With that fix, a quiet minute should cost nothing, so an act
-stands out against it.
-
-**What every isolated measurement has.**
+**What every isolated measurement has.** These are the driver's modes, as
+they ran.
 
 - **Its own rooms.** Each mode founds rooms of its own, so no other act's
   deferred work falls in its windows. The report tables each room against
   its own samples.
-- **Quiet controls.** Each measured act has quiet windows before and after
-  it (`quiet`, 5 minutes, or until the act is due). Nothing is sent in a
-  quiet window, so it shows the room's background to compare with.
+- **Controls.**
+  - In the `pin` and `check` modes, each measured act has quiet windows
+    before and after it (`quiet`: 5 minutes, or until the act is due).
+    Nothing is sent in a quiet window, so it shows the room's background.
+    When a run has quiet windows, `windowTable` uses them as the baseline.
+  - In the `activation` mode, the control for each policy landing is the
+    plain landing next to it, in the same room.
 - **Billing evidence.** The run's JSON keeps the rows written and read in
   each window, the window's times and room, the namespace IDs queried, and
   the raw per-minute samples. The results Markdown repeats the table and
@@ -372,6 +378,25 @@ Hugh approved this as a spike-only switch (assert 66a41558).
 
   `test/node/config.test.ts` covers parsing; any value that is not a whole
   number of milliseconds stops the Room from starting.
+- **Its window on the spike.**
+
+  | Deploy | Time (UTC) | Room version |
+  |---|---|---|
+  | Set to 360000 (Room code `e50e062a`) | 2026-10-02 22:02:51 | `474f4529` |
+  | Unset | 2026-10-02 23:12:45 | `59636ae9` |
+
+  `ROWS_ONLY=pin` ran inside the window. The first `ROWS_ONLY=check` run
+  (22:39) also ran inside it. Its pin tick fell in a control window, and
+  its check figure matches the later run.
+- **Under the switch, a landing did not finish.** The first
+  `ROWS_ONLY=activation` run started at 23:00, inside the window. Its first
+  landing (`op_land_9`) was accepted, but was not `landed` 300 s later, and
+  its pin was not due until 360 s after the propose. I stopped that run,
+  cleaned up its repositories, unset the switch, and ran `check` and
+  `activation` again. The landing's dependence on the pin was not
+  investigated further, because the switch is for measurement only. The
+  driver now records the HTTP status of an operation it waited for and
+  did not see finish.
 - **Evidence that it was unset after its window.** Every full smoke run
   checks that lane 2's propose wrote its pinned ref itself: "the propose
   wrote its pinned ref itself (PIN_DELAY_MS unset)". Nothing reads that
@@ -379,21 +404,16 @@ Hugh approved this as a spike-only switch (assert 66a41558).
 
 ## What remains
 
-- **Measure the four isolated cases** under "Not yet measured", on the
-  spike after the idle-write fix is deployed:
-  1. Deploy this branch's head with `PIN_DELAY_MS=360000`. Run
-     `ROWS_ONLY=pin` with `ROWS_PIN_DELAY_MS=360000`.
-  2. Run `ROWS_ONLY=check` and `ROWS_ONLY=activation`. These do not depend
-     on the switch.
-  3. Unset the switch by redeploying without it, and record when.
-  4. Run one clean full smoke with `ARTROOM_ROW_GATE=1`. Its pin step is the
-     evidence that the switch is off. Check the ceilings again.
+- **Measure the lane C publication-token cost** when lanes B and C are
+  deployed. After mint lane C lands (checker's review b84aead9), a failing
+  log publication mints 11 canonical tokens each time it retries. Each mint
+  writes 4 ledger records, so a retry costs about 44 rows (11 × 4, before
+  index multipliers). The idle-write fix's backoff bounds the retries to
+  about 12 an hour, so the expected cost is about 528 rows an hour for each
+  room whose publication is failing. **Not yet measured.** Lane C is not on
+  main yet, so it cannot run on the spike.
 - **Request 99782949 enforces the budgets.** `src/budgets.ts` states each
   limit and the measurement it comes from. Nothing enforces them yet.
-- **Remove the idle background.** A cohort that holds only checkpoint
-  entries should not be due. A room whose repository is gone should back
-  off (`ALARM` in `src/budgets.ts`). Until then, the ceilings above will be
-  exceeded as rooms accumulate.
 - **Turn on the workflow.** Add the secret `ARTROOM_CF_ANALYTICS_TOKEN` and
   set `ARTROOM_ROW_MONITOR` to `true`. It checks `HOURLY_BUDGET` by
   default.

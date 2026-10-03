@@ -146,7 +146,8 @@ async function waitOp(id, states, totalMs) {
     if (last.status === 200 && states.includes(last.body.state)) return last.body;
     if (last.status !== 200 && last.status !== 504) await sleep(2_000);
   }
-  return last?.body ?? null;
+  // Not reached: the last answer, with its HTTP status, so a failed step says why.
+  return last ? { ...(last.body ?? {}), httpStatus: last.status } : null;
 }
 
 // ------------------------------------------------------------ Artifacts REST (hugh's OAuth) and git
@@ -311,7 +312,7 @@ async function landLane(res) {
   if (!landOk) return res;
   const op = await waitOp(l.body.op.id, ["landed", "failed", "aborted", "retryable", "unresolved"], 300_000);
   res.op = op;
-  step(`lane ${n}: landed`, op?.state === "landed", { op: op?.id, state: op?.state, integration: op?.integration, reason: op?.reason, error: op?.error });
+  step(`lane ${n}: landed`, op?.state === "landed", { op: op?.id, state: op?.state, integration: op?.integration, reason: op?.reason, error: op?.error, httpStatus: op?.httpStatus, code: op?.code, message: op?.message });
   return res;
 }
 

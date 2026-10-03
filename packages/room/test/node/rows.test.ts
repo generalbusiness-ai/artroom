@@ -195,6 +195,8 @@ describe("rows per act: per-minute samples", () => {
     expect(r.samples).toHaveLength(7);
     expect(r.invocations).toHaveLength(3);
     expect(r.sampledFrom).toBe("2026-10-02T11:58:00.000Z");
+    // The report records which namespaces it queried.
+    expect(r.namespaces.map((n) => n.id)).toEqual(["ns-publisher", "ns-registry", "ns-room"]);
     const gql = fake.calls.filter((x) => x.url.endsWith("/graphql"));
     const periodic = gql.filter((c) => /durableObjectsPeriodicGroups/.test(c.body?.query ?? ""));
     const minutes = gql.filter((c) => /durableObjectsInvocationsAdaptiveGroups/.test(c.body?.query ?? ""));
@@ -280,6 +282,22 @@ describe("row gate: fails closed", () => {
     expect(evaluateRows(quiet, SMOKE_BUDGET)).toEqual({ state: "incomplete", failures: ["no Durable Object invocations were visible in the window"] });
     const lagging = await query(fakeCloudflare({ rows: { ...ROWS, "ns-registry": { ...ROWS["ns-registry"], durableObjectsPeriodicGroups: [] } } }));
     expect(evaluateRows(lagging, SMOKE_BUDGET)).toEqual({ state: "incomplete", failures: ["artroom-spike-room_Registry/o-reg had invocations but no periodic storage sample"] });
+  });
+});
+
+describe("rows per act: quiet control windows", () => {
+  it("with quiet controls, the baseline is the room's mean per sample in them, and the act is the rest of its window", () => {
+    const S = (t: string, w: number, r: number) => ({ className: "Room", objectId: "o", name: "room_q", t, rowsWritten: w, rowsRead: r });
+    const samples = [S("2026-10-02T12:00:00Z", 0, 0), S("2026-10-02T12:01:00Z", 0, 0), S("2026-10-02T12:02:00Z", 34, 553), S("2026-10-02T12:03:00Z", 7, 233), S("2026-10-02T12:04:00Z", 0, 10)];
+    const W = [
+      { name: "quiet", kind: "quiet" as const, from: "2026-10-02T12:00:30Z", to: "2026-10-02T12:02:30Z" },
+      { name: "propose", kind: "act" as const, from: "2026-10-02T12:02:30Z", to: "2026-10-02T12:04:30Z" },
+      { name: "after", kind: "quiet" as const, from: "2026-10-02T12:04:30Z", to: "2026-10-02T12:05:30Z" },
+    ];
+    const [, propose] = windowTable(W, { samples, invocations: [] }, "room_q");
+    // Controls: (0 + 0 + 0) written over three samples, (0 + 0 + 10) read: the propose's own publication minute is not subtracted.
+    expect(propose).toMatchObject({ baseline: "quiet controls", baselineWritten: 0, actWritten: 41, roomWritten: 41, actRead: 786 - 2 * (10 / 3) });
+    expect(propose!.caution).toBeUndefined();
   });
 });
 
@@ -393,7 +411,7 @@ describe("row gate: review of caefe17d (checker controls)", () => {
     });
     const g = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fake.fetchImpl });
     expect(g).toMatchObject({ state: "violation", totalRowsWritten: 5_301, sampledFrom: "2026-10-02T11:58:00.000Z" });
-    expect(g.failures).toContain("artroom-spike-room_Room/room_aaaa rows written 5301 > 2100");
+    expect(g.failures).toContain("artroom-spike-room_Room/room_aaaa rows written 5301 > 2000");
   });
 });
 
@@ -472,10 +490,10 @@ describe("row gate: budgets", () => {
       const p = 10 ** (Math.floor(Math.log10(n)) - 1);
       return Math.ceil(n / p) * p;
     };
-    // spike-smoke-2026-10-02T18-47-09-470Z: 2,284 in total, 508 in one object; headroom 4.
-    expect(SMOKE_BUDGET).toEqual({ maxRowsWritten: up2(2_284 * 4), maxRowsWrittenPerObject: up2(508 * 4) });
-    // The hour 17:50-18:50: 11,285 in total, 1,034 in one object; headroom 2.
-    expect(HOURLY_BUDGET).toEqual({ maxRowsWritten: up2(11_285 * 2), maxRowsWrittenPerObject: up2(1_034 * 2) });
+    // spike-smoke-2026-10-03T00-54-30-069Z, after the idle-write fix: 1,270 in total, 489 in one object; headroom 4.
+    expect(SMOKE_BUDGET).toEqual({ maxRowsWritten: up2(1_270 * 4), maxRowsWrittenPerObject: up2(489 * 4) });
+    // The busiest hour after the fix, 23:50-00:50: 2,514 in total, 1,780 in one object; headroom 2.
+    expect(HOURLY_BUDGET).toEqual({ maxRowsWritten: up2(2_514 * 2), maxRowsWrittenPerObject: up2(1_780 * 2) });
     const g = await rowGate({ accountId: "acct", token: "tok", worker: "artroom-spike-room", ...WINDOW, fetchImpl: fakeCloudflare().fetchImpl });
     expect(g).toMatchObject({ state: "pass", budget: SMOKE_BUDGET, totalRowsWritten: 113 });
   });

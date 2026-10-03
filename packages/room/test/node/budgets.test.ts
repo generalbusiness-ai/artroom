@@ -15,7 +15,7 @@ describe("row budgets", () => {
 
   it("the idempotency quota keeps a day of the cheapest act at the hourly per-object ceiling", () => {
     const perHour = Math.floor(HOURLY_BUDGET.maxRowsWrittenPerObject / MEASURED_ROWS_WRITTEN.claim);
-    expect(perHour).toBe(233);
+    expect(perHour).toBe(400);
     expect(IDEM_FIFO_PER_ROOM).toBeGreaterThanOrEqual(24 * perHour);
   });
 
