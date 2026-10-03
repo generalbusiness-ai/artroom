@@ -124,8 +124,15 @@ export const OBSERVE_WAIT = { firstMs: 60_000, maxMs: 6 * 3600_000 } as const;
 export const MINT_REVOKE_BATCH = 20;
 /** A listing with more records than this counts nothing. */
 export const MINT_LISTING_MAX = 1_000;
+/**
+ * Once an answer's token ID is in hand and its record could not be written,
+ * the record is written again, as owed by that ID, at most this many times
+ * before the token is revoked at once (R-MINT-3, as amended for request
+ * 02836f9a).
+ */
+export const MINT_ID_WRITE_ATTEMPTS = 3;
 /** Retries of a transient create error, as `withRetry`: 5 attempts, from 0.5 s. Each is a new record. */
-const RETRY = { attempts: 5, firstMs: 500 } as const;
+export const MINT_RETRY = { attempts: 5, firstMs: 500 } as const;
 /** Most records one `duties` page returns. */
 const PAGE_MAX = 1_000;
 
@@ -385,11 +392,11 @@ export class MintLedger {
   async mint(purpose: string, scope: MintScope, ttl: (sentAt: number) => number, opts: { readonly notAfter?: number } = {}): Promise<LedgerToken> {
     const repo = await this.lookup();
     if (!repo) throw new Error(`the canonical repository was not reached within ${this.waitMs} ms; nothing was sent`);
-    let wait: number = RETRY.firstMs;
+    let wait: number = MINT_RETRY.firstMs;
     for (let attempt = 1; ; attempt++) {
       const r = await this.once(repo, purpose, scope, ttl, opts.notAfter ?? null);
       if (r.ok) return r.token;
-      if (!r.retry || attempt >= RETRY.attempts) throw r.error;
+      if (!r.retry || attempt >= MINT_RETRY.attempts) throw r.error;
       await this.sleep(wait);
       wait *= 2;
     }
@@ -588,22 +595,52 @@ export class MintLedger {
   }
 
   /**
-   * The answer could not be recorded. A token ID from it is revoked at once;
-   * only when Artifacts answers that is the record deleted, by its row ID
-   * and in its earlier state.
+   * The answer gave a token ID, but it could not be recorded as the answer,
+   * or its record was in no state to take it. The ID is in hand, so before
+   * any revocation is attempted the record is written again, as the record
+   * of that token owed revocation, up to `MINT_ID_WRITE_ATTEMPTS` times
+   * (R-MINT-3, as amended for request 02836f9a). Then the token is revoked
+   * by its ID at once. An answer ends the record; a failure leaves it owed,
+   * with its ID, for the alarm's passes. If storage refused every write, the
+   * Room cannot guarantee that the duty survives: the record keeps its
+   * earlier state, and only the revocation at once remains.
    */
   private async handoffFailed(id: number, repo: MintRepo, o: Outcome): Promise<void> {
     if (o.kind !== "token") return;
-    const answered = await within(repo.revokeToken(o.id).then(() => true), this.waitMs, false).catch(() => false);
-    if (!answered) return;
-    try {
-      this.sql.transaction(() => {
-        if (this.drop(id, "unknown")) this.count(0, -1);
-        else this.drop(id, "sent");
-      });
-    } catch {
-      // The record stays as it was: still open, never settled by guesswork.
+    let recorded = false;
+    for (let attempt = 0; attempt < MINT_ID_WRITE_ATTEMPTS && !recorded; attempt++) {
+      try {
+        recorded = this.sql.transaction(() => this.oweKnown(id, o));
+        if (!recorded) break; // the record is in neither state: nothing to write it to
+      } catch {
+        recorded = false;
+      }
     }
+    const answered = await within(repo.revokeToken(o.id).then(() => true), this.waitMs, false).catch(() => false);
+    if (answered) {
+      try {
+        this.sql.transaction(() => {
+          if (this.drop(id, "owed")) this.count(-1, 0);
+          else if (this.drop(id, "unknown")) this.count(0, -1);
+          else this.drop(id, "sent");
+        });
+      } catch {
+        // The record stays owed, or as it was: its revocation is tried again, never settled by guesswork.
+      }
+      return;
+    }
+    await this.wake(this.now() + MINT_REVOKE_BACKOFF.firstMs).catch(() => undefined);
+  }
+
+  /** In the caller's transaction: the record, still `sent` or `unknown`, becomes the record of a known token owed revocation. False if it was in neither state. */
+  private oweKnown(id: number, o: Extract<Outcome, { kind: "token" }>): boolean {
+    for (const from of ["sent", "unknown"] as const) {
+      if (this.move(id, from, "state = 'owed', token = ?, expires_at = ?, due = ?, backoff = NULL, last_error = ?", o.id, o.expiresAt, this.now(), "the answer could not be recorded; owed revocation by its ID")) {
+        this.count(1, from === "unknown" ? -1 : 0);
+        return true;
+      }
+    }
+    return false;
   }
 
   private track(p: Promise<unknown>): void {

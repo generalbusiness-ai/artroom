@@ -8,6 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   MINT_CLOCK_ALLOWANCE_MS,
+  MINT_ID_WRITE_ATTEMPTS,
   MINT_LISTING_MAX,
   MINT_REVOKE_BACKOFF,
   MINT_REVOKE_BATCH,
@@ -600,7 +601,7 @@ test("(5) a late answer to a record whose given-up state could not be stored is 
 
 // ------------------------------------------------------------------ (6)
 
-test("(6) a failed handoff (a trigger rejects the update): the record keeps its state, the ID is revoked at once, and the record is deleted only once that revocation is answered", async () => {
+test("(6) a failed handoff (a trigger rejects the update), as amended for request 02836f9a: the ID in hand is written durably as owed before the revocation at once; an answered revocation ends the record; a failed one leaves it owed with the ID, revoked by a later alarm on a new host", async () => {
   const r = room();
   r.sql.all("CREATE TRIGGER no_hold BEFORE UPDATE ON artroom_mint WHEN NEW.state = 'held' BEGIN SELECT RAISE(ABORT, 'storage failure'); END");
   r.repo.holdRevokes = true;
@@ -608,18 +609,60 @@ test("(6) a failed handoff (a trigger rejects the update): the record keeps its 
   p.catch(() => undefined);
   await until(() => r.repo.heldRevokes.length === 1, "the revocation");
   assert.equal(r.repo.heldRevokes[0]!.id, "tok_1", "revoked by the answer's ID, at once");
-  assert.equal(only(r.sql)["state"], "sent", "the record keeps its earlier state while the revocation is out");
+  assert.deepEqual([only(r.sql)["state"], only(r.sql)["token"]], ["owed", "tok_1"], "the ID is on record before the revocation is out");
   r.repo.heldRevokes[0]!.gate.resolve();
   await assert.rejects(p, /storage failure/);
   assert.equal(rows(r.sql).length, 0);
 
-  // When that revocation fails, the record stays.
+  // When that revocation fails, the record stays owed with the ID, through a new host, until a later alarm revokes it.
   r.repo.holdRevokes = false;
   r.repo.revokeDown = true;
   await assert.rejects(r.ledger.mint("publish:op:2", "write", ttl60), /storage failure/);
+  assert.deepEqual([only(r.sql)["state"], only(r.sql)["token"]], ["owed", "tok_2"]);
+  assert.equal(summary(r.sql)["unknown"], 0);
+  r.sql.all("DROP TRIGGER no_hold");
+  r.repo.revokeDown = false;
+  r.start();
+  assert.equal(only(r.sql)["state"], "owed");
+  r.clock.advance(MINT_REVOKE_BACKOFF.firstMs);
+  await alarm(r);
+  assert.equal(r.repo.live("tok_2"), false);
+  assert.equal(rows(r.sql).length, 0);
+});
+
+test("(6) a failed handoff where storage refuses the ID's write: it is retried, a bounded number of times, before the revocation; if every retry is refused the record keeps its earlier state, the stated limit", async () => {
+  const r = room();
+  const real = r.sql.all.bind(r.sql);
+  let owedWrites = 0;
+  let refuse = 0;
+  (r.sql as { all: Sql["all"] }).all = (q, ...b) => {
+    if (q.startsWith("UPDATE artroom_mint SET state = 'held'")) throw new Error("storage failure");
+    if (q.startsWith("UPDATE artroom_mint SET state = 'owed'")) {
+      owedWrites++;
+      if (refuse > 0) {
+        refuse--;
+        throw new Error("storage failure");
+      }
+    }
+    return real(q, ...b);
+  };
+  r.repo.revokeDown = true;
+  // Two writes refused, the third taken: owed with the ID, before the revocation.
+  refuse = 2;
+  await assert.rejects(r.ledger.mint("publish:op:1", "write", ttl60), /storage failure/);
+  assert.equal(owedWrites, 3);
+  assert.deepEqual([only(r.sql)["state"], only(r.sql)["token"]], ["owed", "tok_1"]);
+  assert.deepEqual(r.repo.revokes, ["tok_1"]);
+  real("DELETE FROM artroom_mint");
+  real("UPDATE artroom_mint_summary SET owed = 0, unknown = 0 WHERE k = 1");
+  // Every write refused: MINT_ID_WRITE_ATTEMPTS tries, then the revocation at once; the record keeps its earlier state.
+  owedWrites = 0;
+  refuse = 1000;
+  await assert.rejects(r.ledger.mint("publish:op:2", "write", ttl60), /storage failure/);
+  assert.equal(owedWrites, MINT_ID_WRITE_ATTEMPTS);
   assert.equal(only(r.sql)["state"], "sent");
-  r.start(); // the next host takes it over as unknown
-  assert.equal(only(r.sql)["state"], "unknown");
+  assert.deepEqual(r.repo.revokes, ["tok_1", "tok_2"]);
+  (r.sql as { all: Sql["all"] }).all = real;
 });
 
 test("(6) two mints in flight: a late completion of one never changes the other's row, or a row another owner has claimed", async () => {

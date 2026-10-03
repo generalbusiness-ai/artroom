@@ -129,8 +129,14 @@ left). The host's alarm also runs `mints.reconcile()` and includes
 `mints.nextDue()` in its next alarm. `ContainerPublisher` and `Pinning` take
 the same ledger (`mints`): since mint lane C, every canonical token they use
 (staging an integration, pinning, previews) is minted and revoked through
-it. The lane fork's read token for pinning is the one exception, until the
-fork has its own ledger (request 02836f9a).
+it. The lane fork's read token for pinning is not a canonical token: since
+request 02836f9a it is minted and revoked through the fork's own ledger,
+`ForkTokens`, which `Workspaces` builds and owns (`workspaces.forkTokens`)
+and `Pinning` takes as `forkTokens`. It follows the same rules, per fork:
+a record and a wake-up before each create, a retry only as a new record, a
+lost answer kept as unknown and watched, a failed revocation owed by ID.
+The host's alarm runs `forkTokens.reconcile()` and includes
+`forkTokens.nextDue()` in its next alarm.
 
 ## Previews
 
