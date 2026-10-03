@@ -20,6 +20,7 @@
  */
 
 import type { AnyPolicyDocument, CheckerConfig, CheckerConfigV2, Checkpoint, ChunkedLine, LogEntry, LogLayout, ReplayContext } from "@generalbusiness/artroom-contract";
+import { ARTROOM_LEGACY_V1 } from "@generalbusiness/artroom-contract";
 import { PLATFORM_KINDS, STEPS_VERSIONS, validateCheckerConfig, validateCheckerConfigV2, validatePolicy, validatePolicyV2 } from "@generalbusiness/artroom-policy";
 import { canonicalize, fromUtf8, parseStrict } from "./canonical.ts";
 import { hex } from "./crypto.ts";
@@ -128,7 +129,7 @@ const starOr = (v: unknown, path: string, item: (v: unknown, path: string) => un
 
 const FORMAT = ["artroom-log-v1"] as const;
 /** The legacy vocabulary's kinds: what a `v1`-shape grant may name (R-ADM-5, R-DECL-1). */
-const ENVELOPE_KINDS = ["claim", "propose", "note", "review", "check", "land", "release", "renew", "roster"] as const;
+const ENVELOPE_KINDS = ARTROOM_LEGACY_V1.envelope.kinds as readonly string[];
 /** A kind's name (R-SIG-4 as amended, R-DECL-2). */
 export const KIND_GRAMMAR = /^[a-z][a-z0-9-]{0,31}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;

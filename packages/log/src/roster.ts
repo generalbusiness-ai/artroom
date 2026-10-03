@@ -31,6 +31,7 @@ import type {
   RosterOp,
   TeamId,
 } from "@generalbusiness/artroom-contract";
+import { ARTROOM_LEGACY_V1 } from "@generalbusiness/artroom-contract";
 import { digestBytes, unb64url } from "./crypto.ts";
 import { checkedTime } from "./time.ts";
 
@@ -77,16 +78,27 @@ export function declaredWho(acts: Readonly<Record<string, ActDeclaration>>, bind
 /** A grant's signed map, as decoded (R-DECL-17). */
 type GrantBody = { readonly kinds: readonly string[] | "*"; readonly acts?: Readonly<Record<string, Binding>> };
 
-const MEMBER_KINDS: readonly EnvelopeKind[] = ["claim", "propose", "note", "review", "land", "release", "renew"];
-const DELEGABLE: readonly DelegableKind[] = ["claim", "propose", "note", "review", "check", "land", "release", "renew"];
+/**
+ * The legacy vocabulary's tables, read from its one frozen description
+ * (`ARTROOM_LEGACY_V1`, R-DECL-1), never written out again: the kinds each
+ * role may sign, the kinds a legacy delegation may name, and the roster ops
+ * by signer.
+ */
+const ROLE_KINDS = ARTROOM_LEGACY_V1.roles as Readonly<Record<Role, readonly string[]>>;
+const DELEGABLE = ARTROOM_LEGACY_V1.delegation.kinds as readonly DelegableKind[];
+const ROSTER_OPS = { admin: ARTROOM_LEGACY_V1.rosterOps.admin as readonly string[], others: ARTROOM_LEGACY_V1.rosterOps.others as readonly string[] };
 const NOT_RECOVERY_OPS: readonly RosterOp["op"][] = ["join", "delegate", "undelegate"];
 
-/** R-GEN-5 and R-GEN-4: may this role sign this kind (and roster op)? */
+/**
+ * R-GEN-5 and R-GEN-4: may this role sign this kind (and roster op)? An
+ * admin signs every kind: the legacy table lists all of them for it, and
+ * `recover` is an admin's (R-DECL-21). With no op, `roster` asks only
+ * whether the role signs roster acts in general, which an admin does.
+ */
 export function roleMaySign(role: Role, kind: EnvelopeKind, op?: RosterOp["op"]): boolean {
-  if (role === "admin") return kind !== "roster" || (op !== "rotate-recovery" && op !== "join");
-  if (kind === "roster") return op === "delegate" || op === "undelegate";
-  if (role === "checker") return kind === "check" || kind === "note";
-  return MEMBER_KINDS.includes(kind);
+  if (kind === "roster") return op === undefined ? role === "admin" : (role === "admin" ? ROSTER_OPS.admin : ROSTER_OPS.others).includes(op);
+  if (role === "admin") return true;
+  return ROLE_KINDS[role].includes(kind);
 }
 
 /**
