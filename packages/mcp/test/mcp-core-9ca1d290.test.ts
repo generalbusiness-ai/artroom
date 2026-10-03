@@ -109,7 +109,7 @@ async function stdioList(api: RoomApi, caller: () => Promise<McpCaller>, toolset
   const send = async (id: number | undefined, method: string, params: unknown = {}) => {
     stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...(id === undefined ? {} : { id }), method, params })}\n`);
     if (id === undefined) return undefined;
-    for (let i = 0; i < 500 && !replies.has(id); i++) await new Promise((r) => setTimeout(r, 10));
+    for (let i = 0; i < 5_000 && !replies.has(id); i++) await new Promise((r) => setTimeout(r, 1));
     return replies.get(id);
   };
   await send(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } });
@@ -138,7 +138,7 @@ async function stdioServer(api: RoomApi, caller: () => Promise<McpCaller>): Prom
   const send = async (method: string, params: unknown = {}) => {
     const mine = ++id;
     stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: mine, method, params })}\n`);
-    for (let i = 0; i < 500 && !replies.has(mine); i++) await new Promise((r) => setTimeout(r, 10));
+    for (let i = 0; i < 5_000 && !replies.has(mine); i++) await new Promise((r) => setTimeout(r, 1));
     return replies.get(mine);
   };
   await send("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } });
@@ -413,20 +413,22 @@ describe("every act tool requires idempotencyKey (R-API-9)", () => {
     act: { kind: "ask", target: { act: LANE }, body: { text: "x" }, binding: STALE },
   };
 
-  test.each(ACT_TOOLS)("%s without a key is bad-request, says how to add one, and the room is never asked", async (name) => {
+  test("each of the eight act tools without a key is bad-request, says how to add one, and the room is never asked", async () => {
     const record = { id: "act_9_00000000", lane: LANE, lease: { generation: 1 }, generation: 1, op: { id: "op_land_9", state: "accepted" } };
-    const r = recording({ lane: () => null, claim: () => record, propose: () => record, note: () => record, review: () => record, land: () => record, renew: () => record, release: () => record, act: () => record });
-    const out = await callTool(r.room, name, VALID[name]);
-    expect(out.isError).toBe(true);
-    expect(out.structuredContent).toMatchObject({ name: "ArtroomError", code: "bad-request", retryable: false });
-    const message = (out.structuredContent as { message: string }).message;
-    expect(message).toContain("input.idempotencyKey: is required");
-    expect(message).toContain("Add any unique string as idempotencyKey, and reuse the same one to retry this call.");
-    expect(r.calls).toEqual([]);
-    // With a key the same input reaches the room.
-    const ok = await callTool(r.room, name, { ...VALID[name], idempotencyKey: "k1" });
-    expect(ok.isError).toBe(false);
-    expect(r.calls.at(-1)!.method).toBe(name);
+    for (const name of ACT_TOOLS) {
+      const r = recording({ lane: () => null, claim: () => record, propose: () => record, note: () => record, review: () => record, land: () => record, renew: () => record, release: () => record, act: () => record });
+      const out = await callTool(r.room, name, VALID[name]);
+      expect(out.isError, name).toBe(true);
+      expect(out.structuredContent, name).toMatchObject({ name: "ArtroomError", code: "bad-request", retryable: false });
+      const message = (out.structuredContent as { message: string }).message;
+      expect(message, name).toContain("input.idempotencyKey: is required");
+      expect(message, name).toContain("Add any unique string as idempotencyKey, and reuse the same one to retry this call.");
+      expect(r.calls, name).toEqual([]);
+      // With a key the same input reaches the room.
+      const ok = await callTool(r.room, name, { ...VALID[name], idempotencyKey: "k1" });
+      expect(ok.isError, name).toBe(false);
+      expect(r.calls.at(-1)!.method).toBe(name);
+    }
   });
 
   test("a key of the wrong form is bad-request without the advice for a missing one; workspace takes no key", async () => {
@@ -504,16 +506,18 @@ describe("waitMs is a whole number from 0 to 45,000 (R-API-15)", () => {
     for (const t of taking) expect(t.inputSchema.properties!["waitMs"]).toMatchObject({ type: "integer", minimum: 0, maximum: 45_000 });
   });
 
-  test.each(Object.keys(WAITING))("%s refuses a waitMs that is too large, negative, fractional, not a number or not finite, before the room is asked", async (name) => {
-    const r = recording({ lane: () => null, attention: () => ({}), workspace: () => ({}), land: () => ({}), op: () => ({}), wait: () => ({}) });
-    for (const bad of [45_001, 60_000, -1, 1.5, "100", null, Number.POSITIVE_INFINITY, Number.NaN]) {
-      const out = await callTool(r.room, name, { ...WAITING[name], waitMs: bad });
-      expect([name, bad, out.isError]).toEqual([name, bad, true]);
-      expect(out.structuredContent).toMatchObject({ name: "ArtroomError", code: "bad-request" });
-      expect((out.structuredContent as { message: string }).message).toContain("input.waitMs:");
+  test("each of the four refuses a waitMs that is too large, negative, fractional, not a number or not finite, before the room is asked", async () => {
+    for (const name of Object.keys(WAITING)) {
+      const r = recording({ lane: () => null, attention: () => ({}), workspace: () => ({}), land: () => ({}), op: () => ({}), wait: () => ({}) });
+      for (const bad of [45_001, 60_000, -1, 1.5, "100", null, Number.POSITIVE_INFINITY, Number.NaN]) {
+        const out = await callTool(r.room, name, { ...WAITING[name], waitMs: bad });
+        expect([name, bad, out.isError]).toEqual([name, bad, true]);
+        expect(out.structuredContent, name).toMatchObject({ name: "ArtroomError", code: "bad-request" });
+        expect((out.structuredContent as { message: string }).message, name).toContain("input.waitMs:");
+      }
+      expect(r.calls, name).toEqual([]);
+      for (const good of [0, 1, 45_000]) expect(validate(TOOLS[name as keyof typeof TOOLS].inputSchema, { ...WAITING[name], waitMs: good }), name).toEqual([]);
     }
-    expect(r.calls).toEqual([]);
-    for (const good of [0, 1, 45_000]) expect(validate(TOOLS[name as keyof typeof TOOLS].inputSchema, { ...WAITING[name], waitMs: good })).toEqual([]);
   });
 
   test("workspace waits 20,000 ms by default and the given time otherwise; on timeout it returns the operation's current state", async () => {
@@ -632,10 +636,10 @@ describe("waitMs is a whole number from 0 to 45,000 (R-API-15)", () => {
     const entries = room.entries.length;
     const lease = JSON.stringify(room.lanes.get(claim.lane));
     const started = Date.now();
-    const out = await call(b, "operation", { id: ws.op.id, kind: "workspace", waitMs: 150 });
+    const out = await call(b, "operation", { id: ws.op.id, kind: "workspace", waitMs: 50 });
     expect(out.isError).toBe(false);
     expect(out.structuredContent).toMatchObject({ id: ws.op.id, kind: "workspace", state: "pending" });
-    expect(Date.now() - started).toBeGreaterThanOrEqual(140);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(40);
     // A read: no entry, and the lane and its lease are as they were.
     expect(room.entries.length).toBe(entries);
     expect(JSON.stringify(room.lanes.get(claim.lane))).toBe(lease);
@@ -709,8 +713,8 @@ describe("attention with waitMs waits for an item for the caller (R-API-15)", ()
       },
     });
     const started = Date.now();
-    const out = await callTool(r.room, "attention", { waitMs: 120 });
-    expect(Date.now() - started).toBeGreaterThanOrEqual(110);
+    const out = await callTool(r.room, "attention", { waitMs: 40 });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(30);
     expect(out.isError).toBe(false);
     expect(out.structuredContent).toEqual(empty);
     expect(r.calls.filter((c) => c.method === "attention")).toHaveLength(2);
@@ -719,7 +723,7 @@ describe("attention with waitMs waits for an item for the caller (R-API-15)", ()
   test("a handle with no subscription waits out the time and reads again", async () => {
     let reads = 0;
     const r = recording({ attention: () => ({ items: reads++ === 0 ? [] : [{ id: "att_1" }], cursor: "c1", more: false, publishedThrough: 3 }) });
-    const out = await callTool(r.room, "attention", { waitMs: 60 });
+    const out = await callTool(r.room, "attention", { waitMs: 20 });
     expect((out.structuredContent as { items: unknown[] }).items).toHaveLength(1);
   });
 
@@ -737,9 +741,10 @@ describe("attention with waitMs waits for an item for the caller (R-API-15)", ()
     let settled = false;
     void waiting.then(() => (settled = true));
     // Bob's own claim is activity in the room, but nothing for the agent.
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 20));
     expect(isRefusal(await bob.api.claim({ goal: "docs", scope: ["docs/**"] }))).toBe(false);
-    await new Promise((r) => setTimeout(r, 400));
+    // Had the wait ended on Bob's claim, it would have ended by now, and its page, checked below, would be empty.
+    await new Promise((r) => setTimeout(r, 60));
     expect(settled).toBe(false);
     // While it waits, the lane and its lease are as they were: waiting holds nothing.
     expect(JSON.stringify(room.lanes.get(claim.lane))).toBe(lease);
@@ -760,7 +765,7 @@ describe("attention with waitMs waits for an item for the caller (R-API-15)", ()
     const p = (await alice.api.propose(claim, { head: head("a") as never, expectedGeneration: 0, summary: "s" })) as Proposal;
     const cursor = ((await callTool(alice.api, "attention", {})).structuredContent as { cursor: string }).cursor;
     const waiting = callTool(alice.api, "attention", { cursor, waitMs: 30_000 });
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 20));
     const note = await bob.api.note({ lane: claim.lane, generation: 1, head: p.head, path: "src/a.ts", line: 3 }, { text: "hello" });
     if (isRefusal(note)) throw new Error(note.rule);
     const page = (await waiting).structuredContent as { items: { why: string }[] };
@@ -822,7 +827,7 @@ describe("an attention wait ends the subscription it opened (R-API-15; checker f
       attention: () => pages[Math.min(read++, pages.length - 1)],
       subscribe: () => {
         opened++;
-        setTimeout(during, 20);
+        setTimeout(during, 5);
         return stream;
       },
     });
@@ -841,7 +846,7 @@ describe("an attention wait ends the subscription it opened (R-API-15; checker f
 
   test("a native stream, the wait runs out: the empty page returns, the source is cancelled once, the reader released, and the read left pending ends as done", async () => {
     const n = native();
-    const { out, pageReads } = await wait(n.stream, [EMPTY], 80);
+    const { out, pageReads } = await wait(n.stream, [EMPTY], 30);
     expect(out.isError).toBe(false);
     expect(out.structuredContent).toEqual(EMPTY);
     expect(pageReads).toBe(2);
@@ -869,7 +874,7 @@ describe("an attention wait ends the subscription it opened (R-API-15; checker f
     expect((await wait(now.stream, [FULL], 30_000)).out.structuredContent).toEqual(FULL);
     expect(now.seen.cancels).toBe(1);
     const late = decoded();
-    expect((await wait(late.stream, [EMPTY], 80)).out.structuredContent).toEqual(EMPTY);
+    expect((await wait(late.stream, [EMPTY], 30)).out.structuredContent).toEqual(EMPTY);
     expect(late.seen.cancels).toBe(1);
     const item = decoded();
     const got = await wait(item.stream, [EMPTY, FULL], 30_000, () => {
@@ -1256,7 +1261,7 @@ describe("toolsets: what tools/list shows follows the caller's authorization (R-
     });
     const send = async (id: number, method: string, params: unknown = {}) => {
       stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
-      for (let i = 0; i < 500 && !replies.has(id); i++) await new Promise((r) => setTimeout(r, 10));
+      for (let i = 0; i < 5_000 && !replies.has(id); i++) await new Promise((r) => setTimeout(r, 1));
       return replies.get(id);
     };
     await send(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } });

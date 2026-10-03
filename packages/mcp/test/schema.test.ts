@@ -63,12 +63,6 @@ describe("the ten tools (R-API-9)", () => {
     }
   });
 
-  test("every act tool accepts an idempotency key, except workspace, which is a request (R-IDEM-6)", () => {
-    for (const name of ["claim", "renew", "release", "propose", "note", "review", "land"] as const) {
-      expect(Object.keys(TOOLS[name].inputSchema.properties)).toContain("idempotencyKey");
-    }
-  });
-
   test("each description says what to do next, and on refusal for every act", () => {
     for (const t of TOOL_LIST) {
       expect(t.description.length).toBeLessThan(1000);
@@ -86,8 +80,9 @@ describe("the ten tools (R-API-9)", () => {
 describe("input validation", () => {
   const head = "a".repeat(40);
   const lane = "act_7_0c1d2e3f";
-  test.each([
+  test("accepts each input of the contract's demo loop", () => {
     // As the contract's demo loop now gives them: each act with its key, and waits within 45,000 ms (amendment 7).
+    const inputs = [
     ["claim", { goal: "Fix login copy", scope: ["src/ui/login/**"], idempotencyKey: "claim-1" }],
     ["claim", { lane, lease: 1, expectedGeneration: 0, scope: ["src/**"], idempotencyKey: "claim-2" }],
     ["workspace", { lane, lease: 1, waitMs: 20000 }],
@@ -99,11 +94,12 @@ describe("input validation", () => {
     ["attention", { limit: 20 }],
     ["attention", {}],
     ["explain", { act: lane }],
-  ] as const)("accepts a demo-loop %s input", (name, input) => {
-    expect(validate(TOOLS[name].inputSchema, input)).toEqual([]);
+    ] as const;
+    for (const [name, input] of inputs) expect(validate(TOOLS[name].inputSchema, input), `${name} ${JSON.stringify(input)}`).toEqual([]);
   });
 
-  test.each([
+  test("refuses an input with a missing, malformed, out-of-range or unknown field, and names the problem", () => {
+    const inputs = [
     ["propose", { lane, head, expectedGeneration: 0, summary: "s" }, /lease: is required/],
     ["propose", { lane, lease: 1, head: "abc", expectedGeneration: 0, summary: "s" }, /head: does not match/],
     ["review", { lane, generation: 1, head, verdict: "maybe", scope: [], text: "" }, /verdict: must be one of/],
@@ -112,8 +108,8 @@ describe("input validation", () => {
     ["note", { anchor: { lane }, text: "x" }, /required/],
     ["claim", { goal: "g", scope: "src/**" }, /scope: expected array/],
     ["explain", { act: "op_land_1" }, /does not match/],
-  ] as const)("refuses a bad %s input", (name, input, problem) => {
-    expect(validate(TOOLS[name].inputSchema, input).join("; ")).toMatch(problem);
+    ] as const;
+    for (const [name, input, problem] of inputs) expect(validate(TOOLS[name].inputSchema, input).join("; "), `${name} ${JSON.stringify(input)}`).toMatch(problem);
   });
 });
 

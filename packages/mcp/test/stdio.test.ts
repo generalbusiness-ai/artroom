@@ -47,7 +47,7 @@ test("initialize, list the tools, and claim over stdio", async () => {
   const send = async (id: number | undefined, method: string, params: unknown = {}) => {
     stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...(id === undefined ? {} : { id }), method, params })}\n`);
     if (id === undefined) return undefined;
-    for (let i = 0; i < 500 && !replies.has(id); i++) await new Promise((r) => setTimeout(r, 10));
+    for (let i = 0; i < 5_000 && !replies.has(id); i++) await new Promise((r) => setTimeout(r, 1));
     return replies.get(id);
   };
 
