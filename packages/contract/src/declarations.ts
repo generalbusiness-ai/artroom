@@ -104,7 +104,12 @@ export interface HoldDeclaration {
   readonly scope: "body.scope" | readonly Glob[];
   /** Absent: the policy's `lanes` when the thread opens. */
   readonly conflict?: LaneMode;
-  /** 10 to 86,400. Absent: the room's lease, which the deployment configures. */
+  /**
+   * 10 to 86,400. Absent: the room's lease, which the deployment configures.
+   * The room resolves it to a number when the thread opens and records that
+   * value on the thread for its life (R-DECL-6, R-DECL-9); the binding stays
+   * `"room"` and never includes the number (R-DECL-15).
+   */
   readonly leaseSeconds?: number;
   /** 1 to 600. Absent: the thread cannot be handed over. */
   readonly reserveSeconds?: number;
@@ -212,7 +217,10 @@ export type BindingField = (
 export interface BindingHold {
   readonly scope: "body.scope" | readonly Glob[];
   readonly conflict: LaneMode;
-  /** `room` when the declaration leaves it to the deployment's lease. */
+  /**
+   * `room` when the declaration leaves it to the deployment's lease. The
+   * numeric value is recorded on each thread at open, never in the binding.
+   */
   readonly leaseSeconds: number | "room";
   readonly reserveSeconds: number | null;
   readonly workspace: boolean;

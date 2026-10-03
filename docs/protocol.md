@@ -3632,11 +3632,18 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
   source, conflict mode, lease length, reservation length and workspace.
   They are fixed for the thread's life. A later document never changes
   them, and activation never ends, shortens or extends a hold.
+- Where the hold leaves the lease length to the room (no `leaseSeconds`),
+  the room resolves it when the thread opens: it records its current
+  numeric lease length on the thread, and that recorded value is the
+  thread's lease length for its life. A later change to the deployment's
+  lease affects only threads opened afterwards. The binding stays
+  symbolic (R-DECL-15).
 - A `room` thread has scope source `body.scope`, the conflict mode of the
-  policy in force when it opened, the room's lease, no reservation length,
-  and a workspace.
+  policy in force when it opened, the room's lease resolved and recorded
+  at open, no reservation length, and a workspace.
 - A configuration-recovery thread (R-DECL-21) has scope source
-  `body.scope`, the room's lease, no reservation length, and a workspace.
+  `body.scope`, the room's lease resolved and recorded at open, no
+  reservation length, and a workspace.
   It is never refused for overlap, and other threads treat it as
   `by-scope`.
 
@@ -3688,7 +3695,11 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
   thread counts as held.
 - `hold.leaseSeconds` is the thread's lease length, from 10 to 86,400
   seconds. Absent, it is the room's lease, which the deployment
-  configures. Renewal (R-LANE-5) uses the thread's lease length.
+  configures, resolved to its numeric value when the thread opens and
+  recorded on the thread (R-DECL-6). Every renewal (R-LANE-5) and every
+  expiry uses the thread's recorded lease length, for the thread's life.
+  A thread opened under a `v1` document has no recorded length and keeps
+  today's behaviour: the room's current lease.
 - `hold.workspace` true gives the thread a workspace: a fork and a token
   (R-WS). Absent means false.
 
@@ -3802,7 +3813,9 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
 - Every default is resolved before hashing, so writing a default out, or
   leaving it out, never changes a binding. An absent `leaseSeconds`
   resolves to `"room"`, not to a number, because the room's lease is
-  deployment configuration: a deploy must never change a binding.
+  deployment configuration: a deploy must never change a binding. The
+  numeric value is resolved and recorded on each thread when it opens
+  (R-DECL-6), and the binding never includes it.
 - The binding leaves out `label`, `help` and `refusals`, which change only
   how the act is described, and `who`, which decides whether this signer
   may act at all and is judged at admission against the current roster
@@ -4122,7 +4135,7 @@ retains are not repeated.
 | R-CRED-5 | `workspace` and `workspace-token` are judged as for an act with step `version` on that thread |
 | R-CRED-10 | A bearer act of a declared kind carries `binding` (`DeclaredBearerAct`); the agent reads it from the `acts` tool |
 | R-LANE-3 | Holder-only follows from the steps (R-DECL-5). An act on a thread of a kind it does not name is refused `wrong-thread` (R-DECL-8) |
-| R-LANE-5 | Renewal sets the expiry to the room clock plus the thread's lease length (R-DECL-9) |
+| R-LANE-5 | Renewal sets the expiry to the room clock plus the lease length recorded on the thread when it opened (R-DECL-6, R-DECL-9) |
 | R-LANE-7 | A takeover of a reserved thread by anyone but the named member is refused `reserved`; a rescope of a fixed-scope thread is refused `scope-fixed` (R-DECL-7, R-DECL-10) |
 | R-OBL-3 | The check's kind and binding are the ones its job names (R-DECL-18) |
 | R-LAND-1 | An act may run `version` then `land` (R-DECL-4). If the new version owes a review, the whole act is refused `obligation-open`, and only the refusal is recorded |
@@ -4283,12 +4296,15 @@ The code-review declarations are those of note section 6:
 
 These continue section 32.1's list.
 
-46. **The room lease in a binding.** A hold without `leaseSeconds` binds
-    to the string `"room"`, not to the deployment's `LEASE_SECONDS`. A
-    room whose deployment changes its lease therefore changes those
-    threads' lease length with no activation. That keeps today's
-    behaviour, where the lease is deployment configuration. An
-    application that needs a fixed lease writes `leaseSeconds`.
+46. **The room lease in a binding** (settled after the checker's question
+    in the stage-1 review). A hold without `leaseSeconds` binds to the
+    string `"room"`, not to the deployment's `LEASE_SECONDS`, so a deploy
+    never changes a binding. When such a thread opens, the room resolves
+    its current numeric lease length and records it on the thread, and
+    R-DECL-6 and R-DECL-9 use that recorded value for the thread's life.
+    A change to the deployment's lease therefore affects only threads
+    opened afterwards, never an existing thread, and needs no activation.
+    This point is no longer open.
 47. **Where `kind-undeclared` is decided.** Note 5.1 places it at step 5,
     with the body check. This amendment places it first in step 4a,
     because the binding of step 4a can be compared only with a declared
