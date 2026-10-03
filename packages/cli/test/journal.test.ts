@@ -28,9 +28,22 @@ const idOf = (e: { seq: number; hash: string }) => `act_${e.seq}_${e.hash.slice(
 /** An answer from the room that says nothing was recorded and it must not be asked again in this run. */
 const NO_RETRY = { name: "ArtroomError", code: "unavailable", message: "The room is restarting.", retryable: false };
 
+const admin = () => connect({ room: async () => h.room.wire() }, h.room.id, { kind: "key", signer: h.room.admin.signer });
+
 async function revokeKey(home: string, reason: "retired" | "compromised"): Promise<void> {
-  const admin = await connect({ room: async () => h.room.wire() }, h.room.id, { kind: "key", signer: h.room.admin.signer });
-  await admin.roster({ op: "revoke-key", key: roomOf(home).key, reason });
+  await (await admin()).roster({ op: "revoke-key", key: roomOf(home).key, reason });
+}
+
+/**
+ * Lets the landing run to its end before anyone waits for it. The fake room moves a landing one state at each read,
+ * and a reader that waits is asked again every 20 ms. The admin reads it here instead, so a test whose subject is
+ * which operation the CLI follows, not how long it waits, finds the landing finished at its first read.
+ */
+async function landingRuns(home: string): Promise<void> {
+  h.room.landingPaused = false;
+  const op = { id: roomOf(home).landing.op, kind: "land" } as const;
+  const room = await admin();
+  for (let i = 0; i < 8 && (await room.op(op)).state !== "landed"; i++);
 }
 
 /** Alice's lane is proposed and approved by Bob: the next `land` is admitted. */
@@ -253,7 +266,7 @@ describe("the act journal outlives the local steps after the room's answer (revi
     expect(acts("land")).toHaveLength(1);
     expect(roomOf(home).landing.op).toMatch(/^op_land_\d+$/);
     expect(journal(home)).toEqual([]);
-    h.room.landingPaused = false;
+    await landingRuns(home);
     expect((await cli(home, ["wait"])).code).toBe(EXIT.ok);
   }
 
@@ -344,7 +357,7 @@ describe("the landing follow-up waits on the operation already started (review f
     expect(out.code).toBe(EXIT.failed);
     expect(norm(out.out)).toMatchSnapshot("wait timed out");
     const op = /artroom wait (op_land_\d+)/.exec(out.out)![1]!;
-    h.room.landingPaused = false;
+    await landingRuns(alice);
     const done = await cli(alice, ["wait", op]);
     expect(done.code).toBe(EXIT.ok);
     expect(acts("land")).toHaveLength(1);
