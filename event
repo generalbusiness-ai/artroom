@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f3e19db5b8f3cc8f120dbc18d85fc34ad5fbafe7","text":"Merge retired a covered predecessor; the successor is at plans/test-invariants.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f437ffe53fd9ae1c6abcd287ed6d94eb5b83e77a","text":"Merge retired a covered predecessor; the successor is at packages/log/tsconfig.build.json."}
