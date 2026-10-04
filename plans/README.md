@@ -2003,6 +2003,47 @@ The contract, `docs/protocol.md`, and the policy, room, git, client, MCP, CLI, c
 
 ## Declared acts stage 5 (request a5d64b35)
 
+### State at the integration head (written after the rest of this section)
+
+Stage 5 is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), where it is composed with stage 2 (approved at `4ec48aa1`, review `25bede37`), stage 3 and the MCP core. The branches `request/decl-stage5` and `request/decl-stage5-ui` stay at `db73dddc` and `5dc0d044`. Read this subsection first. It replaces the status paragraph and the four "must change before review" points below, which described a provisional head.
+
+**What changed since those four points were written.**
+
+- *"It is provisional."* No longer. The head contains stage 2 as reviewed, and the gate of [docs/testing.md](../docs/testing.md) runs at it. It is not composed on main, because main does not have stage 2 yet: the four lanes land together from this branch.
+- *"Its mutation evidence does not meet the standard."* That standard is superseded by request `ecbc722a` (review `b1738122`), not met. The guard counts in "The state of the evidence" are lists of where to look, not work owed. The mutation table below is history.
+- *"The repairs are tested against stand-in rooms."* Still true of most of them, and stated as a limit below.
+- *"The whole-head gates are owed."* Run at the head sent; the review request gives the result.
+
+**Conditions of the request.**
+
+| Condition | State |
+|---|---|
+| (1) every stage 5 surface: the declarations read, the generic signed act, the MCP `act` and `acts` tools, CLI submission and discovery, a UI that prepares and submits an application act | Delivered. The UI page is not wired to a live room (see limits) |
+| (2) signed meaning preserved: no silent rebind, exact retries, grant maps expanded before signing | Delivered. Witnesses in the map, under Client and Room |
+| (3) an act the client binary does not know, over HTTPS and MCP, and the listed refusals | Delivered. The stage 5 acceptance cases of the protocol (section 33.10) each have a witness; an audit of them against the test code found one part missing after the test reduction, since restored |
+| (4) stage ownership and the read-route seam | "Edits to files other stages own", below, stands |
+| (5) named red mutations; gates; one exact head | The mutation part is superseded by `ecbc722a`. Gates and one head: as above |
+
+**Findings.** Reviewers recorded twenty findings on this lane. Eighteen were repaired and confirmed by a reviewer before this branch; each has a section under "Since `b7b9d8df`". Two were open and are repaired at this head:
+
+| Finding | What was wrong | Repair | Witness |
+|---|---|---|---|
+| `61b68774`, `11c564ce`: the client's refusal of input that is not plain data changed | The client copied a target or body before checking it. A class instance was copied into a plain object and sent. A nested `Uint8Array` threw a raw `TypeError` | The value is checked before the copy, by the rule the signer's canonical form uses, and every failure is `bad-request`. Nothing is signed, copied or sent | `packages/client/test/prepared.test.ts`: "a target or body that is not plain data ...", a table of twelve values |
+| `4872a4a1`: a finishing run always said the saved act "was sent again" | When the journal already held the answer, nothing was sent | The message now says which happened: "That act was sent again as it was saved", or "That act had already been answered, and this is its result. Nothing was sent" | `packages/cli/test/declared.test.ts`: "a saved act whose answer the journal already holds ..." |
+
+One consequence of the first repair: a bearer session now refuses input that is not plain data too. Before, only a key handle did, at signing; a bearer would have sent it as JSON.
+
+Each repair has one control with `scripts/control.mjs` that distinguishes.
+
+**Limits, restated.**
+
+- Most repairs since `b7b9d8df` are shown against the client's stand-in room and the UI's memory room. The real Room is exercised by `packages/room/test/workerd/declared-stage5-a5d64b35.test.ts` (the declarations read, bindings, named methods, grants, the MCP `act` tool, old records), and four cases that were also shown against a real Room before the test reduction are now shown only against the stand-in (listed in the Room's known gaps in [test-invariants.md](test-invariants.md)).
+- The UI has never run against a real Room with a `v2` document, and the Acts page is not wired to a live room. It has no `because` input and no `recover` or platform kinds. The review screens keep the review application's words.
+- The browser suite (`npm run e2e` in `packages/ui`) is outside the gate and was last run at `c74f3696`.
+- `recover` has no client surface. The checker service still signs `v: 1`; stage 4 changes that.
+
+**Below, stale.** "For the planner or hugh", points 9 and 10, say stage 2 has moved and the MCP core lacks later commits; this head composes all of them. The UI's "Not done" list says a lost answer is not retried from the form; it is, since `f606dd89`. The quoted CLI message under `bdc35c53` is the "sent again" wording only.
+
 Status: implemented, provisional, not for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used. No reviewer has approved any head of this branch.
 
 How to read this section. The parts from "What was built" to "The UI" describe the composed head `b7b9d8df` as it was reported then: the stage 5 lane's work, the UI lane's work (`request/decl-stage5-ui`, `5dc0d044`), and the stage 2 code as it stood at `15fa7f4c`. They are not rewritten, except choices 19, 20 and 22, a note at the head of the mutation table and of the old gates, and the last list, "For the planner or hugh". The part "Since `b7b9d8df`" has one section for each finding the checker or the planner made on that head or a later one, with its repair. Where the two parts disagree, the later one is right.

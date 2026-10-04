@@ -45,6 +45,7 @@ Files are in `packages/client/test/`.
 |---|---|---|
 | Canonical bytes and signatures are fixed vectors, and a declared envelope's binding is inside the signed bytes. | R-SIG-1 to 3, R-ID-4, R-ID-10, R-DECL-16 | `signing.test.ts`; `workerd/signing.test.ts` |
 | A prepared act is the handle's own frozen copy. | R-IDEM-2, review 43e8fe3b | `prepared.test.ts`: "a prepared act is the handle's own copy" |
+| A target or body that is not plain data is `bad-request` before anything is signed, copied or sent. | R-SIG-6, review 61b68774 | `prepared.test.ts`: "a target or body that is not plain data" |
 | A retry sends what was first built, also after the vocabulary changed. | R-IDEM-1, R-IDEM-2, R-DECL-16 | `prepared.test.ts`: "a retry sends what was first built" |
 | A lost or cut-off answer is retried with the same bytes, a bounded number of times, with backoff. | R-IDEM-1 to 3, R-IDEM-6 | `room.test.ts`: "idempotent retries" |
 | Refusals are values and failures are `ArtroomError`s. | R-API-1, R-ID-3 | `room.test.ts`: "refusals are values" |
@@ -436,6 +437,7 @@ Files are in `packages/cli/test/`.
 | A release removes exactly the credential of the lease it released. | reviews 80d3710c, f7c79158, 17013617 | `workspace.test.ts`: "a release is bound" |
 | The destination lock names its holder, and whatever is in the way is named and never removed. | reviews 4758945b, 7040317d | `lock.test.ts` |
 | `artroom act` signs under the binding the user gave, and a receipt is in the words of the act's own seq. | R-DECL-16, R-DECL-23, R-IDEM-2 | `declared.test.ts` |
+| A run that finishes a saved act says what it did: sent it again, or found its answer already kept and sent nothing. | R-IDEM-2, review 4872a4a1 | `declared.test.ts`: "a saved act whose answer the journal already holds" |
 | Nothing the room sends can add a git setting or a shell word. | request 55be0661 | `hygiene.test.ts` |
 
 ### Removed or replaced
