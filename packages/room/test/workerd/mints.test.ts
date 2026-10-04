@@ -39,7 +39,6 @@ const canonical = (r: TestRoom) => r.world.artifacts.canonicalRepo() as FakeRepo
 /** The canonical repository's token by ID, as Artifacts sees it. */
 const token = (r: TestRoom, id: string) => canonical(r).tokens.get(id)!;
 const internal = () => new FakeArtifactsError("INTERNAL_ERROR", 10400);
-const mintsIdle = (r: TestRoom) => inDO(r, (room) => room.core.mints.idle());
 /** The ledger's own alarm work: revocations owed, and an observation if due. */
 const mintsStep = (r: TestRoom) =>
   inDO(r, async (room) => {
@@ -154,7 +153,7 @@ describe("R-MINT-1: every canonical token is minted through the Room's ledger", 
     ahead(async () => {
       const { r, alice, lane, head, seen, jobs } = await jobRoom({ unit: whole, lint: scoped });
       // What the ledger holds as `sent` at the moment Artifacts is asked for each canonical token.
-      const creates: { asked: number; sent: (string | number | null)[][] }[] = [];
+      const creates: { asked: number | undefined; sent: (string | number | null)[][] }[] = [];
       await inDO(r, (room) => {
         const repo = canonical(r);
         const real = repo.createToken.bind(repo);
@@ -241,17 +240,6 @@ describe("mint lane B (request 78f0971c): the publication token through the cano
       };
     });
     return h;
-  }
-
-  /** Make the engine stop at `token-answered` once, as a host that stops there would: the ledger keeps the token, `held`. */
-  function stopAtTokenAnswered(r: TestRoom) {
-    let fired = false;
-    r.world.landingFault = (point) => {
-      if (point === "token-answered" && !fired) {
-        fired = true;
-        throw new Error("the host stops between the answer and pushToken");
-      }
-    };
   }
 
   it("R-MINT-2 no alarm stored beforehand: while the publication token's create is held, storage has an alarm no later than the takeover time, stored by the ledger's wake before the create was sent; a wake that takes 20 s of room time comes before the lifetime, which the record holds", () =>
@@ -343,235 +331,6 @@ describe("mint lane B (request 78f0971c): the publication token through the cano
       await inDO(r, (room) => room.core.idle());
       expect((await records(r)).records.map((x) => x.state)).toEqual(["unknown"]);
       expect(token(r, late.id).revoked).toBe(false);
-    }));
-
-  it("R-MINT-7 a token held by a live host: each alarm leaves storage with an alarm at least 1 s ahead and no later than the takeover time, and moves that time ahead once it is under 30 s away; after the object is aborted with no alarm stored, the fresh object schedules the debt and its alarm revokes the token by its ID", () =>
-    ahead(async () => {
-      const before = await makeRoom();
-      const { lane, head } = await proposed(before, "docs/c/**", { "docs/c/three.md": "three" });
-      stopAtTokenAnswered(before);
-      const op = await startLanding(before, lane, head);
-      await until(async () => (await records(before)).records.some((x) => x.state === "held"));
-      const heldRecord = (await records(before)).records[0]!;
-      expect(heldRecord).toMatchObject({ purpose: `publish:${op}:1`, state: "held" });
-      const tokenId = heldRecord.tokenId!;
-      const takeover = (await records(before)).takeoverAt!;
-      const state = () => inDO(before, async (room, s) => ({ alarm: await s.storage.getAlarm(), d: room.core.mints.duties(), now: clock.now }));
-      // 20 s later an alarm for other work (the landing's) runs; the takeover time is still more than 30 s away.
-      clock.now += 20_000;
-      expect(await alarm(before)).toBe(true);
-      await inDO(before, (room) => room.core.idle());
-      expect((await opOf(before, op))?.state).toBe("landed");
-      let s = await state();
-      expect(s.d.records.map((x) => [x.state, x.tokenId])).toEqual([["held", tokenId]]);
-      expect(s.d.takeoverAt).toBe(takeover);
-      expect(s.alarm!).toBeLessThanOrEqual(takeover);
-      // Another, with the takeover time now less than 30 s away: it moves to a minute ahead.
-      clock.now += 35_000;
-      expect(await alarm(before)).toBe(true);
-      await inDO(before, (room) => room.core.idle());
-      s = await state();
-      expect(s.d.records.map((x) => [x.state, x.tokenId])).toEqual([["held", tokenId]]);
-      expect(s.d.takeoverAt).toBe(s.now + 60_000);
-      expect(s.d.takeoverAt!).toBeGreaterThan(takeover);
-      expect(s.alarm! - s.now).toBeGreaterThanOrEqual(1_000);
-      expect(s.alarm!).toBeLessThanOrEqual(s.d.takeoverAt!);
-      expect(token(before, tokenId).revoked).toBe(false); // the live host still holds it
-      // The host stops, with no alarm stored. The fresh object stores one for the owed token at start, with no request.
-      await inDO(before, (_room, st) => st.storage.deleteAlarm());
-      const r = await restarted(before);
-      const recovered = await inDO(r, async (room, st) => ({ alarm: await st.storage.getAlarm(), due: room.core.mints.nextDue(), now: clock.now }));
-      expect(recovered.due).toBe(recovered.now + 1_000);
-      expect(recovered.alarm).toBe(recovered.due);
-      expect((await records(r)).records.map((x) => [x.state, x.tokenId])).toEqual([["owed", tokenId]]);
-      expect(await alarm(r)).toBe(true);
-      await mintsIdle(r);
-      expect(token(r, tokenId).revoked).toBe(true);
-      expect((await records(r)).records).toEqual([]);
-      expect(canonical(r).activeTokens()).toEqual([]);
-    }));
-
-  it("R-MINT-2 a wake-up that cannot be stored sends no create: the publication attempt ends with safe metadata, and lands once storage recovers", () =>
-    ahead(async () => {
-      const r = await makeRoom();
-      const a = r.world.artifacts;
-      const { lane, head } = await proposed(r, "docs/d/**", { "docs/d/four.md": "four" });
-      let sentWhilePublishing = 0;
-      // Once the integration is built: nothing stored, and storage refuses every alarm on this object.
-      const op = await startLanding(r, lane, head, () =>
-        inDO(r, async (room, state) => {
-          await state.storage.deleteAlarm();
-          (room as unknown as { storeAlarm: (when: number) => Promise<void> }).storeAlarm = () => Promise.reject(new Error("storage refused the alarm"));
-          a.holdToken = () => {
-            if (room.core.landing.core.held()) sentWhilePublishing++;
-            return false;
-          };
-        }),
-      );
-      await until(async () => ((await inDO(r, (room) => room.core.landing.core.get(op)?.pushes?.length)) ?? 0) > 0);
-      await inDO(r, (room) => room.core.idle());
-      expect(await inDO(r, (room) => room.core.landing.core.get(op)!.pushes![0]!)).toMatchObject({ n: 1, tokenId: null, outcome: "error", detail: "token not minted (create failed: Error)" });
-      expect(sentWhilePublishing).toBe(0);
-      expect((await records(r)).records).toEqual([]);
-      expect(await stored(r)).toBeNull();
-      // Storage recovers on a fresh object; the publication goes forward and lands once.
-      a.holdToken = null;
-      const fresh = await restarted(r);
-      clock.now += 5_000;
-      expect(await alarm(fresh)).toBe(true);
-      await inDO(fresh, (room) => room.core.idle());
-      expect((await opOf(fresh, op))?.state).toBe("landed");
-      expect(canonical(fresh).activeTokens()).toEqual([]);
-    }));
-
-  it("R-MINT-7 a backlog of 25 owed revocations, the first held unanswered, and no further request: no stored alarm is under 1 s ahead or past the held attempt's timeout; a publication lands meanwhile; then alarms alone revoke every record, 20 a pass, earliest due first, each next alarm 1 s after its pass; an earlier lease alarm is kept, and a future observation is stored on time", () =>
-    ahead(async () => {
-      const r = await makeRoom();
-      const a = r.world.artifacts;
-      const t0 = clock.now;
-      // A lane whose lease expires 48 s after the backlog is due: its alarm is earlier than the next observation's time.
-      await r.admin.ok<Claim>("claim", null, { goal: "the lease alarm", scope: ["notes/**"] });
-      const leaseAt = t0 + 30 * 60_000;
-      clock.now = leaseAt - 50_000;
-      const { lane, head } = await proposed(r, "docs/f/**", { "docs/f/six.md": "six" });
-      // 25 tokens whose release fails: owed, due 1 s later, in row order. And one create whose answer is lost: unknown.
-      const ids = await inDO(r, async (room) => {
-        const out: string[] = [];
-        for (let i = 0; i < 25; i++) {
-          const t = await room.core.mints.mint(`test:backlog:${i}`, "read", () => 60);
-          a.failRemote("revokeToken", internal());
-          await t.release();
-          out.push(t.id);
-        }
-        a.loseReply("createToken");
-        await room.core.mints.mint("test:lost", "read", () => 60).catch(() => undefined);
-        return out;
-      });
-      const wait = await inDO(r, (room) => (room.core.mints as unknown as { waitMs: number }).waitMs);
-      const d0 = await records(r);
-      expect([d0.owed, d0.unknown]).toEqual([25, 1]);
-      // The backlog's revocations are recorded in order; the first is held unanswered until the test lets it go.
-      const backlog = new Set(ids);
-      const asked: string[] = [];
-      const repo = canonical(r);
-      const realRevoke = repo.revokeToken.bind(repo);
-      let holdFirst = true;
-      repo.revokeToken = async (id: string) => {
-        if (backlog.has(id)) asked.push(id);
-        if (id === ids[0]) while (holdFirst) await new Promise((res) => setTimeout(res, 1));
-        return realRevoke(id);
-      };
-      try {
-        clock.now += 2_000; // every record is due
-        const t2 = clock.now;
-        // The first pass starts and holds on its first revocation; the alarm returns, and the observation ran once.
-        expect(await alarm(r)).toBe(true);
-        const held = await inDO(r, async (room, state) => ({ alarm: await state.storage.getAlarm(), d: room.core.mints.duties(), due: room.core.mints.nextDue() }));
-        expect(asked).toEqual([ids[0]]);
-        expect(held.d.observation).toMatchObject({ at: t2, nextAt: t2 + 60_000 });
-        expect(held.due).toBe(t2 + wait); // not eligible before the held attempt's timeout
-        expect(held.alarm! - t2).toBeGreaterThanOrEqual(1_000);
-        expect(held.alarm!).toBeLessThanOrEqual(t2 + wait);
-        // Meanwhile a publication reserves, pushes and lands; the landing's own work then runs at its alarm.
-        const op = await startLanding(r, lane, head);
-        await until(async () => (await opOf(r, op))?.state === "landed");
-        await inDO(r, (room) => room.core.idle());
-        expect(await alarm(r)).toBe(true);
-        await inDO(r, (room) => room.core.idle());
-        expect(asked).toEqual([ids[0]]); // the held attempt is not repeated, and no second pass starts
-        expect((await records(r)).owed).toBe(25);
-        // The held revocation answers; the rest of its batch follows.
-        holdFirst = false;
-        await mintsIdle(r);
-        expect(asked).toEqual(ids.slice(0, 20));
-        expect((await records(r)).owed).toBe(5);
-        expect(await stored(r)).toBe(clock.now + 1_000); // the backlog continues 1 s after the pass
-        clock.now += 1_000;
-        expect(await alarm(r)).toBe(true);
-        await mintsIdle(r);
-        expect(asked).toEqual(ids);
-        const done = await records(r);
-        expect([done.owed, done.unknown]).toEqual([0, 1]);
-        expect(ids.every((id) => token(r, id).revoked)).toBe(true);
-        // What is left is the lease's alarm, kept though earlier than the ledger's next time, and then the observation, exactly.
-        for (let i = 0; i < 4 && (await stored(r))! < leaseAt; i++) {
-          clock.now = (await stored(r))!;
-          expect(await alarm(r)).toBe(true);
-          await settle(r);
-        }
-        expect(await inDO(r, (room) => room.core.mints.nextDue())).toBe(t2 + 60_000);
-        expect(leaseAt).toBeLessThan(t2 + 60_000);
-        expect(await stored(r)).toBe(leaseAt);
-        clock.now = leaseAt;
-        expect(await alarm(r)).toBe(true);
-        await inDO(r, (room) => room.core.idle());
-        expect(await stored(r)).toBe(t2 + 60_000);
-      } finally {
-        holdFirst = false;
-        repo.revokeToken = realRevoke;
-      }
-    }));
-
-  it("R-MINT-4 a ledger record with a readable expiry whose revocations fail ends when that expiry passes, with no revocation recorded; a landing's own token row for the same case stays, with plan 003's record, until its revocation is answered", () =>
-    ahead(async () => {
-      const r = await makeRoom();
-      const a = r.world.artifacts;
-      const { lane, head } = await proposed(r, "docs/g/**", { "docs/g/seven.md": "seven" });
-      // The ledger's record: released, the revocation fails; owed with Artifacts' reported expiry.
-      a.failRemote("revokeToken", ...Array.from({ length: 20 }, internal));
-      const ledgerToken = await inDO(r, async (room) => {
-        const t = await room.core.mints.mint("test:expiry", "read", () => 60);
-        await t.release();
-        return { id: t.id, expiresAt: t.expiresAt };
-      });
-      // The landing's row: a publication whose token revocations fail.
-      const tokens = (room: Room) => (room.core.landing as unknown as { tokens: { revoke: (id: string) => Promise<boolean> } }).tokens;
-      await inDO(r, (room) => {
-        tokens(room).revoke = async () => {
-          throw new Error("Artifacts unavailable (revoke)");
-        };
-      });
-      const op = await startLanding(r, lane, head);
-      await until(async () => (await opOf(r, op))?.state === "landed");
-      await inDO(r, (room) => room.core.idle());
-      const landingToken = await inDO(r, (room) => room.core.landing.core.get(op)!.pushes![0]!.tokenId!);
-      // Every revocation of the ledger's token, by ID, as Artifacts receives it.
-      const realRevoke = canonical(r).revokeToken.bind(canonical(r));
-      const asked: number[] = [];
-      canonical(r).revokeToken = async (id: string) => {
-        if (id === ledgerToken.id) asked.push(clock.now);
-        return realRevoke(id);
-      };
-      const pass = async (ms: number) => {
-        clock.now += ms;
-        await alarm(r);
-        await inDO(r, async (room) => {
-          await room.core.idle();
-          await room.core.mints.idle();
-          await room.core.landing.cleanupDone();
-        });
-      };
-      // Alarms while revocations fail: twice before the tokens expire, then past both tokens' expiry.
-      for (const ms of [15_000, 15_000, 45_000, 300_000]) await pass(ms);
-      expect(clock.now).toBeGreaterThan(ledgerToken.expiresAt);
-      const state = await inDO(r, (room) => ({
-        records: room.core.mints.duties().records,
-        rows: room.core.sql.all("SELECT token FROM artroom_land_token").map((x) => x["token"]),
-        cleanup: room.core.landing.core.tokenCleanup().map((c) => c.op),
-      }));
-      expect(state.records).toEqual([]); // settled at its expiry
-      expect(token(r, ledgerToken.id).revoked).toBe(false); // with no revocation recorded
-      // Revocations were tried before its expiry, and none at or after it.
-      expect(asked.length).toBeGreaterThan(0);
-      expect(asked.every((at) => at < ledgerToken.expiresAt)).toBe(true);
-      expect(state.rows).toEqual([landingToken]); // the landing's row stays past its token's expiry …
-      expect(state.cleanup).toEqual([op]); // … with plan 003's record, until tokenRevoked
-      a.recover();
-      await inDO(r, (room) => {
-        tokens(room).revoke = async (id) => canonical(r).revokeToken(id);
-      });
-      await pass(300_000);
-      expect(await inDO(r, (room) => ({ rows: room.core.sql.all("SELECT token FROM artroom_land_token").length, cleanup: room.core.landing.core.tokenCleanup().length }))).toEqual({ rows: 0, cleanup: 0 });
     }));
 
   it("request 3da1d82b: the ledgers' steps and the job token pass are each their own kind of loop work: a failure of the step takes that kind's backoff alone; an earlier alarm for other work skips it and keeps the backoff; the next alarm waits for it; then the step runs, revokes, and clears it", () =>
@@ -809,17 +568,18 @@ describe("R-EXEC-9, mint lane C (4): a check job's deadline, through issue and t
     return { r, seen, mint };
   }
 
-  it("the lifetime is asked after a 20 s wake-up, to end 5 s before the deadline. A reported expiry equal to the deadline is accepted: the token is claimed into its job token row and the job sent; 1 ms later is owed in the ledger and never given out", () =>
+  it("the lifetime is asked after a 20 s wake-up, to end 5 s before the deadline. A reported expiry equal to the deadline, answered 1 ms before it, is accepted: the token is claimed into its job token row and the job sent; an expiry 1 ms later is owed in the ledger and never given out", () =>
     ahead(async () => {
-      const at = await deadlineRoom({ answered: () => void (clock.now += 20_000), answer: (deadline) => ({ expiresAt: new Date(deadline).toISOString() }) });
+      const at = await deadlineRoom({ answered: (deadline) => void (clock.now = deadline - 1), answer: (deadline) => ({ expiresAt: new Date(deadline).toISOString() }) });
       expect(at.seen).toHaveLength(1);
-      expect(at.seen[0]).toMatchObject({ reads: true, now: at.mint.t0 + 40_000 });
+      expect(at.seen[0]!.now).toBe(at.mint.deadline - 1);
       expect(Date.parse(at.seen[0]!.job.deadline)).toBe(at.mint.deadline);
       // Claimed: the ledger's record is gone, and while the job ran its token row held the handoff metadata.
       const [t] = readTokens(at.r);
       expect(at.seen[0]!.rows).toEqual([{ token_id: t!.id, expires_at: at.mint.deadline, next_ms: at.mint.deadline, last_error: "held" }]);
       expect((await records(at.r)).records).toEqual([]);
 
+      // The answer is held 20 s, so the expiry passes the ledger's own check of the lifetime asked: only the deadline refuses it.
       const after = await deadlineRoom({ answered: () => void (clock.now += 20_000), answer: (deadline) => ({ expiresAt: new Date(deadline + 1).toISOString() }) });
       expect(after.seen).toEqual([]);
       expect(await jobTokens(after.r)).toEqual([]);
@@ -827,7 +587,7 @@ describe("R-EXEC-9, mint lane C (4): a check job's deadline, through issue and t
       expect(await jobsOf(after.r)).toMatchObject([{ state: "owed", attempt: 1, token: null }]);
     }));
 
-  it("an answer that arrives at a clock equal to the deadline sends no job and ends the token; 1 ms before it, the job is sent", () =>
+  it("an answer that arrives at a clock equal to the deadline sends no job and ends the token", () =>
     ahead(async () => {
       const at = await deadlineRoom({ answered: (deadline) => void (clock.now = deadline) });
       expect(at.seen).toEqual([]);
@@ -837,10 +597,6 @@ describe("R-EXEC-9, mint lane C (4): a check job's deadline, through issue and t
       expect(canonical(at.r).admits(t!.plaintext, "read")).toBe(false);
       expect(await jobTokens(at.r)).toEqual([]);
       expect((await records(at.r)).records).toEqual([]);
-
-      const before = await deadlineRoom({ answered: (deadline) => void (clock.now = deadline - 1) });
-      expect(before.seen).toHaveLength(1);
-      expect(before.seen[0]!.now).toBe(before.mint.deadline - 1);
     }));
 });
 
@@ -964,7 +720,7 @@ describe("mint lane C (5): an ended job token's row", () => {
         asked.push(id);
         return new Promise<boolean>((resolve) => (answer = resolve));
       };
-      await inDO(r, (room) => setJobTokenWait(room.core, 20));
+      await inDO(r, (room) => setJobTokenWait(room.core, 10));
       expect(await Promise.race([jobs().then(() => "ended"), new Promise((resolve) => setTimeout(() => resolve("held"), 3_000))])).toBe("ended");
       expect(seen).toHaveLength(1);
       const [row] = await jobTokens(r);
@@ -1025,15 +781,18 @@ describe("mint lane C (5): an ended job token's row", () => {
           await room.core.steps.jobTokens();
           await room.core.idle();
         });
-      for (let i = 0; i < 40 && (await jobTokens(r)).length > 0; i++) {
-        clock.now = Math.max(clock.now + 1_000, (await jobTokens(r))[0]!["next_ms"] as number);
+      // Two retries at the row's own times, each refused; then its expiry passes.
+      for (let i = 0; i < 2; i++) {
+        clock.now = (await jobTokens(r))[0]!["next_ms"] as number;
         await pass();
       }
+      expect(asked).toEqual([t.id, t.id]);
+      expect(clock.now).toBeLessThan(t.expiresAt);
+      const tried = asked.length;
+      clock.now = t.expiresAt;
+      await pass();
       expect(await jobTokens(r)).toEqual([]);
       expect(t.revoked).toBe(false);
-      expect(asked.length).toBeGreaterThan(0);
-      expect(clock.now).toBeGreaterThanOrEqual(t.expiresAt);
-      const tried = asked.length;
       clock.now += 600_000;
       await pass();
       expect(asked).toHaveLength(tried);

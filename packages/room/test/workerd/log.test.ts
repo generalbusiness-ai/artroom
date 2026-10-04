@@ -11,11 +11,10 @@
 
 import { describe, expect, it } from "vitest";
 import { evictDurableObject, runDurableObjectAlarm } from "cloudflare:test";
-import type { AttentionItem, CheckerConfig, Claim, Landing, LogEntry, Note, PolicyDocument, Sha, SystemEvent, WorkspaceOp } from "@generalbusiness/artroom-contract";
+import type { AttentionItem, CheckerConfig, Claim, EnvelopeKind, Landing, Note, PolicyDocument, Sha, SystemEvent, WorkspaceOp } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck, rule } from "@generalbusiness/artroom-policy/helpers";
 import { forkName, type LogPushRequest, type LogStageRequest } from "@generalbusiness/artroom-git";
 import { READ_LIMITS, verifyLog, type GitReader } from "@generalbusiness/artroom-log";
-import type { Room } from "../../src/index.ts";
 import { ALARM } from "../../src/budgets.ts";
 import { digestJson } from "../../src/crypto.ts";
 import { FakeArtifactsError } from "../../src/memory/artifacts.ts";
@@ -23,7 +22,7 @@ import { entries, events, idOf, inDO, kindOf, land, opOf, proposed, read, stubOf
 import { advance, call, clock, expectOk, failure, hour, iso, makeRoom, openedWorkspace, pushChange, tick, type TestRoom } from "./support.ts";
 
 const minute = 60_000;
-const notifying = (id: string, on: string, why: string): PolicyDocument => policy(rule({ id, kind: "notify", on: [on], to: ["role:admin"], why }));
+const notifying = (id: string, on: EnvelopeKind, why: string): PolicyDocument => policy(rule({ id, kind: "notify", on: [on], to: ["role:admin"], why }));
 
 describe("section 23, Log construction (R-LOG-2, R-LOG-7, R-LOG-8, R-LOG-12, R-LOG-13)", () => {
   it("a new claim, its notified event, and the first two publications, in the order of the worked example; each decision's replay context and the policy are published under their digests; both commits verify, and a tampered entry does not", async () => {
@@ -352,18 +351,18 @@ describe("request 3da1d82b: failing work backs off, and each kind of work keeps 
 
   /**
    * A cold instance (evicted, so `isBound` has no cached answer) whose
-   * registry lookup throws (an outage) or answers that the repository is not
-   * bound to this room. The lookup itself is replaced, on this object only.
+   * registry lookup throws, as in an outage. The lookup itself is replaced,
+   * on this object only. (A registry that answers "not bound" is in
+   * founding.test.ts, R-PUB-10.)
    */
-  async function coldRegistry(room: TestRoom, answer: "throws" | "not bound"): Promise<void> {
+  async function coldRegistry(room: TestRoom): Promise<void> {
     await evictDurableObject(room.stub);
     await inDO(room, (r) => {
       expect((r.core as unknown as { boundCache: boolean }).boundCache).toBe(false);
       const core = r.core as { bound: (repo: string, id: string, name: string) => Promise<boolean>; realBound?: unknown };
       core.realBound = core.bound;
       core.bound = async () => {
-        if (answer === "throws") throw new Error("registry unavailable");
-        return false;
+        throw new Error("registry unavailable");
       };
     });
   }
@@ -374,31 +373,29 @@ describe("request 3da1d82b: failing work backs off, and each kind of work keeps 
     });
 
   // The checker's controls (review of 12227d41): a failure before the work begins backs off too.
-  for (const answer of ["throws", "not bound"] as const)
-    it(`a publication on a cold instance whose registry ${answer === "throws" ? "throws" : "answers not bound"} (R-PUB-10): it fails closed, backs off 5, 10, 20, 40, 80 s, ${answer === "throws" ? "and is logged each time" : "and is not logged"}; when the registry answers again the next retry publishes`, async () => {
-      const room = await released();
-      await coldRegistry(room, answer);
-      const pushes = room.world.log.pushes;
-      const ran = await alarmsUntil(room, clock.now + 10 * minute);
-      expect(gapsOf(ran).slice(0, 5)).toEqual([5_000, 10_000, 20_000, 40_000, 80_000]);
-      // Fail-closed: nothing was pushed, nothing is published.
-      expect(room.world.log.pushes).toBe(pushes);
-      expect(room.world.log.ref).toBeNull();
-      expect((await read(room, { q: "log" })).publishedThrough).toBe(-1);
-      expect(await inDO(room, (r) => JSON.parse(r.core.sql.all("SELECT v FROM meta WHERE k = 'publication_retry'")[0]!["v"] as string).attempts)).toBe(ran.length);
-      const logged = room.world.diagnoses.filter((d) => d.event === "publication-failed" && d.step === "publish");
-      expect(logged.map((d) => d.message)).toEqual(answer === "throws" ? ran.map(() => "registry unavailable") : []);
-      // A forced publication says why, as before.
-      expect((await failure(room.stub.publishLog())).code).toBe(answer === "throws" ? "unavailable" : "forbidden");
-      await registryBack(room);
-      await alarmsUntil(room, clock.now + 10 * minute);
-      expect((await read(room, { q: "log" })).publishedThrough).toBeGreaterThanOrEqual(2);
-    });
+  it("a publication on a cold instance whose registry throws (R-PUB-10): it fails closed, backs off 5, 10, 20, 40, 80 s, and is logged each time; when the registry answers again the next retry publishes", async () => {
+    const room = await released();
+    await coldRegistry(room);
+    const pushes = room.world.log.pushes;
+    const ran = await alarmsUntil(room, clock.now + 10 * minute);
+    expect(gapsOf(ran).slice(0, 5)).toEqual([5_000, 10_000, 20_000, 40_000, 80_000]);
+    // Fail-closed: nothing was pushed, nothing is published.
+    expect(room.world.log.pushes).toBe(pushes);
+    expect(room.world.log.ref).toBeNull();
+    expect((await read(room, { q: "log" })).publishedThrough).toBe(-1);
+    expect(await inDO(room, (r) => JSON.parse(r.core.sql.all("SELECT v FROM meta WHERE k = 'publication_retry'")[0]!["v"] as string).attempts)).toBe(ran.length);
+    expect(room.world.diagnoses.filter((d) => d.event === "publication-failed" && d.step === "publish").map((d) => d.message)).toEqual(ran.map(() => "registry unavailable"));
+    // A forced publication says why, as before.
+    expect((await failure(room.stub.publishLog())).code).toBe("unavailable");
+    await registryBack(room);
+    await alarmsUntil(room, clock.now + 10 * minute);
+    expect((await read(room, { q: "log" })).publishedThrough).toBeGreaterThanOrEqual(2);
+  });
 
   it("a landing on a cold instance whose registry throws: it fails closed and backs off, instead of asking for the alarm at once; when the registry answers again the operation lands", async () => {
     const room = await makeRoom();
     const { lane, head } = await proposed(room, room.admin, ["src/**"], { "src/app.ts": "v2" });
-    await coldRegistry(room, "throws");
+    await coldRegistry(room);
     const l = await land(room.admin, lane, head);
     // The engine has an accepted operation: it is due at once, every time it is asked.
     expect(await inDO(room, (r) => r.core.landing.nextDue())).toBe(clock.now);

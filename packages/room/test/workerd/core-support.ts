@@ -33,7 +33,7 @@ export const kindOf = (e: LogEntry) => (e.entry.type === "system" ? e.entry.even
 
 /** The system events of one type, with their seq. */
 export function events<T extends SystemEvent["type"]>(log: readonly LogEntry[], type: T): { seq: number; id: string; event: Extract<SystemEvent, { type: T }> }[] {
-  return log.filter((e) => e.entry.type === "system" && e.entry.event.type === type).map((e) => ({ seq: e.seq, id: idOf(e), event: (e.entry as { event: Extract<SystemEvent, { type: T }> }).event }));
+  return log.filter((e) => e.entry.type === "system" && e.entry.event.type === type).map((e) => ({ seq: e.seq, id: idOf(e), event: (e.entry as unknown as { event: Extract<SystemEvent, { type: T }> }).event }));
 }
 
 /** R-LOG-1, R-LOG-2: seqs count from 0 with no gap, each hash is its content's digest, and each entry names the one before. */

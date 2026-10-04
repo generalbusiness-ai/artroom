@@ -26,7 +26,7 @@ import { route } from "../../src/http.ts";
 import type { RoomEnv } from "../../src/config.ts";
 import type { CallerView } from "../../src/requests.ts";
 import { artifactsErrors } from "../../src/memory/artifacts.ts";
-import { entries, headSeq, inDO, once, opOf, roomBearer } from "./core-support.ts";
+import { headSeq, inDO, once, opOf, roomBearer } from "./core-support.ts";
 import { addMember, b64url, call, Client, clock, day, DECLARED, digestBytes, expectOk, failure, iso, makeRoom, newKeyPair, pushChange, randomBytes, sign, tick, type TestRoom } from "./support.ts";
 
 const base = "https://artroom.test/v1/rooms";
@@ -570,7 +570,7 @@ describe("bearer acts and the MCP route (R-CRED-3, R-CRED-10)", () => {
   });
 
   it("the official MCP client against the Worker, pinned to 2026-07-28 and in legacy stateless mode: it lists the tools with object-rooted output schemas, and a refusal conforms to its schema", async () => {
-    const { room, agent } = await mcp();
+    const { agent } = await mcp();
     for (const [i, mode] of ([{ pin: "2026-07-28" }, "legacy"] as VersionNegotiationMode[]).entries()) {
       const c = new McpClient({ name: "room-mcp-test", version: "0.0.0" }, { versionNegotiation: { mode } });
       await c.connect(
