@@ -73,10 +73,91 @@ A retried bearer act gets its original result while the token is valid.
 After the token is revoked or expires, the room refuses it with
 `unauthenticated`: there is no signed envelope to send again.
 
+## Acts a room declares
+
+A room may declare its own acts in its policy document (docs/protocol.md
+section 33). Read them, then act with the binding you read:
+
+```ts
+const catalogue = await room.acts();            // the active declarations
+if (catalogue.vocabulary === "declared") {
+  const { declaration, binding } = catalogue.acts["take-part"];
+  const out = await room.act("take-part", null, { part: "bass" }, { binding });
+}
+```
+
+- `acts()` always reads the room. A room whose active document is `v1`
+  answers `{ vocabulary: "artroom-legacy-v1" }`: it declares nothing, and
+  the named methods are the way to act.
+- `act()` needs the binding. It names the meaning you read. The handle
+  signs exactly what you give it in envelope `v: 2`. It never reads the
+  catalogue, replaces the binding or signs again on its own.
+- If the room answers `binding-stale`, the kind's meaning changed. The
+  refusal's `current` has the active binding and policy version. Read
+  `acts()` again, look at the declaration, and call `act()` with the new
+  binding only if that meaning is still what you intend.
+- `fieldsOf(declaration, shape)` lists the body fields an act takes on a
+  target, with their types. `targetsOf(declaration)` lists the targets.
+- A prepared act keeps its binding, so `replay()` sends the same bytes.
+
+The named methods (`claim`, `propose`, `note`, `review`, `check`, `land`,
+`release`) keep working. In a `v2` room each signs `v: 2` with the binding
+of the code-review declaration it was built for, under the room's steps
+version and `lanes`. A room whose declaration of that kind differs refuses
+it `binding-stale`. The handle reads the catalogue once for this, and reads
+it again after such a refusal. `renew` and `roster` are platform kinds and
+stay `v: 1`.
+
+To show an old record, use the declarations of its own seq, not the active
+ones: `meaningOf(await room.actsAt({ seq: entry.seq }), kind)` gives the
+label, and `retired` when a later policy version dropped the kind. The
+handle keeps ended versions, so entries of one version cost one read. The
+`explain` read already carries `meaning`.
+
+An ended version's declarations never change, but its `retired` marks can:
+a later activation may drop one of its kinds. The handle drops the versions
+it kept when it sees a later activation, in `acts()`, another `actsAt()`
+answer, a `log()` page, an update, or a refusal that names the active
+policy version. An answer that arrives after the handle learnt of a later
+activation from another answer is returned to its caller but not kept: it
+may have been read before that activation. A handle that has seen nothing
+since may answer the marks it read. `actsAt(at, { fresh: true })` always
+reads the room.
+
+`envelopeOf(entry)` gives a log entry's envelope in either version, with a
+declared act's `binding`, or null for a system entry.
+
+A `Lane` has `kind`: the kind of the act that opened the thread. The acts
+that may act on it are those whose declaration's `threads` names that kind.
+A thread opened by an application's own act may have no goal.
+`threadTitle(lane, { meaning, body })` gives the name every reader uses:
+the goal, or else the opening act's label and its first text field by name
+(`titleOf`). "Text" is the type the act's own declaration gave the field
+when the thread opened, so pass the `meaning` of the opening act's own seq.
+With no text field present, or with only a label at hand, it is the first
+field by name. The opening act's ID is the lane's ID, so one
+`explain(lane.lane)` gives both the `meaning` and, through `envelopeOf`,
+the body.
+
+To grant in a `v2` room, build the op with `delegateOp(room, role, { to,
+kinds, lanes, expiresAt })` or the session with `invitationSession(room,
+role, { kinds, ttlSeconds })`. `*` or a list of kinds becomes platform
+kinds and a signed map from each declared kind to its active binding. A
+kind the role may not grant is an error, not a smaller grant. A kind added
+later is not covered.
+
+With a bearer token, `act()` goes to the MCP tool `act` over HTTPS, and to
+`bearerAct` over a service binding, with your binding unchanged. The fixed
+`check` and `roster` methods are still refused over HTTPS.
+
 ## Finishing an act after a restart
 
 Act methods also take `onPrepared`, which receives the act once it is
-resolved and, for a key, signed. Save it. Later, `resubmit({ url }, roomId,
+resolved and, for a key, signed. Save it. The prepared act holds the
+handle's own frozen copy of the target and body, taken before signing: you
+may change or reuse the objects you passed in, and the saved act stays the
+bytes that were signed. A target or body that is not plain data is
+`bad-request`. Later, `resubmit({ url }, roomId,
 signed)` sends the signed envelope straight back to the room, unchanged.
 It needs no handle, read session or new signature, so it works even after
 the key is retired or revoked, and the room returns the original result
@@ -133,6 +214,31 @@ removed.
 `npm test` runs the Node tests against a fake room (in `test/support`)
 that implements the HTTPS routes and `RoomWire`, and the signing vectors
 inside workerd. Tests name the rules they check.
+
+The fake room is a stand-in. The tests show what the client signs, sends,
+retries, keeps and returns; the Room's own rules are tested in
+`packages/room`. The test files, by what they protect:
+
+| File | What it protects |
+|---|---|
+| `test/signing.test.ts` | Canonical bytes, the signing vectors, and the declared envelope's bytes |
+| `test/room.test.ts` | Refusals as values, retries with the same bytes, waits, sessions, cursors, the watch's reconnect and stop, RPC, and no credential in any output. It holds the client cases of review f47a509c, P1 and P2 |
+| `test/prepared.test.ts` | A prepared act is the handle's own copy, and a retry sends what was first built. It holds review 43e8fe3b's first finding and review f47a509c, P4 |
+| `test/catalogue.test.ts` | `acts()` and `actsAt()`: what the handle keeps never takes a reader back behind an activation it has seen. It holds review 43e8fe3b's second finding |
+| `test/declared.test.ts` | The generic act, the named methods' built-for binding, bearer sessions and grants |
+| `test/titles.test.ts` | What readers call a record and a thread (decision c37653e1) |
+| `test/redeem.test.ts` | Redemption in both custodies, with lost and refused responses |
+| `test/updates.test.ts` | The RPC update decoder's stream lifecycle (review 17013617) |
+| `test/agents-md.test.ts` | The generated AGENTS.md block |
+| `test/contract.types.ts` | No test to run: `npm run typecheck` checks that the client has the contract's declared types |
+
+The tests pass `backoff: () => 1` in `ClientOptions`, so a retry or a
+reconnect waits 1 ms. One test in `test/room.test.ts` checks the waits the
+client chooses without that option.
+
+The sections above and below record earlier reviews as they were answered.
+Where they name `test/review-*.test.ts` files or test titles of this
+package, the cases are now in the files of this table.
 
 ## Review f7c79158
 

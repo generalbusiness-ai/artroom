@@ -4,7 +4,7 @@
  * and the same actions always give the same snapshot.
  */
 
-import type { ActId, MemberId, Note, NoteAnchor, ProposalAt, ProposalRef, Result, Review } from "../contract.ts";
+import type { ActId, Catalogue, DeclaredRecord, MemberId, Note, NoteAnchor, ProposalAt, ProposalRef, Result, Review, Seq } from "../contract.ts";
 import type { ChangeHistory, DraftRule, DryRunResult, FileDiff, ReviewDraft, RoomAdapter, RoomSnapshot, Timeline, Why } from "../adapter.ts";
 import { dryRun } from "../dryrun.ts";
 import { DIFFS, parseDiff } from "./diffs.ts";
@@ -110,7 +110,7 @@ export class MockRoom implements RoomAdapter {
   }
 
   /** Run a viewer action now, and remember it so later replays include it. */
-  private act<T>(run: (w: World, by: MemberId) => T): T {
+  private viewerAct<T>(run: (w: World, by: MemberId) => T): T {
     const action: ViewerAction = { afterStep: this.step, by: this.viewer, run };
     this.actions.push(action);
     const n = this.actions.filter((a) => a.afterStep === this.step).length;
@@ -154,12 +154,12 @@ export class MockRoom implements RoomAdapter {
   async review(at: ProposalAt, draft: ReviewDraft): Promise<Result<Review>> {
     const tag = this.world.tagOf(at.lane);
     if (!tag) return { refused: true, rule: "lane-unknown", reason: "That lane does not exist.", fix: "Open a lane from the Room screen." };
-    return this.act((w, by) => w.review(by, tag, at.generation, { verdict: draft.verdict, scope: [...draft.scope], dependsOn: [...draft.dependsOn], text: draft.text }, at.head));
+    return this.viewerAct((w, by) => w.review(by, tag, at.generation, { verdict: draft.verdict, scope: [...draft.scope], dependsOn: [...draft.dependsOn], text: draft.text }, at.head));
   }
 
   async note(anchor: NoteAnchor, text: string, replyTo?: ActId): Promise<Result<Note>> {
     if (!text.trim()) return { refused: true, rule: "invalid-body", reason: "The note is empty.", fix: "Write the note, then send it." };
-    return this.act((w, by) => w.note(by, anchor, text.trim(), replyTo));
+    return this.viewerAct((w, by) => w.note(by, anchor, text.trim(), replyTo));
   }
 
   async dryRun(draft: DraftRule): Promise<Result<DryRunResult>> {
@@ -167,6 +167,22 @@ export class MockRoom implements RoomAdapter {
       return { refused: true, rule: "glob-invalid", reason: "The draft names no paths.", fix: "Add at least one path pattern, such as src/lib/**." };
     }
     return dryRun(this.world.history, draft, POLICY, this.world.policyVersion);
+  }
+
+  // The scripted room's policy is a v1 document, so its catalogue is the legacy one and it admits no generic act.
+
+  async readCatalogue(): Promise<Catalogue | null> {
+    return this.snap.catalogue;
+  }
+
+  async catalogueAt(seq: Seq): Promise<Catalogue | null> {
+    const c = this.snap.catalogue;
+    return c && seq >= c.since ? c : null;
+  }
+
+  async act(): Promise<Result<DeclaredRecord>> {
+    // As a v1 room answers a v: 2 envelope at step 1 (R-DECL-16): a thrown bad-request, nothing recorded.
+    throw Object.assign(new Error("This room has no declared acts. Its policy uses the built-in review acts."), { code: "bad-request" });
   }
 
   setViewer(member: MemberId) {

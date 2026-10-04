@@ -13,6 +13,10 @@
  */
 
 import type {
+  AnyPolicyDocument,
+  Binding,
+  DeclaredPolicyLane,
+  PolicyDocument,
   ActId,
   CheckBody,
   ArtroomError,
@@ -32,7 +36,6 @@ import type {
   ObligationId,
   OpId,
   PolicyActor,
-  PolicyDocument,
   NotifyDirectory,
   PolicyLane,
   PolicyProposal,
@@ -47,7 +50,8 @@ import type {
   Sha,
   SystemEvent,
 } from "@generalbusiness/artroom-contract";
-import { checkerInputs, ownersFor } from "@generalbusiness/artroom-policy";
+import { bindingSubject, checkerInputs, declarationOf, isDeclared, isPlatformKind, ownersFor, validatePolicyV2 } from "@generalbusiness/artroom-policy";
+import { stagedProblems } from "./declared.ts";
 import { canonicalize, parseStrict, utf8 } from "./canonical.ts";
 import { b64url, digestJson, keyPairFromSeed, sha256Hex, unb64url, verify } from "./crypto.ts";
 import { isArtroomError } from "@generalbusiness/artroom-contract";
@@ -75,7 +79,7 @@ import { snapshotCommit, snapshotMessage } from "./snapshot.ts";
 import { issueJobs, jobsDue, jobTokensDue, moveJobMints, oweJobs, revokeJobTokens } from "./jobs.ts";
 import { activeAdmins, activeMembers, teamsOf } from "./roster.ts";
 import { PUBLICATION_CODES, ROOM_SCRUB_TABLES, createSchema, getMeta, head, headSeq, json, num, one, retain, setMeta, str } from "./store.ts";
-import { judge } from "./authority.ts";
+import { adminOwnKey, judge } from "./authority.ts";
 import { report, toConsole } from "./diag.ts";
 import { matchGlob } from "./glob.ts";
 import { ALARM } from "./budgets.ts";
@@ -173,6 +177,17 @@ const SELF_TIMED: ReadonlySet<LoopKind> = new Set(["landing", "mints", "jobToken
 let faultHook: ((point: string) => void) | null = null;
 
 /** Tests only: throw at a named point inside a write, as a crash would. */
+/** How many versions' parsed policies a Room keeps: the active one, and those of operations and jobs made under earlier ones. */
+const POLICY_CACHE = 4;
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const v of Object.values(value)) deepFreeze(v); // G2:policy-frozen-deep
+  }
+  return value;
+}
+
 /** A failed publication's code: a known one, a known Artifacts code, or `transport`. Never other text (request d29c09fa). */
 function publicationCode(e: unknown): string {
   const code = (e as { code?: unknown } | null | undefined)?.code;
@@ -491,7 +506,7 @@ export class RoomCore {
     if (!(await this.isBound(genesis))) throw artroomError("forbidden", "The registry does not bind this repository to this room.");
     // Create the repository (public founding) or read it (import). The initial policy is
     // main's .artroom/policy.json at import, or the default (R-POL-9).
-    let doc: PolicyDocument = this.ports.policy.defaultPolicy();
+    let doc: AnyPolicyDocument = this.ports.policy.defaultPolicy();
     let checkers: ActivePolicyFull["checkers"] = {};
     let main: Sha | null = null;
     let remote: string;
@@ -624,12 +639,18 @@ export class RoomCore {
     return getMeta(this.sql, "error_scrub") !== null ? this.now() : null;
   }
 
-  /** Parse `.artroom/` files strictly and validate them (R-POL-1). `doc` is null when there is no policy file. */
+  /**
+   * Parse `.artroom/` files strictly and validate them (R-POL-1). `doc` is
+   * null when there is no policy file. A `v2` document is validated by the
+   * acts validator with its checker configurations and this room's
+   * historical opening kinds (R-DECL-24), and refused if it uses a step or
+   * hold setting this room does not run yet (`stagedProblems`).
+   */
   parseConfig(
     policyText: string | null,
     checkerTexts: Readonly<Record<string, string>>,
-  ): { readonly ok: true; readonly doc: PolicyDocument | null; readonly checkers: ActivePolicyFull["checkers"] } | { readonly ok: false; readonly problems: readonly string[] } {
-    let doc: PolicyDocument | null = null;
+  ): { readonly ok: true; readonly doc: AnyPolicyDocument | null; readonly checkers: ActivePolicyFull["checkers"] } | { readonly ok: false; readonly problems: readonly string[] } {
+    let doc: AnyPolicyDocument | null = null;
     if (policyText !== null) {
       let raw: unknown;
       try {
@@ -637,6 +658,7 @@ export class RoomCore {
       } catch (e) {
         return { ok: false, problems: [`.artroom/policy.json is not valid JSON: ${(e as Error).message}`] };
       }
+      if (typeof raw === "object" && raw !== null && (raw as { format?: unknown }).format === "artroom-policy-v2") return this.parseDeclared(raw, checkerTexts); // G2:parse-declared
       const v = this.ports.policy.validatePolicy(raw);
       if (!v.ok) return { ok: false, problems: v.problems };
       doc = v.doc;
@@ -656,6 +678,49 @@ export class RoomCore {
     return { ok: true, doc, checkers };
   }
 
+  /** A `v2` document and its `artroom-checker-v2` configurations (R-DECL-24, R-DECL-18). */
+  private parseDeclared(
+    raw: unknown,
+    checkerTexts: Readonly<Record<string, string>>,
+  ): { readonly ok: true; readonly doc: AnyPolicyDocument; readonly checkers: ActivePolicyFull["checkers"] } | { readonly ok: false; readonly problems: readonly string[] } {
+    const configs: Record<string, unknown> = {};
+    for (const [name, text] of Object.entries(checkerTexts)) {
+      try {
+        configs[name] = parseStrict(text);
+      } catch (e) {
+        return { ok: false, problems: [`.artroom/checkers/${name}.json is not valid JSON: ${(e as Error).message}`] };
+      }
+    }
+    const v = validatePolicyV2(raw, { historicalOpeningKinds: this.openingKinds(), checkers: configs }); // G2:historical
+    if (!v.ok) return { ok: false, problems: v.problems };
+    const staged = stagedProblems(v.value);
+    if (staged.length) return { ok: false, problems: staged }; // G2:staged
+    const checkers: Record<string, { config: CheckerConfig; digest: Digest }> = {};
+    for (const [name, config] of Object.entries(configs)) checkers[name] = { config: config as CheckerConfig, digest: digestJson(config) };
+    return { ok: true, doc: v.value, checkers };
+  }
+
+  /** The kinds that have opened a thread in this room (R-DECL-8): every thread's kind but `room` and the platform's `recover`. */
+  openingKinds(): string[] {
+    return this.sql.all("SELECT DISTINCT kind FROM lanes WHERE kind NOT IN ('room', 'recover') ORDER BY kind").map((r) => str(r, "kind")!);
+  }
+
+  /** The active declaration's binding of a kind, or null when it is not declared (R-DECL-15). Kept per policy version. */
+  declaredBinding(kind: string): Binding | null {
+    const policy = this.activePolicy();
+    const doc = policy.doc as AnyPolicyDocument;
+    if (!isDeclared(doc) || !Object.hasOwn(doc.acts, kind)) return null;
+    if (this.bindingCache?.version !== policy.version) this.bindingCache = { version: policy.version, bindings: new Map() }; // G2:binding-cache
+    let b = this.bindingCache.bindings.get(kind);
+    if (b === undefined) {
+      b = digestJson(bindingSubject(doc, kind)) as Binding;
+      this.bindingCache.bindings.set(kind, b);
+    }
+    return b;
+  }
+
+  private bindingCache: { readonly version: PolicyVersion; readonly bindings: Map<string, Binding> } | null = null;
+
   // ------------------------------------------------------------ policy
 
   /** The pinned, immutable active policy and its version (R-POL-9). */
@@ -665,18 +730,28 @@ export class RoomCore {
   }
 
   policyAt(version: PolicyVersion): ActivePolicyFull | null {
+    // A version is the ID of its `policy-activated` entry, so its row never changes: the parsed policy is kept, deeply
+    // frozen, for the few versions in use. Without this the document is parsed once per kind a grant or a request
+    // names (`declaredBinding`).
+    const kept = this.policyCache.get(version);
+    if (kept) return kept; // G2:policy-cache
     const r = one(this.sql, "SELECT * FROM policies WHERE version = ?", version);
     if (!r) return null;
-    return {
+    const policy: ActivePolicyFull = deepFreeze({
       version,
-      doc: Object.freeze(JSON.parse(str(r, "doc")!)) as PolicyDocument,
+      doc: JSON.parse(str(r, "doc")!) as PolicyDocument,
       digest: str(r, "digest") as Digest,
       checkers: JSON.parse(str(r, "checkers")!) as ActivePolicyFull["checkers"],
-    };
+    });
+    if (this.policyCache.size >= POLICY_CACHE) this.policyCache.delete(this.policyCache.keys().next().value!); // G2:policy-cache-bound
+    this.policyCache.set(version, policy);
+    return policy;
   }
 
+  private readonly policyCache = new Map<PolicyVersion, ActivePolicyFull>();
+
   /** Seal `policy-activated` and make it active. Synchronous; inside a transaction (R-POL-9, R-PUB-9). */
-  activate(doc: PolicyDocument, checkers: ActivePolicyFull["checkers"], commit: Sha | null, at: string): ActId {
+  activate(doc: AnyPolicyDocument, checkers: ActivePolicyFull["checkers"], commit: Sha | null, at: string): ActId {
     const previous = getMeta(this.sql, "policy") as PolicyVersion | null;
     const digest = digestJson(doc);
     // Fenced operations are known before sealing: every unreserved one (R-LAND-5).
@@ -857,18 +932,28 @@ export class RoomCore {
     return { member, role, teams: teamsOf(this.sql, member), delegated: false };
   }
 
+  /**
+   * The lane as policy sees it (R-EVAL-3). Under a `v2` document it also
+   * carries the thread's kind, null for the room's null lane
+   * (`DeclaredPolicyLane`, R-EVAL-3 as amended by section 33.3). Under a `v1`
+   * document the input is as it always was, with no `kind`.
+   */
   policyLane(lane: LaneRow | null): PolicyLane {
-    if (!lane) return { id: null, claimed: false, holder: null, scope: [], generation: 0, purpose: "ordinary" };
-    return { id: lane.id, claimed: lane.state === "held", holder: lane.holder, scope: lane.scope, generation: lane.generation, purpose: lane.purpose };
+    const l: PolicyLane = lane
+      ? { id: lane.id, claimed: lane.state === "held", holder: lane.holder, scope: lane.scope, generation: lane.generation, purpose: lane.purpose }
+      : { id: null, claimed: false, holder: null, scope: [], generation: 0, purpose: "ordinary" };
+    if (!isDeclared(this.activePolicy().doc)) return l;
+    const declared: DeclaredPolicyLane = { ...l, kind: lane?.kind ?? null }; // G2:policy-lane-kind
+    return declared;
   }
 
   policyRoom(): PolicyRoom {
     return { admins: activeAdmins(this.sql).length, members: activeMembers(this.sql).length };
   }
 
-  proposalInput(doc: PolicyDocument, g: Pick<GenerationRow, "generation" | "head" | "base" | "changed">): PolicyProposal {
+  proposalInput(doc: AnyPolicyDocument, g: Pick<GenerationRow, "generation" | "head" | "base" | "changed">): PolicyProposal {
     const paths = changedPaths(g.changed);
-    return { generation: g.generation, head: g.head, base: g.base, changed: g.changed, paths, owners: ownersFor(doc, paths) };
+    return { generation: g.generation, head: g.head, base: g.base, changed: g.changed, paths, owners: ownersFor(doc as PolicyDocument, paths) };
   }
 
   notifyDirectory(lane: LaneId | null): NotifyDirectory {
@@ -1027,11 +1112,28 @@ export class RoomCore {
     const entry = this.landEnvelope(op);
     if (!entry || entry.type !== "act") return { reason: "authority-lost", fix: "Land again." };
     const env = entry.act.envelope;
-    const j = judge(this.sql, env, "submitted", this.now());
-    if (!j.ok) return { reason: "authority-lost", fix: `The land initiator's authority is no longer current (${j.refusal.rule}). Land again with current authority.` };
+    const doc = this.activePolicy().doc as AnyPolicyDocument;
     const lane = laneRow(this.sql, op.lane);
-    if (lane?.purpose === "config-recovery" && !(j.authority.via === "member" && j.authority.role === "admin"))
-      return { reason: "authority-lost", fix: "Only an active admin may land a configuration-recovery lane (R-ADMIN-8)." };
+    if (lane?.purpose === "config-recovery") {
+      // R-DECL-21, R-ADMIN-8: platform code judges recovery, whatever the document in force declares and whatever
+      // kind the landing's act had under the document it was admitted in: an active admin's own key.
+      if (!adminOwnKey(this.sql, env)) return { reason: "authority-lost", fix: "Only an active admin may land a configuration-recovery lane (R-ADMIN-8)." }; // G2:revalidate-recovery
+    } else {
+      // Admission refuses an undeclared kind at step 4a; here there is no step 4a, and `judge` leaves that kind's role
+      // and coverage unjudged. So a landing whose kind the active document no longer declares has lost its authority.
+      if (isDeclared(doc) && !isPlatformKind(env.kind) && declarationOf(doc, env.kind) === null)
+        return { reason: "authority-lost", fix: `The room's active policy no longer declares ${env.kind}, so the landing's authority cannot be judged. Land again with an act the room declares.` }; // G2:revalidate-undeclared
+      const j = judge(this.sql, env, "submitted", this.now(), doc);
+      if (!j.ok) return { reason: "authority-lost", fix: `The land initiator's authority is no longer current (${j.refusal.rule}). Land again with current authority.` };
+      // R-LAND-7 judges authority "as for a new admission". A new act of this kind carries the active binding
+      // (R-DECL-16), and a grant covers a kind only for the binding its grantor signed (R-DECL-17). So a landing
+      // under a delegation whose binding is no longer the active one has lost its authority. A member's own key
+      // needs no grant: its landing completes under the declaration it was admitted in (R-DECL-23).
+      // (Under a v1 document, and for a platform kind, there is no active binding, and nothing to compare.)
+      const active = this.declaredBinding(env.kind);
+      if (j.authority.via === "delegation" && active !== null && (env as { binding?: string }).binding !== active) // G2:revalidate-binding
+        return { reason: "authority-lost", fix: `The delegation was granted for an earlier meaning of ${env.kind}. Ask the grantor to delegate again, then land again.` };
+    }
     const policy = this.activePolicy();
     const gen = generationRow(this.sql, op.lane, op.generation);
     if (!gen) return { reason: "authority-lost", fix: "Land again." };
@@ -1357,7 +1459,7 @@ export class RoomCore {
         const gen = generationRow(this.sql, op.lane, op.generation);
         if (gen && changedPaths(gen.changed).some(isConfigPath)) {
           const integration = op.state === "landed" || op.state === "publishing" || op.state === "unresolved" ? op.integration : commit;
-          const cfg = json<{ ok: boolean; policy: PolicyDocument | null; checkers: ActivePolicyFull["checkers"] }>(
+          const cfg = json<{ ok: boolean; policy: AnyPolicyDocument | null; checkers: ActivePolicyFull["checkers"] }>(
             one(this.sql, "SELECT body FROM configs WHERE commit_sha = ?", integration),
             "body",
           );
@@ -1370,13 +1472,19 @@ export class RoomCore {
     } else if (event.type === "revert-lane") {
       // R-REV-6: an unheld lane whose ID is this event's ID.
       const scope = event.scope.length ? [...event.scope] : ["**"];
+      // R-DECL-6: a thread of kind `room`. Under a v2 document the room's lease is resolved and recorded now.
+      const leaseMs = isDeclared(this.activePolicy().doc) ? this.leaseMs : null; // G2:revert-lease
+      // R-DECL-6: a room thread has the conflict mode of the policy in force when it opened.
+      const conflict = isDeclared(this.activePolicy().doc) ? this.activePolicy().doc.lanes : null; // G2:revert-conflict
       this.sql.all(
-        "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, why, handover, revert_of) VALUES (?, ?, 'ordinary', ?, NULL, ?, 0, 0, NULL, NULL, 'unheld', 'opened-by-room', NULL, ?)",
+        "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, why, handover, revert_of, kind, binding, lease_ms, conflict) VALUES (?, ?, 'ordinary', ?, NULL, ?, 0, 0, NULL, NULL, 'unheld', 'opened-by-room', NULL, ?, 'room', NULL, ?, ?)",
         act,
         seq,
         `Revert the landing of ${event.of}`,
         JSON.stringify(scope),
         event.of,
+        leaseMs,
+        conflict,
       );
       this.attendAdmins(seq, act, { why: "revert-lane", lane: act, of: event.of }, `The room opened revert lane ${act} for ${event.of}. Any member may take it over.`);
     } else if (event.type === "publication-unresolved") {
@@ -1550,7 +1658,7 @@ export class RoomCore {
   enqueueNotify(entry: LogEntry, id: ActId, input: Parameters<RoomCore["ports"]["policy"]["notifyContext"]>[0], lane: LaneId | null): void {
     const policy = this.activePolicy();
     const kind = input.act.kind;
-    if (!policy.doc.rules.some((r) => r.kind === "notify" && r.on.includes(kind))) return;
+    if (!policy.doc.rules.some((r) => r.kind === "notify" && (r.on as readonly string[]).includes(kind))) return;
     const context = this.ports.policy.notifyContext(input, this.notifyDirectory(lane));
     this.sql.all(
       "INSERT INTO notify_queue (seq, entry, policy, context, attempts, next_ms) VALUES (?, ?, ?, ?, 0, ?)",

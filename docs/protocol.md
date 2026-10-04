@@ -48,6 +48,7 @@ sections 4 to 11 and 13.
 31. Request c657d4ba: joins and redemption
 32. Contract amendment 5 (10fcfe4e): canonical token mints (R-MINT)
 33. Contract amendment 6 (245986cb): declared acts (R-DECL)
+34. Contract amendment 7 (a9788a59): the MCP core
 
 ## 1. Terms
 
@@ -1890,24 +1891,56 @@ returns entries with a greater seq.
 
 It is not a cross-transport async iterator.
 
-**R-API-9.** The ten MCP tools are `claim`, `workspace`, `renew`,
-`release`, `propose`, `note`, `review`, `land`, `attention` and `explain`.
-Each calls the `RoomApi` method of the same name:
+**R-API-9.** The MCP core has fourteen named convenience tools and the
+generic `act` and `acts` tools of amendment 6: sixteen tools in total.
+The four added reads do not replace the two generic tools. The named
+tools call these `RoomApi` methods:
+
+| Tool | Method | Kind |
+|---|---|---|
+| `claim`, `propose`, `note`, `review`, `land`, `release`, `renew` | The method of the same name | Act |
+| `workspace` | `workspace`, then `workspaceToken` | Request |
+| `attention`, `explain`, `lanes`, `lane`, `proposal` | The method of the same name | Read |
+| `operation` | `op`, and `wait` when `waitMs` is given | Read |
+
+`act` performs a declared act with the caller's explicit binding;
+`acts` reads declarations and their bindings (R-DECL-16). Neither assumes
+the workroom's vocabulary. The named act tools keep their code-review
+bindings as amendment 6 requires.
+
 - `McpHeld` carries `lane` and `lease`, and fencing is the same as for the
   method;
 - `workspace` waits up to `waitMs` (default 20 seconds) for `ready` or
   `failed`, and also calls `workspaceToken`: its `grant` follows R-WS-5;
 - `land` waits up to `waitMs` (default 0);
-- every act tool accepts `idempotencyKey`;
+- **every act tool requires `idempotencyKey`.** A call without one is
+  `ArtroomError` `bad-request`, whose message says to add any unique string
+  and to reuse it to retry. Over a bearer, retries follow R-CRED-10;
 - `propose`, and `claim` in both its forms, accept `because`, and pass it
   to the method unchanged;
 - `attention` returns `RoomApi.attention`'s page unchanged. The page
   carries `publishedThrough` from the same read as its items
   (`AttentionPage`), so the tool makes no second read;
-- `explain` returns `ExplainNotFound`, `{ act, outcome: "not-found" }`, for
-  an act the room does not have, never `null`, because MCP structured
-  content must be an object. `RoomApi.explain` still returns `null`, and
-  HTTPS still answers `not-found`.
+- Artroom chooses object-shaped not-found results for these MCP reads:
+  `explain` returns
+  `ExplainNotFound`, `{ act, outcome: "not-found" }`; `lane`, `proposal`
+  and `operation` return `McpNotFound`, `{ outcome: "not-found", what }`.
+  `RoomApi.explain`, `lane` and `proposal` keep returning `null` for a
+  missing record. `RoomApi.op` and `ReadResults.op` are non-nullable;
+  missing operations throw `ArtroomError` `not-found`. The MCP operation
+  adapter maps only that lookup outcome to `McpNotFound<"operation">`;
+  authentication, permission, unavailable and other failures retain their
+  normal errors. HTTPS still answers `not-found`.
+
+The [MCP structured-content specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#structured-content)
+permits any JSON value conforming to an advertised output schema, including
+`null`. Artroom's object-shaped results are its own consistent interface
+choice, not an upstream object-only restriction.
+
+There is no named `check` or `roster` tool. A generic declared check follows
+the versioned transport and exact-job rules of R-CRED-10 and R-OBL-3;
+`act` does not open the platform roster path to a bearer. Waiting follows
+R-API-15; descriptors follow R-API-13; listing follows R-API-14.
 
 Over HTTPS, the MCP endpoint acts for its bearer through `bearerAct` and
 `bearerRequest` (R-CRED-10). A coding agent needs only the MCP URL and
@@ -1948,6 +1981,128 @@ WebSocket, so the read token travels as a subprotocol, never in the URL.
 
 The client reconnects with the last cursor it saw, so no update is lost or
 repeated.
+
+**R-API-13. MCP descriptors.** Each tool has one `McpToolDescriptor`.
+`tools/list` advertises its `name`, `title`, `description`, `inputSchema`,
+`outputSchema` and `annotations`, in a fixed order. `method` and `toolsets`
+stay on the server.
+- **Output schemas are advertised, and results conform.** For an act tool
+  and `workspace`, `outputSchema` is `oneOf` the tool's result and
+  `Refusal`, so a refusal's structured content conforms too. Every result
+  also carries a short text form: for a refusal, its rule, reason and fix.
+- **Descriptions** are at most 1,000 characters. Each says when to use the
+  tool and gives the likely refusals with their fixes.
+- **Annotations** are hints for hosts, never authority. A host that trusts
+  them may auto-approve read-only tools; the room judges every call either
+  way. The values are fixed:
+
+  | Tools | `readOnlyHint` | `destructiveHint` | `idempotentHint` | `openWorldHint` |
+  |---|---|---|---|---|
+  | `attention`, `explain`, `lanes`, `lane`, `proposal`, `operation`, `acts` | true | false | true | false |
+  | `claim`, `propose`, `note`, `review`, `renew`, `workspace` | false | false | true | false |
+  | `land`, `release`, `act` | false | true | true | false |
+
+  Act tools are idempotent because the key is required (R-API-9).
+  `openWorldHint` is false: every tool acts only on the room.
+  `act` uses conservative fixed hints for every kind: a declared act may
+  land or release, so the generic tool is never advertised as read-only
+  or non-destructive merely because an earlier call performed a review.
+- **Server instructions** are at most 512 characters and stand alone: what
+  the room is, to call `attention` first, and that refusals carry a fix.
+
+**R-API-14. MCP toolsets.** A toolset is the set of tools `tools/list`
+shows a caller (`McpToolsets`):
+
+| Toolset | Tools |
+|---|---|
+| `builder` | `attention`, `claim`, `workspace`, `propose`, `note`, `land`, `release`, `renew`, `lane`, `proposal`, `explain`, `operation` |
+| `reviewer` | `attention`, `lanes`, `lane`, `proposal`, `note`, `review`, `explain` |
+| `observer` | `attention`, `lanes`, `lane`, `proposal`, `explain`, `operation` |
+| `all` | All fourteen named tools, and `act` and `acts` |
+
+The two generic tools compose with every toolset: `acts` is a read in all
+four; `act` is included in `builder`, `reviewer` and `all`, subject to the
+caller's act authority. `observer` lists no act tool. The generic tool's
+listing never grants a kind or a binding; admission judges the explicit
+intent under R-DECL-16.
+
+- **The default comes from the caller's authorization.** First apply the
+  read-only-delegation override: a delegated caller with no eligible new
+  MCP act kind, as defined below, gets `observer`. Otherwise the current
+  roster role selects `all` for `admin` or `maintainer`, `builder` for
+  `member` or `agent`, and `reviewer` for `checker`. That last choice is a
+  presentation set, not review authority: a checker still cannot sign a
+  review or claim, and only eligible act tools are listed.
+- **A caller may select another named toolset.** The query parameter
+  `toolset` on the MCP URL (for example `?toolset=reviewer`), or
+  `--toolset` on `artroom mcp`, selects any one of `builder`, `reviewer`,
+  `observer` and `all`, whatever the caller's default is. The
+  read-only-delegation override decides the default only. Every selected
+  list is filtered by the same eligibility predicate, so selecting `all`
+  shows no act tool the caller could not make a new call of, and grants no
+  act and no signed binding. An unknown name is `bad-request`.
+- **One eligibility predicate governs HTTPS and stdio.** Authenticate the
+  request and use the active document and current roster role. The host
+  that authenticated the request supplies the caller's facts
+  (`McpCaller`): the credential's current role and, under a delegation,
+  the delegation's `kinds` and signed map exactly as recorded. The Room's
+  own endpoint reads them from the token, by a method of the Room that is
+  not part of `RoomApi` or `RoomWire`. `artroom mcp` reads them from the
+  current roster and the credential's own recorded delegation. Both read
+  them again for every `tools/list`. For a `v2`
+  document, a declared kind is eligible for a new generic call exactly
+  when its `who` admits that role under R-DECL-11, including the implicit
+  admin and narrow checker floor. With delegated credentials it must also
+  be delegable, have an entry in the unchanged signed kind-to-binding map,
+  and that entry must equal the active kind's binding. A direct own-key
+  caller needs no grant map. Do not test a target, held thread, policy
+  refusal, proposer/holder exclusion or exact check-job qualification here;
+  those remain admission questions.
+- **Generic `act` uses existence, not a grant named `act`.** List it in a
+  selected set that includes it if at least one declared kind satisfies
+  that predicate. Platform-only grants do not qualify. An all-stale map
+  qualifies no kind; a mixed map qualifies its current permitted entries
+  without requiring every other entry to stay current. A renamed kind
+  with a `check` step is eligible by its declaration, role and signed
+  binding, not by the literal name `check`; v2 generic-check transport
+  limits remain R-CRED-10. Under an active `v1` document, generic `act` is
+  not listed, because a v2 envelope there is `bad-request` (R-DECL-16).
+- **Named act tools use the same authority facts.** Under `v2`, their
+  built-in binding must also match the active declaration and, for a
+  delegated caller, its signed map entry. Under `v1`, use the frozen
+  legacy role/kind and delegation rules. Platform `renew` uses its plain
+  platform grant and role floor. The eligible new MCP act kinds for the
+  default override are the union of these named kinds and the eligible
+  generic kinds, before the selected presentation set is applied. Thus a
+  permitted `renew`-only grant may list named `renew` but never generic
+  `act`; a grant with no eligible new MCP act kind gets `observer`.
+- **No grant changes during discovery.** Do not expand a map, substitute a
+  current binding for a signed stale one or grant a newly declared kind.
+  `acts` remains an authenticated read in every set, even when no new act
+  is eligible. Read, workspace and operation methods retain their normal
+  Room permission checks.
+- **Lists depend only on authorization,** never on earlier calls, as the
+  [MCP tools specification, 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)
+  requires. Listing is deterministic for the same tools and authorization.
+- **Listing is not permission.** A call to a core tool that is not listed
+  runs and is judged by the room like any other call. The discovery
+  predicate must not reject an unlisted invocation. An authenticated
+  exact retry keeps its original envelope or caller-supplied binding and
+  may return its accepted receipt under R-IDEM/R-CRED-10, even if no new
+  call of that kind would now be listed. Never rebind it to make it visible.
+
+**R-API-15. MCP waiting.** A `waitMs` is at most 45,000 (`McpMaxWaitMs`),
+below common client tool timeouts. A larger value is `bad-request`.
+- `workspace` and `land`: as R-API-9, within that bound.
+- `attention`: when the page after `cursor` would be empty, the server waits
+  for the next update that carries attention items for the caller (over a
+  bearer, on `RoomWire.subscribe`), then reads the page again. At `waitMs`
+  it returns the empty page with its cursor. A `waitMs` of 0 (the default)
+  never waits.
+- `operation`: waits until the operation reaches one of `until` (default:
+  the kind's terminal states). At `waitMs` it returns the operation's
+  current state, not an error, so the caller calls again to keep waiting.
+- Waiting never holds a lease, a slot or any room state; it is a read.
 
 ## 22. Open points
 
@@ -2160,6 +2315,18 @@ Cases added for amendment 2 (section 27). Each is normative.
 | **WebSocket.** Connect with subprotocols `artroom.v1` and `artroom.token.<session>`; connect with no token; revoke the session's key while connected | 101 with `Sec-WebSocket-Protocol: artroom.v1` only, then updates; 401 and no socket; the socket closes with 1008. The token is in no URL, response header or log | R-API-12, R-WS-4 |
 | **RPC subscription.** Read `RoomWire.subscribe` after two acts | UTF-8 bytes; each line one `Update`; the `Room` handle yields the same updates | R-API-8 |
 | **MCP.** `explain` of an unknown act; `attention`; `propose` with `because` | `{ act, outcome: "not-found" }`; a page with `publishedThrough` and no extra log read; the record's `because` equals the input | R-API-9 |
+| **MCP keys.** `claim` with no `idempotencyKey`; `claim` with a key, its response lost, then the same call again | `bad-request` and nothing recorded; then one claim, and the retry returns its receipt | R-API-9, R-CRED-10 |
+| **MCP reads.** `lane` and `proposal` of unknown IDs; `lanes` with `touches` | `{ outcome: "not-found", what }` for each; the overlapping lanes | R-API-9 |
+| **MCP operation errors.** `RoomApi.op` throws lookup `not-found`; separately it throws `unauthenticated`, `forbidden` or `unavailable` | Only the lookup becomes `{ outcome: "not-found", what: "operation" }`; each other failure keeps its error | R-API-9 |
+| **MCP descriptors.** `tools/list` as an admin, under an active `v2` document and under an active `v1` document | Under `v2`: the fourteen named tools, then `acts` and `act`, in a fixed order, the act tools subject to binding and authorization. Under `v1`: the fourteen named tools and `acts`, with the generic `act` absent. In both, each tool has a title, an output schema and annotations, and the instructions are at most 512 characters | R-API-13, R-API-14, R-DECL-16 |
+| **MCP refusal conforms.** A `propose` refused `outside-claim` | Structured content validates against the tool's `outputSchema`; the text gives rule, reason and fix | R-API-13, R-API-1 |
+| **MCP toolsets.** `tools/list` as an `agent`; as an `agent` with `?toolset=reviewer`; with `?toolset=nope`; as a bearer whose delegation lacks `land` | The builder twelve and reviewer seven named tools, each composed with the generic tools and filtered by authorization; `bad-request`; the builder list without `land` | R-API-14, R-DECL-16 |
+| **MCP checker default.** A direct checker; a delegated checker with one eligible declared check kind; a delegated checker with no eligible new MCP act kind | The reviewer presentation filtered by authority for the first two; observer for the third; no review or claim authority in any case | R-API-14, R-DECL-11 |
+| **MCP generic discovery.** A v2 bearer with only platform grants; an all-stale signed map; a mixed map with one current eligible entry; a grant for a renamed check kind | Generic `act` absent for the first two, present for the latter two in a set that includes it; signed grants unchanged | R-API-14, R-CRED-10 |
+| **MCP discovery after authorization changes.** The role or declaration's `who` stops admitting the caller; the declaration stops allowing delegation; a direct own-key caller has no grant map | The first two remove that kind's eligibility; the own-key caller uses its current role and declaration; HTTPS and stdio give the same list for the same authorization | R-API-14, R-DECL-11 |
+| **MCP unlisted call.** An `agent` on `?toolset=observer` calls `claim` | The claim is judged and recorded as usual | R-API-14 |
+| **MCP unlisted exact retry.** A still-authenticated caller retries an accepted act with its original key and binding after that kind ceases to qualify for discovery | The accepted receipt returns under the normal retry rules; no new act or substituted binding | R-API-14, R-CRED-10, R-IDEM-2 |
+| **MCP waiting.** `attention` with `waitMs: 30000` and an empty page, then a note notifies the caller; `operation` on a preparing landing with `waitMs: 1000`; any tool with `waitMs: 60000` | The page with the note's item, before 30 s; the operation's current state, no error; `bad-request` | R-API-15 |
 | **Invitation link.** Parse a link with the secret in the fragment, and one with the secret only in the query | The first gives room, invitation and secret; the second is refused | R-CRED-11 |
 | **Recompute after activation.** A policy that adds a `require` rule lands while a proposal's review obligation is met | `policy-activated` with `reopened: 0`; `land` refused `obligation-open` until an `obligations-recomputed` event lists the new obligation; a `require` rule that errors gives `blocked` | R-POL-9, R-LOG-5 |
 | **Land rules in preparation.** A land rule passes during preparation; in a second operation it blocks | A `land-evaluated` event for each, with the decisions; the second is followed by a `failed` outcome | R-LAND-4 |
@@ -3104,7 +3271,12 @@ Each needs a named failure reason, such as `layout-changed`,
 
 ### 30.7 Acceptance cases
 
-Each is normative.
+Each is normative. The limits these cases name are the layout's real
+ones. The tests show most cases at small limits set for the test
+(`setLayoutLimitsForTests`), since each rule is about where a limit falls
+and not about its size; the 8 MiB segment bound and the 4,096-entry
+directory bound are also shown at their real size
+(request `ecbc722a`).
 
 | Case | Expected result | Rules |
 |---|---|---|
@@ -3579,6 +3751,13 @@ Section 33.6 states that criterion.
   `land-reserved`, `abort-attempt`, `publication-unresolved`,
   `land-outcome`, `revert-lane`, `notified`, `checkpoint`, `prepared`,
   `reservation-ended`).
+- No document may declare a kind named `constructor` or `prototype`. The
+  evaluator's value profile admits no object key of either name
+  (`reserved_key`; R-EVAL-3 keeps such names out of keys for the same
+  reason). A kind is a key of every grant map, and a `delegate` op's body
+  is part of a rule input. These are the only two names of the kind
+  grammar that the profile reserves; every other name, `valueof` or
+  `tostring` included, may be declared.
 
 **R-DECL-3. A declaration is data.** A declaration names the act's label,
 its targets and the steps each runs, the thread kinds it may act on, its
@@ -3749,13 +3928,21 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
 - A declaration's `body` names the application's own fields, beyond those
   its steps require. A field name matches `[a-z][A-Za-z0-9]{0,31}`, and is
   not `because` or any field a step of the same act requires (R-DECL-5).
+  It is not `constructor` or `prototype` either. A field is a key of the
+  binding's subject (R-DECL-15) and of every rule input that carries the
+  act's body, and the evaluator's value profile, under which both are
+  made canonical, admits no object key of either name. These are the only
+  two names of the field grammar that the profile reserves: a field may
+  be named `toString` or `valueOf`, and is then read only as the body's
+  own property.
 - Field types are a closed set (`DeclaredField`): `text` (with `max`, 1 to
   16,384 bytes), `int` (with safe-integer `min` and `max`, `min` at most
   `max`), `bool`, `enum` (1 to 64 distinct values, each matching
   `[a-z0-9][a-z0-9-]{0,63}`), `globs` (with `max`, 1 to 64 patterns, in
   the restricted syntax of R-PATH-1), `member` (a member handle), `act`
   (an entry ID) and `segment` (one path segment: 1 to 255 bytes, not `.`
-  or `..`, with no `/` and no glob metacharacter).
+  or `..`, with no `/` and none of the characters R-PATH-1 keeps out of a
+  pattern: `*`, `?`, `[`, `]`, `{`, `}`, `!` and `\`).
 - A field is required for every target of the act unless it says
   `optional: true`, or `requiredFor` lists the target shapes where it is
   required (a non-empty, distinct subset of the act's targets). A field
@@ -3779,6 +3966,12 @@ fix ships as a new steps version (R-DECL-14), not as a change to this one.
   and `{kind}`. Nothing else is interpolated, and a brace that does not
   open one of these slots is refused with `policy-invalid`. So a template
   cannot leak body text or provider text into a refusal.
+- A slot is filled only with a fact in the form the room reports it. For a
+  refusal decided before the target is judged (R-DECL-16), `{lane}` is
+  filled only by a lane ID and `{generation}` only by a positive integer;
+  anything else fills the slot with nothing.
+- A filled `reason` or `fix` is at most 8,192 bytes. The room cuts a
+  longer one at a character boundary.
 - A refusal from a `refuse` rule keeps that rule's own `reason` and `fix`.
 
 **R-DECL-14. The steps version.**
@@ -4121,6 +4314,7 @@ is refused `policy-invalid`.
 | `hold.scope` template | 1 to 64 globs, each at most 256 characters |
 | `hold.leaseSeconds` | 10 to 86,400 |
 | `hold.reserveSeconds` | 1 to 600 |
+| The whole document, as canonical JSON | at most 1,048,576 bytes |
 
 ### 33.3 Amended rules
 
@@ -4249,6 +4443,18 @@ conversion applied, for review. Each is a listed, reviewable rewrite of a
 fixture's form; none is permission to weaken, remove or loosen an
 assertion. A mutation of each declaration field turns a test red.
 
+As reduced by request `ecbc722a`: the second run of the whole suite is
+replaced by a named witness set, `declared-run.test.ts` in the Room's
+tests, which runs chosen tests of the code-review application under the
+`v2` declarations with the same four conversions, and checks that each
+conversion was applied. The Room dispatches by step, and both vocabularies
+run the same step handlers, so what a `v2` document changes (admission
+steps 1, 4, 4a and 5, grants, sessions, check jobs, recovery and what a
+thread records) has direct tests of its own. The list of every converted
+test and the mutation of each declaration field are no longer kept;
+[plans/test-invariants.md](../plans/test-invariants.md) names the
+witnesses and says what the smaller run does not show.
+
 ### 33.7 Contract types and built-in data
 
 | What | Where |
@@ -4326,3 +4532,383 @@ These continue section 32.1's list.
     `hand-over` naming a historical opening kind is judged at admission
     from the thread's recorded settings (stage 4); a thread with no
     reservation length cannot be handed over.
+
+### 33.10 Stage 5: the generic act and the declarations read (a5d64b35, fa120186)
+
+Stage 5 of note section 8.5 gives clients the declared acts: a read of a
+room's declarations with their bindings, an act of any declared kind in the
+client, over HTTPS, in the CLI and as two MCP tools, and records shown under
+the declarations of their own seq. This section adds to section 33.3's rows
+for R-API-9 and R-CRED-10 and amends the rules below. It renumbers nothing.
+It records the planner's clarification `fa120186` on two points: readers
+use `D(s)`, and a generic bound check may use the MCP endpoint.
+
+#### Amended rules
+
+| Rule | Amendment |
+|---|---|
+| R-API-3 | One more read route, `GET /v1/rooms/:room/declarations`, with the same credential as every read. With no query it answers with the active policy version's declarations. `?at=<seq>` answers with the version in force for the entry at that seq. `?policy=<version>` answers with that version. Both together, a seq that is not a whole number from 0, or a malformed version, is `bad-request`. A version the room does not retain is `not-found`. `POST /v1/rooms/:room/acts` takes a signed envelope of either version (`AnySignedEnvelope`). It takes nothing else: a bearer token on that route gives no authority, and a bearer act sent there is `bad-request` |
+| R-API-5 and the reads | `ReadQuery` gains `{ q: "acts", at?, policy? }`, answered with a `Catalogue` or `null` (`ReadResults.acts`). `RoomApi` gains `acts()`, `actsAt()` and `act()`. `Explanation.kind` and `EntrySummary.kind` may be any kind name, and `Explanation` gains `meaning` |
+| R-API-9 | The MCP tool `acts` takes an optional `at` (a seq) or `policy` (a version), never both, and returns the `Catalogue`; for a version the room does not retain it returns `{ outcome: "not-found" }` (`ActsNotFound`), the object-shaped not-found result Artroom chooses for its MCP reads (R-API-9). The MCP tool `act` takes `kind`, `target`, `body`, `binding` and `idempotencyKey`, all required, and calls `RoomApi.act` with them unchanged. It never reads a binding for the agent. A `binding-stale` refusal is an ordinary tool result; its text names the active binding and policy version and says that nothing was done. `explain` returns the `Explanation`, whose `meaning` is the kind's meaning at the entry's own seq. The ten named tools of amendment 2 are unchanged. Section 34 adds four named reads, so the core has fourteen named tools beside `act` and `acts`. The descriptor shape (titles, output schemas, annotations), the toolsets that list `act` and `acts`, their fixed hints, the required key and the wait limit are section 34's (R-API-13 to R-API-15), not this section's |
+| R-CRED-10 | As below, "Bearer sessions and the generic act" |
+| R-DECL-16 | In a client: as below, "The generic act in a client" |
+| R-DECL-17 | A grantor's client builds a `delegate` op or an invitation `session` from the active catalogue: `*`, or a list of kinds, becomes the delegable platform kinds and a map from each declared kind to its active binding. A kind the grantor's role may not grant, or that the document does not declare, stops the build with an error that names it; nothing is signed with a smaller grant than was asked for. In a `v1` room the legacy shape is built, with the kinds as given |
+| R-DECL-23 | As below, "Reading a record" |
+
+#### The declarations read
+
+A `Catalogue` describes one policy version: its `policy` (the version, the
+ID of its `policy-activated` entry), `since` (that entry's seq) and `until`
+(the seq of the next `policy-activated` entry, or `null` while the version
+is active). A version governs the entries from `since` up to, and not
+including, `until`.
+
+- For a `v2` document it is an `ActsCatalogue`: `vocabulary: "declared"`,
+  the document's `steps` and `lanes`, and for each declared kind its
+  declaration and its binding (R-DECL-15). Platform kinds are not listed.
+- For a `v1` document it is a `LegacyCatalogue`: `vocabulary:
+  "artroom-legacy-v1"`, and nothing else. A `v1` version has no
+  declarations and no bindings (R-DECL-1).
+- A declared kind carries `retired`: the seq of the first later
+  `policy-activated` entry whose document does not declare that kind. It is
+  absent while every later document declares it. A still later document
+  that declares the same name again does not remove it.
+
+The read with no selector answers with the active version. It is what a
+caller reads before it prepares an act. A retained earlier version is
+`D(s)` for every entry in its interval.
+
+#### The generic act in a client
+
+1. `act(kind, target, body, { binding, idempotencyKey })` signs envelope
+   `v: 2` with exactly the kind, target, body and binding given. The
+   binding is required. It is the one the caller read from the catalogue,
+   for the meaning it intends.
+2. A client never reads the catalogue to act, never replaces a binding,
+   and never signs an act again on its own. On `binding-stale` it returns
+   the refusal, whose `current` names the active binding and policy
+   version. The caller reads the declaration and, if that meaning is still
+   what it intends, calls again with the new binding. That second call is
+   a new act.
+3. A prepared act keeps its binding (`PreparedAct.binding`, and inside the
+   signed envelope). Sending it again sends the same bytes, or for a bearer
+   session the same kind, target, body, binding and idempotency key. An
+   exact retry of an act the room accepted returns the original record,
+   also after an activation changed the kind's meaning (R-IDEM-2).
+4. A platform kind is refused by the generic act before anything is sent:
+   `renew` and `roster` keep `v: 1` and their own methods.
+5. The named methods of the code-review module (`claim`, `propose`, `note`,
+   `review`, `check`, `land`, `release`) stay. With a key, a handle reads
+   the active catalogue once. Under a `v1` document it signs `v: 1`, as
+   before. Under a `v2` document it signs `v: 2` with the binding of the
+   code-review declaration the method was built for, under the room's
+   steps version and `lanes`. That is not the room's own declaration's
+   binding: where the two differ, the room refuses `binding-stale`. After
+   a `binding-stale` or `kind-undeclared` refusal the handle forgets the
+   catalogue it read, so the caller's next call reads again; the refused
+   act is not sent again. With a bearer session the room adds the built-for
+   binding itself (stage 2), and the handle reads nothing.
+6. The command line follows the same rules. `artroom act` requires
+   `--binding`; it never chooses one. It prints the active meaning after
+   `binding-stale`, and what changed since the meaning the user read where
+   the room still retains that version.
+
+#### Bearer sessions and the generic act
+
+These replace R-CRED-10's items "`check`: over RPC only" and "The HTTPS
+client" for a room whose active document is `v2`. Everything else in
+R-CRED-10 stands.
+
+- **Signing.** For a declared act the caller gives `kind`, `target`,
+  `body`, `idempotencyKey` and `binding` (`DeclaredBearerAct`). The room
+  signs envelope `v: 2` with exactly that binding, with the session key
+  under the session's delegation. It never chooses, replaces or looks up a
+  binding for such an act. With no `binding`, the act is a named tool's
+  (R-API-9 as amended in section 33.3).
+- **The legacy rule stands.** A bearer `check` of the legacy vocabulary
+  goes by `bearerAct` over RPC only. There is no named MCP `check` tool.
+  A handle connected over HTTPS with a bearer token refuses its `check`
+  and `roster` methods with `forbidden` before it sends anything.
+- **A generic bound check.** In a `v2` room a generic act, with its
+  binding, may run a declared `check` step over the MCP endpoint. That
+  includes a bearer HTTPS client, whose generic act is one call of the MCP
+  tool `act`. The rule looks at the step, not at the word `check`: a
+  declared kind of any name whose step is `check` is covered. This amends
+  the earlier wording, which excluded HTTPS only because no tool carried a
+  check.
+- **No new authority.** The delegation's signed map must name that exact
+  kind with that exact binding (R-DECL-17). The session's member's role
+  and the active declaration must allow it (R-DECL-11). Every guard of
+  the check step applies as it does to a key-signed check: the obligation,
+  checker, integration, input, configuration and runner of R-OBL-3, and
+  the rule that a thread's holder and a version's proposer never meet
+  their own check obligation. A generic submission is not independent
+  evidence because it is generic.
+- **What is excluded.** A `v: 1` act is never accepted on the generic
+  path: the generic act is always `v: 2`, and a `v1` room refuses a `v: 2`
+  envelope at step 1. `roster` is never accepted from a bearer; on the
+  generic path a platform kind in a `v: 2` envelope is `bad-request`.
+  Bearer acts are never accepted on `POST /v1/rooms/:room/acts`.
+- **Key-signed checks.** A check signed with a member's own key over
+  HTTPS, or by a Worker under a delegation, stays available with the same
+  authority as before, in `v: 2` with its exact binding.
+- **Not here.** The checker service's own path, `CheckJobV2` naming the
+  act and binding to sign and the `prepared` event, is stage 4's. Allowing
+  this transport does not build it.
+
+#### Reading a record
+
+Readers are the UI, the client, the CLI and the MCP tools.
+
+- A reader shows a record with the label, targets and fields of the
+  catalogue that governs the record's own seq. It never uses the active
+  catalogue for an old record. The active catalogue is for preparing new
+  acts.
+- `RecordMeaning` is what a kind meant under one catalogue: `declared`,
+  with the label, declaration, binding and `retired`; `platform`, for
+  `renew`, `roster` and `recover`; `artroom-legacy-v1`, for a kind of the
+  legacy vocabulary under a `v1` document, with `retired` set to the seq
+  where another version replaced it; or `unknown`, for a kind the document
+  in force did not know.
+- A reader that shows a kind with `retired` says so, with the seq.
+- A later document that declares a retired name again gives it a new
+  binding. Old records keep the label and binding of their own seq. The
+  policy version and the binding tell the two meanings apart.
+- A label, help or wording edit leaves the binding equal. A record made
+  before the edit shows the label in force at its own seq.
+- The `explain` read carries the entry's `meaning`, computed by the room
+  under the same rule.
+
+#### A thread's kind and its name
+
+- A `Lane` carries `kind`: the kind of the act that opened the thread
+  (R-DECL-6), `room` for a revert lane, `recover` for a
+  configuration-recovery thread in a `v2` room. It is the value the room
+  compares with a declaration's `threads` (R-DECL-8). A reader uses it to
+  tell which declared acts may act on a thread. The field is optional in
+  the type, so that an older reader still fits. The room always gives it.
+- A thread that `claim` opened has a `goal`. A thread that an application
+  opened with its own act may have none: its `goal` is the empty text.
+- Every reader names a thread by one rule, `threadTitle`:
+  1. its `goal`, when that is not empty;
+  2. else the title of its opening act, `titleOf`: the label in force at
+     that act's seq, then `: ` and the value of one body field, when the
+     body has one other than `scope` and `because`;
+  3. else the thread's ID, when the opening act is not at hand.
+- The field is the first present by name that the opening act's own
+  declaration types as `text`. That declaration is the one of `D(s)`, the
+  document in force at the opening act's seq, never the active one
+  (R-DECL-23). "Text" is the declared type, not the type of the value: an
+  enum's value, a member handle and an entry ID are strings too. `open`,
+  the step an opening act runs, brings only `scope`, so no step field is
+  considered.
+- When no such field is present, the field is the first present by name,
+  of any type. The same holds when the reader has no declared field types
+  for the act: a kind of the legacy vocabulary, a platform kind, a kind
+  the document does not declare, or a label alone.
+- "First" is by field name. The room keeps a body as canonical JSON, whose
+  keys are sorted, so the order a caller typed is not recorded. Sorting
+  gives one title from the typed body and from the record.
+- A thread's ID is its opening act's ID. One `explain` read of that ID
+  gives the `meaning` and the entry, and `envelopeOf(entry).body` is the
+  body.
+- The CLI prints this name when `artroom act` opens a thread. The MCP tool
+  `act` says it in the first line of its result. Neither prints a thread's
+  goal anywhere else.
+
+#### What a handle keeps
+
+- `actsAt` may answer from an ended version the handle read before. An
+  ended version's declarations and bindings never change. Its `retired`
+  marks can: a later activation may drop one of its kinds.
+- So a handle drops every ended version it kept when it sees an activation
+  later than any it knew. It sees one in a read of the active catalogue, a
+  read of another version, a log page, an update, and a refusal whose
+  `current` names the active policy version.
+- A reader that follows the room's updates therefore shows current marks.
+  A handle that has seen nothing since may answer the marks it read.
+  `actsAt(at, { fresh: true })` reads from the room and replaces what the
+  handle kept. The MCP tool `acts` always reads this way.
+- The active version is never kept by `acts()`.
+
+#### Acceptance cases (stage 5)
+
+Each is normative, and each has a test in the stage 5 report
+(`plans/README.md`).
+
+| Case | Expected result | Rules |
+|---|---|---|
+| **Generic act.** A member signs a declared kind that no client method names, over HTTPS; a bearer does the same through the MCP tool `act` | Admitted; the log holds a `v: 2` envelope with the binding given; the record has the act's own kind | R-DECL-16, R-API-9 |
+| **Changed meaning.** An act prepared under a kind's binding, sent after an activation that changed a body field, a target, or a hold | `binding-stale` with the active binding and policy version; nothing recorded; the client sends nothing more and reads nothing | R-DECL-16 |
+| **Label-only edit.** The same, after an activation that changed only `label`, `help` or wording | Admitted: the binding is equal | R-DECL-15 |
+| **Lost result.** The answer to an accepted act is lost; the client retries | The same bytes are sent; one entry; the original record. After a meaning change, the exact retry still returns it | R-IDEM-2, R-DECL-16 |
+| **Undeclared kind.** A generic act of a kind the active document does not declare | `kind-undeclared`, unrecorded | R-DECL-23 |
+| **Role and grant.** A role `who.roles` does not list; a grant whose map lacks the kind; a grant made for an earlier binding; a grant whose grantor's role lost the kind | `role-forbids`; `delegation-invalid` in each grant case | R-DECL-11, R-DECL-17 |
+| **Expanded grant.** `*` expanded before an activation that adds a kind; a grant signed before a meaning change and sent after it | The new kind is not covered; the delayed grant is `binding-stale`, unrecorded | R-DECL-17 |
+| **Legacy controls.** In a `v1` room: a named method; the generic act; the `acts` read | `v: 1` as before; `bad-request`, nothing recorded; the legacy catalogue | R-DECL-1 |
+| **Named methods in a `v2` room.** A room with the code-review declarations; a room whose `claim` differs | `v: 2` with the built-for binding, admitted; `binding-stale`, and the method is not sent again | R-API-9 |
+| **Generic check.** A bearer whose map names a declared check act under another name, with its binding; one whose map lacks it; one with a stale binding; the version's proposer | Admitted and the obligation met; `delegation-invalid`; `delegation-invalid` or `binding-stale`; `not-authorized-checker` | R-CRED-10, R-OBL-3 |
+| **Excluded on the generic path.** A platform kind; an act with no binding; any act in a `v1` room; a bearer act on `POST /acts` | Each refused before anything is recorded | R-CRED-10 |
+| **Old records.** A room that was `v1`, then declared a kind, relabelled it, retired it and declared the name again with another shape | Each record explains with the label and binding of its own seq; the retired kind's records name the retirement seq; the legacy record names where the `v1` era ended | R-DECL-23 |
+| **Dropped twice.** A kind declared, dropped, declared again and dropped again | Each version that declared it is marked with the first later version that did not | R-DECL-23 |
+| **Retired after the read.** A handle keeps an ended version; a later activation drops one of its kinds; the handle then sees that activation | The next `actsAt` answer carries the mark. With no sign of the activation the kept answer is given, and `fresh` reads again | R-DECL-23 |
+| **Thread kind.** A thread opened by `claim` and one opened by an application's own act | The lane reads give `claim` and the opening kind; an act whose `threads` omits that kind is `wrong-thread` | R-DECL-6, R-DECL-8 |
+| **Thread name.** A thread with no goal, read after its opening kind's label or field types changed | Named by the label of the opening act's seq and its first text field by name under that seq's declaration, or its first field by name when none is text; the CLI and the MCP tool `act` print the same name | R-DECL-23 |
+
+#### Types
+
+| What | Where |
+|---|---|
+| `Catalogue`, `ActsCatalogue`, `LegacyCatalogue`, `CatalogueAct`, `RecordMeaning`, `AnyEnvelope`, `AnySignedEnvelope`, `DeclaredRecord` | `packages/contract/src/declarations.ts` |
+| `ReadQuery` and `ReadResults` (`acts`), `RoomApi.act`, `acts`, `actsAt`, `GenericActOptions`, `CatalogueAt`, `AnyBearerAct`, `ActsNotFound`, the `acts` and `act` entries of `McpTools`, the route `GET /v1/rooms/:room/declarations`, `Explanation.meaning` | `packages/contract/src/transports.ts` |
+| Each step's own fields with their types, `STEP_FIELD_SPECS` | `packages/policy/src/steps.ts` |
+| `meaningOf`, `governs`, `fieldsOf`, `targetsOf`, `builtForBinding`, `expandGrant`, `titleOf`, `threadTitle` | `packages/policy/src/catalogue.ts`; also the export `@generalbusiness/artroom-policy/declared`, which loads no evaluator |
+| `Lane.kind` | `packages/contract/src/lanes.ts` |
+| `envelopeOf`, a log entry's envelope as `AnyEnvelope`, or null for a system entry | `packages/contract/src/guards.ts` |
+
+`ActsCatalogue` was `{ policy, steps, acts }` in section 33.7. It gains
+`vocabulary`, `since`, `until`, `lanes` and the `retired` mark. `LogEntry`
+is unchanged: in a `v2` room an entry's envelope may be a
+`DeclaredEnvelope` or a `recover` envelope, and readers treat it as
+`AnyEnvelope`.
+
+#### Open points
+
+These continue section 33.9's list.
+
+49. **No client method signs `recover`.** The platform kind `recover`
+    (R-DECL-21) is admitted by the room from stage 2, and no client, CLI
+    or MCP surface builds its envelope. Stage 5's request does not name
+    it. Until one does, configuration recovery in a `v2` room needs an
+    envelope signed by hand with an admin's own key.
+50. **The cost of `retired`.** The read finds each kind's retirement by
+    reading later policy documents in order, and stops when every kind has
+    one. It is linear in the number of later versions for a kind that is
+    still declared. A room with very many activations may want the mark
+    stored at activation.
+51. **`LogEntry` and declared envelopes.** `LogEntry` keeps its `v: 1`
+    envelope type so that this stage changes no file of `packages/log`,
+    which stage 3 owns. Readers call `envelopeOf(entry)`, which gives the
+    envelope as `AnyEnvelope` without a cast of their own. The type should
+    widen when stage 3's decoder lands.
+52. **Which field names a thread.** The name of a thread with no goal
+    uses the opening act's first text field by name, and its first field
+    by name when it has no text field (planner's decision `c37653e1`). It
+    goes by name because the room does not record the order a caller
+    typed or the order a declaration lists its fields: both are kept as
+    canonical JSON. So an application with two text fields gets the
+    earlier name, and cannot choose the other. A declaration could name
+    the field. That would be a new member of the declaration, and this
+    stage does not add one.
+
+## 34. Contract amendment 7 (a9788a59): the MCP core
+
+Request `a9788a59` asked for items 1 to 4 of the MCP plan's amendment
+(`notes/2026-10-01-mcp-plan.md` on its design branch, section 11), which Hugh adopted on
+2026-10-01 (assert `775acdd3`). Items 5 to 9 (new reads, application packs,
+toolsets on invitations, OAuth, resources and prompts) are for a later
+amendment. This is amendment 7, after landed amendments 4 (log objects),
+5 (canonical token mints) and 6 (declared acts); it does not reuse section
+30 or amendment 4 from the original unlanded MCP draft.
+
+The adopted fourteen-tool core composes with amendment 6's generic `act`
+and `acts`. This contract handoff adds the four named reads and their
+metadata types. Declared-acts stage 5 owns the generic transport types and
+runtime, including historical declaration reads and the explicit v2
+generic-check transport clarification `fa120186`. Neither scope is
+complete merely because the other is delivered.
+
+### 34.1 Conditions and changes
+
+| Item | Rules | Types (`packages/contract`) |
+|---|---|---|
+| 1. The core tools and toolsets | R-API-9: fourteen named tools plus `act`/`acts`; new R-API-14 | `McpTools` gains `lanes`, `lane`, `proposal`, `operation`; new `McpNotFound`, `McpToolsets`, `McpToolset`; stage 5 composes the generic additions |
+| 2. Titles, annotations, advertised output schemas, instructions | New R-API-13; R-API-1 unchanged | `McpToolDescriptor` gains `title`, `annotations`, `toolsets`; `method` of `operation` is `op`; new `McpToolAnnotations` |
+| 3. Required idempotency key | R-API-9 | `McpCommon.idempotencyKey` is required |
+| 4. Waiting | New R-API-15 | `attention` input gains `waitMs`; new `McpMaxWaitMs` |
+
+The four added reads use methods a bearer already has (`RoomWire.read`
+with `lane`, `lanes`, `proposal` and `op`, and `RoomWire.subscribe`). They
+add no Room authority. Stage 5 separately adds generic methods and read
+routes; its admission dependency remains stage 2. The new core acceptance
+cases are in section 23, rows "MCP keys" to "MCP waiting", alongside
+amendment 6's generic-act cases.
+
+### 34.2 Required lane edits
+
+Edits marked "(type)" fail that package's typecheck against the amended
+contract until they are made. Checked on 2026-10-03 after `npm ci`, against
+parent `9615f449853c505b53cde1d93792330415618f67` with this contract:
+the contract and its examples compile; the client source and test types
+compile; MCP fails for the four missing runners/descriptors and the ten
+descriptors' missing metadata; CLI fails through those MCP imports.
+These are the expected implementation seams, replacing the original
+draft's measurement at `request/laneE-clients@5cd1c13b`. They are not
+passing runtime gates. The final composed delivery must implement them
+and pass the relevant gates before landing.
+
+**Lane E (`packages/mcp`)**
+1. Descriptors: add `title`, `annotations` (the R-API-13 table) and
+   `toolsets` (the R-API-14 table) to each; add `idempotencyKey` to
+   `required` for every act tool; set `maximum: 45000` on every `waitMs`.
+   (type)
+2. Add descriptors and runners for `lanes`, `lane`, `proposal` and
+   `operation`, returning `McpNotFound` for unknown IDs. The operation
+   runner maps `RoomApi.op`'s lookup `not-found` exception to
+   `McpNotFound<"operation">`, preserving every other error. `operation` uses
+   `op`, then `wait` with `until` and `timeoutMs = waitMs`, and maps a
+   `timeout` to a fresh `op` read. (type)
+3. `tools/list` sends `title`, `outputSchema` and `annotations`. For act
+   tools and `workspace`, `outputSchema` is `oneOf` the result schema and
+   the `Refusal` schema. Add a test that validates a success and a refusal
+   against it.
+4. `attention` with `waitMs`: when the page is empty, wait on the
+   subscription for an update with attention items, then read again;
+   return the empty page at the deadline.
+5. Toolsets: implement the shared R-API-14 role/declaration/grant/binding
+   predicate and default precedence in HTTPS and stdio. Accept `?toolset=`;
+   drop ineligible new act tools from discovery, keep every core tool
+   callable, and preserve accepted exact retries. Cover direct and
+   delegated checker defaults, platform-only grants, all-stale and mixed
+   maps, changed role/`who`, non-delegable kinds and a renamed check kind.
+6. Cut the server instructions to at most 512 characters, and every
+   description to at most 1,000.
+7. The generated `AGENTS.md` block (`packages/client`, `agents-md.ts`) says
+   that every act needs an `idempotencyKey` and that a retry reuses it.
+8. Compose `act` and `acts` with all of the above in stage 5. Keep the
+   generic `act` descriptor conservative about side effects, since one
+   tool may perform a review, a check or a landing; `acts` is read-only.
+   Toolsets filter authority without rebinding a signed grant or intent.
+
+**Lane E (`packages/cli`)**
+1. Rebuild against the amended `packages/mcp`. (type, through the import)
+   When this contract was first checked, the command line needed no
+   source change to typecheck. The runtime does need two: `artroom mcp`
+   gives the server the caller's authorization (the R-API-14 seam: the
+   member's own key, or a bearer's recorded delegation, read from the
+   current roster for each `tools/list`), and it takes `--toolset NAME`,
+   the stdio form of `?toolset=`.
+
+**The MCP endpoint's deployment (request `8ae3b2dc`)**
+1. The `RoomApi`-per-bearer adapter must serve `lane`, `lanes`,
+   `proposal`, `op` and `wait` over `RoomWire.read`, and the attention wait
+   over `RoomWire.subscribe`.
+2. The endpoint's host gives the server the caller's authorization for
+   each `tools/list` (R-API-14). Inside the Room's own Worker that is the
+   Room's reading of the token. It is not a method of `RoomApi` or
+   `RoomWire`, and no service binding returns it.
+
+**Other lanes**
+1. Stage 2 continues to own Room admission and shared policy vocabulary.
+   Stage 5 owns declaration read routes and coordinates any Room seam.
+   No other lane needs a change for the four named reads alone.
+
+### 34.3 Review and composition
+
+The MCP contract request `a9788a59` and declared-acts stage-5 request
+`a5d64b35` keep their complete scopes and separate promise bindings. A
+combined delivery must name both, report every changed path at one final
+head and receive independent review of that whole head. If they are
+reviewed separately, the later head must inherit the approved dependency
+and pass its gates again. No provisional contract or runtime head is
+treated as a completed implementation or a positive jam-readiness proof.

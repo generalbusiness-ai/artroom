@@ -8,10 +8,13 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "vitest run && npm test --workspace @generalbusiness/artroom-git --workspace @generalbusiness/artroom-ui",
+    "test:changed": "node scripts/test-changed.mjs",
+    "gate": "bash scripts/gate.sh"
   },
   "devDependencies": {
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
   },
   "engines": {
     "node": ">=22"

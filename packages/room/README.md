@@ -1,5 +1,7 @@
 # @generalbusiness/artroom-room
 
+> **Test file names below may be out of date.** Each section names the tests as they were when it was written. Request `ecbc722a` later merged and removed many test files; [plans/test-invariants.md](../../plans/test-invariants.md) is the current map from each invariant to its test.
+
 The Room is the part of Artroom that decides. It is a Cloudflare Worker and
 one Durable Object per repository. The Durable Object keeps the repository's
 log in SQLite and is the only sequencer for it: every act gets its place in
@@ -311,6 +313,18 @@ lane L's sources (`.types/log`), as the UI does for the policy runtime,
 because lane L's sources assume a lib whose `TextDecoder` options differ
 from the Workers runtime types.
 
+A workerd test file costs about a second to load the Room before its first
+test runs. So some test files are only a list of case files
+(`test/workerd/*.cases.ts`) that share one worker:
+`jobs-and-snapshots`, `obligations-and-carry`, `roster-and-redemption`,
+`publication-and-workspaces` and `alarms-and-diagnoses`. A case file is
+written like any test file, and each test still makes its own room. The
+Node tests are grouped the same way (`test/node/*.cases.ts`), in
+`pure-parts`, `deploy-and-source-rules` and `measure-scripts`. The
+sections below were written when each review landed. They name the tests as
+they were then; request ecbc722a later removed tests that another test
+already decided, and its report maps each invariant to its witness.
+
 ## Acceptance cases and their evidence
 
 Four kinds of evidence, from weakest to strongest:
@@ -493,7 +507,7 @@ change. Every mutation made at least one named test fail.
 
 The checker's review of `315a8576` requested changes. The eight
 reproductions now assert the correct outcomes in
-[test/workerd/review-aabda1ed.test.ts](test/workerd/review-aabda1ed.test.ts).
+[test/workerd/review-aabda1ed.cases.ts](test/workerd/review-aabda1ed.cases.ts).
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
@@ -543,7 +557,7 @@ stream is UTF-8 with one `Update` per line.
 
 The checker's review of `a5a3406a` requested changes. Its reproductions now
 assert the correct outcomes in
-[test/workerd/review-8faa2ef9.test.ts](test/workerd/review-8faa2ef9.test.ts).
+[test/workerd/review-8faa2ef9.cases.ts](test/workerd/review-8faa2ef9.cases.ts).
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
@@ -569,7 +583,7 @@ reached (comparing the pending commit again when sealing) was removed.
 The checker's review of `909a3e3f` confirmed the five 8faa2ef9 findings and
 the 13 amendment 2 edits, and found two more. Its reproductions now assert
 the correct outcomes in
-[test/workerd/review-1249097f.test.ts](test/workerd/review-1249097f.test.ts).
+[test/workerd/review-1249097f.cases.ts](test/workerd/review-1249097f.cases.ts).
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
@@ -643,7 +657,7 @@ on its own integration).
 The checker's review of revision 5 (`45c7946f`) requested changes. The fixes
 are on top of `80d2351`, which adopted lane B's follow-up. Its
 reproductions now fail; the correct outcomes are asserted in
-[test/workerd/review-a711f7b6.test.ts](test/workerd/review-a711f7b6.test.ts).
+[test/workerd/review-a711f7b6.cases.ts](test/workerd/review-a711f7b6.cases.ts).
 
 | Finding | Fix | Tests (in that file) |
 |---|---|---|
@@ -773,7 +787,7 @@ object, and every retained file's body. With an active segment over
 Tests: [test/workerd/log-bounded.test.ts](test/workerd/log-bounded.test.ts)
 (reads of at most `READ_LIMITS.entries`, none of a published full segment,
 retained bodies only when new, and a verified log) and
-[test/node/logremote.test.ts](test/node/logremote.test.ts). The live
+[test/node/logremote.cases.ts](test/node/logremote.cases.ts). The live
 matrix and memory figures are in `notes/log-bounded.md`; the harness is in
 [measure/logbig/](measure/logbig/).
 
@@ -791,7 +805,7 @@ The checker's review of revision 6 (`d0b09ca2`) found one P2, and
 revision 7 had the same defect. This revision merges main `fb2bd41`
 (contract amendment 3) and fixes it. The checker's reproduction now fails;
 the correct outcomes are asserted in
-[test/workerd/review-95323c2b.test.ts](test/workerd/review-95323c2b.test.ts).
+[test/workerd/review-95323c2b.cases.ts](test/workerd/review-95323c2b.cases.ts).
 
 **The finding.** Two integrations can share one filtered snapshot commit,
 because its ID depends only on the files, the checker and the digest
@@ -848,9 +862,9 @@ the snapshot (R-CARRY-15 steps 3 and 5). The rest of amendment 3's lane A
 edits (sealed carry events, the runner pin, one repository per snapshot,
 the new job fields, advisory obligations) are a separate request. The
 merge only adds amendment 3's new `CheckJob` fields to the contract-shaped
-fixture in `review-a711f7b6.test.ts`, which the type check requires.
+fixture in `review-a711f7b6.cases.ts`, which the type check requires.
 
-**Tests**, all in `review-95323c2b.test.ts`, use the reviewer's layout: two
+**Tests**, all in `review-95323c2b.cases.ts`, use the reviewer's layout: two
 active landings both change `src/app.ts` to v2, and the second also
 changes `docs/a.md`, outside the checker's inputs. The two canonical
 integrations differ and their snapshot commits are the same.
@@ -962,8 +976,8 @@ this package (section 29.8, lane A). This request makes all seven. Edits 1,
 `packages/git`, together with the fixes of review 0f9739dc (see that
 section). The tests are in
 [test/workerd/amendment3.test.ts](test/workerd/amendment3.test.ts),
-[test/workerd/review-0f9739dc.test.ts](test/workerd/review-0f9739dc.test.ts)
-and [test/workerd/snapshot-repos.test.ts](test/workerd/snapshot-repos.test.ts);
+[test/workerd/review-0f9739dc.cases.ts](test/workerd/review-0f9739dc.cases.ts)
+and [test/workerd/snapshot-repos.cases.ts](test/workerd/snapshot-repos.cases.ts);
 each test name starts with its rule or finding.
 
 | Edit | What the Room does | Tests (in that file unless named) |
@@ -1046,7 +1060,7 @@ the suite.
 The checker's review of `8931f596` accepted the sealed carry, the runner
 pin and the advisory work, and found two P2s in job delivery. Its
 diagnostic asserted both defects; the tests in
-[test/workerd/review-0f9739dc.test.ts](test/workerd/review-0f9739dc.test.ts)
+[test/workerd/review-0f9739dc.cases.ts](test/workerd/review-0f9739dc.cases.ts)
 assert the correct outcomes. This revision also merges main `6f8cacbe`
 (lane F's carry UI and jj history) and `5acf29ad` (lane G, with
 `SnapshotRepos`), and makes amendment 3's edit 4 (see "Amendment 3").
@@ -1145,7 +1159,7 @@ main `9bb700b6` (contract amendment 4, bounded-memory log publication, lane
 E, the deploy and pi-durable spikes); the one conflict was in `core.ts`'s
 imports, where main's `RetainedRef` replaces `RetainedFile`.
 
-| Finding | Fix | Tests (in [test/workerd/review-786e9606.test.ts](test/workerd/review-786e9606.test.ts) unless named) |
+| Finding | Fix | Tests (in [test/workerd/review-786e9606.cases.ts](test/workerd/review-786e9606.cases.ts) unless named) |
 |---|---|---|
 | P2 1. Two jobs steps both read one owed row and used one attempt's ID before either claimed it; the step that lost then ended the winner's token and retired its snapshot repository | A step claims the attempt in the job's row (`owed` to `sent`, the next attempt number, its deadline) before it reads a snapshot or a tree or mints a token. A step that loses the claim prepares nothing. Every credential belongs to one attempt, and its ID is written to the row as soon as it exists, so an expiry or a restart still ends it. A canonical token is minted to expire by the deadline claimed with the attempt. | "filtered / whole-tree: two jobs steps at once on two owed jobs send one attempt each, whose tokens and repositories stay usable until they answer"; "whole-tree: a step held past the attempt's deadline, while the next step issues attempt 2, ends its own token and sends nothing"; "filtered: a job token that cannot be minted leaves the job due again later; the retry reuses the repository written for it"; review-0f9739dc "two jobs steps at once …", "restart …" |
 | P2 2. Owner, configuration, generation and obligation were judged only before the asynchronous preparation | After preparation the step checks that the row still holds its attempt, and judges the work again with the same synchronous check it used before (`current`: the owner current on the integration, the lane's latest generation, the same configuration, the obligation open), with no await before the dispatch. Work that changed is marked not needed, and its credentials are ended: the canonical token revoked, or the snapshot job ended, which retires its repository. | eight controls: "whole-tree / filtered preparation, owner / generation / configuration / obligation changed while a read token was being minted" |
@@ -1215,7 +1229,7 @@ repository through the Room's namespace-aware binding (`core.artifacts`).
   revocations with backoff (5 seconds, doubling, at most 5 minutes), and the
   alarm is set from them, so a restart keeps the duty.
 
-Tests, in [test/workerd/review-90f30a3b.test.ts](test/workerd/review-90f30a3b.test.ts),
+Tests, in [test/workerd/review-90f30a3b.cases.ts](test/workerd/review-90f30a3b.cases.ts),
 on the real Room Durable Object and SQLite with no other jobs step running.
 The fake's `createToken` can hold the request before minting
 (`holdToken`: the expiry then runs from the late mint) or hold the answer
@@ -1373,7 +1387,7 @@ a canonical token is owned by its own `job_tokens` row:
   token's real expiry, an unknown mint's as unknown (null), and when each
   record is next checked (`nextCheckAt`).
 
-Controls in [test/workerd/review-271dbd53.test.ts](test/workerd/review-271dbd53.test.ts),
+Controls in [test/workerd/review-271dbd53.cases.ts](test/workerd/review-271dbd53.cases.ts),
 on the real Room Durable Object and SQLite. Each injects one failure of the
 Room's own SQLite write at a handoff, then aborts the object and checks
 that a fresh one still owns the token and revokes it.
@@ -1452,7 +1466,7 @@ room and imports a repository on the same deployment.
 |---|---|
 | 1 | `test/workerd/founding-gaps.test.ts` (first lane lands; push fails, is refused or its answer is lost; land on no main); `packages/git/test/first-commit.test.ts` (the commit equals `git commit-tree`'s; real `receive-pack` accepts the pack and refuses an existing main; only a clear `ok` counts) |
 | 2 | `founding-gaps.test.ts` (no active token at sealing; a lost create; revocation fails, then the alarm settles it before founding); `packages/git/test/workspaces.test.ts`, five canonical-repository cases |
-| 3 | `founding-gaps.test.ts` (an import lands and publishes in its own namespace on a deployment that also founds publicly; refusals at draft and found); `test/node/config.test.ts` (production bindings and log remote); `packages/git/test/ref-fence.test.ts` (sandbox namespaces) |
+| 3 | `founding-gaps.test.ts` (an import lands and publishes in its own namespace on a deployment that also founds publicly; refusals at draft and found); `test/node/config.cases.ts` (production bindings and log remote); `packages/git/test/ref-fence.test.ts` (sandbox namespaces) |
 
 Each mutation below was made once, and the named suite run; every one
 failed at least one test (21 of 21 killed).
@@ -1529,7 +1543,7 @@ bindings, because the test pool cannot have Artifacts bindings.
 |---|---|
 | 1 | `packages/git/test/workspaces.test.ts`: healthy (answered) control; no canonical mint; a lost create that applies late, across a restart and after a successful retry; the alarm deletes a late repository before founding; refused control; unconfirmed revocation; spent token; refused first commit; after founding nothing is touched. `founding-gaps.test.ts`: no `createToken` at founding; a lost create; the alarm before founding |
 | 2 | `workspaces.test.ts`: inventories incomplete, without a total, with a record without an ID, with an unknown state; an active token nobody owes |
-| 3 | `founding-gaps.test.ts`: `IMPORT_NAMESPACE` without `IMPORT_ARTIFACTS`, and no `ARTIFACTS`, refused at draft and found with the registry checked; the two-binding import control; `test/node/config.test.ts` |
+| 3 | `founding-gaps.test.ts`: `IMPORT_NAMESPACE` without `IMPORT_ARTIFACTS`, and no `ARTIFACTS`, refused at draft and found with the registry checked; the two-binding import control; `test/node/config.cases.ts` |
 
 Mutations, made once each after committing, with the named suite run: 26
 of 28 were killed. The checker's three diagnostics are among the tests.
@@ -1644,7 +1658,7 @@ The smoke script no longer takes `genesis.repo`'s name (the identity's base)
 for the public room's repository: it finds the sealed incarnation (the
 highest `<base>-<step>`, `incarnationOf`) for its founding checks, ref reads
 and verify, and its cleanup reaches the base name, every incarnation and
-their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.test.ts`
+their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.cases.ts`
 covers both.
 
 ## Client and deployment hygiene (request 55be0661)
@@ -1668,7 +1682,7 @@ including the checker's own fixture
 
 | Finding | Fix | Tests |
 |---|---|---|
-| SEC-04: `PUBLIC_URL` fell back to `https://artroom.example.workers.dev` (src/room.ts), and wrangler.jsonc set that placeholder. Redemption names that host in `Redeemed.mcp`, and the CLI prints a `claude mcp add` command that sends the bearer token there. | `publicUrl()` in src/config.ts requires an `https://` origin with nothing after the host, and has no default. The Worker entrypoint (src/worker.ts constructor) and every Room object (src/room.ts constructor) call it first, so neither starts without one, for HTTPS or RPC. wrangler.jsonc no longer sets `PUBLIC_URL`; a deploy passes `--var PUBLIC_URL:https://<host>`. | test/node/hygiene-55be0661.test.ts (the accepted and refused values; wrangler.jsonc has no `PUBLIC_URL` and names no example host; the spike's value is accepted). test/workerd/hygiene-55be0661.test.ts (the Worker and a Room object refuse to start without it, or with a value that is not an origin). |
+| SEC-04: `PUBLIC_URL` fell back to `https://artroom.example.workers.dev` (src/room.ts), and wrangler.jsonc set that placeholder. Redemption names that host in `Redeemed.mcp`, and the CLI prints a `claude mcp add` command that sends the bearer token there. | `publicUrl()` in src/config.ts requires an `https://` origin with nothing after the host, and has no default. The Worker entrypoint (src/worker.ts constructor) and every Room object (src/room.ts constructor) call it first, so neither starts without one, for HTTPS or RPC. wrangler.jsonc no longer sets `PUBLIC_URL`; a deploy passes `--var PUBLIC_URL:https://<host>`. | test/node/hygiene-55be0661.cases.ts (the accepted and refused values; wrangler.jsonc has no `PUBLIC_URL` and names no example host; the spike's value is accepted). test/workerd/hygiene-55be0661.test.ts (the Worker and a Room object refuse to start without it, or with a value that is not an origin). |
 | SEC-05: the CLI wrote room-supplied values verbatim into the git config file the repository includes (packages/cli/src/git.ts): the workspace remote and token in the setting, and the lane and lease in the first-line comment that marks whose credential it is. A newline in any of them ends its line and adds settings: a remote ending `"]`, newline, `[core]`, newline, `sshCommand = ...`, a token, a `Claim.lane` or a lease with a newline each set `core.sshCommand`. All four were reproduced (the remote and token on main, the lane and lease on e90cc7c0). | Every value written into the file is checked before anything changes, in packages/cli/src/git.ts. `checkGrant`: the remote must be a plain `https://` URL in normal form (no credentials, query, fragment, dot segments or characters outside `A-Za-z0-9._~/-` in the path), and the token may hold only the RFC 6750 token characters and `?` and `=`, up to 4096. `checkMarker`: the lane must be a canonical lane ID (`act_<seq>_<8 hex>`), the lease a whole number, and the installation ID an idempotency key. In packages/cli/src/main.ts, a claim's lane is selected only if canonical; `laneOf` refuses any other `--lane` or stored lane before the destination is reserved; `workspace` checks the grant's remote, token and lease before anything is pending. `configureWorkspace` checks all five again at its own boundary. | packages/cli/test/hygiene-55be0661.test.ts: 14 refused remotes, 10 tokens, 7 lanes, 6 leases and 5 installation IDs, each named; the refusal does not repeat the token; `configureWorkspace` given an injecting remote, token, lane, lease or installation ID refuses and changes nothing; the whole file, written with every admitted character in every field, reads back through git as exactly one setting, every other line is a comment, and the ownership reader reads the mark back exactly; `artroom workspace` given an injecting remote or token exits 1, and a lease from a malicious room (in both the lane and the grant) exits 1, each with no remote, no credential, no `core.sshCommand` and nothing pending, after which a valid workspace installs and releases; a claim answered with an injecting lane exits 1 and selects nothing; an injecting `--lane` is a usage error before the destination is reserved. A redemption with an injecting MCP URL or bearer exits 1, saves nothing and prints no command. packages/cli/test/checker-hygiene-marker.test.ts: the checker's fixture, unchanged. |
 | SEC-11: the HTTPS routes read a body whole and then compared its length in UTF-16 units with 1 MiB, so a body without `Content-Length` was read entirely first (src/http.ts). The MCP route had no cap (packages/mcp/src/worker.ts). | Both count bytes as the body streams in and stop reading past 1 MiB: 413 `payload-too-large` on the HTTPS routes, a 413 JSON-RPC error on the MCP route. A declared `Content-Length` over 1 MiB is refused before any read. The MCP route reads the body only after the bearer is accepted. | test/workerd/hygiene-55be0661.test.ts: a 16 MiB stream with no length is refused after at most 1 MiB plus two chunks is pulled (main pulled all 16 MiB); 1.5 MiB of two-byte characters is refused; a large declared length is refused with nothing pulled; exactly 1 MiB is read. packages/mcp/test/workerd/body-cap.test.ts: the same three, an unknown bearer refused with nothing pulled, and exactly 1 MiB handed on. |
 
@@ -1746,7 +1760,7 @@ separate change.
 
 From simplification review 55563589 (SEC-01, SEC-02, SEC-07). Each
 behaviour was wrong on main `a6330262`; the tests in
-`test/workerd/request-c657d4ba.test.ts` fail there (12 of 13; the 13th is
+`test/workerd/request-c657d4ba.cases.ts` fail there (12 of 13; the 13th is
 the control that other refusals are still recorded) and pass here.
 
 | Finding or condition | Fix | Tests |
@@ -1777,7 +1791,7 @@ test red:
 | `admit` never reports a replay | (1), all three |
 | a refused join is recorded | (2), `/acts` and RPC |
 | joins on `/acts` are not counted | (3), the three that mix or use `/acts` |
-| a room-custody redemption is not counted | (3) room-custody; `roster.test.ts` per-invitation limit |
+| a room-custody redemption is not counted | (3) room-custody; `roster.cases.ts` per-invitation limit |
 | any string invitation is keyed | (3) unissued invitation; HTTPS address |
 | a null address is counted | (3) RPC |
 | the Worker passes a shared address | (3) RPC |
@@ -1804,7 +1818,7 @@ refuses the replayed redemption.
 | Test | What it pins |
 |---|---|
 | `test/workerd/checker-join-recovery.test.ts` (the checker's fixture, unchanged) | Recovery over RPC after an eviction and over HTTPS; "checker: join recovery honors the supplied client clock for its signed session request", which failed at 812fb907 |
-| `request-c657d4ba.test.ts`, "virtual clock: a lost join reply is recovered, and a session request retried after the clock moves is signed again at the moved time" | Against the real Room: the first session request fails retryably after the clock moves ten minutes; the retry's `notAfter` is ten minutes later and is accepted; the log holds one join |
+| `request-c657d4ba.cases.ts`, "virtual clock: a lost join reply is recovered, and a session request retried after the clock moves is signed again at the moved time" | Against the real Room: the first session request fails retryably after the clock moves ten minutes; the retry's `notAfter` is ten minutes later and is accepted; the log holds one join |
 | `packages/client/test/redeem.test.ts`, the two virtual-clock tests | The same two cases against the fake room |
 
 | Mutant in `connect.ts` | Red |
@@ -1938,7 +1952,7 @@ both fixed; the checker's two controls pass.
    While the repository is gone, workspace setup waits too.
 
 One existing test changed with the second fix:
-`review-a711f7b6.test.ts`, "Artifacts is down: … the next alarm completes
+`review-a711f7b6.cases.ts`, "Artifacts is down: … the next alarm completes
 it", ticked again at the same instant after the failed read of the
 canonical remote. That read now backs the landing step off for 5 s, so the
 test moves the clock to the next alarm the room asks for, and the
@@ -1954,7 +1968,7 @@ operation lands there, as the test's name says.
 
 **Mutations**, made one at a time on the code at the head that adds this
 review's fixes; 31 of 31 turned a test red. They were run against this
-request's tests and `phase2b.test.ts` (for the engine's own failures):
+request's tests and `phase2b.cases.ts` (for the engine's own failures):
 
 | Mutant | Red |
 |---|---|
@@ -1984,7 +1998,7 @@ request's tests and `phase2b.test.ts` (for the engine's own failures):
 | a not-bound answer is logged as a failure | cold publication, not bound |
 | the landing step returns quietly when not bound | cold landing, not bound |
 | a landing failure before the engine is not counted | both cold landing tests |
-| the engine's own failures back the landing step off | `phase2b.test.ts`: the instance stops while the push is in flight |
+| the engine's own failures back the landing step off | `phase2b.cases.ts`: the instance stops while the push is in flight |
 | the alarm runs loop work inside its backoff | lease expiry, notification and job deadline cases; cold landing, throws |
 | the next alarm ignores a kind's backoff | pin step; lease expiry and job deadline cases |
 | the next alarm ignores the landing backoff | both cold landing tests |
@@ -2117,8 +2131,8 @@ Left unchanged, with the reason:
 | `foundingDue`, `nextAlarm`, `simulate`, founding's `refreshMain` after the seal | Scheduling reads, control flow, or background work retried by the alarm |
 | `src/worker.ts` RPC entry (`RoomWireTarget`, `Artroom`) | No catch: `unwire` rethrows the Room's `ArtroomError` to the caller |
 
-**Tests.** `test/workerd/request-d268d249.test.ts` (38 tests) and
-`test/node/diag.test.ts` (59 tests).
+**Tests.** `test/workerd/request-d268d249.cases.ts` (38 tests) and
+`test/node/diag.cases.ts` (59 tests).
 
 - One test per pre-admission step (10). Each fails the step once at the
   Artifacts port (`failNext`, which now takes the error to throw) or, for

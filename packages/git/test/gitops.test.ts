@@ -1,274 +1,132 @@
 // The publisher's git sequences, run against real git and local bare repos.
+// The test repositories are written as files (support.ts), so the processes
+// a test starts are the publisher's own commands, a few of git's answers
+// used as an oracle, and the controls. Integration and the push to main are
+// in git-publisher.test.ts, with the landing engine over them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, writeFileSync, chmodSync, appendFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync, chmodSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { Fixture, edit, lines, localExec, sh } from "./support.ts";
-import { type Exec, GitOps, HARDENING, LOG_REF, integrationRef, objectsRef, pinnedRef } from "../src/publisher/gitops.ts";
-import { decodeLogPush, decodeLogStage, toB64url, toLogOutcome } from "../src/publisher/log-push.ts";
+import { LOG_TRANSFER_LIMITS, MemoryGit, type StagePart as TheirPart, type StageWant as TheirWant } from "@generalbusiness/artroom-log";
+import type { Sha } from "@generalbusiness/artroom-contract";
+import { Fixture, GitObjects, edit, lines, localExec, looseIds, looseObject, objectsIn, sh, writeLoose, writeRef } from "./support.ts";
+import { type Exec, HARDENING, LOG_REF, objectsRef, pinnedRef } from "../src/publisher/gitops.ts";
+import { LOG_PUSH_LIMITS, decodeLogPush, decodeLogStage, toB64url, toLogOutcome } from "../src/publisher/log-push.ts";
 import { createHash } from "node:crypto";
 
 const lane = "act_1001_abcdef01";
+const other = "act_1002_abcdef02";
 
-test("integrate: a head that fast-forwards main is its own integration", async (t) => {
-  const f = await new Fixture().init();
+test("lease race: two fresh sandboxes fetch their stored heads and push different ones on the same main; exactly one wins; no hook in a sandbox's repository runs; a missing repository is an error", async (t) => {
+  const f = new Fixture().init();
   t.after(() => f.dispose());
-  const head = await f.propose(lane, 1, f.main, { "src/c.txt": "new\n" });
-  const r = await f.ops.integrate({
-    canonical: f.canonical, expectedMain: f.main, head, headRef: pinnedRef(lane, 1),
-    storeRef: integrationRef("op_1", 1), lane, generation: 1,
-  });
-  assert.deepEqual(r, { kind: "clean", integration: head, ref: pinnedRef(lane, 1), fastForward: true });
-});
-
-test("integrate: a merge commit with parents (expectedMain, head), deterministic, stored in the canonical repo", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const other = await f.propose("act_1002_abcdef02", 1, f.main, { "src/b.txt": edit(lines("b"), 3, "main side") });
-  await sh(f.root, "--git-dir", f.canonical, "update-ref", "refs/heads/main", other);
-  const head = await f.propose(lane, 1, f.main, { "src/a.txt": edit(lines("a"), 3, "lane side") });
-  const req = { canonical: f.canonical, expectedMain: other, head, headRef: pinnedRef(lane, 1),
-    storeRef: integrationRef("op_1", 1), lane, generation: 1 };
-  const r = await f.ops.integrate(req);
-  assert.equal(r.kind, "clean");
-  if (r.kind !== "clean") return;
-  assert.equal(r.fastForward, false);
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", integrationRef("op_1", 1)), r.integration);
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", `${r.integration}^1`), other);
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", `${r.integration}^2`), head);
-  assert.match(await f.show(r.integration, "src/a.txt"), /lane side/);
-  assert.match(await f.show(r.integration, "src/b.txt"), /main side/);
-  // A fresh sandbox rebuilds the same commit, so a retry never lands a different one.
-  const fresh = new GitOps({ exec: localExec, workdir: join(f.root, "publisher2"), config: ["protocol.file.allow=always"] });
-  mkdirSync(join(f.root, "publisher2"));
-  const again = await fresh.integrate({ ...req, storeRef: integrationRef("op_1", 2) });
-  assert.equal(again.kind === "clean" && again.integration, r.integration);
-  // Every input is fixed by (base, head, lane, generation): the message, and both dates at the later parent's commit time.
-  const ct = Math.max(...(await sh(f.root, "--git-dir", f.canonical, "show", "-s", "--format=%ct", other, head)).split("\n").map(Number));
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "show", "-s", "--format=%B|%at %ad|%ct %cd", "--date=raw", r.integration),
-    `Land ${lane} generation 1\n|${ct} ${ct} +0000|${ct} ${ct} +0000`);
-});
-
-test("integrate: a conflict lists the paths and pushes nothing", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const other = await f.propose("act_1002_abcdef02", 1, f.main, { "src/a.txt": edit(lines("a"), 3, "main side") });
-  await sh(f.root, "--git-dir", f.canonical, "update-ref", "refs/heads/main", other);
-  const head = await f.propose(lane, 1, f.main, { "src/a.txt": edit(lines("a"), 3, "lane side") });
-  const r = await f.ops.integrate({ canonical: f.canonical, expectedMain: other, head, headRef: pinnedRef(lane, 1),
-    storeRef: integrationRef("op_1", 1), lane, generation: 1 });
-  assert.deepEqual(r, { kind: "conflict", paths: ["src/a.txt"] });
-  const stored = await localExec(["git", "--git-dir", f.canonical, "rev-parse", "--verify", "-q", integrationRef("op_1", 1)], { env: {} });
-  assert.notEqual(stored.code, 0);
-});
-
-test("the repository's own attributes cannot change a merge (merge=union is ignored)", async (t) => {
-  const f = await new Fixture().init({ ".gitattributes": "src/*.txt merge=union\n", "src/a.txt": lines("a") });
-  t.after(() => f.dispose());
-  const other = await f.propose("act_1002_abcdef02", 1, f.main, { "src/a.txt": edit(lines("a"), 3, "main side") });
-  await sh(f.root, "--git-dir", f.canonical, "update-ref", "refs/heads/main", other);
-  const head = await f.propose(lane, 1, f.main, { "src/a.txt": edit(lines("a"), 3, "lane side") });
-  // Plain git, told to read attributes from the head's tree, merges cleanly with union.
-  const dir = await f.ops.repo(f.canonical);
-  await f.ops.fetch(dir, f.canonical, [`+${pinnedRef(lane, 1)}:${pinnedRef(lane, 1)}`, "+refs/heads/main:refs/remotes/canonical/main"]);
-  const plain = await localExec(["git", "-C", dir, "-c", `attr.tree=${head}`, "merge-tree", "--write-tree", "--name-only", other, head], { env: {} });
-  assert.equal(plain.code, 0, "control: the union driver applies when attributes are read");
-  // The publisher's hardened merge does not read them.
-  const r = await f.ops.integrate({ canonical: f.canonical, expectedMain: other, head, headRef: pinnedRef(lane, 1),
-    storeRef: integrationRef("op_1", 1), lane, generation: 1 });
-  assert.deepEqual(r, { kind: "conflict", paths: ["src/a.txt"] });
-});
-
-test("hooks never run, even if one is placed in the publisher's repo", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
+  const a = f.propose(lane, 1, f.main, { "race/a.txt": "a\n" });
+  const b = f.propose(other, 1, f.main, { "race/b.txt": "b\n" });
+  // Hooks, placed in one sandbox's repository, for the ref updates of a fetch and for a push.
   const dir = await f.ops.repo(f.canonical);
   const marker = join(f.root, "hook-ran");
+  mkdirSync(join(dir, "hooks"), { recursive: true });
   for (const hook of ["reference-transaction", "pre-push", "post-update", "pre-auto-gc"]) {
-    const p = join(dir, "hooks", hook);
-    mkdirSync(join(dir, "hooks"), { recursive: true });
-    writeFileSync(p, `#!/bin/sh\necho ${hook} >> ${marker}\n`);
-    chmodSync(p, 0o755);
+    writeFileSync(join(dir, "hooks", hook), `#!/bin/sh\necho ${hook} >> ${marker}\n`);
+    chmodSync(join(dir, "hooks", hook), 0o755);
   }
-  const head = await f.propose(lane, 1, f.main, { "src/c.txt": "c\n" });
-  const r = await f.ops.integrate({ canonical: f.canonical, expectedMain: f.main, head, headRef: pinnedRef(lane, 1),
-    storeRef: integrationRef("op_1", 1), lane, generation: 1 });
-  assert.equal(r.kind, "clean");
-  const out = await f.ops.pushMain(f.canonical, head, f.main, pinnedRef(lane, 1));
-  assert.equal(out.outcome, "landed");
+  // Neither sandbox has its head yet: each fetches it from the pinned ref first. The loser's lease is stale, whichever push git takes first.
+  const [ra, rb] = await Promise.all([
+    f.ops.pushMain(f.canonical, a, f.main, pinnedRef(lane, 1)),
+    f.sandbox("pb").pushMain(f.canonical, b, f.main, pinnedRef(other, 1)),
+  ]);
+  assert.deepEqual([ra.outcome, rb.outcome].sort(), ["landed", "rejected"]);
+  assert.equal(f.canonicalMain(), ra.outcome === "landed" ? a : b);
   assert.equal(existsSync(marker), false, "a hook ran");
   assert.ok(HARDENING.includes("core.hooksPath=/dev/null"));
   // Control: the same hooks do run under plain git.
-  await localExec(["git", "-C", dir, "update-ref", "refs/x", head], { env: {} });
+  await localExec(["git", "-C", dir, "update-ref", "refs/x", a], { env: {} });
   assert.equal(existsSync(marker), true, "control: plain git runs the reference-transaction hook");
+  // Nothing was sent to a repository that is not there: an error, never unknown.
+  assert.equal((await f.ops.pushMain(join(f.root, "nope.git"), a, f.main, pinnedRef(lane, 1))).outcome, "error");
 });
 
-test("pushMain: compare-and-swap on main, with the four outcomes classified", async (t) => {
-  const f = await new Fixture().init();
+test("pinning: objects ref, then a pinned ref that never moves; the head is the lane's commit itself, a jj change-id header included (R-PROP-1)", async (t) => {
+  const f = new Fixture().init();
   t.after(() => f.dispose());
-  const head = await f.propose(lane, 1, f.main, { "src/c.txt": "c\n" });
-  const stale = await f.ops.pushMain(f.canonical, head, "1".repeat(40), pinnedRef(lane, 1));
-  assert.equal(stale.outcome, "rejected");
-  assert.equal(await f.canonicalMain(), f.main);
-  const ok = await f.ops.pushMain(f.canonical, head, f.main, pinnedRef(lane, 1));
-  assert.equal(ok.outcome, "landed");
-  assert.equal(await f.canonicalMain(), head);
-  // Repeating the same push after it landed is "up to date": git checks no lease when
-  // nothing would change. Main is unchanged. (The engine decides by reading main back.)
-  const again = await f.ops.pushMain(f.canonical, head, f.main, pinnedRef(lane, 1));
-  assert.equal(again.outcome, "landed");
-  assert.match(again.detail, /up to date/);
-  assert.equal(await f.canonicalMain(), head);
-  const missing = await f.ops.pushMain(join(f.root, "nope.git"), head, f.main, pinnedRef(lane, 1));
-  assert.equal(missing.outcome, "error");
-});
-
-test("pushMain from a fresh sandbox fetches the stored integration first", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const head = await f.propose(lane, 1, f.main, { "src/c.txt": "c\n" });
-  mkdirSync(join(f.root, "fresh"));
-  const fresh = new GitOps({ exec: localExec, workdir: join(f.root, "fresh"), config: ["protocol.file.allow=always"] });
-  const r = await fresh.pushMain(f.canonical, head, f.main, pinnedRef(lane, 1));
-  assert.equal(r.outcome, "landed");
-});
-
-test("lease race: of two publishers pushing different integrations on the same main, exactly one wins", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  for (let round = 0; round < 5; round++) {
-    const base = await f.canonicalMain();
-    const a = await f.propose("act_1001_abcdef01", 10 + round, base, { [`race/a${round}.txt`]: "a\n" });
-    const b = await f.propose("act_1002_abcdef02", 10 + round, base, { [`race/b${round}.txt`]: "b\n" });
-    const pubs = ["pa", "pb"].map((d) => {
-      mkdirSync(join(f.root, `${d}${round}`));
-      return new GitOps({ exec: localExec, workdir: join(f.root, `${d}${round}`), config: ["protocol.file.allow=always"] });
-    });
-    const [ra, rb] = await Promise.all([
-      pubs[0]!.pushMain(f.canonical, a, base, pinnedRef("act_1001_abcdef01", 10 + round)),
-      pubs[1]!.pushMain(f.canonical, b, base, pinnedRef("act_1002_abcdef02", 10 + round)),
-    ]);
-    const winners = [ra, rb].filter((r) => r.outcome === "landed").length;
-    assert.equal(winners, 1, `round ${round}: ${ra.outcome} ${rb.outcome}`);
-    const main = await f.canonicalMain();
-    assert.equal(main, ra.outcome === "landed" ? a : b);
-  }
-});
-
-test("pinning: objects ref, then a pinned ref that never moves", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const fork = join(f.root, "fork.git");
-  await sh(f.root, "clone", "-q", "--bare", f.canonical, fork);
-  await sh(f.work, "checkout", "-q", "--detach", f.main);
-  f.write({ "src/c.txt": "c\n" });
-  await sh(f.work, "add", "-A");
-  await sh(f.work, "commit", "-q", "-m", "lane work");
-  const head = await sh(f.work, "rev-parse", "HEAD");
+  // The lane's fork: main, then the lane's work on a branch.
+  const fork = f.bare("fork.git");
+  f.git.writeInto(fork);
+  writeRef(fork, "refs/heads/main", f.main);
+  // jj writes its change-id as a commit header after `committer`. Pinning copies the commit; it never rewrites it.
+  const head = f.git.commit([f.main], { "src/c.txt": "c\n" }, { message: "lane work\n", headers: `change-id ${"zyxwvutsrqponmlk".repeat(2)}\n` });
+  const written = f.git.commitFacts(head).raw;
+  assert.match(written, /\ncommitter [^\n]+\nchange-id [k-z]{32}\n\nlane work\n$/);
   // Not yet pushed to the fork: refused.
   assert.deepEqual(await f.ops.pinObjects(fork, f.canonical, head), { kind: "head-unknown" });
-  await sh(f.work, "push", "-q", fork, "HEAD:refs/heads/work");
+  f.git.writeInto(fork);
+  writeRef(fork, "refs/heads/work", head);
+  assert.equal(looseObject(f.canonical, head), null, "the canonical repo does not have the head yet");
   assert.deepEqual(await f.ops.pinObjects(fork, f.canonical, head), { kind: "pinned", already: false });
-  assert.equal((await f.ops.pinObjects(fork, f.canonical, head)).kind, "pinned");
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", objectsRef(head)), head);
+  assert.equal(f.ref(objectsRef(head)), head);
+  assert.equal(f.show(head, "src/c.txt"), "c\n", "the head's objects were copied from the fork");
+  assert.equal(objectsIn(f.canonical).commitFacts(head).raw, written, "the commit in the canonical repo is byte for byte the one written");
   assert.deepEqual(await f.ops.pinRef(f.canonical, pinnedRef(lane, 1), head), { kind: "pinned", already: false });
   assert.deepEqual(await f.ops.pinRef(f.canonical, pinnedRef(lane, 1), head), { kind: "pinned", already: true });
   // A different head for the same generation is a conflict, and the ref stays.
   const r = await f.ops.pinRef(f.canonical, pinnedRef(lane, 1), f.main);
   assert.deepEqual(r, { kind: "conflict", observed: head });
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", pinnedRef(lane, 1)), head);
-  // A force-push to the fork cannot erase the pinned head.
-  await sh(f.work, "push", "-q", "--force", fork, `${f.main}:refs/heads/work`);
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", pinnedRef(lane, 1)), head);
+  assert.equal(f.ref(pinnedRef(lane, 1)), head);
 });
 
-test("preview: clean with a tree, or the conflicting paths", async (t) => {
-  const f = await new Fixture().init();
+test("preview: a conflict gives the paths; a fast-forward gives the head itself and stores nothing", async (t) => {
+  const f = new Fixture().init();
   t.after(() => f.dispose());
-  const other = await f.propose("act_1002_abcdef02", 1, f.main, { "src/a.txt": edit(lines("a"), 3, "main side") });
-  await sh(f.root, "--git-dir", f.canonical, "update-ref", "refs/heads/main", other);
-  const clash = await f.propose(lane, 1, f.main, { "src/a.txt": edit(lines("a"), 3, "lane side") });
-  const fine = await f.propose(lane, 2, f.main, { "src/b.txt": edit(lines("b"), 3, "lane side") });
-  assert.deepEqual(await f.ops.preview(f.canonical, clash, pinnedRef(lane, 1), lane, 1), { kind: "conflict", base: other, paths: ["src/a.txt"] });
-  const ok = await f.ops.preview(f.canonical, fine, pinnedRef(lane, 2), lane, 2);
-  assert.equal(ok.kind, "clean");
+  const main = f.commit(f.main, { "src/a.txt": edit(lines("a"), 3, "main side") });
+  f.setMain(main);
+  const clash = f.propose(lane, 1, f.main, { "src/a.txt": edit(lines("a"), 3, "lane side") });
+  assert.deepEqual(await f.ops.preview(f.canonical, clash, pinnedRef(lane, 1), lane, 1), { kind: "conflict", base: main, paths: ["src/a.txt"] });
+  const ahead = f.propose(lane, 2, main, { "src/c.txt": "c\n" });
+  const p = await f.ops.preview(f.canonical, ahead, pinnedRef(lane, 2), lane, 2);
+  assert.deepEqual(p, { kind: "clean", base: main, tree: f.git.commitFacts(ahead).tree, integration: ahead, fastForward: true });
+  assert.equal(existsSync(join(f.canonical, "refs", "artroom", "objects")), false, "nothing was stored");
 });
 
 test("filtered snapshot: the fixed commit of R-CARRY-15, written into an empty repository at refs/artroom/snapshot only (R-CARRY-16)", async (t) => {
-  const f = await new Fixture().init({ "src/a.ts": "a\n", "src/secret.ts": "s\n", "package.json": "{}\n", "tests/a.test.ts": "t\n" });
+  const f = new Fixture().init({ "src/a.ts": "a\n", "src/secret.ts": "s\n", "package.json": "{}\n", "tests/a.test.ts": "t\n" });
   t.after(() => f.dispose());
   const files = await f.ops.listTree(f.canonical, f.main);
   assert.deepEqual(files.map((x) => x[0]).sort(), ["package.json", "src/a.ts", "src/secret.ts", "tests/a.test.ts"]);
   const chosen = files.filter(([p]) => p !== "src/secret.ts");
   const secretBlob = files.find(([p]) => p === "src/secret.ts")![2];
-  const store = async (name: string) => {
-    const dir = join(f.root, `${name}.git`);
-    await sh(f.root, "init", "-q", "--bare", dir);
-    return dir;
-  };
   const git = (dir: string, ...args: string[]) => sh(f.root, "--git-dir", dir, ...args);
   const message = `Artroom filtered snapshot for tests\n\nDigest: sha256:${"d".repeat(64)}\n`;
-  const s1 = await store("s1");
+  const s1 = f.bare("s1.git");
   const commit = await f.ops.writeSnapshot({ canonical: f.canonical, store: s1, files: chosen, message });
   // Exactly this commit object: no parent, the fixed identity at time 0, the Room's message.
-  const tree = await git(s1, "rev-parse", `${commit}^{tree}`);
-  const raw = (await localExec(["git", "--git-dir", s1, "cat-file", "commit", commit], { env: {} })).stdout;
+  const stored = objectsIn(s1);
+  const facts = stored.commitFacts(commit);
   assert.equal(
-    raw,
-    `tree ${tree}\nauthor Artroom Snapshot <snapshot@artroom.invalid> 0 +0000\ncommitter Artroom Snapshot <snapshot@artroom.invalid> 0 +0000\n\n${message}`,
+    facts.raw,
+    `tree ${facts.tree}\nauthor Artroom Snapshot <snapshot@artroom.invalid> 0 +0000\ncommitter Artroom Snapshot <snapshot@artroom.invalid> 0 +0000\n\n${message}`,
   );
   // One ref, and nothing but the commit's closure.
   assert.equal(await git(s1, "for-each-ref", "--format=%(refname) %(objectname)"), `refs/artroom/snapshot ${commit}`);
   const reachable = (await git(s1, "rev-list", "--objects", "--all")).split("\n").map((l) => l.slice(0, 40)).sort();
-  const stored = (await git(s1, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)")).split("\n").sort();
-  assert.deepEqual(stored, reachable, "the repository holds exactly the snapshot's commit, trees and blobs");
-  assert.deepEqual((await git(s1, "ls-tree", "-r", "--name-only", commit)).split("\n").sort(), ["package.json", "src/a.ts", "tests/a.test.ts"]);
-  assert.notEqual((await localExec(["git", "--git-dir", s1, "cat-file", "-e", secretBlob], { env: {} })).code, 0);
-  // Anyone computes the same commit from the same files, in any order.
-  const again = await f.ops.writeSnapshot({ canonical: f.canonical, store: await store("s2"), files: [...chosen].reverse(), message });
-  assert.equal(again, commit);
-  // A repository is never given a second snapshot: not the same one, not a wider one.
-  const before = await git(s1, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)");
-  await assert.rejects(f.ops.writeSnapshot({ canonical: f.canonical, store: s1, files: chosen, message }), /not empty/);
+  assert.deepEqual(looseIds(s1), reachable, "the repository holds exactly the snapshot's commit, trees and blobs");
+  assert.deepEqual([...stored.files(commit).keys()].sort(), ["package.json", "src/a.ts", "tests/a.test.ts"]);
+  assert.ok(!looseIds(s1).includes(secretBlob), "the file left out is not in the repository");
+  // Anyone computes the same commit from the same files, in any order: here, without git.
+  const mine = new GitObjects();
+  const tree = mine.tree(new Map([...chosen].reverse().map(([path, , blob]) => [path, blob])));
+  assert.equal(mine.commitTree(tree, [], { who: "Artroom Snapshot <snapshot@artroom.invalid>", at: 0, message }), commit);
+  // A repository is never given a second snapshot.
+  const before = looseIds(s1);
   await assert.rejects(f.ops.writeSnapshot({ canonical: f.canonical, store: s1, files, message }), /not empty/);
-  assert.equal(await git(s1, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)"), before, "nothing was added");
+  assert.deepEqual(looseIds(s1), before, "nothing was added");
   // Nor anything else: a store with any ref at all, even with no snapshot ref, is refused and nothing is pushed.
-  const s3 = await store("s3");
-  await sh(f.root, "--git-dir", f.canonical, "push", "-q", s3, `${f.main}:refs/heads/main`);
+  const s3 = f.bare("s3.git");
+  f.git.writeInto(s3);
+  writeRef(s3, "refs/heads/main", f.main);
+  const held = looseIds(s3);
   await assert.rejects(f.ops.writeSnapshot({ canonical: f.canonical, store: s3, files: chosen, message }), /not empty/);
-  assert.equal(await git(s3, "for-each-ref", "--format=%(refname)"), "refs/heads/main");
-});
-
-// ------------------------------------------------------------------ request 090a0eca: the preview's integration
-
-test("a clean preview carries its integration commit: the merge commit the landing builds on the same main, stored in the canonical repo", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const other = await f.propose("act_1002_abcdef02", 1, f.main, { "src/b.txt": edit(lines("b"), 3, "main side") });
-  await sh(f.root, "--git-dir", f.canonical, "update-ref", "refs/heads/main", other);
-  const head = await f.propose(lane, 1, f.main, { "src/a.txt": edit(lines("a"), 3, "lane side") });
-  const p = await f.ops.preview(f.canonical, head, pinnedRef(lane, 1), lane, 1);
-  assert.ok(p.kind === "clean" && !p.fastForward);
-  if (p.kind !== "clean") return;
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", objectsRef(p.integration)), p.integration, "stored for checkers");
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", `${p.integration}^{tree}`), p.tree);
-  // A landing on the same main, in a fresh sandbox, builds exactly the previewed commit.
-  mkdirSync(join(f.root, "publisher-land"));
-  const lander = new GitOps({ exec: localExec, workdir: join(f.root, "publisher-land"), config: ["protocol.file.allow=always"] });
-  const built = await lander.integrate({ canonical: f.canonical, expectedMain: other, head, headRef: pinnedRef(lane, 1), storeRef: integrationRef("op_9", 1), lane, generation: 1 });
-  assert.deepEqual(built.kind === "clean" && built.integration, p.integration);
-  assert.equal((await lander.pushMain(f.canonical, p.integration, other, integrationRef("op_9", 1))).outcome, "landed");
-  assert.equal(await f.canonicalMain(), p.integration);
-});
-
-test("a clean fast-forward preview's integration is the head itself, and nothing is stored", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const head = await f.propose(lane, 1, f.main, { "src/c.txt": "c\n" });
-  const p = await f.ops.preview(f.canonical, head, pinnedRef(lane, 1), lane, 1);
-  assert.ok(p.kind === "clean" && p.fastForward && p.integration === head);
-  const stored = await localExec(["git", "--git-dir", f.canonical, "for-each-ref", "refs/artroom/objects/"], { env: {} });
-  assert.equal(stored.stdout.trim(), "");
+  assert.deepEqual(looseIds(s3), held);
+  assert.equal(existsSync(join(s3, "refs", "artroom")), false, "no snapshot ref was written");
 });
 
 // ------------------------------------------------------------------ request 090a0eca: pushLog
@@ -290,59 +148,96 @@ function logCommit(text: string, parent: string | null) {
   return { commit: commit.sha, objects: [blob, tree, commit].map(({ type, data }) => ({ type, data })) };
 }
 
-test("pushLog writes lane L's commit with its parent to refs/artroom/log under the lease, then the next one on top", async (t) => {
-  const f = await new Fixture().init();
+/** Put a log commit's objects into a repository on disk, as an earlier publication left them. */
+function seed(gitDir: string, c: ReturnType<typeof logCommit>): string {
+  for (const o of c.objects) writeLoose(gitDir, o.type, o.data);
+  return c.commit;
+}
+
+test("pushLog writes lane L's commit with its parent to refs/artroom/log under the lease, then the next one on top; readLogRef reads the ref, null when it does not exist, and fails (never null) when the remote cannot be read", async (t) => {
+  const f = new Fixture().init();
   t.after(() => f.dispose());
+  assert.equal(await f.ops.readLogRef(f.canonical), null);
+  // A first publication: no lease, and the objects come with the call.
   const c1 = logCommit("first", null);
   const r1 = await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
   assert.equal(r1.outcome.outcome, "landed");
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", LOG_REF), c1.commit);
-  // A fresh sandbox: the parent comes from the canonical repo, only the new objects are sent.
-  mkdirSync(join(f.root, "publisher-2"));
-  const fresh = new GitOps({ exec: localExec, workdir: join(f.root, "publisher-2"), config: ["protocol.file.allow=always"] });
+  assert.deepEqual(toLogOutcome(r1), { ok: true });
+  assert.equal(f.ref(LOG_REF), c1.commit);
+  // A fresh sandbox reads it: ls-remote sees refs outside refs/heads/. The parent comes from the canonical repo, and only the new objects are sent.
+  const fresh = f.sandbox("publisher-2");
+  assert.equal(await fresh.readLogRef(f.canonical, LOG_REF), c1.commit);
   const c2 = logCommit("second", c1.commit);
   assert.equal((await fresh.pushLog(f.canonical, c2.objects, c2.commit, c1.commit)).outcome.outcome, "landed");
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", LOG_REF), c2.commit);
+  assert.equal(f.ref(LOG_REF), c2.commit);
+  assert.deepEqual(objectsIn(f.canonical).commitFacts(c2.commit).parents, [c1.commit]);
   assert.equal((await localExec(["git", "--git-dir", f.canonical, "fsck", "--no-dangling"], { env: {} })).code, 0);
-  assert.deepEqual(toLogOutcome(r1), { ok: true });
+  await assert.rejects(f.ops.readLogRef(f.canonical, "refs/heads/main"), /only refs\/artroom\/log/);
+  await assert.rejects(f.ops.readLogRef(join(f.root, "no-such-repo.git")));
 });
 
 test("pushLog refuses by lease when another writer moved the ref, and says where it is; lane L sees lease-mismatch", async (t) => {
-  const f = await new Fixture().init();
+  const f = new Fixture().init();
   t.after(() => f.dispose());
   const c1 = logCommit("first", null);
-  await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
-  const intruder = logCommit("intruder", c1.commit);
-  await f.ops.pushLog(f.canonical, intruder.objects, intruder.commit, c1.commit);
+  const intruder = logCommit("intruder", seed(f.canonical, c1));
+  f.setRef(LOG_REF, seed(f.canonical, intruder));
   const c2 = logCommit("second", c1.commit);
   const r = await f.ops.pushLog(f.canonical, c2.objects, c2.commit, c1.commit);
   assert.deepEqual([r.outcome.outcome, r.current], ["rejected", intruder.commit]);
   assert.deepEqual(toLogOutcome(r), { ok: false, reason: "lease-mismatch", current: intruder.commit });
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", LOG_REF), intruder.commit);
+  assert.equal(f.ref(LOG_REF), intruder.commit);
   // A first publication (no lease) onto a ref that exists is refused the same way.
   const fresh = logCommit("again", null);
   const r0 = await f.ops.pushLog(f.canonical, fresh.objects, fresh.commit, null);
   assert.deepEqual(toLogOutcome(r0), { ok: false, reason: "lease-mismatch", current: intruder.commit });
   // A lease onto a ref that is gone: lease-mismatch, at nothing.
-  await sh(f.root, "--git-dir", f.canonical, "update-ref", "-d", LOG_REF);
+  f.setRef(LOG_REF, null);
   const r3 = await f.ops.pushLog(f.canonical, c2.objects, c2.commit, c1.commit);
   assert.deepEqual(toLogOutcome(r3), { ok: false, reason: "lease-mismatch", current: null });
 });
 
-test("pushLog sends nothing for a commit that is not exactly lane L's next commit: wrong parent, missing objects", async (t) => {
-  const f = await new Fixture().init();
+test("a lease refusal at the push itself (the ref moved after the check) reads back where the ref is", async (t) => {
+  const f = new Fixture().init();
   t.after(() => f.dispose());
   const c1 = logCommit("first", null);
-  await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
+  const moved = logCommit("other", seed(f.canonical, c1));
+  seed(f.canonical, moved);
+  f.setRef(LOG_REF, c1.commit);
+  // An exec that moves refs/artroom/log just before the push, as a concurrent writer would.
+  const racing: Exec = (argv, opts) => {
+    if (argv.includes("push")) f.setRef(LOG_REF, moved.commit);
+    return localExec(argv, opts);
+  };
+  const c2 = logCommit("second", c1.commit);
+  const r = await f.sandbox("racer", racing).pushLog(f.canonical, c2.objects, c2.commit, c1.commit);
+  assert.equal(r.outcome.outcome, "rejected");
+  assert.deepEqual(toLogOutcome(r), { ok: false, reason: "lease-mismatch", current: moved.commit });
+  assert.equal(f.ref(LOG_REF), moved.commit);
+});
+
+test("pushLog sends nothing for what is not exactly lane L's next commit: a wrong parent, missing objects, or a tree as the log head; the ref does not move", async (t) => {
+  const f = new Fixture().init();
+  t.after(() => f.dispose());
+  const c1 = logCommit("first", null);
+  f.setRef(LOG_REF, seed(f.canonical, c1));
   const orphan = logCommit("orphan", null); // no parent, but the lease is c1
   const r = await f.ops.pushLog(f.canonical, orphan.objects, orphan.commit, c1.commit);
   assert.equal(r.outcome.outcome, "error");
   const missing = logCommit("missing", c1.commit);
   const r2 = await f.ops.pushLog(f.canonical, missing.objects.slice(2), missing.commit, c1.commit); // the commit alone
   assert.equal(r2.outcome.outcome, "error");
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "rev-parse", LOG_REF), c1.commit, "the ref did not move");
   const o = toLogOutcome(r2);
   assert.ok(!o.ok && o.reason === "unknown" && /nothing was sent/.test(o.detail), "lane L reads the ref back after an unclear answer");
+  assert.equal(f.ref(LOG_REF), c1.commit, "the ref did not move");
+  // A tree with no lease, on a repository with no log ref: rev-list alone would read it as a commit with no parent.
+  const empty = f.bare("empty.git");
+  const head = object("tree", new Uint8Array());
+  const r0 = await f.ops.pushLog(empty, [{ type: "tree", data: head.data }], head.sha, null);
+  assert.equal(r0.outcome.outcome, "error");
+  assert.match(r0.outcome.detail, /is not a commit/);
+  assert.deepEqual(toLogOutcome(r0).ok, false);
+  assert.equal(existsSync(join(empty, LOG_REF)), false, "no log ref was created");
 });
 
 test("lane L's PushOutcome and this package's LogPushOutcome are the same type", () => {
@@ -350,6 +245,8 @@ test("lane L's PushOutcome and this package's LogPushOutcome are the same type",
   const a: Theirs = toLogOutcome({ outcome: { outcome: "landed", detail: "" } });
   const b: ReturnType<typeof toLogOutcome> = a;
   assert.deepEqual(b, { ok: true });
+  // Lane L bounds one transfer by the numbers the sandbox checks a request against.
+  assert.deepEqual(LOG_TRANSFER_LIMITS, LOG_PUSH_LIMITS);
 });
 
 test("only a landed push is ok, only a read-back lease refusal is lease-mismatch, any other rejection is refused; everything else is unknown, with the token redacted", () => {
@@ -383,8 +280,8 @@ test("a pushLog request is checked before git: only refs/artroom/log, commit ids
   const d = decodeLogPush(ok);
   assert.ok("objects" in d);
   assert.deepEqual([...d.objects[0]!.data], [0, 1, 255]);
-  const refused = (req: object) => {
-    const r = decodeLogPush({ ...ok, ...req });
+  const refused = (req: object, limits?: { objects: number; bytes: number }) => {
+    const r = decodeLogPush({ ...ok, ...req }, limits);
     assert.ok("refused" in r && !r.refused.ok && r.refused.reason === "unknown", JSON.stringify(req).slice(0, 80));
   };
   refused({ ref: "refs/heads/main" });
@@ -392,88 +289,13 @@ test("a pushLog request is checked before git: only refs/artroom/log, commit ids
   refused({ lease: "main" });
   refused({ objects: [{ type: "tag", data: "" }] });
   refused({ objects: [{ type: "blob", data: "a+b/" }] });
-  refused({ objects: Array.from({ length: 100_001 }, () => ({ type: "blob", data: "" })) });
-  const mib = toB64url(new Uint8Array(1024 * 1024));
-  refused({ objects: Array.from({ length: 65 }, () => ({ type: "blob", data: mib })) });
+  // The bounds are parameters: one object, or one byte, over a small bound is refused, and at the bound it is taken.
+  const three = Array.from({ length: 3 }, () => ({ type: "blob", data: toB64url(new Uint8Array(4)) }));
+  assert.ok("objects" in decodeLogPush({ ...ok, objects: three }, { objects: 3, bytes: 12 }));
+  refused({ objects: three }, { objects: 2, bytes: 12 });
+  refused({ objects: three }, { objects: 3, bytes: 11 });
+  assert.deepEqual(LOG_PUSH_LIMITS, { objects: 100_000, bytes: 8 * 1024 * 1024 });
 });
-
-test("the integration is dated at the later parent's commit time, whichever side it is on", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const env = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@x", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@x" };
-  const proposed = await f.propose("act_1002_abcdef02", 1, f.main, { "src/b.txt": edit(lines("b"), 3, "main side") });
-  for (const at of [1_000_000_000, 4_000_000_000]) {
-    // main moves to a commit dated far before, then far after, the lane's head
-    const tree = await sh(f.root, "--git-dir", f.canonical, "rev-parse", `${proposed}^{tree}`);
-    const dated = await localExec(["git", "--git-dir", f.canonical, "commit-tree", tree, "-p", f.main, "-m", `main at ${at}`],
-      { env: { ...env, GIT_AUTHOR_DATE: `@${at} +0000`, GIT_COMMITTER_DATE: `@${at} +0000` } });
-    const other = dated.stdout.trim();
-    await sh(f.root, "--git-dir", f.canonical, "update-ref", "refs/heads/main", other);
-    const g = at === 1_000_000_000 ? 1 : 2;
-    const head = await f.propose(lane, g, f.main, { "src/a.txt": edit(lines("a"), 3, `lane ${at}`) });
-    const p = await f.ops.preview(f.canonical, head, pinnedRef(lane, g), lane, g);
-    assert.ok(p.kind === "clean" && !p.fastForward);
-    const headTime = Number(await sh(f.root, "--git-dir", f.canonical, "show", "-s", "--format=%ct", head));
-    const want = Math.max(at, headTime);
-    assert.equal(await sh(f.root, "--git-dir", f.canonical, "show", "-s", "--format=%at %ct", p.integration), `${want} ${want}`);
-  }
-});
-
-test("a lease refusal at the push itself (the ref moved after the check) reads back where the ref is", async (t) => {
-  // An exec that moves refs/artroom/log just before the push, as a concurrent writer would.
-  let intruder = "";
-  let canonical = "";
-  const racing: Exec = async (argv, opts) => {
-    if (argv.includes("push") && intruder) await localExec(["git", "--git-dir", canonical, "update-ref", LOG_REF, intruder], { env: {} });
-    return localExec(argv, opts);
-  };
-  const f = await new Fixture(racing).init();
-  t.after(() => f.dispose());
-  canonical = f.canonical;
-  const c1 = logCommit("first", null);
-  await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
-  const other = logCommit("other", c1.commit);
-  await f.ops.pushLog(f.canonical, other.objects, other.commit, c1.commit);
-  await sh(f.root, "--git-dir", f.canonical, "update-ref", LOG_REF, c1.commit);
-  intruder = other.commit;
-  const c2 = logCommit("second", c1.commit);
-  const r = await f.ops.pushLog(f.canonical, c2.objects, c2.commit, c1.commit);
-  assert.equal(r.outcome.outcome, "rejected");
-  assert.deepEqual(toLogOutcome(r), { ok: false, reason: "lease-mismatch", current: other.commit });
-});
-
-test("readLogRef: the log ref's commit, null when it does not exist, and an error (never null) when the remote cannot be read", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  assert.equal(await f.ops.readLogRef(f.canonical), null);
-  const c1 = logCommit("first", null);
-  await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
-  assert.equal(await f.ops.readLogRef(f.canonical), c1.commit);
-  // A fresh sandbox reads it too: ls-remote sees refs outside refs/heads/.
-  mkdirSync(join(f.root, "reader"));
-  const fresh = new GitOps({ exec: localExec, workdir: join(f.root, "reader"), config: ["protocol.file.allow=always"] });
-  assert.equal(await fresh.readLogRef(f.canonical, LOG_REF), c1.commit);
-  await assert.rejects(f.ops.readLogRef(f.canonical, "refs/heads/main"), /only refs\/artroom\/log/);
-  await assert.rejects(f.ops.readLogRef(join(f.root, "no-such-repo.git")));
-});
-
-for (const type of ["tree", "blob"] as const) {
-  test(`pushLog refuses a ${type} as the log head, with or without a lease, and the ref does not move`, async (t) => {
-    const f = await new Fixture().init();
-    t.after(() => f.dispose());
-    const empty = object(type, new Uint8Array());
-    const r0 = await f.ops.pushLog(f.canonical, [{ type, data: empty.data }], empty.sha, null);
-    assert.equal(r0.outcome.outcome, "error");
-    assert.match(r0.outcome.detail, /is not a commit/);
-    assert.deepEqual(toLogOutcome(r0).ok, false);
-    assert.equal(await f.ops.readLogRef(f.canonical), null, "no log ref was created");
-    const c1 = logCommit("first", null);
-    await f.ops.pushLog(f.canonical, c1.objects, c1.commit, null);
-    const r1 = await f.ops.pushLog(f.canonical, [{ type, data: empty.data }], empty.sha, c1.commit);
-    assert.equal(r1.outcome.outcome, "error");
-    assert.equal(await f.ops.readLogRef(f.canonical), c1.commit, "the ref did not move");
-  });
-}
 
 // ------------------------------------------------------------------ review b618eca1: staging
 
@@ -491,80 +313,61 @@ function bigCommit(big: Uint8Array, parent: string | null) {
 const want = (o: { type: "blob" | "tree" | "commit"; data: Uint8Array; sha: string }) => ({ sha: o.sha, type: o.type, size: o.data.length });
 const chunk = (o: { type: "blob" | "tree" | "commit"; data: Uint8Array; sha: string }, offset: number, n: number) => ({ ...want(o), offset, data: o.data.subarray(offset, offset + n) });
 
-test("stageLog: a blob larger than one part is staged in order, checked by its ID, then the commit alone is pushed and lands", async (t) => {
-  const f = await new Fixture().init();
+test("stageLog: a blob larger than one part is staged in order, checked by its ID, then the commit alone is pushed and lands; each answer is the one lane L's own model of a remote gives; a restarted sandbox has lost the staging and says so", async (t) => {
+  const f = new Fixture().init();
   t.after(() => f.dispose());
   const big = new Uint8Array(10_000).map((_, i) => (i * 7) % 251);
   const c = bigCommit(big, null);
   const cohort = c.commit.sha;
   const wants = c.all.map(want);
-  // Probe: everything missing, nothing staged.
-  assert.deepEqual(await f.ops.stageLog(f.canonical, cohort, wants, []), { ok: true, missing: wants.map((w) => ({ sha: w.sha, have: 0 })) });
-  let r = await f.ops.stageLog(f.canonical, cohort, wants, [chunk(c.blob, 0, 4000)]);
-  assert.ok(r.ok);
-  assert.equal(r.missing.find((m) => m.sha === c.blob.sha)?.have, 4000);
+  // Lane L tests its publisher against MemoryGit: the sandbox must answer each call as that model does.
+  const model = new MemoryGit();
+  const stage = async (parts: ReturnType<typeof chunk>[]) => {
+    const r = await f.ops.stageLog(f.canonical, cohort, wants, parts);
+    assert.deepEqual(r, await model.stage(cohort as Sha, wants as TheirWant[], parts as TheirPart[]), "the sandbox and lane L's model answer alike");
+    return r;
+  };
+  const after4000 = { ok: true, missing: wants.map((w) => ({ sha: w.sha, have: w.sha === c.blob.sha ? 4000 : 0 })) };
+  assert.deepEqual(await stage([chunk(c.blob, 0, 4000)]), after4000);
   // The same part again is skipped; a part out of order is ignored and the answer says where to resume.
-  r = await f.ops.stageLog(f.canonical, cohort, wants, [chunk(c.blob, 0, 4000), chunk(c.blob, 8000, 2000)]);
-  assert.ok(r.ok);
-  assert.equal(r.missing.find((m) => m.sha === c.blob.sha)?.have, 4000);
-  r = await f.ops.stageLog(f.canonical, cohort, wants, [chunk(c.blob, 4000, 4000), chunk(c.blob, 8000, 2000), chunk(c.tree, 0, c.tree.data.length), chunk(c.commit, 0, c.commit.data.length)]);
-  assert.deepEqual(r, { ok: true, missing: [] });
+  assert.deepEqual(await stage([chunk(c.blob, 0, 4000), chunk(c.blob, 8000, 2000)]), after4000);
+  const rest = [chunk(c.blob, 4000, 4000), chunk(c.blob, 8000, 2000), chunk(c.tree, 0, c.tree.data.length), chunk(c.commit, 0, c.commit.data.length)];
+  assert.deepEqual(await stage(rest), { ok: true, missing: [] });
+  // A restart loses the staging: pushLog on the new sandbox sends nothing and says so, and its probe asks for every object again.
+  const restarted = f.sandbox("restarted");
+  const lost = await restarted.pushLog(f.canonical, [], cohort, null);
+  assert.equal(lost.outcome.outcome, "error");
+  const o = toLogOutcome(lost);
+  assert.ok(!o.ok && o.reason === "unknown" && /nothing was sent.*stage it again/.test(o.detail));
+  assert.equal(f.ref(LOG_REF), null);
+  assert.deepEqual(await restarted.stageLog(f.canonical, cohort, wants, []), { ok: true, missing: wants.map((w) => ({ sha: w.sha, have: 0 })) });
+  // The sandbox that staged it pushes the commit alone.
   const pushed = await f.ops.pushLog(f.canonical, [], cohort, null);
   assert.equal(pushed.outcome.outcome, "landed");
-  assert.equal(await f.ops.readLogRef(f.canonical), cohort);
-  assert.equal(await sh(f.root, "--git-dir", f.canonical, "cat-file", "-s", c.blob.sha), "10000");
+  assert.deepEqual(toLogOutcome(pushed), await model.push([], LOG_REF, cohort as Sha, null));
+  assert.equal(f.ref(LOG_REF), cohort);
+  assert.equal(looseObject(f.canonical, c.blob.sha)?.body.length, 10_000);
 });
 
 test("stageLog: an object that does not hash to its ID is refused and its staged bytes dropped; a part that does not match what is wanted is refused", async (t) => {
-  const f = await new Fixture().init();
+  const f = new Fixture().init();
   t.after(() => f.dispose());
   const big = new Uint8Array(3000).fill(1);
   const c = bigCommit(big, null);
   const wants = c.all.map(want);
-  await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 1000)]);
+  // The second part's bytes are not the blob's: the complete file hashes to another ID.
   const forged = { ...chunk(c.blob, 1000, 2000), data: new Uint8Array(2000).fill(2) };
-  const r = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [forged]);
-  assert.ok(!r.ok && /hashes to/.test(r.detail));
-  const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
-  assert.ok(probe.ok);
-  assert.equal(probe.missing.find((m) => m.sha === c.blob.sha)?.have, 0, "the staged bytes were dropped");
+  const r = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 1000), forged]);
+  assert.ok(!r.ok && /hashes to .* its bytes were discarded/.test(r.detail), r.ok ? "ok" : r.detail);
+  const area = join(await f.ops.repo(f.canonical), "artroom-stage", c.commit.sha);
+  assert.deepEqual(readdirSync(area), [], "the staged bytes were dropped");
+  assert.equal(looseObject(await f.ops.repo(f.canonical), c.blob.sha), null, "nothing was stored under the blob's ID");
   const outside = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [{ ...chunk(c.blob, 0, 1000), offset: 2500 }]);
   assert.ok(!outside.ok && /outside the object/.test(outside.detail));
   const whole = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [{ ...chunk(c.tree, 0, c.tree.data.length), sha: c.blob.sha, size: c.tree.data.length }]);
   assert.ok(!whole.ok && /does not match/.test(whole.detail));
   const wrongId = await f.ops.stageLog(f.canonical, c.commit.sha, [{ ...want(c.tree), sha: c.blob.sha }], [{ ...chunk(c.tree, 0, c.tree.data.length), sha: c.blob.sha }]);
   assert.ok(!wrongId.ok && /hashes to/.test(wrongId.detail));
-});
-
-test("stageLog: staging is lost on a restart; pushLog then sends nothing and says so, and staging again lands the same commit", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const c = bigCommit(new Uint8Array(5000).fill(3), null);
-  const wants = c.all.map(want);
-  await f.ops.stageLog(f.canonical, c.commit.sha, wants, c.all.map((o) => chunk(o, 0, o.data.length)));
-  mkdirSync(join(f.root, "restarted"));
-  const restarted = new GitOps({ exec: localExec, workdir: join(f.root, "restarted"), config: ["protocol.file.allow=always"] });
-  const r = await restarted.pushLog(f.canonical, [], c.commit.sha, null);
-  assert.equal(r.outcome.outcome, "error");
-  const o = toLogOutcome(r);
-  assert.ok(!o.ok && o.reason === "unknown" && /nothing was sent.*stage it again/.test(o.detail));
-  assert.equal(await restarted.readLogRef(f.canonical), null);
-  const probe = await restarted.stageLog(f.canonical, c.commit.sha, wants, []);
-  assert.ok(probe.ok && probe.missing.length === 3);
-  await restarted.stageLog(f.canonical, c.commit.sha, wants, c.all.map((o2) => chunk(o2, 0, o2.data.length)));
-  assert.equal((await restarted.pushLog(f.canonical, [], c.commit.sha, null)).outcome.outcome, "landed");
-});
-
-test("stageLog: staging another cohort discards the previous cohort's partial bytes", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const a = bigCommit(new Uint8Array(4000).fill(4), null);
-  const b = bigCommit(new Uint8Array(4000).fill(5), null);
-  await f.ops.stageLog(f.canonical, a.commit.sha, a.all.map(want), [chunk(a.blob, 0, 1000)]);
-  await f.ops.stageLog(f.canonical, b.commit.sha, b.all.map(want), [chunk(b.blob, 0, 1000)]);
-  const back = await f.ops.stageLog(f.canonical, a.commit.sha, a.all.map(want), []);
-  assert.ok(back.ok);
-  assert.equal(back.missing.find((m) => m.sha === a.blob.sha)?.have, 0);
 });
 
 test("a stageLog request is checked before git: ids, types, sizes, offsets, base64url, within the limits", () => {
@@ -587,13 +390,15 @@ test("a stageLog request is checked before git: ids, types, sizes, offsets, base
 
 // ------------------------------------------------------------------ review de5289a5: staging recovery
 
+type Fault = { when: (argv: readonly string[]) => boolean; mode: "lose" | "fail" };
+
 /**
  * A fixture whose exec can lose the answer of, or fail, the next command
  * matching `when`: "lose" runs it and then throws (the change applied, the
  * reply was lost); "fail" answers a failure without running it.
  */
-async function faulty() {
-  const faults: { when: (argv: readonly string[]) => boolean; mode: "lose" | "fail" }[] = [];
+function faulty() {
+  const faults: Fault[] = [];
   const exec: Exec = async (argv, opts) => {
     const i = faults.findIndex((x) => x.when(argv));
     const fault = i >= 0 ? faults.splice(i, 1)[0] : undefined;
@@ -602,118 +407,109 @@ async function faulty() {
     if (fault?.mode === "lose") throw new Error("simulated: the command ran and its answer was lost");
     return r;
   };
-  const f = await new Fixture(exec).init();
-  return { f, faults };
+  return { f: new Fixture(exec).init(), faults };
 }
 const isAppend = (argv: readonly string[]) => argv[0] === "sh" && argv[2] === 'cat >> "$1"';
 const isHashFile = (argv: readonly string[]) => argv.includes("hash-object") && argv.includes("--");
 const isRemove = (argv: readonly string[]) => argv[0] === "sh" && argv[2] === 'rm "$1"';
+/** The second command that matches `when`. */
+const second = (when: Fault["when"]): Fault["when"] => {
+  let seen = 0;
+  return (argv) => when(argv) && ++seen === 2;
+};
 
-async function stagingFile(f: Fixture, cohort: string, sha: string) {
-  return join(await f.ops.repo(f.canonical), "artroom-stage", cohort, sha);
-}
-/** Stage the rest of `c` whole and push it: it must land as `c.commit`. */
-async function finish(ops: GitOps, f: Fixture, c: ReturnType<typeof bigCommit>) {
-  const wants = c.all.map(want);
-  let r = await ops.stageLog(f.canonical, c.commit.sha, wants, []);
-  assert.ok(r.ok, JSON.stringify(r));
-  const missing = new Set(r.missing.map((m) => m.sha));
-  r = await ops.stageLog(f.canonical, c.commit.sha, wants, c.all.filter((o) => missing.has(o.sha) && o !== c.blob).map((o) => chunk(o, 0, o.data.length)));
-  assert.deepEqual(r, { ok: true, missing: [] });
-  assert.equal((await ops.pushLog(f.canonical, [], c.commit.sha, null)).outcome.outcome, "landed");
-  assert.equal(await ops.readLogRef(f.canonical), c.commit.sha);
-}
 
-test("de5289a5: the final append applied and its answer was lost; the next call finds the complete file and stores it", async (t) => {
-  const { f, faults } = await faulty();
+test("de5289a5: the final append applied and its answer was lost; the next call, from a restarted client with the filesystem kept, finds the complete file and stores it, and the commit lands", async (t) => {
+  const { f, faults } = faulty();
   t.after(() => f.dispose());
   const c = bigCommit(new Uint8Array(6000).fill(6), null);
   const wants = c.all.map(want);
-  await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 4000)]);
-  faults.push({ when: isAppend, mode: "lose" });
-  const lost = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 4000, 2000)]);
+  const file = join(await f.ops.repo(f.canonical), "artroom-stage", c.commit.sha, c.blob.sha);
+  faults.push({ when: second(isAppend), mode: "lose" });
+  const lost = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 4000), chunk(c.blob, 4000, 2000)]);
   assert.ok(!lost.ok);
-  assert.equal(statSync(await stagingFile(f, c.commit.sha, c.blob.sha)).size, 6000, "the complete file survived");
-  // The probe settles it: the blob is stored and no longer missing.
-  const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
+  assert.equal(statSync(file).size, 6000, "the complete file survived");
+  // The probe settles it: the blob is stored and no longer missing. The client is new; its sandbox's files are not.
+  const restarted = f.sandbox("publisher");
+  const probe = await restarted.stageLog(f.canonical, c.commit.sha, wants, []);
   assert.ok(probe.ok);
   assert.ok(!probe.missing.some((m) => m.sha === c.blob.sha));
-  assert.equal(existsSync(await stagingFile(f, c.commit.sha, c.blob.sha)), false);
-  await finish(f.ops, f, c);
+  assert.equal(existsSync(file), false);
+  // The rest is staged whole and the commit alone is pushed: it lands as the commit lane L built.
+  const rest = await restarted.stageLog(f.canonical, c.commit.sha, wants, [c.tree, c.commit].map((o) => chunk(o, 0, o.data.length)));
+  assert.deepEqual(rest, { ok: true, missing: [] });
+  assert.equal((await restarted.pushLog(f.canonical, [], c.commit.sha, null)).outcome.outcome, "landed");
+  assert.equal(f.ref(LOG_REF), c.commit.sha);
 });
 
-test("de5289a5: interrupted between the append and the hashing, the caller restarted (filesystem kept): a new sandbox client stores the file", async (t) => {
-  const { f } = await faulty();
+/** Put `bytes` where the sandbox stages `sha` for `cohort`, as earlier calls' appends left them. */
+function staged(sandbox: string, cohort: string, sha: string, bytes: Uint8Array): string {
+  mkdirSync(join(sandbox, "artroom-stage", cohort), { recursive: true });
+  const file = join(sandbox, "artroom-stage", cohort, sha);
+  writeFileSync(file, bytes);
+  return file;
+}
+
+test("de5289a5: a complete staged file whose hash-object answer was lost, whose hash-object failed, or whose cleanup failed is settled by the next call", async (t) => {
+  const { f, faults } = faulty();
   t.after(() => f.dispose());
-  const c = bigCommit(new Uint8Array(6000).fill(8), null);
-  const wants = c.all.map(want);
-  await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 4000)]);
-  appendFileSync(await stagingFile(f, c.commit.sha, c.blob.sha), c.blob.data.subarray(4000)); // the append ran; nothing after it did
-  const restarted = new GitOps({ exec: localExec, workdir: join(f.root, "publisher"), config: ["protocol.file.allow=always"] });
-  const probe = await restarted.stageLog(f.canonical, c.commit.sha, wants, []);
-  assert.ok(probe.ok && !probe.missing.some((m) => m.sha === c.blob.sha));
-  await finish(restarted, f, c);
-});
-
-test("de5289a5: a lost hash-object answer, a failed hash-object and a failed cleanup are each settled by the next call", async (t) => {
-  for (const [what, fault] of [
+  const sandbox = await f.ops.repo(f.canonical);
+  for (const [n, [what, fault]] of ([
     ["lost hash-object answer", { when: isHashFile, mode: "lose" }],
     ["failed hash-object", { when: isHashFile, mode: "fail" }],
     ["failed cleanup", { when: isRemove, mode: "fail" }],
-  ] as const) {
-    const { f, faults } = await faulty();
-    t.after(() => f.dispose());
-    const c = bigCommit(new Uint8Array(6000).fill(9), null);
+  ] as const).entries()) {
+    const c = bigCommit(new Uint8Array(6000).fill(20 + n), null); // a cohort each
     const wants = c.all.map(want);
-    await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 4000)]);
+    // The appends completed the file; the call that settles it meets the fault.
+    const file = staged(sandbox, c.commit.sha, c.blob.sha, c.blob.data);
     faults.push(fault);
-    const first = await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 4000, 2000)]);
+    const first = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
     if (what === "failed cleanup") assert.ok(first.ok && !first.missing.some((m) => m.sha === c.blob.sha), what);
     else assert.ok(!first.ok, what);
-    if (what === "failed hash-object") assert.equal(statSync(await stagingFile(f, c.commit.sha, c.blob.sha)).size, 6000, "kept for the next call");
+    assert.equal(statSync(file).size, 6000, `${what}: the file is still there`);
+    assert.equal(looseObject(sandbox, c.blob.sha) !== null, what !== "failed hash-object", `${what}: whether the blob was stored`);
     const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
     assert.ok(probe.ok && !probe.missing.some((m) => m.sha === c.blob.sha), what);
-    assert.equal(existsSync(await stagingFile(f, c.commit.sha, c.blob.sha)), false, `${what}: the file is gone`);
-    await finish(f.ops, f, c);
+    assert.equal(existsSync(file), false, `${what}: the file is gone`);
+    assert.equal(looseObject(sandbox, c.blob.sha)?.body.length, 6000, `${what}: the blob is stored`);
   }
 });
 
-test("de5289a5: a complete file with the wrong bytes, or too many bytes, is discarded and the call fails; staging again from the start lands", async (t) => {
-  for (const bad of [new Uint8Array(6000).fill(1), new Uint8Array(6001).fill(10)]) {
-    const { f } = await faulty();
-    t.after(() => f.dispose());
-    const c = bigCommit(new Uint8Array(6000).fill(10), null);
-    const wants = c.all.map(want);
-    await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 1000)]);
-    writeFileSync(await stagingFile(f, c.commit.sha, c.blob.sha), bad);
-    const r = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
+test("de5289a5: a complete file with the wrong bytes, or too many bytes, is discarded and the call fails", async (t) => {
+  const f = new Fixture().init();
+  t.after(() => f.dispose());
+  const sandbox = await f.ops.repo(f.canonical);
+  for (const [n, bad] of [new Uint8Array(6000).fill(1), new Uint8Array(6001).fill(10)].entries()) {
+    const c = bigCommit(new Uint8Array(6000).fill(10 + n), null); // a cohort each
+    const file = staged(sandbox, c.commit.sha, c.blob.sha, bad);
+    const r = await f.ops.stageLog(f.canonical, c.commit.sha, c.all.map(want), []);
     assert.ok(!r.ok && /discarded/.test(r.detail), r.ok ? "ok" : r.detail);
-    const probe = await f.ops.stageLog(f.canonical, c.commit.sha, wants, []);
-    assert.ok(probe.ok);
-    assert.equal(probe.missing.find((m) => m.sha === c.blob.sha)?.have, 0);
-    await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 0, 3000)]);
-    await f.ops.stageLog(f.canonical, c.commit.sha, wants, [chunk(c.blob, 3000, 3000)]);
-    await finish(f.ops, f, c);
+    assert.equal(existsSync(file), false, "staging starts again from nothing");
+    assert.equal(looseObject(sandbox, c.blob.sha), null, "nothing was stored under the blob's ID");
   }
 });
 
-test("de5289a5: an object counts as stored only with the exact type and size wanted", async (t) => {
-  const f = await new Fixture().init();
+test("de5289a5: a call settles only the objects it asks about, and an object counts as stored only with the exact type and size wanted; staging another cohort discards the previous cohort's partial bytes", async (t) => {
+  const f = new Fixture().init();
   t.after(() => f.dispose());
-  const c = bigCommit(new Uint8Array(100).fill(2), null);
-  await f.ops.stageLog(f.canonical, c.commit.sha, [want(c.blob)], [chunk(c.blob, 0, 100)]);
-  const r = await f.ops.stageLog(f.canonical, c.commit.sha, [{ ...want(c.blob), type: "tree" }], []);
-  assert.ok(!r.ok && /stored as a blob/.test(r.detail));
-  const sized = await f.ops.stageLog(f.canonical, c.commit.sha, [{ ...want(c.blob), size: 99 }], []);
-  assert.ok(!sized.ok && /stored as a blob of 100/.test(sized.detail));
-});
-
-test("de5289a5: a call settles only the objects it asks about; another batch's staging is left as it is", async (t) => {
-  const f = await new Fixture().init();
-  t.after(() => f.dispose());
-  const c = bigCommit(new Uint8Array(3000).fill(4), null);
-  await f.ops.stageLog(f.canonical, c.commit.sha, c.all.map(want), [chunk(c.blob, 0, 1000)]);
-  const other = await f.ops.stageLog(f.canonical, c.commit.sha, [want(c.tree)], []);
-  assert.deepEqual(other, { ok: true, missing: [{ sha: c.tree.sha, have: 0 }] });
-  assert.equal(statSync(await stagingFile(f, c.commit.sha, c.blob.sha)).size, 1000);
+  const sandbox = await f.ops.repo(f.canonical);
+  const a = bigCommit(new Uint8Array(3000).fill(4), null);
+  // Another batch's staging, 1,000 bytes of the blob, is left as it is.
+  const partial = staged(sandbox, a.commit.sha, a.blob.sha, a.blob.data.subarray(0, 1000));
+  const asked = await f.ops.stageLog(f.canonical, a.commit.sha, [want(a.tree)], [chunk(a.tree, 0, a.tree.data.length)]);
+  assert.deepEqual(asked, { ok: true, missing: [] });
+  assert.equal(statSync(partial).size, 1000);
+  // The tree is stored: asked for as another type, or another size, it does not count.
+  const r = await f.ops.stageLog(f.canonical, a.commit.sha, [{ ...want(a.tree), type: "blob" }], []);
+  assert.ok(!r.ok && /stored as a tree/.test(r.detail));
+  const sized = await f.ops.stageLog(f.canonical, a.commit.sha, [{ ...want(a.tree), size: a.tree.data.length - 1 }], []);
+  assert.ok(!sized.ok && new RegExp(`stored as a tree of ${a.tree.data.length}`).test(sized.detail));
+  // Review b618eca1: one cohort's staging at a time. The same cohort again keeps its bytes; another cohort discards them.
+  const same = await f.ops.stageLog(f.canonical, a.commit.sha, [want(a.blob)], []);
+  assert.deepEqual(same, { ok: true, missing: [{ sha: a.blob.sha, have: 1000 }] });
+  const b = bigCommit(new Uint8Array(4000).fill(5), null);
+  assert.deepEqual(await f.ops.stageLog(f.canonical, b.commit.sha, [want(b.blob)], []), { ok: true, missing: [{ sha: b.blob.sha, have: 0 }] });
+  assert.equal(existsSync(partial), false);
+  assert.deepEqual(readdirSync(join(sandbox, "artroom-stage")), [b.commit.sha]);
 });

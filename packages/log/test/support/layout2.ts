@@ -5,6 +5,7 @@ import type { LogEntry, LogLayout, Sha, SystemEvent } from "@generalbusiness/art
 import { canonicalize, utf8 } from "../../src/canonical.ts";
 import { LOG_REF, seal } from "../../src/entries.ts";
 import { MemoryGit, buildTree, encodeCommit, gitObject, parseCommit, parseTree, type GitObject, type GitRemote, type PushOutcome, type StageOutcome, type StagePart, type StageWant, type TreeEntry } from "../../src/git.ts";
+import { DIRECTORY_ENTRIES, OBJECT_BOUND, setLayoutLimitsForTests, type LayoutLimits } from "../../src/layout.ts";
 import type { EntryLine, EntrySource } from "../../src/publisher.ts";
 import { RoomSim, keys, memberAuthority } from "./room-sim.ts";
 
@@ -12,6 +13,25 @@ export const alice = memberAuthority("@alice", keys.alice.key);
 export const L2 = (from: number): LogLayout => ({ version: 2, from });
 
 export const lineOf = (e: LogEntry): number => utf8(canonicalize(e)).length;
+
+/**
+ * A test body run with the layout rules at smaller limits
+ * (`setLayoutLimitsForTests`), so it crosses a bound with a few small
+ * entries. The contract's limits are put back when the body ends.
+ */
+export function at(limits: Partial<LayoutLimits>, body: () => Promise<void>): () => Promise<void> {
+  return async () => {
+    const restore = setLayoutLimitsForTests(limits);
+    try {
+      await body();
+    } finally {
+      restore();
+    }
+  };
+}
+
+/** Publisher options in the proportions of the defaults to the contract's bound: one transfer is B, one read is B / 8. */
+export const proportional = () => ({ maxTransfer: { objects: 100_000, bytes: OBJECT_BOUND }, read: { entries: 64, bytes: OBJECT_BOUND / 8 } });
 
 /** A note on `lane` with `pad` bytes of text. */
 export function note(sim: RoomSim, lane: string, pad: number): LogEntry {
@@ -166,10 +186,18 @@ export class Scripted implements GitRemote {
   }
 }
 
-/** Expect every tree to list at most 4,096 entries and be under 397,312 bytes (R-LOG-19). */
+/**
+ * Expect every tree to list at most the directory limit of members and be
+ * under 397,312 bytes (R-LOG-19). A directory that splits lists one shard
+ * directory per group, at most 1,000 of them: at the contract's limit of
+ * 4,096 that is within the limit too; at a smaller test limit it is not, so
+ * shard directories are counted apart.
+ */
 export function expectSmallTrees(trees: readonly { path: string; size: number; names: string[] }[]) {
+  const shard = /^([0-9a-f]{2}|[0-9]{3})$/;
   for (const t of trees) {
-    expect(t.names.length, t.path).toBeLessThanOrEqual(4096);
+    expect(t.names.filter((n) => !shard.test(n)).length, t.path).toBeLessThanOrEqual(DIRECTORY_ENTRIES);
+    expect(t.names.length, t.path).toBeLessThanOrEqual(Math.max(DIRECTORY_ENTRIES, 1000));
     expect(t.size, t.path).toBeLessThan(397_312);
   }
 }

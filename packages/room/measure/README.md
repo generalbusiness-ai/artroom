@@ -1,5 +1,7 @@
 # Durable Object rows: the gate and the measurement
 
+> **Test file names below may be out of date.** Each section names the tests as they were when it was written. Request `ecbc722a` later merged and removed many test files; [plans/test-invariants.md](../../../plans/test-invariants.md) is the current map from each invariant to its test.
+
 Request 8bd623cc. A SQLite write in a Durable Object is billed as one row
 for the table plus one row for each secondary index the write touches. No
 counter in the application sees that, so the gate asks Cloudflare's billing
@@ -31,8 +33,8 @@ See "What remains".
 | [rows.mjs](rows.mjs) | The gate: query, attribution, budgets. Run directly, it is the scheduled check. Plain Node, no `npm ci` needed. |
 | [spike-smoke.mjs](spike-smoke.mjs) | Gates its own run when the token is set. `SPIKE_PHASE=rows` is the part 1 driver. |
 | [results/row-costs-2026-10-02.md](results/row-costs-2026-10-02.md) | Part 1: the measured table, its method, the index count for each table, and the findings. |
-| [../src/budgets.ts](../src/budgets.ts) | Part 3: the budgets the cost requests cite, each justified from the table. [../test/node/budgets.test.ts](../test/node/budgets.test.ts) checks the derivations. |
-| [../test/node/rows.test.ts](../test/node/rows.test.ts) | Tests against recorded responses in the shapes Cloudflare returns. No live call. |
+| [../src/budgets.ts](../src/budgets.ts) | Part 3: the budgets the cost requests cite, each justified from the table, in its comment. The room reads only `ALARM`, whose behaviour the workerd tests show; no test repeats the arithmetic of the others (request ecbc722a removed the one that did). |
+| [../test/node/rows.cases.ts](../test/node/rows.cases.ts) | Tests against recorded responses in the shapes Cloudflare returns. No live call. |
 | [../../../.github/workflows/row-writes.yml](../../../.github/workflows/row-writes.yml) | The hourly check. It does nothing until it is turned on. |
 
 ## The token
@@ -115,7 +117,7 @@ was not clean.
 ## Fail closed
 
 Each case below gives an `incomplete` result, never a pass with zero rows.
-Each one has a test in `rows.test.ts`.
+Each one has a test in `rows.cases.ts`.
 
 | Case | Test |
 |---|---|
@@ -163,7 +165,7 @@ when it sends it, which can be after the write. This is woo's fix in
 
 The ceilings were re-grounded on 2026-10-03, after the idle-write fix
 (request 3da1d82b). Each is the measured value times a headroom factor,
-rounded up to two significant figures. `rows.test.ts` derives them again
+rounded up to two significant figures. `rows.cases.ts` derives them again
 from those figures.
 
 | Budget | Used by | Measured (total / per object) | Headroom | Ceiling (total / per object) | Before the fix |
@@ -390,7 +392,7 @@ they ran.
 
 Hugh approved this as a spike-only switch (assert 66a41558).
 
-- **Off by default.** No config file sets it; `test/node/deploy.test.ts`
+- **Off by default.** No config file sets it; `test/node/deploy.cases.ts`
   checks the production, spike and test configs. With it unset, the
   propose's commit writes the pin at once, as before.
 - **Set only by an explicit measurement step:**
@@ -407,7 +409,7 @@ Hugh approved this as a spike-only switch (assert 66a41558).
   the pin, because a proposal read must find its pinned ref (R-PROP-1).
   Whenever a pin is written, its due time is deleted, even after the switch
   is unset.
-- **Its tests**, in `test/workerd/pin-delay.test.ts` against the real
+- **Its tests**, in `test/workerd/pin-delay.cases.ts` against the real
   Durable Object:
   - unset, the pin is written by the commit, with no tick and no due time;
   - set, it is not written before its due time, the next alarm is exactly
@@ -419,7 +421,7 @@ Hugh approved this as a spike-only switch (assert 66a41558).
   - unset after a delayed pin, the restarted object writes it at once and
     cleans up.
 
-  `test/node/config.test.ts` covers parsing; any value that is not a whole
+  `test/node/config.cases.ts` covers parsing; any value that is not a whole
   number of milliseconds stops the Room from starting.
 - **Rows read when scheduling a backlog of pending pins** (the checker's
   control on `48b1fee9`).
@@ -440,9 +442,11 @@ Hugh approved this as a spike-only switch (assert 66a41558).
   pending pin.
 
   Tests:
-  - `test/workerd/pin-backlog.test.ts` uses only main's interfaces, so it
-    runs on main (one full scan) and on this lane (bounded).
-  - `test/workerd/pin-delay.test.ts` covers:
+  - `test/workerd/pin-backlog.test.ts` used only main's interfaces, so it
+    ran on main (one full scan) and on this lane (bounded). Request
+    ecbc722a removed it: `pin-delay.cases.ts` holds the bounded-read cases,
+    which also stand for the 150,000-pin case named below.
+  - `test/workerd/pin-delay.cases.ts` covers:
     - the reads, with the switch unset and set;
     - 150,000 pending pins;
     - dating at start, and that a start with the switch off writes nothing;

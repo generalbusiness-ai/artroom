@@ -74,6 +74,16 @@ export class GitCli implements GitRemote {
     return at;
   }
 
+  /**
+   * Fetch the room's pinned version heads (`refs/artroom/heads/*`), if it
+   * has any, so that verify can check each version's changed paths against
+   * Git objects (notes/2026-10-02-declared-acts.md section 4.3). Best effort:
+   * without them, versions are reported `git-unwitnessed`.
+   */
+  async fetchPins(): Promise<void> {
+    this.run(["fetch", "--quiet", "--no-tags", this.remote, "+refs/artroom/heads/*:refs/artroom-stage/heads/*"]);
+  }
+
   async readObject(sha: Sha): Promise<{ readonly type: ObjectType; readonly data: Uint8Array }> {
     if (this.run(["cat-file", "-e", sha]).code !== 0) for (const ref of this.seen) await this.fetch(ref);
     const type = this.must(["cat-file", "-t", sha]).toString().trim() as ObjectType;

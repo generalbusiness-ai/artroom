@@ -14,6 +14,7 @@ import {
   type HttpRoom,
   type InvitationId,
   type ActRecord,
+  type AnySignedEnvelope,
   type Joined,
   type LogPage,
   type JoinEnvelope,
@@ -148,8 +149,8 @@ export async function join(
   const wire = isService(endpoint) ? new RpcWire(await endpoint.room(room), redactor) : new HttpWire(endpointUrl(endpoint.url), room, options, redactor);
   try {
     const retries = options.retries ?? 3;
-    let out = await withRetries(() => wire.redeem({ custody: "client", join: signed }), retries, key);
-    if (isRefusal(out) && out.rule === "invitation-invalid") out = (await recoverJoin(wire, room, signed, invitation.signer, retries, options.now ?? Date.now)) ?? out;
+    let out = await withRetries(() => wire.redeem({ custody: "client", join: signed }), retries, key, options.backoff);
+    if (isRefusal(out) && out.rule === "invitation-invalid") out = (await recoverJoin(wire, room, signed, invitation.signer, retries, options.now ?? Date.now, options.backoff)) ?? out;
     if (!isRefusal(out) && out.custody !== "client") throw artroomError("internal", "The room answered a client-custody join with a room-custody result.");
     if (!isRefusal(out)) redactor.add(out.session.token);
     return out as Result<Joined>;
@@ -163,10 +164,10 @@ export async function join(
  * when it admitted none. `now` is the caller's clock (`ClientOptions.now`):
  * the session request's `notAfter` must fall in the room's window (R-CRED-6).
  */
-async function recoverJoin(wire: HttpWire | RpcWire, room: RoomId, signed: SignedEnvelope, signer: Signer, retries: number, now: () => number): Promise<Joined | null> {
-  const record = await withRetries(() => wire.submit(signed), retries, signed.envelope.idempotencyKey);
+async function recoverJoin(wire: HttpWire | RpcWire, room: RoomId, signed: SignedEnvelope, signer: Signer, retries: number, now: () => number, backoff: ClientOptions["backoff"]): Promise<Joined | null> {
+  const record = await withRetries(() => wire.submit(signed), retries, signed.envelope.idempotencyKey, backoff);
   if (isRefusal(record) || record.kind !== "roster" || record.by.via !== "join") return null;
-  const session = await withRetries(async () => wire.request(await signRequest(room, { signer }, { kind: "session", ttlSeconds: 3600 }, now())), retries, undefined);
+  const session = await withRetries(async () => wire.request(await signRequest(room, { signer }, { kind: "session", ttlSeconds: 3600 }, now())), retries, undefined, backoff);
   if (isRefusal(session) || !("member" in session)) return null;
   return { custody: "client", member: record.by.member, role: record.by.role, key: signer.key, record, session };
 }
@@ -177,10 +178,10 @@ async function recoverJoin(wire: HttpWire | RpcWire, room: RoomId, signed: Signe
  * the original result if it recorded the act, even after the signing key
  * was retired or revoked (R-IDEM-2). Only the act's own room is accepted.
  */
-export async function resubmit(endpoint: Endpoint, room: RoomId, signed: SignedEnvelope, options: ClientOptions = {}): Promise<Result<ActRecord>> {
+export async function resubmit(endpoint: Endpoint, room: RoomId, signed: AnySignedEnvelope, options: ClientOptions = {}): Promise<Result<ActRecord>> {
   if (signed.envelope.room !== room) throw artroomError("bad-request", "This act was signed for another room.");
   const wire = new HttpWire(endpointUrl(endpoint.url), room, options, new Redactor());
-  return withRetries(() => wire.submit(signed), options.retries ?? 3, signed.envelope.idempotencyKey);
+  return withRetries(() => wire.submit(signed), options.retries ?? 3, signed.envelope.idempotencyKey, options.backoff);
 }
 
 /** What a lost room-custody redemption means, and what to do (section 22, point 29). */
@@ -218,7 +219,8 @@ export async function redeem(
       if (e.maybeRecorded === true) throw { ...e, message: `${e.message} ${LOST_REDEMPTION}` };
       // The room answered with an error and recorded nothing (R-CRED-9), so the invitation is still unused.
       if (!e.retryable || n >= retries) throw e;
-      await new Promise((r) => setTimeout(r, Math.min(e.retryAfterMs ?? 500 * 2 ** n, 5_000)));
+      const wait = Math.min(e.retryAfterMs ?? 500 * 2 ** n, 5_000);
+      await new Promise((r) => setTimeout(r, options.backoff ? options.backoff(wait) : wait));
     }
   }
 }

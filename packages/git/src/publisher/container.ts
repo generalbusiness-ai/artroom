@@ -21,7 +21,7 @@
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { type BuildResult, type Exec, GitOps, LOG_REF, type PinResult, type StageResult, type PreviewResult, SNAPSHOT_REF, type SnapshotFile, objectsRef } from "./gitops.ts";
 import { decodeLogPush, decodeLogStage, toLogOutcome, type LogPushOutcome, type LogStageRequest } from "./log-push.ts";
-import { type AllowedUpdates, FenceError, ZERO, checkUpdates, isReceivePack, readCommands, repoPathOf } from "./ref-fence.ts";
+import { type AllowedUpdates, type GatewayProps, type RepoGrant, ZERO, gatewayFetch, repoPathOf } from "./ref-fence.ts";
 import type { PushOutcome } from "./push-outcome.ts";
 
 export interface PublisherEnv {
@@ -31,17 +31,7 @@ export interface PublisherEnv {
   readonly IMPORT_NAMESPACE?: string;
 }
 
-/** What the gateway may do for one repository: add this token, and allow these ref updates (null: no push). */
-export interface RepoGrant {
-  readonly token: string;
-  readonly updates: AllowedUpdates | null;
-}
-
-export interface GatewayProps {
-  readonly host: string;
-  /** By repository path, for example `/git/<namespace>/<repo>.git`. */
-  readonly repos: Readonly<Record<string, RepoGrant>>;
-}
+export type { GatewayProps, RepoGrant } from "./ref-fence.ts";
 
 /** A remote and the token for it, as the Room passes them. */
 export interface RemoteAccess {
@@ -54,35 +44,13 @@ const INACTIVITY_MS = 15 * 60 * 1000;
 const TOKEN = /art_v\d+_[A-Za-z0-9_]+(\?expires=\d+)?/g;
 export const redact = (s: string): string => s.replace(TOKEN, "<token>");
 
-const forbidden = (why: string) => new Response(`Forbidden by gateway: ${why}\n`, { status: 403 });
-
 /**
  * Receives every HTTPS request the container makes to the Artifacts host.
- * Adds the token for that repository, and fences pushes.
+ * Adds the token for that repository, and fences pushes (`gatewayFetch`).
  */
 export class ArtifactsGateway extends WorkerEntrypoint<PublisherEnv, GatewayProps> {
-  override async fetch(request: Request): Promise<Response> {
-    const p = this.ctx.props;
-    const url = new URL(request.url);
-    if (url.protocol !== "https:" || url.hostname !== p.host) return forbidden("host");
-    const entry = Object.entries(p.repos).find(([path]) => url.pathname.startsWith(`${path}/`));
-    if (!entry) return forbidden("repository");
-    const grant = entry[1];
-    const headers = new Headers(request.headers);
-    headers.set("Authorization", `Bearer ${grant.token}`);
-    if (!isReceivePack(url)) return fetch(new Request(request, { headers }));
-    if (grant.updates === null) return forbidden("this operation may not push");
-    if (request.method !== "POST") return fetch(new Request(request, { headers })); // discovery: info/refs
-    if (request.headers.has("content-encoding")) return forbidden("compressed push");
-    if (!request.body) return forbidden("empty push");
-    try {
-      const { commands, replay } = await readCommands(request.body);
-      checkUpdates(commands, grant.updates);
-      return fetch(url.toString(), { method: "POST", headers, body: replay });
-    } catch (e) {
-      if (e instanceof FenceError) return forbidden(e.message);
-      throw e;
-    }
+  override fetch(request: Request): Promise<Response> {
+    return gatewayFetch(this.ctx.props, request);
   }
 }
 

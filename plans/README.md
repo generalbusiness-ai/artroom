@@ -2936,3 +2936,1935 @@ The tree was clean before and after the gates.
 - The protocol text, apart from R-MINT-3's amendment for C2. Section 32 stays about canonical mints; this section records the analogy. If the checker wants R-MINT-1 to name the fork ledger, that is a contract change for its own request.
 - The lease token mint in `workspaces.ts`, and snapshot repository tokens.
 - Showing the fork ledger's records to admins: `forkTokens.duties()` pages them, as `mints.duties()` does, for the cleanup projection request (`8d249233`).
+
+## Declared acts stage 2 (request fd6f00b6)
+
+Status: implemented, pending review. Gitseq request `fd6f00b6` (planner to builder), stage 2 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), under [docs/protocol.md](../docs/protocol.md) section 33 (stage 1, landed at `815e3383`) and the planner's clarification, assert `869d9aad`. Branch `request/decl-stage2`, cut from main `815e3383` and merged with main `a04c774b` (mint lane F). The head for review is the commit that carries this section. Nothing was pushed or deployed, and no Cloudflare credential was used.
+
+The Room now admits acts from its active document's vocabulary. Under a `v1` document that is the legacy vocabulary, on the code path it had. Under a `v2` document it is the document's declarations. The code-review declarations ship as data, and a room adopts them only by activating a `v2` document (R-DECL-1); a room with no policy file still gets the R-POL-7 default, which is `v1`.
+
+### What packages/log keeps, and why
+
+Condition 1 names five hard-coded kind lists. Three are replaced here: `room/src/schema.ts`, `room/src/roster.ts` and `policy/src/validate.ts` now read the legacy kinds from the frozen description `ARTROOM_LEGACY_V1`, through `packages/policy/src/vocabulary.ts`. The other two, `log/src/decode.ts` and `log/src/roster.ts`, are delivered by stage 3 (request `1e8fee4b`), which owns all of `packages/log` under assert `869d9aad`. An earlier commit on this branch swapped those two lists for imports; commit `2cd97b88` removed that, and this head's `packages/log` is byte-identical to main's.
+
+Two things follow until stage 3 lands, and both are stated here rather than hidden:
+
+- `artroom verify` cannot read a `v2` room's log. Seven existing Room tests assert that verify accepts a published log. They pass in the legacy run. The declared run leaves them out by title (`NEEDS_STAGE_3_VERIFY` in [packages/room/vitest.workers.declared.config.ts](../packages/room/vitest.workers.declared.config.ts)). Stage 3's head, built on this one, must turn them on.
+- So the code-review suite criterion of section 33.6 is met here for 533 tests and is open for those seven.
+
+### What was built
+
+- **One source of kinds.** `packages/policy/src/vocabulary.ts`: the legacy kinds, role table, delegable kinds and roster ops read from `ARTROOM_LEGACY_V1`; the platform kinds `renew`, `roster` and `recover`; and, for either kind of document, `kindsOf`, `shapeOf`, `stepsOf`, `roleMaySign`, `delegableBy`, `declarationOf` and `isDeclared`. `codeReviewPolicy(base)` gives a `v2` document with the base document's fields and `CODE_REVIEW_ACTS`.
+- **Step 1 by vocabulary** (`room/src/schema.ts`). In a `v1` room: the legacy kinds and `v: 1` only, as before. In a `v2` room: any kind of the grammar, `v: 2` with a binding for a declared kind, `v: 1` for a platform kind. Admission judges step 1 again under the document it decides with, since an activation may land between receipt and decision.
+- **Step 4, who may sign** (`room/src/authority.ts`). A declared kind is judged by `who.roles`, with `admin` implicit (R-DECL-11). A delegation covers a declared kind only through its signed map, and only for the binding its grantor signed (R-DECL-17). `renew` and `roster` keep the legacy table.
+- **Step 4a** (`room/src/admission.ts`). After authority and before the body check: an undeclared kind is `kind-undeclared`; an envelope that is not `v: 2` with the active declaration's binding is `binding-stale`, naming the current binding and policy version. Neither is recorded. Idempotency runs before it, so an exact retry of an accepted act gets its original receipt (R-DECL-16).
+- **Step 5, bodies.** A declared act's body is closed against its declared fields, its steps' fields and `because` (R-DECL-12). `recover` and the `v2` grant shapes are the platform's.
+- **Steps 7 to 10 by step.** `decide` dispatches by step, not by kind: the legacy kinds, the declared kinds and `recover` ops run the same handlers. `renew` and `roster` keep their own.
+- **Threads** (R-DECL-6, R-DECL-8, R-DECL-23). A thread records its kind, the opening act's binding and its lease length. An act on a thread whose kind its `threads` does not name is refused `wrong-thread`, recorded at step 7. A configuration-recovery thread takes only `recover` ops, and `recover` acts only on one.
+- **The lease rule** (R-DECL-6, R-DECL-9, R-DECL-15). In a `v2` room a thread records its numeric lease when it opens: the hold's `leaseSeconds`, or the room's lease at that moment. Renewal, take-over and expiry use the recorded value. A thread opened under the legacy vocabulary records none and keeps the room's current lease, as today.
+- **`recover`** (R-DECL-21). The platform kind, with ops `open`, `take`, `version`, `approve`, `land`, `release` and `note`, each running its step with the legacy recovery rules. A legacy recovery lane still open at the first `v2` activation takes `recover` ops.
+- **Grants** (R-DECL-17). In a `v2` room a `delegate` op and a room-custody session name platform kinds plainly and declared kinds in a signed map from kind to binding, never `*`. The map is judged when the grant is admitted, and again at each act. Grants from before declared acts cover no declared kind.
+- **Refusal wording** (R-DECL-13). A platform refusal of a declared act takes the declaration's `reason` and `fix` for its code, with slots filled from facts the room already reports. The code is the room's. A rule's refusal keeps its own wording.
+- **Validation at propose time** (R-DECL-24). A `v2` document is validated by the acts validator with the room's historical opening kinds and its `artroom-checker-v2` configurations.
+- **Migration 4** (`room/src/store.ts`). Columns `lanes.kind`, `lanes.binding`, `lanes.lease_ms` and `delegations.acts`. Every stored lane gets its kind: `room` for a revert lane, `claim` otherwise.
+- **Contract.** `Refusal.current` gains `binding` and `policy`, for `binding-stale`. The stored delegation type gains its optional map.
+
+### Choices where the design left room
+
+1. **A document this Room cannot run yet does not activate.** The stage 1 validator accepts steps and hold settings that stage 4 builds: two steps in one act, `hand-over`, a comment on target `none`, a scope template, `hold.conflict`, `hold.reserveSeconds`, and a hold without a workspace. `stagedProblems` (`room/src/declared.ts`) refuses each as `policy-invalid` at propose time, naming the act. Stage 4 removes these guards as it builds each primitive.
+2. **A grant for another meaning is `delegation-invalid` at step 4**, not `binding-stale` at step 4a. Authority is judged first, and a delegation that names another binding does not cover the act. The grant's own admission, and an invitation's redemption, are `binding-stale`, as section 33.5 states.
+3. **Bearer acts carry the code-review binding by default.** The named MCP tools were each built for one code-review declaration. A bearer act that names no binding is given that declaration's binding under the room's steps version and `lanes`. A room whose declaration differs refuses it `binding-stale`. The room never gives an act the meaning of its own declaration on the caller's behalf. A bearer act may name its binding, which is then used as given.
+4. **An invitation without a `v2` session grants no declared kind.** That holds for one from before declared acts and for a new one with no session. It grants only the delegable platform kinds of what it covered. Its session map, when it has one, is judged at the invitation's admission and again at redemption.
+5. **A record's `kind` is the act's own kind.** A `recover` record also carries its `op`.
+6. **Thread kinds.** A thread a `recover` open creates has kind `recover`. Lanes stored before migration 4 get kind `claim`, a legacy recovery lane included, since a `claim` opened it. The historical opening kinds given to the validator leave out `room` and `recover`.
+7. **A revert thread opened under a `v2` document records the room's lease**, since it has no opening declaration. Under a `v1` document it records none.
+8. **A workspace request** is judged as for an act with step `version` on the thread: `propose` under the legacy vocabulary, `recover` on a recovery thread, and otherwise a declared act with step `version` whose `threads` names the thread's kind.
+9. **Optional declared fields.** `goal`, `summary` and `text` may be absent where a declaration makes them optional. The stored columns then hold an empty string.
+
+### What a `v2` room cannot do yet
+
+No deployed room should activate a `v2` document before the later stages land:
+
+- The client, CLI and the checker service still sign `v: 1` envelopes (stages 4 and 5). A `v2` room refuses them `binding-stale`.
+- Check jobs do not carry their act's binding (R-DECL-18, stage 4).
+- `artroom verify` does not read `v: 2` envelopes or `v2` documents (stage 3).
+
+### Conditions
+
+| Condition | Where | Tests |
+|---|---|---|
+| (1) one source of kinds; dispatch by step; wording; `kind-undeclared`, `binding-stale`; exact retry | `policy/src/vocabulary.ts`; `room/src/{schema,roster,authority,admission,declared}.ts`; the two log lists are stage 3's (above) | `policy/test/vocabulary.test.ts`; `room/test/node/declared-equivalence.test.ts`; `declared-fd6f00b6.test.ts`: the first four `describe` blocks, the wording test, the exact-retry test |
+| (2) the lease rule, with storage, renewal and restart | `admission.ts` (`claimNew`, `leaseMsOf`, `renewLease`), `core.ts` (revert threads), `store.ts` | `declared-fd6f00b6.test.ts`: the four lease tests; the migration tests |
+| (3) no behaviour change for the code-review application | the legacy run and the declared run | see "The two runs" |
+| (4) a mutation of each declaration field and each new guard | | see "Mutation table" |
+| (5) row writes | | see "Row writes" |
+| (6) migration 4, upgrade-tested from every stored version | `store.ts` (`declaredColumns`, `ROOM_MIGRATIONS`) | `declared-fd6f00b6.test.ts`: a room stored at version 1, 2 and 3, reopened; run twice on one store |
+| (7) gates, report, one exact head | | see "Gates" |
+
+The stage 2 acceptance cases of section 33.5, each with its test in [packages/room/test/workerd/declared-fd6f00b6.test.ts](../packages/room/test/workerd/declared-fd6f00b6.test.ts):
+
+| Case | Test |
+|---|---|
+| Same-shape change | "same-shape change: an act signed under [version], submitted after activation of [version, land], is binding-stale and no landing starts" |
+| Hold change | "hold change: a claim signed before leaseSeconds or the scope source changed is binding-stale" |
+| Unrelated update | "unrelated update: a new kind, a changed refuse rule, a new label or wording leave the binding equal, and the act is admitted" |
+| Exact retry | "exact retry: an act accepted before an activation, retried after it, gets its original receipt" |
+| Grants, the four parts | "a grant signed for a meaning that changed before its admission is binding-stale; ..."; "the grantor's role and who.delegable bound the map; a grant expanded before a kind was added does not cover it"; "an exact retry of an admitted grant after a meaning change gets its receipt; acts under it are then delegation-invalid"; "an invitation signed before a meaning change and redeemed after it is binding-stale; the invitation stays unused" |
+| Grants from before declared acts | "grants from before declared acts: after the first v2 activation a v1-era * delegation covers renew and no declared kind; one limited to review and check covers nothing"; "an invitation from before declared acts, redeemed after the first v2 activation, grants only the delegable platform kinds its session covered ..." |
+| Take-over with a new scope | "take-over with a new scope: ..." |
+| Retired opening kind | "a retired opening kind: ..." |
+| Legacy suite; code-review suite | the two runs, below |
+
+### The two runs
+
+`npm test` in `packages/room` now runs the workerd suite twice.
+
+**The legacy run** (`vitest.workers.config.ts`) is the existing suite against the legacy vocabulary. It passes: 580 tests. These are the only edits to existing test files:
+
+- **The stored schema version is 4, not 3.** Condition 6 gives this stage migration 4, so the tests that pin the latest version change with it. This is not one of the four conversions; it is listed here so the checker can judge it. `founding-gaps.test.ts`: two assertions, in "request d29c09fa: the error upgrade drains in an unfounded room ...". `mint-sites-5ff58c9a.test.ts`: five assertions, in "mint lane C: the due indexes reach a room stored before them (review 993dce7a)". `safe-errors-d29c09fa.test.ts`: two assertions and one comment.
+- **Three expected values pass through a harness function** that returns its argument unchanged in the legacy run. `amendment2.test.ts`, "edit 9: policy-activated names the checkers": two configuration digests through `configDigest`. `amendment3.test.ts`, "R-EXEC-8 to R-EXEC-10": one configuration digest through `configDigest`. `review-8faa2ef9.test.ts`, "'*' is fixed at the grant": a delegation's kinds through `coveredKinds`.
+- **`support.ts`** builds envelopes, policy files and checker files through the harness (`vocabulary.ts`), which changes nothing in the legacy run.
+
+**The declared run** (`vitest.workers.declared.config.ts`) is the same suite against the code-review `v2` declarations. Every room's document is the test's own document as `v2` with `CODE_REVIEW_ACTS`. The harness applies the four conversions of section 33.6 and no others, and logs each one per test as it applies it. It passes 533 tests and does not run 47.
+
+| Conversion | Tests | Files |
+|---|---|---|
+| 1. Bindings on envelopes of declared kinds | 383 | 34 |
+| 2. Recovery tests as `recover` ops | 4 | 1 |
+| 3. Checker configurations as `artroom-checker-v2` naming `"act": "check"` | 127 | 18 |
+| 4. Signed grant maps on `delegate` ops and room-custody sessions | 29 | 8 |
+
+Every converted test is listed one by one, with its conversion, in [declared-stage2-conversions.md](declared-stage2-conversions.md). The list is 543 entries, so it has its own file. It is written by a script from the run's own log, and it also lists the 126 tests that needed no conversion and the 47 the declared run does not run.
+
+In the declared run the same three expected values are converted, by the same conversions: the two digest sites name the `artroom-checker-v2` configuration's digest (conversion 3), and `coveredKinds` reads a grant's map kinds, then its plain kinds, which is the legacy expansion's order (conversion 4). No assertion is removed or loosened.
+
+The 47 tests the declared run does not run are the seven verify tests above, and this stage's own 40 workerd tests (`declared-fd6f00b6.test.ts` and `declared-rows-fd6f00b6.test.ts`). Those found their own `v1` and `v2` rooms and sign their own envelopes, stale ones on purpose, which the harness would otherwise sign again.
+
+### Row writes
+
+Condition 5 asks that the measurement harness show no new rows per act on the declared path. The harness, `packages/room/measure/rows.mjs`, reads Cloudflare's billing datasets for the deployed spike, driven by `spike-smoke.mjs`. A declared session there needs the spike to run this code under a `v2` document. That is a deployment of unreviewed admission code, which this request does not authorize, so it was not done.
+
+This stage measures the same quantity locally instead. `declared-rows-fd6f00b6.test.ts` runs one session in a `v1` room and the same session in a `v2` room. It adds SQLite's `rowsWritten` for every statement of the Room object, which is the figure Cloudflare bills: the table row and each index row a write touches. It asserts that the declared path writes no more rows than the legacy path for any act, for admission alone and with the alarm work the act causes. The checker or planner should say whether this meets condition 5, or whether a live reading on the spike is owed after review, with hugh's authorization to deploy.
+
+| Act | Legacy: admission | Declared: admission | Legacy: with its alarm work | Declared: with its alarm work |
+|---|---|---|---|---|
+| invite (roster) | 9 | 9 | 9 | 9 |
+| join (roster) | 13 | 13 | 13 | 13 |
+| claim (open) | 9 | 9 | 9 | 9 |
+| propose (version), with its pin and preview | 53 | 53 | 55 | 55 |
+| note (comment) | 11 | 11 | 11 | 11 |
+| review | 10 | 10 | 10 | 10 |
+| land, with its landing | 15 | 15 | 81 | 81 |
+| claim (open), a second thread | 9 | 9 | 9 | 9 |
+| renew | 8 | 8 | 8 | 8 |
+| release | 12 | 12 | 12 | 12 |
+| claim (take over) | 8 | 8 | 8 | 8 |
+| delegate (roster) | 9 | 9 | 9 | 9 |
+| configuration-recovery open | 9 | 9 | 9 | 9 |
+
+The counts are equal for every act. Migration 4 adds no index, and its columns are written in the row the act already writes.
+
+### Mutation table
+
+Each mutant was applied alone by a script kept outside the repository (`run.py` beside `mutants.py`). For each one it checks that the text to change occurs exactly once, writes the mutated file, runs four test sets, collects the failing tests from vitest's JSON reports, and writes the file's original bytes back. It never runs `git checkout`, and `git status --porcelain` was empty when it finished. The four sets are: `policy` (node: `vocabulary.test.ts` and `declared-acts.test.ts`); `room-node` (`declared-equivalence.test.ts` and `schema.test.ts`); `room-legacy` (the whole legacy workerd run); `room-declared` (the whole declared workerd run).
+
+54 mutants (`C:`) each change one field of one code-review declaration in `packages/policy/src/codereview.ts`: every label, target, `threads` entry, body field, `who` and `hold` of the seven acts. 82 mutants (`G2:`) each change one guard. 74 of them are the statements marked `// G2:<id>` in `packages/policy/src/vocabulary.ts` and `packages/room/src`. The other eight mutate a marked statement in a second way, or a line beside one: the two legacy lists in `vocabulary.ts`, the checker configurations given to the validator, the lease recorded at open (twice), the entry exemption of the thread check, `recover` naming no thread, and a rule's own wording.
+
+**136 mutants, all red, each by at least one assertion failure.** No red is a timeout. One mutant, `G2:legacy-kinds`, also stops `landing.test.ts` from loading; it has 21 assertion failures besides. Every mutant but one turns red a test in this stage's own test files or in stage 1's `declared-acts.test.ts`. The one, `G2:workspace-recover`, is caught by the four converted recovery tests of the declared run.
+
+Three guards had no test when first mutated, and each now has one in `declared-fd6f00b6.test.ts`:
+
+- `G2:session-grant` and `G2:session-intersection` survived the first full run, at `67735791`.
+- `G2:grant-platform` survived the second, at `2cd97b88`. The first run had counted it red, but only because an unrelated concurrency test failed once in that run. That was a false red, so the red tests of every mutant in the final run were checked by file, as above.
+
+The table is the run at `2cd97b88`, with `G2:grant-platform` run again at `b6002634`, where its test was added. The merge of main `a42c4d83` after that adds two notes and no source. The last column names up to two of the red tests, this stage's own first.
+
+| # | Mutant | Mutation | Tests turned red | Named tests |
+|---|---|---|---|---|
+| 1 | `C:claim.label` | claim's label `Claim` becomes `Claims` | 1 (1 policy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables |
+| 2 | `C:claim.targets.none` | claim loses target `none` (`open`) | 519 (8 policy, 3 room-node, 33 room-legacy, 475 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `declared-acts.test.ts`: accepted documents (R-DECL-24) rules may name declared kinds and platform kinds; and 517 more |
+| 3 | `C:claim.targets.thread` | claim loses target `thread` (`take`) | 517 (8 policy, 2 room-node, 32 room-legacy, 475 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `declared-acts.test.ts`: accepted documents (R-DECL-24) rules may name declared kinds and platform kinds; and 515 more |
+| 4 | `C:claim.threads.claim` | claim's `threads` is `["room"]` | 12 (2 policy, 4 room-legacy, 6 room-declared) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 10 more |
+| 5 | `C:claim.threads.room` | claim's `threads` is `["claim"]` | 4 (3 policy, 1 room-legacy) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `declared-acts.test.ts`: the binding identity (R-DECL-15) a step list, body field, scope source, hold setting, threads, kind or steps version changes it; and 2 more |
+| 6 | `C:claim.body.goal.type` | claim's `goal` is `globs`, not `text` | 514 (6 policy, 1 room-node, 32 room-legacy, 475 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `declared-acts.test.ts`: accepted documents (R-DECL-24) rules may name declared kinds and platform kinds; and 512 more |
+| 7 | `C:claim.body.goal.max` | claim's `goal` max is 1023, not 1024 | 3 (2 policy, 1 room-node) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 1 more |
+| 8 | `C:claim.body.goal.requiredFor` | claim's `goal` loses `requiredFor: ["none"]` | 16 (4 policy, 1 room-node, 5 room-legacy, 6 room-declared) | `declared-acts.test.ts`: refused documents: each guard (R-DECL-24) G:optional-and-requiredfor refuses both optional and requiredFor; `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; and 14 more |
+| 9 | `C:claim.body.plan.type` | claim's `plan` is `globs`, not `text` | 3 (2 policy, 1 room-node) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 1 more |
+| 10 | `C:claim.body.plan.max` | claim's `plan` max is 16383, not 16384 | 3 (2 policy, 1 room-node) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 1 more |
+| 11 | `C:claim.body.plan.optional` | claim's `plan` is no longer optional | 403 (4 policy, 1 room-node, 21 room-legacy, 377 room-declared) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `declared-acts.test.ts`: the binding identity (R-DECL-15) writing a default out leaves the binding unchanged; and 401 more |
+| 12 | `C:claim.who.maintainer` | claim's `who.roles` loses `maintainer` | 6 (2 policy, 2 room-node, 2 room-declared) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) who.roles decides, with admin implicit; renew keeps the legacy table; an undeclared kind is not signable here; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 4 more |
+| 13 | `C:claim.who.member` | claim's `who.roles` loses `member` | 189 (2 policy, 2 room-node, 6 room-legacy, 179 room-declared) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) a grant names renew if the role may sign it, and the declared kinds the role may sign whose who.delegable is not false; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 187 more |
+| 14 | `C:claim.who.agent` | claim's `who.roles` loses `agent` | 24 (1 policy, 2 room-node, 3 room-legacy, 18 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations let each role sign, and grant, what the legacy table does (R-DECL-11) each role and kind: the same answer; and 22 more |
+| 15 | `C:claim.hold.scope` | claim's `hold.scope` is the template `["**"]`, not `body.scope` | 508 (2 policy, 31 room-legacy, 475 room-declared) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 506 more |
+| 16 | `C:claim.hold.workspace` | claim's `hold.workspace` is false | 509 (3 policy, 31 room-legacy, 475 room-declared) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `declared-acts.test.ts`: the binding identity (R-DECL-15) a step list, body field, scope source, hold setting, threads, kind or steps version changes it; and 507 more |
+| 17 | `C:claim.hold.leaseSeconds` | claim's hold gains `leaseSeconds: 1800` | 3 (2 policy, 1 room-legacy) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 1 more |
+| 18 | `C:propose.label` | propose's label becomes `Proposal` | 1 (1 policy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables |
+| 19 | `C:propose.targets.thread` | propose's step on `thread` is `release`, not `version` | 513 (5 policy, 1 room-node, 32 room-legacy, 475 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `declared-acts.test.ts`: accepted documents (R-DECL-24) rules may name declared kinds and platform kinds; and 511 more |
+| 20 | `C:propose.threads.claim` | propose's `threads` is `["room"]` | 261 (1 policy, 7 room-legacy, 253 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) an entry target is not a thread target: a note on an entry of a thread its threads do not name is admitted; on a line of it, wrong-thread; and 259 more |
+| 21 | `C:propose.threads.room` | propose's `threads` is `["claim"]` | 3 (1 policy, 2 room-legacy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) a room thread (a revert lane, R-REV-6) takes the code-review acts that name room: claim, propose, note, review, land and release; and 1 more |
+| 22 | `C:propose.body.summary.max` | propose's `summary` max is 8191, not 8192 | 2 (1 policy, 1 room-node) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) propose: every case gets the same outcome and message |
+| 23 | `C:propose.body.summary.optional` | propose's `summary` becomes optional | 2 (1 policy, 1 room-node) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) propose: every case gets the same outcome and message |
+| 24 | `C:propose.who.agent` | propose's `who.roles` loses `agent` | 14 (1 policy, 2 room-node, 11 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations let each role sign, and grant, what the legacy table does (R-DECL-11) each role and kind: the same answer; and 12 more |
+| 25 | `C:note.label` | note's label becomes `Comment` | 1 (1 policy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables |
+| 26 | `C:note.targets.entry` | note loses target `entry` | 24 (1 policy, 2 room-node, 5 room-legacy, 16 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) note: every case gets the same outcome and message; and 22 more |
+| 27 | `C:note.targets.line` | note loses target `line` | 515 (6 policy, 2 room-node, 32 room-legacy, 475 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `declared-acts.test.ts`: accepted documents (R-DECL-24) rules may name declared kinds and platform kinds; and 513 more |
+| 28 | `C:note.threads.claim` | note's `threads` is `["room"]` | 2 (1 policy, 1 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 1 more |
+| 29 | `C:note.threads.room` | note's `threads` is `["claim"]` | 3 (1 policy, 2 room-legacy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) a room thread (a revert lane, R-REV-6) takes the code-review acts that name room: claim, propose, note, review, land and release; and 1 more |
+| 30 | `C:note.body.text.max` | note's `text` max is 16383, not 16384 | 2 (1 policy, 1 room-node) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) note: every case gets the same outcome and message |
+| 31 | `C:note.who.checker` | note's `who.roles` loses `checker` | 6 (3 policy, 2 room-node, 1 room-declared) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) who.roles decides, with admin implicit; renew keeps the legacy table; an undeclared kind is not signable here; `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) a grant names renew if the role may sign it, and the declared kinds the role may sign whose who.delegable is not false; and 4 more |
+| 32 | `C:note.who.member` | note's `who.roles` loses `member` | 10 (2 policy, 2 room-node, 2 room-legacy, 4 room-declared) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) a grant names renew if the role may sign it, and the declared kinds the role may sign whose who.delegable is not false; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 8 more |
+| 33 | `C:review.label` | review's label becomes `Approve` | 1 (1 policy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables |
+| 34 | `C:review.targets.version` | review's step on `version` is `check`, not `review` | 49 (2 policy, 1 room-node, 3 room-legacy, 43 room-declared) | `declared-acts.test.ts`: refused documents: each guard (R-DECL-24) G:checker-step refuses a checker naming review; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 47 more |
+| 35 | `C:review.threads.claim` | review's `threads` is `["room"]` | 45 (1 policy, 1 room-legacy, 43 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-rows-fd6f00b6.test.ts`: condition 5: rows written per act, legacy and declared (request fd6f00b6) the declared path writes no row more than the legacy path for any act, admission alone or with its alarm work; and 43 more |
+| 36 | `C:review.threads.room` | review's `threads` is `["claim"]` | 3 (1 policy, 2 room-legacy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) a room thread (a revert lane, R-REV-6) takes the code-review acts that name room: claim, propose, note, review, land and release; and 1 more |
+| 37 | `C:review.body.text.max` | review's `text` max is 16383, not 16384 | 2 (1 policy, 1 room-node) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) review: every case gets the same outcome and message |
+| 38 | `C:review.body.text.optional` | review's `text` becomes optional | 2 (1 policy, 1 room-node) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) review: every case gets the same outcome and message |
+| 39 | `C:review.who.maintainer` | review's `who.roles` loses `maintainer` | 43 (1 policy, 2 room-node, 40 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations let each role sign, and grant, what the legacy table does (R-DECL-11) each role and kind: the same answer; and 41 more |
+| 40 | `C:check.label` | check's label becomes `Checked` | 1 (1 policy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables |
+| 41 | `C:check.targets.version` | check's step on `version` is `review`, not `check` | 514 (6 policy, 1 room-node, 32 room-legacy, 475 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `declared-acts.test.ts`: accepted documents (R-DECL-24) rules may name declared kinds and platform kinds; and 512 more |
+| 42 | `C:check.threads.claim` | check's `threads` is `["room"]` | 53 (2 policy, 51 room-declared) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 51 more |
+| 43 | `C:check.threads.room` | check's `threads` is `["claim"]` | 3 (2 policy, 1 room-legacy) | `declared-acts.test.ts`: the binding identity (R-DECL-15) the subject resolves every default; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 1 more |
+| 44 | `C:check.who.checker` | check's `who.roles` is empty | 137 (4 policy, 2 room-node, 1 room-legacy, 130 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `declared-acts.test.ts`: built-in data (R-DECL-1, section 33.7) the code-review check act is one a checker configuration may name; and 135 more |
+| 45 | `C:land.label` | land's label becomes `Merge` | 1 (1 policy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables |
+| 46 | `C:land.targets.version` | land's step on `version` is `review`, not `land` | 107 (1 policy, 2 room-node, 2 room-legacy, 102 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) land: every case gets the same outcome and message; and 105 more |
+| 47 | `C:land.threads.claim` | land's `threads` is `["room"]` | 102 (1 policy, 1 room-legacy, 100 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-rows-fd6f00b6.test.ts`: condition 5: rows written per act, legacy and declared (request fd6f00b6) the declared path writes no row more than the legacy path for any act, admission alone or with its alarm work; and 100 more |
+| 48 | `C:land.threads.room` | land's `threads` is `["claim"]` | 3 (1 policy, 2 room-legacy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) a room thread (a revert lane, R-REV-6) takes the code-review acts that name room: claim, propose, note, review, land and release; and 1 more |
+| 49 | `C:land.who.member` | land's `who.roles` loses `member` | 83 (1 policy, 2 room-node, 2 room-legacy, 78 room-declared) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; `declared-equivalence.test.ts`: the code-review declarations let each role sign, and grant, what the legacy table does (R-DECL-11) each role and kind: the same answer; and 81 more |
+| 50 | `C:release.label` | release's label becomes `Let go` | 1 (1 policy) | `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables |
+| 51 | `C:release.targets.thread` | release's step on `thread` is `take`, not `release` | 31 (2 policy, 1 room-node, 6 room-legacy, 22 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 29 more |
+| 52 | `C:release.threads.claim` | release's `threads` is `["room"]` | 28 (3 policy, 3 room-legacy, 22 room-declared) | `declared-acts.test.ts`: accepted documents (R-DECL-24) the code-review declarations validate, with a checker naming check, and no warnings; `declared-acts.test.ts`: the binding identity (R-DECL-15) writing a default out leaves the binding unchanged; and 26 more |
+| 53 | `C:release.threads.room` | release's `threads` is `["claim"]` | 3 (2 policy, 1 room-legacy) | `declared-acts.test.ts`: the binding identity (R-DECL-15) writing a default out leaves the binding unchanged; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 1 more |
+| 54 | `C:release.who.member` | release's `who.roles` loses `member` | 15 (2 policy, 2 room-node, 5 room-legacy, 6 room-declared) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) a grant names renew if the role may sign it, and the declared kinds the role may sign whose who.delegable is not false; `vocabulary.test.ts`: the code-review declarations are the note's section 6 (docs/protocol.md section 33.7) every field of every declaration, written out from the tables; and 13 more |
+| 55 | `G2:binding-field` | the envelope allows `binding` in a `v1` room too | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v1 room is the legacy vocabulary: a v: 2 envelope, a binding on v: 1, and recover are bad-request at step 1 |
+| 56 | `G2:v1-version` | a `v1` room accepts envelope `v: 2` | 2 (1 room-node, 1 room-legacy) | `schema.test.ts`: R-SIG-4 envelopes accepts a closed envelope and refuses unknown fields, wrong versions and malformed IDs; `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v1 room is the legacy vocabulary: a v: 2 envelope, a binding on v: 1, and recover are bad-request at step 1 |
+| 57 | `G2:v2-version` | a `v2` room accepts envelope `v: 3` | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) a v2 room: a kind of the grammar passes step 1 whatever it is; v: 2 needs a binding; a platform kind is v: 1; recover targets follow the op |
+| 58 | `G2:kind-grammar` | the kind grammar check accepts any name that starts with a letter | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) a v2 room: a kind of the grammar passes step 1 whatever it is; v: 2 needs a binding; a platform kind is v: 1; recover targets follow the op |
+| 59 | `G2:platform-v1` | a platform kind may be `v: 2` | 2 (1 room-node, 1 room-legacy) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) a v2 room: a kind of the grammar passes step 1 whatever it is; v: 2 needs a binding; a platform kind is v: 1; recover targets follow the op; `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v2 room admits the code-review acts with their bindings; a thread records its kind, opening binding and lease length (R-DECL-6) |
+| 60 | `G2:binding-format` | the binding's format is not checked | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) a v2 room: a kind of the grammar passes step 1 whatever it is; v: 2 needs a binding; a platform kind is v: 1; recover targets follow the op |
+| 61 | `G2:binding-v1` | a `v: 1` envelope may carry a binding | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) a v2 room: a kind of the grammar passes step 1 whatever it is; v: 2 needs a binding; a platform kind is v: 1; recover targets follow the op |
+| 62 | `G2:declared-target` | a declared act's target is checked against no declaration | 7 (7 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) claim: each target gets the same outcome and message; `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) propose: each target gets the same outcome and message; and 5 more |
+| 63 | `G2:recover-target` | a `recover` op that takes no target accepts one | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) a v2 room: a kind of the grammar passes step 1 whatever it is; v: 2 needs a binding; a platform kind is v: 1; recover targets follow the op |
+| 64 | `G2:required-on` | `requiredFor` makes a field required on every target | 13 (2 room-node, 5 room-legacy, 6 room-declared) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) claim: every case gets the same outcome and message; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the declared field types, each with its limits (R-DECL-12); and 11 more |
+| 65 | `G2:declared-fields` | declared body fields are not checked against their types | 6 (5 room-node, 1 room-declared) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) claim: every case gets the same outcome and message; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) propose: every case gets the same outcome and message; and 4 more |
+| 66 | `G2:step-fields` | the steps' own fields are not checked | 9 (7 room-node, 2 room-declared) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) claim: every case gets the same outcome and message; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) propose: every case gets the same outcome and message; and 7 more |
+| 67 | `G2:because` | `because` is not checked | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the two differences on purpose: claim's purpose, and because on every act |
+| 68 | `G2:field-text` | a `text` field's max is ignored | 6 (5 room-node, 1 room-declared) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) claim: every case gets the same outcome and message; `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) propose: every case gets the same outcome and message; and 4 more |
+| 69 | `G2:field-int` | an `int` field's range is ignored | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the declared field types, each with its limits (R-DECL-12) |
+| 70 | `G2:field-enum` | an `enum` field accepts any string | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the declared field types, each with its limits (R-DECL-12) |
+| 71 | `G2:field-globs` | a `globs` field's max is fixed at 64 | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the declared field types, each with its limits (R-DECL-12) |
+| 72 | `G2:field-member` | a `member` field accepts any string | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the declared field types, each with its limits (R-DECL-12) |
+| 73 | `G2:field-act` | an `act` field accepts any string | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the declared field types, each with its limits (R-DECL-12) |
+| 74 | `G2:field-segment` | a `segment` field accepts slashes and glob characters | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the declared field types, each with its limits (R-DECL-12) |
+| 75 | `G2:field-fixed` | a `segment` field is not marked fixed-format for the secret scan | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge bodies as the legacy vocabulary does (R-DECL-12, step 5) the declared field types, each with its limits (R-DECL-12) |
+| 76 | `G2:recover-op` | an unknown `recover` op is not refused | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) recover bodies are the legacy recovery acts' fields, by op |
+| 77 | `G2:grant-kinds` | a grant's plain kinds are not limited to delegable platform kinds | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) grants in a v2 room are platform kinds and a signed map, never * |
+| 78 | `G2:grant-map` | a grant map's bindings are not checked for format | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) grants in a v2 room are platform kinds and a signed map, never * |
+| 79 | `G2:grant-shape` | a `v2` grant may omit its map | 1 (1 room-node) | `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) grants in a v2 room are platform kinds and a signed map, never * |
+| 80 | `G2:who-roles` | a declared kind is judged by the legacy role table, not `who.roles` | 3 (3 room-legacy) | `declared-fd6f00b6.test.ts`: who may sign: who.roles, admin implicit (R-DECL-11) a declared kind's roles decide at step 4, unrecorded; an admin may sign every declared act; renew keeps the legacy table; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) a retired opening kind: its held thread with an open version can still be reviewed and released by acts that name it; a new act of it is kind-undeclared; and 1 more |
+| 81 | `G2:delegation-v1-era` | a `v1`-era delegation is not refused for a declared kind | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) grants from before declared acts: after the first v2 activation a v1-era * delegation covers renew and no declared kind; one limited to review and check covers nothing |
+| 82 | `G2:delegation-covers` | a delegation whose map lacks the kind is not refused | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) the grantor's role and who.delegable bound the map; a grant expanded before a kind was added does not cover it; `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) a room-custody invitation with no session grants renew and no declared kind; its bearer's code-review tools carry the code-review binding |
+| 83 | `G2:delegation-binding` | a delegation whose map names another binding is not refused | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) an exact retry of an admitted grant after a meaning change gets its receipt; acts under it are then delegation-invalid; `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) bearer acts: the named tools' code-review binding is admitted where claim means the code-review claim, and binding-stale where it does not |
+| 84 | `G2:undeclared-class` | an undeclared kind is judged at step 4 by the legacy table | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) an undeclared kind is kind-undeclared after authority and before the body check; nothing is recorded |
+| 85 | `G2:step1-recheck` | step 1 is not judged again under the document in force | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: step 1 under the document in force (R-ADM-1 as amended) admission judges step 1 again under the document it decides with: an envelope of the other vocabulary is bad-request there too |
+| 86 | `G2:4a-platform` | step 4a also demands a binding of platform kinds | 299 (22 room-legacy, 277 room-declared) | `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v2 room admits the code-review acts with their bindings; a thread records its kind, opening binding and lease length (R-DECL-6); `declared-fd6f00b6.test.ts`: who may sign: who.roles, admin implicit (R-DECL-11) a declared kind's roles decide at step 4, unrecorded; an admin may sign every declared act; renew keeps the legacy table; and 297 more |
+| 87 | `G2:undeclared` | an undeclared kind passes step 4a | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) an undeclared kind is kind-undeclared after authority and before the body check; nothing is recorded; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) a retired opening kind: its held thread with an open version can still be reviewed and released by acts that name it; a new act of it is kind-undeclared |
+| 88 | `G2:stale` | a stale or missing binding passes step 4a | 3 (3 room-legacy) | `declared-fd6f00b6.test.ts`: step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) a v: 1 envelope of a declared kind, and a v: 2 one with another binding, are binding-stale with the current binding and version; the signer signs again under the same key; `declared-fd6f00b6.test.ts`: step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) same-shape change: an act signed under [version], submitted after activation of [version, land], is binding-stale and no landing starts; and 1 more |
+| 89 | `G2:grant-platform` | a grant may name a platform kind its role may not sign | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) a grant's plain kinds are bound by the grantor's role: a checker, who may not sign renew, may not grant it by a delegation, nor be invited with a session that lists it; nothing is recorded |
+| 90 | `G2:grant-undeclared` | a grant map naming an undeclared kind is admitted | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) a grant signed for a meaning that changed before its admission is binding-stale; a kind it does not declare is kind-undeclared; nothing is recorded; `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) an invitation's session map is judged when the invitation is admitted (R-DECL-17): a stale binding is binding-stale, an undeclared kind kind-undeclared, a kind the invited role may not sign invalid-body; nothing is recorded |
+| 91 | `G2:grant-delegable` | a grant map may name a kind the role may not grant, or one that is not delegable | 3 (2 room-legacy, 1 room-declared) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) the grantor's role and who.delegable bound the map; a grant expanded before a kind was added does not cover it; `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) an invitation's session map is judged when the invitation is admitted (R-DECL-17): a stale binding is binding-stale, an undeclared kind kind-undeclared, a kind the invited role may not sign invalid-body; nothing is recorded; and 1 more |
+| 92 | `G2:grant-stale` | a grant map with a stale binding is admitted | 3 (3 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) a grant signed for a meaning that changed before its admission is binding-stale; a kind it does not declare is kind-undeclared; nothing is recorded; `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) an invitation signed before a meaning change and redeemed after it is binding-stale; the invitation stays unused; and 1 more |
+| 93 | `G2:session-grant` | an invitation's session map is not judged at its admission | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) an invitation's session map is judged when the invitation is admitted (R-DECL-17): a stale binding is binding-stale, an undeclared kind kind-undeclared, a kind the invited role may not sign invalid-body; nothing is recorded |
+| 94 | `G2:wording` | a declaration's refusal wording is never used | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: refusal wording from the declaration (R-DECL-13) a platform refusal of a declared act takes the declaration's reason and fix, slots filled; the code is the room's; a rule's refusal keeps its own |
+| 95 | `G2:rule-wording` | a rule's refusal takes the declaration's wording too | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: refusal wording from the declaration (R-DECL-13) a platform refusal of a declared act takes the declaration's reason and fix, slots filled; the code is the room's; a rule's refusal keeps its own |
+| 96 | `G2:thread-kind` | the thread-kind check passes every thread | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) an entry target is not a thread target: a note on an entry of a thread its threads do not name is admitted; on a line of it, wrong-thread; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one |
+| 97 | `G2:entry-exempt` | an entry target is judged as a thread target | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) an entry target is not a thread target: a note on an entry of a thread its threads do not name is admitted; on a line of it, wrong-thread |
+| 98 | `G2:recovery-thread` | a declared act on a recovery thread is not refused | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one; `declared-fd6f00b6.test.ts`: recover, the platform kind (R-DECL-21) an admin's own key opens, versions, approves and lands a recovery thread; any other signer is admin-required; a legacy recovery lane takes recover ops after the first v2 activation |
+| 99 | `G2:recover-ordinary` | `recover` is admitted on any thread | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one |
+| 100 | `G2:recover-no-thread` | `recover` naming no thread is not refused | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one |
+| 101 | `G2:lease-record` | an opening act with no `leaseSeconds` records no lease | 3 (3 room-legacy) | `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v2 room admits the code-review acts with their bindings; a thread records its kind, opening binding and lease length (R-DECL-6); `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one; and 1 more |
+| 102 | `G2:lease-hold` | `hold.leaseSeconds` is ignored at open | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) hold.leaseSeconds is the thread's lease length: renewal and expiry use it; a take-over keeps it |
+| 103 | `G2:lease-v1` | a `v1` thread records a lease length too | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v1 room is the legacy vocabulary: a v: 2 envelope, a binding on v: 1, and recover are bad-request at step 1; `declared-fd6f00b6.test.ts`: the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) a v1 thread keeps today's behaviour: no recorded length, and the room's current lease after a deployment change, also once the room is v2 |
+| 104 | `G2:lease-of` | renewal and expiry always use the room's current lease | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) a thread records the room's numeric lease at open and keeps it across a restart and a deployment lease change, for renewal and expiry; a new thread takes the new lease; `declared-fd6f00b6.test.ts`: the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) hold.leaseSeconds is the thread's lease length: renewal and expiry use it; a take-over keeps it |
+| 105 | `G2:thread-kind-record` | every thread is recorded as kind `claim` | 3 (3 room-legacy) | `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one; `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) a retired opening kind: its held thread with an open version can still be reviewed and released by acts that name it; a new act of it is kind-undeclared; and 1 more |
+| 106 | `G2:binding-record` | the opening binding is not recorded | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v2 room admits the code-review acts with their bindings; a thread records its kind, opening binding and lease length (R-DECL-6) |
+| 107 | `G2:recover-open` | a `recover` open is not a configuration-recovery open | 6 (2 room-legacy, 4 room-declared) | `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) wrong-thread is recorded at step 7: a thread whose kind the act does not name, a declared act on a recovery thread, and recover on an ordinary one; `declared-fd6f00b6.test.ts`: recover, the platform kind (R-DECL-21) an admin's own key opens, versions, approves and lands a recovery thread; any other signer is admin-required; a legacy recovery lane takes recover ops after the first v2 activation; and 4 more |
+| 108 | `G2:grant-store` | a grant's signed map is not stored | 17 (5 room-legacy, 12 room-declared) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) the grantor's role and who.delegable bound the map; a grant expanded before a kind was added does not cover it; `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) an exact retry of an admitted grant after a meaning change gets its receipt; acts under it are then delegation-invalid; and 15 more |
+| 109 | `G2:staged-pair` | a two-step act is not refused at propose time | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time |
+| 110 | `G2:staged-handover` | `hand-over` is not refused at propose time | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time |
+| 111 | `G2:staged-unanchored` | a comment on target `none` is not refused at propose time | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time |
+| 112 | `G2:staged-template` | a scope template is not refused at propose time | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time |
+| 113 | `G2:staged-conflict` | `hold.conflict` is not refused at propose time | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time |
+| 114 | `G2:staged-reserve` | `hold.reserveSeconds` is not refused at propose time | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time |
+| 115 | `G2:staged-workspace` | a hold without a workspace is not refused at propose time | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time |
+| 116 | `G2:fill` | refusal wording slots are not filled | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: refusal wording from the declaration (R-DECL-13) a platform refusal of a declared act takes the declaration's reason and fix, slots filled; the code is the room's; a rule's refusal keeps its own |
+| 117 | `G2:parse-declared` | a `v2` document is never parsed by the acts validator | 507 (32 room-legacy, 475 room-declared) | `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v1 room is the legacy vocabulary: a v: 2 envelope, a binding on v: 1, and recover are bad-request at step 1; `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v2 room admits the code-review acts with their bindings; a thread records its kind, opening binding and lease length (R-DECL-6); and 505 more |
+| 118 | `G2:historical` | the validator is given no historical opening kinds | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a v2 document is validated by the acts validator with the room's historical opening kinds; a v1 checker configuration in it is refused |
+| 119 | `G2:checkers-v2` | the validator is given no checker configurations | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a v2 document is validated by the acts validator with the room's historical opening kinds; a v1 checker configuration in it is refused |
+| 120 | `G2:staged` | staged problems are not refused | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a document that uses a step or hold setting this room runs only from stage 4 is policy-invalid at propose time |
+| 121 | `G2:binding-cache` | the binding cache is not reset on a new policy version | 6 (6 room-legacy) | `declared-fd6f00b6.test.ts`: step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) same-shape change: an act signed under [version], submitted after activation of [version, land], is binding-stale and no landing starts; `declared-fd6f00b6.test.ts`: step 4a: kind-undeclared and binding-stale, unrecorded (R-DECL-16) hold change: a claim signed before leaseSeconds or the scope source changed is binding-stale; and 4 more |
+| 122 | `G2:revert-lease` | a revert thread never records the room's lease | 2 (2 room-legacy) | `declared-fd6f00b6.test.ts`: threads (R-DECL-6, R-DECL-8, R-DECL-23) a room thread (a revert lane, R-REV-6) takes the code-review acts that name room: claim, propose, note, review, land and release; `declared-fd6f00b6.test.ts`: the lease rule (R-DECL-6, R-DECL-9, R-DECL-15) a revert thread opened under a v2 document records the room's lease; under a v1 document it records none |
+| 123 | `G2:session-map` | a `v2` session's signed map is dropped at redemption | 10 (2 room-legacy, 8 room-declared) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) an invitation signed before a meaning change and redeemed after it is binding-stale; the invitation stays unused; `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) bearer acts: the named tools' code-review binding is admitted where claim means the code-review claim, and binding-stale where it does not; and 8 more |
+| 124 | `G2:session-intersection` | a session with no map is granted every delegable platform kind | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) an invitation from before declared acts, redeemed after the first v2 activation, grants only the delegable platform kinds its session covered: one limited to claim and propose grants nothing, one that lists renew grants renew (intersection, never acquisition) |
+| 125 | `G2:bearer-binding` | a bearer act's own binding is ignored | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) bearer acts: the named tools' code-review binding is admitted where claim means the code-review claim, and binding-stale where it does not |
+| 126 | `G2:bearer-builtfor` | a bearer act's default binding is the room's own declaration's | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) bearer acts: the named tools' code-review binding is admitted where claim means the code-review claim, and binding-stale where it does not |
+| 127 | `G2:workspace-kinds` | a workspace request ignores the thread's kind | 1 (1 room-legacy) | `declared-fd6f00b6.test.ts`: R-DECL-24 at propose time, and the stage-4 steps a workspace request is judged as for an act with step version on the thread (R-CRED-5 as amended) |
+| 128 | `G2:workspace-recover` | a workspace request on a recovery thread is not judged as `recover` | 4 (4 room-declared) | `landing.test.ts`: R-ADMIN configuration recovery and sole-admin approval section 23, Policy lockout: the sole admin repairs the policy through a configuration-recovery lane; policy-activated follows; `landing.test.ts`: R-ADMIN configuration recovery and sole-admin approval R-ADMIN-5 is the Room's own rule: with a policy port that ignores the lane purpose, recovery-lane acts are still not judged by policy; and 2 more |
+| 129 | `G2:migration-add` | migration 4 adds its columns without checking they are absent | 27 (14 room-legacy, 13 room-declared) | `declared-fd6f00b6.test.ts`: migration 4 (thread kind, binding and lease; grant maps) migration 4 is idempotent: run twice on one store, it adds each column once; and 26 more |
+| 130 | `G2:migration-backfill` | migration 4 gives every stored lane kind `claim` | 3 (3 room-legacy) | `declared-fd6f00b6.test.ts`: migration 4 (thread kind, binding and lease; grant maps) a room stored at version 1, reopened: the columns are added, every lane gets its kind, binding and lease stay null, and reopening again changes nothing; `declared-fd6f00b6.test.ts`: migration 4 (thread kind, binding and lease; grant maps) a room stored at version 2, reopened: the columns are added, every lane gets its kind, binding and lease stay null, and reopening again changes nothing; and 1 more |
+| 131 | `G2:admin-implicit` | `admin` is not implicit in `who.roles` | 231 (2 policy, 2 room-node, 22 room-legacy, 205 room-declared) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) who.roles decides, with admin implicit; renew keeps the legacy table; an undeclared kind is not signable here; `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) a grant names renew if the role may sign it, and the declared kinds the role may sign whose who.delegable is not false; and 229 more |
+| 132 | `G2:delegable` | `who.delegable: false` is ignored | 2 (1 policy, 1 room-legacy) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) a grant names renew if the role may sign it, and the declared kinds the role may sign whose who.delegable is not false; `declared-fd6f00b6.test.ts`: grants carry the bindings their grantor signed (R-DECL-17) the grantor's role and who.delegable bound the map; a grant expanded before a kind was added does not cover it |
+| 133 | `G2:declared-steps` | a declared act's steps are always its `thread` target's | 398 (1 policy, 20 room-legacy, 377 room-declared) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) steps come from the declaration's targets, by the target's shape; `declared-fd6f00b6.test.ts`: declared acts stage 2: one vocabulary per document (R-DECL-1) a v2 room admits the code-review acts with their bindings; a thread records its kind, opening binding and lease length (R-DECL-6); and 396 more |
+| 134 | `G2:kinds-of` | a `v2` document's kinds leave out the platform kinds | 2 (1 policy, 1 room-declared) | `vocabulary.test.ts`: a v2 document's vocabulary is its declarations (R-DECL-11, R-DECL-17) its kinds are the declared ones and the platform kinds; and 1 more |
+| 135 | `G2:legacy-kinds` | the legacy kinds leave out `renew` | 21 (1 policy, 1 room-node, 20 room-legacy, 1 room-declared) | `vocabulary.test.ts`: the legacy vocabulary, read from its frozen description (R-DECL-1) its kinds, role table, delegable kinds and roster ops are ARTROOM_LEGACY_V1's, not copies; `declared-equivalence.test.ts`: the code-review declarations judge envelopes and targets as the legacy vocabulary does (step 1) a v2 room: a kind of the grammar passes step 1 whatever it is; v: 2 needs a binding; a platform kind is v: 1; recover targets follow the op; and 19 more |
+| 136 | `G2:legacy-roles` | the legacy role table lets a checker sign only `check` and `roster` | 5 (2 policy, 2 room-node, 1 room-legacy) | `vocabulary.test.ts`: the legacy vocabulary, read from its frozen description (R-DECL-1) its kinds, role table, delegable kinds and roster ops are ARTROOM_LEGACY_V1's, not copies; `vocabulary.test.ts`: the legacy vocabulary, read from its frozen description (R-DECL-1) roles and grants are the legacy table's; and 3 more |
+
+### Gates
+
+Run under bash at `b0c280b9`, the merge of main `a42c4d83`, serially, with exit codes checked. The head for review adds this section, the conversions list and the removal of one blank line at the end of a test support file. The gates were run again at that head, and the review request states the result.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm ci` (root) | 0 | installed |
+| `npm run typecheck` (root) | 0 | every workspace |
+| `npm test` (root) | 0 | 3,240 passed, 49 skipped |
+| `git diff --check origin/main` | 2 at `b0c280b9`, then 0 | at `b0c280b9` it reported one blank line at the end of `packages/room/test/workerd/declared-support.ts`; the next commit removes that line and the check is clean |
+
+Per package, in the order root `npm test` runs them (node, then workerd where a package has both): checkers 43; cli 162; client 88 and 2; git 340; log 198 and 193; mcp 73 and 5; policy 313 and 311 (+2 skipped); room 258 node, 580 legacy workerd, 533 declared workerd (+47 not run); ui 141.
+
+Main `a04c774b` had 2,626 passed and 2 skipped (review `daba6bca`), and `a42c4d83` adds only notes. The difference is this stage's: policy +10 node and +10 workerd (`vocabulary.test.ts`); room +21 node (`declared-equivalence.test.ts`), +40 legacy workerd (`declared-fd6f00b6.test.ts`, 39, and `declared-rows-fd6f00b6.test.ts`, 1), and the whole declared run, 533 passed and 47 not run. Skipped tests are counted as vitest reports them: the declared run's 47, and policy's 2 node-only tests in workerd.
+
+### Not changed here
+
+`packages/log`, the client, MCP, CLI, checkers and UI packages, `docs/protocol.md`, the design note and `examples/` are unchanged. The Worker entry, wrangler configuration and deployed spike are unchanged. `LICENSE`, `NOTICE` and `AGENTS.md` are untouched.
+
+## Declared acts stage 3 (request 1e8fee4b)
+
+Status: implemented, pending review. Gitseq request `1e8fee4b` (planner to builder), stage 3 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), approved as design in review `1808ae17`, as clarified by the planner's assert `869d9aad` in answer to the checker's request `41892cb2`. Branch `request/decl-stage3`, with main `a04c774b` merged. The head for review is the commit that carries this section. Nothing was pushed or deployed, and no Cloudflare credential was used.
+
+This branch changes `packages/log` and this file, and nothing else.
+
+### Prerequisite and composition (assert 869d9aad)
+
+- **Stage 3 owns all of `packages/log`** (point 1). Stage 2's condition 1 named two fixed lists there, in `decode.ts` and `roster.ts`. They are delivered here: both files now read the legacy vocabulary's kinds, role table, delegable kinds and roster ops from its one frozen description, the contract's `ARTROOM_LEGACY_V1`. Stage 2's branch no longer touches `packages/log`.
+- **This head does not contain stage 2** (point 2). It is the stage 3 work on main `a04c774b`. The head that is reviewed for landing must contain reviewed stage 2. After stage 2 lands, the builder merges main into this branch, reconciles `packages/log`'s imports with the shared policy vocabulary exports where that still applies, and turns on the seven Room tests listed as `NEEDS_STAGE_3_VERIFY` in `packages/room/vitest.workers.declared.config.ts` on the stage 2 branch. Those seven tests are not shown passing at this head: the file that lists them is not on this branch.
+- **A private trial of the composition, not gate evidence.** In a scratch worktree the builder merged stage 2's head `2cd97b88` with this work and turned the seven tests on. It found one disagreement between the two stages, which is stage 2's to settle. Under a `v2` document this verifier builds the policy lane with the thread's kind (`DeclaredPolicyLane`; R-EVAL-3 as amended in protocol section 33.3; note section 8.1, "`PolicyLane` gains the kind"). Stage 2's Room does not add it (`RoomCore.policyLane`). So every `v2` log the stage 2 Room writes fails here at its first policy call: `context-mismatch`, "they differ at input.lane.kind". With that one field added to the Room's lane input under a `v2` document, the Room's whole suite passed in the trial: the declared run 540 passed and 39 skipped (stage 2's 533 and the seven), the legacy run 579. The finding was passed to the stage 2 lane. The trial is the only place the real Room's `v2` logs have met this verifier; the fixtures here come from a simulator.
+
+### What was built
+
+- **`decode.ts`.** Kinds decode by the R-SIG-4 grammar, in envelope `v: 1` or, with a binding, `v: 2`. Grant maps, `recover` ops, and `prepared` and `reservation-ended` events decode. A retained `v2` document and `artroom-checker-v2` configuration decode. A document that names a steps version or evaluator profile the verifier does not carry is `Unsupported`, not malformed.
+- **`declared.ts`.** Kind, binding, target and body are judged under the document in force at each entry's seq: the legacy vocabulary under a `v1` document; under a `v2` document the declarations and the steps version it names (`STEPS_V1`, with each step's own fields), `recover` by its ops, and grants by their shape.
+- **`roster.ts`.** Who may sign is judged under the vocabulary in force: the legacy table, or `who.roles` with `admin` implicit. Grants made under a `v2` document carry signed maps, checked at the grant and at each use. It now also answers what evidence validity asks: a key's revocation.
+- **`fold.ts`.** The thread fold: threads, holders, lease generations, scopes, versions, landing operations, `prepared` events. New in this delivery: each version keeps the obligations its `require` call made, the policy version that made them, and the verdicts carried onto it; each accepted review and check is an evidence row with the facts fixed at its admission (the member's teams, whether the member was an author, its flags, and for a check the integration it counts for); each `check-carried` event is a judgement, and a carry when it carried.
+- **`obligations.ts`** (new). Verify's own port of the Room's obligation rules: the one qualification rule, evidence validity after a revocation, the sole-admin flag, the status of a review obligation (latest qualifying approvals here, then carried verdicts, against `count`) and of a check obligation (a passing check on the integration, or a carry onto it under the policy in force), advisory obligations, the land input's `obligations` and `reviews`, a notify directory's `reviewers`, and the verdicts a `carry` call is owed for.
+- **`calls.ts`.** A call session. Verify makes the calls admission had to make, in order, on one act meter, with the evaluator's own functions, and compares each with the recorded call in its place: `decision-missing`, `context-mismatch`, `policy-decision-mismatch`, and `decision-extra` for a recorded call left over. Verify decides which calls are owed and where admission stops; the evaluator decides which rules apply inside a call.
+- **`verify.ts`.** The wiring. For an act: `refuse`; for a version `require`, then one `carry` call for each earlier verdict that is owed one, then `land` when the act also lands. For a land act: `refuse`, then `land` at stage `land`. For `land-evaluated`: `land` at stage `reservation`, with checks counted for the event's integration. For `obligations-recomputed`: `require` by the proposer, then a `carry` call for each carried verdict whose obligation still holds, with `policy.same` false; a failed `require` keeps the earlier obligations. For `notified`: `notify`, with the reviewers as they stood when the act was sealed. For `check-carried`: the judgement must be owed, its input and facts are rebuilt, and its recorded outcome is the evaluator's. Under a `v1` document the same calls are made and not compared, so the fold follows a room across its first `v2` activation; a `v1` entry is judged by replay alone, as before, and reports as before.
+- **`cli.ts`, `gitcli.ts`.** `artroom verify` fetches the room's pinned version heads, prints proof limits, and exits 1 when the log names a version the verifier does not carry.
+
+### Conditions
+
+| Condition of request 1e8fee4b | Code | Tests |
+|---|---|---|
+| (1) Decoding accepts any kind of the grammar. Kind, body and who are judged under `D(s)` and the steps version the retained document names, with `artroom-legacy-v1` for `v1` entries and `v: 1` envelopes. `steps-unsupported` and `profile-unsupported` are the verifier's own limits | `decode.ts`, `declared.ts`, `roster.ts`, `verify.ts` | `declared-stage3.test.ts`: "condition 1: decoding by grammar" (grammar kinds, the malformed shapes); "condition 1: decoding by grammar, and kind, binding, body and who under D(s)" (the activating log, `kind-undeclared` twice, `binding-stale` twice, the legacy rule three times, bodies and targets, `recover` ops, grants, `who.roles`); "condition 1: the steps version and profile named by the retained document" (two steps versions, `steps-unsupported`, `profile-unsupported`) |
+| (2) Verify derives the required evaluation calls per step from the evaluator's own code, rebuilds each call's inputs and budget progression from the folded state, and reports `decision-missing`, `decision-extra` and `context-mismatch`. The prepared event is checked where present | `calls.ts`, `fold.ts`, `obligations.ts`, `verify.ts` | `declared-stage3.test.ts`: "condition 2: required evaluation calls, derived and rebuilt from the fold" and its two inner groups. `declared-obligations.test.ts`: all of it. See "What is still the retained context's" below: for those fields, in those cases, condition 2 is not met and stays open |
+| (3) Fixtures | `test/fixtures/`, `scripts/` | The list below |
+| (4) Every new guard has a named red mutation. No existing test is edited | The `// V:<id>` markers | The mutation table below. `git diff --stat a04c774b -- packages/log/test` lists 17 files, every one of them added |
+| (5) Root, log and policy gates green at the exact head. Report here. One exact head | | The gates table below |
+
+### Fixtures (condition 3)
+
+Each is a room-signed log. `scripts/declared-fixtures.ts` writes ten of them with the simulator in `test/support/declared-room.ts`; `scripts/v1-fixture.ts` wrote the eleventh once, at `815e3383`, before verify changed. Forged variants are made from them in the tests and resealed with the room key.
+
+| Fixture | What it holds | Condition 3 item |
+|---|---|---|
+| `declared-activates-kind` | A `v2` room whose landed policy change activates a document adding the kind `standup` and changing `note`'s meaning; refuse, require, land and notify calls; the repository's objects | A fresh-clone replay of a log whose document activates a kind (also through `artroom verify` on a real repository, `declared-stage3.node.test.ts`); `kind-undeclared` on a forged entry; `binding-stale` on a forged entry; the forged logs that delete a refuse, require, land or notify call and substitute a false context |
+| `v1-log-815e3383` | A `v1` log and the report main `815e3383`'s verifier gave it | An old `v1` log verifying unchanged |
+| `declared-two-steps` | Two steps versions, the second a test-only name | A log spanning two steps versions |
+| `declared-legacy-recovery` | A `v1` room locked by its policy: the recovery claim, propose, flagged approval, land, outcome, the activation of a `v2` document, and the release as a `recover` op | The whole legacy recovery sequence |
+| `declared-refusals` | Recorded refusals at each place admission stops, and a blocked recomputation | Where admission stops |
+| `declared-profile` | A document naming a profile no verifier carries | `profile-unsupported` |
+| `declared-check-prepared` | A check whose integration a `prepared` event names | The prepared event, where present |
+| `declared-grants` | Grants across the first `v2` activation | R-DECL-17 in verify |
+| `declared-carry` | 116 entries, six threads: a verdict carried to a version with the same tree, judged again at two recomputations, replaced by its reviewer's objection; checks counted by integration, carried by `check-carried` events and judged again after an activation; an advisory, a volatile and a failing check; two checkers with one configuration digest; a verdict that does not carry; an objection that is owed no call; an author's own approval; a policy that changes who qualifies; a revoked checker key; a sole admin's self-approval and a second admin; a recomputation whose `require` fails | The forged logs for the land input's obligations and reviews, the notify directory's reviewers, and each carry call owed, omitted, extra or falsified (assert 869d9aad, point 3) |
+| `declared-carry-plain` | A verdict carried with no carry rule, so with no recorded decision; then a verdict that is not carried because the new version has no obligation for it | A carry derived with nothing recorded; undecided carries without Git objects |
+| `declared-snapshot` | A scoped checker: a `prepared` event records the snapshot commit for a landing's integration; the same with no `prepared` event; a version with no check obligation | A filtered check's integration; a judgement with no obligation |
+
+The simulator admits acts as the Room's admission does. Its obligation rules are a port of the Room's `obligations.ts` in `test/support/room-obligations.ts`, kept apart from verify's own `src/obligations.ts`, so the fixtures are not made by the code they test. Extending the simulator left the seven fixtures of the earlier commits byte for byte the same.
+
+### Stage 6 work brought forward, and what stage 6 still owns
+
+Brought forward here, as condition 2 asks and assert 869d9aad point 3 confirms: the thread fold; the obligation and evidence fold; the required calls for `refuse`, `require`, `carry`, `land` and `notify`, with every input rebuilt and the budget carried from call to call; the comparison of a version's changed paths with Git objects where they are present, and the `git-unwitnessed` limit where they are not; the check against `prepared` events where they are present; and a fixture that spans two steps versions.
+
+Stage 6 still owns (assert 869d9aad, point 4), and nothing here stands in for it:
+
+- **Derived effects.** The fold takes receipt effects as recorded. The `obligations` effects of receipts, and the `obligations` and `reopened` lists of an `obligations-recomputed` event, are not compared with the statuses verify derives (`effect-mismatch`). Lane, lease and landing transitions are not re-derived.
+- **The first refusal.** Whether the platform guard behind a recorded refusal really failed, and whether an accepted act passed its platform guards (`refusal-mismatch`, `guard-failed`): for example a review by a member who qualifies for no obligation, a check with a wrong binding, or a land with an open review obligation. Verify re-judges every piece of evidence when it counts obligations, so such a review or check meets nothing here; it is not yet a failure in itself.
+- **Witness and prepared-event requirements.** `witness-missing` and `git-mismatch` as named failures. Today a context that hides a change Git shows fails as `context-mismatch`.
+- **Streaming and bounds,** and the ordering of clock events such as `lease-expired`.
+- **The adversarial fixtures of note section 4.7** and their honest controls, as a set.
+- **Retained steps versions** and the cases of note section 3.9: a deployment that adds a steps version with no activation, and an exact retry across the move.
+- **The real Room, to a published log, to a fresh clone.** It waits for stage 4, which emits `prepared` and `reservation-ended`.
+
+### What is still the retained context's
+
+Assert 869d9aad, point 3, named four things the earlier commits of this branch took from the context the room retained. Each is now rebuilt from the fold:
+
+| Field | Now | Tests |
+|---|---|---|
+| A land input's `obligations` | Rebuilt: the version's obligations, each blocking one, and whether the evidence meets it, for the integration asked about | "a land input's obligations are rebuilt", 13 forged contexts |
+| A land input's `reviews` | Rebuilt: each qualifying reviewer's latest verdict, here or carried, by act ID | "a land input's reviews are rebuilt", 6 forged contexts |
+| A notify directory's `reviewers` | Rebuilt: the thread's latest version's qualifying reviewers when the act was sealed | "a notify directory's reviewers are rebuilt", 6 forged contexts |
+| Each carry call's evidence, policy comparison and facts, and which verdicts one is owed for | Rebuilt and derived: an omitted call is `decision-missing`, a call for evidence owed none is `decision-extra`, a falsified field is `context-mismatch` | "carry calls for verdicts are derived, and their inputs rebuilt", 17 tests; "check-carried events are rebuilt", 9 tests |
+
+What the log does not carry is still taken from the retained context of the matching call. Each case is reported in `VerifyReport.limits` as `git-unwitnessed`, with the entry and what was taken. For these fields, in these cases, condition 2 is not met:
+
+1. **The paths changed since an earlier verdict's head** (`changedSince`), when the Git objects of the two heads are absent. They decide whether the verdict carries. With a recorded carry call for the verdict, the paths are that call's and everything else in it is rebuilt. With none, whether the verdict carried on the platform's conditions alone is undecided: the version keeps it as undecided, and a later land input takes from the retained context only whether the obligation is met and whether the verdict is listed; the listed verdict's content is still the fold's. Next change: stage 6's version witness (the receipt of a version names its witness's digest, protocol section 33.3 on R-LOG-6), extended to the changes since each carried verdict; or fetching the heads.
+2. **A version's base and changed paths**, when the Git objects are absent. This is the limit the earlier commits already reported. Same next change.
+3. **The integration a check on a filtered snapshot counts for**, when no `prepared` event names its snapshot commit. A land input for one integration then takes that obligation's `met` from the retained context, if no other evidence meets it. Next change: stage 4, when the Room seals `prepared` events; verify can then require one (`witness-missing`).
+4. **A check carry's new tree and filtered snapshot**, when no `prepared` event names the integration and, for the tree, its Git commit is absent. Next change: stage 4, as above.
+5. **Whether a `check-carried` judgement was owed.** The Room judges carrying a check when a landing is prepared, which the log does not time, so an omitted judgement cannot be derived. A judgement that is recorded is checked: it must name a landing of the version, a check obligation the version has, an earlier passing check of that checker on another integration, and must not repeat. A carry that is not recorded meets no obligation, so leaving one out gains nothing. No next change is proposed; it is stated in the report's `cannotProve`.
+6. **The admin obligation of a version no recorded context names.** Its changed paths are then unknown, and whether it has `obl_admin-approval` is taken from its receipt's `obligations` effect, as recorded. Next change: stage 6's derived effects and version witness.
+7. **Entries under a `v1` document.** Their calls are made to keep the fold, and not compared: R-DECL-1 keeps the legacy judgement as it was.
+
+### Choices where the design left room
+
+1. **One derivation for both vocabularies.** Under a `v1` document verify makes the same calls and compares nothing. The alternative, taking a `v1` version's obligations from its receipt, cannot work: a receipt lists obligation IDs, not who may meet them.
+2. **The admin obligation is decided in one place,** from the version's witness. The `require` call lists it too when it knows the paths; that listing is ignored.
+3. **Undecided carries are kept as undecided,** not guessed. A later carry call for such a verdict is accepted if recorded and not required if absent.
+4. **`git-unwitnessed` is the one proof limit the contract names** (`VerifyProofLimit`). It is used for the missing `prepared` event too, with a detail that says so. Whether the contract should name a second limit is a question for the planner; no contract file is changed here.
+5. **A `prepared` event binds a check on a filtered snapshot by its snapshot commit or by its integration.** The earlier commit accepted only the second, which would have refused a scoped check that names the snapshot commit, as R-CARRY-15 lets it.
+6. **A recorded context of another kind is no context for a call.** The rebuilt digest then fails to match it. The earlier separate guard for this is removed: nothing could tell it from the digest comparison.
+7. **The legacy lists come from the contract's `ARTROOM_LEGACY_V1`,** not from stage 2's policy exports, so stage 3 does not depend on stage 2's code. Both read the same frozen data.
+8. **Forged calls are made consistent.** `forgeCall` runs the evaluator on the false context and records its decisions, so replaying the record finds nothing and only the rebuilt context shows the forgery.
+9. **Five guards have two mutants.** Removing each of these guards makes verify throw on the state the guard excludes. That mutant is red by the exception. A second mutant keeps the guard firing with the wrong answer, and is red by a test's own assertion.
+
+### Mutation table
+
+Each mutant was applied alone by `/private/tmp/claude-501/-Users-hughpyle-play-artroom/af183959-fa1e-41f2-aa7f-1fb81256fb3a/scratchpad/mut3/run.py`, after the code was committed (`e969587a`). The runner checks that the mutant's text occurs exactly once, writes the mutated file, runs `npx vitest run --config vitest.config.ts test/declared-stage3.test.ts test/declared-stage3.node.test.ts test/declared-obligations.test.ts` in `packages/log` (node), records the failing tests and how each failed from the JSON reporter, and writes the file's original bytes back in a `finally`. It never runs `git checkout`. `git status --porcelain` was empty afterwards. A guard written as one `if` statement on its marked line gets the mutation "its condition never holds". The others are written out in `mutants.py` beside the runner, and described in the table.
+
+**97 mutants over 92 guards, all red.** None is red by a timeout or by a test file that failed to load. 92 are red by a test's own assertion. Five are red only by an exception that verify throws once the guard is gone (`V:carried-obligation`, `V:d-steps`, `V:grant-declared`, `V:target`, `V:unsupported`); each of those guards has a second mutant, marked `#2`, that is red by assertion.
+
+The first run, 93 mutants at `013ed88d`, left four survivors. What was done about each:
+
+- `V:admin-obligation`: the `require` call's own listing of the admin obligation made the guard redundant. The obligation is now decided in one place (choice 2).
+- `V:check-binding`: no fixture had two checkers with the same configuration digest, so the configuration check hid it. The carry fixture's later policies add one, with a test.
+- `V:context-kind`: the digest comparison reported the same failure. The guard was removed (choice 6).
+- `V:d-policy-v2`: the validation at activation reported the same failure. A test now names the guard by its own detail.
+
+| # | Mutant | File | Mutation | Tests turned red |
+|---|---|---|---|---|
+| 1 | `V:accepted-refused` | `verify.ts` | an act accepted although a rule refuses it passes | condition 2: required evaluation calls, derived and rebuilt from the fold where admission stopped: recorded refusals guard-failed: an act accepted although a refuse rule refuses it |
+| 2 | `V:activation-valid` | `verify.ts` | an activated `v2` document is not validated in the room's context | condition 2: required evaluation calls, derived and rebuilt from the fold malformed: an activated v2 document whose threads name a kind that never opened a thread here |
+| 3 | `V:admin-obligation` | `obligations.ts` | the platform's admin obligation is never derived | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 29 more |
+| 4 | `V:advisory` | `obligations.ts` | an advisory check obligation is listed as blocking | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 33 more |
+| 5 | `V:because` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) standup: a because that is not a list of reasons |
+| 6 | `V:binding` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) binding-stale: a note signed under the earlier document's note binding, sealed after its meaning changed; condition 1: decoding by grammar, and kind, binding, body and who under D(s) binding-stale: a v: 1 envelope of a declared kind under a v2 document; and 2 more |
+| 7 | `V:body-closed` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) standup: a field the declaration does not have |
+| 8 | `V:body-object` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) standup: a body that is not an object |
+| 9 | `V:canonical-snapshot` | `verify.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-snapshot: a check on a snapshot commit counts for the integration a prepared event records it for; with no prepared event that is reported; a check on a filtered snapshot (R-CARRY-15, R-DECL-20) context-mismatch: with the prepared event, a land context that says the check does not count; and 1 more |
+| 10 | `V:carried-obligation` | `verify.ts` | the guard's condition never holds; verify then throws on the state the guard excludes | a check-carried judgement for an obligation the version does not have (declared-snapshot, third thread) decision-extra: a judgement that carries the first version's check to the second, which has no such obligation |
+| 11 | `V:carried-obligation#2` | `verify.ts` | the guard accepts the judgement instead of failing it | a check-carried judgement for an obligation the version does not have (declared-snapshot, third thread) decision-extra: a judgement that carries the first version's check to the second, which has no such obligation |
+| 12 | `V:carried-once` | `verify.ts` | the guard's condition never holds | check-carried events are rebuilt (R-CARRY-6 to R-CARRY-14) decision-extra: the same judgement recorded twice for one check, integration and policy |
+| 13 | `V:carried-op` | `verify.ts` | the guard's condition never holds | check-carried events are rebuilt (R-CARRY-6 to R-CARRY-14) decision-extra: a judgement naming a landing of another version |
+| 14 | `V:carried-other-integration` | `verify.ts` | the guard's condition never holds | check-carried events are rebuilt (R-CARRY-6 to R-CARRY-14) decision-extra: a judgement for a check that already counts for the integration |
+| 15 | `V:carried-outcome` | `verify.ts` | the guard's condition never holds | check-carried events are rebuilt (R-CARRY-6 to R-CARRY-14) carried-outcome-mismatch: the recorded outcome is not the one the evaluator gives: a volatile check recorded as carried |
+| 16 | `V:carried-passing` | `verify.ts` | the guard's condition never holds | check-carried events are rebuilt (R-CARRY-6 to R-CARRY-14) decision-extra: a judgement for a failing check |
+| 17 | `V:carried-replaced` | `obligations.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 6 more |
+| 18 | `V:carry-candidates` | `obligations.ts` | acts counted for check obligations are carry candidates too | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-snapshot: a check on a snapshot commit counts for the integration a prepared event records it for; with no prepared event that is reported; and 41 more |
+| 19 | `V:carry-extra` | `calls.ts` | the guard's condition never holds | carry calls for verdicts are derived, and their inputs rebuilt (R-CARRY-1 to R-CARRY-5) decision-extra: a carry call recorded for a verdict whose reviewed scope changed, where the evaluator decides nothing |
+| 20 | `V:carry-holds` | `verify.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-carry-plain: a verdict carried by the platform's conditions alone is derived, with no recorded decision; a verdict is carried only to obligations the new version has (declared-carry-plain, second thread) the honest log: the second version has no obligation, a later policy requires the review again, and the land input lists only the new approval; and 1 more |
+| 21 | `V:carry-policy` | `obligations.ts` | a check carry counts under any policy version (the condition never holds) | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 13 more |
+| 22 | `V:check-binding` | `obligations.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 9 more |
+| 23 | `V:check-config` | `obligations.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 13 more |
+| 24 | `V:check-integration` | `obligations.ts` | a check counts for any integration | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 29 more |
+| 25 | `V:check-ok` | `obligations.ts` | a failing check counts | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 15 more |
+| 26 | `V:checker-format-v1` | `verify.ts` | a `v1` document's checker format is not checked | condition 2: required evaluation calls, derived and rebuilt from the fold malformed: a v1 document activated with an artroom-checker-v2 configuration |
+| 27 | `V:context` | `calls.ts` | the guard's condition never holds | a land input's obligations are rebuilt (R-POL-6, R-OBL-1 to R-OBL-7) context-mismatch: a land act whose context says a check obligation is met, when no check on that integration meets it; a land input's obligations are rebuilt (R-POL-6, R-OBL-1 to R-OBL-7) context-mismatch: a land act whose context leaves an open obligation out; and 45 more |
+| 28 | `V:d-binding` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a v: 2 envelope without a binding; condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a v: 2 envelope whose binding is not a digest |
+| 29 | `V:d-binding-v1` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a binding in a v: 1 envelope |
+| 30 | `V:d-kind` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a kind outside the grammar |
+| 31 | `V:d-map-key` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a grant map key outside the grammar |
+| 32 | `V:d-map-kinds` | `decode.ts` | a `v2` grant's platform kinds are not checked | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a v2 grant naming a declared kind plainly |
+| 33 | `V:d-map-value` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a grant map value that is not a binding; condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a session map value that is not a binding |
+| 34 | `V:d-platform-v2` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a platform kind in a v: 2 envelope |
+| 35 | `V:d-policy-v2` | `decode.ts` | the guard's condition never holds | stage 3 guards whose failure another guard would also report: each is named by its own detail malformed: a retained v2 document that is not a policy document is named so where it is decoded |
+| 36 | `V:d-prepared` | `decode.ts` | a `prepared` event's integration, base and tree are not decoded | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a prepared event without its integration |
+| 37 | `V:d-prepared-owner` | `decode.ts` | a preview owner's generation is not decoded | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a prepared event whose owner names no generation |
+| 38 | `V:d-profile` | `decode.ts` | the guard's condition never holds | condition 1: the steps version and profile named by the retained document profile-unsupported: a document naming a profile the verifier lacks stops at the first entry under it; not a failure |
+| 39 | `V:d-recover-op` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a recover op that is not one |
+| 40 | `V:d-reservation` | `decode.ts` | a `reservation-ended` event's lane is not decoded | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a reservation-ended event without its lane |
+| 41 | `V:d-session` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: a session map value that is not a binding |
+| 42 | `V:d-steps` | `decode.ts` | the guard's condition never holds; verify then throws on the state the guard excludes | condition 1: the steps version and profile named by the retained document steps-unsupported: a verifier without the second version stops at the first entry that needs it; not a failure |
+| 43 | `V:d-steps#2` | `decode.ts` | the guard names `profile-unsupported` instead | condition 1: the steps version and profile named by the retained document steps-unsupported: a verifier without the second version stops at the first entry that needs it; not a failure |
+| 44 | `V:d-v` | `decode.ts` | the guard's condition never holds | condition 1: decoding by grammar (R-SIG-4 as amended, R-DECL-2, R-DECL-16) malformed: an envelope format other than 1 or 2 |
+| 45 | `V:declared-kind` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) kind-undeclared: a forged entry of a kind no document declares; condition 1: decoding by grammar, and kind, binding, body and who under D(s) kind-undeclared: an act of the new kind sealed before the activation that declares it |
+| 46 | `V:declared-required` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) standup: a declared field missing |
+| 47 | `V:declared-type` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) standup: a declared field over its limit |
+| 48 | `V:delegation-covers` | `roster.ts` | the coverage check is skipped: any delegation covers the act | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a v1-era grant covers no declared kind after the first v2 activation; condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a declared kind the grant's map does not name; and 1 more |
+| 49 | `V:evidence-author` | `verify.ts` | no reviewer or checker is recorded as an author | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 17 more |
+| 50 | `V:evidence-revoked` | `obligations.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 4 more |
+| 51 | `V:extra` | `calls.ts` | a recorded call left over is accepted | carry calls for verdicts are derived, and their inputs rebuilt (R-CARRY-1 to R-CARRY-5) decision-extra: a carry call recorded for an objection, which is owed none; carry calls for verdicts are derived, and their inputs rebuilt (R-CARRY-1 to R-CARRY-5) decision-extra: the owed carry call recorded twice; and 4 more |
+| 52 | `V:git-witness` | `verify.ts` | the retained context's changes are taken even when Git shows more | condition 2: required evaluation calls, derived and rebuilt from the fold context-mismatch: a version's contexts replaced by plausible false ones, leaving out .artroom/policy.json, digests recomputed |
+| 53 | `V:grant-binding` | `roster.ts` | a grant covers the kind whatever binding it names | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) an act under a grant made for an earlier meaning of its kind |
+| 54 | `V:grant-declared` | `roster.ts` | the guard's condition never holds; verify then throws on the state the guard excludes | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a grant naming a kind the document does not declare: kind-undeclared |
+| 55 | `V:grant-declared#2` | `roster.ts` | the guard names `delegation-invalid` instead | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a grant naming a kind the document does not declare: kind-undeclared |
+| 56 | `V:grant-delegable` | `roster.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a grant of a kind that may not be delegated: delegation-invalid |
+| 57 | `V:grant-platform` | `roster.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a grant of a platform kind the grantor's role may not sign |
+| 58 | `V:grant-role` | `roster.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a grant of a kind the grantor's role may not sign: delegation-invalid |
+| 59 | `V:grant-shape-declared` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a grant in the legacy shape under a v2 document: body-invalid |
+| 60 | `V:grant-shape-legacy` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a grant with a signed map under a v1 document: body-invalid |
+| 61 | `V:grant-stale` | `roster.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a grant naming a binding that is not the one in force: binding-stale; condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a room-custody session naming a binding that is not the one in force: binding-stale |
+| 62 | `V:invite-session` | `roster.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) a room-custody session naming a binding that is not the one in force: binding-stale |
+| 63 | `V:land-op` | `verify.ts` | a `land-evaluated` event for an unknown operation is accepted | condition 2: required evaluation calls, derived and rebuilt from the fold guard-failed: a land-evaluated event for an operation no land act started |
+| 64 | `V:land-reviews` | `obligations.ts` | every latest verdict is listed, qualifying or not | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 10 more |
+| 65 | `V:legacy-kind` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) the legacy rule: recover is not a kind of a v1 room |
+| 66 | `V:legacy-v1` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) the legacy rule: a v: 2 envelope under a v1 document was never admitted (body-invalid) |
+| 67 | `V:missing` | `calls.ts` | a required call with no recorded call in its place is accepted | carry calls for verdicts are derived, and their inputs rebuilt (R-CARRY-1 to R-CARRY-5) decision-missing: a propose whose carry call is deleted, where the earlier verdict is owed one; carry calls for verdicts are derived, and their inputs rebuilt (R-CARRY-1 to R-CARRY-5) decision-missing: a propose that records one of the two carry calls it owes; and 9 more |
+| 68 | `V:outcome` | `calls.ts` | the guard's condition never holds | condition 2: required evaluation calls, derived and rebuilt from the fold policy-decision-mismatch: a recorded outcome that is not the one the rebuilt call makes |
+| 69 | `V:prepared` | `verify.ts` | a check is not compared with the `prepared` events | a check on a filtered snapshot (R-CARRY-15, R-DECL-20) guard-failed: a check naming a snapshot the prepared event does not record for its checker; condition 2: required evaluation calls, derived and rebuilt from the fold the prepared event, where present (R-DECL-20) guard-failed: a check bound to an integration that no prepared event for its version names |
+| 70 | `V:recompute-blocked` | `verify.ts` | the recorded block is not compared with the rebuilt call | condition 2: required evaluation calls, derived and rebuilt from the fold where admission stopped: recorded refusals refusal-mismatch: a recomputation whose require call fails, recorded without its block |
+| 71 | `V:recompute-keeps` | `verify.ts` | a blocked recomputation takes the failed call's empty obligations | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 1 more |
+| 72 | `V:recompute-version` | `verify.ts` | a recomputation of a version the log never proposed is accepted | condition 2: required evaluation calls, derived and rebuilt from the fold where admission stopped: recorded refusals guard-failed: a recomputation of a version the log never proposed |
+| 73 | `V:recover-closed` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) recover ops (R-DECL-21) release: a field the op does not have |
+| 74 | `V:recover-required` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) recover ops (R-DECL-21) release: a required field missing |
+| 75 | `V:recover-target` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) recover ops (R-DECL-21) release: a target the op does not take |
+| 76 | `V:recover-type` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) recover ops (R-DECL-21) release: a field of the wrong type |
+| 77 | `V:refusal-after` | `verify.ts` | a refusal decided after the refuse rules passes although a rule refuses first | condition 2: required evaluation calls, derived and rebuilt from the fold where admission stopped: recorded refusals refusal-mismatch: an outside-claim refusal although the refuse rules, which ran first, refuse it |
+| 78 | `V:refusal-rule` | `verify.ts` | the recorded refusal's rule is not compared | condition 2: required evaluation calls, derived and rebuilt from the fold where admission stopped: recorded refusals refusal-mismatch: a recorded policy refusal naming a rule that is not the one that refuses |
+| 79 | `V:review-approves` | `obligations.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 22 more |
+| 80 | `V:review-count` | `obligations.ts` | an obligation needs one approval more than its count | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 64 more |
+| 81 | `V:review-principal` | `obligations.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 10 more |
+| 82 | `V:review-self` | `obligations.ts` | an author's own verdict qualifies | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 17 more |
+| 83 | `V:reviewers` | `obligations.ts` | every reviewer is listed, qualifying or not | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 8 more |
+| 84 | `V:reviewers-then` | `verify.ts` | the reviewers count evidence sealed after the act | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 20 more |
+| 85 | `V:scope-fixed` | `declared.ts` | the guard's condition never holds | stage 3 guards whose failure another guard would also report: each is named by its own detail body-invalid: a scope on a thread whose scope is fixed is a problem, by name; a thread whose scope is fixed by a template (R-DECL-7) open carries no scope, and a scope is refused; take on such a thread carries none either |
+| 86 | `V:sole-admin` | `obligations.ts` | the guard's condition never holds | honest logs verify, with every input rebuilt from the fold declared-carry verifies on a fresh replay with the Git objects, with no proof limit; honest logs verify, with every input rebuilt from the fold declared-carry verifies without the Git objects; each input it could not rebuild is reported git-unwitnessed; and 2 more |
+| 87 | `V:step-required` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) propose: a step's field missing; a thread whose scope is fixed by a template (R-DECL-7) open carries no scope, and a scope is refused; take on such a thread carries none either |
+| 88 | `V:step-type` | `declared.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) propose: a step's field of the wrong type |
+| 89 | `V:stop-after-refuse` | `calls.ts` | the guard's condition never holds | condition 2: required evaluation calls, derived and rebuilt from the fold where admission stopped: recorded refusals the refusals log verifies: a refuse rule, outside-claim after the refuse rules, obligation-open before policy, a landing blocked by a recomputation; condition 2: required evaluation calls, derived and rebuilt from the fold where admission stopped: recorded refusals decision-missing: an outside-claim refusal without the refuse call that ran before it; and 4 more |
+| 90 | `V:stop-blocked` | `calls.ts` | a land refused with its version's block is taken as refused by a rule | condition 2: required evaluation calls, derived and rebuilt from the fold where admission stopped: recorded refusals the refusals log verifies: a refuse rule, outside-claim after the refuse rules, obligation-open before policy, a landing blocked by a recomputation |
+| 91 | `V:target` | `declared.ts` | the guard's condition never holds; verify then throws on the state the guard excludes | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) standup: a target the declaration does not accept |
+| 92 | `V:target#2` | `declared.ts` | the guard accepts the target | condition 1: decoding by grammar, and kind, binding, body and who under D(s) body and target under the declaration in force (body-invalid) standup: a target the declaration does not accept |
+| 93 | `V:thread-known` | `verify.ts` | the guard's condition never holds | an act that names a thread or entry the log never had guard-failed: a note on an entry the log never had, which the room refuses as lane-unknown |
+| 94 | `V:unsupported` | `verify.ts` | a version the verifier lacks is not recognised; verify then throws on the state the guard excludes | condition 1: the steps version and profile named by the retained document steps-unsupported: a verifier without the second version stops at the first entry that needs it; not a failure; condition 1: the steps version and profile named by the retained document profile-unsupported: a document naming a profile the verifier lacks stops at the first entry under it; not a failure |
+| 95 | `V:unsupported#2` | `verify.ts` | the stop is not reported | condition 1: the steps version and profile named by the retained document steps-unsupported: a verifier without the second version stops at the first entry that needs it; not a failure; condition 1: the steps version and profile named by the retained document profile-unsupported: a document naming a profile the verifier lacks stops at the first entry under it; not a failure |
+| 96 | `V:who-grantor` | `roster.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) grants carry the bindings their grantor signed (R-DECL-17) the grantor's role, changed since the grant, may no longer sign the kind |
+| 97 | `V:who-roles` | `roster.ts` | the guard's condition never holds | condition 1: decoding by grammar, and kind, binding, body and who under D(s) who.roles: a member signing the check act, which only checkers may sign (role-forbids) |
+
+### Gates
+
+Run under bash, serially, with exit codes checked, in a clean worktree at `e969587a`, the last code commit. `git status --porcelain` was empty before and after. The head for review adds only this section: `git diff --stat e969587a HEAD` lists `plans/README.md` alone. Main `a04c774b`'s root count is the checker's, from review `daba6bca` of head `4d2614a7`, whose tree main `a04c774b` has: 2,626 passed and 2 skipped. Its per-package counts are from the same suite run on the stage 2 branch after it merged that main, where `packages/log` is main's.
+
+| Gate | Exit | Result | Main `a04c774b` |
+|---|---|---|---|
+| `npm ci` (root) | 0 | installed | 0 |
+| `npm run typecheck` (root) | 0 | every workspace | 0 |
+| `npm test` (root) | 0 | 2,942 passed, 2 skipped | 2,626 passed, 2 skipped |
+| `npm run typecheck` in `packages/log` | 0 | src and tests | |
+| `npm test` in `packages/log` | 0 | node 357 passed; workerd 350 passed | node 198; workerd 193 |
+| `npm run typecheck` in `packages/policy` | 0 | src and tests | |
+| `npm test` in `packages/policy` | 0 | node 303 passed; workerd 301 passed, 2 skipped | the same |
+| `git diff --check origin/main` | 0 | clean | |
+
+Per package, root `npm test` (node, then workerd where a package has both): checkers 43; cli 162; client 88 and 2; git 340; log 357 and 350; mcp 73 and 5; policy 303 and 301 (+2 skipped); room 237 and 540; ui 141. Every count except log's equals main's. Log's difference is the three new test files: `declared-stage3.test.ts`, `declared-obligations.test.ts`, and `declared-stage3.node.test.ts`, which runs on node only. The Room's own suite, which verifies the logs the real Room writes under `v1` documents, passes unchanged against this verifier.
+
+### Not changed here
+
+The contract, `docs/protocol.md`, and the policy, room, git, client, MCP, CLI, checkers and UI packages are unchanged. No existing test is edited: every file this branch changes under `packages/log/test` is new. `LICENSE`, `NOTICE` and `AGENTS.md` are untouched.
+
+## Declared acts stage 5 (request a5d64b35)
+
+Status: implemented, provisional, not for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used. No reviewer has approved any head of this branch.
+
+How to read this section. The parts from "What was built" to "The UI" describe the composed head `b7b9d8df` as it was reported then: the stage 5 lane's work, the UI lane's work (`request/decl-stage5-ui`, `5dc0d044`), and the stage 2 code as it stood at `15fa7f4c`. They are not rewritten, except choices 19, 20 and 22, a note at the head of the mutation table and of the old gates, and the last list, "For the planner or hugh". The part "Since `b7b9d8df`" has one section for each finding the checker or the planner made on that head or a later one, with its repair. Where the two parts disagree, the later one is right.
+
+Four things are true of the present head and must change before review:
+
+- **It is provisional.** It sits on the stage 2 code of `15fa7f4c`. Stage 2 is not landed and has changed since. The head for review is composed again on main after stage 2 lands, with every gate and every acceptance test run again there.
+- **Its mutation evidence does not meet the standard now in force** (the checker's `b256f7a0`). An independent reading of the source found 174 guards with no mutant outside the UI and 201 in the UI, and existing mutants that do not compile: 33 outside the UI and, by reading, 16 in it. See "The state of the evidence".
+- **The repairs since `b7b9d8df` are tested against stand-in rooms**, the fake room of the client's tests and the UI's memory room, unless a section says otherwise. They are not shown against a real Room, over real HTTPS or MCP.
+- **The whole-head gates are owed again.** Root `npm ci` and `npm test` have not been run at the present head. Each repair ran the tests of the packages it changed and the root typecheck. See "Gates since `b7b9d8df`".
+
+Stage 3 is not in this head either: `packages/log` is unchanged, and `artroom verify` does not read a `v2` room's log until stage 3 lands. The MCP core runtime (request `9ca1d290`) is on its own branch and is not in this head.
+
+### What was built
+
+- **The declarations read.** `ReadQuery` `{ q: "acts" }` over RPC and `GET /v1/rooms/:room/declarations` over HTTPS, in `packages/room/src/reads.ts` (`catalogue`) and `http.ts`. With no selector it answers with the active policy version. `at` is an entry's seq and answers with the version in force there, `D(s)`. `policy` names a version. A `v2` version answers with each declared kind's declaration and binding, the steps version and `lanes`. A `v1` version answers with the legacy catalogue, which has no declarations and no bindings. Each declared kind carries `retired`, the seq of the first later activation that dropped it.
+- **A record's meaning at its own seq.** `meaningOf(catalogue, kind)` gives the label, declaration, binding and retirement in force for a record. The Room's `explain` read carries it as `Explanation.meaning`.
+- **The generic act.** `RoomApi.act(kind, target, body, { binding, idempotencyKey })` in `packages/client/src/room.ts`. It signs envelope `v: 2` with exactly what the caller gave. It refuses a missing or malformed binding and a platform kind before sending.
+- **The named methods in a `v2` room.** With a key, the handle reads the catalogue once, then signs each code-review act as `v: 2` with the binding of the declaration it was built for, under the room's steps version and `lanes`. In a `v1` room they sign `v: 1` as before.
+- **Bearer acts.** Over RPC the caller's binding goes to `bearerAct` unchanged. Over HTTPS the generic act is one call of the MCP tool `act`. The HTTPS bearer client's `check` and `roster` methods stay refused.
+- **Grants.** `delegateOp` and `invitationSession` (`packages/client/src/grants.ts`) build the op in the room's active vocabulary. `expandGrant` turns `*` or a list of kinds into platform kinds and a signed map of the active bindings.
+- **MCP.** The tools `acts` and `act`, in their own block of `packages/mcp/src/tools.ts`, beside the ten named tools, which are unchanged.
+- **CLI.** `artroom acts [KIND] [--at SEQ | --policy VERSION]` and `artroom act KIND --binding B …`, journaled like the other act commands. `artroom log` and `artroom explain` show a declared kind with the label of the record's own seq.
+- **A table of the steps' fields.** `STEP_FIELD_SPECS` in `packages/policy/src/steps.ts`: each step's own body fields with their types, so a form or the CLI can ask for them. `fieldsOf(declaration, shape)` lists an act's fields on a target.
+- **What a handle keeps.** `actsAt` answers from an ended version the handle read before. A later activation can still set `retired` on that version's kinds, so the handle drops what it kept when it sees a later activation. `actsAt(at, { fresh: true })` always reads the room.
+- **A thread's kind.** `Lane.kind`, on the `lane` and `lanes` reads: the kind of the act that opened the thread.
+- **A thread's name.** `titleOf` and `threadTitle` in `packages/policy/src/catalogue.ts`. The CLI and the MCP tool `act` print the name when an act opens a thread.
+- **A typed envelope accessor.** `envelopeOf(entry)` in `packages/contract/src/guards.ts`.
+- **Protocol.** [docs/protocol.md](../docs/protocol.md) section 33.10, appended. It amends R-API-3, R-API-9, R-CRED-10, R-DECL-16, R-DECL-17 and R-DECL-23, adds the stage 5 acceptance cases and the types, and adds open points 49 to 52. No rule is renumbered and no earlier text is edited.
+
+The API the UI lane builds on is summarized in the session scratch file `stage5-api.md`; everything it names is in the files above.
+
+### Conditions
+
+| Condition of `a5d64b35` | State | Where and how shown |
+|---|---|---|
+| (1) Every stage 5 surface | Met at this head | Read, client, HTTPS, MCP, CLI and UI: built and tested. The ten named MCP tools remain. The MCP core (`a9788a59`) is separately owed; see "Composing with the MCP core" |
+| (2) Signed meaning preserved | Met | The client, the MCP tool and the CLI never read a binding to act, never replace one and never sign again. Tests: "signed meaning is never changed by the client" (Room, 6), "a changed meaning is shown, never adopted for the user" (CLI, 3), the stale test of the MCP suite. Exact retries after an activation return the original record. Grants carry the grantor's bindings and are expanded before signing. Credential custody and redaction are unchanged |
+| (3) An honest act unknown to the client, and the listed cases | Met | See "Acceptance cases", and "The UI" for the UI's cases |
+| (4) Ownership and the read-route seam | Met | See "Edits to files other stages own" |
+| (5) Mutations, tests, gates, one composed head | Part met | Mutations and gates below, at this composed head. **Open: the one exact head for review**, which needs stage 2 landed on main |
+
+| Point of `fa120186` | State | Where and how shown |
+|---|---|---|
+| Historical readers use `D(s)` | Met for the client, MCP, CLI and UI | "old records are read under the declarations of their own seq" (Room, 5 tests): activation, retirement, later name reuse with a changed shape, a label-only change, legacy records, exact old retries |
+| The generic bound check over the MCP endpoint | Met | "a declared check step under another name" (Room, 3 tests), "the generic act over the MCP endpoint" (Room, 4 tests). R-CRED-10 and R-API-9 are amended at this head in section 33.10 |
+| The first jam task need not use this path | Not a code matter | Nothing here makes it depend on it |
+
+### Acceptance cases
+
+All of these run the real client package and the real MCP endpoint against the Worker and its Durable Object, in [packages/room/test/workerd/declared-stage5-a5d64b35.test.ts](../packages/room/test/workerd/declared-stage5-a5d64b35.test.ts) (38 tests). Nothing in them is a double.
+
+| Case of section 33.10 | Tests |
+|---|---|
+| Generic act, over HTTPS | "the client signs v: 2 with the binding the caller read; the room admits it and records the act's own kind" |
+| Generic act, over MCP | "a bearer reads the declarations with acts, and performs a kind that has no named tool with act, signed under its delegation" |
+| Changed meaning: body, targets | "a changed body field limit …", "a new required body field …", "a changed target …" |
+| Changed meaning: hold | "a changed hold: an opening act prepared before its hold changed is binding-stale; the caller reads again and resubmits deliberately" |
+| Label-only edit | "a label-only or help-only edit leaves the binding equal, and the act prepared before it is admitted" |
+| Lost result; exact retry | "a lost result is retried with the same bytes, and an exact retry after a meaning change returns the original record" |
+| Undeclared kind | "an undeclared kind is kind-undeclared; a body the declaration does not allow is invalid-body; neither is recorded" |
+| Role and grant | "a role the declaration does not list is role-forbids; …"; "a grant that does not name the kind, names an earlier binding, or whose grantor's role lost the kind does not cover the act; …" |
+| Expanded grant; delayed grant | "a grant is expanded before signing: …"; "a grant signed before a meaning change and sent after it is binding-stale; …" |
+| Legacy controls | "a v1 room: the named methods sign v: 1 as before; the generic act is bad-request and records nothing"; "a v1 room answers with the legacy catalogue …" |
+| Named methods in a `v2` room | "a v2 room with the code-review declarations: each named method signs v: 2 with the binding it was built for; renew stays v: 1"; "a room whose claim means something else: …" |
+| Generic check | "a bearer whose grant names verify meets the obligation through act; one without it, or with a stale binding, does not"; "the holder and proposer cannot meet their own check obligation through act; …"; "the HTTPS bearer client: its fixed check method stays forbidden; its generic act goes to the MCP endpoint; a key-signed check over HTTPS still works" |
+| Excluded on the generic path | "platform kinds, acts without a binding, and every act in a v1 room are refused on the generic path; nothing is recorded"; "a bearer act is never taken on POST /acts: …" |
+| Old records | the five tests of "old records are read under the declarations of their own seq" |
+| Dropped twice | "each version that declared the kind is marked with the first later version that did not: an earlier version is not moved to the second drop" |
+| Retired after the read | Client: "with no sign of a later activation the handle answers what it kept; { fresh: true } reads again and replaces it", and eight tests "after …, the handle drops what it kept and the next answer has the room's marks", one for each sign. MCP: "a kind retired after the server first read its version is shown retired on the next call, with nothing else read in between" |
+| Thread kind | "the lane reads give each thread's kind: claim in a v1 room; in a v2 room the kind of the act that opened it" |
+| Thread name | "a thread with no goal is named by its opening act, in the words in force when it opened: label and first field"; "the act tool names the thread it opened the same way; a thread with a goal is named by its goal"; CLI: "an act that opens a thread names it as every reader does: its goal, or the act's label and first field" |
+
+Unit tests beside them, against the fake room in its declared mode: client 33 ([declared-a5d64b35.test.ts](../packages/client/test/declared-a5d64b35.test.ts)), MCP 10 and 4 schema tests, CLI 20. The UI suite has 195 tests. A Room node test, 11 tests, checks that `STEP_FIELD_SPECS` agrees with admission's step 5 for every step: [declared-steps-a5d64b35.test.ts](../packages/room/test/node/declared-steps-a5d64b35.test.ts).
+
+### Choices where the design left room
+
+1. **The route is `/declarations`, not `/acts`.** `POST /v1/rooms/:room/acts` submits an act. A `GET` on the same path for a different thing would share its path in logs and in tests that count submissions. The read query and the MCP tool are still named `acts`, as R-API-9 has them.
+2. **A `v1` version answers with a legacy catalogue.** Section 33.7's `ActsCatalogue` had a `steps` field and no `v1` form. The read returns `{ vocabulary: "artroom-legacy-v1", policy, since, until }`, so a client learns the room's vocabulary from the same read.
+3. **`retired` is the first later activation that dropped the kind, and reuse does not clear it.** A record made under a version keeps that version's meaning. The binding and policy version tell a reused name's two meanings apart.
+4. **The Room computes `explain`'s meaning.** One implementation serves the client, the CLI, the MCP tool and the UI.
+5. **The named methods read the catalogue once per handle.** A handle cannot know the room's vocabulary without asking, and it must not sign `v: 1`, be refused, and sign again by itself. So the first named act of a handle with a key costs a session request and one read, in every room. `renew` and `roster` cost nothing more. After a `binding-stale` or `kind-undeclared` refusal, or a `bad-request`, the handle forgets what it read; the caller's next call reads again.
+6. **The client depends on the policy package, through an export that loads no evaluator.** The binding identity lives in `packages/policy`. The client imports `@generalbusiness/artroom-policy/declared`, which pulls in the binding functions, the code-review declarations, the vocabulary functions and the catalogue helpers, and not the expression engine. The client, MCP and CLI TypeScript configurations move from `ES2022` to `ES2024`, which the policy sources need.
+7. **A table of step fields for clients, checked against the Room.** Admission's step checks are code. A form needs data. `STEP_FIELD_SPECS` is that data, and the Room node test fails if the two drift.
+8. **`artroom act` requires `--binding`.** The CLI could read the active binding for the user. It does not: a user who read a declaration yesterday would then act under today's meaning without being told. `artroom acts KIND` prints the binding and the command.
+9. **A binding that is not the active one is refused by the CLI before signing**, with the refusal the room would give. The room still judges every act it is sent, including one whose meaning changes between the CLI's read and its send; that case is tested.
+10. **What the room knows is read for the user**: the lease, the lane's generation, and a version's head, as the named commands read them. The binding is never among them.
+11. **After `binding-stale` the CLI lists what changed** when one of the last eight policy versions holds the kind under the binding the user gave. Otherwise it says the change cannot be listed.
+12. **`expandGrant` refuses; it does not narrow.** A listed kind the role may not grant is an error naming it. `*` means what the role may grant, and says so by what it lists.
+13. **`LogEntry` is unchanged.** Widening it would change `packages/log`, which stage 3 owns. Readers call `envelopeOf(entry)`, which gives the envelope as `AnyEnvelope`. Open point 51.
+14. **No Room change was needed for the bearer transport.** Stage 2's `bearerAct` already signs a caller's binding as given. The exclusions follow from step 1: a platform kind in `v: 2` and a `v: 2` envelope in a `v1` room are `bad-request`. The tests pin both.
+15. **An MCP tool error is now a plain object.** A failure the Room throws over RPC reaches the MCP server as an `Error` instance, which MCP rejects as structured content. Before the generic `act`, no tool reached a thrown `bad-request` from the Room. `errorResult` now copies the error's own fields.
+16. **The AGENTS.md block is unchanged.** It is pinned by a snapshot and teaches the named loop. The MCP server's instructions gain one sentence about `acts` and `act`, within their 512 characters.
+17. **A handle drops kept catalogues on evidence, not on a timer.** It cannot know of an activation it has not seen. Every answer that shows one drops the kept versions: `acts()`, another `actsAt()` answer, a `log()` page, an update, and a refusal that names the active policy version. A handle that has seen nothing may answer old marks, and `fresh` is the way to be sure.
+18. **The MCP tool `acts` always reads fresh.** A stdio server keeps one handle for its life, and an agent's call is a question to the room.
+19. **A thread with no goal is named by its opening act's first text field by name.** This is the planner's decision `c37653e1`, built at `3a03d405`; it replaces "first field by name", under which the demo's songs were both "Start a song: c". The room keeps bodies and policy documents as canonical JSON with sorted keys, and records neither the order a caller typed nor the order a declaration lists its fields. `titleOf` sorts, so the typed body and the record give one name. "Text" is the field's declared type under the declaration of the opening act's own seq. With no text field present, the first field by name is used, as before. Open point 52 is updated to say so.
+20. **The CLI prints an act in the words of the declarations at the act's own seq.** After the room answers, `artroom act` reads `D(out.seq)` and takes the label and the thread's name from it and from the body the journal kept, for a new act and for one finished from the journal alike (`ff266354`; the checker's `0b9119de`, the planner's `b22d29ee` and `23ae8924`). Before that commit it used the catalogue read while the act was prepared, which is the wrong one when a label changes before admission, and it printed no thread line for an act finished from the journal. The read is for display only. If it fails, the act is still done: the kind is printed in place of the label, and the thread is named by its goal or its ID. With `--json` nothing is read.
+21. **The MCP tool `act` reads the declarations only for a thread with no goal**, and only at the record's seq. If that read fails, the act is still reported as done and the thread is named by its ID.
+22. **A saved act is named as the act it is.** The CLI's journal finds a saved generic act by its idempotency key, not by its kind. A run that names the key with another kind finishes the saved act with the saved bytes. Its receipt names the saved act, from the record's own kind, and the run is told on the error stream that no act of the kind it typed was made (`bdc35c53`). The other choice, to refuse the run because the kinds differ, would leave an act that the room has recorded without its local steps done.
+
+### Edits to files other stages own
+
+- **Stage 2's files.** Two. `packages/policy/src/index.ts`: two added export lines, for the catalogue helpers and the steps table. `packages/room/src/model.ts`: one added line in `laneView`, `kind: row.kind`, with its comment. No other file stage 2 changed is edited. This work reads stage 2's `vocabulary.ts` and its test helpers (`declared-support.ts`).
+- **Stage 3's files.** None. `packages/log` is byte-identical to the stage 2 candidate's.
+- **The MCP core's files** (`a9788a59`, the planner's). `packages/contract/src/transports.ts`: additive, apart from six lines that had to change in place (`Explanation.kind`, the end of the `ReadQuery` union, `RoomWire.submit`, `RoomWire.bearerAct` and its comment, and the body of `POST /acts`). The two new `McpTools` entries are in their own block after the ten. The contract index gains four names in its transports export list: `ActsNotFound`, `AnyBearerAct`, `CatalogueAt` and `GenericActOptions`, and `envelopeOf` in its guards list. Its MCP exports are otherwise untouched.
+- **Main's Room files.** `packages/room/src/reads.ts` (the read and `explain`'s meaning) and `packages/room/src/http.ts` (the route). No migration.
+- **The UI lane's files.** Eight, at composition: `src/room/contract.ts`, `src/room/acts.ts`, `src/room/live/describe.ts`, `src/room/live/live-room.ts`, `src/room/mock/memory-room.ts`, `src/screens/Acts.tsx`, `src/ui/format.ts`, and the tests `acts-fields.test.ts`, `acts-screen.test.tsx` and `declared-rendering.test.tsx`. See "Composition".
+
+### The UI lane's four questions
+
+The UI lane finished at `5dc0d044` and asked four things of this lane.
+
+| Question | Answer | What was done |
+|---|---|---|
+| An ended catalogue is not final: a later activation can set `retired`. Is the handle's cache correct? | It was not. The handle kept an ended version for good. | The handle now drops what it kept when it sees a later activation, and `actsAt` takes `{ fresh: true }`. Ten client tests and one MCP test. The UI reads `acts()` on each snapshot, which is one of the signs, so its next `actsAt` is current |
+| The `Lane` read carries no thread kind. | A small additive change. | `Lane.kind` added to the contract and to the Room's `laneView`. One Room test, which also shows the room refusing an act whose `threads` omits the kind. The full Room suite passes with it |
+| A thread opened by an application's act has an empty `goal`. What do readers show? | One rule for every reader: the goal, else the opening act's label and first field, else the lane's ID. | `threadTitle` and `titleOf`. The CLI and the MCP tool `act` print it when an act opens a thread. Neither prints a thread's goal anywhere else. Three Room tests, one CLI test, one MCP test, two client tests |
+| Log entry envelopes are typed as `v: 1`. | A typed accessor is a small additive change. Widening `LogEntry` is not: it reaches `packages/log`. | `envelopeOf(entry)`. One client test. The CLI's log uses it |
+
+At composition the UI was changed to use all four: it calls `threadTitle`, reads `Lane.kind`, reads envelopes with `envelopeOf`, and keeps no earlier catalogue of its own. See "Composition".
+
+### Composition
+
+The head is three lines of work joined.
+
+| Step | Commit | What |
+|---|---|---|
+| Merge the UI lane | `9386487e` | `request/decl-stage5-ui` at `5dc0d044`, `packages/ui` only. No conflict |
+| The UI uses the four additions | `8fc6ae0c` | See below |
+| Merge the repaired stage 2 | `f7839217` | `22ee206d`. One conflict |
+| The defect classes, in stage 5's code | `ec16786b`, `2578faef` | See below |
+| Merge stage 2 again | `498ee159` | `71584cbc`, nine findings of an independent audit. No conflict |
+| The fake room follows it | `1a3d43a6` | The `opened` effect carries the thread's kind and binding in a `v2` room |
+| Merge stage 2 a third time | `cd5e494f` | `15fa7f4c`: the room's retry lookup requires the closed outer shape. No conflict |
+| The fake room follows it | `27421448` | Its retry lookup requires the same shape |
+
+**The conflict.** `plans/README.md`: both branches append a section at the end. Both are kept, stage 2's first. No source file conflicted.
+
+**What changed in the UI.**
+
+- `laneGoal` calls `threadTitle`. Four expectations in the UI's tests changed with it, in `acts-screen.test.tsx` (two) and `declared-rendering.test.tsx` (two): a song thread is named "Start a song: c", not "Start a song: Blue Bossa". New guard `G5U:thread-name`.
+- The Acts form finds the threads an act may act on from `Lane.kind`. The stand-in room gives a lane its kind. Guard `G5U:thread-filter`, re-anchored.
+- Log envelopes are read with `envelopeOf` in `live-room.ts`, `describe.ts` and the stand-in room. No cast of an envelope remains in the live adapter.
+- The live adapter keeps no earlier catalogue. The active catalogue of the last load answers for the entries it governs (`G5U:governs`, re-anchored). Earlier versions are asked of the handle, which drops what it kept when it sees a later activation. `G5U:catalogue-refresh` now guards the statement that takes each load's active catalogue.
+
+**What the repaired stage 2 changed, and what stage 5 needed.** Stage 5's tests passed on each merged head with no change. At `71584cbc` the Room's `reads.ts` and `model.ts`, which both lines edit, merged with no conflict. A declared kind's target is now judged after step 4a, so an act prepared for a removed target shape is `binding-stale`, as section 33.10's acceptance case already says. Two Room tests were added to show the repairs through the client: a prepared declared act replayed after the room returned to a `v1` document gets its original record, and a bearer's named act repeated with its key after the room moved to declared acts gets its original record.
+
+**The same classes of defect, looked for in stage 5's own code.**
+
+| Class | Where it was looked for | Found | Fix and test |
+|---|---|---|---|
+| A presence test that reads through the prototype | `catalogue.ts`, the client, the MCP runners, the CLI, the Room's read, the UI | The CLI's `missing` took a required field named `constructor` or `toString` as given | Own properties only. CLI test "a field named like an inherited property is the body's own or it is missing; a change of such a field is listed as one". Mutant `G5:cli-missing-own` |
+| The same | | The CLI's `meaningChanges` listed a new or removed field of such a name as changed | Own properties only. The same test. Mutants `G5:cli-changes-own`, `G5:cli-changes-own-after` |
+| The same | | The UI read a form value and a field's problem by name through the prototype (`readBody`, the Acts form, the stand-in room) | `own(o, name)`. UI test "its value is the form's own or it is empty: a required one is asked for, an optional one is left out, a given one is sent". Mutant `G5U:own-name` |
+| A retry rebuilt under the document now in force | The client's `replay`, the CLI journal, the MCP tool `act`, the HTTPS bearer client | Those four send the act as first built. One other place did not: a named act repeated with its key on the same handle was built again under the vocabulary then read | The handle keeps a named act it got no answer for, and sends those bytes when the same act is repeated with its key. Client tests "a named act repeated with its key on the same handle …" and "only the same act is the kept one …". Mutants `G5:named-retry-kept`, `G5:named-retry-keep`, `G5:named-retry-same`, `G5:named-retry-answered` |
+| A declared field given a platform meaning | `threadTitle`, the CLI's output, the MCP results, the UI's review screens | The CLI filled a declared field named `expectedGeneration`, `lease` or `head` from the room as if it were the step's | Only a step's own field is read for the user. CLI test "only a step's own field is read from the room …". Mutant `G5:cli-step-field-only` |
+| The same | | The UI showed a review step's field named `text` as the review's text whatever its type | Text only. UI test "a review or a comment under an application's own name is still evidence …", extended. Mutant `G5U:review-text` |
+| The same | | `threadTitle`, the CLI's thread line and the MCP tool `act` take a thread's goal only when it is text. No defect |  |
+| A grant or invitation that gains a kind across a change of vocabulary | `expandGrant`, the grant builders, the fake room | `expandGrant` names every kind and binding it grants and refuses a kind that may not be delegated. No defect | Client test "a kind whose declaration stops being delegable is not covered by a grant made before …" |
+| The same | | The fake room's `v2` mode did not follow the repaired Room in four places | It now answers an exact retry before a step 1 failure, refuses a `v2` session under a `v1` document, gives an invitation admitted under `v2` with no session only the platform kinds, and judges `who.delegable` at each use. Client tests "a prepared declared act replayed after the room returned to the legacy vocabulary …" and "a session signed under a v2 document is refused under a v1 one, and the invitation stays unused". The fake room is a test double and has no mutants |
+
+**Mutation at the composed head.**
+
+- Stage 5: 129 mutants, 128 red by assertion, 1 survivor: `G5:cli-binding-given`. The survivor is the equivalent mutant described under "Mutation table". Eight mutants are new, for the guards in the table above. At this head 38 mutants were run again: the eight new ones, every mutant whose guarded statement changed since the full run, the mutants of the title rule, and every mutant of a Room file, because the Room's code under them changed with the merge. The Room-file mutants were run once more after the second merge and are red. The other results are those of the full run at `477dda2f`.
+- The UI: 51 mutants, all run again at this head, 51 red by assertion, 0 survivors. The UI lane's table below lists its 48. Three are new here: `G5U:thread-name`, `G5U:own-name` and `G5U:review-text`. Four were re-anchored: `G5U:governs`, `G5U:catalogue-refresh`, `G5U:thread-filter` and `G5U:built-for-binding`.
+
+**Gates at the composed head.**
+
+Run one after another at commit `27421448`, from 12:21 to 12:29 local on 2026-10-03, with nothing else running in the worktree. An earlier run was stopped by a process kill on the machine at 12:08 and by two merges of stage 2 after it; no result of an interrupted run is recorded here. The commit that adds this text changes `plans/README.md` only; `git diff --check` and `git status` were run again after it.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm ci` (root) | 0 | installed |
+| `npm run typecheck` (root, every package) | 0 | |
+| `npm test` (root, every package) | 0 | checkers 43; CLI 182; client 121 and 2; log 198 and 193; MCP 87 and 5; policy 313, and 311 with 2 skipped; Room node 270, workerd legacy run 642, workerd declared run 533 with 109 skipped; UI 195 |
+| `git diff --check 15fa7f4c` | 0 | no whitespace errors |
+| `git status --porcelain` | | empty |
+
+No test failed. The declared run skips the files that found their own rooms, as stage 2's own tests do; the stage 5 integration file is one of them.
+
+### Composing with the MCP core
+
+`a9788a59` adds four read tools and a descriptor shape with titles, annotations and toolsets. It is on branch `request/mcp-amendment` and not on main. This stage does not merge it. To compose:
+
+- `acts` and `act` are written in today's descriptor shape. The core's merge adds its fields to them as to the ten. Which toolsets list `act` and `acts` is the core's contract to say, not this stage's.
+- The tests that pinned exactly ten tools now pin the ten named tools and these two by name, so four more reads do not break them. They are listed below.
+- The core makes `idempotencyKey` required on act tools. `act` already requires it.
+- The core's branch calls itself amendment 4 and uses section 30.2, which on main are the log-objects amendment. It needs renumbering before it meets section 33.
+
+### Existing tests changed
+
+Each is a change of a pinned tool list, made as the coordinator asked. No other existing test file changed.
+
+- `packages/mcp/test/schema.test.ts`, "exactly the contract's ten names, each calling the method of the same name": the list equality becomes "each of the ten is listed once, and no name is listed twice". "required fields are the contract's required fields": the same exact table, taken over the ten.
+- `packages/mcp/test/stage0.test.ts`: the list of tools that can refuse gains `act`.
+- `packages/cli/test/cli.test.ts`, "artroom mcp serves the ten tools over stdio from the real bin": the list equality becomes "each of the ten once, and `acts` and `act`".
+- `packages/room/test/workerd/mcp.test.ts`: two `toHaveLength(10)` become "contains the ten and the two".
+- `packages/client/test/support/fake-room.ts`, the test double: policy versions, `activate`, the `acts` read, `v: 2` envelopes with step 4a, grant maps, a bearer act's binding, a lane's `kind`, and a declared kind of the room's own that opens a thread.
+
+### Mutation table
+
+**This evidence does not meet the standard now in force.** The checker's finding `b256f7a0` on stage 2 applies to every lane: each new guard needs a mutant that passes the whole workspace's typecheck and turns a named assertion red, one mutant for each condition, with the tested head, the compiler's result and every failure message kept. The table below was made before that, at `477dda2f` and `b9ecd3af`. It is kept as a record of what was run and is not offered as proof. The same holds for the UI lane's mutation table further down. See "The state of the evidence" under "Since `b7b9d8df`".
+
+121 mutants, each one text edit to one guard, run against five test sets: the client, MCP and CLI node suites, the Room's steps test, and the Room's stage 5, MCP and HTTP workerd tests. 120 fail at least one test by an assertion. 1 survives. No mutant failed only by a timeout, a load failure or a missing report. The runner writes each file's original bytes back in a `finally`, and `git status --porcelain` was empty after the run.
+
+The run was made at commit `477dda2f`. It left seven survivors. Six had no test, and commit `b9ecd3af` adds one for each; those six mutants were run again and are red. Only tests changed between the two commits, so the other results stand.
+
+| Part | File | Mutants | Red | Survive |
+|---|---|---|---|---|
+| The Room's read and explain | `packages/room/src/reads.ts` | 11 | 11 | 0 |
+| The Room's route | `packages/room/src/http.ts` | 3 | 3 | 0 |
+| The MCP runners | `packages/mcp/src/run.ts` | 13 | 13 | 0 |
+| The MCP descriptors | `packages/mcp/src/tools.ts` | 2 | 2 | 0 |
+| The client handle | `packages/client/src/room.ts` | 25 | 25 | 0 |
+| The client's envelope | `packages/client/src/envelope.ts` | 2 | 2 | 0 |
+| The client's bearer paths | `packages/client/src/bearer.ts` | 3 | 3 | 0 |
+| The client's grant builders | `packages/client/src/grants.ts` | 2 | 2 | 0 |
+| The catalogue helpers | `packages/policy/src/catalogue.ts` | 24 | 24 | 0 |
+| The steps' field table | `packages/policy/src/steps.ts` | 3 | 3 | 0 |
+| The CLI commands | `packages/cli/src/main.ts` | 20 | 19 | 1 |
+| The CLI's fields and text | `packages/cli/src/declared.ts` | 9 | 9 | 0 |
+| The CLI's output | `packages/cli/src/format.ts` | 2 | 2 | 0 |
+| The Room's lane view | `packages/room/src/model.ts` | 1 | 1 | 0 |
+| The envelope accessor | `packages/contract/src/guards.ts` | 1 | 1 | 0 |
+| **Total** | | **121** | **120** | **1** |
+
+**The survivor.** `G5:cli-binding-given`: `artroom act` sends the active binding in place of the one the user gave. It is an equivalent mutant. The statement before it (`G5:cli-stale`) returns a refusal unless the two are equal, so no input reaches the send with different values. The mutant of that earlier guard is red.
+
+**A mutant that was replaced.** `G5:cli-field-unknown` first kept an unknown `--set` field as text. That is also equivalent: the check of the whole body two lines later refuses the same field with the same words. The mutant now drops the unknown field without a word, and is red.
+
+<details><summary>Every mutant</summary>
+
+| Mutant | What it does | Tests that fail |
+|---|---|---|
+| `G5:read-one-selector` | The read accepts at and policy together | 1 |
+| `G5:read-policy-format` | A malformed policy version is looked up, not refused | 1 |
+| `G5:read-at-format` | A negative or fractional seq is looked up, not refused | 1 |
+| `G5:read-at` | At always answers with the latest version | 7 |
+| `G5:read-at-order` | At answers with the first version at or before the seq, not the last | 5 |
+| `G5:read-until` | Every version says it is still active | 5 |
+| `G5:read-legacy` | A v1 version answers as a declared catalogue with no acts | 8 |
+| `G5:read-retired` | No kind is ever marked retired | 5 |
+| `G5:read-retired-first` | Retired is the last version that dropped the kind, not the first | 1 |
+| `G5:read-binding` | The catalogue's binding is the digest of the declaration, not of the binding subject | 18 |
+| `G5:explain-at-seq` | Explain reads a record's meaning under the active version | 4 |
+| `G5:route-acts-missing` | A version the room does not retain is 200 with null | 1 |
+| `G5:route-at` | The route ignores ?at | 2 |
+| `G5:route-policy` | The route ignores ?policy | 1 |
+| `G5:acts-not-found` | Acts answers a missing version with another shape | 2 |
+| `G5:acts-both` | The acts tool accepts at and policy together | 2 |
+| `G5:acts-at` | The acts tool ignores at | 3 |
+| `G5:act-binding` | The act tool replaces the agent's binding with the active one | 6 |
+| `G5:act-key` | The act tool drops the agent's idempotency key | 3 |
+| `G5:headline-stale` | A stale refusal's text does not name the active binding | 2 |
+| `G5:headline-meaning` | Explain's text shows the kind, never the label of its seq | 2 |
+| `G5:headline-retired` | Explain's text does not say a kind was retired | 2 |
+| `G5:error-plain` | A tool error's structured content is the thrown object itself | 2 |
+| `G5:tool-binding-required` | The act tool's schema does not require a binding | 3 |
+| `G5:tool-key-required` | The act tool's schema does not require an idempotency key | 3 |
+| `G5:named-platform-v1` | Renew and roster get a binding in a v2 room | 1 |
+| `G5:named-legacy-v1` | The named methods sign v: 2 in a v1 room | 101 |
+| `G5:named-forget` | The handle keeps a catalogue the room said was stale | 3 |
+| `G5:named-forget-vocabulary` | The handle keeps a vocabulary the room no longer uses | 1 |
+| `G5:named-v2` | The named methods sign v: 1 in a v2 room | 20 |
+| `G5:named-once` | The named methods read the catalogue for every act | 5 |
+| `G5:generic-platform` | The generic act sends a platform kind | 5 |
+| `G5:generic-binding` | The generic act signs the active binding in place of the caller's | 10 |
+| `G5:replay-binding` | A bearer's prepared act is sent without its binding | 14 |
+| `G5:catalogue-cache` | ActsAt answers every question with the first version it kept | 5 |
+| `G5:catalogue-keep-ended` | ActsAt keeps the active version too | 1 |
+| `G5:binding-required` | A missing or malformed binding is signed | 3 |
+| `G5:declared-v2` | The declared envelope says v: 1 | 49 |
+| `G5:mcp-bearer-generic` | The HTTPS bearer client's generic act goes to a named tool | 4 |
+| `G5:mcp-bearer-unnamed` | A kind with no named tool and no binding is sent to the act tool | 1 |
+| `G5:rpc-bearer-binding` | Over RPC a bearer's generic act drops its binding | 14 |
+| `G5:grant-problems` | A grant with a problem is built as an empty grant | 2 |
+| `G5:grant-legacy-shape` | In a v1 room the grant is built in the v2 shape | 2 |
+| `G5:meaning-legacy` | A legacy record does not say where the v1 era ended | 3 |
+| `G5:meaning-legacy-kinds` | Any kind is a legacy kind under a v1 version | 1 |
+| `G5:meaning-platform` | A platform kind is read as unknown | 2 |
+| `G5:meaning-own` | An inherited property name is read as a declared kind | 1 |
+| `G5:meaning-label` | A declared record shows its kind's name, not its label | 6 |
+| `G5:meaning-retired` | A declared record does not say its kind was retired | 5 |
+| `G5:governs` | A version governs the seq of the next activation | 3 |
+| `G5:governs-since` | A version governs entries before it began | 3 |
+| `G5:fields-fixed-scope` | An open with a scope template still asks for a scope | 1 |
+| `G5:fields-step` | Every step field is required | 17 |
+| `G5:fields-required` | RequiredFor is ignored | 1 |
+| `G5:fields-once` | A field two steps share is listed twice | 1 |
+| `G5:built-for` | A named method carries the room's own declaration's binding | 2 |
+| `G5:built-for-lanes` | The built-for binding ignores the room's lanes | 1 |
+| `G5:grant-star` | * asks for every declared kind, grantable or not | 3 |
+| `G5:grant-binding` | The grant map names a fixed binding | 4 |
+| `G5:grant-refuse` | A kind the role may not grant is dropped without a word | 2 |
+| `G5:grant-platform` | Renew is never granted | 3 |
+| `G5:steps-lease-optional` | The table says take requires a lease | 2 |
+| `G5:steps-note-max` | The table says release requires a note | 1 |
+| `G5:steps-review-scope` | The table says a review's scope is optional | 1 |
+| `G5:cli-binding-required` | Artroom act runs without --binding | 1 |
+| `G5:cli-binding-format` | A malformed --binding is used | 1 |
+| `G5:cli-legacy` | Artroom act runs in a v1 room | 1 |
+| `G5:cli-undeclared` | An undeclared kind is a usage error, not a refusal | 1 |
+| `G5:cli-stale` | A binding that is not the active one is signed and sent | 1 |
+| `G5:cli-target` | A target the declaration does not accept is sent | 1 |
+| `G5:cli-lease` | The lease read for the user is wrong | 1 |
+| `G5:cli-generation` | The generation read for the user is wrong | 1 |
+| `G5:cli-head` | A version's head is not read for the user | 1 |
+| `G5:cli-not-holder` | Someone who does not hold the lane gets a usage error, not the refusal | 1 |
+| `G5:cli-missing` | An act with a required field missing is sent | 1 |
+| `G5:cli-binding-given` | Artroom act sends the active binding, not the one given | none: equivalent, see above |
+| `G5:cli-acts-one` | Artroom acts accepts --at and --policy together | 1 |
+| `G5:cli-log-version` | The log reads every entry under the first version it fetched | 1 |
+| `G5:cli-log-meaning` | The log shows no labels | 1 |
+| `G5:cli-stale-old` | What changed is listed against the previous version, whatever the user read | 1 |
+| `G5:cli-stale-help` | After binding-stale the active meaning is not printed | 2 |
+| `G5:cli-int` | A whole number out of its range is sent | 1 |
+| `G5:cli-bool` | Anything but true is false | 1 |
+| `G5:cli-enum` | An enum value outside its list is sent | 1 |
+| `G5:cli-field-unknown` | --set with an unknown field is dropped without a word | 1 |
+| `G5:cli-body-unknown` | --body with an unknown field is sent | 1 |
+| `G5:cli-kind-label` | A legacy record prints a label too | 3 |
+| `G5:cli-kind-retired` | The log does not say a kind was retired | 2 |
+| `G5:cli-refusal-current` | A stale refusal does not print the active binding | 2 |
+| `G5:cli-explain-meaning` | Explain does not print the meaning's policy version and binding | 1 |
+| `G5:cli-changes-body` | A changed field is not listed | 1 |
+| `G5:cli-changes-hold` | A changed hold is not listed | 1 |
+| `G5:cache-drop` | A later activation drops nothing the handle kept | 8 |
+| `G5:cache-later` | An activation the handle already knew drops what it kept | 2 |
+| `G5:cache-refusal` | A refusal that names the active version is not a sign of an activation | 2 |
+| `G5:cache-update` | An update with an activation is not a sign | 3 |
+| `G5:cache-log` | A log page with an activation is not a sign | 1 |
+| `G5:cache-active` | A read of the active catalogue is not a sign | 1 |
+| `G5:cache-read` | A read of another version is not a sign | 3 |
+| `G5:cache-fresh` | Fresh answers from what the handle kept | 2 |
+| `G5:cache-replace` | A fresh answer does not replace the kept one | 1 |
+| `G5:cache-saw-named` | A named act's refusal is not looked at for an activation | 1 |
+| `G5:cache-saw-generic` | A generic act's refusal is not looked at for an activation | 1 |
+| `G5:cache-saw-poll` | A long-poll update is not looked at | 1 |
+| `G5:cache-saw-watch` | A watched update is not looked at | 1 |
+| `G5:cache-saw-stream` | An update on the RPC stream is not looked at | 1 |
+| `G5:title-order` | The first field is the first one typed, not the first by name | 3 |
+| `G5:title-first` | Scope may name a record | 5 |
+| `G5:title-first-because` | Because may name a record | 1 |
+| `G5:title-bool` | A yes or no value is shown as true or false | 1 |
+| `G5:title-goal` | A thread with a goal is named by its opening act | 5 |
+| `G5:title-opening` | A thread with no goal is named by its ID | 5 |
+| `G5:lane-kind` | Every thread reads as a claim thread | 1 |
+| `G5:envelope-of` | A recorded refusal has no envelope | 1 |
+| `G5:cli-thread` | Artroom act does not name the thread it opened | 1 |
+| `G5:cli-thread-goal` | Artroom act names a thread that has a goal by the act | 1 |
+| `G5:cli-thread-opened` | Artroom act prints a thread line for an act that opened nothing | 1 |
+| `G5:mcp-thread` | The act tool names a thread with no goal by its ID | 2 |
+| `G5:mcp-thread-opened` | The act tool says an act opened a thread when it did not | 1 |
+| `G5:mcp-thread-goal` | The act tool names a thread that has a goal by the act | 2 |
+| `G5:acts-fresh` | The acts tool answers an earlier version from what the handle kept | 1 |
+
+</details>
+
+### Gates of the lane's own head
+
+These gates are of old heads. No whole-head gate has been run at the present head; see "Gates since `b7b9d8df`".
+
+These are the gates before composition. The gates of the composed head are under "Composition".
+
+Run one after another at commit `b9ecd3af`, in the worktree, with nothing else running there. The commit that adds this section changes `plans/README.md` only; `git diff --check` and `git status` were run again after it.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm run typecheck` (root, every package) | 0 | |
+| `npm test` (root, every package) | 0 | checkers 43; CLI 180; client 116 and 2; log 198 and 193; MCP 87 and 5; policy 313, and 311 with 2 skipped; Room 269, 615, and 533 with 82 skipped; UI 141 |
+| client `npm run typecheck` | 0 | |
+| client `npm test` | 0 | 116 in node, 2 in workerd |
+| MCP `npm run typecheck` | 0 | |
+| MCP `npm test` | 0 | 87 in node, 5 in workerd |
+| CLI `npm run typecheck` | 0 | |
+| CLI `npm test` | 0 | 180 |
+| Room `npm run typecheck` | 0 | |
+| Room `npm test` | 0 | node 269; workerd, legacy run 615; workerd, declared run 533 passed and 82 skipped |
+| `git diff --check 2cd97b88` | 0 | no whitespace errors |
+| `git status --porcelain` | | empty |
+
+No test failed and none was skipped that the stage 2 candidate does not skip. The declared run skips the files that found their own rooms, as stage 2's own tests do; the stage 5 integration file is one of them.
+
+The UI count there is the stage 2 candidate's UI, before the UI lane was merged.
+
+### Not changed here
+
+`packages/log`, `packages/git`, `packages/checkers` and `packages/ui`; the Room's admission, schema, authority, store and migrations; the design note; the Worker entry and wrangler configuration; the deployed spike. `LICENSE`, `NOTICE` and `AGENTS.md` are untouched.
+
+### The UI (companion lane, branch `request/decl-stage5-ui`)
+
+> **Changed at composition.** This subsection is the UI lane's report as written at `5dc0d044`. Four things in it are no longer true of the composed head. Choice 4: the adapter keeps no earlier catalogue; the handle does, and drops them on a later activation. Choice 8: the thread's name comes from `threadTitle`. Choice 9: the thread list reads `Lane.kind`. The four items under "Asked of the companion lane" are answered in "The UI lane's four questions" and done. The suite has 195 tests and 51 mutants at the composed head. The gates of the composed head are under "Composition".
+
+
+Status: implemented on the stage 5 API commit `2eeb7e72`, as two commits, head `5dc0d04400336c31523054f765d16382960c3c91`. It changes only `packages/ui`. It is provisional in the same way as the rest of stage 5: it sits on the stage 2 candidate and is recomposed on main after stage 2 lands. Nothing was pushed or deployed.
+
+#### What was built
+
+- **Reads in the adapter.** `RoomSnapshot.catalogue` is the active policy version's declarations and bindings, or null when the transport cannot read them. `RoomAdapter` gains `readCatalogue()`, `catalogueAt(seq)` and `act(kind, target, body, binding)`. The UI still takes an `HttpRoom` from its caller and still has one contract import site (`src/room/contract.ts`). The live adapter calls the handle's `acts`, `actsAt` and `act`. A live room's Policy screen now shows the active version and the entry it took effect at.
+- **Records under D(s)** (`src/room/live/describe.ts`, `live-room.ts`, `src/room/acts.ts`). Each act and each recorded refusal is read under the catalogue that governs its own seq, one read per policy version in the loaded window. A feed entry carries its `meaning`: the label in force at its seq, the policy version, the binding, the target in words, each body field by name, and the seq where the kind was retired.
+- **The feed and the why panel** (`screens/Room.tsx`, `ui/bits.tsx`, `ui/WhyDialog.tsx`). A declared record shows who, its label, its target and its fields. A retired kind shows "Retired at seq N". A record of a kind the policy did not declare shows its kind and fields and says so. The why panel has a section "What it meant at entry N". It uses the meaning the Room computed (`Explanation.meaning`) when there is one.
+- **The Acts screen** (`screens/Acts.tsx`, route `#/acts`, key `4`). It lists the active declarations with label, help, who may sign and what each acts on. For a chosen act it builds a form from `fieldsOf(declaration, shape)`: one input per field by type, required and optional marked, the limits stated. It checks the limits before sending and sends once, with the binding of the declarations the person chose the act from.
+- **The second demo room** (`?app=setlist`). It is the live adapter over an in-memory room (`mock/memory-room.ts`) whose policy declares five acts for a band's setlist (`mock/setlist.ts`): start a song, add a part, cue, sign off, wrap up. A second policy version renames one, reshapes another and drops a third. None is a code-review verb. The declarations validate under `validatePolicyV2` and use every declared field type.
+
+#### Choices
+
+1. **A code-review sentence is chosen by binding, not by name.** A record whose binding equals `builtForBinding(catalogue, kind)` keeps the sentence it always had ("@ash claimed ..."). Any other declared record is shown generically, as "who: label." with its fields. A room that declares its own `claim` gets the generic rendering.
+2. **Legacy records are unchanged.** A record under a `v1` document, and `renew` and `roster` in every room, keep their sentences and get no field list in the feed. Their meaning, with the seq where the `v1` policy was replaced, is in the why panel.
+3. **When declarations cannot be read, nothing is guessed.** Only a `v: 1` envelope of one of the nine legacy kinds is read as a legacy record. Anything else says its meaning could not be read. The snapshot still loads, with `catalogue: null`.
+4. **Earlier catalogues are read again after an activation.** A new policy version can retire a kind of an ended version, so an ended version's catalogue is not final. The adapter keeps catalogues only while the active policy version is unchanged.
+5. **Evidence by step.** Reviews, checks and notes for the Proposal screen are rebuilt by the step a record ran under its own declaration (`review`, `check`, `comment`), so an application's own name for a review still counts. A comment with no `text` field is not a note.
+6. **A stale act is never resent by the UI.** On `binding-stale` the form reads the declarations again, lists what changed (fields, steps, targets, threads, hold), and waits. "Send it with the new meaning" validates the form against the new declaration first. If a new required field is empty, nothing is sent.
+7. **An open form keeps the declarations it was opened with.** A snapshot refresh behind it changes nothing in it. Only the person's confirmation replaces them.
+8. **A thread opened by an application's act has no goal.** The Room screen names it by that act's label and first field, read under the act's own entry.
+9. **The thread list in a form** offers threads whose opening act's kind is in the declaration's `threads`. The kind comes from the loaded feed, because `Lane` carries no kind. A thread whose opening entry is outside the loaded window is offered too.
+10. **A change that arrives during a load is not lost.** The live adapter loads once more after it. Before, an update in that window was dropped until the next one.
+
+#### Tests
+
+53 new tests in three files; the 141 existing tests are unchanged and pass.
+
+| Case | Test file | Tests |
+|---|---|---|
+| Activation: label, target and typed fields | `declared-rendering.test.tsx` | "an act of an application's own kind is a sentence with the label, and its typed fields by name"; "the feed shows the record's label, target and fields, and the thread is named by the act that opened it" |
+| Retirement | `declared-rendering.test.tsx` | "retirement: a record of a kind a later policy dropped says where it was retired, and still shows its label and fields" |
+| Name reuse with a changed shape | `declared-rendering.test.tsx` | "name reuse with a changed shape: the old record keeps the old meaning and its retirement; the new record has the new one" |
+| Label-only change | `declared-rendering.test.tsx` | "label-only change: the old record shows the old label, a new one the new label, under one binding" |
+| Legacy record | `declared-rendering.test.tsx` | "a legacy record keeps the sentence it always had, after the room moves to declared acts"; "a platform act reads the same in every room" |
+| Unknown kind | `declared-rendering.test.tsx` | "a kind the policy in force did not declare: its kind, its fields, and a plain statement"; "when the room cannot give its declarations, only a v: 1 record of a legacy kind is read as one"; "a kind it has no sentence for falls back to the plain statement" |
+| Sentence by binding | `declared-rendering.test.tsx` | "a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not" |
+| Evidence by step | `declared-rendering.test.tsx` | "a review or a comment under an application's own name is still evidence for the review screens, by its step" |
+| The why panel | `declared-rendering.test.tsx` | "it shows what the kind meant at that entry, its fields, and that a later policy dropped it"; "the meaning the room computed is the one shown" |
+| Each field type and its limits | `acts-fields.test.ts` | ten tests under "reading one field": required and optional, text (bytes), int (range), a step's int, bool, enum, globs, member, act and segment, a step's commit, an unknown type |
+| Body, targets, record view, what changed | `acts-fields.test.ts` | nine tests, among them "a body is built only when every field reads", "targets by shape", "a new required field, a changed limit and a removed field are each named" |
+| The list of acts | `acts-screen.test.tsx` | "every declaration is listed with its label, help, who may sign and what it acts on, in the room's words"; "a room on the built-in review acts says so, and offers no form"; "an address that names an act the room does not declare says so" |
+| The form, by field type | `acts-screen.test.tsx` | four tests under "the form is built from the declaration: one input per field, by type" |
+| Limits before sending | `acts-screen.test.tsx` | "the declared limits are checked first: a wrong field is named and nothing is sent"; "a target that is missing is named and nothing is sent" |
+| A submit with the binding | `acts-screen.test.tsx` | "a good act is sent once, with exactly the binding of the declarations the person was looking at, and is then in the feed" |
+| Refusal wording as given | `acts-screen.test.tsx` | "a refusal shows the room's rule with the reason and fix as the declaration worded them"; "an act the viewer's role may not sign is refused by the room, and the refusal is shown" |
+| Binding-stale | `acts-screen.test.tsx` | "nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend"; "confirming sends once more, with the new binding, when the form still fits the new meaning"; "the person can decline: nothing more is sent and the list returns" |
+| Kind-undeclared | `acts-screen.test.tsx` | "the kind is gone (kind-undeclared): the form says so, reads the acts again and sends nothing more" |
+| A non-code-review application, end to end | `declared-rendering.test.tsx`, `acts-screen.test.tsx`, `e2e/smoke.spec.ts` | "its feed, threads and acts are in its own words, and none of the review verbs appears"; "a person prepares and sends an act of an application that is not code review, and sees it recorded"; the browser test "a room that declares its own acts" |
+| The application itself | `acts-fields.test.ts` | "both policy versions validate with no problem"; "it shares no kind with the code-review seven, and uses every declared field type" |
+
+No existing assertion was changed. The browser test run rewrote the committed screenshots, because the top bar has a new item, and added three (`declared-room-light`, `declared-acts-light`, `declared-form-light`).
+
+#### Mutation table
+
+Each mutant was applied alone by `scratchpad/mut5ui/run.py` at the final source. It edits one guard, runs the whole UI suite (`npx vitest run`) with the JSON reporter, records the failing tests, and writes the file's original bytes back in a `finally`. It never runs `git checkout`. A failure counts only if it is an assertion failure; a timeout or a file that fails to load is flagged apart. Each guard is one statement marked `// G5U:<id>`, and a check before the run confirmed 48 markers and 48 mutants, each applying exactly once.
+
+**48 mutants, all red by assertion.** None survived. No red was a timeout or a load failure.
+
+| # | Guard | File | Mutation | Red by assertion | A test it turned red |
+|---|---|---|---|---|---|
+| 1 | `G5U:required` | `room/acts.ts` | An empty required field is accepted | 4 | `acts-fields.test.ts`: reading one field: each type, with its declared limits a required field left empty is a problem; an optional one is left out of the body; and 3 more |
+| 2 | `G5U:optional-absent` | `room/acts.ts` | An empty optional field is sent as an empty string | 3 | `acts-fields.test.ts`: reading one field: each type, with its declared limits a required field left empty is a problem; an optional one is left out of the body; and 2 more |
+| 3 | `G5U:text-max` | `room/acts.ts` | The text limit counts characters, not bytes | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits text: the limit is in bytes, and the text is sent as typed |
+| 4 | `G5U:int-whole` | `room/acts.ts` | A value that is not a whole number is accepted | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits int: whole numbers only, inside the declared range |
+| 5 | `G5U:int-min` | `room/acts.ts` | An int below the minimum is accepted | 2 | `acts-fields.test.ts`: reading one field: each type, with its declared limits int: whole numbers only, inside the declared range; and 1 more |
+| 6 | `G5U:int-max` | `room/acts.ts` | An int above the maximum is accepted | 3 | `acts-fields.test.ts`: reading one field: each type, with its declared limits int: whole numbers only, inside the declared range; and 2 more |
+| 7 | `G5U:bool` | `room/acts.ts` | A bool accepts any text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits bool: yes or no, nothing else |
+| 8 | `G5U:enum` | `room/acts.ts` | An enum accepts any text | 2 | `acts-fields.test.ts`: reading one field: each type, with its declared limits enum: one of the declared values; and 1 more |
+| 9 | `G5U:globs-max` | `room/acts.ts` | The count of path patterns is not limited | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits globs: one per line, blank lines dropped, no more than the declared count |
+| 10 | `G5U:member` | `room/acts.ts` | A member field accepts any text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits member, act and segment are fixed formats |
+| 11 | `G5U:act` | `room/acts.ts` | An entry field accepts any text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits member, act and segment are fixed formats |
+| 12 | `G5U:segment` | `room/acts.ts` | A segment accepts slashes and pattern characters | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits member, act and segment are fixed formats |
+| 13 | `G5U:sha` | `room/acts.ts` | A commit field accepts any text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits a step's commit is 40 hex digits |
+| 14 | `G5U:unknown-type` | `room/acts.ts` | A field of an unknown type is sent as text | 1 | `acts-fields.test.ts`: reading one field: each type, with its declared limits a field type this page does not know is refused, never guessed |
+| 15 | `G5U:body-problems` | `room/acts.ts` | A body is built although a field has a problem | 3 | `acts-fields.test.ts`: reading a whole body and a target a body is built only when every field reads; each problem is named by its field; and 2 more |
+| 16 | `G5U:target-lane` | `room/acts.ts` | A missing thread is accepted | 2 | `acts-fields.test.ts`: reading a whole body and a target targets by shape; and 1 more |
+| 17 | `G5U:target-generation` | `room/acts.ts` | A version that is not a positive whole number is accepted | 1 | `acts-fields.test.ts`: reading a whole body and a target targets by shape |
+| 18 | `G5U:target-entry` | `room/acts.ts` | An entry target that is not an entry ID is accepted | 1 | `acts-fields.test.ts`: reading a whole body and a target targets by shape |
+| 19 | `G5U:record-fields` | `room/acts.ts` | A record's field values are dropped | 11 | `acts-fields.test.ts`: a record under the meaning in force at its own seq (R-DECL-23) the label, the retirement, the target in words and every field by name; because is left to the reasons; and 10 more |
+| 20 | `G5U:record-label` | `room/acts.ts` | A record shows its kind where its label belongs | 13 | `acts-fields.test.ts`: a record under the meaning in force at its own seq (R-DECL-23) the label, the retirement, the target in words and every field by name; because is left to the reasons; and 12 more |
+| 21 | `G5U:record-retired` | `room/acts.ts` | A record never says its kind was retired | 6 | `acts-fields.test.ts`: a record under the meaning in force at its own seq (R-DECL-23) the label, the retirement, the target in words and every field by name; because is left to the reasons; and 5 more |
+| 22 | `G5U:changes-steps` | `room/acts.ts` | Changed steps are not reported | 1 | `acts-fields.test.ts`: what changed between two meanings of one kind changed steps, a new and a lost target, the threads and the hold |
+| 23 | `G5U:changes-added` | `room/acts.ts` | A new field is not reported | 2 | `acts-fields.test.ts`: what changed between two meanings of one kind a new required field, a changed limit and a removed field are each named; and 1 more |
+| 24 | `G5U:changes-field` | `room/acts.ts` | A changed field is not reported | 2 | `acts-fields.test.ts`: what changed between two meanings of one kind a new required field, a changed limit and a removed field are each named; and 1 more |
+| 25 | `G5U:changes-removed` | `room/acts.ts` | A removed field is not reported | 1 | `acts-fields.test.ts`: what changed between two meanings of one kind a new required field, a changed limit and a removed field are each named |
+| 26 | `G5U:sentence-default` | `room/live/describe.ts` | The sentence table invents a sentence for a kind it was not written for | 1 | `declared-rendering.test.tsx`: the sentence table is only for the kinds it was written for a kind it has no sentence for falls back to the plain statement, whatever vocabulary it is read under |
+| 27 | `G5U:unread-legacy-only` | `room/live/describe.ts` | With no readable declarations, a v: 2 record is read as a legacy one by its name | 1 | `declared-rendering.test.tsx`: a record whose kind had no meaning is shown plainly, never dropped when the room cannot give its declarations, only a v: 1 record of a legacy kind is read as one |
+| 28 | `G5U:built-for-sentence` | `room/live/describe.ts` | A record under the code-review declaration loses its sentence | 1 | `declared-rendering.test.tsx`: the code-review sentences belong to the code-review declarations, by binding and not by name a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not |
+| 29 | `G5U:declared-sentence` | `room/live/describe.ts` | A declared record is given a review sentence by its name | 11 | `acts-screen.test.tsx`: sending an act a good act is sent once, with exactly the binding of the declarations the person was looking at, and is then in the feed; and 10 more |
+| 30 | `G5U:unknown-shown` | `room/live/describe.ts` | An undeclared kind is not said to be undeclared | 1 | `declared-rendering.test.tsx`: a record whose kind had no meaning is shown plainly, never dropped a kind the policy in force did not declare: its kind, its fields, and a plain statement |
+| 31 | `G5U:refusal-label` | `room/live/describe.ts` | A refused declared act is named by its kind, not its label | 1 | `declared-rendering.test.tsx`: the code-review sentences belong to the code-review declarations, by binding and not by name a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not |
+| 32 | `G5U:meaning-attached` | `room/live/describe.ts` | Feed entries carry no meaning | 9 | `acts-screen.test.tsx`: the form is built from the declaration: one input per field, by type segment, globs, a thread to act on, and the version step's own fields; and 8 more |
+| 33 | `G5U:refresh-again` | `room/live/live-room.ts` | A change that arrives during a load is lost | 2 | `acts-screen.test.tsx`: the form is built from the declaration: one input per field, by type the thread list offers only threads the act may act on; and 1 more |
+| 34 | `G5U:catalogue-unavailable` | `room/live/live-room.ts` | A room that cannot give its declarations fails the whole load | 3 | `declared-rendering.test.tsx`: a record whose kind had no meaning is shown plainly, never dropped when the room cannot give its declarations, only a v: 1 record of a legacy kind is read as one; and 2 more |
+| 35 | `G5U:governs` | `room/live/live-room.ts` | Every record is read under the first catalogue that was read | 3 | `declared-rendering.test.tsx`: old records keep the meaning they had label-only change: the old record shows the old label, a new one the new label, under one binding; and 2 more |
+| 36 | `G5U:meaning-at-seq` | `room/live/live-room.ts` | Records are read under the active declarations | 5 | `declared-rendering.test.tsx`: old records keep the meaning they had label-only change: the old record shows the old label, a new one the new label, under one binding; and 4 more |
+| 37 | `G5U:built-for-binding` | `room/live/live-room.ts` | The code-review sentence is chosen by the kind's name, not its binding | 1 | `declared-rendering.test.tsx`: the code-review sentences belong to the code-review declarations, by binding and not by name a v2 room with the code-review declarations keeps the review sentences; a room that means something else by claim does not |
+| 38 | `G5U:catalogue-refresh` | `room/live/live-room.ts` | Earlier catalogues are never read again after an activation | 2 | `declared-rendering.test.tsx`: old records keep the meaning they had retirement: a record of a kind a later policy dropped says where it was retired, and still shows its label and fields; and 1 more |
+| 39 | `G5U:explain-meaning` | `room/live/live-room.ts` | The meaning the room computed is ignored | 1 | `declared-rendering.test.tsx`: the why panel reads a record under its own entry's policy the meaning the room computed is the one shown |
+| 40 | `G5U:act-binding` | `room/live/live-room.ts` | The adapter rebinds the act to the active meaning by itself | 3 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend; and 2 more |
+| 41 | `G5U:evidence-by-step` | `room/live/live-room.ts` | A declared review is not evidence | 1 | `declared-rendering.test.tsx`: activation: a declared record shows its label, its target and its fields a review or a comment under an application's own name is still evidence for the review screens, by its step |
+| 42 | `G5U:thread-filter` | `screens/Acts.tsx` | Every thread is offered, whatever its kind | 1 | `acts-screen.test.tsx`: the form is built from the declaration: one input per field, by type the thread list offers only threads the act may act on |
+| 43 | `G5U:no-send-on-problems` | `screens/Acts.tsx` | The act is sent although a field or the target is wrong | 3 | `acts-screen.test.tsx`: sending an act the declared limits are checked first: a wrong field is named and nothing is sent; and 2 more |
+| 44 | `G5U:send-binding` | `screens/Acts.tsx` | A confirmed resend carries the binding the form first held | 1 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) confirming sends once more, with the new binding, when the form still fits the new meaning |
+| 45 | `G5U:gone` | `screens/Acts.tsx` | A kind that is gone is shown as an ordinary refusal | 1 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) the kind is gone (kind-undeclared): the form says so, reads the acts again and sends nothing more |
+| 46 | `G5U:stale-no-resend` | `screens/Acts.tsx` | A stale act is sent again at once, with nobody asked | 3 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend; and 2 more |
+| 47 | `G5U:confirm-resend` | `screens/Acts.tsx` | Confirming the new meaning sends nothing | 2 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend; and 1 more |
+| 48 | `G5U:form-holds-catalogue` | `screens/Acts.tsx` | An open form follows every refresh of the declarations | 1 | `acts-screen.test.tsx`: a meaning that changed behind the form (binding-stale) nothing is resubmitted until the person confirms; the form says what changed; a new required field stops the resend |
+
+#### Gates
+
+Run at head `5dc0d04400336c31523054f765d16382960c3c91`, under bash, with exit codes checked.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm ci` (root) | 0 | installed |
+| `npm run typecheck` in `packages/ui` | 0 | generates the policy declarations, then checks the UI |
+| `npm test` in `packages/ui` | 0 | 14 files, 194 passed (141 before, 53 new) |
+| `npm run typecheck` (root) | 0 | every workspace |
+| `npm run e2e` in `packages/ui` (not a requested gate) | 0 | 9 passed, 1 new |
+| `git diff --check` | 0 | clean |
+
+The root `npm test` was not run by this lane; the companion lane runs it on the composed branch.
+
+#### Not done
+
+- The form has no input for `because`.
+- The form does not send `recover` or the platform kinds.
+- A lost answer is not retried from the form. The adapter passes no idempotency key and leaves retries to the handle.
+- The page is still not wired to a live room: `main.tsx` runs the two demo rooms, and `LiveRoom` takes a handle from its caller (README gap 9).
+- The Room, Proposal and Needs-you screens keep the review application's words ("lane", "claim", "generation").
+- The in-memory room is a stand-in. It has no signatures, expiring leases, policy rules, landing or idempotency. The UI has not been run against the real Room with a `v2` document.
+- Stage 4's steps and hold settings are described by `fieldsOf` already, but no test here exercises them.
+
+#### Asked of the companion lane
+
+The API gave everything the UI needed to build. Four things would remove a workaround or a risk:
+
+1. **An ended catalogue is not final.** `retired` on a kind of an ended version changes when a later activation drops that kind. The API summary says the client handle keeps ended versions. If it keeps them for good, a reader sees a stale answer after a later activation. The UI drops its own catalogues when the active policy version changes; the handle should do the same, or say that `actsAt` may be stale.
+2. **A thread's kind is not in the `lanes` read.** `Lane` has no `kind`, so the form finds the threads an act may act on from the opening entry in the loaded feed. A `kind` on `Lane` (R-DECL-6) would make that exact.
+3. **A thread opened by an application's act has an empty `goal`.** The UI names it from the opening act. Nothing is needed if that is the intended reading.
+4. **The review screens read declared records through casts.** A record of a declared act with step `review`, `check` or `comment` has the fields of a `Review`, `Check` or `Note`, but the log entry's envelope is typed as the `v: 1` `Envelope`. The UI reads it as `AnyEnvelope` and casts.
+
+Nothing here needs the planner or hugh to decide.
+
+### Since `b7b9d8df`
+
+The sections that follow are in the order the findings were made. Each names the act that records the finding, the commit that repairs it, its tests and its mutants. Each mutant named in these sections was run with the newer runners (`mut5/run2.py` and the UI harness's runner): it passes the root typecheck, is red by a named assertion, and its file was restored.
+
+| Finding | Recorded as | Repaired at |
+|---|---|---|
+| The UI read inherited functions for fields named `toString` or `valueOf`; a lost answer was shown as a refusal; an explicit refresh left historical meaning stale | checker `fb27de86` | `f606dd89` |
+| The client kept the caller's own target and body objects; an older historical read repopulated the cache | checker `43e8fe3b` | `3e6241df` |
+| A delayed catalogue read overwrote a newer activation; browser case 9 | checker `fcd7391d` | `4567a490`, `5590c318` |
+| Which field names a thread | planner `c37653e1` | `3a03d405` |
+| A failed read undid a confirmed activation | planner `0fd98c41` | `624dbb9f` |
+| The CLI printed the label read at preparation | checker `0b9119de`, planner `b22d29ee` | `ff266354` |
+| An act finished from the journal printed the raw kind and no thread | planner `23ae8924`, corrected by `c6f6ad78` | `ff266354` |
+| The same catalogue object let an earlier error clear availability | checker `8df737b8`, planner `80bef90a` | `c74f3696` |
+| A saved act was printed under the kind the finishing run typed | both reviewers, in the workroom | `bdc35c53` |
+
+### The checker's preliminary UI findings (act `fb27de86`)
+
+The checker read the UI at `5dc0d044` and recorded three defects, each with baselines that pass and assertions that fail. This branch had already repaired the first and the third when it was composed; it had no tests of its own for them. The second was open. All three now have tests in [packages/ui/test/review-fb27de86.test.tsx](../packages/ui/test/review-fb27de86.test.tsx), with the checker's baselines beside them, at `8f3615d5` (repairs and tests in `f606dd89`, the README in `8f3615d5`). The checker's own fifteen probes, run once against this branch, pass.
+
+| # | Defect | Rule | Repair | Tests |
+|---|---|---|---|---|
+| 1 | A legal field named `toString` or `valueOf` read the inherited function: an optional one left out threw, a required one left out threw, and the form showed the function as the field's value and as its problem | R-DECL-12 | `own(map, name)` reads form values, problems and bodies by own property only (`packages/ui/src/room/acts.ts`, `src/screens/Acts.tsx`). The names stay legal. A sweep of `packages/ui/src` found no other lookup by a declared name that reads a plain object: historical kinds are kept in a map with no prototype, and field changes are compared through `Map` | "a field named toString or valueOf": three baselines; left out when optional; one named problem when required; the control starts empty with no problem; a required one shows only its own problem, sends nothing, and is then sent under its own name |
+| 2 | An answer that was lost was shown as "The room did not take the act", though the room had recorded the act | R-IDEM-2 | The form keeps what it sent as one intent: target, body, binding and an idempotency key it makes. When the error says `maybeRecorded`, the form says the outcome is unresolved and offers "Ask again, the same act", which sends that intent unchanged with the same key. While unresolved it sends no other act and shows no Send button. The adapter passes the key to the room and reads the room again after an act, also when the answer was lost. A failure that says nothing of a record keeps the old wording | "an answer that was lost is not a rejection": two baselines; unresolved, never "not taken"; the page reads the room again with change notices held back; asking again is the same act and key, one entry; an act the room never saw is recorded once; no new act while unresolved; asking again after the meaning changed is `binding-stale`, shown, not resent |
+| 3 | After an explicit read of the declarations, the catalogue kept for `D(s)` was the old one, with `until: null`. A later act was read under the old policy, and a retired kind had no retired mark | R-DECL-23 | `readCatalogue` replaces the catalogue that `governing` answers from, as a load does | "an explicit read of the declarations is what D(s) is answered from": the unchanged case answers from what is kept and asks the room nothing; after an activation a later act is read under the new policy and an earlier entry under the old one, whose interval now ends; after a retirement the old catalogue has its end and the retired mark |
+
+The stand-in room (`MemoryRoom`) had no idempotency, so asking again could not be tested against it. It now answers a key as R-IDEM-2 to R-IDEM-4 say: the same act returns its record, another act is `idempotency-mismatch`, and a refusal it did not record leaves the key free. Four tests hold it to that.
+
+What this does not show. The retry is tested against the stand-in room, not over HTTPS or MCP against a real Room: that the transport's uncertain error and the Room's replay meet is the client's and the Room's tests' to show. The form keeps the intent in memory only; closing the page loses it, and the README says so.
+
+**Mutants.** The UI runner is brought to the stage 2 standard (checker's `b256f7a0`): with each mutant applied it runs the root `npm run typecheck`, then the UI suite, and records the tested head and tree, the typecheck's exit and errors, every red test with its full failure message, the file's SHA-256 before and after, and `git status`. Fifteen mutants are new, each a compiling fault, and two existing ones (`G5U:act-binding`, `G5U:send-binding`) follow their moved statements. `G5U:governs` failed the typecheck as first written (an unused import) and is rewritten to compile. These, with `G5U:own-name` and `G5U:catalogue-refresh`, were run at `8f3615d5`: 20 mutants, all typecheck, all red by a named assertion, every file restored. The other 46 mutants of the UI inventory have not been run under the new runner; some use a literal `false`, which may not typecheck. The whole inventory is owed at the final composed head.
+
+| Mutant | What it does | Typecheck | A red assertion |
+|---|---|---|---|
+| `G5U:governs` | every record is read under the active catalogue | 0 | 7 red. `review-fb27de86.test.tsx`: "after an activation and an explicit read, an act accepted later is read under the new policy, and an earlier entry under": `AssertionError: expected 'act_2_2eeb2724' to be 'act_1_3f90684a' // Object.is equality` |
+| `G5U:catalogue-refresh` | the first active catalogue read answers for good, also after an activation | 0 | 2 red. `declared-rendering.test.tsx`: "old records keep the meaning they had retirement: a record of a kind a later policy dropped says where it was retired, a": `AssertionError: expected { vocabulary: 'declared', …(7) } to match object { label: 'Wrap up', retired: 4, …(1) }` |
+| `G5U:act-binding` | the adapter rebinds the act to the active meaning by itself | 0 | 4 red. `review-fb27de86.test.tsx`: "asking again after the meaning changed is answered binding-stale: the form shows the new meaning and sends nothing by it": `AssertionError: expected null not to be null` |
+| `G5U:send-binding` | a confirmed resend carries the binding the form first held | 0 | 1 red. `acts-screen.test.tsx`: "a meaning that changed behind the form (binding-stale) confirming sends once more, with the new binding, when the form s": `AssertionError: expected null not to be null` |
+| `G5U:own-name` | a field named like an inherited property reads the inherited value | 0 | 5 red. `review-fb27de86.test.tsx`: "the control of an optional field toString starts empty, with no problem shown, and the act is sent without it": `AssertionError: expected [Function toString] to be '' // Object.is equality` |
+| `G5U:own-form-value` | a field's control starts with whatever the form state inherits under its name | 0 | 2 red. `review-fb27de86.test.tsx`: "the control of an optional field toString starts empty, with no problem shown, and the act is sent without it": `AssertionError: expected [Function toString] to be '' // Object.is equality` |
+| `G5U:own-form-problem` | a field shows as its problem whatever the problem map inherits under its name | 0 | 2 red. `review-fb27de86.test.tsx`: "the control of an optional field toString starts empty, with no problem shown, and the act is sent without it": `AssertionError: expected <p class="small tone-bad" …(1)></p> to be null` |
+| `G5U:unresolved` | a lost answer is shown as a rejection | 0 | 5 red. `review-fb27de86.test.tsx`: "an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken": `AssertionError: expected null to be <div class="notice warn" …(1)>…(1)</div> // Object.is equality` |
+| `G5U:same-intent` | asking again sends the act under a new idempotency key | 0 | 3 red. `review-fb27de86.test.tsx`: "an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken": `AssertionError: expected 'ui-f4f3b733e5300fe769c248b4d2c448f8' to be 'ui-65b4c6c986ae785a942133567fc700b2' // Object.is equality` |
+| `G5U:ask-again-kept` | asking again reads the form again and sends a new act | 0 | 2 red. `review-fb27de86.test.tsx`: "asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing ": `AssertionError: expected null not to be null` |
+| `G5U:unresolved-no-new` | the form sends a new act while an answer is unresolved | 0 | 1 red. `review-fb27de86.test.tsx`: "while the answer is unresolved the form sends no new act": `AssertionError: expected [ { kind: 'start-song', …(3) }, …(1) ] to have a length of 1 but got 2` |
+| `G5U:unresolved-no-send-button` | the Send button stays while an answer is unresolved | 0 | 1 red. `review-fb27de86.test.tsx`: "while the answer is unresolved the form sends no new act": `AssertionError: expected <button …(2)></button> to be null` |
+| `G5U:new-key` | every act the form sends has the same idempotency key | 0 | 1 red. `review-fb27de86.test.tsx`: "two keys are two acts": `AssertionError: expected 'ui-' to match /^ui-[0-9a-f]{32}$/` |
+| `G5U:act-key` | the adapter drops the caller's idempotency key | 0 | 3 red. `review-fb27de86.test.tsx`: "an act the room recorded, whose answer was lost, is shown as unresolved, never as not taken": `AssertionError: expected 'ui-41a1aadfa699514a395c85ac2f1f6b6a' to be undefined // Object.is equality` |
+| `G5U:act-refresh` | the page does not read the room again after an act | 0 | 1 red. `review-fb27de86.test.tsx`: "the page reads the room again after a lost answer, also when the room sends it no notice of the change": `AssertionError: expected [] to have a length of 1 but got +0` |
+| `G5U:catalogue-read` | an explicit read of the declarations does not replace the catalogue that D(s) is answered from | 0 | 2 red. `review-fb27de86.test.tsx`: "after an activation and an explicit read, an act accepted later is read under the new policy, and an earlier entry under": `AssertionError: expected 'act_1_3f90684a' to be 'act_2_2eeb2724' // Object.is equality` |
+| `G5U:mock-same-act` | the stand-in room refuses a retry of the same act under its key | 0 | 3 red. `review-fb27de86.test.tsx`: "asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing ": `AssertionError: expected null not to be null` |
+| `G5U:mock-mismatch` | the stand-in room answers another act under a used key with the first act's record | 0 | 1 red. `review-fb27de86.test.tsx`: "another act under a used key is idempotency-mismatch, and records nothing": `AssertionError: expected { id: 'act_2_bd5e356e', seq: 2, …(5) } to match object { refused: true, …(1) }` |
+| `G5U:mock-recorded-only` | the stand-in room keeps a refusal it did not record under the key | 0 | 1 red. `review-fb27de86.test.tsx`: "a refusal the room did not record leaves the key free: the corrected act under it is admitted": `AssertionError: expected true to be false // Object.is equality` |
+| `G5U:mock-kept` | the stand-in room keeps nothing under a key, so a retry is admitted a second time | 0 | 4 red. `review-fb27de86.test.tsx`: "asking again sends exactly the same act with the same key: the room answers with the record it made and records nothing ": `AssertionError: expected null not to be null` |
+
+### The checker's client findings (act `43e8fe3b`)
+
+The checker read the client at `b7b9d8df` and recorded two defects, each with controls that pass and named assertions that fail. Both are repaired at `3e6241df`, with tests in [packages/client/test/review-43e8fe3b.test.ts](../packages/client/test/review-43e8fe3b.test.ts). The tests are written for this branch and cover the checker's eight cases; its fixtures were read, not copied, and its local diagnostic patches were not adopted.
+
+| # | Defect | Rule | Repair | Tests |
+|---|---|---|---|---|
+| 1 | A prepared act held the caller's own target and body objects, and its signed envelope held the same objects. A caller that changed or reused them after a successful act changed the kept envelope: the signature no longer verified, and `replay` was `unauthenticated` instead of the original record | R-IDEM-2, R-SIG-5 | `ownedIntent` (`packages/client/src/room.ts`) takes the handle's own copy of the target and body, frozen all the way down, before the envelope is built, signed or given to `onPrepared`. `act` and the named methods both use it, for a key and for a bearer session. The caller's objects are left as they were, neither kept nor frozen. A target or body that is not plain data is `bad-request` before anything is signed or sent | "a generic act signed by a key: after the caller changes ..." (four cases: nothing, its body, its target, its body with a structured clone saved); "a named act signed by a key ..."; "a bearer session, where the room signs ..."; "the copies are frozen all the way down ..."; "a target or body that is not plain data is bad-request ..." |
+| 2 | `actsAt` kept an answer about an ended policy version though the handle had learnt of a later activation while the answer was on its way. The answer could have been read before that activation, and keeping it brought back `retired` marks older than what the handle knew: the next `actsAt` gave no `retired` mark, while `{ fresh: true }` gave it | R-DECL-23 | `actsAt` notes the latest activation the handle knows before it reads. If that has changed when the answer arrives, by any other answer, the answer is returned to its caller and not kept. An answer's own `until` does not count against it, so the sequential case is kept as before | "over https / over rpc: an answer read before a retirement, arriving after the handle saw that activation, is not kept ..."; "a held answer that no activation overtook is kept as before ..."; "a handle that learns of any activation while an answer is held does not keep that answer ..."; "in sequence, with no answer held ..." |
+
+Two choices, for the checker to judge:
+
+- **The overtaken answer is still returned to the caller that asked.** It is what the room said when it was read, as any read that races an activation is. Only keeping it was wrong.
+- **A handle that knew of no activation when it asked, and learns of the latest one while the answer is held, does not keep the answer either**, even when no activation happened in between. The handle cannot tell the two cases apart, and the cost is one more read.
+
+The nine mutants of these repairs, and `G5:catalogue-keep-ended`, whose statement the second repair changed, were run at `3e6241df` by the new runner (`run2.py` beside `mutants.py`), which records for each mutant the tested head and tree, the root `npm run typecheck` exit and errors with the mutant applied, every red test with its full failure message, and the file's SHA-256 before and after with `git status`. All ten pass the typecheck and are red by a named assertion; each file was restored. The results are `results-43e8fe3b.json`.
+
+| Mutant | Fault | Typecheck | Red tests | A named red |
+|---|---|---|---|---|
+| `G5:act-owned` | a generic act keeps and signs the caller's own target and body objects | 0 | 4 | "a bearer session, where the room signs: a generic and a named act are each sent again as first prepared, whate...": `AssertionError: expected { kind: 'ask', …(4) } to deeply equal { kind: 'ask', …(4) }` |
+| `G5:named-owned` | a named act keeps and signs the caller's own target and body objects | 0 | 3 | "a bearer session, where the room signs: a generic and a named act are each sent again as first prepared, whate...": `AssertionError: expected { kind: 'claim', target: null, …(2) } to deeply equal { kind: 'cl` |
+| `G5:intent-target` | the target is not copied: the handle keeps, and freezes, the caller's own object | 0 | 5 | "a generic act signed by a key: after the caller changes its body, the kept envelope still verifies and replay ...": `AssertionError: expected [ false, true ] to deeply equal [ false, false ]` |
+| `G5:intent-body` | the body is not copied: the handle keeps, and freezes, the caller's own object | 0 | 6 | "a generic act signed by a key: after the caller changes its body, the kept envelope still verifies and replay ...": `AssertionError: expected [ true, false ] to deeply equal [ false, false ]` |
+| `G5:intent-plain` | a target or body that is not plain data fails with an error that is not bad-request | 0 | 1 | "a target or body that is not plain data is bad-request before anything is signed or sent": `Error: expected Error: An act's target and body must be p… to match object { name: 'Artroo` |
+| `G5:intent-frozen` | the handle's copy is not frozen | 0 | 1 | "the copies are frozen all the way down, so the hook that is handed the prepared act cannot change what is sent": `AssertionError: expected [ false, false ] to deeply equal [ true, true ]` |
+| `G5:intent-frozen-deep` | only the outside of the handle's copy is frozen | 0 | 1 | "the copies are frozen all the way down, so the hook that is handed the prepared act cannot change what is sent": `AssertionError: expected [ false, false ] to deeply equal [ true, true ]` |
+| `G5:cache-overtaken` | an answer overtaken by a later activation is kept | 0 | 3 | "a handle that learns of any activation while an answer is held does not keep that answer, since it cannot tell...": `AssertionError: expected { vocabulary: 'declared', …(6) } not to be { vocabulary: 'declare` |
+| `G5:cache-overtaken-always` | no answer about an ended version is ever kept | 0 | 15 | "a held answer that no activation overtook is kept as before: the next question about its interval is answered ...": `AssertionError: expected { vocabulary: 'declared', …(6) } to be { vocabulary: 'declared', ` |
+| `G5:catalogue-keep-ended` | actsAt keeps the active version too | 0 | 1 | "is always read from the room; actsAt() keeps an ended version and answers its whole interval without a read": `AssertionError: expected 7 to be 8 // Object.is equality` |
+
+`frozen` skips `null` and values that are not objects. That condition cannot be weakened and still compile, since `Object.values` takes an object; the named and bearer tests send a `null` target through it.
+
+What this does not show. The tests run against the fake room over its local HTTPS routes and its RPC wire, not a real Room. The checker's own eight cases ran against a real Room at `b7b9d8df`; a rerun of those at this head is the checker's. The whole stage 5 inventory has not been run by the new runner: a typecheck-only pass of all 138 mutants at `3e6241df` shows 105 pass the root typecheck and 33 do not (listed in `typecheck-fails-3e6241df.md` beside the harness, mostly a name left unused or narrowing lost by a literal deletion). Those 33 are not evidence until each is rewritten as a compiling behavioural fault, and the 46 UI mutants not yet run by the new UI runner are in the same position. The full run at the final composed head is owed.
+
+### The checker's review fcd7391d (UI at `f606dd89`): answers out of order, and the browser suite
+
+**Finding 1 (P2), repaired at `4567a490`, tests corrected at `5590c318`.** A load and an explicit read each ask the room for its active catalogue, and the older question can be answered last. `readCatalogue`, `load` and `refresh` each published their answer as it came. So an answer read before an activation replaced the later catalogue the page had already confirmed: the snapshot went back a policy version, and `catalogueAt` read a record accepted after the activation under the earlier policy, through `governing`'s fast path.
+
+The repair is in `packages/ui/src/room/live/live-room.ts`, and uses the idea of the client's `actsAt` repair (`3e6241df`):
+
+- A catalogue's age is the seq of its activation (`since`), which only grows. No catalogue is older than any.
+- `confirm` takes a completed answer only if it is not older than what the adapter holds. A lost answer ("not available") has no age of its own: it stands only if nothing was confirmed while it was on its way, judged against the age held when the question was asked.
+- `load` and `readCatalogue` both publish through `confirm`. A load is also published under the catalogue held when it finishes (`current`), since an explicit read can confirm a later activation after the load read its own.
+- The late caller of `readCatalogue` is given the catalogue the page holds, not the older one its own question read. The client's `actsAt` returns the overtaken answer to its caller; the two differ here on purpose, because this read is "what is active now".
+
+Tests: `packages/ui/test/review-fcd7391d.test.ts`, 12 tests against the stand-in room with its change notices held back. They cover the checker's six cases (two regressions and four controls, the two historical-read controls among them) and six more: a newer answer to an older question is taken; a lost answer after a later activation does not blank the catalogue, from an explicit read and from a load; a lost answer with nothing confirmed in between still gives "not available"; a load still reading when a later activation is confirmed is published under the later one; a load that could not read the catalogue is published with the one an explicit read confirmed.
+
+Mutants (UI harness, results in `mut5ui-composed/results-fcd7391d.json`, run at `5590c318`; each passes the root typecheck, is red by a named assertion and was restored):
+
+| Mutant | Fault | A red assertion |
+|---|---|---|
+| `G5U:catalogue-older` | an answer from before a confirmed activation replaces the later catalogue | "an answer from before an activation the page has confirmed does not bring the earlier catalogue back" |
+| `G5U:catalogue-overtaken` | a lost answer blanks the catalogue though a later activation was confirmed meanwhile | "a lost answer that arrives after a later activation was confirmed does not blank the catalogue" |
+| `G5U:catalogue-read-age` | an explicit read judges a lost answer by what is held when it arrives | the same test |
+| `G5U:catalogue-refresh-age` | a load judges a lost answer by what is held when it arrives | "a load whose catalogue answer is lost after a later activation was confirmed keeps that catalogue" |
+| `G5U:refresh-current` | a load is published under the catalogue it read | "a load that has read its catalogue, and is still reading when a later activation is confirmed, is published under the later one" |
+| `G5U:catalogue-age` | no catalogue counts as newer than any | "with no activation in between, two reads answered out of order leave the same catalogue", and 41 more |
+| `G5U:catalogue-refresh` (moved) | the first catalogue read answers for good | 3 assertions |
+| `G5U:catalogue-read` (moved) | an explicit read does not replace the catalogue | 6 assertions |
+
+A first run at `4567a490` had three of these red by a `TypeError` on null, not by an expectation; the tests were changed to compare through a null-safe helper and the run repeated. That first run is kept as `results-fcd7391d-at-4567a490.json`.
+
+**Finding 2, the browser suite: cause found, not repaired; it needs a decision outside `packages/ui`.** The suite is still 8 of 9 at `5590c318` (`mut5ui-composed/e2e-5590c318.log`). The declared-room case fails at its first assertion, `smoke.spec.ts:199`, which expects a thread named "Start a song: Footprints"; the page shows "Start a song: c".
+
+The cause is not the form and not a lost input. It is the thread name rule itself. Section 33.10 of the protocol, and `titleOf` in `packages/policy/src/catalogue.ts`, name a thread with no goal by its opening act's label and "its first body field by name". The demo's `start-song` has the fields `key`, `swing`, `tempo` and `title`, so the first by name is `key`, and the name is "Start a song: c". Both demo songs are in the key of c, so the Room screen shows two threads with the same name. The browser case was written at `0eb42cb2`, when the name used the title; the rule was changed at `8fc6ae0c` and four UI unit tests were written to expect "Start a song: c" (`declared-rendering.test.tsx:106, 351`; `acts-screen.test.tsx:118, 140`). The browser suite was not run then.
+
+So the browser case and the rule contradict each other, and the page follows the rule. Nothing in `packages/ui` can satisfy both: the case fixes the field names (`title`, `key`, `tempo`, `scope`), and every reader must use the one rule. The expectation was not changed.
+
+A private, uncommitted copy of the case with the two names the rule gives ("Start a song: c", first match, and "Start a song: d" for the song the form sends) passes to the end (`e2e-5590c318-private-rule-titles.log`). So the two thread names are the only failing assertions of the case: the acts list, the form, its two validation messages, the recorded entry and the feed all pass.
+
+The decision owed: either the rule changes so that a song is named by its title, or the browser case and the screenshots change to the rule's names. The first seems right, since the rule as written gives two threads one name. One rule that needs no typed order and passes every existing CLI and MCP test: the first field by name whose declared type under `D(s)` is `text`, and the first field by name only when the act has no text field. That changes `titleOf` and its callers in `packages/policy`, the text of section 33.10, and the four UI unit expectations above.
+
+### The planner's decision c37653e1: which field names a thread (`3a03d405`)
+
+The planner decided the question the last section left open (act `c37653e1`). A thread with no goal is named by its opening act's label and its first text field by name. This replaces "first field by name", under which both demo songs were called "Start a song: c", because `key`, an enum, sorts before `title`.
+
+**The rule, as built in `titleOf`** (`packages/policy/src/catalogue.ts`, the helper every reader shares):
+
+1. A thread's non-empty goal still comes first (`threadTitle`, unchanged).
+2. Otherwise the opening act's label at its own seq, then the value of the first present body field by name that the act's own declaration at that seq types as `text`. `scope` and `because` are never taken.
+3. With no such field present, the first present field by name, of any type, as before.
+4. With no declaration at hand (a legacy, platform or unknown kind, or a caller that has only a label), the first field by name, as before.
+5. With no opening act at hand, the thread's ID, as before.
+
+"Text" is the declared type, not the type of the value. The declaration is the one of the record's own seq: callers pass the `meaning` that `meaningOf` gives under `actsAt({ seq })`, or the `meaning` that `explain` returns. No declaration member is added, no binding changes, and the helper still imports no evaluator.
+
+**One choice for review.** `titleOf` reads only the act's declared fields, not its steps' fields. The step an opening act runs is `open`, which brings only `scope`, and `scope` never names a thread. So there is no step-owned text field to carry, and the helper takes no target shape. Section 33.10 says this. If a later steps version gives an opening step a text field, the helper needs the target shape then.
+
+**What changed**
+
+- `packages/policy/src/catalogue.ts`: `titleOf` and `threadTitle` accept a meaning with an optional `declaration`; `textFields` lists a declaration's text fields by own name.
+- `packages/ui`: an entry's meaning (`EntryMeaning`) carries the declaration of its seq, so `laneGoal` can pass it to the shared helper. Four unit expectations now name songs by title.
+- `packages/cli/src/main.ts`, `packages/mcp/src/run.ts`: comments only; both already pass the meaning of the act's own catalogue.
+- `docs/protocol.md` section 33.10, the acceptance row "Thread name", and open point 52; the READMEs of policy, client, CLI, MCP and UI.
+- `packages/room/test/workerd/declared-stage5-a5d64b35.test.ts` is unchanged and still passes: its song declares `key` as text, so "first by name" and "first text field by name" agree there. Its title still says "label and first field".
+
+**Tests**
+
+- `packages/client/test/thread-names-c37653e1.test.ts`, 9 tests: an enum before a text field; one body under two declarations with the types exchanged, and the same string in both fields; typed order against canonical order; an absent optional text field; an act with no text field; `scope` and `because`; a field named `valueOf`; legacy, platform, unknown and label-only fallbacks; a thread opened before a document that relabels the act and exchanges its field types, read through `actsAt({ seq })`.
+- `packages/ui/test/thread-names-c37653e1.test.ts`, 3 tests: the page names a song by its title; a thread keeps its name after a later document retypes the fields; an act with no text field.
+- The CLI and MCP title tests each gain an enum field that sorts first, and assert the title is used.
+
+**Mutants at `624dbb9f`** (all pass the root typecheck, each red by a named assertion, each file restored)
+
+| Mutant | Fault | Red assertions | First named test |
+|---|---|---|---|
+| `G5:title-text` | a text field is never preferred | 9 | CLI: "an act that opens a thread names it as every reader does ..." |
+| `G5:title-text-type` | every declared field counts as text | 9 | CLI: the same |
+| `G5:title-fallback` | with no text field present, the label alone | 7 | client: "threadTitle: the goal when the thread has one ..." |
+| `G5:title-order` (moved) | first typed, not first by name | 6 | CLI: the same |
+| `G5:title-first` (moved) | `scope` may name a record | 3 | client: "titleOf: the label at the record's seq ..." |
+| `G5:title-first-because` (moved) | `because` may name a record | 2 | client: the same |
+| `G5U:record-declaration` | an entry's meaning carries no declaration | 7 | UI: "the title names the song, though the enum field key comes first by name" |
+| `G5U:thread-name` (rewritten to compile) | a thread with no goal is named by its ID | 7 | UI: the same |
+
+Results: `mut5/results-c37653e1.json` and `mut5ui-composed/results-0fd98c41.json`. Two conditions have no mutant because they exist only for the type checker: `meaning.declaration ? ... : null` and `declaration.body ?? {}`. The label-only and no-body tests run through both.
+
+**Browser suite at `624dbb9f`: 9 of 9.** Case 9, "a room that declares its own acts", passes through form validation, acceptance and its final lane checks, with its "Footprints" and "So What" assertions unchanged. Cases 1 to 8 pass as before. Log: `mut5ui-composed/e2e-c37653e1.log`.
+
+### The planner's review 0fd98c41: a failed read must not undo a confirmed activation (`624dbb9f`)
+
+The planner's review of `4567a490` found two cases that the repair for `fcd7391d` left open. Both are in the stand-in room and concern what the page shows, not Room admission.
+
+1. The page holds a catalogue, confirms a later activation, a record is accepted under it, and then a read fails. An older answer, held since before the activation, then arrives. The page took it: the earlier catalogue came back, and the later record was read under the earlier policy.
+2. A load has read a catalogue and is still reading. A later activation is confirmed, then a read fails. The load finishes and was published with the catalogue it had read.
+
+**Cause.** The page compared a late answer only with the catalogue it held. A failed read left it holding none, which lost the knowledge of what it had confirmed.
+
+**Repair** (`packages/ui/src/room/live/live-room.ts`)
+
+- The page keeps `confirmed`, the seq of the newest activation it has read, apart from the catalogue it holds. It only grows. An answer older than that is never taken, also while the page holds no catalogue.
+- A failed answer stands only if no other answer was taken while it was on its way. This is judged by the catalogue held when the question was asked, so a successful read of the same version also outranks an older failure.
+- A load is always published under the catalogue held when it finishes, or with none after a failed read. The page stays honestly without a catalogue until a read succeeds.
+
+**Tests:** `packages/ui/test/review-0fd98c41.test.ts`, 6 tests: the two cases; an older answer of the same age gives the catalogue back; a failed read does not blank a catalogue another read gave meanwhile; a newer answer restores the catalogue; the same load with no failed read is published under the later catalogue. The planner's four fixtures and the checker's six race fixtures, copied in unchanged for one run and removed, all pass (10 of 10).
+
+**Mutants at `624dbb9f`** (all pass the root typecheck, each red by a named assertion, each file restored)
+
+| Mutant | Fault | Assertion reds | First named test |
+|---|---|---|---|
+| `G5U:catalogue-confirmed` | the page never remembers what it confirmed | 3 | "with a later activation confirmed in between, it does not bring the earlier catalogue back ..." |
+| `G5U:catalogue-forget` | a failed read forgets what was confirmed | 1 | the same |
+| `G5U:catalogue-older` | an older answer replaces the later catalogue | 3 | the same |
+| `G5U:catalogue-overtaken` | a failed answer blanks the catalogue though another was taken | 2 (and 1 error) | fcd7391d: "a lost answer that arrives after a later activation was confirmed ..." |
+| `G5U:refresh-current` | a load is published under the catalogue it read | 4 | "it is not published with the earlier catalogue it read: the page still holds none" |
+| `G5U:catalogue-read-age` | a failed explicit read is compared at arrival | 1 (and 1 error) | fcd7391d: the same lost-answer test |
+| `G5U:catalogue-refresh-age` | a failed load read is compared at arrival | 1 | fcd7391d: "a load whose catalogue answer is lost after a later activation was confirmed ..." |
+| `G5U:catalogue-refresh`, `G5U:catalogue-read`, `G5U:governs` (unchanged text, rerun) | as before | 4, 8, 9 (and 1, 9, 5 timeouts) | thread-name and catalogue tests |
+
+`G5U:catalogue-age` is gone with the function it changed. Results: `mut5ui-composed/results-0fd98c41.json`.
+
+**Gates at `624dbb9f`**
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | 0 |
+| policy tests | 313 node; 311 workerd, 2 skipped |
+| client tests | 143 node; 2 workerd |
+| CLI tests | 182 |
+| MCP tests | 87 node; 5 workerd |
+| UI unit suite | 243 |
+| UI build | 0 |
+| Browser suite | 9 of 9 |
+| `git diff --check` | clean |
+
+Root `npm test` and the Room suites were not run. The other UI and stage 5 mutants were not rerun; 33 of the 138 in `mut5` still fail the root typecheck (`mut5/typecheck-fails-3e6241df.md`).
+
+**Limits.** All of this is tested against the stand-in room, not a real Room over HTTPS or MCP. After a failed read the page shows no catalogue until the next successful read; it does not ask again by itself. An application with two text fields gets the earlier name and cannot choose the other (open point 52).
+
+### The checker's review 0b9119de and the planner's b22d29ee: the CLI printed the label read at preparation (`ff266354`)
+
+**Finding (P2).** `artroom act` took the label and the thread's name from the declarations it read while it prepared the act. A label is no part of a binding, so a label-only activation between that read and the act's admission leaves the act valid. It was then admitted under one label and printed under another. The checker's fixture showed "Open a score: Nardis" printed for an act admitted under "Begin a tune". Its paired control showed that the latest label is wrong too: an activation after admission must not change what the accepted act is called.
+
+**Repair** (`packages/cli/src/main.ts`)
+
+- After the room answers, `recordedMeaning` reads the declarations in force at the record's own seq (`actsAt({ seq })`) through the run's one handle, and the `Done` line and the thread's name come from that meaning.
+- The thread is named from the prepared act's body, which `journaled` now returns. That is the body that was signed and sent.
+- With `--json` the record is printed and nothing is read.
+- A read that fails, or a room that has no declarations for that seq, changes only the words: the command still succeeds, `Done:` names the kind, and the thread is named by its goal or its ID. Nothing is signed or sent again.
+
+`packages/cli/README.md` says all of this. Choices 19 and 20 above are rewritten to match; they had still described the earlier rule and the catalogue read at preparation.
+
+**Tests** (`packages/cli/test/review-0b9119de.test.ts`, the first seven)
+
+| Test | What it holds |
+|---|---|
+| with no activation in between, the words are those the user read | the control |
+| a label changed after the act was prepared and before it was admitted: the act is printed under the new label, which governs it | the finding; one act, the binding unchanged |
+| a label changed after the act was admitted: the act keeps the label it was admitted under, not the latest | the paired control |
+| the words are read once, after the answer, at the record's seq; --json prints the record and reads no words | one read of the active declarations to prepare, one of `?at=<seq>`; none of the second with `--json` |
+| a failed read after the answer leaves the act done: the kind and the thread's ID are printed, and nothing is sent again | exit 0, one act, and the same key again gives the original record |
+| a room that has no declarations to give for that seq: the kind is printed, never the latest label | the null answer |
+| a thread that has a goal is named by it, with or without the words | the goal needs no declaration |
+
+### The planner's 23ae8924, as corrected by c6f6ad78: an act finished from the journal (`ff266354`)
+
+**Finding (P3, presentation).** A command finished from the journal printed `Done: start-song, recorded as …` and no thread line, with or without a later activation. The planner's correction and the checker's `7488b311` class this as presentation only: five sends of the same bytes gave one act and one thread, and that must stay so. Enriching the display was allowed, not required, and must use the saved intent and `D(out.seq)`, add no read to the preparation of the resend, and keep the receipt when the words cannot be read.
+
+**Repair.** The same code as the section above: the display no longer depends on anything the first run read. The saved act goes back exactly as before, through `resubmit`, with no session and no read. Only after its answer is known does the CLI open a session and read `D(out.seq)`. If no session can be opened, as for a key that is no longer a member's, the receipt is still printed with the kind and the thread's ID.
+
+**The read count is reconciled, not dropped.** The existing test "an act whose answer was lost is resent unchanged …" counted every `GET /declarations` and expected none. It now records each such read with its query and expects exactly one, `?at=<the record's seq>`: no read of the active declarations, which is what preparation reads, and one read for the words.
+
+**Tests** (the last three of `review-0b9119de.test.ts`)
+
+| Test | What it holds |
+|---|---|
+| the saved act goes back unchanged, and the receipt has the label and the thread's name from the body the journal kept | five identical signed bodies, one act, one thread; reads are exactly `?at=<seq>` |
+| after a later label-only activation the finished act still has the label it was admitted under | `D(out.seq)`, not the latest |
+| when no session can be opened to read the words, the saved act is still finished and its receipt given | every session request refused; exit 0; kind and ID printed; no declarations read; the journal holds nothing more |
+
+**Mutants for both CLI sections** (run at `c74f3696` with `mut5/run2.py`; results in `mut5/results-0b9119de.json`)
+
+| Mutant | The fault | Typecheck | Red tests | A red assertion |
+|---|---|---|---|---|
+| `G5:cli-thread` | artroom act names the thread it opened by its ID though it read the act's words | 0 | 6 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) after a later label-only activation the finished act still has the l: AssertionError: expected 'Thread: act_4_66dcc492 (lane act_4_66…' to match /^Thread: Start a song: Footprints \(l…/ |
+| `G5:cli-thread-line` | artroom act prints no thread line for the thread it opened | 0 | 10 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) when no session can be opened to read the words, the saved act is st: AssertionError: expected [ Array(1) ] to deeply equal [ …(2) ] |
+| `G5:cli-thread-goal` | artroom act names a thread that has a goal by the act | 0 | 2 | the words cannot be read: the receipt is still given (R-DECL-23, R-IDEM-2) a thread that has a goal is named by it, with or without the words: AssertionError: expected 'Thread: act_4_dbbd5381 (lane act_4_db…' to match /^Thread: Rate-limit login \(lane act_…/ |
+| `G5:cli-thread-opened` | artroom act prints a thread line for an act that opened nothing | 0 | 1 | artroom act: any declared act, under the binding the user read the lease, the generation and a version's head are read from the room when left out, as: AssertionError: expected 'Done: Release (release), recorded as …' to match /^Done: Release \(release\), recorded …/ |
+| `G5:cli-recorded-seq` | artroom act prints an act in the latest words, not those of its own seq | 0 | 8 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) after a later label-only activation the finished act still has the l: AssertionError: expected 'Done: Begin a tune (start-song), reco…' to match /^Done: Start a song \(start-song\), r…/ |
+| `G5:cli-recorded-null` | when the room has no declarations for the act's seq, artroom act prints the latest label | 0 | 1 | the words cannot be read: the receipt is still given (R-DECL-23, R-IDEM-2) a room that has no declarations to give for that seq: the kind is printed, : AssertionError: expected [ …(2) ] to deeply equal [ …(2) ] |
+| `G5:cli-recorded-unread` | a failed read of the words turns a recorded act's receipt into an error | 0 | 3 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) when no session can be opened to read the words, the saved act is st: AssertionError: expected 2 to be +0 // Object.is equality |
+| `G5:cli-recorded-json` | artroom act --json reads the words it does not print | 0 | 1 | artroom act prints the act as recorded, in the words of its own seq (R-DECL-23) the words are read once, after the answer, at the record's seq; --json: AssertionError: expected [ '', '?at=5' ] to deeply equal [ '' ] |
+| `G5:cli-label` | artroom act prints the kind where the label belongs | 0 | 10 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) after a later label-only activation the finished act still has the l: AssertionError: expected 'Done: start-song, recorded as act_4_0…' to match /^Done: Start a song \(start-song\), r…/ |
+| `G5:cli-prepared-body` | artroom act names a thread without the body that was sent | 0 | 6 | an act finished from the journal is printed as a new one is (R-IDEM-2, R-DECL-23) after a later label-only activation the finished act still has the l: AssertionError: expected 'Thread: Start a song (lane act_4_7da2…' to match /^Thread: Start a song: Footprints \(l…/ |
+
+All ten pass the root typecheck, are red by a named assertion, and were restored (`git status` empty after each). Four were in the inventory before and are rewritten for the new code (`G5:cli-thread`, `G5:cli-thread-goal`, `G5:cli-thread-opened` unchanged in text, and `G5:cli-thread-line`, which replaces a literal `if (false)`); six are new.
+
+### The checker's review 8df737b8, accepted by the planner's 80bef90a: the same catalogue object (`c74f3696`)
+
+**Finding (P3).** A failed read of the active catalogue leaves the page without one only if no other answer was taken while it was on its way. The page told that by comparing the catalogue it held with the one it held when the question was asked. A custom room handle may return the same readonly object for two reads of an unchanged catalogue; the contract does not promise a new one. A later successful read then looked like no read at all, and the earlier failure cleared it. The built-in HTTP handle parses a new object from each answer and was not affected.
+
+**Repair** (`packages/ui/src/room/live/live-room.ts`). The page counts the answers it takes (`taken`). `load` and `readCatalogue` note the count when they ask, and `confirm` lets a failed answer stand only if the count has not moved. Object identity is no longer used. What was confirmed still outlasts a failed read, so the repaired lower-activation cases of `0fd98c41` stay closed, and their tests pass unchanged.
+
+**Tests** (`packages/ui/test/review-8df737b8.test.ts`, 6 tests; the room is the stand-in, with a handle that reuses the object when the catalogue is unchanged)
+
+| Test | What it holds |
+|---|---|
+| an explicit read that fails late does not blank the catalogue a later read gave, when the handle gives the same object again | the finding |
+| the same, when the handle gives a new object | the control: only the identity differs |
+| with no answer taken meanwhile, a failed read honestly leaves the page without a catalogue, also for a handle that reuses objects | the honest-null control; the next answer is taken |
+| a load whose read fails late is published under the catalogue an explicit read gave meanwhile, same object, and new object | the load path, both ways |
+| with no answer taken meanwhile, the load is published with no catalogue | the load's honest-null control |
+
+**Mutants** (run at `c74f3696` with the UI runner; results in `mut5ui-composed/results-8df737b8.json`)
+
+| Mutant | The fault | Typecheck | Red by assertion | A red assertion |
+|---|---|---|---|---|
+| `G5U:catalogue-refresh` | the first active catalogue read answers for good, also after an activation | 0 | 5 | a load whose read of the catalogue fails late (R-DECL-23) with no answer taken meanwhile, the load is published with no catalogue: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-read` | an explicit read of the declarations does not replace the catalogue that D(s) is answered from | 0 | 14 | a failed read and an answer taken while it was on its way (R-DECL-23) an explicit read that fails late does not blank the catalogue a later read gave,: AssertionError: expected 'Start a song' to be 'A later meaning' // Object.is equality |
+| `G5U:catalogue-overtaken` | a lost answer blanks the catalogue though another answer was taken while it was on its way | 0 | 6 | a failed read and an answer taken while it was on its way (R-DECL-23) an explicit read that fails late does not blank the catalogue a later read gave,: AssertionError: expected null to deeply equal { vocabulary: 'declared', …(6) } |
+| `G5U:catalogue-older` | an answer from before a confirmed activation replaces the later catalogue | 0 | 3 | an older answer that arrives after a newer read failed (R-DECL-23) with a later activation confirmed in between, it does not bring the earlier catalog: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-confirmed` | the page never remembers which activation it has confirmed | 0 | 3 | an older answer that arrives after a newer read failed (R-DECL-23) with a later activation confirmed in between, it does not bring the earlier catalog: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-forget` | a failed read forgets the activation the page had confirmed | 0 | 1 | an older answer that arrives after a newer read failed (R-DECL-23) with a later activation confirmed in between, it does not bring the earlier catalog: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-read-age` | an explicit read compares a lost answer with the answers taken when it arrives, not when it was asked | 0 | 3 | a failed read and an answer taken while it was on its way (R-DECL-23) an explicit read that fails late does not blank the catalogue a later read gave,: AssertionError: expected null to deeply equal { vocabulary: 'declared', …(6) } |
+| `G5U:catalogue-refresh-age` | a load compares a lost answer with the answers taken when it arrives, not when it was asked | 0 | 3 | a load whose read of the catalogue fails late (R-DECL-23) it is published under the catalogue an explicit read gave meanwhile, when the handle gives a: AssertionError: expected null to deeply equal { vocabulary: 'declared', …(6) } |
+| `G5U:catalogue-taken` | the page does not count the answers it takes, so a failed read blanks a catalogue a later read gave | 0 | 6 | a failed read and an answer taken while it was on its way (R-DECL-23) an explicit read that fails late does not blank the catalogue a later read gave,: AssertionError: expected null to deeply equal { vocabulary: 'declared', …(6) } |
+| `G5U:catalogue-asked-read` | an explicit read that fails always finds an answer taken meanwhile, and never leaves the page without a catalogue | 0 | 6 | a failed read and an answer taken while it was on its way (R-DECL-23) with no answer taken meanwhile, a failed read honestly leaves the page without a: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+| `G5U:catalogue-asked-load` | a load whose read fails always finds an answer taken meanwhile, and is published with the earlier catalogue | 0 | 1 | a load whose read of the catalogue fails late (R-DECL-23) with no answer taken meanwhile, the load is published with no catalogue: AssertionError: expected { vocabulary: 'declared', …(6) } to be null |
+
+All eleven pass the root typecheck, are red by a named assertion, and were restored. Three are new (`G5U:catalogue-taken`, `G5U:catalogue-asked-read`, `G5U:catalogue-asked-load`); five follow their changed statements; `G5U:catalogue-older`, `G5U:catalogue-confirmed` and `G5U:catalogue-forget` are unchanged and were run again because they sit in the same function. Some mutants also made other tests fail by a timeout or a thrown error (`G5U:catalogue-refresh`: timeout; `G5U:catalogue-read`: timeout; `G5U:catalogue-overtaken`: error; `G5U:catalogue-read-age`: error; `G5U:catalogue-taken`: error; `G5U:catalogue-asked-load`: timeout); those are not counted.
+
+**Gates at `c74f3696`**
+
+| Gate | Result |
+|---|---|
+| Root `npm run typecheck` | 0 |
+| CLI typecheck; CLI tests | 0; 192 passed |
+| UI typecheck; UI unit tests | 0; 249 passed |
+| UI build | 0 |
+| Browser suite | 9 of 9 (`mut5ui-composed/e2e-8df737b8.log`): the scenario; the reviewer's queue; keyboard; screenshots light and dark; the jj recut history; check carry; phone width; the declared room's feed, acts and form |
+| `git diff --check` | clean |
+
+Root `npm test` and the Room suites were not run for these three commits.
+
+**Limits**
+
+- Every test here runs against the fake room over its local HTTPS routes, or the UI's stand-in room. None shows a real Room's admission, or the words read over MCP for a bearer session.
+- The words are read after the journal entry is finished. A run stopped between the two prints nothing; the same command with the same key then gets the original record from the room and prints it.
+- One read more is made for each successful `artroom act` that prints words. A record does not name its policy version, so the CLI cannot tell without a read whether the catalogue it prepared with still governs.
+- The section of `plans/README.md` on the branch still has the earlier choices 19 and 20; this draft has the corrected ones.
+
+### The reviewers' finding at `c74f3696`: a saved act finished under another kind's name (`bdc35c53`)
+
+Both reviewers reproduced this at `c74f3696` and reported it in the workroom; neither had recorded it as an act when the repair was made.
+
+**What was wrong.** The CLI's journal finds a saved `artroom act` by its idempotency key and the command `act`, not by the kind. A run that names the key again with another kind finishes the saved act: the saved bytes go back unchanged, and one act and one thread exist. That part was right. But the receipt added at `ff266354` took the kind from the finishing run's arguments. A saved `start-song` finished by a run that typed `start-tune` was printed as "Begin a different tune (start-tune)", on the "Done" line and the "Thread" line, and with the kind typed when the words could not be read.
+
+**The repair** (`packages/cli/src/main.ts`).
+
+- The receipt's kind is the record's own kind (`DeclaredRecord.kind`). The label is read for that kind at the record's seq, and the fallback names that kind.
+- The thread is still named from the body the journal kept.
+- A run that names another kind than the saved act's is told so, on the error stream, in text and `--json` alike: "This idempotency key belongs to a saved start-song act. That act was sent again as it was saved; no start-tune act was made." The exit code is the saved act's. A run that names the same kind, or a new act, is told nothing.
+- If the room refuses the saved act when it is sent again, the explanation after `binding-stale` is for the saved kind and the binding the saved act was prepared under, not for what the run typed.
+- No read is added, and the replayed bytes are unchanged.
+
+**Tests** (`packages/cli/test/saved-kind-a5d64b35.test.ts`, 6 tests, against the fake room over its local HTTPS routes):
+
+- the changed kind with the words read: the saved act's label, kind and thread name; the line on the error stream; five identical sends, one act, one thread, no act of the typed kind;
+- the changed kind with every read session refused: "Done: start-song" and the thread by its ID, and the same line;
+- `--json`: the record is the saved act's, and the line is on the error stream;
+- control: the same kind with another body finishes the saved act with the saved body, and nothing more is said;
+- control: a new act of the other kind under its own key is that kind's;
+- a saved act that never reached the room, whose meaning then changed: `binding-stale`, explained for `start-song` under the saved binding, with what changed.
+
+The ten tests of `review-0b9119de.test.ts` pass unchanged. No test asserts a count of reads on a path where the client may ask again.
+
+**Mutants.** Run at `bdc35c53` with `mut5/run2.py`; results in `mut5/results-saved-kind.json`. Each passes the root typecheck, is red by a named assertion, and was restored.
+
+| Mutant | The fault | Red by |
+|---|---|---|
+| `G5:cli-saved-kind` | the finishing run takes the kind it typed for the saved act's kind | "the saved act's meaning changed before it reached the room ...": the line is missing |
+| `G5:cli-saved-kind-told` | a run that named another kind is not told | the same assertion, and the three "is told" assertions |
+| `G5:cli-saved-kind-told-only` | every act is told it finished a saved act | "control: the same kind with another body ...": expected no such line |
+| `G5:cli-stale-saved-kind` | a refused saved act is explained for the kind typed | "... start-song now means" not found |
+| `G5:cli-stale-saved-binding` | the change is looked up under the binding typed | "What changed since the meaning you read" not found |
+| `G5:cli-recorded-kind-words` | the label is read for the kind typed | expected "Done: Start a song (start-song)", got "Done: Begin a different tune (start-s…" |
+| `G5:cli-recorded-kind-shown` | the receipt shows the kind typed beside the label | got "Done: Start a song (start-tune)" |
+| `G5:cli-recorded-kind-fallback` | with no words read, the receipt names the kind typed | "when the words cannot be read ...": the two lines differ |
+
+Six mutants of the same lines were run again and are red: `G5:cli-label` (its text moved), `G5:cli-thread`, `G5:cli-recorded-seq`, `G5:cli-recorded-null`, `G5:cli-recorded-unread` and `G5:cli-recorded-json`.
+
+**Gates at `bdc35c53`**: CLI tests 198 passed; CLI typecheck 0; root typecheck 0; `git diff --check` clean.
+
+**Limits.** The tests use the fake room. The line is printed for a changed kind only: a run that names the same kind with another body or target is told nothing, as before. The refused-saved-act case is tested for `binding-stale` only.
+
+### The state of the evidence
+
+Condition 4's kind of evidence, a mutant for every new guard, is not complete for this stage.
+
+- **Guards with no mutant.** Two independent readings of the stage's source diff against the mutant inventories, made at `624dbb9f`, are kept outside the repository (`guard-audit-stage5-core.md` and `guard-audit-stage5-ui.md`, beside the harnesses). Outside the UI: 349 guards read, 126 covered, 174 with no mutant, 66 of those with no test that would fail, 20 judged equivalent or unreachable. In the UI: 349 guards read, 63 covered, 201 with no mutant (151 in the UI and 50 in its stand-in room), 93 of those with no test that would fail, 57 judged equivalent or unreachable. Nothing in either reading was compiled or run.
+- **Mutants that do not compile.** A typecheck of every mutant of `mut5` at `3e6241df` found 33 of 138 that fail the root typecheck. In the UI inventory, 16 of 74 are likely to fail by reading, and 45 of 74 have no recorded typecheck. None of these is rewritten yet. A mutant that does not compile shows nothing.
+- **What is to the standard.** Only the mutants named in the sections above, which were written and run with each repair.
+- **One survivor of the old table**, `G5:cli-binding-given`, is an equivalent mutant: the line before it forces the two values to be equal.
+
+Closing this is owed before review: a compiling fault and a named red for each guard, a test with its control where none exists, the equivalence claims checked against the code, and one run of every mutant at the head for review.
+
+### Gates since `b7b9d8df`
+
+No gate below is a whole-head gate. Each was run by the repair that the commit makes.
+
+| Commit | What was run | Result |
+|---|---|---|
+| `f606dd89`, `8f3615d5` | UI unit suite, UI typecheck, `git diff --check` | 222 passed; 0; clean |
+| `3e6241df` | client node and workerd, client typecheck, MCP, CLI, root typecheck, `git diff --check` | 134 and 2 passed; 0; 87 passed; 182 passed; 0; clean |
+| `5590c318` | UI unit suite, UI typecheck, root typecheck, UI build, browser suite | 234 passed; 0; 0; 0; 8 of 9 (case 9 failed on the thread name, see `c37653e1`) |
+| `624dbb9f` | root typecheck; policy; client; CLI; MCP; UI unit; UI build; browser suite; `git diff --check` | 0; 313 node, 311 workerd with 2 skipped; 143 and 2; 182; 87 and 5; 243; 0; 9 of 9; clean |
+| `c74f3696` | root typecheck; CLI typecheck and tests; UI typecheck and tests; UI build; browser suite; `git diff --check` | 0; 0 and 192 passed; 0 and 249 passed; 0; 9 of 9; clean |
+| `bdc35c53` | root typecheck; CLI typecheck and tests; `git diff --check` | 0; 0 and 198 passed; clean |
+
+Not run at the present head: root `npm ci`, root `npm test`, the Room suites, and the browser suite after `bdc35c53` (which changes `packages/cli` only). The Room's stage 5 test file still has a title that says "label and first field"; its assertions pass.
+
+### For the planner or hugh
+
+1. **`recover` has no client surface** (open point 49). The request does not name it. Without it, configuration recovery in a `v2` room needs a hand-signed envelope.
+2. **The checker service still signs `v: 1`**, and its notes are `v: 1` too. That is stage 4's, as `fa120186` says. Until then a `v2` room gets checks from members' own keys or from a bearer through `act`.
+3. **The cost of the catalogue read for the named methods** (choice 5): two requests per handle before its first named act, in every room. If that is too much for the CLI, the vocabulary could be kept in its room configuration; that is a small follow-up, not done here.
+4. **Which field names a thread** (open point 52) is decided: the planner's `c37653e1` prefers the first text field by name, built at `3a03d405`. An application still cannot choose the field; a declaration that names it would be a new member of the declaration, and is not proposed here.
+5. **The demo's songs** are now named by their titles, "Start a song: Footprints" and "Start a song: So What", under that decision.
+6. **Toolsets for `acts` and `act`** come from the planner's MCP core contract. This stage does not assign them.
+7. **A named act repeated from a new handle after a change of vocabulary** is built under the vocabulary then in force, because a new handle has nothing kept. The room answers `idempotency-mismatch` and names the first act. Nothing is recorded twice. The CLI is not affected: its journal keeps the signed bytes. A stdio MCP server that restarts between the two calls is.
+8. **The Acts form offers every thread to an act whose declaration names no `threads`.** The room refuses such an act on any thread (`wrong-thread`). This is the UI lane's choice and is left as it was.
+9. **Stage 2 has moved since this branch was composed on `15fa7f4c`.** It is not landed. This branch is composed again on main after it lands. Among stage 2's later changes, a `recover` record now names its op in `recover`, not `op`, and check jobs name their kind and binding; neither is read by this stage's code, by inspection only.
+10. **The MCP core runtime** (request `9ca1d290`) was built from `b7b9d8df` on its own branch and does not have the commits since.
+
+## MCP core runtime (request 9ca1d290)
+
+### State at `8b46e825` (written after the section below)
+
+The rest of this section describes `b359e278` and is no longer current. It is kept until the head for review exists. This note says what changed since, and what was stopped.
+
+**Done at this head**
+
+- **Recomposed on stage 5's head `bdc35c53`.** Two merges of `request/decl-stage5`: `575caa60` (at `624dbb9f`) and `3a33b1c6` (at `bdc35c53`). One conflict, in `docs/protocol.md` at the end of section 33.10: stage 5's open point 52 is kept as it now reads, and section 34 follows it unchanged. No rule is renumbered.
+- **The planner's five decisions (`3d8a74a9`)**, in `ca9cd4c1`:
+  1. The caller seam is kept and written down in R-API-14, section 34.2 and the MCP README. It is not a `RoomApi` or `RoomWire` method. `artroom redeem` now keeps the redemption's delegation ID, and `artroom mcp` reads the list under exactly that delegation. `callerFromRoster` refuses a session that names a delegation another key granted, and a key that names a delegation not granted to it. A credential saved before the ID was kept still uses its key's latest delegation.
+  2. R-API-14 says a caller may select another named toolset, any of the four. The override decides the default only, and every selected list has the same filter.
+  3. Section 34.2's command-line item names the caller wiring and `--toolset` as required work.
+  4. Section 23's row "MCP descriptors" gives both vectors: sixteen tools for an admin under a `v2` document, fifteen, with no generic `act`, under `v1`.
+  5. No provisional head closes the runtime scope `9ca1d290` or the contract scope `a9788a59`.
+- **Checker finding `48765af0`** (P2, condition 5), in `dbcf3a7f` and `8b46e825`: an attention wait cancelled a native update stream while its own reader held the lock, which the stream refuses, so the source was never cancelled. The wait now cancels a native stream through its reader and releases the lock. The client's decoded stream is cancelled as before.
+- **Checker caveat `18438fd0`**, in `dbcf3a7f`: the stdio revocation test now asks one server for a second list after the revocation, with the command line's own callback and no fallback to an earlier roster.
+- **Controls the decision lists as owed**, added against the real Room in `ca9cd4c1` and `acd6917a`: adapter parity for a `v2` bearer, a `v1` bearer and a member's own key; revocation by undelegate, by revoke-key and by removing the member; a checker's own key; the admin list under both documents; selecting a larger toolset with no gain.
+
+**Checked at this head**
+
+- Root `npm run typecheck`: exit 0.
+- MCP package tests: 149 node and 5 workerd passed. The command line's `mcp-core` and `cli` test files: 14 passed. The Room's `mcp-core` and `mcp` test files, legacy run: 31 passed. The client's AGENTS.md test: 3 passed.
+
+**Stopped, and owed**
+
+- **The mutation run is partial.** The inventory is now 76 mutants: the 61 of `b359e278`, of which nine did not pass the workspace typecheck and were rewritten as compiling faults, and fifteen new ones. A run of all 76 at `8b46e825` was stopped after 39, on the planner's request `ecbc722a`. All 39 pass the root typecheck with the mutant applied, are red by a named assertion, and were restored. The other 37 have no result at this head. An earlier complete run of the then 71 at `acd6917a` had the same outcome for all 71; that head is two source commits and one merge behind this one. Runner, inventory and results are in the session scratch directory `mutmcp` (`run2.py`, `mutants.py`, `results2.json`, `results2-acd6917a.json`).
+- **Root `npm ci` and `npm test` were not run at this head.** They last passed at `09651d3e`, before the stream repair and the second merge.
+- **The mutation table and gates below are those of `b359e278`.** They are not evidence for this head.
+- **The guard-by-guard audit** of this lane's source diff against the inventory has not been done.
+- **Not shown by any test here:** the real `artroom mcp` binary against the real Room, and an expired bearer over stdio.
+- The final integration still follows reviewed stage 5 on main.
+
+Status: implemented, provisional, not yet for review. Gitseq request `9ca1d290` (planner to builder): the runtime of the adopted MCP core, composed with the planner's contract (`request/mcp-core-current`, `1d9ac5ad`) and with stage 5's generic surfaces. Branch `request/mcp-core-runtime`. Code head `217f01f6`; the commit that adds this section changes only this file. Nothing was pushed or deployed, and no Cloudflare credential was used.
+
+Two things are true of this head and must change before review:
+
+- **It is provisional.** It stands on stage 5's composed head `b7b9d8df` and on the stage 2 code head `15fa7f4c`. Neither has landed. The final integration follows reviewed stage 5 on main: this work is composed again there, and every gate and test is run again at that head.
+- **Main is not merged.** Main is five planning notes ahead of this head, all under `notes/`. No source file differs.
+
+This runtime is not needed by the first jam development task and is not a jam-readiness gate.
+
+### What was built
+
+- **Sixteen tools.** The fourteen named tools and the generic `acts` and `act`, in one fixed order: `claim`, `workspace`, `propose`, `note`, `review`, `land`, `renew`, `release`, `attention`, `explain`, `lanes`, `lane`, `proposal`, `operation`, `acts`, `act`. In [packages/mcp/src/tools.ts](../packages/mcp/src/tools.ts).
+- **Four reads through `RoomApi`.** `lanes`, `lane`, `proposal` and `operation`, in [packages/mcp/src/run.ts](../packages/mcp/src/run.ts). An unknown lane, proposal or operation is `{ outcome: "not-found", what }`. For `operation`, only the lookup's `not-found` becomes that result. Every other failure stays an error.
+- **Descriptors.** Each tool has a title, an advertised output schema, fixed annotations and its toolsets. `tools/list` sends name, title, description, input schema, output schema and annotations. `method` and `toolsets` stay on the server. The longest description is 730 characters. The instructions are 480.
+- **Toolsets.** [packages/mcp/src/toolsets.ts](../packages/mcp/src/toolsets.ts): the one eligibility predicate (`eligible`), the default (`defaultToolset`), the list (`toolsFor`) and the name check (`toolsetOf`). The Worker handler reads `?toolset=`. `artroom mcp` takes `--toolset`.
+- **The caller's authorization.** `tools/list` needs the caller's role and its delegation's signed grant. `RoomApi` has no method that says who is calling, so the host supplies it (`McpCaller`). The Room reads it for a bearer token (`callerOf` in [packages/room/src/requests.ts](../packages/room/src/requests.ts)). The command line builds it from the roster (`callerFromRoster`). See choice 1.
+- **Required keys.** Every act tool's schema requires `idempotencyKey`: `claim`, `propose`, `note`, `review`, `land`, `renew`, `release` and `act`. The input is checked against the schema before any runner is called. A call without a key is `bad-request`, and its message says to add any unique string and to reuse it to retry.
+- **Waits.** `waitMs` is a whole number from 0 to 45,000 on `attention`, `workspace`, `land` and `operation`. `attention` waits on the handle's subscription for an item for the caller. `operation` waits for `until`, by default the kind's finished states. At the limit each returns what is true now.
+- **AGENTS.md.** The MCP form of the generated block says that every act needs an `idempotencyKey` and that a retry reuses it. [packages/client/src/agents-md.ts](../packages/client/src/agents-md.ts).
+- **READMEs.** [packages/mcp/README.md](../packages/mcp/README.md) and one paragraph of [packages/cli/README.md](../packages/cli/README.md).
+
+### Conditions
+
+| Condition of `9ca1d290` | State | Where and how shown |
+|---|---|---|
+| (1) R-API-9, 13, 14 and 15 and every section 34.2 edit: fourteen named tools plus `act` and `acts`; the four reads through `RoomApi`, with structured results for unknown IDs | Met at this head | "Section 34.2 edits" below. MCP: "lanes, lane, proposal and operation read through RoomApi" (3 tests). Room: "the four reads answer from the room; unknown IDs are structured not-found results; …" |
+| (2) Titles, conforming output schemas for success and refusal, fixed annotations, descriptions of at most 1,000 characters, instructions of at most 512; conservative fixed hints for `act`; `acts` read-only | Met | MCP: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations" (5 tests). One of them makes a success and a refusal of every act tool and of `workspace` and checks each against the tool's own advertised schema. Room: a `propose` refused `outside-claim` fits the schema `tools/list` sent |
+| (3) Toolsets, defaults from authorization, filtering, the `toolset` query, `bad-request` for an unknown name; a deterministic list that does not depend on earlier calls; unlisted calls still judged by the room; `acts` in every set, `act` in builder, reviewer and all; no act tool in observer; a checker covered without review or claim authority; no grant expanded, no intent rebound | Met, with one seam to decide: choice 1 | MCP: "toolsets: what tools/list shows follows the caller's authorization" (12 tests), "listing is not permission" (2). Room: "tools/list at the Worker's MCP endpoint" (6), "the Room gives its MCP endpoint the caller's authorization" (2), "a call the list does not show is still the room's to judge" (2). CLI: "artroom mcp --toolset" (3) |
+| (4) Required `idempotencyKey` in schema and at run time for every act tool, `act` included; missing-key refusal; lost-result retries with one effect and the original result; revocation and receipt rules kept; AGENTS.md updated | Met | MCP: "every act tool requires idempotencyKey" (13 tests). Room: "every act tool requires idempotencyKey; a retry gives one effect and the original result" (2), which also shows `unauthenticated` for a retry after revocation. Client: "the MCP block says that every act needs an idempotencyKey and that a retry reuses it" |
+| (5) `waitMs` a finite integer from 0 to 45,000 on four tools; defaults kept; caller-specific attention waits; `operation`'s `until` and default finished states; fresh current state on timeout; nothing held while waiting | Met | MCP: "waitMs is a whole number from 0 to 45,000" (10 tests), "attention with waitMs waits for an item for the caller" (7). Room: "waiting is a bounded read that holds nothing in the room" (3): the log's head and the lane's row are equal before and after each wait |
+| (6) Stage 5's binding and history behaviour, custody, the `v1` controls and the `fa120186` guards and tests are kept; stage 4's check-service jobs stay separate | Met | Every existing test passes at this head; see "Gates". No stage 5 or stage 2 guard was edited. "Existing tests changed" lists each change. Nothing here touches check-service jobs |
+| (7) Main, the four contract paths, section 34 and amendment 7, and stage 5's section 33 reconciled; changed paths and one exact head reported; independent review; tests, named red mutations and gates | Part met | Reconciled at this head: see "Reconciliation" and "Edits to the planner's four paths". Mutations and gates below. **Open:** main's five notes are not merged; the one exact head for review needs stage 5 landed on main; independent review has not started; the planner republishes its artifacts at the final head |
+
+### Section 34.2 edits
+
+| Edit of section 34.2 | Where |
+|---|---|
+| Lane E 1: `title`, `annotations` and `toolsets` on each descriptor; `idempotencyKey` required on every act tool; `maximum: 45000` on every `waitMs` | `packages/mcp/src/tools.ts`: the constants `READ`, `WRITE` and `CHANGES`, each descriptor, `MAX_WAIT_MS` and `waitMs()` |
+| Lane E 2: descriptors and runners for `lanes`, `lane`, `proposal` and `operation`; `McpNotFound`; `operation` uses `op`, then `wait`, and reads again on a timeout | `tools.ts` (descriptors) and `run.ts` (`RUN.lanes`, `RUN.lane`, `RUN.proposal`, `RUN.operation`) |
+| Lane E 3: `tools/list` sends `title`, `outputSchema` and `annotations`; `oneOf` result and `Refusal`; a test that validates a success and a refusal | `packages/mcp/src/server.ts` (`listedTools`). The test is in `packages/mcp/test/mcp-core-9ca1d290.test.ts` |
+| Lane E 4: `attention` with `waitMs` | `run.ts`: `RUN.attention` and `watchAttention` |
+| Lane E 5: the shared predicate and default in HTTPS and stdio; `?toolset=`; ineligible act tools dropped from discovery; every tool still callable; exact retries kept | `toolsets.ts`; `server.ts` (`tools/list` reads the caller and the declarations for each request, and `tools/call` never consults the list); `worker.ts` (the query); `stdio.ts`; `packages/cli/src/main.ts` (`artroom mcp`) |
+| Lane E 6: instructions of at most 512 characters; descriptions of at most 1,000 | `tools.ts`: `INSTRUCTIONS` is 480; the longest description, `act`, is 730 |
+| Lane E 7: the generated AGENTS.md block | `packages/client/src/agents-md.ts` |
+| Lane E 8: `act` and `acts` composed with all of the above; conservative hints for `act`; `acts` read-only; no grant or intent rebound | `tools.ts` (`act` uses `CHANGES`, `acts` uses `READ`, and both carry toolsets); `toolsets.ts` (the generic act is listed by existence, and the signed map is only read) |
+| CLI 1: rebuild against the amended MCP package | Done. One source change was also needed, against the section's "no source change": choice 2 |
+| The MCP endpoint's deployment: the adapter serves `lane`, `lanes`, `proposal`, `op` and `wait` over `RoomWire.read`, and the attention wait over `RoomWire.subscribe` | `packages/room/src/mcp.ts` already builds the client's bearer handle on the Worker's own `RoomWire`. The new Room tests run the four tools and the attention wait through it. The endpoint also gives the server the caller's authorization (`McpWire.caller`) |
+| Other lanes: no change for the four reads | None was made for the reads. The Room gained one read for toolsets: choice 1 |
+
+### Choices where the design left room
+
+1. **The host says who is calling.** `RoomApi` has no method for the caller's own role or grant, and the contract was not widened here. `createArtroomServer` takes `caller()`, and calls it for each `tools/list`. The Room has a new method `caller(token)`, which judges the token exactly as a read does and returns the member's role and the delegation's `kinds` and signed `acts` as recorded. It is not part of `RoomWire`: only the Worker's own MCP endpoint reaches it (`McpRoomWire` in `packages/room/src/worker.ts`). The command line builds the same value from the `members` read: a key file is the member's own key; a bearer file acts under the delegation its room-held key granted. One MCP test shows the two give equal values.
+2. **`artroom mcp` changed.** Section 34.2 says the command line needs no source change. It needed six lines: the stdio server must be told the caller, and `--toolset` is the stdio form of `?toolset=`. An unknown name is refused before the room is asked for anything.
+3. **Under a delegation, the role is the grantor's member's.** Admission judges a delegated act by the grantor's role, so discovery does too.
+4. **A caller may name any of the four toolsets.** R-API-14 says a caller "may ask for fewer" and that the query "selects another toolset". The named set is filtered by the same eligibility, so asking for `all` shows no act tool the caller could not use. The observer override applies to the default only.
+5. **An unknown toolset is HTTP 400.** The body is a JSON-RPC error with code -32602 and the `ArtroomError` `bad-request` in `data`. It is checked after the bearer. Every method on that URL is refused, `tools/call` too, so a mistyped URL never half works. An empty value and a repeated parameter are unknown names.
+6. **The order.** The ten tools keep their order. The four reads follow them, then `acts` and `act`.
+7. **The message for a missing key** is the input check's own message with one sentence added: "Add any unique string as idempotencyKey, and reuse the same one to retry this call." Stage 5's assertion on "input.idempotencyKey: is required" still holds.
+8. **A named act tool is listed only while its built-in binding is the active one.** In a room whose `claim` means something else, `claim` is not listed and `act` is. `renew` is listed by the legacy role table and a plain grant, in every room.
+9. **`workspace` and the reads are never filtered.** `workspace` is a request. The room's own checks judge it.
+10. **`operation`'s finished states.** `landed`, `aborted`, `retryable` and `failed` for a landing; `ready` and `failed` for a workspace; `clean`, `conflict` and `failed` for a preview. An empty `until` means the default. `land` still waits for a terminal or slot-holding state, as before.
+11. **The attention wait opens its watch before it reads the page**, so an item that arrives between the two is seen. With `waitMs` of 0 the tool makes one read and no subscription, as before. A handle with no subscription waits out the time and reads again.
+12. **The wait limit is the schema's.** The input is copied through JSON and checked against the schema before any runner runs. JSON has no NaN or Infinity; an in-process caller that passes one gets `bad-request`.
+13. **The HTTPS bearer client is unchanged.** It always sent a key, and it sends `waitMs: 0`.
+14. **In a `v1` room an admin is shown fifteen tools.** R-API-14 says the generic `act` is not listed under a `v1` document. Section 23's row "MCP descriptors" says sixteen for an admin; that holds in a `v2` room.
+
+### Reconciliation with stage 5's text
+
+Section 34 and stage 5's section 33.10 do not contradict each other on any point of meaning. Two sentences of section 33.10 spoke of things section 34 now settles, and were changed to agree:
+
+- The R-API-9 row said `acts` returns `ActsNotFound` "because MCP structured content must be an object". R-API-9 now says the object shape is Artroom's own choice, not a limit of MCP. The row now says so.
+- The same row said "The ten named tools are unchanged. The descriptor shape (titles, annotations, toolsets) and any further read tools are the MCP core's". It now says the ten are unchanged, that section 34 adds four named reads, and that the descriptor shape, the toolsets that list `act` and `acts`, their fixed hints, the required key and the wait limit are section 34's.
+
+Nothing else in section 33.10 or in R-CRED-10 was edited. R-API-9's own text already says there is no named `check` or `roster` tool and sends a generic declared check to R-CRED-10 as stage 5 amended it. No rule was renumbered.
+
+### Edits to the planner's four paths
+
+The merge is `b9e959cd`. No later commit touches these paths.
+
+| Path | Edit |
+|---|---|
+| `docs/protocol.md` | One conflict: both branches append a section. Both are kept, section 33.10 first, then section 34. Then the two sentences above, in section 33.10's R-API-9 row. Section 34 and R-API-13 to R-API-15 are as the planner wrote them |
+| `packages/contract/src/transports.ts` | One conflict, in `McpTools`: both branches add members at its end. Both are kept: `lanes`, `lane`, `proposal`, `operation`, then `acts`, `act`. `ActsNotFound`, `McpNotFound`, `McpToolsets` and `McpToolAnnotations` follow. One comment line changed: stage 5's "the two generic tools, beside the ten named ones" now says fourteen and cites both sections. No type was changed |
+| `packages/contract/src/index.ts` | None. It merged without conflict |
+| `packages/contract/examples/demo-loop.ts` | None. It merged without conflict |
+
+### Existing tests changed
+
+No assertion was weakened. Each change follows from a required key, the 45,000 limit or a toolset.
+
+| File | Change |
+|---|---|
+| `packages/mcp/test/support.ts` | `roomWithMcp` gives the handler the bearer's caller. New helper `keyed`, which adds a fresh key to an act tool's arguments when a test names none |
+| `packages/mcp/test/schema.test.ts` | `operation` calls `op`. `tools/list` entries have six fields. The seven named act tools' required lists include `idempotencyKey`. The demo-loop inputs carry keys, and the `land` input waits 45,000, not 60,000. `NAMED_TOOLS` is fourteen. Four compile-time checks added for the new tools |
+| `packages/mcp/test/server.test.ts` | `call` uses `keyed`. "lists exactly the ten tools …" is now "lists the agent's tools …": the builder list, each tool equal to its descriptor |
+| `packages/mcp/test/stage0.test.ts` | The listed names are the builder list. Two `propose` calls carry keys |
+| `packages/mcp/test/stdio.test.ts` | The server is given a caller. The list is the builder list. The `claim` call carries a key |
+| `packages/mcp/test/amendment-2.test.ts` | `call` uses `keyed`. The `renew` after revocation carries a key |
+| `packages/mcp/test/review-f47a509c.test.ts` | Three `claim` inputs carry keys |
+| `packages/mcp/test/workerd/worker.test.ts` | The handler is given a caller, and its stub room answers `acts`. The list is every tool but `act`. The `claim` call carries a key |
+| `packages/mcp/test/workerd/body-cap.test.ts` | The handler is given a caller |
+| `packages/cli/test/harness.ts` | The handler is given the bearer's caller |
+| `packages/cli/test/cli.test.ts` | "artroom mcp serves the ten tools over stdio …": the list is the builder list, a call of the unlisted `lanes` is added, and the `claim` carries a key |
+| `packages/room/test/workerd/mcp.test.ts` | `LISTED` is the builder list without `act`, since the suite runs under both vocabularies. `tool` adds a key where a test names none. Two official-client calls carry keys |
+| `packages/room/test/workerd/declared-stage5-a5d64b35.test.ts` | Five named-tool calls carry keys: four `claim` and one `propose` |
+| `packages/client/test/support/fake-room.ts` (a test double) | `bearerCaller`, as the Room's `caller`. `lanes` filters by `touches`. A checker may sign its own `roster` ops, as the Room's role table says, so a checker's invitation can be redeemed |
+
+New test files: `packages/mcp/test/mcp-core-9ca1d290.test.ts` (52 tests), `packages/room/test/workerd/mcp-core-9ca1d290.test.ts` (16 tests, in the legacy run; they found their own `v1` and `v2` rooms, as stage 2's and stage 5's do), `packages/cli/test/mcp-core-9ca1d290.test.ts` (3 tests), and one test added to `packages/client/test/agents-md.test.ts`.
+
+### Mutation table
+
+Each new guard is one statement marked `// GM:<id>`. The runner and results are in the session scratch directory `mutmcp` (`run.py`, `mutants.py`, `results.json`). For each mutant the runner applies one text edit, runs the suites that cover the file's package, and writes the file's bytes back. A red counts only when a test fails by an assertion. A test that times out or fails by another thrown error is counted apart.
+
+61 mutants over 48 marked guards. 61 turn at least one named test red by an assertion. Survivors: none. The first run left one survivor, `readonly-direct`: no test had an own-key caller with nothing eligible. A test was added ("the default comes from the roster role …" now checks a checker's own key in a room that declares nothing for it), and the mutant was run again and is red. 4 mutants also made one test fail by a thrown error or a timeout; those failures are not counted as reds, and each of those mutants has assertion reds besides.
+
+| Mutant | What it does | Reds | One test that goes red |
+|---|---|---|---|
+| `key-claim` (`mcp/tools.ts`) | Claim no longer requires a key | 5 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-renew` (`mcp/tools.ts`) | Renew no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-release` (`mcp/tools.ts`) | Release no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-propose` (`mcp/tools.ts`) | Propose no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-note` (`mcp/tools.ts`) | Note no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-review` (`mcp/tools.ts`) | Review no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-land` (`mcp/tools.ts`) | Land no longer requires a key | 4 | mcp: "every act tool requires idempotencyKey (R-API-9) the schema requires it for the eight act tools, act included, and for no other tool" |
+| `key-act` (`mcp/tools.ts`) | Act no longer requires a key | 4 | mcp: "act: any declared act, with the binding the agent read the schema refuses a call without a binding or a key before the room is asked; a platform ki…" |
+| `key-advice` (`mcp/run.ts`) | A missing key is not told how to add one | 9 | mcp: "every act tool requires idempotencyKey (R-API-9) claim without a key is bad-request, says how to add one, and the room is never asked" |
+| `wait-max` (`mcp/tools.ts`) | Waits up to 300,000 ms are accepted | 5 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) exactly four tools take waitMs, each with the same bounds" Also 1 test failed by a thrown error or a timeout, not counted. |
+| `wait-whole` (`mcp/tools.ts`) | `waitMs` need not be a whole number | 6 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) exactly four tools take waitMs, each with the same bounds" |
+| `wait-from-zero` (`mcp/tools.ts`) | A negative waitMs is accepted | 6 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) exactly four tools take waitMs, each with the same bounds" |
+| `attention-default` (`mcp/run.ts`) | Attention with no waitMs opens a watch and reads twice | 1 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) with no waitMs, or 0, it is one read and no subscription" |
+| `attention-nonempty` (`mcp/run.ts`) | Attention waits although the page has items | 1 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) a page that already has items returns at once, without waiting" |
+| `attention-reread` (`mcp/run.ts`) | Attention returns the first, empty page after the wait | 6 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) over the long poll: updates without attention items do not end the wait; the one …" |
+| `attention-items` (`mcp/run.ts`) | Any update ends the attention wait on a stream, not only one with items for the caller | 1 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) through the endpoint: an empty page, then a note notifies the caller: the page wi…" |
+| `attention-items-poll` (`mcp/run.ts`) | Any update ends the attention wait on the long poll | 1 | mcp: "attention with waitMs waits for an item for the caller (R-API-15) over the long poll: updates without attention items do not end the wait; the one …" |
+| `op-not-found-all` (`mcp/run.ts`) | Every failure of the operation read becomes not-found | 1 | mcp: "lanes, lane, proposal and operation read through RoomApi (R-API-9) operation: only the lookup's not-found becomes a result; unauthenticated, forbid…" |
+| `op-not-found-none` (`mcp/run.ts`) | An unknown operation is an error, not a result | 4 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) a success and a refusal of every act tool and of w…" |
+| `op-until-ignored` (`mcp/run.ts`) | Operation ignores the caller's until | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation reads once with no waitMs; with one it waits for until, by default the kind's finish…" |
+| `op-until-default` (`mcp/run.ts`) | Operation's default until is not the kind's finished states | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation reads once with no waitMs; with one it waits for until, by default the kind's finish…" |
+| `op-wait-zero` (`mcp/run.ts`) | Operation waits although waitMs is 0 | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation reads once with no waitMs; with one it waits for until, by default the kind's finish…" |
+| `op-wait-reached` (`mcp/run.ts`) | Operation waits although the state is already reached | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation reads once with no waitMs; with one it waits for until, by default the kind's finish…" |
+| `op-timeout-swallow` (`mcp/run.ts`) | Every failure of the operation wait is answered with the current state | 1 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation at waitMs returns the operation's current state, read afresh, and not an error; anot…" |
+| `op-timeout-error` (`mcp/run.ts`) | An operation wait that times out is an error | 3 | mcp: "waitMs is a whole number from 0 to 45,000 (R-API-15) operation at waitMs returns the operation's current state, read afresh, and not an error; anot…" |
+| `lane-not-found` (`mcp/run.ts`) | An unknown lane is null, not a structured result | 4 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) a success and a refusal of every act tool and of w…" |
+| `proposal-not-found` (`mcp/run.ts`) | An unknown proposal says what: lane | 4 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) a success and a refusal of every act tool and of w…" |
+| `hint-conservative` (`mcp/tools.ts`) | Act, land and release are advertised as not destructive | 2 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) the annotations are the rule's table, and act's ar…" |
+| `list-annotations` (`mcp/server.ts`) | Tools/list sends no annotations | 5 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `list-title` (`mcp/server.ts`) | Tools/list sends no title | 3 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `list-server-fields` (`mcp/server.ts`) | Tools/list sends the server-side toolsets | 2 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `act-toolsets` (`mcp/tools.ts`) | The observer toolset lists act | 3 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) each descriptor's toolsets are the rule's table: a…" |
+| `list-fresh` (`mcp/server.ts`) | A server keeps the first caller and declarations it read | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the list is the same before and after other calls, and it is read afr…" |
+| `toolset-unknown` (`mcp/toolsets.ts`) | An unknown toolset name is accepted | 2 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) an unknown toolset name is bad-request, over HTTPS and for stdio, and…" Also 1 test failed by a thrown error or a timeout, not counted. |
+| `toolset-query` (`mcp/worker.ts`) | The toolset query is ignored | 8 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) an unknown toolset name is bad-request, over HTTPS and for stdio, and…" Also 1 test failed by a thrown error or a timeout, not counted. |
+| `toolset-one` (`mcp/worker.ts`) | Two toolset parameters are accepted | 2 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) an unknown toolset name is bad-request, over HTTPS and for stdio, and…" |
+| `platform-grant` (`mcp/toolsets.ts`) | Renew is listed without a grant for it | 7 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the generic act is listed by existence: platform-only grants and an a…" |
+| `platform-role` (`mcp/toolsets.ts`) | Renew is listed for a role that may not sign it | 3 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) a caller may ask for another toolset; the list is that set, filtered …" |
+| `legacy-grant` (`mcp/toolsets.ts`) | A v1 delegation's kinds do not filter the named tools | 4 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) tools/list as an agent; with ?toolset=reviewer; as a bearer whose del…" |
+| `legacy-role` (`mcp/toolsets.ts`) | The v1 role table does not filter the named tools | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the generic act is listed by existence: platform-only grants and an a…" |
+| `generic-v1` (`mcp/toolsets.ts`) | The generic act is listed under a v1 document | 10 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) tools/list as an agent; with ?toolset=reviewer; as a bearer whose del…" |
+| `who` (`mcp/toolsets.ts`) | Who.roles does not decide eligibility | 5 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `who-admin` (`mcp/toolsets.ts`) | Admin is not implicit | 3 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `delegable` (`mcp/toolsets.ts`) | A kind that may not be delegated is eligible for a delegated caller | 2 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) discovery follows a changed role, a changed who and a declaration tha…" |
+| `map-binding` (`mcp/toolsets.ts`) | A stale signed binding counts as current | 6 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the generic act is listed by existence: platform-only grants and an a…" |
+| `map-entry` (`mcp/toolsets.ts`) | A kind the signed map does not name is eligible | 13 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) tools/list as an agent; with ?toolset=reviewer; as a bearer whose del…" |
+| `built-for` (`mcp/toolsets.ts`) | A named tool is listed although its built-in binding is not the active one | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) a named act tool is shown only while the room's declaration of its ki…" |
+| `readonly-override` (`mcp/toolsets.ts`) | A delegation with no eligible act kind keeps its role's toolset | 8 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) a checker: its own key; delegated with one eligible declared check ki…" |
+| `readonly-direct` (`mcp/toolsets.ts`) | An own-key caller with no eligible act kind gets observer | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `checker-default` (`mcp/toolsets.ts`) | A checker's default is builder | 5 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `default-all` (`mcp/toolsets.ts`) | An admin's default is builder | 4 | mcp: "descriptors: sixteen tools, each with a title, an output schema and fixed annotations (R-API-13) tools/list as an admin shows the fourteen named to…" |
+| `set-member` (`mcp/toolsets.ts`) | Every toolset lists every tool | 25 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `act-filter` (`mcp/toolsets.ts`) | Act tools are listed whatever the caller may sign | 22 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) the default comes from the roster role: all for admin and maintainer,…" |
+| `act-existence` (`mcp/toolsets.ts`) | The generic act is listed with no eligible kind | 14 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) tools/list as an agent; with ?toolset=reviewer; as a bearer whose del…" |
+| `roster-revoked` (`mcp/toolsets.ts`) | A revoked delegation named by ID is a caller | 1 | mcp: "toolsets: what tools/list shows follows the caller's authorization (R-API-14) HTTPS and stdio give the same list for the same authorization" |
+| `agents-key` (`client/agents-md.ts`) | The MCP block keeps the old retry advice | 1 | client: "the MCP block says that every act needs an idempotencyKey and that a retry reuses it (R-API-9, amendment 7)" |
+| `cli-toolset` (`cli/main.ts`) | Artroom mcp ignores --toolset | 1 | cli: "artroom mcp --toolset (R-API-14) a member's key: the builder list by default, the reviewer list with --toolset reviewer, and a tool the list omits …" |
+| `cli-caller` (`cli/main.ts`) | A bearer file is treated as the member's own key | 1 | cli: "artroom mcp --toolset (R-API-14) a redeemed bearer: the list follows the session's delegation, as it does at the MCP URL" |
+| `caller-judged` (`room/requests.ts`) | The caller read does not judge the token | 1 | room: "the Room gives its MCP endpoint the caller's authorization (R-API-14) an unknown token, and a bearer whose key was revoked, are unauthenticated; to…" |
+| `caller-grant` (`room/requests.ts`) | The caller read drops the signed map | 5 | room: "the Room gives its MCP endpoint the caller's authorization (R-API-14) a bearer: its member's role now, and its delegation's signed grant unchanged;…" Also 1 test failed by a thrown error or a timeout, not counted. |
+| `caller-delegation` (`room/requests.ts`) | The caller read presents a bearer as the member's own key | 7 | room: "the Room gives its MCP endpoint the caller's authorization (R-API-14) a bearer: its member's role now, and its delegation's signed grant unchanged;…" |
+
+### Gates
+
+Run one after another in this worktree at the code head, each as its own command, with its exit code checked. The commit that adds this section changes no file a test or the compiler reads; the typecheck and the whitespace check were run again after it.
+
+| Gate | Exit | Result |
+|---|---|---|
+| `npm ci` | 0 | Installed from the lockfile, which is unchanged |
+| `npm run typecheck` | 0 | All eleven workspaces |
+| `npm test` | 0 | 3,167 vitest tests passed and 127 skipped, in these runs: checkers 43; cli 185; client 122 and 2; log 198 and 193; mcp 139 and 5; policy 313, and 311 with 2 skipped; room node 270, room legacy run 658, room declared run 533 with 125 skipped; ui 195. `packages/git` runs under the Node test runner: 340 passed. No test failed |
+| `git diff --check b7b9d8df` | 0 | No whitespace error |
+
+The declared run's skips are the tests that found their own rooms (stage 2's, stage 5's and this request's 16) and the seven that need stage 3's `artroom verify`. Policy's 2 skips are as before.
+
+### Not changed here
+
+`packages/log`, `packages/policy`, `packages/git`, `packages/ui`, `packages/checkers` and the Room's admission are unchanged. The Room's only source changes are the caller read (`requests.ts`, `room.ts`) and its use by the MCP endpoint (`mcp.ts`, `worker.ts`). No migration. The contract is as the merge left it.
+
+### For the planner or hugh
+
+1. **The caller read.** Choice 1 adds a Room read that the contract does not name. The planner may want it in the contract instead, for example as a read query a session or bearer token may make about itself. That would let every host use one source, and would remove the command line's rule for finding a bearer's delegation in the roster.
+2. **Asking for a larger toolset.** Choice 4 lets an agent name `all`. If "fewer" was meant strictly, the name check is the place to refuse it.
+3. **Section 34.2's CLI line** says no source change is required. One was: choice 2.
+4. **Section 23's "MCP descriptors" row** holds only in a `v2` room: choice 14.
+5. **The planner's artifacts.** The planner republishes them at the final head. That head does not exist yet: it needs stage 5 reviewed and landed, then this branch composed on main.
+
+## Test overhead (request ecbc722a)
+
+Status: implemented, pending review. Gitseq request `ecbc722a` (planner to builder, relaying the project owner's new highest priority), promise `1c6bf45c`. Branch `request/test-overhead`. Nothing was pushed or deployed.
+
+The request: cut Artroom's test overhead at least ten times. Remove every test that does not prove a useful invariant, make the expensive useful tests cheap, measure before and after, and stop the exhaustive mutation sweeps.
+
+**What the head is.** The work could not start from main, because the cost was in the lanes under review. So the branch first composes them: declared acts stage 2 (`35797f84`), stage 3 (`5449d19c`), stage 5 (`db73dddc`) and the MCP core runtime (`729fb330`), merged at `a1990c94`. Only this file conflicted. That composed head is the baseline. None of those lanes is reviewed or landed, and this request does not review them: their functional outcomes and their open findings stay owed under their own requests.
+
+### The result
+
+The target is judged by two figures, elapsed pipeline time and aggregate process CPU, for the complete gate and for one edit taken to review. That is the request's criterion 3 as amended by `da68c9a9` and ratified by `67d58f37`: the amendment withdraws the demand for observed worker lifetimes, which the planner's wording had added, and keeps both ten-times targets.
+
+| Judged against the target | Before | After | Times less |
+|---|---|---|---|
+| Complete gate, elapsed | 410.4 s (sum of the old gate's steps) | 33.9 s (one observed gate) | 12.1 |
+| Complete gate, CPU | 830.1 s | 78.0 s | 10.6 |
+| The same, both sides as sums of separately timed steps: elapsed | 410.4 s | 40.7 s | 10.1 |
+| The same: CPU | 830.1 s | 87.0 s | **9.5, short of ten** |
+| One edit taken to review, elapsed | 925.7 s (reconstructed) | 41.3 s | 22 |
+| One edit taken to review, CPU | 2,092 s (reconstructed) | 98.0 s | 21 |
+
+The one shortfall is CPU when both sides are sums of separately timed steps: 9.5. The gate as it is actually run is one command with one root vitest process, and against the old pipeline it is 10.6 times less CPU. Both figures are given so that the reader can choose; the limits of each are listed below the next table.
+
+Five kinds of figure appear in this section. They answer different questions and are kept apart:
+
+- **Elapsed**: how long a person waits.
+- **CPU**: user and system seconds, summed over every process a step started.
+- **Single-worker suite time**: the elapsed time of each suite's command when it is given one worker and runs one file at a time. This is the nearest observation of what the test workers cost when nothing runs side by side. It is the whole command, so it includes the runner's own start and, in workerd, the pool and the runtime. It is not an observed worker lifetime, and it is not how the gate normally runs.
+- **Printed worker subtotal**: vitest's own totals of import, test, setup and environment time over all test files in the normal parallel run, plus the git runner's duration. It leaves out the rest of a worker's life, and parallel load inflates it. The ui package's vitest prints shares, not seconds, so its part is its summed test-file time (2.7 s before, 0.9 s after).
+- **Summed test-file time**: the test durations in vitest's reports. It leaves out imports and setup.
+
+The steps were timed with [scripts/measure-tests.sh](../scripts/measure-tests.sh), each one alone under `/usr/bin/time`, one after another. One 18-core machine, shared with other sessions: the one-minute load was 5 to 18 during the baseline and 6 to 18 during the after run. `node_modules` was already installed both times.
+
+| The complete gate | Elapsed | CPU | Printed worker subtotal | Summed test-file time | Tests run |
+|---|---|---|---|---|---|
+| Before, at `a1990c94`: the sum of 17 steps (`npm ci`, typecheck, each suite) | 410.4 s | 830.1 s | 990.8 s | 787 s | 4,339 |
+| After, at `641ebb43`: the sum of the same steps, 16 now | 40.7 s | 87.0 s | 51.4 s | 37 s | 2,000 |
+| After, at `a31d84ba`: one whole gate, observed (`npm run gate -- --ci`) | 33.9 s | 78.0 s | 49.1 s | | 2,000 |
+| After, at `a31d84ba`: one whole gate with no install, observed (`npm run gate`) | 29.3 s | 70.6 s | | | 2,000 |
+
+By the same method on both sides, the sum of steps, the gate costs 10.1 times less elapsed time and 9.5 times less CPU. The printed worker subtotal is 19.3 times less and the summed test-file time 21 times less. One whole gate as it is now run is 12.1 times less elapsed and 10.6 times less CPU than the baseline sum. The tests alone went from 391.6 s and 791.4 CPU seconds to 29.8 s and 63.7: 13.2 and 12.4 times.
+
+**Every suite with one worker, as a serial comparison.** `scripts/measure-tests.sh <dir> --serial` ran every suite with one worker, one file at a time, at both heads. The one-minute load was 3 to 17 during the baseline run and 3 during the after run.
+
+| Every suite, one worker each | Sum of the suites' elapsed time | CPU |
+|---|---|---|
+| Before, at `a1990c94`, 15 suites | 742.2 s | 691.2 s |
+| After, at `64a379c2`, 14 suites | 59.7 s | 64.8 s |
+
+That is 12.4 times less. The largest parts before were the log package in workerd (299.2 s) and in Node (115.1 s), the git package (71.2 s), the Room's two workerd runs (68.0 s and 60.8 s) and the CLI (51.5 s). The largest part after is the Room's workerd run, 26.6 s: with one worker, one isolate makes every room, and the pool's nested proxies (see "Found on the way") cost most there. With the gate's four workers the same run takes 6 s.
+
+What these comparisons are, and are not:
+
+- **The baseline is a sum of steps, not one observed run.** The old gate was `npm ci`, the typecheck and `npm test --workspaces`, which ran these same suites one after another, so the sum is close to what a person waited. No single uninterrupted baseline gate was timed.
+- **The like-for-like row is the second.** It is also a sum of steps, each started with a warm file cache from the step before.
+- **The last two rows are single observed runs** of the gate command, under `/usr/bin/time`. They include the one-process root run, which the baseline could not have. The fourth was taken during the edit cycle below, with a one-minute load of 19.
+- **No worker lifetime was measured, and none is claimed.** The single-worker figure is the elapsed time of whole commands in a configuration the gate does not use. The printed subtotal covers only the phases vitest prints. Under the amendment neither decides the target; they show where the time is.
+- **CPU is the weakest ratio**, 9.5 by the sum of steps and 10.6 for the observed gate. The typecheck and the install are unchanged (about 23 CPU seconds together) and are now more than a quarter of the gate.
+
+By step, elapsed seconds, CPU seconds and tests run:
+
+| Step | Before: elapsed | CPU | tests | After: elapsed | CPU | tests | Times less: elapsed | CPU |
+|---|---|---|---|---|---|---|---|---|
+| `checkers` | 36.5 | 33.8 | 48 | 2.6 | 2.2 | 35 | 14.2 | 15.2 |
+| `cli` | 8.8 | 21.8 | 201 | 1.5 | 3.7 | 132 | 5.8 | 6.0 |
+| `client-node` | 6.7 | 4.5 | 144 | 0.8 | 1.3 | 99 | 8.2 | 3.6 |
+| `client-workerd` | 1.0 | 1.2 | 2 | 1.0 | 1.2 | 2 | 1.0 | 1.0 |
+| `git` | 72.3 | 56.5 | 340 | 5.3 | 4.0 | 308 | 13.6 | 13.9 |
+| `log-node` | 32.0 | 137.2 | 369 | 2.1 | 15.2 | 267 | 15.0 | 9.1 |
+| `log-workerd` | 194.2 | 328.1 | 362 | 1.4 | 1.7 | 12 | 140.7 | 191.9 |
+| `mcp-node` | 2.5 | 4.0 | 149 | 1.1 | 1.6 | 103 | 2.2 | 2.5 |
+| `mcp-workerd` | 1.4 | 2.1 | 5 | removed | removed | 0 | | |
+| `policy-node` | 1.0 | 4.7 | 355 | 0.8 | 1.9 | 209 | 1.2 | 2.5 |
+| `policy-workerd` | 2.4 | 5.7 | 353 | 1.5 | 2.4 | 48 | 1.6 | 2.3 |
+| `room-node` | 1.7 | 8.4 | 403 | 1.0 | 2.6 | 165 | 1.7 | 3.3 |
+| `room-workerd` | 15.6 | 90.9 | 819 | 6.3 | 19.7 | 410 | 2.5 | 4.6 |
+| `room-declared` | 13.9 | 80.3 | 540 | 3.0 | 3.5 | 33 | 4.7 | 22.7 |
+| `ui` | 1.6 | 12.2 | 249 | 1.2 | 2.8 | 177 | 1.3 | 4.4 |
+| **all test steps** | **391.6** | **791.4** | **4339** | **29.8** | **63.7** | **2000** | **13.2** | **12.4** |
+| `npm run typecheck` | 6.5 | 14.2 | | 6.2 | 13.4 | | 1.0 | 1.1 |
+| `npm ci` | 12.2 | 24.5 | | 4.6 | 9.9 | | | |
+
+`npm ci` is the same command both times; its two figures differ only by the machine's load and cache.
+
+The Room's workerd step was timed again at `a31d84ba`, after a review correction removed a workaround from its harness (see "Review corrections" below): 6.1 s and 6.5 s elapsed, 19.3 and 20.1 CPU seconds, against 5.9 and 6.1 s, 18.4 and 18.5, with the workaround.
+
+**One edit, taken to review.** The same place both ways: the two guards of the refusal-text bound in `packages/room/src/declared.ts`. In the after run the edit itself changes only the comment beside each guard, so that the affected tests are selected and pass. The faults are the two controls that follow, each of which breaks one guard and restores it.
+
+| | Elapsed | CPU |
+|---|---|---|
+| Before, as stage 2 was run: put together from measured parts | 925.7 s | 2,092 s |
+| After, measured at `a31d84ba` | 41.3 s | 98.0 s |
+
+That is 22 times less elapsed time and 21 times less CPU.
+
+The before figure is a reconstruction, not one continuous run. Its parts were each measured: one mutant per guard under the old runner, with the root typecheck and five test sets for each (104.9 s, 432.0 CPU seconds for the two), and the baseline gate counted twice (410.4 s, 830.1 CPU seconds each), because the old practice ran the gate at the code head and again at the report head.
+
+The after figure is the sum of four commands, run one after another with the edit in place. The one-minute load was 19.
+
+| Command | Result | Elapsed | CPU |
+|---|---|---|---|
+| `npm run test:changed` | root run: 12 files, 457 tests passed; git and ui not affected | 9.3 s | 24.1 s |
+| `node scripts/control.mjs packages/room/src/declared.ts 'return clipBytes(text, WORDING_FILLED_BYTES);' 'return text;' --expect 'refusal wording' -- packages/room --config vitest.node.config.ts test/node/declared-equivalence.test.ts` | distinguishes: 14 pass before; the named test fails by its assertion | 1.4 s | 1.7 s |
+| the same, with `'if (bytes > max) break;'` changed to `'if (bytes > max + 1) break;'` | distinguishes, by the same test | 1.4 s | 1.7 s |
+| `npm run gate` | passed: 2,000 tests | 29.3 s | 70.6 s |
+
+The single-worker comparison for the edit cycle is known only in part. After, with one worker: the affected tests took 28.8 s (`npx vitest run --changed --maxWorkers=1 --no-file-parallelism`, the same 12 files), the two controls 1.4 s each, and the gate's suites 59.7 s: 91.3 s. Before, the two gates' suites alone are 1,484 s with one worker. The two mutants' test sets were not run with one worker, so the before figure is a lower bound and the ratio, 16 times, is "at least".
+
+The comparison understates what stage 2 really cost: over one day its review loop ran 1,799 mutant runs, 24 hours of runner time, and six root gates, and the inventory was still not complete when the run was stopped.
+
+### Where the time was, and what changed
+
+- **The log package was 59 percent of all CPU.** Four test files, each run in Node and again in workerd, built logs at real limits: 20 MiB files, a search over 1.3 million digests, a 64 MiB staging case. The layout rules are now shown at small limits set for the test, with the 8 MiB segment bound and the 4,096-entry directory bound still shown at real size. workerd runs one file, which pins a log's commit IDs for both runtimes.
+- **The git package** started about 4,930 git processes and ran its files one at a time. Test repositories are now written as files, the landing engine runs on a repository in memory that is compared with real git by one script, and waits are bounded at 10 to 40 ms.
+- **The checkers** ran a real `npm ci` and `npm test` 30 times and built a git fixture per test. Those run once; what the service decides, signs and sends is tested against a container in memory, with the provider, gateway and checkout still real.
+- **The Room's suite ran twice**, once as written and once under the `v2` declarations. The second run is now a witness set in one file: 32 chosen tests and one test of the run itself. The other files share isolates, so the Worker is loaded once per worker and not once per file, and 52 files became 11.
+- **Real waits are gone**: the client's backoff (6 s), the CLI's dropped-reply cases (1.4 s each), a 2 s ledger timeout, lock tests with waits of up to 3 s. Each now uses an injected delay, a gate or the test clock.
+- **Policy** ran its whole suite in two runtimes; workerd now runs the three files that are about the runtime.
+- **One process.** `npm test` at the root is one vitest run with a project per package and runtime, where there were fifteen runs.
+
+### What was removed
+
+2,339 of 4,339 run tests are gone, and 2,000 remain. No test was removed for being slow. The reasons, by group, are in [test-invariants.md](test-invariants.md), with the witness that still protects each invariant. In broad terms:
+
+- **The same thing twice:** the log and policy suites in a second runtime (about 660 tests); the Room's whole suite under a second vocabulary (507).
+- **One test per condition:** the tests written in the last days of stage 2 so that every mutant of every guard had a red test (about 300 in the Room, 146 in policy), merged into the tests of each invariant.
+- **Tests of test code:** the stand-in rooms of the UI and the client, the checkers' room stand-in.
+- **Tests of other programs:** git's and npm's own behaviour.
+- **Review-by-review repeats:** files added one finding at a time that pinned the same rule again; each of the 36 defects repaired in stage 2 keeps one witness.
+
+About 260 kept witnesses were checked by breaking the source by hand, one change at a time, and seeing the named test fail by its assertion. About ten did not distinguish. Two were repaired, one assertion that claimed more than it tested was removed, and the rest are listed in the map as known gaps.
+
+### How to work now
+
+[docs/testing.md](../docs/testing.md) is the guidance, and `AGENTS.md` points to it. In short: name the invariant; test it at the cheapest boundary that can show it; run `npm run test:changed` while working; run `npm run gate` once at the head sent for review; show that a new witness distinguishes with `scripts/control.mjs`, one change at a time. There is no mutation sweep.
+
+- **`npm run test:changed`** covers the three test runners. The root vitest run picks the test files that import a changed file. The git and ui packages each run whole when a changed file is in the package or in a package it depends on. Its last lines say which ran.
+- **`scripts/control.mjs`** runs the tests unchanged first, which must pass, then with the one change. It answers "distinguishes" only when a test failed by an assertion. A run that did not start, did not compile, timed out or failed only by a thrown error is "inconclusive", with its own exit code, and is not evidence.
+- **`npm run gate`** checks whitespace, typechecks every workspace and runs every test. The UI build (`vite build`) and the browser suite (`npm run e2e` in `packages/ui`, one file) were not part of the gate before this work and are not part of it now. Neither was changed, and neither is in any figure above.
+
+### Earlier demands that this request replaces
+
+The request says to reconcile the earlier blanket demands and record them as superseded, not as met.
+
+| Earlier demand | Where | Now |
+|---|---|---|
+| The Room's whole suite passes unchanged against the legacy vocabulary and again against the `v2` declarations, with every converted test listed one by one | stage 2, condition 3; protocol section 33.6 | Superseded. The declared witness set runs 32 chosen tests under `v2`, and one more test checks that each of the four conversions was applied. 507 tests no longer run under `v2`. Section 33.6 says so. `plans/declared-stage2-conversions.md` is removed |
+| A mutation of each declaration field and each new guard turns a test red | stage 2, condition 4; taken up for stages 3 and 5 and the MCP core | Superseded, not met. The stage 2 run of 594 mutants was stopped at 199, and its output is kept as partial. The stage 3 and stage 5 audits (502 and 375 guards with no mutant) are kept as lists of where to look, not as work owed. The MCP run stopped at 39 of 76 |
+| Every repaired reviewer finding keeps its test | all lanes | Kept, as one witness per finding |
+| Root gates at the exact head, and again at the report head | all lanes | The gate runs once, at the head sent. A commit that changes only documents carries the tree hashes instead |
+| The live row-write measurement on the provider | request `92ddf4cc` | Unchanged, still owed |
+
+The stage 2, 3, 5 and MCP sections above were written before this request. They name test files, counts and mutation tables that this work merged or removed, and those parts are superseded by this section; [test-invariants.md](test-invariants.md) is the current map.
+
+### Seams added to source
+
+None changes behaviour: `ClientOptions.backoff` (client); `Io.retries`, `Io.stdio` and `gitCommand.run` (CLI); a re-export of `StdioServerTransport` (MCP); `setLayoutLimitsForTests` (log); and the body of `ArtifactsGateway.fetch` moved, unchanged, to `gatewayFetch` (git).
+
+### Found on the way
+
+- **A minor defect, not fixed here:** `judgeBearer` in the Room does not check the grantor key's revocation as the read path does. After a room-held key is retired, a bearer's exact retry still returns the original record, while reads answer `unauthenticated`. Nothing is recorded. It has its own request, `5d41ea36`.
+- **A tool defect, not worked around:** `@cloudflare/vitest-pool-workers` 0.22.0 nests one more proxy on its wrapper class for each Durable Object an isolate constructs, so a room cost 9 ms at first and 64 ms after 450 rooms in one isolate. With four workers no isolate makes that many, and the cost is under half a second for the suite.
+- **Tests that did not test:** the client's watch close-during-backoff test and session-token redaction test passed with the source broken; both are repaired. The mint-site scan missed a computed key under a type assertion; fixed in the test. One existing Room test (R-ADM-6) failed now and then under load because it slept 20 ms; it now waits for the policy call.
+
+### What this does not show
+
+- **The figures are from one shared machine.** Elapsed time moved up to twofold from minute to minute with other sessions' load. CPU time is steadier, and the paired runs in each package's notes agree with the table. A quiet machine would give smaller numbers on both sides.
+- **Not every step fell ten times.** The Room's first run is 2.5 times less elapsed and 4.6 times less CPU, the CLI about 6 times, the client, policy, UI and MCP 2 to 4 times. Their floor is the cost of starting a vitest run (0.5 to 1 s each) and, in the Room, real Durable Objects: about 9 ms a room and 2.4 ms an admitted act, 30 ms a test. The gate as a whole passes ten times because the two largest costs fell 14 to 190 times.
+- **The second-vocabulary run is much smaller.** A fault that only shows when some other legacy test runs under `v2` would no longer be caught by the suite. The direct tests of what `v2` changes are the protection.
+- **The removed tests were judged, not proved, redundant.** Each removal has a reason and a surviving witness in the map, and a sample of witnesses was checked by breaking the source. The checker's focused counterexamples are the independent test of that judgement.
+- **The lanes are not reviewed.** A green gate here says the composed head passes its reduced suite. It does not approve stage 2, 3 or 5 or the MCP core.
+- **The browser suite** (`packages/ui/e2e`) is outside the gate, as before, and was not changed.
+
+### Review corrections
+
+The checker read the work before it was sent for review and recorded preliminary findings (`259df8d7`, at `0608e2e8`). Each is corrected at `a31d84ba`:
+
+| Finding | Correction |
+|---|---|
+| The Room's test harness replaced the global `Proxy` to flatten the pool's nested wrappers, matching by the handler's source text. The checker showed an ordinary nested proxy whose result this changes | The workaround is removed. It saved under half a second. The harness now changes nothing in the runtime |
+| `npm run test:changed` ran only the root vitest run, which leaves out git and ui | It now runs all three runners, and says which ran ([scripts/test-changed.mjs](../scripts/test-changed.mjs)) |
+| `scripts/control.mjs` counted a run that never started, or failed to load, as a distinguishing control | It needs a passing run first, and separates "distinguishes", "survives" and "inconclusive". Tried on twelve cases, among them a missing directory, a missing configuration, a change that does not compile, a thrown error and a test file that does not exist: each is inconclusive |
+| The 33.8 s gate figure was a sum of separately measured parts, and the edit-cycle "before" was a reconstruction, neither labelled | The table now separates sums of steps from observed runs, and the edit cycle states its parts |
+| CPU and summed test-file time do not show worker time | Worker time is its own column |
+| The map's known gaps still called the whole `v2` suite a criterion | The line now says the demand is superseded, and what gap remains |
+| The measurement script ended with "done" whatever happened | It names failed steps and fails |
+
+The checker then reviewed `15680192` and asked for changes (`3965e230`, with the checks in `0d7ccc8f`). Each is corrected at `64a379c2`:
+
+| Finding | Correction |
+|---|---|
+| `scripts/control.mjs` answered "survives" when every test was skipped after the change | A run with fewer tests than the passing run before it is inconclusive |
+| It answered "distinguishes" when one test failed by an assertion and another timed out | Any timeout makes the run inconclusive. The assertion is still printed, as partial evidence |
+| `npm run test:changed` selected no root test for a change to the lock file or a root `tsconfig`, and reported the root run as passed | A root file now runs every test of all three runners |
+| A new file with a name git quotes was not matched to its package, and vitest could not read it | Names are read from git with `-z`. Such a name runs the whole root vitest run; git and ui are still chosen by where the file is, and now match it |
+| The worker figure was a subtotal of printed phases, presented as worker time | It is named a subtotal. A single-worker run of every suite at both heads is added as a serial comparison, not as worker time. The amendment `da68c9a9` then set the target on elapsed time and CPU, and the result is stated against it |
+| The edit cycle's edit is comment text; its faults are the controls | Stated |
+
+### Gates
+
+Run with `npm run gate -- --ci` at `a31d84ba`: install exit 0; whitespace exit 0 (`git diff --check` against the base on main); typecheck exit 0, every workspace; test exit 0, 2,000 tests passed (1,515 in the root vitest run, with 69 more skipped where the witness set loads a file and runs only its chosen tests; 308 in git; 177 in ui); `git status` empty. After `a31d84ba` the source and tests are unchanged; later commits change three scripts, the guidance and this section. The gate was run again at that head, and the review request states the result.

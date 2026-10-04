@@ -1,8 +1,10 @@
 // The gateway's ref fence: it reads receive-pack commands and refuses any
 // update the operation did not allow, replaying allowed bodies unchanged.
+// The gateway itself is a Workers entrypoint (container.ts) that calls
+// `gatewayFetch`; the tests at the end drive that function.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkUpdates, readCommands, repoPathOf, FenceError, ZERO } from "../src/publisher/ref-fence.ts";
+import { checkUpdates, gatewayFetch, readCommands, repoPathOf, FenceError, ZERO, type GatewayProps } from "../src/publisher/ref-fence.ts";
 
 const A = "a".repeat(40), B = "b".repeat(40), C = "c".repeat(40);
 const enc = new TextEncoder();
@@ -85,4 +87,66 @@ test("the sandbox reaches the public namespace and, in a deployment that imports
   assert.equal(repoPathOf(`https://${host}/git/imp/r.git`, host, ["pub", "imp"]), "/git/imp/r.git");
   for (const bad of [`https://${host}/git/other/r.git`, `https://${host}/git/pubx/r.git`, `http://${host}/git/pub/r.git`, `https://evil.example/git/pub/r.git`, `https://u:p@${host}/git/pub/r.git`, `https://${host}/git/pub/r.git?x=1`, `https://${host}/git/pub/r`])
     assert.throws(() => repoPathOf(bad, host, ["pub", "imp"]), /not allowed/, bad);
+});
+
+// ------------------------------------------------------------------ the gateway's decision for one request
+
+const HOST = "acct.artifacts.cloudflare.net";
+const GRANTS: GatewayProps = {
+  host: HOST,
+  repos: {
+    "/git/ns/canon.git": { token: "art_v1_secret", updates: { "refs/heads/main": { old: A, new: B } } },
+    "/git/ns/fork.git": { token: "art_v1_secret2", updates: null },
+  },
+};
+
+/** What reached Artifacts: every request the gateway let through, with its body. */
+function upstream() {
+  const sent: { url: string; method: string; auth: string | null; body: Uint8Array }[] = [];
+  const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
+    const req = input instanceof Request ? input : new Request(input, { ...init, duplex: "half" } as RequestInit);
+    sent.push({ url: req.url, method: req.method, auth: req.headers.get("authorization"), body: new Uint8Array(await req.arrayBuffer()) });
+    return new Response("from Artifacts");
+  }) as typeof fetch;
+  return { sent, fetcher };
+}
+
+const push = (path: string, bytes: Uint8Array, headers: Record<string, string> = {}) =>
+  new Request(`https://${HOST}${path}/git-receive-pack`, {
+    method: "POST",
+    body: stream(bytes, 3), // tiny chunks
+    headers: { "content-type": "application/x-git-receive-pack-request", ...headers },
+    duplex: "half",
+  } as RequestInit);
+
+test("the gateway lets through the one update the operation allows, with the repository's token added and the body unchanged; fetches get the token too", async () => {
+  const up = upstream();
+  const bytes = body([`${A} ${B} refs/heads/main\0 report-status`]);
+  const r = await gatewayFetch(GRANTS, push("/git/ns/canon.git", bytes), up.fetcher);
+  assert.equal(await r.text(), "from Artifacts");
+  assert.equal(up.sent.length, 1);
+  assert.deepEqual([up.sent[0]!.url, up.sent[0]!.method, up.sent[0]!.auth], [`https://${HOST}/git/ns/canon.git/git-receive-pack`, "POST", "Bearer art_v1_secret"]);
+  assert.deepEqual(up.sent[0]!.body, bytes);
+  // A fetch from a repository with a read-only grant goes through, with that repository's token.
+  await gatewayFetch(GRANTS, new Request(`https://${HOST}/git/ns/fork.git/info/refs?service=git-upload-pack`), up.fetcher);
+  assert.deepEqual([up.sent[1]!.method, up.sent[1]!.auth], ["GET", "Bearer art_v1_secret2"]);
+});
+
+test("the gateway refuses, before any request leaves: a push that would move main anywhere but the allowed update, another ref, a read-only grant, a compressed push, another repository, and another host", async () => {
+  const up = upstream();
+  const refused = async (what: string, request: Request, why: RegExp) => {
+    const r = await gatewayFetch(GRANTS, request, up.fetcher);
+    assert.equal(r.status, 403, what);
+    assert.match(await r.text(), why, what);
+  };
+  const allowed = body([`${A} ${B} refs/heads/main\0 report-status`]);
+  await refused("another expected main", push("/git/ns/canon.git", body([`${C} ${B} refs/heads/main\0 report-status`])), /does not match/);
+  await refused("another ref", push("/git/ns/canon.git", body([`${ZERO} ${B} refs/heads/other\0 report-status`])), /not allowed/);
+  await refused("a read-only grant", push("/git/ns/fork.git", allowed), /may not push/);
+  await refused("a compressed push", push("/git/ns/canon.git", allowed, { "content-encoding": "gzip" }), /compressed/);
+  await refused("another repository", push("/git/ns/elsewhere.git", allowed), /repository/);
+  await refused("a repository whose name starts with a granted one", push("/git/ns/canon.git.evil", allowed), /repository/);
+  await refused("another host", new Request("https://example.com/git/ns/canon.git/info/refs"), /host/);
+  await refused("plain http", new Request(`http://${HOST}/git/ns/canon.git/info/refs`), /host/);
+  assert.deepEqual(up.sent, [], "nothing reached Artifacts");
 });

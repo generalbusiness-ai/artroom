@@ -1,0 +1,22 @@
+{
+  // Declarations of the log, the client and the MCP server, which the Room and
+  // its tests check against (see the `paths` in tsconfig.json). One compiler
+  // run emits all three into .types/<package>/src, the same files that one run
+  // per package wrote. `noCheck`: this run only emits; each package's own
+  // typecheck checks its sources, under its own lib.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "lib": ["ES2024", "ESNext.Disposable", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": false,
+    "noCheck": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": ".types"
+  },
+  "include": ["../log/src", "../client/src", "../mcp/src"],
+  "exclude": ["../log/src/gitcli.ts", "../log/src/cli.ts"]
+}

@@ -34,7 +34,7 @@ import { registry } from "./registry.ts";
 import { unb64url } from "./crypto.ts";
 import { artroomError, wire, type Wire } from "./errors.ts";
 import { liveCursor, read, updateAfter } from "./reads.ts";
-import { authenticateHash, authenticateRead, bearerAct, bearerRequest, redeem, request, tokenHash } from "./requests.ts";
+import { authenticateHash, authenticateRead, bearerAct, bearerRequest, callerOf, redeem, request, tokenHash, type CallerView } from "./requests.ts";
 import type { Sql } from "./ports.ts";
 
 interface SocketState {
@@ -117,6 +117,11 @@ export class Room extends DurableObject<RoomEnv> {
   /** `workspace` or `workspace-token` for a bearer session (R-CRED-10). */
   bearerRequest(bearer: string, req: unknown): Promise<Wire<WorkspaceOp | WorkspaceGrant | Refusal>> {
     return this.wire("bearerRequest", () => bearerRequest(this.core, bearer, req));
+  }
+
+  /** The authorization behind a session or bearer token, for the MCP endpoint's `tools/list` (R-API-14). A read. */
+  caller(token: string): Promise<Wire<CallerView>> {
+    return this.wire("caller", async () => callerOf(this.core, token));
   }
 
   read<Q extends ReadQuery>(token: string, query: Q): Promise<Wire<ReadResults[Q["q"]]>> {

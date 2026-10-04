@@ -1,5 +1,7 @@
 # @generalbusiness/artroom-log
 
+> **Test file names below may be out of date.** Each section names the tests as they were when it was written. Request `ecbc722a` later merged and removed many test files; [plans/test-invariants.md](../../plans/test-invariants.md) is the current map from each invariant to its test.
+
 This package publishes a room's log to git and verifies it offline. It is
 lane L of Artroom. It has two parts:
 
@@ -17,7 +19,7 @@ lane L of Artroom. It has two parts:
 npm install                          # at the repository root
 cd packages/log
 npm run test:node                    # all tests, including real git repositories
-npm run test:workerd                 # the same tests in workerd, except the git CLI ones
+npm run test:workerd                 # the golden log in workerd (see Tests)
 node src/cli.ts verify <remote>      # or: npx artroom-verify <remote>
 ```
 
@@ -115,7 +117,7 @@ The publisher follows these rules:
   lost staging area are all recovered, and the commit is always the one
   `commitFor` computes. `cohort-too-large` remains only for a remote that
   cannot stage. `MemoryGit` and `GitCli` stage. Tests:
-  `test/transfer.test.ts`, `test/staging.test.ts`.
+  `test/transfer.test.ts`.
 - **Bounded memory** (request 5a7290b9). `entries` may be an
   `EntrySource`: the publisher reads it in batches and never holds the
   log, or a whole segment, at once. The Room passes one over its SQLite.
@@ -294,6 +296,28 @@ entries of the last consistent commit.
 
 ## Tests
 
+How the tests are sized (request ecbc722a):
+
+- **Small limits.** A test that must cross a limit crosses a small one. The
+  transfer and read bounds are publisher options. The layout's three limits
+  (B, 1,000 entries to a segment, 4,096 names to a directory) are set for
+  one test by `setLayoutLimitsForTests` in `src/layout.ts`, which the
+  publisher, its index reader and verify all read. The rules are compared
+  with the contract's reference functions at the contract's limits, and two
+  cases stay at them: one entry of B + 1 bytes under the default read and
+  transfer limits, and 5,000 segments at the directory limit of 4,096.
+- **One runtime.** The code is the same in Node and in workerd, and the
+  Room's workerd tests publish and verify through this package. The
+  workerd run holds only `test/golden.test.ts`, which pins one log's commit
+  IDs for both runtimes and checks the runtime's text decoder.
+- **Rules where they are cheapest.** A rule that is a pure function of one
+  entry (the decoder's grammar, the body check) is tested as one. Each
+  verification failure keeps one witness through verify. Rules that verify
+  rebuilds and compares with the record are shown by honest fixtures
+  written by a separate simulator (see `test/declared-obligations.test.ts`).
+
+The files:
+
 - `test/golden.test.ts` covers the walk-through in protocol section 20:
   - genesis, the initial policy, a claim and its `notified` event;
   - publication C1 and its checkpoint event;
@@ -305,7 +329,8 @@ entries of the last consistent commit.
   It also checks that every recorded decision replays, the tree layout, and
   publication: lag, idempotency, retries before and after the ref moves,
   `unresolved` then completing forward, an unexpected writer, rewriting,
-  resuming and batching.
+  resuming and batching. It pins the commit IDs of one log, and it is the
+  one file that also runs in workerd.
 - `test/tamper.test.ts` changes a log in one way per case and expects a
   named reason:
 
@@ -345,19 +370,33 @@ entries of the last consistent commit.
   reference serialization) across segment boundaries, staged and not,
   from arrays and sources, with restarts; bounded reads; retained files
   read only when new; the size, order, staging-offset and rewrite guards;
-  `open` reading no segment; an entry near the 2 MB row bound.
+  `open` reading no segment; an entry over the read limit, read alone.
+- `test/transfer.test.ts` covers what one transfer may carry: a push sends
+  only what its lease does not hold, and a publication over one transfer is
+  staged in parts and pushed as the commit alone, through a lost answer, a
+  restart and a lost staging area.
 - `scripts/memory.ts` measures the publisher's heap with a 66.5 MiB active
   segment against the 417a1618 publisher (results in `scripts/results/`).
 
-- `test/amendment-4.test.ts` and `test/amendment-4-large.test.ts` cover
-  contract amendment 4 (see below and `notes/amendment4-log.md`).
+- `test/amendment-4.test.ts` covers contract amendment 4 (see below and
+  `notes/amendment4-log.md`).
+- `test/declared-stage3.test.ts` covers declared acts stage 3: decoding by
+  grammar; kind, binding, body and who under the document in force at each
+  entry; the legacy rule and the legacy recovery fixture; and the
+  evaluation calls a log must record.
+- `test/declared-obligations.test.ts` covers the inputs verify rebuilds
+  from the fold: a land input's obligations and reviews, a notify
+  directory's reviewers, and each carry call.
 
 - `test/gitcli.node.test.ts` (Node only) publishes to a real local git
-  repository and checks it:
-  - `git fsck` passes;
-  - `artroom verify` exits 0 on the log, and 1 after a forced rewrite;
+  repository through the git CLI adapter and checks it:
+  - `git fsck --strict` passes;
   - a publisher with a stale view stops at the lease;
+  - a publisher reopened from the ref continues it;
   - tokens are redacted.
+- `test/cli.node.test.ts` (Node only) runs the `artroom verify` command on
+  real repositories: exit 0 on an intact log, with the room's pinned head
+  fetched; exit 1 on a rewritten log; exit 2 on a remote it cannot read.
 
 ## Live round trip
 
@@ -446,9 +485,9 @@ broken on purpose and a named test failed.
    malformed"; "malformed retained data: a replay context and a policy
    document, each where an entry needs it"; "a malformed retained file no
    entry needs fails the commit but not the prefix"; "a genuine read error
-   still throws, so the CLI reports it apart from a failed check". In
-   `test/gitcli.node.test.ts`: "artroom verify exits 1, not 2, on a log
-   whose first entry is malformed".
+   still throws, so the CLI reports it apart from a failed check". The
+   command's own exit status, 1 for a failed check and 2 for a remote it
+   cannot read, is in `test/cli.node.test.ts`.
 4. **P2: preserve previously published replay evidence.**
    Fix: the publisher merges the retained files of the last log commit
    into every later one, and `open` reads them back from the ref.
@@ -628,10 +667,11 @@ guard was broken on purpose and a named test failed.
 ## Contract amendment 4
 
 The lane L edits of `docs/protocol.md` section 30.9, each with its tests.
-The tests are in `test/amendment-4.test.ts` and, for entries and files of
-8 MiB and more and the 5 million entry log, `test/amendment-4-large.test.ts`.
-Each guard was broken on purpose and a named test failed; the table is in
-`notes/amendment4-log.md`.
+The tests are in `test/amendment-4.test.ts`. Most run at small limits (see
+Tests); "at the contract's own limits" keeps an entry of B + 1 bytes and
+5,000 segments. Each guard was broken on purpose and a named test failed
+when the edits were made; the table is in `notes/amendment4-log.md`, which
+names the tests as they were then.
 
 1. **`plan` writes the layout the checkpoint names.** Segment starts by
    R-LOG-17 (`Placement`), a `ChunkedLine` and a chunked entry file for a
@@ -642,18 +682,19 @@ Each guard was broken on purpose and a named test failed; the table is in
    Layout 1 output does not change: every test of `test/bounded.test.ts`
    still compares with `test/support/publisher-417a1618.ts`.
    Tests: "Byte close", "Count close", "Edge", "Switch, small open
-   segment", "Switch, large open segment", "Unpublished old entry over B",
-   "Retained prefix and determinism", "Many segments", "At the switch every
-   retained file moves to its layout 2 path".
+   segment", "Old log, then the switch with a large open segment",
+   "Unpublished old entry over B", "Retained prefix, large activation and
+   determinism", "Many segments", "At the switch every retained file moves
+   to its layout 2 path".
 2. **A line over B is hashed and sent in parts.** `EntryLine` and
    `RetainedRef.read`. Tests: "Unpublished old entry over B" (read whole or
-   in parts, the same commit; in parts no read is the whole line), "Large
-   notification", "Retained prefix and determinism" (no retained file
+   in parts, the same commit; in parts no read is the whole line),
+   "Retained prefix, large activation and determinism" (no retained file
    loaded whole).
 3. **`commitFor` stays synchronous.** With another parent it places every
-   segment from the entries and `from`. Tests: "Retained prefix and
-   determinism", "open on a layout 2 head reads its shape and continues
-   it".
+   segment from the entries and `from`. Tests: "Retained prefix, large
+   activation and determinism", "open on a layout 2 head reads its shape
+   and continues it".
 4. **The guard.** `object-too-large`. Test: "Guard: a faulty publisher
    that plans an object over B stores and pushes nothing".
 5. **Refused pushes.** `PushOutcome` gains `refused`; after it the
@@ -675,11 +716,13 @@ Each guard was broken on purpose and a named test failed; the table is in
 8. **`artroom verify` and `readLogFiles`** make the checks of 30.6 with
    named reasons. Tests: "Layout regression" (two), "Misplaced boundary",
    "a segment that does not follow on from the one before is
-   segment-bound; a misplaced shard directory is fan-out; a segment over B
-   with entries from from on is object-too-large", "Bad chunk" (an entry
-   file, and a chunked retained file), "Old log".
-9. **The cases of 30.7 that need no Room.** All of the above, and "Large
-   revert" and "Large activation". The reference functions agree with
-   `src/layout.ts`: "the shared rules agree with the contract's reference
-   functions".
+   segment-bound; a misplaced shard directory is fan-out; a retained file
+   left whole over B is object-too-large", "a layout 2 segment over B
+   holding entries from from on is object-too-large", "Bad chunk" (an entry
+   file, and a chunked retained file), "Old log, then the switch".
+9. **The cases of 30.7 that need no Room.** All of the above. The large
+   revert is the entry of "Unpublished old entry over B", and the large
+   activation is part of "Retained prefix, large activation and
+   determinism". The reference functions agree with `src/layout.ts`: "the
+   shared rules agree with the contract's reference functions".
 

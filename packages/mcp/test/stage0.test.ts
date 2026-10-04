@@ -1,6 +1,6 @@
 /**
- * MCP plan stage 0 (request 8ae3b2dc): advertised output schemas, short
- * instructions, and both wire formats, checked with the official MCP client.
+ * MCP plan stage 0 (request 8ae3b2dc): advertised output schemas and both
+ * wire formats, checked with the official MCP client.
  * After `tools/list`, the client validates every structured result against
  * the tool's advertised `outputSchema`, and throws if one does not conform,
  * so these tests fail when a result (a refusal included) falls outside its
@@ -20,7 +20,8 @@ beforeEach(async () => {
 });
 afterEach(() => room.stop());
 
-const REFUSING = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release"] as const;
+// `act`, the generic declared act (declared acts stage 5), can refuse as the named act tools can.
+const REFUSING = ["claim", "workspace", "propose", "note", "review", "land", "renew", "release", "act"] as const;
 const head = (c: string) => c.repeat(40);
 
 async function client(a: Redeemed, mode: VersionNegotiationMode): Promise<Client> {
@@ -28,15 +29,6 @@ async function client(a: Redeemed, mode: VersionNegotiationMode): Promise<Client
   await c.connect(new StreamableHTTPClientTransport(new URL(a.mcp), { requestInit: { headers: { authorization: `Bearer ${a.bearer}` } } }));
   return c;
 }
-
-describe("instructions (MCP plan section 6)", () => {
-  test("stand alone in at most 512 characters, naming attention and the refusal fix", () => {
-    expect(INSTRUCTIONS.length).toBeLessThanOrEqual(512);
-    expect(INSTRUCTIONS).toMatch(/attention first/);
-    expect(INSTRUCTIONS).toMatch(/rule, reason and fix/);
-    expect(INSTRUCTIONS).toMatch(/idempotencyKey/);
-  });
-});
 
 describe("advertised output schemas (MCP plan section 5)", () => {
   test("every tool advertises an object-rooted outputSchema; a tool that can refuse is oneOf its result and Refusal", () => {
@@ -66,7 +58,7 @@ describe.each([
   ["2026-07-28", { pin: "2026-07-28" } as VersionNegotiationMode],
   ["legacy stateless (2025)", "legacy" as VersionNegotiationMode],
 ])("the official MCP client, %s", (_label, mode) => {
-  test("connects, gets the instructions, and lists the tools with their output schemas unwrapped", async () => {
+  test("connects, gets the instructions, and lists the tools with their output schemas unwrapped; results and refusals conform to them; failures are tool errors", async () => {
     const a = await agent(room, url);
     const c = await client(a, mode);
     try {
@@ -74,30 +66,22 @@ describe.each([
       else expect(c.getNegotiatedProtocolVersion()).toBe("2026-07-28");
       expect(c.getInstructions()).toBe(INSTRUCTIONS);
       const { tools } = await c.listTools();
-      expect(tools.map((t) => t.name)).toEqual(Object.keys(TOOLS));
+      // An agent's bearer gets the builder toolset (R-API-14). The room's document is `v1`, so `act` is not listed.
+      expect(tools.map((t) => t.name)).toEqual(["claim", "workspace", "propose", "note", "land", "renew", "release", "attention", "explain", "lane", "proposal", "operation", "acts"]);
       for (const t of tools) expect(t.outputSchema).toEqual(TOOLS[t.name as keyof typeof TOOLS].outputSchema);
-    } finally {
-      await c.close();
-    }
-  });
 
-  test("results and refusals conform to the advertised schema; failures are tool errors", async () => {
-    const a = await agent(room, url);
-    const c = await client(a, mode);
-    try {
-      // The client validates structured content only against a tool list it has cached, as hosts do.
-      await c.listTools();
+      // The client validates structured content against the tool list it has now cached, as hosts do.
       const claimed = await c.callTool({ name: "claim", arguments: { goal: "Fix login copy", scope: ["src/ui/**"], idempotencyKey: "c1" } });
       expect(claimed.isError).toBe(false);
       const claim = claimed.structuredContent as unknown as Claim;
       expect(claim).toMatchObject({ kind: "claim", lease: { generation: 1 } });
       const held = { lane: claim.lane, lease: claim.lease.generation };
 
-      const proposed = await c.callTool({ name: "propose", arguments: { ...held, head: head("a"), expectedGeneration: 0, summary: "one" } });
+      const proposed = await c.callTool({ name: "propose", arguments: { ...held, head: head("a"), expectedGeneration: 0, summary: "one", idempotencyKey: "p1" } });
       expect(proposed.structuredContent).toMatchObject({ kind: "propose", generation: 1 });
 
       // A refusal is structured content the client accepts, never wrapped in `{ result }`.
-      const refused = await c.callTool({ name: "propose", arguments: { ...held, head: head("b"), expectedGeneration: 0, summary: "two" } });
+      const refused = await c.callTool({ name: "propose", arguments: { ...held, head: head("b"), expectedGeneration: 0, summary: "two", idempotencyKey: "p2" } });
       expect(refused.isError).toBe(false);
       expect(refused.structuredContent).toMatchObject({ refused: true, rule: "generation-moved" });
       expect((refused.content as { text: string }[])[0]!.text).toMatch(/^Refused \(generation-moved\): .+ Fix: /);

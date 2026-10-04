@@ -1,25 +1,21 @@
 /**
  * The default policy pack (lane D), run through the real runtime. Each rule
- * has a pass case and a refuse (or apply) case. Then the plan section 7
- * carry cases, the policy-level cases of protocol section 23, the
- * reservation-stage case, and the budget on a 500-path proposal.
+ * has a pass case and a refuse (or apply) case. Then the carry defaults the
+ * pack adds, and owner coverage. The platform's carry conditions are in
+ * carry.test.ts, policy lockout in admin.test.ts, and the pack's measured
+ * budget in budgets.test.ts.
  */
 
 import { describe, expect, test } from "vitest";
-import type { Digest, PathChange, PolicyDocument } from "@generalbusiness/artroom-contract";
+import type { PathChange, PolicyDocument, RepoPath } from "@generalbusiness/artroom-contract";
 import demo from "../../../examples/demo-repo/.artroom/policy.ts";
 import demoJson from "../../../examples/demo-repo/.artroom/policy.json" with { type: "json" };
-import { PACK, starterPolicy } from "../src/pack.ts";
-import { OBJECTION_OPEN } from "../src/helpers.ts";
+import { PACK, checkTests, ownerCoverage, ownerReview, starterPolicy } from "../src/pack.ts";
+import { OBJECTION_OPEN, owners, policy, requireReview } from "../src/helpers.ts";
 import { validatePolicy } from "../src/validate.ts";
-import { evaluateCarry, evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, matchesRetainedLandInput, type RuleEvaluation } from "../src/rules.ts";
-import { actMeter } from "../src/evaluator.ts";
-import { checkerInputs, filterSnapshot } from "../src/carry.ts";
-import { snapshotDigest, type SnapshotEntry } from "../src/integrity.ts";
-import { ACT_BUDGET } from "../src/profile.ts";
-import { matchesAny } from "../src/glob.ts";
-import { ownersFor } from "../src/rules.ts";
-import { act, active, actor, carryInput, lane, landInput, notifyInput, recoveryLane, refuseInput, requireInput, sha } from "./support/fixtures.ts";
+import { evaluateCarry, evaluateLand, evaluateNotify, evaluateRefuse, evaluateRequire, ownersFor, type ObligationSpec } from "../src/rules.ts";
+import { globCovers, matchesAny } from "../src/glob.ts";
+import { act, active, actor, carryInput, lane, landInput, notifyInput, refuseInput, requireInput } from "./support/fixtures.ts";
 
 const P: PolicyDocument = demo;
 const A = active(P);
@@ -109,12 +105,6 @@ describe("refuse rules", () => {
     }
   });
 
-  test("jj-conflicts: a configuration-recovery lane still skips policy", async () => {
-    const r = await propose([{ status: "added", path: ".jjconflict-side-0/.artroom/policy.json" }], { lane: recoveryLane(), actor: actor("@root", "admin") });
-    expect(r.refusal).toBeNull();
-    expect(r.evaluations).toEqual([]);
-  });
-
   test("claim-before-propose: refuses an unclaimed lane, passes a claimed one", async () => {
     const proposal = requireInput(P, ["src/app.ts"]).proposal;
     const refused = await evaluateRefuse(A, refuseInput(P, "propose", { proposal, lane: lane(null, false) }));
@@ -179,17 +169,6 @@ describe("land rules", () => {
     expect((await land(["src/api/login.ts"], [approve(40, "carried"), approve(41)])).refusal).toBeNull();
     expect((await land(["src/app.ts"], [approve(40, "carried", "@app")])).refusal).toBeNull();
   });
-
-  test("reservation stage: preparation evaluates stage reservation, retains bytes, and the guard compares them", async () => {
-    const reviews = [approve(40, "carried")];
-    const prospective = { ...landInput(P, ["src/api/login.ts"], reviews), stage: "reservation" as const };
-    expect((await evaluateLand(A, prospective)).refusal?.rule).toBe("fresh-approval");
-    const ok = { ...prospective, reviews: [...reviews, approve(41)] };
-    const prepared = await evaluateLand(A, ok);
-    expect(prepared.refusal).toBeNull();
-    expect(matchesRetainedLandInput(prepared.retained!, JSON.parse(JSON.stringify(ok)))).toBe(true);
-    expect(matchesRetainedLandInput(prepared.retained!, { ...ok, reviews: [...ok.reviews, objection(42)] })).toBe(false);
-  });
 });
 
 describe("notify rules", () => {
@@ -208,23 +187,12 @@ describe("notify rules", () => {
   });
 });
 
-describe("carry: the pack's defaults and the plan section 7 cases", () => {
+describe("carry: the pack's defaults", () => {
   const login = { scope: ["src/api/login.ts"] };
-
-  test("plan 7 case 1: declared dependsOn and the dependency changes: not carried", async () => {
-    const r = await evaluateCarry(A, carryInput(P, { ...login, dependsOn: ["src/lib/authz/**"], changedSince: ["src/lib/authz/check.ts"] }));
-    expect(r.notCarried?.code).toBe("dependency-changed");
-  });
 
   test("plan 7 case 2: no declaration, the pack's default for src/api/** lists src/lib/**: not carried", async () => {
     const r = await evaluateCarry(A, carryInput(P, { ...login, changedSince: ["src/lib/authz/check.ts"] }));
     expect(r.notCarried?.code).toBe("dependency-changed");
-  });
-
-  test("plan 7 case 3: no declaration and no default: carried and highlighted", async () => {
-    const r = await evaluateCarry(A, carryInput(P, { scope: ["src/ui/button.ts"], changedSince: ["src/lib/authz/check.ts"] }));
-    expect(r.carried?.reason.text).toBe("carried: reviewed and declared paths unchanged");
-    expect(r.highlight).toBe(true);
   });
 
   test("plan 7 cases 4 and 5: package-lock.json or .artroom/policy.json: nothing carried; the pack adds config/**", async () => {
@@ -240,114 +208,152 @@ describe("carry: the pack's defaults and the plan section 7 cases", () => {
     expect(r.notCarried).toMatchObject({ code: "policy-rejected", rule: "stale-approval" });
     expect((await evaluateCarry(A, carryInput(P, { ...login, changedSince: many.slice(0, 25) }))).carried).not.toBeNull();
   });
-
-  const digest = (c: string): Digest => `sha256:${c.repeat(64).slice(0, 64)}`;
-  const facts = (before: Parameters<typeof checkFacts>[0], now: Parameters<typeof checkFacts>[1]) => checkFacts(before, now);
-  function checkFacts(input: { kind: "tree"; tree: ReturnType<typeof sha> } | { kind: "filtered"; snapshot: Digest; paths: string[] }, now: { tree: ReturnType<typeof sha>; snapshot: Digest | null }) {
-    return {
-      check: {
-        before: { integration: sha("5"), input, config: digest("c"), runner: digest("e") },
-        now: { integration: sha("6"), tree: now.tree, snapshot: now.snapshot, config: digest("c"), runner: digest("e") },
-        volatile: false,
-      },
-    };
-  }
-
-  test("plan 7 case 6: a new failing test, src unchanged: the whole-tree tests check reruns", async () => {
-    const r = await evaluateCarry(A, carryInput(P, { kind: "check", changedSince: ["tests/new.test.ts"] }), facts({ kind: "tree", tree: sha("7") }, { tree: sha("8"), snapshot: null }));
-    expect(r.notCarried?.code).toBe("integration-changed");
-  });
-
-  test("section 23 'scoped checker, new test': inputs src/**, a new tests/ file changes the snapshot: not carried", async () => {
-    const inputs = checkerInputs(["src/**"], P.carry)!;
-    const files: SnapshotEntry[] = [["src/app.ts", "100644", sha("1")]];
-    const was = await snapshotDigest(filterSnapshot(files, inputs));
-    const now = await snapshotDigest(filterSnapshot([...files, ["tests/login.test.ts", "100644", sha("2")]], inputs));
-    const r = await evaluateCarry(A, carryInput(P, { kind: "check", changedSince: ["tests/login.test.ts"] }), facts({ kind: "filtered", snapshot: was, paths: inputs }, { tree: sha("8"), snapshot: now }));
-    expect(r.notCarried?.code).toBe("integration-changed");
-  });
-
-  test("plan 7 case 7: a file read by tests but outside a scoped checker's inputs is not in the runner's snapshot", () => {
-    const inputs = checkerInputs(["src/**"], P.carry)!;
-    expect(filterSnapshot([["data/users.json", "100644", sha("3")]] as SnapshotEntry[], inputs)).toEqual([]);
-  });
 });
 
-describe("section 23: policy lockout", () => {
-  test("on a configuration-recovery lane the pack's refuse, require and land rules are not evaluated", async () => {
-    const proposal = requireInput(P, [".artroom/policy.json"]).proposal;
-    const r = await evaluateRefuse(A, refuseInput(P, "propose", { proposal, lane: { ...recoveryLane(), claimed: false }, actor: actor("@root", "admin") }));
-    expect(r.refusal).toBeNull();
-    expect(r.evaluations).toEqual([]);
-    const req = await evaluateRequire(A, { ...requireInput(P, [".artroom/policy.json"]), lane: recoveryLane() });
-    expect(req.obligations.map((o) => o.id)).toEqual(["obl_admin-approval"]);
-  });
-});
+// Owner coverage (review 4df45987). `owner-review` asks for a review from `owners`, and by R-OBL-2 only the owners of
+// the obligation's paths can meet it, so a path with no owner would open an obligation nobody can meet.
 
-describe("budget: the pack on a 500-path proposal", () => {
-  const paths = Array.from({ length: 500 }, (_, i) => `src/api/module${String(i).padStart(3, "0")}/handler.ts`);
-  const used = (evaluations: readonly RuleEvaluation[]) =>
-    evaluations.reduce((u, e) => ({ steps: u.steps + e.decision.usage.steps, inspectedBytes: u.inspectedBytes + e.decision.usage.inspectedBytes }), { steps: 0, inspectedBytes: 0 });
+/** The obligations a proposal of `paths` gets, each with who can qualify for it by R-OBL-2. */
+async function obligations(doc: PolicyDocument, paths: RepoPath[]) {
+  const input = requireInput(doc, paths);
+  const r = await evaluateRequire(active(doc), input);
+  expect(r.refusal).toBeNull();
+  const qualifiers = (o: ObligationSpec): string[] => {
+    if (o.kind !== "review") return [...o.by];
+    const who = new Set<string>();
+    for (const from of o.from) {
+      if (from !== "owners") who.add(from);
+      else for (const e of input.proposal.owners) if (o.paths.includes(e.path)) e.owners.forEach((p) => who.add(p));
+    }
+    return [...who].sort();
+  };
+  return { owners: input.proposal.owners, list: r.obligations, who: Object.fromEntries(r.obligations.map((o) => [o.id, qualifiers(o)])) };
+}
 
-  test("each act stays within the per-act budget, with the measured usage pinned", async () => {
-    const proposal = requireInput(P, paths).proposal;
-    // propose: refuse then require, one meter (R-EVAL-9).
-    const meter = actMeter();
-    const refuse = await evaluateRefuse(A, refuseInput(P, "propose", { proposal }), { budget: meter });
-    const require = await evaluateRequire(A, requireInput(P, paths), { budget: meter });
-    expect(refuse.refusal).toBeNull();
-    expect(require.refusal).toBeNull();
-    const propose = { steps: meter.steps, inspectedBytes: meter.inspectedBytes };
-    // land and reservation: the largest rule, fresh-approval, scans every path.
-    const reviews = [approve(40, "carried"), approve(41)];
-    const landed = await evaluateLand(A, landInput(P, paths, reviews));
-    const reserved = await evaluateLand(A, { ...landInput(P, paths, reviews), stage: "reservation" });
-    expect(landed.refusal).toBeNull();
-    expect(reserved.refusal).toBeNull();
-    const fresh = landed.evaluations.find((e) => e.decision.rule === "fresh-approval")!.decision.usage;
-    const jj = refuse.evaluations.find((e) => e.decision.rule === "jj-conflicts")!.decision.usage;
-    // carry: stale-approval on 500 changed paths outside the reviewed scope.
-    const carried = await evaluateCarry(A, carryInput(P, { scope: ["docs/x.md"], changedSince: paths.map((p) => p.replace("src/api/", "src/ui/")) }));
-    expect(carried.notCarried?.rule).toBe("stale-approval");
-    const measured = { propose, jjConflicts: jj, land: used(landed.evaluations), reservation: used(reserved.evaluations), freshApproval: fresh, carry: used(carried.evaluations) };
-    expect(measured).toEqual(MEASURED);
-    for (const u of Object.values(measured)) {
-      expect(u.steps).toBeLessThan(ACT_BUDGET.steps);
-      expect(u.inspectedBytes).toBeLessThan(ACT_BUDGET.inspectedBytes);
+describe("the demo policy gives every path an owner", () => {
+  test("root files, tests, deploy configuration and .artroom files: @maintainers can meet owner-review", async () => {
+    for (const path of ["README.md", "package.json", "tests/login.test.ts", "wrangler.jsonc", ".github/workflows/ci.yml", "config/flags.yaml", "scripts/release.sh", ".artroom/policy.json", ".artroom/policy.ts"]) {
+      const r = await obligations(P, [path]);
+      expect(r.owners, path).toEqual([{ path, owners: ["@maintainers"] }]);
+      const owner = r.list.find((o) => o.id === "obl_owner-review");
+      expect(owner, path).toMatchObject({ kind: "review", paths: [path], from: ["owners"], count: 1, allowSelf: false });
+      expect(r.who["obl_owner-review"], path).toEqual(["@maintainers"]);
     }
   });
 
-  test("jj-conflicts does not lower the path limit: at the largest proposal input the profile accepts, propose fits the act budget", async () => {
-    // 1,461 such paths is the most a propose input can hold under the per-value byte limit, with or without this rule.
-    const big = (n: number) => Array.from({ length: n }, (_, i) => `src/api/module${String(i).padStart(4, "0")}/handler.ts`);
-    const meter = actMeter();
-    const ok = await evaluateRefuse(A, refuseInput(P, "propose", { proposal: requireInput(P, big(1461)).proposal }), { budget: meter });
-    expect(ok.refusal).toBeNull();
-    expect({ steps: meter.steps, inspectedBytes: meter.inspectedBytes }).toEqual(LARGEST_PROPOSE);
-    const over = await evaluateRefuse(A, refuseInput(P, "propose", { proposal: requireInput(P, big(1462)).proposal }));
-    expect(over.refusal?.reason).toContain("value_bytes");
+  test("an admin obligation is extra protection, never a substitute for owners", async () => {
+    const config = await obligations(P, [".artroom/policy.json"]);
+    expect(config.list.map((o) => o.id)).toEqual(["obl_admin-approval", "obl_owner-review"]);
+    expect(config.who).toEqual({ "obl_admin-approval": ["role:admin"], "obl_owner-review": ["@maintainers"] });
+    const deploy = await obligations(P, ["wrangler.jsonc"]);
+    expect(deploy.who).toEqual({ "obl_owner-review": ["@maintainers"], "obl_deploy-config-review": ["role:admin"] });
   });
 
-  test("when the act budget runs out, the largest rule gives a deterministic policy-budget-exceeded", async () => {
-    const reviews = [approve(40, "carried"), approve(41)];
-    const tight = () => actMeter({ steps: 3000, inspectedBytes: ACT_BUDGET.inspectedBytes });
-    const runs = [await evaluateLand(A, landInput(P, paths, reviews), { budget: tight() }), await evaluateLand(A, landInput(P, paths, reviews), { budget: tight() })];
-    for (const r of runs) expect(r.refusal?.rule).toBe("policy-budget-exceeded");
-    expect(runs[0]!.evaluations.map((e) => e.decision)).toEqual(runs[1]!.evaluations.map((e) => e.decision));
-    const outcome = runs[0]!.evaluations.at(-1)!.decision.outcome;
-    expect(outcome.result === "error" && outcome.detail.split(":")[0]).toBe("act_step_budget");
+  test("a mixed proposal: every path has owners, and the obligation names them all", async () => {
+    const paths = ["src/api/login.ts", "README.md", "tests/login.test.ts", "docs/intro.md", "wrangler.jsonc"];
+    const r = await obligations(P, paths);
+    for (const e of r.owners) expect(e.owners.length, e.path).toBeGreaterThan(0);
+    expect(r.owners.find((e) => e.path === "src/api/login.ts")!.owners).toEqual(["@maintainers", "@security", "@app"]);
+    expect(r.list.find((o) => o.id === "obl_owner-review")!.paths).toEqual(paths);
+    expect(r.who["obl_owner-review"]).toEqual(["@app", "@docs", "@maintainers", "@security"]);
+  });
+
+  test("the demo policy and starterPolicy() have complete owner coverage", () => {
+    expect(ownerCoverage(P)).toEqual([]);
+    expect(Object.keys(P.owners)).toContain("**");
   });
 });
 
-/** Measured on Node and workerd; both runs must give exactly these (docs/policy-pack.md). */
-/** Propose at 1,461 paths: jj-conflicts and claim-before-propose. */
-const LARGEST_PROPOSE = { steps: 14622, inspectedBytes: 511636 };
+describe("a partial owner map is refused before it is compiled", () => {
+  const partial = { "src/api/**": "@security", "src/**": "@app", "docs/**": "@docs" } as const;
 
-const MEASURED = {
-  propose: { steps: 5012, inspectedBytes: 172286 },
-  jjConflicts: { steps: 5007, inspectedBytes: 172159 },
-  land: { steps: 3546, inspectedBytes: 148055 },
-  reservation: { steps: 3546, inspectedBytes: 148055 },
-  freshApproval: { steps: 3532, inspectedBytes: 147708 },
-  carry: { steps: 6, inspectedBytes: 30012 },
-};
+  test("what it would do: README.md alone gets an owner-review obligation nobody can meet", async () => {
+    // Built without starterPolicy, as a hand-written policy.json could be.
+    const doc = policy(owners(partial), ownerReview(), checkTests());
+    const alone = await obligations(doc, ["README.md"]);
+    expect(alone.owners).toEqual([{ path: "README.md", owners: [] }]);
+    expect(alone.who["obl_owner-review"]).toEqual([]);
+    // Partially owned: @app qualifies only through src/app.ts; README.md itself has no owner.
+    const mixed = await obligations(doc, ["src/app.ts", "README.md"]);
+    expect(mixed.owners).toEqual([{ path: "src/app.ts", owners: ["@app"] }, { path: "README.md", owners: [] }]);
+    expect(mixed.who["obl_owner-review"]).toEqual(["@app"]);
+    expect(ownerCoverage(doc)).toHaveLength(1);
+  });
+
+  test("starterPolicy() throws with a message that names the rule, the glob and the fix", () => {
+    expect(() => starterPolicy({ owners: partial })).toThrow(
+      /rule owner-review needs a review from the owners of \*\*, but no owners pattern covers all of \*\*.*owners\(\{ "\*\*": "@maintainers" \}\)/,
+    );
+    expect(starterPolicy({ owners: { ...partial, "**": "@maintainers" } }).owners["**"]).toEqual(["@maintainers"]);
+  });
+
+  test("ownerCoverage: an owner-review limited to owned paths passes; an owners pattern with nobody in it is already invalid", () => {
+    expect(ownerCoverage(policy(owners(partial), ownerReview(["src/**", "docs/**"])))).toEqual([]);
+    expect(ownerCoverage(policy(owners(partial), ownerReview(["src/**", "tests/**"])))).toHaveLength(1);
+    expect(() => policy(owners({ ...partial, "**": [] }), ownerReview())).toThrow(/owners\[\*\*\]: must be a non-empty array/);
+    // A review that some other principal can give is always satisfiable.
+    expect(ownerCoverage(policy(owners(partial), requireReview({ id: "any-review", paths: "**", from: ["owners", "role:maintainer"] })))).toEqual([]);
+  });
+
+  test("globCovers is conservative: it never claims coverage that a path disproves", () => {
+    const yes: [string, string][] = [["**", "**"], ["**", "README.md"], ["src/**", "src/api/**"], ["src/*", "src/a*"], ["*.ts", "*.ts"], ["**/*.ts", "src/**/x.ts"], ["*/**", "src/x"]];
+    const no: [string, string][] = [["*", "**"], ["src/**", "**"], ["src/*", "src/**"], ["src/a*", "src/*"], ["*.ts", "*"], ["docs/**", "doc/**"]];
+    for (const [outer, inner] of yes) expect(globCovers(outer, inner), `${outer} covers ${inner}`).toBe(true);
+    for (const [outer, inner] of no) expect(globCovers(outer, inner), `${outer} does not cover ${inner}`).toBe(false);
+  });
+});
+
+describe("the compiler refuses a partial owner map (Node: it is a Node script)", () => {
+  test.runIf(__ARTROOM_RUNTIME__ === "node")("relative to INIT_CWD; refuses partial owners and writes nothing; compiles a covered map", async () => {
+    // Node-only modules, loaded at run time: the test typecheck has no Node types.
+    const load = (name: string): Promise<unknown> => import(/* @vite-ignore */ name);
+    const fs = (await load("node:fs")) as unknown as NodeFs;
+    const { tmpdir } = (await load("node:os")) as unknown as { tmpdir(): string };
+    const { join } = (await load("node:path")) as unknown as { join(...parts: string[]): string };
+    const { execFile } = (await load("node:child_process")) as unknown as { execFile(cmd: string, args: string[], opts: object, done: (error: { code?: number } | null, stdout: string, stderr: string) => void): void };
+    const proc = (globalThis as unknown as { process: { execPath: string; env: Record<string, string | undefined>; cwd(): string } }).process;
+    const { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } = fs;
+    // The package directory, from this file's own place: the tests may be run from the repository root.
+    const { fileURLToPath } = (await load("node:url")) as unknown as { fileURLToPath(url: URL): string };
+    const pkg = fileURLToPath(new URL("..", import.meta.url));
+    expect(existsSync(join(pkg, "scripts/compile-policy.ts"))).toBe(true);
+    const root = mkdtempSync(join(tmpdir(), "artroom-compile-"));
+    try {
+      const write = (dir: string, map: string) => {
+        mkdirSync(join(root, dir, ".artroom"), { recursive: true });
+        const helpers = JSON.stringify(join(pkg, "src/helpers.ts"));
+        const pack = JSON.stringify(join(pkg, "src/pack.ts"));
+        writeFileSync(
+          join(root, dir, ".artroom/policy.ts"),
+          `import { owners, policy } from ${helpers};\nimport { ownerReview } from ${pack};\nexport default policy(owners(${map}), ownerReview());\n`,
+        );
+      };
+      // npm runs the script in the package directory and sets INIT_CWD to where it was run.
+      const compile = (dir: string) =>
+        new Promise<{ status: number; stderr: string }>((done) =>
+          execFile(proc.execPath, ["scripts/compile-policy.ts", join(dir, ".artroom")], { cwd: pkg, env: { ...proc.env, INIT_CWD: root }, encoding: "utf8" }, (error, _out, stderr) => done({ status: error ? (error.code ?? -1) : 0, stderr })),
+        );
+      write("partial", '{ "src/**": "@app" }');
+      write("covered", '{ "**": "@maintainers", "src/**": "@app" }');
+      // The two runs share nothing, so they run at the same time.
+      const [refused, ok] = await Promise.all([compile("partial"), compile("covered")]);
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain("rule owner-review needs a review from the owners of **, but no owners pattern covers all of **");
+      expect(existsSync(join(root, "partial/.artroom/policy.json"))).toBe(false);
+      expect(ok.status, ok.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(join(root, "covered/.artroom/policy.json"), "utf8")).owners).toEqual({ "**": ["@maintainers"], "src/**": ["@app"] });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+/** The parts of node:fs the compiler test uses. */
+interface NodeFs {
+  mkdtempSync(prefix: string): string;
+  mkdirSync(path: string, opts: { recursive: true }): void;
+  writeFileSync(path: string, text: string): void;
+  existsSync(path: string): boolean;
+  readFileSync(path: string, encoding: "utf8"): string;
+  rmSync(path: string, opts: { recursive: true; force: true }): void;
+}

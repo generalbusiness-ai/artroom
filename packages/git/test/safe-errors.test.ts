@@ -15,14 +15,14 @@ import { outcomeNote } from "../src/publisher/push-outcome.ts";
 import type { ArtifactsNamespace, RepoHandle } from "../src/artifacts.ts";
 import type { MintLedger } from "../src/mints.ts";
 import { type ScrubCursor, type ScrubTable, WITHHELD, isSafeErrorText, safeErrorText, scrubBatch, scrubLegacyErrors } from "../src/safe-errors.ts";
-import { Clock, ControlledPublisher, ECHOED, FakeRoom, FakeTokens, Fixture, actId, echoNote, echoing, everyRow, laneId, noEcho, nodeSql, opId } from "./support.ts";
+import { Clock, ControlledPublisher, ECHOED, FakeRoom, FakeTokens, MemoryCanonical, actId, echoNote, echoing, everyRow, laneId, noEcho, nodeSql, opId } from "./support.ts";
 
 async function world() {
-  const f = await new Fixture().init();
+  const f = new MemoryCanonical().init(); // the sinks are the engine's: no test here needs real git
   const room = new FakeRoom();
   const clock = new Clock();
   const sql = nodeSql();
-  const pub = new ControlledPublisher(new GitPublisher(f.ops, f.canonical));
+  const pub = new ControlledPublisher(f.publisher);
   const engine = new Landing({ sql, room, publisher: pub, tokens: new FakeTokens(), now: clock.now });
   await engine.refreshMain();
   const head = await f.propose(laneId(1), 1, f.main, { "src/c.txt": "c\n" });
@@ -95,7 +95,7 @@ test("d29c09fa, a failed integration (GitPublisher, git's stderr in a GitError):
       throw new GitError("merge-tree", { code: 128, stdout: "", stderr: echoing().message });
     },
   } as unknown as GitOps;
-  const git = new GitPublisher(ops, w.f.canonical);
+  const git = new GitPublisher(ops, "/canonical.git");
   w.pub.integrate = (r) => git.integrate(r);
   await w.engine.prepare(w.id);
   assert.equal(record(w, w.id).lastError, "integration failed: Error");

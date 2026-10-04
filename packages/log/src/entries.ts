@@ -8,10 +8,12 @@ import type { ActId, Checkpoint, Digest, EntryContent, Genesis, KeyId, LogEntry,
 import { canonicalize, parseStrict } from "./canonical.ts";
 import { digestJson, sha256Hex, sign } from "./crypto.ts";
 import { utf8 } from "./canonical.ts";
+import { SEGMENT_ENTRIES as SEGMENT_SIZE } from "./layout.ts";
 
 export const LOG_REF = "refs/artroom/log";
 export const ROOT = "artroom-log/v1";
-export const SEGMENT_SIZE = 1000;
+/** R-LOG-9: a segment's entries, the one limit `layout.ts` holds (`SEGMENT_ENTRIES`). */
+export { SEGMENT_SIZE };
 
 /** `act_<seq>_<first 8 hex of hash>` (R-ID-1). */
 export function entryId(seq: Seq, hash: Digest): ActId {

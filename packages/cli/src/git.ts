@@ -25,8 +25,17 @@ import { writePrivate } from "./config.ts";
 export const REMOTE = "artroom";
 const INCLUDE = "artroom/credentials";
 
+/**
+ * How git is run: `git <args>` in `cwd`, giving its trimmed output and
+ * throwing when git fails. Tests of what artroom decides, not of git itself,
+ * put a stand-in here (test/harness.ts).
+ */
+export const gitCommand = {
+  run: (cwd: string, args: readonly string[]): string => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim(),
+};
+
 function git(cwd: string, args: readonly string[]): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  return gitCommand.run(cwd, args);
 }
 
 function tryGit(cwd: string, args: readonly string[]): string | undefined {

@@ -16,11 +16,37 @@ import { encodeTree, gitObject, type TreeEntry } from "./git.ts";
 /** Artifacts refuses a larger git object (measured 2026-10-02). */
 export const ARTIFACTS_OBJECT_LIMIT = 33_554_432;
 /** R-LOG-19: B. Every blob a layout 2 commit writes is at most this: a quarter of Artifacts' limit. */
-export const OBJECT_BOUND = 8_388_608;
+export let OBJECT_BOUND = 8_388_608;
 /** R-LOG-19: a directory lists at most this many names before it splits. */
-export const DIRECTORY_ENTRIES = 4_096;
+export let DIRECTORY_ENTRIES = 4_096;
 /** R-LOG-9, R-LOG-17: a segment closes at this many entries in both layouts. */
-export const SEGMENT_ENTRIES = 1_000;
+export let SEGMENT_ENTRIES = 1_000;
+
+/** The three limits of the layout rules. */
+export interface LayoutLimits {
+  readonly objectBound: number;
+  readonly directoryEntries: number;
+  readonly segmentEntries: number;
+}
+
+/**
+ * For tests only: run the layout rules at smaller limits, so a test can
+ * cross a bound with a few small entries. The publisher, its index reader
+ * and `verify` all read the limits from this module, so they stay in
+ * agreement. Returns a function that puts the contract's limits back. No
+ * other code calls this: a log written at other limits is not a log any
+ * other reader verifies.
+ */
+export function setLayoutLimitsForTests(limits: Partial<LayoutLimits>): () => void {
+  const before: LayoutLimits = { objectBound: OBJECT_BOUND, directoryEntries: DIRECTORY_ENTRIES, segmentEntries: SEGMENT_ENTRIES };
+  const set = (l: Partial<LayoutLimits>) => {
+    OBJECT_BOUND = l.objectBound ?? OBJECT_BOUND;
+    DIRECTORY_ENTRIES = l.directoryEntries ?? DIRECTORY_ENTRIES;
+    SEGMENT_ENTRIES = l.segmentEntries ?? SEGMENT_ENTRIES;
+  };
+  set(limits);
+  return () => set(before);
+}
 
 /** A seq or a chunk index as a name: 12 decimal digits. */
 export const twelve = (n: number): string => String(n).padStart(12, "0");

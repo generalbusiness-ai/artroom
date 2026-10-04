@@ -5,6 +5,7 @@
  *  2. signature (R-SIG-5)                        ArtroomError, nothing recorded
  *  3. idempotency (R-IDEM)                       the original result, or an unrecorded refusal
  *  4. authority by case (R-ADM-3, R-ADM-12)      unrecorded refusal
+ * 4a. kind and binding, in a v2 room (R-DECL-16) unrecorded refusal
  *  5. body schema and sizes (R-SIG-4, R-SIG-6)   unrecorded refusal
  *  6. secret scan (R-SEC-1)                      unrecorded refusal
  *  7. lane and lease (R-LANE)                    recorded refusal
@@ -16,6 +17,12 @@
  * A refused `join` is never recorded, at any step: its body carries the
  * invitation's secret (R-GEN-6, R-ADM-8).
  *
+ * What a room admits is its active document's vocabulary (R-DECL-1): the
+ * legacy vocabulary under a `v1` document, the declarations under a `v2`
+ * one. Steps 7 to 10 run by step, not by kind (`dispatch`): the legacy
+ * kinds map onto the same steps, and the platform kinds `renew`, `roster`
+ * and `recover` are judged by platform code.
+ *
  * Steps 3 to 9 read state and may await policy evaluation. Step 10 runs in
  * one synchronous transaction that first checks the log head is unchanged;
  * if it moved, the decision is made again (R-ADM-6). A runtime failure at
@@ -23,6 +30,8 @@
  */
 
 import type {
+  ActDeclaration,
+  AnyPolicyDocument,
   Digest,
   ActId,
   ActRecord,
@@ -63,19 +72,23 @@ import type {
   RepoPath,
   Review,
   ReviewBody,
+  RecoverOp,
   RosterOp,
+  Role,
   RosterRecord,
   Sha,
   SignedEnvelope,
+  Step,
 } from "@generalbusiness/artroom-contract";
 import type { InputOf } from "@generalbusiness/artroom-policy";
-import { checkerInputs } from "@generalbusiness/artroom-policy";
+import { checkerInputs, declarationOf, delegableBy as grantable, isDeclared, isPlatformKind, stepsOf } from "@generalbusiness/artroom-policy";
+import { bindingStale, kindUndeclared, worded, type RefusalFacts } from "./declared.ts";
 import { canonicalize, utf8 } from "./canonical.ts";
 import { b64url, digestJson, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
-import { iso, opIds, parseTime, pinnedRef } from "./ids.ts";
+import { iso, opIds, parseTime, pinnedRef, RE } from "./ids.ts";
 import { idOf } from "./log.ts";
-import { judge, laneOf, refusal } from "./authority.ts";
+import { judge, laneOf, refusal, type Signer } from "./authority.ts";
 import { matchesAny } from "./glob.ts";
 import {
   changedPaths,
@@ -101,7 +114,7 @@ import {
 } from "./obligations.ts";
 import type { ArtroomConfig, DiffResult, Evaluation, ObligationSpec } from "./ports.ts";
 import { activeAdmins, activeKeys, delegableBy, delegation, invitation, keyRow, memberRow, recoveryKey, revocationOf, teamsOf } from "./roster.ts";
-import { checkBody, checkEnvelopeSize, checkSignedEnvelope, ShapeError } from "./schema.ts";
+import { checkBody, checkEnvelopeSize, checkSignedEnvelope, ShapeError, checkDeclaredTarget } from "./schema.ts";
 import { limitInvitation } from "./ratelimit.ts";
 import { scanValue } from "./secrets.ts";
 import { one, num, setMeta, str } from "./store.ts";
@@ -141,6 +154,12 @@ interface Ctx {
   readonly core: RoomCore;
   readonly signed: SignedEnvelope;
   readonly env: Envelope;
+  /** The active declaration of the act's kind, in a v2 room; null for the legacy vocabulary and platform kinds. */
+  readonly decl: ActDeclaration | null;
+  /** The `recover` op this act is (R-DECL-21), or null. */
+  readonly recover: RecoverOp["op"] | null;
+  /** Facts the room reports, for a declaration's refusal wording (R-DECL-13). */
+  readonly facts: RefusalFacts;
   readonly path: AdmissionPath;
   readonly digest: string;
   readonly pre: Pre;
@@ -201,12 +220,15 @@ export async function submit(core: RoomCore, input: unknown, path: AdmissionPath
  * join counts against the invitation's rate limit (R-CRED-9).
  */
 export async function admit(core: RoomCore, input: unknown, path: AdmissionPath, hooks: AdmitHooks = {}): Promise<Admitted> {
-  // Step 1: parse, version, room ID, size (R-SIG-4, R-SIG-5, R-SIG-6).
+  // Step 1: parse, version, room ID, size (R-SIG-4, R-SIG-5, R-SIG-6), under the active document's vocabulary.
   try {
-    checkSignedEnvelope(input);
+    stepOne(input, core.founded ? core.activePolicy().doc : undefined);
   } catch (e) {
-    if (e instanceof ShapeError) throw artroomError(e.rule === "payload-too-large" ? "payload-too-large" : "bad-request", e.message);
-    throw artroomError("bad-request", "The act is not a signed envelope.");
+    // R-DECL-16: an exact retry of an accepted act gets its original receipt, even when the document now in force no
+    // longer admits its version, kind or target. Only that exact envelope, with its signature, is answered.
+    const prior = core.founded ? await acceptedBefore(core, input) : null; // G2:retry-before-shape
+    if (prior) return { result: prior, replay: true };
+    throw e;
   }
   const signed = input as SignedEnvelope;
   const env = signed.envelope;
@@ -261,6 +283,48 @@ export async function admit(core: RoomCore, input: unknown, path: AdmissionPath,
 }
 
 /**
+ * The stored result of an earlier admission of exactly this signed envelope,
+ * or null. It is asked only when step 1 fails under the document in force:
+ * the envelope was well formed under the document it was admitted under, so
+ * it is read here without that document. It must be an object with a string
+ * actor and idempotency key, inside the signed JSON profile and the size
+ * limit, with a signature that verifies, and the same digest as the stored
+ * act (R-IDEM-2).
+ */
+async function acceptedBefore(core: RoomCore, input: unknown): Promise<ActRecord | Refusal | null> {
+  // The closed outer shape, as step 1 has it: exactly `envelope` and `sig`. An extra field is bad-request for a retry
+  // as for a new act.
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return null;
+  const outer = Object.keys(input);
+  if (outer.length !== 2 || !Object.hasOwn(input, "envelope") || !Object.hasOwn(input, "sig")) return null; // G2:retry-outer
+  const signed = input as { envelope?: unknown; sig?: unknown };
+  if (typeof signed.sig !== "string") return null;
+  const env = signed.envelope as { actor?: unknown; idempotencyKey?: unknown; room?: unknown } | null;
+  if (typeof env !== "object" || env === null || typeof env.actor !== "string" || typeof env.idempotencyKey !== "string" || env.room !== core.roomId) return null;
+  let digest: string;
+  try {
+    checkEnvelopeSize(utf8(canonicalize(env)).length);
+    digest = digestJson(env);
+  } catch {
+    return null;
+  }
+  const prior = one(core.sql, "SELECT digest, result FROM idem WHERE actor = ? AND ikey = ?", env.actor, env.idempotencyKey);
+  if (!prior || str(prior, "digest") !== digest) return null;
+  if (!(await verify(env.actor as never, "artroom-envelope-v1", env as never, signed.sig).catch(() => false))) return null;
+  return JSON.parse(str(prior, "result")!) as ActRecord | Refusal;
+}
+
+/** Step 1's shape checks (R-ADM-1 step 1 as amended): an `ArtroomError` `bad-request` or `payload-too-large`, never recorded. */
+function stepOne(input: unknown, doc: AnyPolicyDocument | undefined): void {
+  try {
+    checkSignedEnvelope(input, doc);
+  } catch (e) {
+    if (e instanceof ShapeError) throw artroomError(e.rule === "payload-too-large" ? "payload-too-large" : "bad-request", e.message);
+    throw artroomError("bad-request", "The act is not a signed envelope.");
+  }
+}
+
+/**
  * The last check before sealing, inside the write transaction and with the
  * room clock read now (R-ADM-6, P1.3 of review aabda1ed). Authority that
  * depends on time (a delegation's or an invitation's expiry) or on state is
@@ -270,8 +334,9 @@ export async function admit(core: RoomCore, input: unknown, path: AdmissionPath,
  */
 export function finalBoundary(core: RoomCore, plan: Extract<Plan, { t: "refused" | "accept" }>): Refusal | null {
   const ctx = plan.ctx;
-  const j = judge(core.sql, ctx.env, ctx.path, core.now());
-  if (!j.ok) return j.refusal;
+  const j = judge(core.sql, ctx.env, ctx.path, core.now(), core.activePolicy().doc);
+  // A refusal decided here is a platform refusal of the act like any other: in its declaration's words (R-DECL-13).
+  if (!j.ok) return worded(j.refusal, ctx.decl, ctx.facts); // G2:boundary-wording
   if (canonicalize(j.authority) !== canonicalize(ctx.authority)) throw new Moved();
   const lane = laneOf(ctx.env);
   if (lane) {
@@ -287,10 +352,15 @@ export function finalBoundary(core: RoomCore, plan: Extract<Plan, { t: "refused"
 export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: AdmissionPath, digest: string, authority?: Authority): Plan | null {
   const env = signed.envelope;
   const sql = core.sql;
-  // Step 3: idempotency, scoped to the signing key (R-IDEM-1 to R-IDEM-4).
+  const policy = core.activePolicy();
+  // Step 3: idempotency, scoped to the signing key (R-IDEM-1 to R-IDEM-4). An exact retry of an accepted act gets its
+  // original receipt first of all, even after its binding has gone stale or the document stopped admitting its shape
+  // (R-DECL-16).
   const prior = one(sql, "SELECT digest, seq, result FROM idem WHERE actor = ? AND ikey = ?", env.actor, env.idempotencyKey);
+  if (prior && str(prior, "digest") === digest) return { t: "replay", result: JSON.parse(str(prior, "result")!) as ActRecord | Refusal }; // G2:retry-first
+  // Step 1 again, under the document in force now: an activation may have changed the vocabulary since.
+  stepOne(signed, policy.doc); // G2:step1-recheck
   if (prior) {
-    if (str(prior, "digest") === digest) return { t: "replay", result: JSON.parse(str(prior, "result")!) as ActRecord | Refusal };
     const original = str(one(sql, "SELECT id FROM entries WHERE seq = ?", num(prior, "seq")!), "id");
     return {
       t: "unrecorded",
@@ -298,18 +368,32 @@ export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: Admissi
     };
   }
   // Step 4: authority at admission (R-ADM-3, R-ADM-12).
-  const j = authority ? ({ ok: true, authority } as const) : judge(sql, env, path, core.now());
+  const j = authority ? ({ ok: true, authority } as const) : judge(sql, env, path, core.now(), policy.doc);
   if (!j.ok) return { t: "unrecorded", refusal: j.refusal };
+  // Step 4a, in a v2 room (R-DECL-16): the kind is declared, and the act carries the active declaration's binding.
+  if (isDeclared(policy.doc) && !isPlatformKind(env.kind)) { // G2:4a-platform
+    const current = core.declaredBinding(env.kind);
+    if (current === null) return { t: "unrecorded", refusal: kindUndeclared(env.kind, policy.version) }; // G2:undeclared
+    const signedFor = (env as Signer).binding;
+    if ((env.v as number) !== 2 || signedFor !== current) return { t: "unrecorded", refusal: bindingStale(env.kind, signedFor, current, policy.version) }; // G2:stale
+    // The target, against the declaration the binding names (R-DECL-4): bad-request, thrown, as step 1's is.
+    try {
+      checkDeclaredTarget(policy.doc, env.kind, env.target); // G2:target-after-4a
+    } catch (e) {
+      if (e instanceof ShapeError) throw artroomError("bad-request", e.message);
+      throw e;
+    }
+  }
   // Step 5: body schema and sizes (R-SIG-4, R-SIG-6, R-PATH-1).
   let fixed: ReadonlySet<string>;
   let exempt: ReadonlySet<string>;
   try {
-    ({ fixed, exempt } = checkBody(env.kind, env.target, env.body));
+    ({ fixed, exempt } = checkBody(env.kind, env.target, env.body, policy.doc));
   } catch (e) {
     if (e instanceof ShapeError) return { t: "unrecorded", refusal: nope(e.rule as Refusal["rule"], e.message, "Correct the body and sign it again.") };
     throw e;
   }
-  const semantic = env.kind === "roster" ? rosterSemantics(core, env, j.authority) : null;
+  const semantic = env.kind === "roster" ? rosterSemantics(core, env, j.authority, policy.doc) : null;
   if (semantic) return { t: "unrecorded", refusal: semantic };
   // Step 6: secret scan (R-SEC-1 to R-SEC-4). The reason names the field and detector, never the value.
   const finding = scanValue(env.body, "body", fixed, exempt);
@@ -321,8 +405,27 @@ export function earlySteps(core: RoomCore, signed: SignedEnvelope, path: Admissi
   return null;
 }
 
+/**
+ * A `v2` grant's names and bindings (R-DECL-17), at its admission: each
+ * platform kind and each declared kind of its map may be signed by `role`
+ * and delegated, each declared kind is declared, and each binding is the
+ * active declaration's. Unrecorded.
+ */
+function grantProblem(core: RoomCore, doc: AnyPolicyDocument, role: Role, kinds: readonly string[], acts: Readonly<Record<string, string>>, invalid: (reason: string) => Refusal): Refusal | null {
+  const may = grantable(doc, role);
+  for (const k of kinds) if (!may.platform.includes(k)) return invalid(`The role ${role} may not grant ${k}.`); // G2:grant-platform
+  const policy = core.activePolicy();
+  for (const [k, b] of Object.entries(acts)) {
+    const current = core.declaredBinding(k);
+    if (current === null) return kindUndeclared(k, policy.version); // G2:grant-undeclared
+    if (!may.declared.includes(k)) return invalid(declarationOf(doc, k)!.who.delegable === false ? `${k} may not be delegated.` : `The role ${role} may not grant ${k}.`); // G2:grant-delegable
+    if (b !== current) return bindingStale(k, b, current, policy.version); // G2:grant-stale
+  }
+  return null;
+}
+
 /** Step 5 checks that need the roster (unrecorded). */
-function rosterSemantics(core: RoomCore, env: Envelope, by: Authority): Refusal | null {
+function rosterSemantics(core: RoomCore, env: Envelope, by: Authority, doc: AnyPolicyDocument): Refusal | null {
   const sql = core.sql;
   const op = env.body as RosterOp;
   const bad = (reason: string) => nope("invalid-body", reason, "Correct the roster op and sign it again.");
@@ -338,6 +441,10 @@ function rosterSemantics(core: RoomCore, env: Envelope, by: Authority): Refusal 
       if (exp === null || exp <= now || exp > now + MAX_INVITE_MS) return bad("An invitation must expire within 7 days of the room clock (R-GEN-6).");
       if (op.session) {
         const role = op.role ?? existing!.role;
+        if (isDeclared(doc)) {
+          const s = op.session as unknown as { kinds: readonly string[]; acts: Readonly<Record<string, string>> };
+          return grantProblem(core, doc, role, s.kinds, s.acts, () => bad(`The role ${role} may not sign every kind the session lists.`)); // G2:session-grant
+        }
         const may = delegableBy(role);
         if (op.session.kinds !== "*" && op.session.kinds.some((k) => !may.includes(k))) return bad(`The role ${role} may not sign every kind the session lists.`);
       }
@@ -365,7 +472,11 @@ function rosterSemantics(core: RoomCore, env: Envelope, by: Authority): Refusal 
       const exp = parseTime(op.expiresAt);
       if (exp === null || exp <= now) return bad("A delegation must expire in the future.");
       if (op.to === env.actor) return bad("A key cannot delegate to itself.");
-      // R-ADM-5: only kinds the grantor's role may sign, never roster.
+      // R-ADM-5: only kinds the grantor's role may sign, never roster; in a v2 room, by the signed map (R-DECL-17).
+      if (isDeclared(doc)) {
+        const g = op as unknown as { kinds: readonly string[]; acts: Readonly<Record<string, string>> };
+        return grantProblem(core, doc, by.role!, g.kinds, g.acts, (reason) => nope("delegation-invalid", reason, "Grant only kinds your role may sign."));
+      }
       const may = delegableBy(by.role!);
       if (op.kinds !== "*" && op.kinds.some((k) => !may.includes(k)))
         return nope("delegation-invalid", `The role ${by.role} may not grant every kind listed.`, "Grant only kinds your role may sign.");
@@ -401,8 +512,10 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
   const unavailable = () => artroomError("unavailable", "The repository could not be read. Nothing was recorded; retry with the same idempotency key.", { maybeRecorded: false });
   let noMain = false;
   let step: string = env.kind;
+  // The reads a step needs, by step (R-PROP-1 step 1, R-OBL-3, R-LAND-2).
+  const runs = stepOfEnvelope(core.activePolicy().doc, env);
   try {
-    if (env.kind === "propose") {
+    if (runs === "version") {
       const lane = laneOf(env)!;
       const body = env.body as ProposeBody;
       if (!laneRow(core.sql, lane)) return {};
@@ -427,7 +540,7 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
       }
       return { head: { inFork }, diff, main, config, since };
     }
-    if (env.kind === "check") {
+    if (runs === "check") {
       const b = env.body as CheckBody;
       // A scoped check that binds a snapshot commit the room recorded: the room derived it, so nothing is read.
       if (b.input?.kind === "filtered" && one(core.sql, "SELECT 1 AS x FROM check_snapshots WHERE commit_sha = ?", b.integration)) return {};
@@ -438,7 +551,7 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
       if (b.input?.kind === "filtered" && Array.isArray(b.input.paths)) return { tree, snapshot: (await a.snapshot(b.integration, b.input.paths))?.digest ?? null };
       return { tree };
     }
-    if (env.kind === "land" && core.landing.core.main() === null) {
+    if (runs === "land" && core.landing.core.main() === null) {
       step = "land.readMain";
       if ((await a.readMain()) === null) noMain = true;
       else {
@@ -458,22 +571,94 @@ async function preAdmission(core: RoomCore, env: Envelope): Promise<Pre> {
 
 // =============================================================== steps 7 to 9
 
+/** The `recover` op that stands for each step (R-DECL-21). */
+const RECOVER_STEP: Readonly<Record<RecoverOp["op"], Step>> = {
+  open: "open",
+  take: "take",
+  version: "version",
+  approve: "review",
+  land: "land",
+  release: "release",
+  note: "comment",
+};
+
+/** The one step an envelope runs under this document, or null for `renew` and `roster`, which are not steps. */
+export function stepOfEnvelope(doc: AnyPolicyDocument, env: Pick<Envelope, "kind" | "target" | "body">): Step | null {
+  if (env.kind === "renew" || env.kind === "roster") return null;
+  if ((env.kind as string) === "recover") {
+    const op = (env.body as { op?: unknown }).op;
+    return typeof op === "string" && Object.hasOwn(RECOVER_STEP, op) ? RECOVER_STEP[op as RecoverOp["op"]] : null;
+  }
+  const steps = stepsOf(doc, env.kind, env.target);
+  return steps?.length === 1 ? steps[0] : null;
+}
+
+/**
+ * A declared act's body, as the step handlers read it. The handlers were
+ * written for the legacy kinds, whose `purpose` selects configuration
+ * recovery and whose `goal`, `plan`, `summary` and `text` are text. A
+ * declaration may give those names to fields of its own, of any type
+ * (R-DECL-12). So `purpose` never reaches a handler from a declared act:
+ * recovery is the platform kind `recover` (R-DECL-21). The other four reach
+ * it only as text, which is what the thread and version rows hold.
+ */
+function handlerBody(body: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const { purpose: _purpose, ...kept } = body; // G2:declared-purpose
+  void _purpose;
+  const rest: Record<string, unknown> = kept;
+  for (const name of ["goal", "plan", "summary", "text"]) if (rest[name] !== undefined && typeof rest[name] !== "string") delete rest[name]; // G2:declared-text
+  return rest;
+}
+
+/** Facts every refusal of this envelope may report (R-DECL-13): its kind, and the lane and generation it names. */
+function envelopeFacts(env: Envelope): RefusalFacts {
+  // A declared kind's target is judged only after step 4a (`checkDeclaredTarget`), and refusals decided before that
+  // are worded too. So a fact is taken from the target only if it has the form the room itself reports: a lane ID,
+  // a generation number. Anything else fills its slot with nothing.
+  const t = env.target as { lane?: unknown; generation?: unknown } | null;
+  return {
+    kind: env.kind,
+    ...(t && typeof t.lane === "string" && RE.actId.test(t.lane) ? { lane: t.lane } : {}), // G2:fact-lane
+    ...(t && Number.isSafeInteger(t.generation) && (t.generation as number) >= 1 ? { generation: String(t.generation) } : {}), // G2:fact-generation
+  };
+}
+
+/** Refusals that policy rules made: they keep their own wording (R-DECL-13). */
+const RULE_REFUSALS = new WeakSet<Refusal>();
+const fromRule = <R extends Refusal | null>(r: R): R => {
+  if (r) RULE_REFUSALS.add(r);
+  return r;
+};
+
+/** A platform refusal of a declared act, in its declaration's words (R-DECL-13). */
+function wordedPlan(plan: Plan, decl: ActDeclaration | null, facts: RefusalFacts): Plan {
+  if (!decl || (plan.t !== "unrecorded" && plan.t !== "refused") || RULE_REFUSALS.has(plan.refusal)) return plan; // G2:wording
+  const r = worded(plan.refusal, decl, facts);
+  return r === plan.refusal ? plan : { ...plan, refusal: r };
+}
+
 export async function decide(core: RoomCore, signed: SignedEnvelope, path: AdmissionPath, pre: Pre, opts: DecideOptions = {}): Promise<Plan> {
   const digest = digestJson(signed.envelope);
-  const early = earlySteps(core, signed, path, digest, opts.authority);
-  if (early) return early;
+  const policy = core.activePolicy();
   const env = signed.envelope;
-  const j = opts.authority ? ({ ok: true, authority: opts.authority, flags: [] as Flag[] } as const) : judge(core.sql, env, path, core.now());
-  if (!j.ok) return { t: "unrecorded", refusal: j.refusal };
+  const decl = declarationOf(policy.doc, env.kind);
+  const facts = envelopeFacts(env);
+  const early = earlySteps(core, signed, path, digest, opts.authority);
+  if (early) return wordedPlan(early, decl, facts);
+  const j = opts.authority ? ({ ok: true, authority: opts.authority, flags: [] as Flag[] } as const) : judge(core.sql, env, path, core.now(), policy.doc);
+  if (!j.ok) return wordedPlan({ t: "unrecorded", refusal: j.refusal }, decl, facts);
   const ctx: Ctx = {
     core,
     signed,
     env,
+    decl,
+    recover: (env.kind as string) === "recover" ? (env.body as RecoverOp).op : null,
+    facts,
     path,
     digest,
     pre,
     now: core.now(),
-    policy: core.activePolicy(),
+    policy,
     budget: core.ports.policy.actBudget(),
     authority: j.authority,
     flags: [...j.flags],
@@ -483,25 +668,47 @@ export async function decide(core: RoomCore, signed: SignedEnvelope, path: Admis
   };
   // R-LAND-8: while the slot is held, every act is ordered after the reservation (open point 6).
   if (core.landing.after()) ctx.flags.push("after-reservation");
-  switch (env.kind) {
-    case "claim":
-      return env.target === null ? claimNew(ctx, env.body as ClaimBody) : reclaim(ctx, env.target.lane, env.body as ReclaimBody);
-    case "propose":
-      return propose(ctx, env.target.lane, env.body as ProposeBody);
-    case "note":
-      return note(ctx, env.target, env.body as { text: string; replyTo?: ActId });
+  return wordedPlan(await dispatch(ctx), decl, ctx.facts);
+}
+
+/**
+ * Steps 7 to 10, by step (note section 8.1): the legacy kinds, the declared
+ * kinds and `recover` ops all run the same step handlers. `renew` and
+ * `roster` are platform kinds with their own.
+ */
+function dispatch(ctx: Ctx): Promise<Plan> {
+  const env = ctx.env;
+  if (env.kind === "renew") return renew(ctx, env.target.lane, (env.body as { lease: number }).lease);
+  if (env.kind === "roster") return roster(ctx, env.body as RosterOp);
+  const step = stepOfEnvelope(ctx.policy.doc, env);
+  const t = env.target as { lane: LaneId; generation: Generation } & NoteAnchor;
+  // A recover op's body is its step's, with `op` (R-DECL-21); an open is a configuration-recovery open.
+  const b = (ctx.recover
+    ? { ...(env.body as RecoverOp), op: undefined, ...(ctx.recover === "open" ? { purpose: "config-recovery" } : {}) } // G2:recover-open
+    : ctx.decl
+      ? handlerBody(env.body as unknown as Readonly<Record<string, unknown>>) // G2:declared-body
+      : env.body) as never;
+  switch (step) {
+    case "open":
+      return claimNew(ctx, b);
+    case "take":
+      return reclaim(ctx, t.lane, b);
+    case "version":
+      return propose(ctx, t.lane, b);
+    case "comment":
+      return note(ctx, env.target as NoteAnchor, b);
     case "review":
-      return review(ctx, env.target.lane, env.target.generation, env.body as ReviewBody);
+      return review(ctx, t.lane, t.generation, b);
     case "check":
-      return check(ctx, env.target.lane, env.target.generation, env.body as CheckBody);
+      return check(ctx, t.lane, t.generation, b);
     case "land":
-      return land(ctx, env.target.lane, env.target.generation, env.body as { lease: number; head: Sha });
+      return land(ctx, t.lane, t.generation, b);
     case "release":
-      return release(ctx, env.target.lane, env.body as ReleaseBody);
-    case "renew":
-      return renew(ctx, env.target.lane, (env.body as { lease: number }).lease);
-    case "roster":
-      return roster(ctx, env.body as RosterOp);
+      return release(ctx, t.lane, b);
+    default:
+      // Unreachable: step 1 accepts only targets the declaration names, and a document with steps this room does not run
+      // yet never activates (`stagedProblems`).
+      throw artroomError("internal", `The room cannot run ${env.kind} on this target.`);
   }
 }
 
@@ -520,6 +727,40 @@ function holderCheck(ctx: Ctx, lane: LaneRow, lease: number): Refusal | null {
     });
   if (lease !== lane.leaseGen) return nope("lease-fenced", `The act carries lease generation ${lease}; the current one is ${lane.leaseGen}.`, "Act with the current lease.", { leaseGeneration: lane.leaseGen });
   return null;
+}
+
+/** The lease length a thread uses for renewal and expiry: recorded when it opened, or the room's current one (R-DECL-9). */
+function leaseMsOf(core: RoomCore, lane: Pick<LaneRow, "leaseMs">): number {
+  return lane.leaseMs ?? core.leaseMs; // G2:lease-of
+}
+
+/** The facts of a thread an act names, for refusal wording (R-DECL-13). */
+function laneFacts(ctx: Ctx, lane: LaneRow): void {
+  const f = ctx.facts as { -readonly [K in keyof RefusalFacts]: RefusalFacts[K] };
+  f.lane = lane.id;
+  if (lane.holder) f.holder = lane.holder;
+  f.generation ??= String(lane.generation);
+}
+
+/**
+ * R-DECL-8, recorded at step 7: in a v2 room, an act on a thread is refused
+ * `wrong-thread` unless the thread's kind is in its declaration's `threads`.
+ * A configuration-recovery thread takes only `recover` ops, and `recover`
+ * acts only on one (R-DECL-21). `renew`, a platform kind, acts on any
+ * thread. With `entry`, only the recovery rule applies: an entry target is
+ * not a thread target.
+ */
+function threadCheck(ctx: Ctx, lane: LaneRow | null, entry = false): Refusal | null {
+  if (!isDeclared(ctx.policy.doc) || ctx.env.kind === "renew") return null;
+  if (ctx.recover) {
+    if (lane?.purpose === "config-recovery") return null; // G2:recover-ordinary
+    return nope("wrong-thread", lane ? `${lane.id} is not a configuration-recovery thread; recover acts only on those.` : "recover acts only on a configuration-recovery thread.", "Act on it with the room's declared acts.");
+  }
+  if (!lane) return null;
+  if (lane.purpose === "config-recovery")
+    return nope("wrong-thread", `${lane.id} is a configuration-recovery thread, on which only recover ops act.`, "Use the platform kind recover, with an admin's own key."); // G2:recovery-thread
+  if (entry || ctx.decl?.threads?.includes(lane.kind)) return null; // G2:thread-kind
+  return nope("wrong-thread", `${lane.id} is a ${lane.kind} thread, which ${ctx.env.kind} does not act on.`, `Act on it with an act whose threads name ${lane.kind}.`);
 }
 
 /** R-ADMIN-5: every act on a configuration-recovery lane is an active admin's own key (case a). */
@@ -547,11 +788,11 @@ async function policyRefuse(ctx: Ctx, lane: LaneRow | null, proposal: InputOf<"r
   ctx.refuseInput = input;
   if (ctx.precomputed) {
     ctx.evaluations.push(...ctx.precomputed.evaluations);
-    return ctx.precomputed.refusal;
+    return fromRule(ctx.precomputed.refusal);
   }
   const r = await ctx.core.ports.policy.refuse(ctx.policy, input, { budget: ctx.budget, recoveryKey });
   ctx.evaluations.push(...r.evaluations);
-  return r.refusal;
+  return fromRule(r.refusal);
 }
 
 /** Whether policy `refuse` rules apply to this act at all (R-ADMIN-3). */
@@ -571,25 +812,36 @@ export function refuseInput(core: RoomCore, env: Envelope, by: Authority, lane: 
   };
 }
 
+/** R-ADM-11, R-LANE-5: renewal to the room clock plus the thread's lease length (R-DECL-9). */
 function renewEffect(ctx: Ctx, lane: LaneRow): Effect {
-  return { type: "renewed", lane: lane.id, expiresAt: iso(ctx.now + ctx.core.leaseMs) };
+  return { type: "renewed", lane: lane.id, expiresAt: iso(ctx.now + leaseMsOf(ctx.core, lane)) };
 }
 
 function renewLease(ctx: Ctx, lane: LaneId): void {
   const core = ctx.core;
-  const expires = ctx.now + core.leaseMs;
+  const before = laneRow(core.sql, lane);
+  if (!before) return;
+  const expires = ctx.now + leaseMsOf(core, before);
   core.sql.all("UPDATE lanes SET expires_ms = ? WHERE id = ? AND state = 'held'", expires, lane);
   // Lane B's workspace keeps the lease's deadline: a token is never minted past it (R-CRED-8).
   const l = laneRow(core.sql, lane);
   if (l?.state === "held" && one(core.sql, "SELECT 1 AS x FROM ws_leases WHERE lane = ? AND lease_gen = ? AND state = 'open'", lane, l.leaseGen)) core.workspaces.open(lane, l.leaseGen, expires);
 }
 
+/**
+ * The fields every record shares. Its kind is the act's own: a legacy kind,
+ * a declared kind, or `recover` (R-DECL-21); `kind` names the record shape
+ * the step produces. A `recover` record names its op as `recover`, a field
+ * no step's record has: a landing's own `op` is its landing operation.
+ */
 function recordBase<K extends ActRecord["kind"]>(ctx: Ctx, entry: LogEntry, id: ActId, kind: K, receipt: Receipt) {
   const because = (ctx.env.body as { because?: Claim["because"] }).because;
+  void kind;
   return {
     id,
     seq: entry.seq,
-    kind,
+    kind: ctx.env.kind as K,
+    ...(ctx.recover ? { recover: ctx.recover } : {}), // G2:recover-record
     by: receipt.authority,
     at: entry.at,
     ...(receipt.after ? { after: receipt.after } : {}),
@@ -608,6 +860,17 @@ function receiptOf(entry: LogEntry): Receipt {
 async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
   const core = ctx.core;
   const purpose: LanePurpose = body.purpose ?? "ordinary";
+  // R-DECL-6: the thread's kind and the opening act's binding; R-DECL-9: its lease length, resolved and recorded now in
+  // a v2 room (a hold's leaseSeconds, or the room's lease), and left unset under the legacy vocabulary.
+  const declared = isDeclared(ctx.policy.doc);
+  const kind = ctx.recover ? "recover" : ctx.env.kind; // G2:thread-kind-record
+  const binding = declared && !ctx.recover ? core.declaredBinding(kind) : null; // G2:binding-record
+  const leaseSeconds = ctx.decl?.hold?.leaseSeconds;
+  const recordedLease = declared ? (leaseSeconds !== undefined ? leaseSeconds * 1000 : core.leaseMs) : null; // G2:lease-record
+  const leaseMs = recordedLease ?? core.leaseMs;
+  // R-DECL-6: the conflict mode is fixed at open too: the hold's, else the policy's `lanes` now; a recovery thread is
+  // by-scope to others. It is recorded here and judged from stage 4 (the either-side rule of R-DECL-9).
+  const conflict = declared ? (ctx.recover ? "by-scope" : (ctx.decl?.hold?.conflict ?? (ctx.policy.doc as AnyPolicyDocument).lanes)) : null; // G2:conflict-record
   if (purpose === "config-recovery") {
     ctx.flags.push("config-recovery");
     if (ctx.authority.via !== "member" || ctx.authority.role !== "admin")
@@ -622,8 +885,9 @@ async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
   const lane = null;
   const r = purpose === "config-recovery" ? null : await policyRefuse(ctx, lane);
   if (r) return refused(ctx, r);
-  const lease = { holder: ctx.authority.member!, generation: 1, expiresAt: iso(ctx.now + core.leaseMs) };
-  const effect = { type: "opened" as const, purpose, lease };
+  const lease = { holder: ctx.authority.member!, generation: 1, expiresAt: iso(ctx.now + leaseMs) };
+  // R-LOG-6 as amended: in a v2 room the opened effect names the thread's kind and the opening act's binding.
+  const effect = { type: "opened" as const, purpose, lease, ...(declared ? { kind, binding } : {}) }; // G2:opened-kind
   return {
     t: "accept",
     ctx,
@@ -633,21 +897,25 @@ async function claimNew(ctx: Ctx, body: ClaimBody): Promise<Plan> {
     apply: (entry, id) => {
       const overlaps = overlapsFor(core.sql, id, body.scope);
       core.sql.all(
-        "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state) VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, 'held')",
+        "INSERT INTO lanes (id, seq, purpose, goal, plan, scope, generation, lease_gen, holder, expires_ms, state, kind, binding, lease_ms, conflict) VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, 'held', ?, ?, ?, ?)",
         id,
         entry.seq,
         purpose,
-        body.goal,
+        body.goal ?? "",
         body.plan ?? null,
         JSON.stringify(body.scope),
         lease.holder,
-        ctx.now + core.leaseMs,
+        ctx.now + leaseMs,
+        kind,
+        binding,
+        recordedLease,
+        conflict,
       );
       const rec: Claim = {
         ...recordBase(ctx, entry, id, "claim", receiptOf(entry)),
         lane: id,
         purpose,
-        goal: body.goal,
+        goal: body.goal ?? "", // G2:record-goal
         ...(body.plan !== undefined ? { plan: body.plan } : {}),
         scope: body.scope,
         lease,
@@ -663,6 +931,9 @@ async function reclaim(ctx: Ctx, laneId: LaneId, body: ReclaimBody): Promise<Pla
   const core = ctx.core;
   const lane = laneRow(core.sql, laneId);
   if (!lane) return refused(ctx, nope("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane."), "R-LANE-3");
+  laneFacts(ctx, lane);
+  const wrong = threadCheck(ctx, lane);
+  if (wrong) return refused(ctx, wrong, "R-DECL-8");
   if (lane.purpose === "config-recovery") {
     const r = recoveryLaneCheck(ctx, lane);
     if (r) return refused(ctx, r, "R-ADMIN-5");
@@ -685,7 +956,7 @@ async function reclaim(ctx: Ctx, laneId: LaneId, body: ReclaimBody): Promise<Pla
   }
   const r = await policyRefuse(ctx, lane);
   if (r) return refused(ctx, r);
-  const expires = ctx.now + core.leaseMs;
+  const expires = ctx.now + leaseMsOf(core, lane);
   const lease = { holder: ctx.authority.member!, generation: rescope ? lane.leaseGen : lane.leaseGen + 1, expiresAt: iso(expires) };
   const effect = rescope
     ? ({ type: "rescoped", lane: laneId, scope: body.scope, obligationsRecomputed: false } as const)
@@ -731,6 +1002,9 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
   const core = ctx.core;
   const lane = laneRow(core.sql, laneId);
   if (!lane) return refused(ctx, nope("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane."), "R-LANE-3");
+  laneFacts(ctx, lane);
+  const wrong = threadCheck(ctx, lane);
+  if (wrong) return refused(ctx, wrong, "R-DECL-8");
   const h = holderCheck(ctx, lane, body.lease);
   if (h) return refused(ctx, h, "R-LANE-3");
   if (body.expectedGeneration !== lane.generation)
@@ -761,6 +1035,7 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
       return refused(ctx, nope("recovery-scope", `A configuration-recovery proposal may change only .artroom/**, and it changes ${bad.join(", ") || "nothing"}.`, "Propose the other changes on an ordinary lane."), "R-ADMIN-6");
   }
   const outside = paths.filter((p) => !matchesAny(p, lane.scope));
+  if (outside.length) (ctx.facts as { path?: string }).path = outside[0]!;
   if (outside.length)
     return refused(ctx, nope("outside-claim", `${outside[0]} is outside the claim's scope${outside.length > 1 ? ` (and ${outside.length - 1} more)` : ""}.`, "Extend the claim."), "R-PROP-4");
   // R-POL-1: a proposed policy or checker configuration must be valid.
@@ -781,7 +1056,7 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
       { budget: ctx.budget },
     );
     ctx.evaluations.push(...req.evaluations);
-    if (req.refusal) return refused(ctx, req.refusal);
+    if (req.refusal) return refused(ctx, fromRule(req.refusal));
     for (const o of withAdvisory(req.obligations, ctx.policy.checkers)) if (!specs.some((s) => s.id === o.id)) specs.push(o);
   }
   // Carrying earlier verdicts (R-CARRY), through the policy port: platform conditions first, then carry rules.
@@ -850,7 +1125,7 @@ async function propose(ctx: Ctx, laneId: LaneId, body: ProposeBody): Promise<Pla
         entry.seq,
         body.head,
         prospective.base,
-        body.summary,
+        body.summary ?? "",
         ctx.authority.member!,
         JSON.stringify(changed),
         JSON.stringify(specs),
@@ -954,9 +1229,15 @@ async function note(ctx: Ctx, anchor: NoteAnchor, body: { text: string; replyTo?
     if (!e) return refused(ctx, nope("lane-unknown", `There is no entry ${anchor.act}.`, "Anchor the note to an existing act."), "R-LANE-3");
     const l = str(e, "lane");
     lane = l ? laneRow(core.sql, l) : null;
+    if (lane) laneFacts(ctx, lane);
+    const wrong = threadCheck(ctx, lane, true);
+    if (wrong) return refused(ctx, wrong, "R-DECL-8");
   } else {
     lane = laneRow(core.sql, anchor.lane);
     if (!lane) return refused(ctx, nope("lane-unknown", `There is no lane ${anchor.lane}.`, "Anchor the note to an existing lane."), "R-LANE-3");
+    laneFacts(ctx, lane);
+    const wrong = threadCheck(ctx, lane);
+    if (wrong) return refused(ctx, wrong, "R-DECL-8");
     const g = generationRow(core.sql, anchor.lane, anchor.generation);
     if (!g) return refused(ctx, nope("lane-unknown", `${anchor.lane} has no generation ${anchor.generation}.`, "Anchor the note to an existing generation."), "R-LANE-3");
     if (g.head !== anchor.head) return refused(ctx, nope("head-mismatch", `Generation ${anchor.generation}'s head is ${g.head}.`, "Anchor the note to the head you read."), "R-OBL-1");
@@ -982,7 +1263,7 @@ async function note(ctx: Ctx, anchor: NoteAnchor, body: { text: string; replyTo?
       const recd: Note = {
         ...recordBase(ctx, entry, id, "note", receiptOf(entry)),
         anchor,
-        text: body.text,
+        text: body.text ?? "",
         ...(body.replyTo ? { replyTo: body.replyTo } : {}),
       };
       return recd;
@@ -996,6 +1277,9 @@ async function review(ctx: Ctx, laneId: LaneId, generation: Generation, body: Re
   const core = ctx.core;
   const lane = laneRow(core.sql, laneId);
   if (!lane) return refused(ctx, nope("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane."), "R-LANE-3");
+  laneFacts(ctx, lane);
+  const wrong = threadCheck(ctx, lane);
+  if (wrong) return refused(ctx, wrong, "R-DECL-8");
   const g = generationRow(core.sql, laneId, generation);
   if (!g) return refused(ctx, nope("lane-unknown", `${laneId} has no generation ${generation}.`, "Review an existing generation."), "R-LANE-3");
   const rec = recoveryLaneCheck(ctx, lane);
@@ -1079,7 +1363,7 @@ async function review(ctx: Ctx, laneId: LaneId, generation: Generation, body: Re
         verdict: body.verdict,
         scope: body.scope,
         dependsOn: body.dependsOn ?? [],
-        text: body.text,
+        text: body.text ?? "", // G2:record-text
         fulfils:
           body.verdict === "approve"
             ? qualifiesIds.map((o) => ({ obligation: o, evidence: { basis: "here" as const, act: id, kind: "review" as const, generation, head: body.head } }))
@@ -1096,6 +1380,10 @@ async function check(ctx: Ctx, laneId: LaneId, generation: Generation, body: Che
   const core = ctx.core;
   const lane = laneRow(core.sql, laneId);
   if (!lane) return refused(ctx, nope("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane."), "R-LANE-3");
+  laneFacts(ctx, lane);
+  const wrong = threadCheck(ctx, lane);
+  if (wrong) return refused(ctx, wrong, "R-DECL-8");
+  (ctx.facts as { obligation?: string }).obligation = body.obligation;
   const g = generationRow(core.sql, laneId, generation);
   if (!g) return refused(ctx, nope("lane-unknown", `${laneId} has no generation ${generation}.`, "Check an existing generation."), "R-LANE-3");
   const rec = recoveryLaneCheck(ctx, lane);
@@ -1234,6 +1522,9 @@ async function land(ctx: Ctx, laneId: LaneId, generation: Generation, body: { le
   const core = ctx.core;
   const lane = laneRow(core.sql, laneId);
   if (!lane) return refused(ctx, nope("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane."), "R-LANE-3");
+  laneFacts(ctx, lane);
+  const wrong = threadCheck(ctx, lane);
+  if (wrong) return refused(ctx, wrong, "R-DECL-8");
   const h = holderCheck(ctx, lane, body.lease);
   if (h) return refused(ctx, h, "R-LAND-1");
   const rec = recoveryLaneCheck(ctx, lane);
@@ -1245,10 +1536,11 @@ async function land(ctx: Ctx, laneId: LaneId, generation: Generation, body: { le
   if (body.head !== g.head) return refused(ctx, nope("head-mismatch", `Generation ${generation}'s head is ${g.head}.`, "Land the head you reviewed."), "R-LAND-1");
   const inFlight = core.activeLandOp(laneId);
   if (inFlight) return refused(ctx, nope("land-in-progress", "This lane already has a landing operation in flight.", "Wait for it to finish.", { op: inFlight }), "R-LANE-10");
-  if (g.blocked) return refused(ctx, { ...g.blocked, refused: true }, "R-POL-9");
+  if (g.blocked) return refused(ctx, fromRule({ ...g.blocked, refused: true }), "R-POL-9");
   if (g.recompute) return refused(ctx, nope("obligation-open", "The obligations are being recomputed under a new policy.", "Try again shortly."), "R-POL-9");
   const obligations = obligationsFor(core.sql, laneId, generation, { doc: ctx.policy.doc, checkers: ctx.policy.checkers });
   const open = obligations.find((o) => o.kind === "review" && o.state !== "met");
+  if (open) (ctx.facts as { obligation?: string }).obligation = open.id;
   if (open) return refused(ctx, nope("obligation-open", `The obligation ${open.id} is open.`, "Meet it, then land."), "R-LAND-1");
   // Step 9: refuse rules on `land`, then land rules at stage "land" (R-POL-6); neither on a recovery lane (R-ADMIN-8).
   const r = await policyRefuse(ctx, lane);
@@ -1257,7 +1549,7 @@ async function land(ctx: Ctx, laneId: LaneId, generation: Generation, body: { le
     const input = core.landInput({ lane: laneId, generation }, lane, g, ctx.policy, "land", ctx.authority);
     const lr = await core.ports.policy.land(ctx.policy, input, { budget: ctx.budget });
     ctx.evaluations.push(...lr.evaluations);
-    if (lr.refusal) return refused(ctx, lr.refusal);
+    if (lr.refusal) return refused(ctx, fromRule(lr.refusal));
   }
   const opId = opIds.land(core.headSeq() + 1);
   return {
@@ -1282,6 +1574,9 @@ async function release(ctx: Ctx, laneId: LaneId, body: ReleaseBody): Promise<Pla
   const core = ctx.core;
   const lane = laneRow(core.sql, laneId);
   if (!lane) return refused(ctx, nope("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane."), "R-LANE-3");
+  laneFacts(ctx, lane);
+  const wrong = threadCheck(ctx, lane);
+  if (wrong) return refused(ctx, wrong, "R-DECL-8");
   const h = holderCheck(ctx, lane, body.lease);
   if (h) return refused(ctx, h, "R-LANE-3");
   const rec = recoveryLaneCheck(ctx, lane);
@@ -1329,7 +1624,7 @@ async function renew(ctx: Ctx, laneId: LaneId, lease: number): Promise<Plan> {
       const rn: Renewal = {
         ...recordBase(ctx, entry, id, "renew", receiptOf(entry)),
         lane: laneId,
-        lease: { holder: lane.holder!, generation: lane.leaseGen, expiresAt: iso(ctx.now + core.leaseMs) },
+        lease: { holder: lane.holder!, generation: lane.leaseGen, expiresAt: iso(ctx.now + leaseMsOf(core, lane)) },
       };
       return rn;
     },
@@ -1398,7 +1693,7 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
         case "invite": {
           const exp = parseTime(op.expiresAt)!;
           sql.all(
-            "INSERT INTO invitations (id, member, role, custody, expires_at, expires_ms, secret_hash, session) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO invitations (id, member, role, custody, expires_at, expires_ms, secret_hash, session, declared) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             id,
             op.member,
             op.role ?? null,
@@ -1407,6 +1702,8 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
             exp,
             op.secretHash,
             op.session ? JSON.stringify(op.session) : null,
+            // R-DECL-17: what an invitation with no session grants was fixed by the vocabulary it was admitted under.
+            isDeclared(ctx.policy.doc) ? 1 : null, // G2:invitation-era
           );
           break;
         }
@@ -1481,8 +1778,10 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
           break;
         case "delegate": {
           const exp = parseTime(op.expiresAt)!;
+          // R-DECL-17: a grant in a v2 room keeps its signed map from declared kind to binding.
+          const acts = (op as { acts?: unknown }).acts; // G2:grant-store
           sql.all(
-            "INSERT INTO delegations (id, grantor, grantee, kinds, lanes, expires_at, expires_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO delegations (id, grantor, grantee, kinds, lanes, expires_at, expires_ms, acts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             id,
             ctx.env.actor,
             op.to,
@@ -1491,6 +1790,7 @@ async function roster(ctx: Ctx, op: RosterOp): Promise<Plan> {
             JSON.stringify(op.lanes),
             op.expiresAt,
             exp,
+            acts === undefined ? null : JSON.stringify(acts),
           );
           break;
         }

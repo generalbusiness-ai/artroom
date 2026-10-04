@@ -94,7 +94,27 @@ export {
   type PolicyV2Validation,
 } from "./acts.ts";
 export { TARGET_ORDER, bindingOf, bindingSubject, bindingsOf } from "./binding.ts";
+// Declared acts stage 5: reading a catalogue as a client does. Also at `@generalbusiness/artroom-policy/declared`, without the evaluator.
+export { builtForBinding, expandGrant, fieldsOf, governs, meaningOf, targetsOf, threadTitle, titleOf, type ActField, type ExpandedGrant, type GrantExpansion } from "./catalogue.ts";
+export { STEP_FIELD_SPECS, type StepFieldSpec, type StepFieldType } from "./steps.ts";
 export { CODE_REVIEW_ACTS } from "./codereview.ts";
+export {
+  DELEGABLE_PLATFORM,
+  LEGACY_DELEGABLE,
+  LEGACY_KINDS,
+  LEGACY_ROLE_KINDS,
+  PLATFORM_KIND_LIST,
+  ROSTER_OPS,
+  codeReviewPolicy,
+  declarationOf,
+  delegableBy,
+  isDeclared,
+  isPlatformKind,
+  kindsOf,
+  roleMaySign,
+  shapeOf,
+  stepsOf,
+} from "./vocabulary.ts";
 export {
   OBJECTION_OPEN,
   carry,

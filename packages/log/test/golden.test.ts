@@ -1,11 +1,27 @@
-/** Golden logs built through the contract's sealing order, published and verified (R-LOG-2, R-LOG-8 to 11). */
+/**
+ * Golden logs built through the contract's sealing order, published and
+ * verified (R-LOG-2, R-LOG-8 to 11).
+ *
+ * This is the one file that also runs in workerd
+ * (`vitest.workers.config.ts`). The package's code is the same in both
+ * runtimes, and the Room's own workerd tests publish and verify through it.
+ * What a second runtime could change is the bytes: hashing, signing,
+ * sorting and text encoding. So this file publishes, retries, restarts and
+ * verifies with policy replay in each runtime, and pins the commit IDs of
+ * one log, which both runtimes must reach.
+ */
 
 import { describe, expect, test } from "vitest";
+import { textOf } from "../src/decode.ts";
 import { MemoryGit, parseCommit } from "../src/git.ts";
 import { LOG_REF, entryId } from "../src/entries.ts";
 import { LogPublisher, PublishError, publicationDue, readLogFiles, readPublishedEntries } from "../src/publisher.ts";
 import { verifyLog } from "../src/verify.ts";
 import { goldenLog, keys, memberAuthority, RoomSim } from "./support/room-sim.ts";
+import { bareRoom } from "./support/layout2.ts";
+
+/** The room and the two commits of the pinned log below, computed in Node and in workerd. */
+const PINNED = ["room_0978f3e9a3f50e0819827796573144a5", "76048ff654346b672aaf7ffb9c3e9286af05baf4", "a50eb8c21b37756bc0bb01ff7863781816fc59a4"];
 
 describe("protocol section 20: a claim, its notification and two publications", () => {
   test("every value is computed from earlier values, and the log verifies", async () => {
@@ -144,8 +160,24 @@ describe("publication", () => {
   });
 });
 
-test("the run uses the runtime its config names", () => {
+test("the same log gives the same commits in every runtime: a log with no policy decision, so its bytes are this package's alone, has pinned commit IDs", async () => {
+  const sim = bareRoom();
+  const git = new MemoryGit();
+  const p = new LogPublisher(git);
+  sim.system({ type: "lease-expired", lane: "act_1_00000000" as never, holder: "@alice" as never, leaseGeneration: 1 });
+  const first = await sim.publish(p); // layout 1, then its checkpoint event
+  const second = await p.publish(sim.entries, sim.checkpoint({ version: 2, from: first.through + 1 }), []); // layout 2
+  expect([sim.room, first.commit, second.commit]).toEqual(PINNED);
+  const report = await verifyLog(git);
+  expect(report.failures).toEqual([]);
+  expect(report).toMatchObject({ ok: true, commits: 2, verifiedThrough: 2 });
+});
+
+test("the run uses the runtime its config names, and that runtime's text decoder refuses bytes that are not UTF-8 instead of replacing them", () => {
   const agent = (globalThis as { navigator?: { userAgent?: string } }).navigator?.userAgent ?? "";
   if (__ARTROOM_RUNTIME__ === "workerd") expect(agent).toBe("Cloudflare-Workers");
   else expect(agent).toMatch(/^Node\.js\//);
+  // The decoder is the runtime's own: a malformed line must stay malformed in each (decode.ts).
+  expect(textOf(new Uint8Array([0x7b, 0xff, 0x7d]))).toBeNull();
+  expect(textOf(new Uint8Array([0x7b, 0x7d]))).toBe("{}");
 });

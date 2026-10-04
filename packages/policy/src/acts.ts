@@ -14,6 +14,7 @@
 import type { CheckerConfigV2, PlatformRule, PolicyDocumentV2, Step, TargetShape } from "@generalbusiness/artroom-contract";
 import { globProblem } from "./glob.ts";
 import { Problems, checkerFields, documentFields, isObj, result, type Obj, type Validation } from "./validate.ts";
+import { safeName } from "./values.ts";
 
 /** The platform's bounds on declarations (R-DECL-26). */
 export const DECLARATION_BOUNDS = {
@@ -30,6 +31,8 @@ export const DECLARATION_BOUNDS = {
   templateChars: 256,
   leaseSeconds: { min: 10, max: 86400 },
   reserveSeconds: { min: 1, max: 600 },
+  /** The whole document's canonical JSON, in bytes: what a room stores in one row, with room to spare. */
+  documentBytes: 1048576,
 } as const;
 
 /** The steps versions this platform carries (R-DECL-14). */
@@ -205,6 +208,9 @@ export function validatePolicyV2(doc: unknown, ctx: PolicyV2Context = {}): Polic
     const at = `acts.${kind}`;
     if (!KIND.test(kind)) p.add(at, "a kind must match [a-z][a-z0-9-]{0,31}"); // G:kind-grammar
     if (RESERVED_KINDS.includes(kind)) p.add(at, `${kind} is reserved by the platform`); // G:kind-reserved
+    // A kind is a key of every grant map, which a rule input carries, and the evaluator's value profile (values.ts,
+    // `safeName`) admits no key so named. Of the kind grammar that is `constructor` and `prototype` only.
+    if (!safeName(kind)) p.add(at, `${kind} is a key name the evaluator's value profile reserves`); // G2:kind-profile
     const d = raw![kind];
     if (!isObj(d)) {
       p.add(at, "must be an object"); // G:decl-object
@@ -230,7 +236,28 @@ export function validatePolicyV2(doc: unknown, ctx: PolicyV2Context = {}): Polic
 
   soundness(p, acts, warnings, openers);
   checkers(p, ctx.checkers ?? {}, acts);
+  // R-DECL-26: the bounds above still allow a document of several megabytes, more than a room can store in one row.
+  const size = canonicalBytes(doc);
+  if (size === null) p.add("policy", "must be plain JSON"); // G2:doc-plain
+  else if (size > DECLARATION_BOUNDS.documentBytes) p.add("policy", `the document's canonical JSON must be at most ${DECLARATION_BOUNDS.documentBytes} bytes`); // G2:doc-bytes
   return done();
+}
+
+/**
+ * The UTF-8 size of a JSON value's canonical form (RFC 8785), or null if
+ * it has none. Sorting keys does not change a size, and RFC 8785 writes
+ * strings and safe integers as `JSON.stringify` does, so this is the size
+ * of the compact JSON text. It is counted here, not by the evaluator's
+ * canonical writer: that one refuses the key names it reserves, which a
+ * legal owner path such as `constructor` is, before it has counted what
+ * follows them.
+ */
+function canonicalBytes(value: unknown): number | null {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).length;
+  } catch {
+    return null;
+  }
 }
 
 function declaration(p: Problems, kind: string, at: string, d: Obj): Act {
@@ -323,6 +350,9 @@ function declaration(p: Problems, kind: string, at: string, d: Obj): Act {
 function field(p: Problems, at: string, name: string, f: unknown, taken: ReadonlySet<string>, targets: readonly TargetShape[]): void {
   if (!FIELD.test(name)) p.add(at, "a field name must match [a-z][A-Za-z0-9]{0,31}"); // G:field-name
   if (taken.has(name)) p.add(at, `${name} is a field of this act's steps, or because`); // G:field-reserved
+  // A field is a key of the binding subject and of every rule input that carries the body, and the evaluator's value
+  // profile, under which both are made canonical, admits no key so named: `constructor` and `prototype` only.
+  if (!safeName(name)) p.add(at, `${name} is a key name the evaluator's value profile reserves`); // G2:field-profile
   if (!isObj(f)) return p.add(at, "must be an object"); // G:field-object
   const type = f["type"];
   if (!isString(type) || !Object.hasOwn(FIELD_KEYS, type)) return p.add(at, "type must be text, int, bool, enum, globs, member, act or segment"); // G:field-type

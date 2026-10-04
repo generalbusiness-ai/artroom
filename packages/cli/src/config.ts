@@ -8,7 +8,7 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { KeyId, LaneId, MemberId, OpId, Redeemed, RoomId, Role } from "@generalbusiness/artroom-contract";
+import type { DelegationId, KeyId, LaneId, MemberId, OpId, Redeemed, RoomId, Role } from "@generalbusiness/artroom-contract";
 import type { PreparedAct, PrivateJwk } from "@generalbusiness/artroom-client";
 
 export interface RoomConfig {
@@ -19,6 +19,8 @@ export interface RoomConfig {
   /** `client`: a key file here signs. `room`: a bearer file here reads, and the room signs. */
   readonly custody: "client" | "room";
   readonly key: KeyId;
+  /** Custody `room`: the delegation the bearer session acts under, as its redemption recorded it. */
+  readonly delegation?: DelegationId;
   readonly mcp?: string;
   /** The lane the next command acts on, from the last `claim`. Change it only with `setLane` in main.ts. */
   lane?: LaneId;

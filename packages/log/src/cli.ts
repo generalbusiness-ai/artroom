@@ -3,8 +3,8 @@
  * artroom verify <remote> [--ref <ref>] [--json] [--no-replay]
  *
  * Fetch refs/artroom/log from a git remote and verify it offline
- * (R-LOG-10). Exit status: 0 verified, 1 a check failed, 2 usage or fetch
- * error.
+ * (R-LOG-10). Exit status: 0 verified, 1 a check failed or the log names a
+ * version this verifier does not carry (R-DECL-25), 2 usage or fetch error.
  */
 
 import { GitCli, redact } from "./gitcli.ts";
@@ -27,6 +27,7 @@ if (!remote || !ref) {
 try {
   const git = GitCli.open(remote);
   await git.fetch(ref);
+  await git.fetchPins();
   const report = await verifyLog(git, { ref, replayDecisions: replay });
   if (json) console.log(JSON.stringify(report, null, 2));
   else {
@@ -37,6 +38,9 @@ try {
     console.log(`Policy decisions replayed: ${report.decisionsReplayed}.`);
     for (const f of report.failures)
       console.log(`  ${f.reason}${f.seq !== undefined ? ` at entry ${f.seq}` : ""}${f.commit ? ` in ${f.commit}` : ""}: ${f.detail}`);
+    if (report.unsupported)
+      console.log(`Not verified from entry ${report.unsupported.seq}: ${report.unsupported.reason}, a limit of this verifier, not a finding against the log. ${report.unsupported.detail}`);
+    for (const l of report.limits) console.log(`  ${l.reason} at entry ${l.seq}: ${l.detail}`);
     for (const c of report.cannotProve) console.log(`Cannot prove: ${c}`);
   }
   process.exit(report.ok ? 0 : 1);

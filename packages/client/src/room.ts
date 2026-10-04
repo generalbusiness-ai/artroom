@@ -4,13 +4,23 @@
  * and read; only the wire differs.
  */
 
+import { canonicalize } from "./canonical.ts";
 import {
   isArtroomError,
   isRefusal,
   type ActId,
   type ActOptions,
   type ActRecord,
+  type AnySignedEnvelope,
   type ArtroomError,
+  type Binding,
+  type Catalogue,
+  type CatalogueAt,
+  type DeclaredRecord,
+  type DeclaredTarget,
+  type GenericActOptions,
+  type Json,
+  type KindName,
   type AttentionPage,
   type Check,
   type CheckActInput,
@@ -20,7 +30,6 @@ import {
   type Cursor,
   type EnvelopeKind,
   type IdempotencyKey,
-  type SignedEnvelope,
   type Explanation,
   type Held,
   type HttpRoom,
@@ -69,7 +78,8 @@ import {
   type WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
 import { artroomError } from "./errors.ts";
-import { buildEnvelope, checkIdempotencyKey, signEnvelope, signRequest, type Identity } from "./envelope.ts";
+import { builtForBinding, governs, isPlatformKind } from "@generalbusiness/artroom-policy/declared";
+import { buildDeclaredEnvelope, buildEnvelope, checkBinding, checkIdempotencyKey, signEnvelope, signRequest, type Identity } from "./envelope.ts";
 import { newIdempotencyKey } from "./keys.ts";
 import type { BearerActor } from "./bearer.ts";
 import type { ClientOptions, HttpWire, RequestResult, RpcWire, Wire } from "./wire.ts";
@@ -94,7 +104,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** Retries `attempt` after retryable failures, then says how to retry safely. */
-export async function withRetries<T>(attempt: () => Promise<T>, retries: number, idempotencyKey: string | undefined): Promise<T> {
+export async function withRetries<T>(attempt: () => Promise<T>, retries: number, idempotencyKey: string | undefined, backoff: ClientOptions["backoff"] = undefined): Promise<T> {
   for (let n = 0; ; n++) {
     try {
       return await attempt();
@@ -108,25 +118,67 @@ export async function withRetries<T>(attempt: () => Promise<T>, retries: number,
           message: `${e.message} Retry with idempotency key ${idempotencyKey}: if the act was recorded, the room returns the original result (R-IDEM-2).`,
         } satisfies ArtroomError;
       }
-      await sleep(Math.min(e.retryAfterMs ?? 200 * 2 ** n, 5_000));
+      const wait = Math.min(e.retryAfterMs ?? 200 * 2 ** n, 5_000);
+      await sleep(backoff ? backoff(wait) : wait);
     }
   }
 }
 
 /** An act, resolved and, for a key, signed: everything needed to send it again unchanged. */
 export interface PreparedAct {
-  readonly kind: EnvelopeKind;
+  /** A legacy, platform or declared kind. */
+  readonly kind: EnvelopeKind | KindName;
   readonly target: unknown;
   readonly body: unknown;
   readonly idempotencyKey: IdempotencyKey;
-  /** The signed envelope; absent for a bearer session, where the room signs. */
-  readonly signed?: SignedEnvelope;
+  /**
+   * For a generic declared act: the binding the caller read (R-DECL-16). It
+   * is kept with the act, so a resend carries the same binding and never a
+   * newer one. Absent for the named methods.
+   */
+  readonly binding?: Binding;
+  /** The signed envelope, of either version; absent for a bearer session, where the room signs. */
+  readonly signed?: AnySignedEnvelope;
+}
+
+/** `value` and everything inside it, frozen. */
+function frozen<T>(value: T): T {
+  if (typeof value === "object" && value !== null) {
+    Object.freeze(value);
+    for (const inner of Object.values(value)) frozen(inner); // G5:intent-frozen-deep
+  }
+  return value;
+}
+
+/**
+ * The handle's own copy of an act's target and body, deeply frozen. A
+ * prepared act must stay the bytes that were signed, or for a bearer the
+ * call that was made, whatever the caller does afterwards with the objects
+ * it passed in: the envelope and the prepared act hold these copies, never
+ * the caller's objects (R-IDEM-2).
+ */
+function ownedIntent<T, B>(target: T, body: B): { readonly target: T; readonly body: B } {
+  let copy: { target: T; body: B };
+  try {
+    copy = { target: structuredClone(target), body: structuredClone(body) };
+  } catch {
+    throw artroomError("bad-request", "An act's target and body must be plain data: the handle keeps them, to send the act again unchanged."); // G5:intent-plain
+  }
+  return frozen(copy); // G5:intent-frozen
 }
 
 /** `ActOptions`, plus a hook to persist the prepared act before it is first sent. */
 export interface ClientActOptions extends ActOptions {
   readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
 }
+
+/** The generic act's options: the binding is required; the hook is as for the named methods. */
+export interface ClientGenericActOptions extends GenericActOptions {
+  readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
+}
+
+/** The seven code-review kinds the named methods sign. `renew` and `roster` are platform kinds and stay `v: 1`. */
+const NAMED_DECLARED: ReadonlySet<string> = new Set(["claim", "propose", "note", "review", "check", "land", "release"]);
 
 /** The shared core of every handle. */
 abstract class RoomCore {
@@ -138,6 +190,25 @@ abstract class RoomCore {
   protected readonly bearer: BearerActor | undefined;
   #session: Session | undefined;
   #sessionPending: Promise<Session> | undefined;
+  /** The active catalogue the named methods sign under, read once and kept until the room says it is stale. */
+  #vocabulary: Catalogue | undefined;
+  /**
+   * Catalogues of ended policy versions this handle read, for `actsAt`. An
+   * ended version is not final: a later activation can set `retired` on its
+   * kinds. So every one is dropped when the handle sees a later activation
+   * than the latest it knew.
+   */
+  readonly #ended: Catalogue[] = [];
+  /** The seq of the latest `policy-activated` entry this handle has seen, by any read. */
+  #activation = -1;
+  /**
+   * Named acts this handle sent and got no answer for, by idempotency key.
+   * A caller that repeats the call with the same key gets the same bytes
+   * sent again, as first built, also when the room's vocabulary changed in
+   * between (R-IDEM-2, R-DECL-16). Building the act again under the
+   * vocabulary now in force would be a different act under the same key.
+   */
+  readonly #unanswered = new Map<string, PreparedAct>();
 
   constructor(wire: Wire & { redactor: import("./errors.ts").Redactor }, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActor) {
     this.wire = wire;
@@ -210,61 +281,191 @@ abstract class RoomCore {
   async #signedRequest(body: RequestBody): Promise<Result<RequestResult>> {
     if (this.bearer !== undefined) return this.bearer.request(body);
     // Each attempt is signed afresh: the room refuses a nonce it has seen (R-CRED-6).
-    return withRetries(async () => this.wire.request(await signRequest(this.id, this.identity, body, this.now())), this.opts.retries ?? 3, undefined);
+    return withRetries(async () => this.wire.request(await signRequest(this.id, this.identity, body, this.now())), this.opts.retries ?? 3, undefined, this.opts.backoff);
   }
 
   // -------------------------------------------------------------------- acts
 
-  protected async act<T>(kind: EnvelopeKind, target: unknown, body: unknown, opts?: ClientActOptions): Promise<Result<T>> {
+  /**
+   * The binding a named method signs with, or undefined for envelope `v: 1`
+   * (R-API-9 as amended). `renew` and `roster` are platform kinds: always
+   * `v: 1`. For the seven code-review kinds the handle reads the room's
+   * active catalogue once. Under a `v1` document they are `v: 1`, as before.
+   * Under a `v2` document each is `v: 2` with the binding of the code-review
+   * declaration the method was built for, under the room's steps version
+   * and `lanes`. It is never the room's own declaration's binding: where the
+   * two differ the room refuses `binding-stale`.
+   */
+  async #builtFor(kind: string): Promise<Binding | undefined> {
+    if (!NAMED_DECLARED.has(kind)) return undefined; // G5:named-platform-v1
+    this.#vocabulary ??= await this.acts();
+    const c = this.#vocabulary;
+    if (c.vocabulary !== "declared") return undefined; // G5:named-legacy-v1
+    return (await builtForBinding(c, kind)) ?? undefined;
+  }
+
+  /**
+   * Note an activation at `seq`. If it is later than any this handle knew,
+   * the ended catalogues it kept are dropped: their `retired` marks were
+   * read before it (R-DECL-23).
+   */
+  #sawActivation(seq: number): void {
+    if (seq <= this.#activation) return; // G5:cache-later
+    this.#activation = seq;
+    this.#ended.length = 0; // G5:cache-drop
+  }
+
+  /** The seq inside an entry ID, `act_<seq>_<hash>`: a policy version is its `policy-activated` entry's ID. */
+  static #seqOf(id: unknown): number | undefined {
+    const m = typeof id === "string" ? /^act_(\d+)_/.exec(id) : null;
+    return m ? Number(m[1]) : undefined;
+  }
+
+  /** Activations named by what the room just answered: a refusal's current policy version, an update's or a log page's entries. */
+  protected sawRefusal(out: unknown): void {
+    const seq = isRefusal(out) ? RoomCore.#seqOf(out.current?.policy) : undefined;
+    if (seq !== undefined) this.#sawActivation(seq); // G5:cache-refusal
+  }
+
+  protected sawUpdate(update: Update): void {
+    for (const e of update.entries) if (e.type === "system" && e.kind === "policy-activated") this.#sawActivation(e.seq); // G5:cache-update
+  }
+
+  /**
+   * Forget the catalogue the named methods sign under. Called when the room
+   * says an act's vocabulary or binding is not the active one, so the
+   * caller's next call reads again. The refused act itself is never sent
+   * again by the handle (R-DECL-16).
+   */
+  #vocabularyStale(out: unknown): void {
+    if (isRefusal(out) && (out.rule === "binding-stale" || out.rule === "kind-undeclared")) this.#vocabulary = undefined; // G5:named-forget
+  }
+
+  /** One of the named methods' acts: built, signed for a key, and sent. */
+  protected async named<T>(kind: EnvelopeKind, givenTarget: unknown, givenBody: unknown, opts?: ClientActOptions): Promise<Result<T>> {
     const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
+    const { target, body } = ownedIntent(givenTarget, givenBody); // G5:named-owned
+    const kept = this.#unanswered.get(idempotencyKey);
+    let prepared: PreparedAct;
+    if (kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)) {
+      prepared = kept; // G5:named-retry-kept
+    } else if (this.bearer !== undefined) {
+      // The room signs. For a named tool in a `v2` room it adds the built-for binding itself (R-CRED-10).
+      prepared = { kind, target, body, idempotencyKey };
+    } else {
+      const binding = await this.#builtFor(kind);
+      const envelope =
+        binding === undefined
+          ? buildEnvelope(this.id, this.identity, kind, target, body, idempotencyKey)
+          : buildDeclaredEnvelope(this.id, this.identity, kind, binding, target as DeclaredTarget, body, idempotencyKey); // G5:named-v2
+      prepared = { kind, target, body, idempotencyKey, signed: await signEnvelope(envelope, this.identity.signer) };
+    }
+    await opts?.onPrepared?.(prepared);
+    let out: Result<ActRecord>;
+    try {
+      out = await this.replay(prepared);
+    } catch (e) {
+      // A room that left the vocabulary this handle read answers `bad-request` at step 1: read again next time.
+      if (isArtroomError(e) && e.code === "bad-request") {
+        this.#vocabulary = undefined; // G5:named-forget-vocabulary
+        // The room answers an exact retry of an accepted act before step 1, so it never accepted this one.
+        this.#unanswered.delete(idempotencyKey);
+      } else {
+        // No answer: the room may have recorded it. A repeat with this key sends these bytes.
+        if (this.#unanswered.size >= 64 && !this.#unanswered.has(idempotencyKey)) this.#unanswered.delete(this.#unanswered.keys().next().value!);
+        this.#unanswered.set(idempotencyKey, prepared); // G5:named-retry-keep
+      }
+      throw e;
+    }
+    this.#unanswered.delete(idempotencyKey);
+    this.#vocabularyStale(out);
+    this.sawRefusal(out);
+    return out as Result<T>;
+  }
+
+  /**
+   * An act of any declared kind (R-DECL-16, R-API-9 as amended). The caller
+   * gives the binding it read from `acts()`: the meaning it intends. The
+   * handle signs exactly this kind, target, body and binding in envelope
+   * `v: 2`, or for a bearer session passes them to the room unchanged.
+   *
+   * It never reads the catalogue, never replaces the binding and never
+   * signs again. If the room refuses `binding-stale`, the refusal's
+   * `current` names the active binding and policy version; the caller reads
+   * the declaration, decides, and calls again with that binding if the new
+   * meaning is still what it intends. An exact retry (the same idempotency
+   * key and bytes, by `replay`) of an act the room accepted returns the
+   * original record, also after an activation (R-IDEM-2).
+   */
+  async act(
+    kind: KindName,
+    givenTarget: DeclaredTarget,
+    givenBody: { readonly [field: string]: Json },
+    opts: GenericActOptions & Pick<ClientGenericActOptions, "onPrepared">,
+  ): Promise<Result<DeclaredRecord>> {
+    const binding = checkBinding(opts?.binding);
+    if (typeof kind !== "string" || isPlatformKind(kind))
+      throw artroomError("bad-request", `${String(kind)} is a platform kind, signed in envelope v: 1 with no binding. Use its own method.`); // G5:generic-platform
+    const idempotencyKey = checkIdempotencyKey(opts.idempotencyKey ?? newIdempotencyKey());
+    const { target, body } = ownedIntent(givenTarget, givenBody); // G5:act-owned
     const prepared: PreparedAct =
       this.bearer !== undefined
-        ? { kind, target, body, idempotencyKey }
-        : { kind, target, body, idempotencyKey, signed: await signEnvelope(buildEnvelope(this.id, this.identity, kind, target, body, idempotencyKey), this.identity.signer) };
-    await opts?.onPrepared?.(prepared);
-    return (await this.replay(prepared)) as Result<T>;
+        ? { kind, target, body, idempotencyKey, binding }
+        : {
+            kind,
+            target,
+            body,
+            idempotencyKey,
+            binding,
+            signed: await signEnvelope(buildDeclaredEnvelope(this.id, this.identity, kind, binding, target, body, idempotencyKey), this.identity.signer),
+          };
+    await opts.onPrepared?.(prepared);
+    const out = await this.replay(prepared);
+    this.sawRefusal(out);
+    return out as Result<DeclaredRecord>;
   }
 
   /**
    * Sends a prepared act, unchanged: the same signed bytes, or for a bearer
-   * the same tool call, with the same idempotency key. If the room recorded
-   * it before, it returns the original result (R-IDEM-2). Use it to finish
-   * an act after a restart, without reading or rebuilding anything.
+   * the same tool call, with the same idempotency key and, for a generic
+   * act, the same binding. If the room recorded it before, it returns the
+   * original result (R-IDEM-2). Use it to finish an act after a restart,
+   * without reading or rebuilding anything.
    */
   async replay(act: PreparedAct): Promise<Result<ActRecord>> {
     const retries = this.opts.retries ?? 3;
     if (act.signed === undefined) {
       if (this.bearer === undefined) throw artroomError("bad-request", "This act was prepared for a bearer session; it has no signature.");
       const bearer = this.bearer;
-      return withRetries(() => bearer.act(act.kind, act.target, act.body, act.idempotencyKey), retries, act.idempotencyKey);
+      return withRetries(() => bearer.act(act.kind, act.target, act.body, act.idempotencyKey, act.binding), retries, act.idempotencyKey, this.opts.backoff); // G5:replay-binding
     }
     if (act.signed.envelope.room !== this.id) throw artroomError("bad-request", "This act was prepared for another room.");
     const signed = act.signed;
     // The same signed bytes on every attempt: a retry is the same request (R-IDEM-1, R-IDEM-2).
-    return withRetries(() => this.wire.submit(signed), retries, act.idempotencyKey);
+    return withRetries(() => this.wire.submit(signed), retries, act.idempotencyKey, this.opts.backoff);
   }
 
   claim(input: ClaimInput, opts?: ClientActOptions): Promise<Result<Claim>> {
     const lane = (input as { lane?: LaneId | Held }).lane;
     if (lane === undefined) {
-      return this.act("claim", null, pick(input, ["goal", "scope", "purpose", "plan", "because"]), opts);
+      return this.named("claim", null, pick(input, ["goal", "scope", "purpose", "plan", "because"]), opts);
     }
     const body = pick(input, ["scope", "goal", "plan", "because", "expectedGeneration"]);
-    if (typeof lane === "string") return this.act("claim", { lane }, body, opts); // take-over (R-LANE-7)
-    return this.act("claim", { lane: lane.lane }, { ...body, lease: lane.lease.generation }, opts); // rescope (R-LANE-2)
+    if (typeof lane === "string") return this.named("claim", { lane }, body, opts); // take-over (R-LANE-7)
+    return this.named("claim", { lane: lane.lane }, { ...body, lease: lane.lease.generation }, opts); // rescope (R-LANE-2)
   }
 
   propose(held: Held, input: ProposeInput, opts?: ClientActOptions): Promise<Result<Proposal>> {
-    return this.act("propose", { lane: held.lane }, { ...pick(input, ["expectedGeneration", "head", "summary", "because"]), lease: held.lease.generation }, opts);
+    return this.named("propose", { lane: held.lane }, { ...pick(input, ["expectedGeneration", "head", "summary", "because"]), lease: held.lease.generation }, opts);
   }
 
   note(anchor: NoteAnchor, input: NoteInput, opts?: ClientActOptions): Promise<Result<Note>> {
     const target = "act" in anchor ? { act: anchor.act } : pick(anchor, ["lane", "generation", "head", "path", "line", "endLine"]);
-    return this.act("note", target, pick(input, ["text", "replyTo"]), opts);
+    return this.named("note", target, pick(input, ["text", "replyTo"]), opts);
   }
 
   review(proposal: ProposalAt, input: ReviewInput, opts?: ClientActOptions): Promise<Result<Review>> {
-    return this.act(
+    return this.named(
       "review",
       { lane: proposal.lane, generation: proposal.generation },
       { head: proposal.head, ...pick(input, ["verdict", "scope", "dependsOn", "text"]) },
@@ -273,7 +474,7 @@ abstract class RoomCore {
   }
 
   check(proposal: ProposalRef, input: CheckActInput, opts?: ClientActOptions): Promise<Result<Check>> {
-    return this.act(
+    return this.named(
       "check",
       { lane: proposal.lane, generation: proposal.generation },
       pick(input, ["obligation", "check", "integration", "input", "config", "runner", "volatile", "ok", "detail", "landOp"]),
@@ -283,19 +484,19 @@ abstract class RoomCore {
 
   land(held: Held, proposal: ProposalAt, opts?: ClientActOptions): Promise<Result<Landing>> {
     if (held.lane !== proposal.lane) return Promise.reject(artroomError("bad-request", "The proposal is not on the held lane."));
-    return this.act("land", { lane: proposal.lane, generation: proposal.generation }, { lease: held.lease.generation, head: proposal.head }, opts);
+    return this.named("land", { lane: proposal.lane, generation: proposal.generation }, { lease: held.lease.generation, head: proposal.head }, opts);
   }
 
   release(held: Held, input?: ReleaseInput, opts?: ClientActOptions): Promise<Result<Release>> {
-    return this.act("release", { lane: held.lane }, { lease: held.lease.generation, ...pick(input ?? {}, ["note"]) }, opts);
+    return this.named("release", { lane: held.lane }, { lease: held.lease.generation, ...pick(input ?? {}, ["note"]) }, opts);
   }
 
   renew(held: Held, opts?: ClientActOptions): Promise<Result<Renewal>> {
-    return this.act("renew", { lane: held.lane }, { lease: held.lease.generation }, opts);
+    return this.named("renew", { lane: held.lane }, { lease: held.lease.generation }, opts);
   }
 
   roster(op: RosterOp, opts?: ClientActOptions): Promise<Result<RosterRecord>> {
-    return this.act("roster", null, op, opts);
+    return this.named("roster", null, op, opts);
   }
 
   async workspace(held: Held): Promise<Result<WorkspaceOp>> {
@@ -353,8 +554,10 @@ abstract class RoomCore {
     return this.read(page === undefined ? { q: "attention" } : { q: "attention", page });
   }
 
-  log(req?: LogRequest): Promise<LogPage> {
-    return this.read(req === undefined ? { q: "log" } : { q: "log", req });
+  async log(req?: LogRequest): Promise<LogPage> {
+    const page = await this.read(req === undefined ? { q: "log" } : { q: "log", req });
+    for (const e of page.acts) if (e.entry.type === "system" && e.entry.event.type === "policy-activated") this.#sawActivation(e.seq); // G5:cache-log
+    return page;
   }
 
   explain(act: ActId): Promise<Explanation | null> {
@@ -363,6 +566,57 @@ abstract class RoomCore {
 
   members(): Promise<Roster> {
     return this.read({ q: "members" });
+  }
+
+  /**
+   * The active policy version's declarations, with each kind's binding
+   * (R-API-9 as amended). A room whose active document is `v1` answers with
+   * the legacy catalogue. Always read from the room: this is what a caller
+   * looks at before it prepares an act.
+   */
+  async acts(): Promise<Catalogue> {
+    const c = await this.read({ q: "acts" });
+    if (c === null) throw artroomError("internal", "The room has no active policy version.");
+    this.#sawActivation(c.since); // G5:cache-active
+    return c;
+  }
+
+  /**
+   * The declarations in force at an entry's seq, `D(s)`, or of a named
+   * policy version (R-DECL-23). Readers show a record with these labels and
+   * fields, never the active ones. Null when the room retains no such
+   * version.
+   *
+   * The handle keeps an ended version it read and answers later questions
+   * about its interval without a read. An ended version's declarations and
+   * bindings never change, but its `retired` marks can: a later activation
+   * may drop one of its kinds. So the kept versions are dropped whenever
+   * the handle sees a later activation: in a read of the active catalogue,
+   * a log page, an update, or a refusal that names the active policy
+   * version. A reader that follows the room therefore sees current marks.
+   * An answer that arrives after the handle has learnt of a later activation
+   * from another answer is returned to its caller but not kept, since it
+   * may have been read before that activation.
+   * `{ fresh: true }` reads from the room whatever the handle kept.
+   */
+  async actsAt(at: CatalogueAt, opts: { readonly fresh?: boolean } = {}): Promise<Catalogue | null> {
+    const kept = opts.fresh === true ? undefined : this.#ended.find((c) => (at.seq !== undefined ? governs(c, at.seq) : c.policy === at.policy)); // G5:catalogue-cache
+    if (kept) return kept;
+    const known = this.#activation;
+    const c = await this.read(at.seq !== undefined ? { q: "acts", at: at.seq } : { q: "acts", policy: at.policy });
+    if (c === null) return null;
+    // An answer is kept only if nothing else told the handle of a later activation while it was on its way. If
+    // something did, this answer may have been read before that activation, and its `retired` marks are then older
+    // than what the handle already knows: keeping it would bring them back.
+    const overtaken = this.#activation !== known; // G5:cache-overtaken
+    // What this answer says about activations: its own, and the one that ended it.
+    this.#sawActivation(c.until ?? c.since); // G5:cache-read
+    if (c.until !== null && !overtaken) {
+      const i = this.#ended.findIndex((k) => k.policy === c.policy);
+      if (i >= 0) this.#ended[i] = c; // G5:cache-replace
+      else this.#ended.push(c);
+    }
+    return c;
   }
 
   /** Releases the client side only: the room holds no state for a handle (R-API-2). */
@@ -385,14 +639,15 @@ export class HttpRoomClient extends RoomCore implements HttpRoom {
   /** The HTTPS long poll: the next update after `cursor`, or an empty one after `waitMs` (R-API-8). */
   async subscribe(cursor?: Cursor, opts?: { readonly waitMs?: number }): Promise<Update> {
     const waitMs = Math.min(Math.max(opts?.waitMs ?? 25_000, 0), WAIT_MAX_MS);
+    let update: Update;
     try {
-      return await this.#http.subscribe(await this.auth(), cursor, waitMs);
+      update = await this.#http.subscribe(await this.auth(), cursor, waitMs);
     } catch (e) {
-      if (isArtroomError(e) && e.code === "unauthenticated" && this.creds.kind !== "bearer") {
-        return await this.#http.subscribe(await this.auth(true), cursor, waitMs);
-      }
-      throw e;
+      if (!(isArtroomError(e) && e.code === "unauthenticated" && this.creds.kind !== "bearer")) throw e;
+      update = await this.#http.subscribe(await this.auth(true), cursor, waitMs);
     }
+    this.sawUpdate(update);
+    return update;
   }
 
   /**
@@ -419,9 +674,13 @@ export class HttpRoomClient extends RoomCore implements HttpRoom {
       check: async () => {
         await this.read({ q: "log", req: { limit: 1 } });
       },
-      onUpdate,
+      onUpdate: (update) => {
+        this.sawUpdate(update);
+        onUpdate(update);
+      },
       onError: onError ?? (() => {}),
       onClose: () => this.#watches.delete(sub),
+      backoff: this.opts.backoff ?? ((ms) => ms),
     });
     this.#watches.add(sub);
     return sub;
@@ -451,6 +710,7 @@ interface WatchDeps {
   onUpdate(update: Update): void;
   onError(error: ArtroomError): void;
   onClose(): void;
+  backoff(ms: number): number;
 }
 
 class WatchSubscription implements Watch {
@@ -537,7 +797,7 @@ class WatchSubscription implements Watch {
   #retry(): void {
     if (this.#closed) return;
     const delay = Math.min(250 * 2 ** this.#failures++, 10_000);
-    this.#timer = setTimeout(() => void this.#connect(), delay);
+    this.#timer = setTimeout(() => void this.#connect(), this.#deps.backoff(delay));
   }
 
   close(): void {
@@ -566,7 +826,22 @@ export class RpcRoomClient extends RoomCore implements Room {
 
   /** The room's newline-delimited JSON bytes, decoded into updates (R-API-8). */
   async subscribe(cursor?: Cursor): Promise<UpdateStream> {
-    return decodeUpdates(await this.#rpc.subscribe(await this.auth(), cursor));
+    const updates = decodeUpdates(await this.#rpc.subscribe(await this.auth(), cursor));
+    // Each update is looked at for a later activation as it is read (see `actsAt`).
+    return {
+      getReader: () => {
+        const reader = updates.getReader();
+        return {
+          read: async () => {
+            const r = await reader.read();
+            if (!r.done) this.sawUpdate(r.value);
+            return r;
+          },
+          releaseLock: () => reader.releaseLock(),
+        };
+      },
+      cancel: (reason) => updates.cancel(reason),
+    };
   }
 }
 

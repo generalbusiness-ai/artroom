@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { EMPTY_TREE_SHA, FIRST_COMMIT_IDENTITY, FIRST_COMMIT_MESSAGE, firstCommit, pushFirstCommit } from "../src/first-commit.ts";
-import { cleanup, localExec, sh, tmp } from "./support.ts";
+import { GitObjects, bareRepo, cleanup, localExec, objectsIn, readRef, sh, tmp, writeRef } from "./support.ts";
 
 const AT = Date.UTC(2026, 9, 2, 3, 4, 5);
 
@@ -20,16 +20,13 @@ function gitBackend(bare: string, seen: { url?: string; auth?: string | null }[]
   }) as typeof fetch;
 }
 
-async function bareRepo(root: string): Promise<string> {
-  const bare = join(root, "canonical.git");
-  await sh(root, "init", "-q", "--bare", bare);
-  return bare;
-}
+/** An empty bare repository, written as files. */
+const emptyRepo = (root: string) => bareRepo(join(root, "canonical.git"));
 
 test("the first commit is the commit git itself makes: the empty tree, the Room's identity, the founding time", async (t) => {
   const root = tmp();
   t.after(() => cleanup(root));
-  const bare = await bareRepo(root);
+  const bare = emptyRepo(root);
   const { commit, objects } = await firstCommit(AT);
   assert.deepEqual(objects.map((o) => o.type), ["tree", "commit"]);
   assert.equal(objects[0]!.sha, EMPTY_TREE_SHA);
@@ -50,39 +47,34 @@ test("the first commit is the commit git itself makes: the empty tree, the Room'
 test("pushed to an empty repository, main is created at the first commit; the pack is complete and the token travels only in the header", async (t) => {
   const root = tmp();
   t.after(() => cleanup(root));
-  const bare = await bareRepo(root);
+  const bare = emptyRepo(root);
   const seen: { url?: string; auth?: string | null }[] = [];
   const out = await pushFirstCommit("https://acct.artifacts.cloudflare.net/git/ns/repo.git", "art_v1_secret", AT, gitBackend(bare, seen));
   const { commit } = await firstCommit(AT);
   assert.deepEqual(out, { kind: "created", commit });
-  assert.equal(await sh(root, "--git-dir", bare, "rev-parse", "refs/heads/main"), commit);
-  assert.equal(await sh(root, "--git-dir", bare, "rev-parse", "main^{tree}"), EMPTY_TREE_SHA);
+  assert.equal(readRef(bare, "refs/heads/main"), commit);
+  assert.equal(objectsIn(bare).commitFacts(commit).tree, EMPTY_TREE_SHA);
   await sh(root, "--git-dir", bare, "fsck", "--strict", "--no-dangling");
   assert.equal(seen.length, 1);
   assert.equal(seen[0]!.url, "https://acct.artifacts.cloudflare.net/git/ns/repo.git/git-receive-pack");
   assert.equal(seen[0]!.auth, "Bearer art_v1_secret");
+  // The same first commit pushed again (a retried founding) is refused, and main is the first's.
+  assert.equal((await pushFirstCommit("https://acct.artifacts.cloudflare.net/git/ns/repo.git", "art_v1_secret", AT, gitBackend(bare, []))).kind, "refused");
+  assert.equal(readRef(bare, "refs/heads/main"), commit);
 });
 
 test("a repository whose main exists is never moved: the push is refused, and main keeps its commit", async (t) => {
   const root = tmp();
   t.after(() => cleanup(root));
-  const bare = await bareRepo(root);
-  const work = join(root, "work");
-  await sh(root, "init", "-q", work);
-  await sh(work, "commit", "-q", "--allow-empty", "-m", "someone else's main");
-  await sh(work, "push", "-q", bare, "HEAD:refs/heads/main");
-  const before = await sh(root, "--git-dir", bare, "rev-parse", "refs/heads/main");
+  const bare = emptyRepo(root);
+  const theirs = new GitObjects();
+  const before = theirs.commit([], {}, { message: "someone else's main\n" });
+  theirs.writeInto(bare);
+  writeRef(bare, "refs/heads/main", before);
   const out = await pushFirstCommit("https://h/git/ns/repo.git", "art_v1_x", AT, gitBackend(bare, []));
   assert.equal(out.kind, "refused");
   assert.match(out.kind === "refused" ? out.detail : "", /ng refs\/heads\/main/);
-  assert.equal(await sh(root, "--git-dir", bare, "rev-parse", "refs/heads/main"), before);
-  // The same first commit pushed twice (a retried founding): the second is refused, and main is the first's.
-  const again = join(root, "again");
-  await sh(root, "init", "-q", again);
-  const fresh = await bareRepo(again);
-  assert.equal((await pushFirstCommit("https://h/git/ns/r.git", "t", AT, gitBackend(fresh, []))).kind, "created");
-  assert.equal((await pushFirstCommit("https://h/git/ns/r.git", "t", AT, gitBackend(fresh, []))).kind, "refused");
-  assert.equal(await sh(root, "--git-dir", fresh, "rev-parse", "refs/heads/main"), (await firstCommit(AT)).commit);
+  assert.equal(readRef(bare, "refs/heads/main"), before);
 });
 
 test("an answer that is not a clear ok is refused, never created", async () => {

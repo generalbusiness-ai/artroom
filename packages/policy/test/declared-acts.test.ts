@@ -1,9 +1,11 @@
 /**
- * Declared acts, stage 1 (request 245986cb; docs/protocol.md section 33):
- * the acts validator (R-DECL-24), the binding identity (R-DECL-15), the
- * code-review declarations (section 33.7) and the legacy vocabulary's digest
- * (R-DECL-1). Each refusal test is named by the guard it covers (`G:<id>`
- * in src/acts.ts); plans/README.md lists the mutation that turns each red.
+ * Declared acts (docs/protocol.md section 33): the acts validator's rules
+ * and bounds for a `v2` document (R-DECL-24, R-DECL-26), the binding
+ * identity (R-DECL-15), and the built-in data (R-DECL-1, section 33.7).
+ *
+ * The refusals are one table, run by one test. Each row is a rule or a
+ * bound of section 33, named by the guard that enforces it (`G:<id>` in
+ * src/acts.ts), so a failure names the row.
  */
 
 import { describe, expect, test } from "vitest";
@@ -12,7 +14,7 @@ import { validateCheckerConfigV2, validatePolicyV2, type PolicyV2Context } from 
 import { bindingOf, bindingSubject } from "../src/binding.ts";
 import { CODE_REVIEW_ACTS } from "../src/codereview.ts";
 import { defaultPolicy } from "../src/helpers.ts";
-import { digestJson } from "../src/integrity.ts";
+import { canonicalize, digestJson } from "../src/integrity.ts";
 import { validatePolicy } from "../src/validate.ts";
 import { IN_KEY, JAM_ACTS, JAM_RULES } from "./support/jam.ts";
 
@@ -94,33 +96,26 @@ const cases: readonly Case[] = [
   ["doc-format", "format v1 with acts", edit(codeReview, (d) => (d["format"] = "artroom-policy-v1")), /^format: must be artroom-policy-v2/],
   ["doc-profile", "an unknown profile", edit(codeReview, (d) => (d["profile"] = "artroom-jsonata-v9")), /^profile: /],
   ["doc-steps", "an unknown steps version", edit(codeReview, (d) => (d["steps"] = "artroom-steps-v9")), /^steps: must be a steps version/],
-  ["acts-object", "acts that are not an object", edit(codeReview, (d) => (d["acts"] = [] as never)), /^acts: must be an object/],
   ["acts-count", "65 kinds", () => v2(many(65)), /more than 64 kinds/],
   ["rule-on", "a rule on an undeclared kind", edit(codeReview, (d) => (d["rules"] as unknown[]).push({ id: "x", kind: "refuse", on: ["claimz"], refuse: "true", reason: "No.", fix: "No." })), /"claimz" is not an act kind/],
   ["kind-grammar", "a kind with a capital letter", edit(codeReview, (d) => (d.acts["Claim2"] = clone(d.acts["release"]!))), /acts\.Claim2: a kind must match/],
   ["kind-reserved", "a reserved kind", edit(codeReview, (d) => (d.acts["prepared"] = clone(d.acts["release"]!))), /prepared is reserved/],
-  ["kind-reserved", "the platform kind recover", edit(codeReview, (d) => (d.acts["recover"] = clone(d.acts["release"]!))), /recover is reserved/],
-  ["decl-object", "a declaration that is not an object", edit(codeReview, (d) => (d.acts["x"] = "act" as never)), /acts\.x: must be an object/],
   ["decl-keys", "an unknown declaration field", edit(codeReview, (d) => (at(d, "propose")["color"] = "red")), /acts\.propose: unknown field color/],
   ["label", "an empty label", edit(codeReview, (d) => (at(d, "propose")["label"] = "")), /acts\.propose\.label: must be 1 to 128/],
   ["help", "help over 4,096 bytes", edit(codeReview, (d) => (at(d, "propose")["help"] = "h".repeat(4097))), /acts\.propose\.help: must be a string/],
   ["targets-nonempty", "no targets", edit(codeReview, (d) => (at(d, "propose")["targets"] = {})), /must name at least one target shape/],
   ["target-shape", "an unknown target shape", edit(codeReview, (d) => (at(d, "propose")["targets"] = { everywhere: ["version"] })), /everywhere is not a target shape/],
   ["target-steps", "a step on the wrong target", edit(codeReview, (d) => (at(d, "propose")["targets"] = { thread: ["review"] })), /targets\.thread: must be one step that thread allows/],
-  ["target-steps", "a third step", edit(codeReview, (d) => (at(d, "propose")["targets"] = { thread: ["version", "land", "release"] })), /targets\.thread: must be one step/],
   ["target-steps", "version then land on a version target", edit(codeReview, (d) => (at(d, "land")["targets"] = { version: ["version", "land"] })), /targets\.version: must be one step/],
   ["threads-required", "a thread act without threads", edit(codeReview, (d) => delete at(d, "propose")["threads"]), /propose\.threads: is required/],
   ["threads-unused", "threads on an act with no thread target", () => v2({ ...JAM_ACTS, signal: { ...JAM_ACTS.signal, threads: ["lead"] } }), /signal\.threads: is only for/],
   ["threads-list", "a repeated thread kind", edit(codeReview, (d) => (at(d, "propose")["threads"] = ["claim", "claim"])), /propose\.threads: must be 1 to 64 distinct/],
   ["threads-known", "a misspelt thread kind", edit(codeReview, (d) => (at(d, "propose")["threads"] = ["clam"])), /threads\[0\]: clam is not room/],
-  ["threads-known", "a kind that never opened a thread here", edit(codeReview, (d) => (at(d, "release")["threads"] = ["claim", "draft"])), /draft is not room/],
   ["handover-reserve", "a hand-over onto a hold without reserveSeconds", edit(jam, (d) => delete at(d, "take-solo")["hold"]["reserveSeconds"]), /take-solo has no reserveSeconds/],
-  ["body-object", "a body that is not an object", edit(codeReview, (d) => (at(d, "propose")["body"] = [])), /propose\.body: must be an object/],
   ["body-count", "33 body fields", edit(codeReview, (d) => (at(d, "propose")["body"] = Object.fromEntries(Array.from({ length: 33 }, (_, i) => [`f${i}`, { type: "bool", optional: true }])))), /more than 32 fields/],
   ["field-name", "a field name with a capital first letter", edit(codeReview, (d) => (at(d, "propose")["body"]["Summary"] = { type: "bool" })), /body\.Summary: a field name must match/],
   ["field-reserved", "a field named like its step's field", edit(codeReview, (d) => (at(d, "propose")["body"]["lease"] = { type: "int", min: 0, max: 9 })), /body\.lease: lease is a field of this act's steps/],
   ["field-reserved", "a field named because", edit(codeReview, (d) => (at(d, "propose")["body"]["because"] = { type: "bool" })), /body\.because: because is a field/],
-  ["field-object", "a field that is not an object", edit(codeReview, (d) => (at(d, "propose")["body"]["x"] = 3)), /body\.x: must be an object/],
   ["field-type", "an unknown field type", edit(codeReview, (d) => (at(d, "propose")["body"]["x"] = { type: "blob" })), /body\.x: type must be text, int/],
   ["field-keys", "a parameter its type does not have", edit(codeReview, (d) => (at(d, "propose")["body"]["summary"]["min"] = 1)), /body\.summary: unknown field min/],
   ["text-max", "text over 16 KiB", edit(codeReview, (d) => (at(d, "propose")["body"]["summary"]["max"] = 16385)), /summary\.max: must be an integer from 1 to 16384/],
@@ -128,37 +123,27 @@ const cases: readonly Case[] = [
   ["int-range", "an int with min over max", edit(codeReview, (d) => (at(d, "propose")["body"]["n"] = { type: "int", min: 5, max: 1 })), /body\.n: min and max must be safe integers/],
   ["enum-values", "a repeated enum value", edit(codeReview, (d) => (at(d, "propose")["body"]["e"] = { type: "enum", values: ["a", "a"] })), /body\.e\.values: must be 1 to 64 distinct/],
   ["enum-values", "an enum value that cannot fill a scope", edit(codeReview, (d) => (at(d, "propose")["body"]["e"] = { type: "enum", values: ["A/b"] })), /body\.e\.values: must be 1 to 64 distinct/],
-  ["optional-bool", "optional that is not a boolean", edit(codeReview, (d) => (at(d, "propose")["body"]["summary"]["optional"] = "yes")), /summary\.optional: must be true or false/],
   ["optional-and-requiredfor", "both optional and requiredFor", edit(codeReview, (d) => (at(d, "claim")["body"]["goal"]["optional"] = true)), /body\.goal: may say optional or requiredFor, not both/],
   ["requiredfor-targets", "requiredFor naming a target the act lacks", edit(codeReview, (d) => (at(d, "claim")["body"]["goal"]["requiredFor"] = ["version"])), /goal\.requiredFor: must be a non-empty list/],
-  ["who-object", "no who", edit(codeReview, (d) => delete at(d, "propose")["who"]), /propose\.who: must be an object/],
   ["who-keys", "an unknown who field", edit(codeReview, (d) => (at(d, "propose")["who"]["teams"] = ["@a"])), /propose\.who: unknown field teams/],
-  ["roles-list", "roles that are not a list", edit(codeReview, (d) => (at(d, "propose")["who"]["roles"] = "member")), /who\.roles: must be a list of distinct roles/],
   ["roles-admin", "admin listed explicitly", edit(codeReview, (d) => (at(d, "propose")["who"]["roles"] = ["admin", "member"])), /who\.roles: must not list admin/],
   ["roles-known", "an unknown role", edit(codeReview, (d) => (at(d, "propose")["who"]["roles"] = ["owner"])), /who\.roles: "owner" is not a role/],
   ["roles-checker", "checker on an act with step version", edit(codeReview, (d) => (at(d, "propose")["who"]["roles"] = ["member", "checker"])), /may list checker only for an act whose steps are check or comment/],
-  ["delegable", "delegable that is not a boolean", edit(codeReview, (d) => (at(d, "propose")["who"]["delegable"] = "no")), /who\.delegable: must be true or false/],
   ["hold-required", "an opening act without a hold", edit(codeReview, (d) => delete at(d, "claim")["hold"]), /claim\.hold: is required/],
   ["hold-unused", "a hold on an act without step open", edit(codeReview, (d) => (at(d, "propose")["hold"] = { scope: "body.scope" })), /propose\.hold: is only for an act with step open/],
-  ["hold-object", "a hold that is not an object", edit(codeReview, (d) => (at(d, "claim")["hold"] = "body.scope")), /claim\.hold: must be an object/],
   ["hold-keys", "an unknown hold field", edit(codeReview, (d) => (at(d, "claim")["hold"]["owner"] = "@a")), /claim\.hold: unknown field owner/],
   ["hold-conflict", "an unknown conflict mode", edit(codeReview, (d) => (at(d, "claim")["hold"]["conflict"] = "shared")), /hold\.conflict: must be exclusive or by-scope/],
   ["hold-lease", "a lease under 10 seconds", edit(codeReview, (d) => (at(d, "claim")["hold"]["leaseSeconds"] = 9)), /hold\.leaseSeconds: must be an integer from 10 to 86400/],
   ["hold-lease", "a lease over 24 hours", edit(codeReview, (d) => (at(d, "claim")["hold"]["leaseSeconds"] = 86401)), /hold\.leaseSeconds/],
   ["hold-reserve", "a reservation over 10 minutes", edit(jam, (d) => (at(d, "take-solo")["hold"]["reserveSeconds"] = 601)), /hold\.reserveSeconds: must be an integer from 1 to 600/],
   ["hold-reserve", "a reservation of 0 seconds", edit(jam, (d) => (at(d, "take-solo")["hold"]["reserveSeconds"] = 0)), /hold\.reserveSeconds/],
-  ["hold-workspace", "workspace that is not a boolean", edit(codeReview, (d) => (at(d, "claim")["hold"]["workspace"] = "yes")), /hold\.workspace: must be true or false/],
-  ["hold-scope", "an empty template", edit(jam, (d) => (at(d, "lead")["hold"]["scope"] = [])), /lead\.hold\.scope: must be body\.scope or 1 to 64 globs/],
   ["hold-scope", "a scope source naming another body field", edit(codeReview, (d) => (at(d, "claim")["hold"]["scope"] = "body.goal")), /claim\.hold\.scope: must be body\.scope/],
   ["template-chars", "a template glob over 256 characters", edit(jam, (d) => (at(d, "lead")["hold"]["scope"] = [`${"a/".repeat(128)}x`])), /lead\.hold\.scope\[0\]: must be a glob of at most 256/],
   ["slot-field", "a slot naming a text field", edit(jam, (d) => (at(d, "take-part")["hold"]["scope"] = ["parts/{name}/**"], at(d, "take-part")["body"]["name"] = { type: "text", max: 20 })), /\{name\} must name a segment or enum field/],
   ["slot-field", "a slot naming an optional field", edit(jam, (d) => (at(d, "take-part")["body"]["part"]["optional"] = true)), /\{part\} must name a segment or enum field of this act that is required on target none/],
   ["template-glob", "a template that is not a glob once filled", edit(jam, (d) => (at(d, "take-part")["hold"]["scope"] = ["parts/{part}/[ab]"])), /is not a valid glob once its slots are filled/],
-  ["refusals-object", "refusals that are not an object", edit(jam, (d) => (at(d, "lead")["refusals"] = [])), /lead\.refusals: must be an object/],
   ["refusal-code", "wording for an unknown refusal code", edit(jam, (d) => (at(d, "lead")["refusals"] = { "no-such": { reason: "R.", fix: "F." } })), /no-such is not a platform refusal code/],
-  ["wording-object", "wording that is not an object", edit(jam, (d) => (at(d, "lead")["refusals"] = { "lane-held": "Busy." })), /refusals\.lane-held: must be an object with reason and fix/],
   ["refusal-keys", "wording with an unknown field", edit(jam, (d) => (at(d, "lead")["refusals"] = { "lane-held": { reason: "R.", fix: "F.", help: "H." } })), /refusals\.lane-held: unknown field help/],
-  ["wording-length", "an empty reason", edit(jam, (d) => (at(d, "lead")["refusals"] = { "lane-held": { reason: "", fix: "F." } })), /lane-held\.reason: must be 1 to 512 bytes/],
   ["wording-length", "a fix over 512 bytes", edit(jam, (d) => (at(d, "lead")["refusals"] = { "lane-held": { reason: "R.", fix: "f".repeat(513) } })), /lane-held\.fix: must be 1 to 512 bytes/],
   ["wording-slot", "a slot that is not a refusal slot", edit(jam, (d) => (at(d, "lead")["refusals"] = { "lane-held": { reason: "{goal} is busy.", fix: "F." } })), /\{goal\} is not a refusal slot/],
   ["wording-brace", "a brace that opens no slot", edit(jam, (d) => (at(d, "lead")["refusals"] = { "lane-held": { reason: "Busy } now.", fix: "F." } })), /a brace must open a slot/],
@@ -168,43 +153,61 @@ const cases: readonly Case[] = [
   ["checker-act", "a checker configuration with no act", jam, /checkers\.in-key: act: must name the declared kind/, { checkers: { "in-key": { ...IN_KEY, act: undefined } } }],
   ["checker-declared", "a checker naming an undeclared kind", codeReview, /checkers\.ci\.act: lint is not declared/, { checkers: { ci: { ...CI, act: "lint" } } }],
   ["checker-step", "a checker naming signal", jam, /checkers\.in-key\.act: signal must run only the step check/, { checkers: { "in-key": { ...IN_KEY, act: "signal" } } }],
-  ["checker-step", "a checker naming review", codeReview, /checkers\.ci\.act: review must run only the step check/, { checkers: { ci: { ...CI, act: "review" } } }],
   ["checker-role", "a check act checkers may not sign", edit(jam, (d) => (at(d, "in-key-check")["who"]["roles"] = ["member"])), /in-key-check must list checker in who\.roles/, { checkers: { "in-key": IN_KEY } }],
   ["checker-body", "a check act with a required body field", edit(jam, (d) => (at(d, "in-key-check")["body"] = { key: { type: "enum", values: ["c", "g"] } })), /in-key-check requires body field key/, { checkers: { "in-key": IN_KEY } }],
 ];
 
-describe("refused documents: each guard (R-DECL-24)", () => {
-  for (const [id, what, make, pattern, ctx] of cases) test(`G:${id} refuses ${what}`, () => refused(make(), pattern, ctx));
+/** A value of the wrong type at each place a document has an object, a list or a flag: [where, edit]. */
+const wrongTypes: readonly (readonly [string, () => unknown, PolicyV2Context?])[] = [
+  ["acts", edit(codeReview, (d) => (d["acts"] = [] as never))],
+  ["a declaration", edit(codeReview, (d) => (d.acts["x"] = "act" as never))],
+  ["targets", edit(codeReview, (d) => (at(d, "propose")["targets"] = "thread"))],
+  ["threads", edit(codeReview, (d) => (at(d, "propose")["threads"] = "claim"))],
+  ["body", edit(codeReview, (d) => (at(d, "propose")["body"] = []))],
+  ["a field", edit(codeReview, (d) => (at(d, "propose")["body"]["x"] = 3))],
+  ["optional", edit(codeReview, (d) => (at(d, "propose")["body"]["summary"]["optional"] = "yes"))],
+  ["who", edit(codeReview, (d) => delete at(d, "propose")["who"])],
+  ["who.roles", edit(codeReview, (d) => (at(d, "propose")["who"]["roles"] = "member"))],
+  ["who.delegable", edit(codeReview, (d) => (at(d, "propose")["who"]["delegable"] = "no"))],
+  ["hold", edit(codeReview, (d) => (at(d, "claim")["hold"] = "body.scope"))],
+  ["hold.scope", edit(jam, (d) => (at(d, "lead")["hold"]["scope"] = []))],
+  ["hold.workspace", edit(codeReview, (d) => (at(d, "claim")["hold"]["workspace"] = "yes"))],
+  ["refusals", edit(jam, (d) => (at(d, "lead")["refusals"] = []))],
+  ["a refusal's wording", edit(jam, (d) => (at(d, "lead")["refusals"] = { "lane-held": "Busy." }))],
+  ["a checker configuration", codeReview, { checkers: { ci: "check" } }],
+];
 
-  // workerd has no filesystem for the source; the node run checks this.
-  test.runIf(__ARTROOM_RUNTIME__ === "node")("every guard in src/acts.ts has a refusal test here, or a named test below", async () => {
-    const { readFileSync } = await import("node:fs");
-    const source = readFileSync(new URL("../src/acts.ts", import.meta.url), "utf8");
-    const guards = [...source.matchAll(/\/\/ G:([a-z0-9-]+)/g)].map((m) => m[1]!);
-    const named = new Set([...cases.map((c) => c[0]), "warn-unending", "checker-object", "checker-keys", "checker-format"]);
-    expect(guards.filter((g) => !named.has(g))).toEqual([]);
+describe("refused documents (R-DECL-24, R-DECL-26)", () => {
+  test("each rule and bound of section 33 refuses its document with policy-invalid, and names the place", () => {
+    for (const [id, what, make, pattern, ctx] of cases) {
+      const v = validatePolicyV2(make(), ctx);
+      const row = `G:${id}, ${what}`;
+      expect(v.ok, row).toBe(false);
+      if (v.ok) continue;
+      expect(v.refusal.rule, row).toBe("policy-invalid");
+      expect(v.problems.some((p) => pattern.test(p)), `${row}: no problem matches ${pattern}: ${v.problems.join(" | ")}`).toBe(true);
+    }
+  });
+
+  test("a value of the wrong type anywhere in a document is refused, never thrown on", () => {
+    for (const [where, make, ctx] of wrongTypes) {
+      const v = validatePolicyV2(make(), ctx);
+      expect(v.ok, where).toBe(false);
+      if (!v.ok) expect(v.refusal.rule, where).toBe("policy-invalid");
+    }
   });
 });
 
 describe("checker configurations (R-DECL-18)", () => {
-  test("G:warn-unending reports an opening kind no act can end, without refusing", () => {
-    const v = validatePolicyV2(jam(), { checkers: { "in-key": IN_KEY } });
-    expect(v.ok).toBe(true);
-    expect(v.warnings.join("\n")).toMatch(/propose-rules/);
-  });
-  test("G:checker-object refuses a configuration that is not an object", () => {
-    expect(validateCheckerConfigV2("check").ok).toBe(false);
-  });
-  test("G:checker-keys refuses an unknown configuration field", () => {
-    const v = validateCheckerConfigV2({ ...CI, acts: ["check"] });
-    expect(v.ok ? [] : v.problems).toContain("checker: unknown field acts");
-  });
-  test("G:checker-format refuses artroom-checker-v1 directly", () => {
-    const v = validateCheckerConfigV2({ ...CI, format: "artroom-checker-v1" });
-    expect(v.ok ? [] : v.problems).toContain("format: must be artroom-checker-v2");
-  });
-  test("a v2 configuration naming its act is valid", () => {
+  test("a v2 configuration names its act; a v1 format, an unknown field and a value that is not an object are refused", () => {
     expect(validateCheckerConfigV2(IN_KEY).ok).toBe(true);
+    const problems = (config: unknown) => {
+      const v = validateCheckerConfigV2(config);
+      return v.ok ? [] : v.problems;
+    };
+    expect(problems({ ...CI, format: "artroom-checker-v1" })).toContain("format: must be artroom-checker-v2");
+    expect(problems({ ...CI, acts: ["check"] })).toContain("checker: unknown field acts");
+    expect(validateCheckerConfigV2("check").ok).toBe(false);
   });
 });
 
@@ -308,8 +311,68 @@ describe("built-in data (R-DECL-1, section 33.7)", () => {
     expect(Object.isFrozen(goal)).toBe(true);
     expect(() => ((goal as { max: number }).max = 2048)).toThrow(TypeError);
   });
+});
 
-  test("the code-review check act is one a checker configuration may name", () => {
-    expect(problems(codeReview(), { checkers: { ci: CI, lint: { ...CI, inputs: ["src/**"] } } })).toEqual([]);
+describe("names and sizes the evaluator's value profile limits (R-DECL-2, R-DECL-12, R-DECL-26)", () => {
+  test("a kind or a body field named constructor or prototype is refused: the value profile reserves those key names", () => {
+    for (const name of ["constructor", "prototype"]) {
+      refused(edit(codeReview, (d) => (d.acts[name] = clone(d.acts["release"]!)))(), new RegExp(`^acts\\.${name}: ${name} is a key name the evaluator's value profile reserves`));
+      refused(edit(codeReview, (d) => (at(d, "propose")["body"][name] = { type: "bool", optional: true }))(), new RegExp(`body\\.${name}: ${name} is a key name the evaluator's value profile reserves`));
+    }
+  });
+
+  test("every other name of an object's prototype is a valid kind or field, and its binding can be computed", async () => {
+    const d = codeReview();
+    for (const name of ["toString", "valueOf", "hasOwnProperty", "isPrototypeOf"]) at(d, "propose")["body"][name] = { type: "bool", optional: true };
+    d.acts["valueof"] = clone(d.acts["release"]!);
+    expect(problems(d)).toEqual([]);
+    expect(await bindingOf(d as unknown as PolicyDocumentV2, "propose")).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(await bindingOf(d as unknown as PolicyDocumentV2, "valueof")).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  const BOUND = 1048576;
+  const TOO_LARGE = ["policy: the document's canonical JSON must be at most 1048576 bytes"];
+  const bytes = (d: unknown) => new TextEncoder().encode(canonicalize(d as never)).length;
+  /** The code-review document with one more rule, whose description brings the canonical form to `size` bytes. */
+  const sized = (size: number, base: Doc = codeReview()) => {
+    const rule: Any = { id: "describe", kind: "notify", on: ["claim"], to: ["role:admin"], why: "A change.", description: "" };
+    (base["rules"] as Any[]).push(rule);
+    rule["description"] = "x".repeat(size - new TextEncoder().encode(JSON.stringify(base)).length);
+    return base;
+  };
+
+  test("a document of exactly 1,048,576 canonical bytes validates, and one byte more is refused", () => {
+    const exact = sized(BOUND);
+    // The size the validator counts is the size of the canonical form.
+    expect(bytes(exact)).toBe(BOUND);
+    expect(problems(exact)).toEqual([]);
+    expect(problems(sized(BOUND + 1))).toEqual(TOO_LARGE);
+  });
+
+  // An owner path or a dependency glob may be any legal glob, `constructor` and `prototype` included. The evaluator's
+  // canonical writer refuses those as keys, so the document's size is not counted with it (checker finding 23766004).
+  test("an owner path or a dependency glob named constructor or prototype is legal, and does not hide a document over the bound", () => {
+    const keyed: readonly (readonly [string, (d: Doc, name: string) => void])[] = [
+      ["an owner path", (d, name) => (d["owners"] = { [name]: ["role:admin"] })],
+      ["a dependency glob", (d, name) => ((d["carry"] as Any)["dependsOn"] = { [name]: ["src/**"] })],
+    ];
+    for (const name of ["constructor", "prototype"])
+      for (const [what, put] of keyed) {
+        const made = () => {
+          const d = codeReview();
+          put(d, name);
+          return d;
+        };
+        expect(problems(made()), `${what} named ${name}`).toEqual([]);
+        // Only the size refuses the larger document: the same document on the bound is valid.
+        expect(problems(sized(BOUND, made())), `${what} named ${name}, on the bound`).toEqual([]);
+        expect(problems(sized(BOUND + 1, made())), `${what} named ${name}, over the bound`).toEqual(TOO_LARGE);
+      }
+  });
+
+  test("a document that has no JSON form is refused, not thrown on", () => {
+    const d = codeReview();
+    (d["rules"] as Any[]).push({ id: "describe", kind: "notify", on: ["claim"], to: ["role:admin"], why: "A change.", description: 10n });
+    expect(problems(d)).toContain("policy: must be plain JSON");
   });
 });

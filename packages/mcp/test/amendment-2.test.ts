@@ -8,7 +8,7 @@
 
 import { afterEach, beforeEach, expect, test } from "vitest";
 import type { Claim, Proposal, Redeemed } from "@generalbusiness/artroom-contract";
-import { agent, roomWithMcp, rpc, type FakeRoom, type Url } from "./support.ts";
+import { agent, roomWithMcp, rpc, type FakeRoom, type Url, keyed } from "./support.ts";
 
 let room: FakeRoom;
 let url: Url;
@@ -18,7 +18,8 @@ beforeEach(async () => {
 });
 afterEach(() => room.stop());
 
-const call = async (a: Redeemed, name: string, args: unknown) => (await rpc(a.mcp, a.bearer, "tools/call", { name, arguments: args })).body.result;
+// Every act tool requires an idempotency key (R-API-9, amendment 7): `keyed` gives a fresh one where a test names none.
+const call = async (a: Redeemed, name: string, args: unknown) => (await rpc(a.mcp, a.bearer, "tools/call", { name, arguments: keyed(name, args) })).body.result;
 const bodyOf = (id: string) => {
   const e = room.entryById(id)!;
   return e.entry.type === "act" ? (e.entry.act.envelope.body as { because?: unknown }) : {};
@@ -56,7 +57,7 @@ test("acts are signed by the room under the bearer's delegation; a revoked beare
   expect(ws.grant).not.toBeNull();
   room.revokeDelegation(a.delegation);
   const entries = room.entries.length;
-  const res = await rpc(a.mcp, a.bearer, "tools/call", { name: "renew", arguments: { lane: claim.lane, lease: 1 } });
+  const res = await rpc(a.mcp, a.bearer, "tools/call", { name: "renew", arguments: { lane: claim.lane, lease: 1, idempotencyKey: "renew-after-revocation" } });
   expect(res.status).toBe(401);
   expect(room.entries.length).toBe(entries);
 });

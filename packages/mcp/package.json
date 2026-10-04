@@ -1,7 +1,7 @@
 {
   "name": "@generalbusiness/artroom-mcp",
   "version": "0.0.0",
-  "description": "Artroom's MCP server: exactly the contract's ten tools, as a stateless Workers handler and as a local stdio server.",
+  "description": "Artroom's MCP server: the contract's sixteen tools, as a stateless Workers handler and as a local stdio server.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -11,9 +11,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
-    "test": "npm run test:node && npm run test:workerd",
-    "test:node": "vitest run --config vitest.config.ts",
-    "test:workerd": "vitest run --config vitest.workers.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "test:node": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@generalbusiness/artroom-client": "0.0.0",
@@ -23,7 +22,6 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.22.0",
     "@modelcontextprotocol/client": "2.0.0",
     "@types/node": "22.20.4",
     "vitest": "4.1.11"

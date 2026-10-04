@@ -1,9 +1,9 @@
 /** The "why" panel: what `explain` says about one act — the rules applied, their outcomes, and the invariants checked. */
 
 import { useEffect, useRef, useState } from "preact/hooks";
-import type { Why } from "../room/adapter.ts";
+import type { EntryMeaning, Why } from "../room/adapter.ts";
 import type { ActId, Decision } from "../room/contract.ts";
-import { Actor, Badge } from "./bits.tsx";
+import { Actor, Badge, RecordFields } from "./bits.tsx";
 import { useApp } from "./context.ts";
 import { Icon } from "./icons.tsx";
 
@@ -25,6 +25,22 @@ function outcomeText(d: Decision): string {
       return `Notified ${o.to.join(", ")}.`;
     case "error":
       return `Errored (${o.code}): ${o.detail}`;
+  }
+}
+
+/** Where a record's meaning came from, in a sentence (R-DECL-23). The record is read under the policy of its own entry, not today's. */
+function meaningNote(m: EntryMeaning): string {
+  switch (m.vocabulary) {
+    case "declared":
+      return `Declared by the policy in force at this entry, version ${m.policy}.${m.retired !== undefined ? ` A later policy dropped this kind at seq ${m.retired}. This record keeps the meaning it had.` : ""}`;
+    case "artroom-legacy-v1":
+      return `One of the built-in review acts, under a policy with no declarations of its own.${m.retired !== undefined ? ` That policy was replaced at seq ${m.retired}.` : ""}`;
+    case "platform":
+      return "A platform act. It means the same in every room.";
+    case "unknown":
+      return "The policy in force at this entry did not declare this kind.";
+    default:
+      return "";
   }
 }
 
@@ -120,6 +136,13 @@ export function WhyDialog({ act, onClose }: { act: ActId | null; onClose: () => 
           <p class="muted">The room has no explanation for this entry.</p>
         ) : (
           <>
+            {why.meaning && (
+              <section class="stack-sm" data-meaning={why.meaning.vocabulary}>
+                <h3>What it meant at entry {why.seq}</h3>
+                <p class="small muted">{meaningNote(why.meaning)}</p>
+                <RecordFields meaning={why.meaning} />
+              </section>
+            )}
             {why.reasons.length > 0 && (
               <section class="stack-sm">
                 <h3>Rests on</h3>

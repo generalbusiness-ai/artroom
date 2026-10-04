@@ -26,12 +26,16 @@ From the repository root, after `npm install`:
 ```sh
 npm run typecheck
 cd packages/policy
-npm run test:node      # vitest in Node
-npm run test:workerd   # the same files inside workerd (@cloudflare/vitest-pool-workers)
+npm run test:node      # vitest in Node: every test file
+npm run test:workerd   # three of them again inside workerd (@cloudflare/vitest-pool-workers)
 ```
 
-Both runs use the same test files. A test in each run checks that it is
-running on the host it names.
+The workerd run repeats only what depends on the runtime: the evaluator's
+conformance corpus and bounds (`test/profile-corpus.test.ts`), the pinned
+engine and the digests (`test/integrity.test.ts`), and the measured budgets
+(`test/budgets.test.ts`), whose numbers must be the same in both runs. The
+rest of the package is plain logic over JSON and runs in Node only. A test in
+each run checks that it is running on the host it names.
 
 ## Pinned versions
 
@@ -176,9 +180,10 @@ A test interleaves evaluations of one rule to check this.
 ## The conformance corpus
 
 `test/profile-corpus.test.ts` ports atseq's evaluator cases with their
-expected values unchanged, including every exact budget boundary. Two
+expected values unchanged, including the exact budget boundaries. Two
 Artroom cases tighten boundaries that atseq tests in steps of two: AST depth
-at an odd level, and inspected bytes to the byte. It does not
+at an odd level, and inspected bytes to the byte; the second replaces atseq's
+coarser case of the same bound. It does not
 port atseq's fold, Lexicon schema and Inlay view cases, which have no Artroom
 counterpart, or its Node-only dependency check, which
 `test/integrity.test.ts` replaces with WebCrypto checks.
@@ -190,15 +195,20 @@ Artroom's cases:
   for each carry condition;
 - `test/admin.test.ts`: sole-admin bootstrap, the policy lockout case, the
   configuration-recovery lane, and policy activation;
-- `test/rules.test.ts`: the five rule kinds, determinism, replay, the
-  spike's pathological rule, a `require` rule over budget, the per-act
-  budget and interleaving;
+- `test/rules.test.ts`: the five rule kinds, determinism, replay, a
+  `require` rule over budget, interleaving, land stages and the reservation
+  byte guard (review 09c01bf9), and the replay context, its frozen snapshot
+  and unusual paths (review dd2a995b);
+- `test/budgets.test.ts`: the spike's pathological rule, the per-act budget,
+  and the default pack's measured usage on a 500-path proposal;
 - `test/faults.test.ts`: an injected engine fault in each rule kind gives a
   retryable error that records nothing;
-- `test/review-dd2a995b.test.ts`: checker review dd2a995b's reproductions,
-  asserting the repaired behaviour;
-- `test/review-09c01bf9.test.ts`: land stages and the reservation byte
-  guard;
+- `test/pack.test.ts`: each rule of the default pack, the carry defaults it
+  adds, and owner coverage (review 4df45987);
+- `test/declared-acts.test.ts`: the acts validator's rules and bounds for a
+  `v2` document, as one table, and the binding identity;
+- `test/vocabulary.test.ts`: which kinds a document means, the steps of a
+  kind on a target, who may sign, and what a grant may name;
 - `test/helpers.test.ts`: the plan's section 5 policy example, the default
   policy, validation and globs.
 
@@ -251,6 +261,27 @@ export { policy, owners, requireCheck, requireReview, carry, lanes, rule } from 
 
 The helper imports only types from the contract, so this adds no runtime
 cycle.
+
+## Reading a catalogue: `@generalbusiness/artroom-policy/declared`
+
+Clients need a few declared-acts functions and none of the evaluator. The
+export `./declared` (`src/declared.ts`) gives them, and loads no expression
+engine:
+
+- the binding identity (`bindingOf`, `bindingSubject`, `bindingsOf`) and
+  the code-review declarations (`CODE_REVIEW_ACTS`);
+- `STEP_FIELD_SPECS` (`src/steps.ts`): each step's own body fields with
+  their types, for a form. A Room test checks that it agrees with
+  admission (`packages/room/test/node/declared-steps-a5d64b35.test.ts`);
+- `src/catalogue.ts`: `meaningOf` and `governs` (a record under the
+  declarations of its own seq), `fieldsOf` and `targetsOf` (the fields of
+  an act), `builtForBinding` (the binding a named code-review method
+  carries in a room), `expandGrant` (a grant as the signed map its
+  grantor signs), and `titleOf` and `threadTitle` (what readers call a
+  thread: its goal, or its opening act's label and first text field by
+  name, under the declaration of that act's own seq).
+
+These decide nothing. The room judges every act again at admission.
 
 ## Contract gaps and how they were resolved
 

@@ -16,14 +16,21 @@
 
 import { rmSync } from "node:fs";
 import { dirname } from "node:path";
+import type { Readable, Writable } from "node:stream";
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import {
   agentsMd,
   connect,
+  fieldsOf,
   generateSigner,
+  governs,
   isArtroomError,
   isRefusal,
   join,
+  meaningOf,
+  shapeOf,
+  targetsOf,
+  threadTitle,
   LOST_REDEMPTION,
   newIdempotencyKey,
   redeem,
@@ -34,11 +41,16 @@ import {
   type HttpRoomClient,
   type PreparedAct,
 } from "@generalbusiness/artroom-client";
-import { isActId } from "@generalbusiness/artroom-contract";
+import { envelopeOf, isActId } from "@generalbusiness/artroom-contract";
 import type {
   ActId,
+  Binding,
+  Catalogue,
   Claim,
+  DeclaredRecord,
+  DeclaredTarget,
   Held,
+  Json,
   HttpRoom,
   LandOp,
   Landing,
@@ -49,6 +61,8 @@ import type {
   OpId,
   Proposal,
   Reason,
+  RecordMeaning,
+  Seq,
   Refusal,
   Release,
   Renewal,
@@ -61,6 +75,7 @@ import { SCHEMA, SchemaError, Store, type Config, type JournalEntry, type LocalI
 import { attentionText, claimText, errorText, explainText, landText, logText, proposalText, refusalText, short } from "./format.ts";
 import { checkGrant, checkMarker, checkRedeemed, configureWorkspace, credentialFileIn, credentialOwner, gitDir, head as gitHead, readOwner, REMOTE, withDestination, type Party } from "./git.ts";
 import { parseInvitation } from "./link.ts";
+import { actText, actsText, bodyOf, FieldError, meaningChanges, missing } from "./declared.ts";
 
 export interface Io {
   out(line: string): void;
@@ -71,6 +86,14 @@ export interface Io {
   readonly fetch?: typeof fetch;
   /** For tests: called after each durable local step, by name. Throwing here simulates an interruption. */
   readonly step?: (name: string) => void;
+  /**
+   * For tests: how many times the client sends a request again within one
+   * run after a retryable failure (`ClientOptions.retries`). Default: the
+   * client's own, with its waits between attempts.
+   */
+  readonly retries?: number;
+  /** For tests: the streams `artroom mcp` serves on. Default: this process's stdin and stdout. */
+  readonly stdio?: { readonly stdin: Readable; readonly stdout: Writable };
 }
 
 export const EXIT = { ok: 0, failed: 1, usage: 2, refused: 3 } as const;
@@ -98,9 +121,17 @@ Working with others
   artroom explain <act>                     Why an act was accepted or refused.
   artroom log [--after SEQ] [--limit N]     The room's log.
 
+Acts this room declares
+  artroom acts [KIND] [--at SEQ | --policy VERSION]   The declared acts; with KIND, its fields and binding.
+  artroom act KIND --binding BINDING [--lane LANE [--generation N] | --entry ACT | --target JSON]
+              [--set FIELD=VALUE]... [--body JSON] [--because REF]...
+                                        Do a declared act. BINDING is the one artroom acts KIND printed:
+                                        it names the meaning you read, and the room refuses the act if
+                                        that meaning has changed.
+
 Agents
   artroom agents-md [--mcp]             Print the block that teaches an agent the loop, for AGENTS.md.
-  artroom mcp                           Run the MCP tools over stdio, signing with your key.
+  artroom mcp [--toolset NAME]          Run the MCP tools over stdio, signing with your key.
 
 Options: --json for JSON output; --room ROOM and --lane LANE to choose; --idempotency-key KEY to
 finish an act that did not get an answer; --verbose to show each request.
@@ -188,6 +219,7 @@ function roomOf(ctx: Ctx): { config: Config; id: RoomId; room: RoomConfig } {
 function clientOptions(ctx: Ctx): ClientOptions {
   return {
     ...(ctx.io.fetch ? { fetch: ctx.io.fetch } : {}),
+    ...(ctx.io.retries !== undefined ? { retries: ctx.io.retries } : {}),
     ...(ctx.values["verbose"] === true ? { log: (l: string) => ctx.io.err(`  ${l}`) } : {}),
   };
 }
@@ -411,7 +443,7 @@ function applyLocal(ctx: Ctx, id: RoomId, key: string, local: LocalIntent, out: 
  * - `answered`: nothing is sent; the local steps run again from the kept
  *   answer.
  */
-async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T>; extra: string[] }> {
+async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T>; extra: string[]; prepared?: PreparedAct }> {
   const { id, room } = roomOf(ctx);
   const key = str(ctx.values, "idempotency-key") ?? commandKey();
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(key)) throw new UsageError("An idempotency key is 1 to 64 characters from A-Z, a-z, 0-9, '_' and '-'.");
@@ -465,7 +497,83 @@ async function journaled<T>(ctx: Ctx, spec: ActSpec<T>): Promise<{ out: Result<T
   ctx.step("act-completed");
   ctx.store.finish(id, "act", key);
   ctx.act = undefined;
-  return { out, extra };
+  // The act as it was prepared, and so as it was sent: what the journal kept, whichever run prepared it.
+  return { out, extra, prepared: entry!.prepared };
+}
+
+/**
+ * The meaning a recorded act's kind had at the act's own seq, `D(seq)`
+ * (R-DECL-23), or undefined when it cannot be read. An act is shown in the
+ * words of the declaration it was admitted under: not those read while it
+ * was prepared, since a label can change before admission and leave the
+ * binding as it was, and not the latest, which may be later still. This is
+ * a read for display only. The act is already recorded, so a failure here
+ * changes the words printed and nothing else: nothing is sent again, and
+ * the receipt is still given.
+ */
+async function recordedMeaning(ctx: Ctx, seq: Seq, kind: string): Promise<RecordMeaning | undefined> {
+  try {
+    // The run's one handle: the one that sent a new act, or a new one for an act finished from the journal.
+    const { api } = await open(ctx);
+    const c: Catalogue | null = await api.actsAt({ seq }); // G5:cli-recorded-seq
+    return c === null ? undefined : meaningOf(c, kind); // G5:cli-recorded-null
+  } catch {
+    return undefined; // G5:cli-recorded-unread
+  }
+}
+
+/** The target of a generic act, from the command line: null, an entry, a thread, a version, or the JSON given. */
+function targetOf(ctx: Ctx, room: RoomConfig): DeclaredTarget {
+  const raw = str(ctx.values, "target");
+  const entry = str(ctx.values, "entry");
+  const generation = int(ctx.values, "generation");
+  const explicit = str(ctx.values, "lane") !== undefined;
+  if (raw !== undefined) {
+    if (entry !== undefined || generation !== undefined || explicit) throw new UsageError("Give --target, or --lane, --generation and --entry, not both.");
+    try {
+      return JSON.parse(raw) as DeclaredTarget;
+    } catch {
+      throw new UsageError("--target takes JSON: null, or an object such as {\"lane\":\"act_12_0a1b2c3d\"}.");
+    }
+  }
+  if (entry !== undefined) {
+    if (generation !== undefined || explicit) throw new UsageError("Give --entry alone, or --lane with --generation.");
+    if (!isActId(entry)) throw new UsageError("An entry ID looks like act_12_0a1b2c3d.");
+    return { act: entry };
+  }
+  if (generation !== undefined) return { lane: laneOf(ctx, room), generation };
+  if (explicit) return { lane: laneOf(ctx, room) };
+  return null;
+}
+
+/**
+ * What to tell the user after `binding-stale`: the active meaning, what
+ * changed since the one they read where the room still retains it, and the
+ * command that acts under the active meaning. Nothing here acts again.
+ */
+async function staleText(ctx: Ctx, api: HttpRoomClient | undefined, kind: string, given: string): Promise<string[]> {
+  try {
+    const client = api ?? (await open(ctx)).api;
+    const c = await client.acts();
+    const now = c.vocabulary === "declared" && Object.hasOwn(c.acts, kind) ? c.acts[kind] : undefined;
+    if (c.vocabulary !== "declared" || now === undefined) return [`  ${kind} is not declared in the active policy version ${c.policy}. See: artroom acts`];
+    const lines = [`  Nothing was done. In policy version ${c.policy}, ${kind} now means:`, ...actText(c, kind).slice(0, -1).map((l) => `  ${l}`)];
+    // The meaning the user read, if one of the last versions still holds it under that binding.
+    let before: Catalogue | null = c;
+    let old;
+    for (let i = 0; i < 8 && before !== null && before.since > 0 && old === undefined; i++) {
+      before = await client.actsAt({ seq: before.since - 1 });
+      if (before?.vocabulary === "declared" && Object.hasOwn(before.acts, kind) && before.acts[kind]!.binding === given) old = before.acts[kind]!.declaration; // G5:cli-stale-old
+    }
+    if (old !== undefined) {
+      const changed = meaningChanges(old, now.declaration);
+      lines.push("  What changed since the meaning you read:", ...changed.map((l) => `    ${l}`));
+    } else lines.push("  The meaning you read is not in the room's recent policy versions, so the change cannot be listed.");
+    lines.push(`  If this is still what you intend, act under it: artroom act ${kind} --binding ${now.binding} …`);
+    return lines;
+  } catch {
+    return [`  To read the active meaning: artroom acts ${kind}`];
+  }
 }
 
 function parseReason(ref: string): Reason {
@@ -627,7 +735,7 @@ const COMMANDS: Record<string, Command> = {
       );
       const path = ctx.store.bearerPath(inv.room);
       const config = ctx.store.read();
-      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, mcp: shown.mcp, invitation: inv.invitation };
+      config.rooms[inv.room] = { url: entry.url, name, member: shown.member, role: shown.role, custody: "room", key: shown.key, delegation: shown.delegation, mcp: shown.mcp, invitation: inv.invitation };
       config.current = inv.room;
       ctx.store.write(config);
       ctx.step("config-written");
@@ -952,7 +1060,159 @@ const COMMANDS: Record<string, Command> = {
       const limit = int(ctx.values, "limit");
       const cursor = str(ctx.values, "cursor");
       const page = await api.log({ ...(after !== undefined ? { after } : {}), ...(limit ? { limit } : {}), ...(cursor ? { cursor: cursor as never } : {}) });
-      return print(ctx, page, () => logText(page.acts, page.head, page.publishedThrough, page.more, page.cursor));
+      // Each act is shown with the label its kind had at its own seq (R-DECL-23): one read per policy version on the page.
+      const meanings = new Map<number, RecordMeaning>();
+      const versions: Catalogue[] = [];
+      for (const e of page.acts) {
+        if (e.entry.type === "system") continue;
+        let c = versions.find((k) => governs(k, e.seq)); // G5:cli-log-version
+        if (c === undefined) {
+          const read = await api.actsAt({ seq: e.seq });
+          if (read === null) continue;
+          versions.push(read);
+          c = read;
+        }
+        meanings.set(e.seq, meaningOf(c, envelopeOf(e)!.kind)); // G5:cli-log-meaning
+      }
+      return print(ctx, page, () => logText(page.acts, page.head, page.publishedThrough, page.more, page.cursor, meanings));
+    },
+  },
+
+  acts: {
+    options: { at: { type: "string" }, policy: { type: "string" } },
+    async run(ctx) {
+      const at = int(ctx.values, "at");
+      const policy = str(ctx.values, "policy");
+      if (at !== undefined && policy !== undefined) throw new UsageError("Give --at or --policy, not both."); // G5:cli-acts-one
+      if (policy !== undefined && !isActId(policy)) throw new UsageError("A policy version looks like act_12_0a1b2c3d.");
+      const kind = ctx.args[0];
+      const { api } = await open(ctx);
+      const c = at !== undefined ? await api.actsAt({ seq: at }) : policy !== undefined ? await api.actsAt({ policy: policy as ActId }) : await api.acts();
+      if (c === null) {
+        if (ctx.json) ctx.io.out("null");
+        else ctx.io.err("The room retains no such policy version.");
+        return EXIT.failed;
+      }
+      if (kind === undefined) return print(ctx, c, () => actsText(c));
+      if (c.vocabulary !== "declared" || !Object.hasOwn(c.acts, kind)) {
+        if (ctx.json) ctx.io.out("null");
+        else {
+          ctx.io.err(`${kind} is not declared in policy version ${c.policy}.`);
+          for (const l of actsText(c)) ctx.io.err(l);
+        }
+        return EXIT.failed;
+      }
+      return print(ctx, { policy: c.policy, since: c.since, until: c.until, steps: c.steps, kind, ...c.acts[kind] }, () => actText(c, kind));
+    },
+  },
+
+  act: {
+    options: {
+      binding: { type: "string" },
+      target: { type: "string" },
+      generation: { type: "string" },
+      entry: { type: "string" },
+      set: { type: "string", multiple: true },
+      body: { type: "string" },
+      because: { type: "string", multiple: true },
+    },
+    async run(ctx) {
+      const kind = ctx.args[0];
+      if (kind === undefined) throw new UsageError("Give the kind of act. To see what this room declares: artroom acts");
+      const given = str(ctx.values, "binding");
+      // The binding is never read for the user: it names the meaning they read, and only they know which that was (R-DECL-16).
+      if (given === undefined) throw new UsageError(`Give the binding of the meaning you read: --binding sha256:… It is printed by: artroom acts ${kind}`); // G5:cli-binding-required
+      if (!/^sha256:[0-9a-f]{64}$/.test(given)) throw new UsageError("--binding takes the whole binding, sha256: and 64 hex digits, as artroom acts prints it."); // G5:cli-binding-format
+      let base: Record<string, Json> = {};
+      const raw = str(ctx.values, "body");
+      if (raw !== undefined) {
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("not an object");
+          base = parsed as Record<string, Json>;
+        } catch {
+          throw new UsageError("--body takes a JSON object.");
+        }
+      }
+      const because = list(ctx.values, "because").map(parseReason);
+      let reader: HttpRoomClient | undefined;
+      const { out, prepared } = await journaled<DeclaredRecord>(ctx, {
+        command: "act",
+        async start(api, room, opts) {
+          reader = api;
+          const c = await api.acts();
+          if (c.vocabulary !== "declared") throw new UsageError("This room declares no acts of its own: it uses the legacy vocabulary. Use the named commands, such as artroom claim."); // G5:cli-legacy
+          const a = Object.hasOwn(c.acts, kind) ? c.acts[kind] : undefined;
+          if (a === undefined)
+            return { refused: true, rule: "kind-undeclared", reason: `The kind ${kind} is not declared in the room's active policy, version ${c.policy}.`, fix: "See what the room declares: artroom acts" }; // G5:cli-undeclared
+          // The meaning the user read is not the active one: nothing is signed. This is what the room would answer.
+          if (a.binding !== given) // G5:cli-stale
+            return {
+              refused: true,
+              rule: "binding-stale",
+              reason: `The act was prepared for ${kind} as ${given}; the active declaration's binding is ${a.binding}, in policy version ${c.policy}.`,
+              fix: "Read the active declaration. Do the act again under its binding only if that meaning is still what you intend.",
+              current: { binding: a.binding, policy: c.policy },
+            };
+          const target = targetOf(ctx, room);
+          const shape = shapeOf(target);
+          const fields = shape === null ? null : fieldsOf(a.declaration, shape);
+          if (shape === null || fields === null) throw new UsageError(`${kind} does not act on that target. It takes: ${targetsOf(a.declaration).join(", ")}. See: artroom acts ${kind}`); // G5:cli-target
+          let body: Record<string, Json>;
+          try {
+            body = bodyOf(fields, base, list(ctx.values, "set"));
+          } catch (e) {
+            if (e instanceof FieldError) throw new UsageError(e.message);
+            throw e;
+          }
+          if (because.length > 0) body["because"] = because as unknown as Json;
+          // What the room already knows is read for the user, as the named commands do: the lease, the generation, the head.
+          const lane = target !== null && "lane" in target ? target.lane : undefined;
+          // Only a step's own field is read from the room. A field the declaration gives one of these names is the
+          // application's, with a meaning of its own, and is left as the user gave it.
+          const wants = (name: string) => fields.some((f) => f.name === name && f.from === "step") && body[name] === undefined; // G5:cli-step-field-only
+          if (lane !== undefined && wants("lease") && fields.find((f) => f.name === "lease")!.required) {
+            const h = await held(api, lane, room.member);
+            if (isRefusal(h)) return h;
+            body["lease"] = h.lease.generation; // G5:cli-lease
+          }
+          if (lane !== undefined && wants("expectedGeneration")) {
+            const l = await api.lane(lane);
+            if (l !== null) body["expectedGeneration"] = l.generation; // G5:cli-generation
+          }
+          if (lane !== undefined && shape === "version" && wants("head")) {
+            const p = await api.proposal({ lane, generation: (target as { generation: number }).generation });
+            if (p !== null) body["head"] = p.head; // G5:cli-head
+          }
+          const lacks = missing(fields, body);
+          if (lacks.length > 0) throw new UsageError(`${kind} on target ${shape} also needs: ${lacks.map((n) => `--set ${n}=…`).join(" ")}. See: artroom acts ${kind}`); // G5:cli-missing
+          return api.act(kind, target, body, { binding: given as Binding, ...opts }); // G5:cli-binding-given
+        },
+      });
+      // A run that finishes an act from the journal finishes the act that was saved, whatever kind this command line
+      // names: the saved bytes go back unchanged (R-IDEM-2). So the act is named from what was saved and recorded,
+      // never from this run's arguments, and a run that named another kind is told which act it finished.
+      const saved = prepared?.kind ?? kind; // G5:cli-saved-kind
+      if (saved !== kind) ctx.io.err(`This idempotency key belongs to a saved ${saved} act. That act was sent again as it was saved; no ${kind} act was made.`); // G5:cli-saved-kind-told
+      if (isRefusal(out)) {
+        const code = refused(ctx, out);
+        if (!ctx.json && out.rule === "binding-stale") for (const l of await staleText(ctx, reader, saved, prepared?.binding ?? given)) ctx.io.err(l);
+        return code;
+      }
+      // The words are those of the act as recorded: its own kind (`DeclaredRecord.kind`), under the declarations of its
+      // own seq. They are read after the answer, for a new act and for one finished from the journal alike, and only
+      // when words are printed.
+      const meaning = ctx.json ? undefined : await recordedMeaning(ctx, out.seq, out.kind); // G5:cli-recorded-json
+      const lines = [`Done: ${meaning !== undefined ? `${meaning.label} (${out.kind})` : out.kind}, recorded as ${out.id}.`]; // G5:cli-label
+      // An act that opened a thread: name the thread as every reader does, by its goal, or by this act's label and its
+      // first text field by name, from the body that was sent. Without the declaration it is named by its ID.
+      const opened = out as { lane?: unknown; goal?: unknown; effect?: { type?: unknown } };
+      if (opened.effect?.type === "opened" && typeof opened.lane === "string") {
+        const opening = meaning !== undefined ? { meaning, body: prepared?.body } : undefined; // G5:cli-thread
+        const title = threadTitle({ lane: opened.lane, goal: typeof opened.goal === "string" ? opened.goal : "" }, opening);
+        lines.push(`Thread: ${title} (lane ${opened.lane}).`);
+      }
+      return print(ctx, out, () => lines);
     },
   },
 
@@ -966,12 +1226,23 @@ const COMMANDS: Record<string, Command> = {
   },
 
   mcp: {
-    options: {},
+    options: { toolset: { type: "string" } },
     async run(ctx) {
-      const { api } = await open(ctx);
-      const { serveArtroomStdio } = await import("@generalbusiness/artroom-mcp/stdio");
-      const handle = serveArtroomStdio(api);
-      await new Promise<void>((resolve) => process.stdin.once("end", resolve));
+      const { StdioServerTransport, callerFromRoster, serveArtroomStdio, toolsetOf } = await import("@generalbusiness/artroom-mcp/stdio");
+      // `--toolset` is the stdio form of the MCP URL's `?toolset=`: builder, reviewer, observer or all. An unknown name
+      // is bad-request, before anything is asked of the room.
+      const toolset = toolsetOf(str(ctx.values, "toolset"));
+      const { api, room } = await open(ctx);
+      // The tool list follows this credential's authorization, read from the roster at each `tools/list` (R-API-14):
+      // a key file is the member's own key; a bearer file acts under the session's delegation, the one its redemption
+      // recorded. (A credential saved before that ID was kept names none: then it is the key's latest delegation.)
+      const session = room.delegation !== undefined ? { key: room.key, session: true, delegation: room.delegation } : { key: room.key, session: true }; // GM:cli-delegation
+      const who = room.custody === "room" ? session : { key: room.key }; // GM:cli-caller
+      const caller = async () => callerFromRoster(await api.members(), who);
+      const asked = toolset !== undefined ? { toolset } : {}; // GM:cli-toolset
+      const streams = ctx.io.stdio;
+      const handle = serveArtroomStdio(api, { caller, ...asked }, streams ? { transport: new StdioServerTransport(streams.stdin, streams.stdout) } : {});
+      await new Promise<void>((resolve) => (streams?.stdin ?? process.stdin).once("end", resolve));
       await handle.close();
       return EXIT.ok;
     },

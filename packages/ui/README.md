@@ -1,6 +1,8 @@
 # Artroom UI
 
-The web interface for Artroom: four screens over one data adapter.
+> **Test file names below may be out of date.** Each section names the tests as they were when it was written. Request `ecbc722a` later merged and removed many test files; [plans/test-invariants.md](../../plans/test-invariants.md) is the current map from each invariant to its test.
+
+The web interface for Artroom: five screens over one data adapter.
 
 | Screen | What it shows |
 |---|---|
@@ -8,6 +10,7 @@ The web interface for Artroom: four screens over one data adapter.
 | **Room** | Claims and their overlaps (before any code exists), lanes and leases, the landing operations, the publication slot, and how far the log is published. Live. |
 | **Proposal** | One generation: the diff, notes anchored to path, line and head, the obligations as a checklist, each piece of evidence marked *reviewed here*, *carried* (with the reason) or *stale* (with the reason), each check carry judgment from its `check-carried` event, advisory checks listed apart as never blocking, and "why" links. When commits carry jj `change-id` headers, also which changes the generation rewrote, added or dropped, with an interdiff for each rewritten one. |
 | **Policy** | The rules in plain English, recent outcomes, and a dry run of a draft rule against the room's history. |
+| **Acts** | What the room's policy lets people do, in the room's own words: each declared act with its label, help and who may sign it, and a form built from the declaration to prepare and send one. See "Declared acts". |
 
 It is built with Preact and Vite, with hand-written CSS. It has no component
 library. It is served as Workers static assets.
@@ -40,9 +43,10 @@ options:
 | `?viewer=@sam` | Show another member's queue. The top bar also has a "Viewing as" menu. |
 | `?dev` | Show the demo timeline: play, pause, step. The footer's "Replay the scenario" button and the <kbd>d</kbd> key do the same. |
 | `?theme=dark` | Force a theme: `light`, `dark` or `system`. The top bar's theme button cycles them. |
+| `?app=setlist` | Open the second demo room instead: a band's setlist, whose policy declares its own five acts and none of the review ones. `?viewer=@ivo` works here too. |
 
 Keyboard: <kbd>1</kbd> Needs you, <kbd>2</kbd> Room, <kbd>3</kbd> Policy,
-<kbd>j</kbd>/<kbd>k</kbd> next and previous item, <kbd>?</kbd> help. With
+<kbd>4</kbd> Acts, <kbd>j</kbd>/<kbd>k</kbd> next and previous item, <kbd>?</kbd> help. With
 the timeline open, <kbd>,</kbd> and <kbd>.</kbd> step back and forward.
 
 ## Test it
@@ -54,6 +58,28 @@ npm test                                # vitest: component and adapter tests (h
 npx playwright install chromium         # once
 npm run e2e                             # Playwright, headless: builds, serves, walks the scenario
 ```
+
+The vitest files, by what they protect. The sections below record earlier
+reviews as they were answered; where they name a `test/review-*.test.tsx`
+file, `test/policy-runtime.test.ts` or `test/amendment-3.test.tsx`, the cases
+are now in the files of this table.
+
+| File | What it protects |
+|---|---|
+| `test/screens.test.tsx` | The five screens over the scripted room, note threads bound to their head, and the why dialog (review 82f2743b, P2.4 and P2.5) |
+| `test/acts-screen.test.tsx` | The Acts screen: a form built from a declaration, a stale meaning never sent without the person confirming, and a lost answer shown as unresolved and asked again with the same key (review fb27de86) |
+| `test/acts-fields.test.ts` | Reading typed fields and targets with the declared limits; what changed between two meanings |
+| `test/declared-rendering.test.tsx` | Every record shown under the declarations of its own seq; thread names from the opening act's own declaration (decision c37653e1) |
+| `test/live-catalogue.test.ts` | The page's catalogue never goes back behind an activation it confirmed (reviews fcd7391d, 0fd98c41, 8df737b8 and fb27de86) |
+| `test/live-room.test.tsx` | The live adapter over the contract's reads: no workspace token, partial reads shown as partial (review 82f2743b, P2.6), check-carried events |
+| `test/publication.test.tsx` | What the page says about an unresolved publication and a finished landing (reviews 82f2743b and 88a20f74) |
+| `test/checks.test.tsx` | Advisory checks never shown as blocking; a carried check's reason from its own event (amendment 3, review a4241e41) |
+| `test/change-history.test.tsx` | The per-change history and its interdiff (reviews 125ee638 and f3fff92c) |
+| `test/dry-run.test.ts` | A draft rule's preview agrees with the policy runtime, and is validated first (reviews 82f2743b, P1.1 and 88a20f74, P2) |
+
+The scripted room and the in-memory room in `src/room/mock` are stand-ins.
+The tests use them to drive the page and the live adapter; they do not test
+the stand-ins' own behaviour, which shows nothing about a real Room.
 
 `npm run typecheck` first generates declarations for the policy runtime into
 `.types/` (git-ignored) and checks the UI against them. The runtime's sources
@@ -92,11 +118,14 @@ src/room/glob.ts         path matching and overlap, from the policy runtime
 src/room/refuse-claim.ts the refuse-claim draft compiled to a profile expression, and its TypeScript twin
 src/room/mock/           MockRoom: a small deterministic room model and the scripted scenario
 src/room/live/           LiveRoom: a stub over the contract's HttpRoom and its WebSocket watch
+src/room/acts.ts         declared acts: reading typed fields and targets, a record under its own meaning, what changed between two meanings
+src/room/mock/memory-room.ts   an in-memory room with declared acts, behind the live adapter
+src/room/mock/setlist.ts       a small application that is not code review, and declared-room.ts, its demo
 src/room/dryrun.ts       the policy dry run, through the policy runtime
 src/room/changes.ts      per-change history and interdiffs from jj change-id headers
 src/room/mock/repo.ts    an in-memory git object store, read through lane B's TreeReader
 src/ui/ChangeHistory.tsx the per-change view on the Proposal screen
-src/screens/             the four screens
+src/screens/             the five screens
 src/ui/landing.tsx       what each landing state means, from its recorded facts
 src/ui/                  shell pieces: icons, badges, router, the "why" dialog, the demo bar
 ```
@@ -212,6 +241,94 @@ proposal generation:
 `src/room/changes.ts` takes exactly these (`CommitInfo[]` and a
 `CommitStore`), so either form plugs into the existing adapter.
 
+## Declared acts
+
+Declared acts stage 5 (request `a5d64b35`, clarification `fa120186`;
+docs/protocol.md section 33). A room's policy can declare its own acts. The
+UI reads them and never assumes the review verbs.
+
+**Old records keep the meaning they had.** Each act and each recorded
+refusal is read under the declarations in force at its own entry, `D(s)`,
+never under the active ones (R-DECL-23). The live adapter reads one
+catalogue for each policy version in the loaded window (`actsAt({ seq })`)
+and builds each feed entry from it (`src/room/live/describe.ts`):
+
+- A declared record shows who, the label in force at its entry, its target
+  in words, and each body field by name.
+- A kind that a later policy dropped shows "Retired at seq N". If a still
+  later policy declares the name again, the old record keeps the old label,
+  fields and retirement. Two meanings of one name differ by binding.
+- A label-only edit does not change the binding. The old record still shows
+  the old label, because it is read under its own entry's policy.
+- A legacy record, and `renew` and `roster` in every room, keep the
+  sentences they always had.
+- A record made under the code-review declaration keeps the code-review
+  sentence. That is decided by binding, not by name: a room that declares a
+  different `claim` gets the generic rendering.
+- A record whose kind the policy in force did not declare is shown plainly
+  with its kind and fields. It is never dropped.
+- When a room cannot give its declarations, only a `v: 1` record of one of
+  the nine legacy kinds is read as one. Anything else says its meaning
+  could not be read.
+
+After an activation the earlier catalogues are read again, because a new
+policy can retire a kind of an earlier one.
+
+**Evidence by step.** Reviews, checks and notes for the Proposal screen are
+rebuilt from the log by the step a record ran (`review`, `check`,
+`comment`) under its own declaration, so an application's own name for a
+review still counts. Legacy records are matched by kind, as before.
+
+**The act form** (`src/screens/Acts.tsx`, `src/room/acts.ts`). It lists
+the active declarations and builds a form for one from
+`fieldsOf(declaration, shape)`: an input per field by type, required fields
+marked, and the declared limits checked before anything is sent. It sends
+once, with the binding of the declarations the person chose the act from.
+A refresh of the snapshot behind an open form does not change the form.
+
+- On `binding-stale` the form says the meaning changed, reads the
+  declarations again, lists what changed, and sends again only when the
+  person presses "Send it with the new meaning". If the new meaning needs a
+  field the form does not have yet, nothing is sent until it is filled in.
+- When the room's answer does not arrive, and the error says the act may
+  have been recorded, the form says the outcome is unresolved. It never
+  says the act was not taken. "Ask again, the same act" sends exactly
+  what was sent, with the same idempotency key: the room returns the
+  record it made, or records the act once (R-IDEM-2). Until then the form
+  sends no other act.
+- On `kind-undeclared` it says the room no longer has that act and returns
+  to the list.
+- Any other refusal shows the room's rule with the reason and fix as given,
+  since a declaration may word them.
+
+The UI's checks are a courtesy. The room decides again at admission.
+
+**The second demo room** (`?app=setlist`; `src/room/mock/declared-room.ts`).
+It is the live adapter over an in-memory room (`memory-room.ts`) whose
+policy declares five acts for a band's setlist (`setlist.ts`): start a
+song, add a part, cue, sign off, wrap up. A second policy version renames
+one, reshapes another and drops a third, so the feed shows each case
+above. The in-memory room is a stand-in: it has no signatures, expiring
+leases, policy rules or landing. It answers a generic act's idempotency
+key as the Room does (R-IDEM-2 to R-IDEM-4).
+
+**Not done here.**
+
+- The form has no input for `because` (the reasons an act rests on).
+- The form does not send `recover` or the platform kinds.
+- After a lost answer the form asks again only when the person says so.
+  It keeps the act and its idempotency key for as long as the form stays
+  open: it does not store them, so closing the page loses them, and the
+  act's outcome is then read from the feed.
+- The Room, Proposal and Needs-you screens keep the review application's
+  wording ("lane", "claim", "generation"). A thread opened by another
+  application's act is named by that act's label and its first text field
+  by name, read with the declaration in force when the thread opened.
+- Steps and hold settings the Room does not run until stage 4 (hand-over,
+  scope templates, reservations, comments with no anchor, two steps in one
+  act) are described by `fieldsOf` already, so the form needs no change
+  when they arrive, but nothing here has exercised them.
+
 ## Contract gaps
 
 Things the UI needs that the lane 0 contract does not provide yet. The mock
@@ -228,10 +345,16 @@ supplies them; the live adapter reports them as unavailable.
    adapter shows the slot as held only when a loaded landing holds it, and
    otherwise as unavailable, never as free.
 4. **No read of main**: its head and when it last moved.
-5. **No read of the active policy document, and no dry-run method.** Plan
+5. **No read of the active policy's rules, and no dry-run method.** Plan
    section 12 asks for a dry run against history. The demo room runs it with
    the policy runtime over the rule inputs it recorded; a live room would
-   need the retained replay contexts (R-LOG-7).
+   need the retained replay contexts (R-LOG-7). Declared acts stage 5 closes
+   part of this gap: the live adapter now reads the active policy version,
+   the entry it took effect at, and its declared acts with their bindings
+   (`acts()`), and the declarations in force at any entry (`actsAt()`). The
+   rules themselves (`refuse`, `require`, `carry`, `land`, `notify`) still
+   have no read, so the Policy screen shows a live room's version and
+   outcomes but not its rules.
 6. **`NotCarried` does not name its obligation.** The UI infers it from the
    previous generation's evidence.
 7. **No way to dismiss a notify-only attention item** (`why: "policy"`).
@@ -240,8 +363,14 @@ supplies them; the live adapter reports them as unavailable.
    while the cursor advances) and reads the newest 500 log entries. Whatever
    it could not read is marked in `RoomSnapshot.coverage`, and the screens say
    so instead of claiming "nothing" or "all".
-9. **`connect()` is declared, not implemented**, so `LiveRoom` takes an
-   `HttpRoom` from its caller, and `main.tsx` runs only the mock.
+9. **The page is not wired to a live room.** The client package now
+   implements `connect()`, but the UI does not depend on it: `LiveRoom` still
+   takes an `HttpRoom` from its caller, and `main.tsx` runs only the two demo
+   rooms. Wiring it means a sign-in flow and key custody in the browser,
+   which is its own piece of work. Declared acts stage 5 did not change
+   this. What it did change: `LiveRoom` now uses the handle's `acts`,
+   `actsAt` and `act`, so a caller that passes a connected handle gets the
+   declared-acts reads and the generic act with no further change here.
 10. **No read of a generation's commits** (open point 39). The per-change
     history is not shown in a live room, and the UI does not build it from
     anything else.

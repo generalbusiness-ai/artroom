@@ -9,7 +9,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { connect, generateSigner, isRefusal, join } from "@generalbusiness/artroom-client";
 import { listedTools } from "../src/index.ts";
-import { serveArtroomStdio } from "../src/stdio.ts";
+import { callerFromRoster, serveArtroomStdio } from "../src/stdio.ts";
 import { FakeRoom, type Url } from "./support.ts";
 
 let room: FakeRoom;
@@ -29,7 +29,9 @@ test("initialize, list the tools, and claim over stdio", async () => {
 
   const stdin = new PassThrough();
   const stdout = new PassThrough();
-  const handle = serveArtroomStdio(api, { transport: new StdioServerTransport(stdin, stdout) });
+  // The caller is the member's own key, as the command line gives it (R-API-14).
+  const caller = async () => callerFromRoster(await api.members(), { key: signer.key });
+  const handle = serveArtroomStdio(api, { caller }, { transport: new StdioServerTransport(stdin, stdout) });
   const replies = new Map<number, any>();
   let buffer = "";
   stdout.on("data", (chunk: Buffer) => {
@@ -45,7 +47,7 @@ test("initialize, list the tools, and claim over stdio", async () => {
   const send = async (id: number | undefined, method: string, params: unknown = {}) => {
     stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...(id === undefined ? {} : { id }), method, params })}\n`);
     if (id === undefined) return undefined;
-    for (let i = 0; i < 500 && !replies.has(id); i++) await new Promise((r) => setTimeout(r, 10));
+    for (let i = 0; i < 5_000 && !replies.has(id); i++) await new Promise((r) => setTimeout(r, 1));
     return replies.get(id);
   };
 
@@ -54,8 +56,12 @@ test("initialize, list the tools, and claim over stdio", async () => {
   expect(init.result.instructions).toMatch(/refusal is an answer/);
   await send(undefined, "notifications/initialized");
   const list = await send(2, "tools/list");
-  expect(list.result.tools).toEqual(listedTools());
-  const claim = await send(3, "tools/call", { name: "claim", arguments: { goal: "Local work", scope: ["docs/**"] } });
+  // A member gets the builder toolset (R-API-14), each tool as its descriptor gives it. The room's document is `v1`,
+  // so the generic `act` is not listed.
+  const builder = ["claim", "workspace", "propose", "note", "land", "renew", "release", "attention", "explain", "lane", "proposal", "operation", "acts"];
+  expect(list.result.tools.map((t: { name: string }) => t.name)).toEqual(builder);
+  expect(list.result.tools).toEqual(listedTools().filter((t) => builder.includes(t.name)));
+  const claim = await send(3, "tools/call", { name: "claim", arguments: { goal: "Local work", scope: ["docs/**"], idempotencyKey: "stdio-claim-1" } });
   expect(claim.result.structuredContent).toMatchObject({ kind: "claim", by: { via: "member", member: "@alice" } });
   await handle.close();
 });

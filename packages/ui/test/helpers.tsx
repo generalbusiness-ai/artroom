@@ -1,4 +1,4 @@
-import { render } from "@testing-library/preact";
+import { render, waitFor as waitForSlowly } from "@testing-library/preact";
 import { App } from "../src/app.tsx";
 import type { RoomAdapter } from "../src/room/adapter.ts";
 import { MockRoom, type MockOptions } from "../src/room/mock/mock-room.ts";
@@ -23,3 +23,14 @@ export function laneId(goal: string, step?: number) {
   const s = new MockRoom(step === undefined ? {} : { step }).snapshot();
   return s.lanes.find((l) => l.goal === goal)!.lane;
 }
+
+/**
+ * testing-library's `waitFor`, looking again every 2 ms. Its own default is
+ * every 50 ms, which is what most of this suite's time was: the state these
+ * tests wait for is an adapter's snapshot or a count, which no change to the
+ * page announces.
+ */
+export const waitFor: typeof waitForSlowly = (callback, options) => waitForSlowly(callback, { interval: 2, ...options });
+
+/** Lets what is already under way finish: timers that are due and the promises behind them. */
+export const settled = (ms = 5) => new Promise<void>((resolve) => setTimeout(resolve, ms));

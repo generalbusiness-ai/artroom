@@ -5,7 +5,8 @@
  * - `RoomApi`: the methods every typed handle has.
  * - `Room`: the handle over a Workers service binding (RPC). Disposable.
  * - `HttpRoom`: the handle over HTTPS, for browsers, the CLI and scripts.
- * - `McpTools`: the ten MCP tools, mapped one to one to `RoomApi` methods.
+ * - `McpTools`: the fourteen named MCP tools, each calling one `RoomApi` method, and
+ *   `McpToolsets`, which of them a caller is shown (R-API-9, R-API-14).
  * - `ArtroomService`, `RoomWire`, `HttpRoutes`: the wire beneath the handles.
  * - `ArtroomFounder`, `RoomDraft`, `Founding`, `RoomRef`: founding a room and
  *   finding its ID from its name (R-GEN-10, R-GEN-11, R-API-11).
@@ -55,7 +56,7 @@ import type {
   RosterRecord,
 } from "./acts.ts";
 import type { Held, Lane, LaneFilter } from "./lanes.ts";
-import type { OpByKind, OpKind, OpRef, OpState, Reached, WaitOptions, WorkspaceGrant, WorkspaceOp } from "./landing.ts";
+import type { Op, OpByKind, OpKind, OpRef, OpState, Reached, WaitOptions, WorkspaceGrant, WorkspaceOp } from "./landing.ts";
 import type { AttentionPage, LogPage, LogRequest, Page, PageRequest, Update } from "./pagination.ts";
 import type { Genesis, Role, Roster, RosterOp, SignedOnboardingGrant } from "./roster.ts";
 import type { Result } from "./errors.ts";
@@ -63,6 +64,8 @@ import type { Envelope, JoinEnvelope, RequestBody, SignedEnvelope, SignedRequest
 import type { Decision } from "./policy.ts";
 import type { Evidence, NotCarried } from "./evidence.ts";
 import type { LogEntry } from "./log.ts";
+import type { AnySignedEnvelope, Binding, Catalogue, DeclaredBearerAct, DeclaredRecord, DeclaredTarget, KindName, RecordMeaning } from "./declarations.ts";
+import type { Json, PolicyVersion, Seq } from "./ids.ts";
 
 // -------------------------------------------------------------- credentials
 
@@ -196,12 +199,25 @@ export interface ActOptions {
   readonly idempotencyKey?: IdempotencyKey;
 }
 
+/**
+ * Options of the generic act (R-DECL-16, stage 5). `binding` is required:
+ * it is the binding the caller read from the catalogue, for the meaning it
+ * intends. A handle never reads, replaces or re-signs it.
+ */
+export interface GenericActOptions extends ActOptions {
+  readonly binding: Binding;
+}
+
+/** Which policy version's declarations to read: the one in force at an entry's seq, or one named by its version. */
+export type CatalogueAt = { readonly seq: Seq; readonly policy?: never } | { readonly policy: PolicyVersion; readonly seq?: never };
+
 // ------------------------------------------------------------------- reads
 
 /** What `explain` returns: the rules applied, their inputs and outcomes (plan section 5). */
 export interface Explanation {
   readonly act: ActId;
-  readonly kind: EnvelopeKind | "system";
+  /** The act's kind: a legacy, platform or declared kind (R-DECL-2), or `system`. */
+  readonly kind: EnvelopeKind | KindName | "system";
   readonly outcome: "accepted" | "refused" | "system";
   readonly entry: LogEntry;
   readonly decisions: readonly Decision[];
@@ -211,6 +227,12 @@ export interface Explanation {
   readonly evidence?: readonly { readonly obligation: string; readonly evidence: readonly Evidence[]; readonly notCarried: readonly NotCarried[] }[];
   /** True when the entry is at or below `publishedThrough`, so `artroom verify` can check it offline. */
   readonly published: boolean;
+  /**
+   * For an act or a recorded refusal: what its kind meant at its own seq,
+   * under the document in force there (R-DECL-23). A reader shows the entry
+   * with this label, never with the active vocabulary's.
+   */
+  readonly meaning?: RecordMeaning;
 }
 
 // ---------------------------------------------------------------- the handle
@@ -231,6 +253,16 @@ export interface RoomApi {
   renew(held: Held, opts?: ActOptions): Promise<Result<Renewal>>;
   roster(op: RosterOp, opts?: ActOptions): Promise<Result<RosterRecord>>;
 
+  /**
+   * An act of any declared kind, in envelope `v: 2`, with the binding the
+   * caller read (R-DECL-16, R-API-9 as amended). The handle signs exactly
+   * this kind, target, body and binding. On `binding-stale` the refusal's
+   * `current` gives the active binding and policy version; the handle does
+   * not read again, bind again or sign again. Platform kinds are refused
+   * here: they have their own methods.
+   */
+  act(kind: KindName, target: DeclaredTarget, body: { readonly [field: string]: Json }, opts: GenericActOptions): Promise<Result<DeclaredRecord>>;
+
   /** Opens (or returns) the lane's workspace operation: pending → ready | failed. Holder only. No token (R-WS-1). */
   workspace(held: Held): Promise<Result<WorkspaceOp>>;
   /** The fork's write token. Current holder and lease only, judged at each call (R-WS-2). */
@@ -248,6 +280,14 @@ export interface RoomApi {
   log(req?: LogRequest): Promise<LogPage>;
   explain(act: ActId): Promise<Explanation | null>;
   members(): Promise<Roster>;
+  /** The active policy version's declarations and bindings; a `v1` room answers with the legacy catalogue. */
+  acts(): Promise<Catalogue>;
+  /**
+   * A retained policy version's declarations: `D(s)` for an entry's seq (R-DECL-23), or null when there is none.
+   * A handle may keep an ended version it read. Its `retired` marks can still change, so the handle drops what it
+   * kept when it sees a later activation; `fresh` reads from the room whatever it kept.
+   */
+  actsAt(at: CatalogueAt, opts?: { readonly fresh?: boolean }): Promise<Catalogue | null>;
 }
 
 /**
@@ -311,7 +351,9 @@ export type ReadQuery =
   | { readonly q: "attention"; readonly page?: PageRequest }
   | { readonly q: "log"; readonly req?: LogRequest }
   | { readonly q: "explain"; readonly act: ActId }
-  | { readonly q: "members" };
+  | { readonly q: "members" }
+  /** With neither field: the active version. `at` is an entry's seq; `policy` a version. At most one. */
+  | { readonly q: "acts"; readonly at?: Seq; readonly policy?: PolicyVersion };
 
 export interface ReadResults {
   readonly lane: Lane | null;
@@ -322,6 +364,7 @@ export interface ReadResults {
   readonly log: LogPage;
   readonly explain: Explanation | null;
   readonly members: Roster;
+  readonly acts: Catalogue | null;
 }
 
 type Unsigned<E> = E extends Envelope ? Pick<E, "kind" | "target" | "body" | "idempotencyKey"> : never;
@@ -333,13 +376,19 @@ type Unsigned<E> = E extends Envelope ? Pick<E, "kind" | "target" | "body" | "id
  */
 export type BearerAct = Unsigned<Exclude<Envelope, { readonly kind: "roster" }>>;
 
+/**
+ * A bearer act as the room accepts it (R-CRED-10 as amended, stage 5): a
+ * legacy act, or a declared act with the binding its caller read.
+ */
+export type AnyBearerAct = BearerAct | DeclaredBearerAct;
+
 /** The unrecorded requests a bearer session may make: the workspace and its token (R-CRED-10). */
 export type BearerRequest = Exclude<RequestBody, { readonly kind: "session" }>;
 
 /** The per-room RPC target beneath `Room`. Every method is stateless on the server. */
 export interface RoomWire extends Disposable {
   /** Admitted with path `submitted`: a `join` here can redeem only a client-custody invitation (R-ADM-12). */
-  submit(act: SignedEnvelope): Promise<Result<ActRecord>>;
+  submit(act: AnySignedEnvelope): Promise<Result<ActRecord | DeclaredRecord>>;
   /** `workspace` returns `WorkspaceOp`; `workspace-token` returns `WorkspaceGrant`; `session` returns `Session`. */
   request(req: SignedRequest): Promise<Result<WorkspaceOp | WorkspaceGrant | Session>>;
   /** Redeem an invitation. Needs no session (R-CRED-9). */
@@ -347,9 +396,11 @@ export interface RoomWire extends Disposable {
   /**
    * An act for an MCP agent, signed by the room with the bearer's session key
    * under its delegation, on the `submitted` path (R-CRED-3 step 4, R-CRED-10).
-   * An unknown, expired or revoked bearer throws `unauthenticated`.
+   * An unknown, expired or revoked bearer throws `unauthenticated`. A
+   * declared act carries the binding its caller read; the room signs `v: 2`
+   * with exactly that binding and never chooses another.
    */
-  bearerAct(bearer: string, act: BearerAct): Promise<Result<ActRecord>>;
+  bearerAct(bearer: string, act: AnyBearerAct): Promise<Result<ActRecord | DeclaredRecord>>;
   /** `workspace` or `workspace-token` for a bearer session, judged as R-CRED-5 and R-WS-2 judge a signed request (R-CRED-10). */
   bearerRequest(bearer: string, req: BearerRequest): Promise<Result<WorkspaceOp | WorkspaceGrant>>;
   /** `session` is a session token or a bearer token (R-API-3). */
@@ -373,7 +424,7 @@ export interface HttpRoutes {
   /** `:room` is a name or an ID. No credential (R-API-11). */
   "GET /v1/rooms/:room": { readonly ok: RoomRef };
   /** Path `submitted`: a `join` here can redeem only a client-custody invitation (R-ADM-12). */
-  "POST /v1/rooms/:room/acts": { readonly body: SignedEnvelope; readonly ok: ActRecord };
+  "POST /v1/rooms/:room/acts": { readonly body: AnySignedEnvelope; readonly ok: ActRecord | DeclaredRecord };
   /** Responses carrying a `WorkspaceGrant` are sent with `Cache-Control: no-store` (R-WS-4). */
   "POST /v1/rooms/:room/requests": { readonly body: SignedRequest; readonly ok: WorkspaceOp | WorkspaceGrant | Session };
   /** No `Authorization` header; rate-limited per address and invitation (R-CRED-9). */
@@ -386,6 +437,12 @@ export interface HttpRoutes {
   "GET /v1/rooms/:room/log": { readonly query: LogRequest; readonly ok: LogPage };
   "GET /v1/rooms/:room/explain/:act": { readonly ok: Explanation };
   "GET /v1/rooms/:room/members": { readonly ok: Roster };
+  /**
+   * The declarations of one policy version, with each kind's binding. No
+   * query: the active version. `at` is an entry's seq; `policy` a version;
+   * at most one. `not-found` when the room retains no such version.
+   */
+  "GET /v1/rooms/:room/declarations": { readonly query: { readonly at?: Seq; readonly policy?: PolicyVersion }; readonly ok: Catalogue };
   "GET /v1/rooms/:room/subscribe": { readonly query: { readonly cursor?: Cursor; readonly waitMs?: number }; readonly ok: Update };
   /**
    * `?cursor=` is optional. The client offers the subprotocols `artroom.v1`
@@ -439,14 +496,26 @@ export interface McpHeld {
   readonly lease: LeaseGeneration;
 }
 
+/**
+ * Every MCP act tool takes an idempotency key, and over MCP it is required
+ * (R-API-9, amendment 7): reusing it retries the same call, so an act is
+ * never recorded twice after a lost response.
+ */
 interface McpCommon {
-  readonly idempotencyKey?: IdempotencyKey;
+  readonly idempotencyKey: IdempotencyKey;
 }
 
+/** The longest any MCP tool waits, in milliseconds (R-API-15). */
+export type McpMaxWaitMs = 45_000;
+
 /**
- * The ten MCP tools. Each maps to the `RoomApi` method of the same name; the
- * MCP server rebuilds `Held` from `McpHeld` using the room's current lease
- * expiry, and fences on `lease` exactly as the method does (R-API-9).
+ * The fourteen named MCP tools (R-API-9). Each calls one `RoomApi` method: the ten
+ * of amendment 2 by the same name, and `lanes`, `lane`, `proposal` and
+ * `operation` (which calls `op` and `wait`). The MCP server rebuilds `Held`
+ * from `McpHeld` using the room's current lease expiry, and fences on `lease`
+ * exactly as the method does. A `waitMs` is at most `McpMaxWaitMs`.
+ * Declared-acts stage 5 composes generic `act` and `acts` with this core;
+ * adding those tools does not remove any named tool or its toolset.
  */
 export interface McpTools {
   readonly claim: {
@@ -466,7 +535,7 @@ export interface McpTools {
     readonly output: Result<Claim>;
   };
   /**
-   * Waits up to `waitMs` (default 20 000) for ready or failed. `grant` is
+   * Waits up to `waitMs` (default 20 000, at most 45 000) for ready or failed. `grant` is
    * present only when ready, and only for the current holder and lease (R-WS-2).
    */
   readonly workspace: {
@@ -494,15 +563,98 @@ export interface McpTools {
       };
     readonly output: Result<Review>;
   };
-  /** Waits up to `waitMs` (default 0) for a terminal or slot-holding state. */
+  /** Waits up to `waitMs` (default 0, at most 45 000) for a terminal or slot-holding state. */
   readonly land: {
     readonly input: McpHeld & McpCommon & { readonly generation: Generation; readonly head: Sha; readonly waitMs?: number };
     readonly output: Result<Landing>;
   };
-  /** Also the MCP form of `subscribe`: call again with the returned cursor. The page is `RoomApi.attention`'s, unchanged. */
-  readonly attention: { readonly input: PageRequest; readonly output: AttentionPage };
-  /** An unknown act is `ExplainNotFound`, because MCP structured content must be an object (R-API-9). */
+  /**
+   * Also the MCP form of `subscribe`: call again with the returned cursor. The
+   * page is `RoomApi.attention`'s, unchanged. With `waitMs` (default 0, at most
+   * 45 000), when the page after `cursor` would be empty, the server waits for
+   * the next update that carries attention items for the caller, then reads
+   * the page again; at `waitMs` it returns the empty page (R-API-15).
+   */
+  readonly attention: { readonly input: PageRequest & { readonly waitMs?: number }; readonly output: AttentionPage };
+  /** Artroom represents an unknown act with the object-shaped `ExplainNotFound` (R-API-9). */
   readonly explain: { readonly input: { readonly act: ActId }; readonly output: Explanation | ExplainNotFound };
+  /** `RoomApi.lanes`. */
+  readonly lanes: { readonly input: LaneFilter & PageRequest; readonly output: Page<Lane> };
+  /** `RoomApi.lane`. An unknown lane is `McpNotFound`. */
+  readonly lane: { readonly input: { readonly lane: LaneId }; readonly output: Lane | McpNotFound<"lane"> };
+  /** `RoomApi.proposal`. An unknown generation is `McpNotFound`. */
+  readonly proposal: { readonly input: ProposalRef; readonly output: Proposal | McpNotFound<"proposal"> };
+  /**
+   * `RoomApi.op`, and with `waitMs` (default 0, at most 45 000) `RoomApi.wait`
+   * until one of `until` (default: the kind's terminal states). On expiry it
+   * returns the operation's current state, not an error (R-API-15). The
+   * adapter maps only `RoomApi.op`'s lookup `not-found` exception to
+   * `McpNotFound`; other errors retain their existing behavior.
+   */
+  readonly operation: {
+    readonly input: OpRef & { readonly until?: readonly string[]; readonly waitMs?: number };
+    readonly output: Op | McpNotFound<"operation">;
+  };
+  // Declared acts stage 5 (R-API-9 as amended, sections 33.10 and 34): the two generic tools, beside the fourteen named ones.
+  /**
+   * The declarations of a policy version with their bindings: the active
+   * one, or the one in force at entry `at`, or version `policy`. An agent
+   * reads a kind's binding here before it calls `act`.
+   */
+  readonly acts: { readonly input: { readonly at?: Seq; readonly policy?: PolicyVersion }; readonly output: Catalogue | ActsNotFound };
+  /**
+   * Any declared act. `binding` and `idempotencyKey` are required: the
+   * binding names the meaning the agent read, and the room never replaces
+   * it (R-DECL-16, R-CRED-10 as amended).
+   */
+  readonly act: {
+    readonly input: {
+      readonly kind: KindName;
+      readonly target: DeclaredTarget;
+      readonly body: { readonly [field: string]: Json };
+      readonly binding: Binding;
+      readonly idempotencyKey: IdempotencyKey;
+    };
+    readonly output: Result<DeclaredRecord>;
+  };
+}
+
+/** The MCP `acts` result when the room retains no such policy version. */
+export interface ActsNotFound {
+  readonly outcome: "not-found";
+}
+
+/** Artroom's object-shaped MCP not-found result; its output schema defines this chosen shape (R-API-9). */
+export interface McpNotFound<W extends "lane" | "proposal" | "operation"> {
+  readonly outcome: "not-found";
+  readonly what: W;
+}
+
+/**
+ * Which tools each MCP toolset lists (R-API-14). The generic names are kept
+ * here for composition with declared-acts stage 5. A toolset decides only what
+ * `tools/list` shows; a listed or unlisted tool, once called, is judged by the
+ * room like any other call.
+ */
+export interface McpToolsets {
+  readonly builder:
+    | "attention" | "claim" | "workspace" | "propose" | "note" | "land" | "release" | "renew"
+    | "lane" | "proposal" | "explain" | "operation" | "act" | "acts";
+  readonly reviewer: "attention" | "lanes" | "lane" | "proposal" | "note" | "review" | "explain" | "act" | "acts";
+  readonly observer: "attention" | "lanes" | "lane" | "proposal" | "explain" | "operation" | "acts";
+  readonly all: McpToolName | "act" | "acts";
+}
+export type McpToolset = keyof McpToolsets;
+
+/**
+ * MCP tool annotations, as the MCP specification 2026-07-28 defines them.
+ * Hints for hosts, never authority (R-API-13).
+ */
+export interface McpToolAnnotations {
+  readonly readOnlyHint: boolean;
+  readonly destructiveHint: boolean;
+  readonly idempotentHint: boolean;
+  readonly openWorldHint: boolean;
 }
 
 /** The MCP `explain` result for an act the room does not have. `outcome` tells it apart from an `Explanation`. */
@@ -530,12 +682,23 @@ export interface JsonSchema {
   readonly additionalProperties?: boolean;
 }
 
-/** The descriptor the MCP server publishes per tool. Lane E writes these and tests them against `McpTools`. */
+/**
+ * The descriptor the MCP server publishes per tool (R-API-13). Lane E writes
+ * these and tests them against `McpTools` and `McpToolsets`. `tools/list`
+ * advertises `name`, `title`, `description`, `inputSchema`, `outputSchema`
+ * and `annotations`; `method` and `toolsets` stay on the server.
+ */
 export interface McpToolDescriptor<T extends McpToolName = McpToolName> {
   readonly name: T;
+  readonly title: string;
+  /** At most 1 000 characters: when to use the tool, and its likely refusals with their fixes. */
   readonly description: string;
   readonly inputSchema: JsonSchema & { readonly type: "object" };
+  /** For act tools, `oneOf` the tool's result and `Refusal`, so every result's structured content conforms. */
   readonly outputSchema: JsonSchema;
-  /** The `RoomApi` method this tool calls. */
-  readonly method: T;
+  readonly annotations: McpToolAnnotations;
+  /** The `RoomApi` method this tool calls (`operation` calls `op` and `wait`). */
+  readonly method: T extends "operation" ? "op" : T;
+  /** The toolsets that list this tool. */
+  readonly toolsets: readonly { [S in McpToolset]: T extends McpToolsets[S] ? S : never }[McpToolset][];
 }

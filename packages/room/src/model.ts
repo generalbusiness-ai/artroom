@@ -51,6 +51,14 @@ export interface LaneRow {
   readonly why: "released" | "expired" | "opened-by-room" | null;
   readonly handover: ActId | null;
   readonly revertOf: OpId | null;
+  /** The thread's kind: the kind of the act that opened it, or `room` (R-DECL-6). */
+  readonly kind: string;
+  /** The binding of the act that opened it; null for a thread the legacy vocabulary or the room opened. */
+  readonly binding: string | null;
+  /** The lease length recorded when it opened (R-DECL-9); null: the room's current lease, as a legacy thread keeps. */
+  readonly leaseMs: number | null;
+  /** The conflict mode recorded when it opened (R-DECL-6); null for a thread opened under the legacy vocabulary. */
+  readonly conflict: "exclusive" | "by-scope" | null;
 }
 
 export function laneRow(sql: Sql, id: string): LaneRow | null {
@@ -71,6 +79,10 @@ export function laneRow(sql: Sql, id: string): LaneRow | null {
     why: str(r, "why") as LaneRow["why"],
     handover: str(r, "handover") as ActId | null,
     revertOf: str(r, "revert_of") as OpId | null,
+    kind: str(r, "kind")!,
+    binding: str(r, "binding"),
+    leaseMs: num(r, "lease_ms"),
+    conflict: str(r, "conflict") as "exclusive" | "by-scope" | null,
   };
 }
 
@@ -243,6 +255,8 @@ export function laneView(sql: Sql, row: LaneRow, landing: OpId | undefined): Lan
     overlaps: overlapsFor(sql, row.id, row.scope),
     ...(landing ? { landing } : {}),
     ...(row.revertOf ? { revertOf: row.revertOf } : {}),
+    // The thread's kind (R-DECL-6), so a reader can tell which acts' `threads` name it (declared acts stage 5).
+    kind: row.kind, // G5:lane-kind
   };
   if (row.state === "held")
     return { ...base, state: "held", lease: { holder: row.holder!, generation: row.leaseGen, expiresAt: iso(row.expiresMs!) } };

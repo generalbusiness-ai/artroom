@@ -153,15 +153,48 @@ export const DUE_INDEXES = [
 ] as const;
 
 /**
+ * The columns of version 4 (declared acts stage 2, request fd6f00b6): a
+ * thread's kind, the binding of the act that opened it, and the lease length
+ * and the conflict mode recorded when it opened (R-DECL-6, R-DECL-9); a delegation's signed grant
+ * map, and whether an invitation was admitted under a `v2` document
+ * (R-DECL-17). Null where the legacy vocabulary leaves them unset.
+ */
+export const DECLARED_COLUMNS: readonly (readonly [table: string, column: string, type: string])[] = [
+  ["lanes", "kind", "TEXT"],
+  ["lanes", "binding", "TEXT"],
+  ["lanes", "lease_ms", "INTEGER"],
+  ["lanes", "conflict", "TEXT"],
+  ["delegations", "acts", "TEXT"],
+  ["invitations", "declared", "INTEGER"],
+];
+
+const hasColumn = (sql: Sql, table: string, column: string): boolean => one(sql, "SELECT 1 AS x FROM pragma_table_info(?) WHERE name = ?", table, column) !== undefined;
+
+/**
+ * Version 4: the declared-acts columns, each added only if absent, so the
+ * step is idempotent. Every stored lane gets its kind: `room` for a revert
+ * lane the room opened (R-REV-6), `claim` for every other, which a `claim`
+ * opened (a configuration-recovery lane included). The binding and lease
+ * length stay null: those lanes were opened under the legacy vocabulary and
+ * keep the room's current lease (R-DECL-9). It updates existing rows in
+ * place and adds none.
+ */
+function declaredColumns(sql: Sql): void {
+  for (const [table, column, type] of DECLARED_COLUMNS) if (!hasColumn(sql, table, column)) sql.all(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); // G2:migration-add
+  sql.all("UPDATE lanes SET kind = CASE WHEN revert_of IS NOT NULL THEN 'room' ELSE 'claim' END WHERE kind IS NULL"); // G2:migration-backfill
+}
+
+/**
  * The Room's schema steps, run once each, in order, by `migrate`. Version 3
  * (mint lane C) was written as version 2 alongside request d29c09fa's scrub,
  * and renumbered when that landed first: a version-1 room gets both, a
- * version-2 room the indexes only.
+ * version-2 room the indexes only. Version 4 is declared acts stage 2's.
  */
 export const ROOM_MIGRATIONS: readonly Migration[] = [
   { version: 1, name: "base", up: (sql) => SCHEMA.forEach((q) => sql.all(q)) },
   { version: 2, name: "safe error metadata at rest (request d29c09fa)", up: scrubErrors },
   { version: 3, name: "due indexes (mint lane C, request 5ff58c9a)", up: (sql) => DUE_INDEXES.forEach((q) => sql.all(q)) },
+  { version: 4, name: "thread kind, binding and lease; grant maps (declared acts stage 2, request fd6f00b6)", up: declaredColumns },
 ];
 
 /** Codes a failed publication may store as `publication_error` and name to the caller: lane L's and the Room's own. */

@@ -13,14 +13,17 @@ import type {
   Obligation,
   Page,
   Proposal,
+  RecordMeaning,
   Refusal,
 } from "@generalbusiness/artroom-contract";
+import { kindText } from "./declared.ts";
 
 export const short = (sha: string) => sha.slice(0, 12);
 
 export function refusalText(r: Refusal): string[] {
   const lines = [`Refused: ${r.rule}`, `  Reason: ${r.reason}`];
   if (r.fix) lines.push(`  Fix: ${r.fix}`);
+  if (r.rule === "binding-stale" && r.current?.binding !== undefined) lines.push(`  Active binding: ${r.current.binding}, in policy version ${String(r.current.policy)}.`); // G5:cli-refusal-current
   if (r.act) lines.push(`  Recorded as ${r.act}. For the details: artroom explain ${r.act}`);
   return lines;
 }
@@ -111,22 +114,24 @@ export function attentionText(page: Page<AttentionItem>, all: boolean): string[]
   return lines;
 }
 
-function entryWhat(e: LogEntry): string {
+function entryWhat(e: LogEntry, meaning?: RecordMeaning): string {
   if (e.entry.type === "system") return `system ${e.entry.event.type}`;
   const env = e.entry.act.envelope;
-  const what = env.kind === "roster" ? `roster ${(env.body as { op: string }).op}` : env.kind;
+  // A declared kind is shown with the label it had at this entry's own seq (R-DECL-23).
+  const what = env.kind === "roster" ? `roster ${(env.body as { op: string }).op}` : kindText(env.kind, meaning);
   const by = e.entry.receipt.authority.member ?? "recovery key";
   return `${e.entry.type === "refusal" ? `refused ${what} (${e.entry.receipt.refusal.rule})` : what} by ${by}`;
 }
 
-export function logText(acts: readonly LogEntry[], head: number, publishedThrough: number, more: boolean, cursor: string): string[] {
-  const lines = acts.map((e) => `${String(e.seq).padStart(5)}  act_${e.seq}_${e.hash.slice(7, 15)}  ${e.at}  ${entryWhat(e)}`);
+export function logText(acts: readonly LogEntry[], head: number, publishedThrough: number, more: boolean, cursor: string, meanings: ReadonlyMap<number, RecordMeaning> = new Map()): string[] {
+  const lines = acts.map((e) => `${String(e.seq).padStart(5)}  act_${e.seq}_${e.hash.slice(7, 15)}  ${e.at}  ${entryWhat(e, meanings.get(e.seq))}`);
   lines.push(`Head ${head}, published through ${publishedThrough}.${more ? ` More: artroom log --cursor ${cursor}` : ""}`);
   return lines;
 }
 
 export function explainText(x: Explanation): string[] {
-  const lines = [`${x.act}: ${x.kind}, ${x.outcome}${x.published ? ", published" : ", not yet published"}.`];
+  const lines = [`${x.act}: ${kindText(x.kind, x.meaning)}, ${x.outcome}${x.published ? ", published" : ", not yet published"}.`];
+  if (x.meaning?.vocabulary === "declared") lines.push(`Meaning: ${x.meaning.kind} as declared in policy version ${x.meaning.policy}, binding ${x.meaning.binding}.`); // G5:cli-explain-meaning
   if (x.entry.entry.type === "refusal") {
     const r = x.entry.entry.receipt.refusal;
     lines.push(`Refused by ${r.rule}: ${r.reason}${r.fix ? ` Fix: ${r.fix}` : ""}`);

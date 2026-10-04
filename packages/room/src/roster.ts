@@ -4,10 +4,12 @@
  */
 
 import type {
+  AnyPolicyDocument,
   DelegableKind,
   Delegation,
   DelegationId,
   EnvelopeKind,
+  GrantMap,
   Invitation,
   InvitationId,
   KeyCustody,
@@ -22,33 +24,33 @@ import type {
   Seq,
   TeamId,
 } from "@generalbusiness/artroom-contract";
+import { LEGACY_ROLE_KINDS, ROSTER_OPS, roleMaySign as vocabularyMaySign } from "@generalbusiness/artroom-policy";
 import type { Sql } from "./ports.ts";
 import { getMeta, json, num, one, str } from "./store.ts";
 
-/** Kinds each role may sign (R-GEN-5). Policy cannot widen it. */
-const ROLE_KINDS: Readonly<Record<Role, readonly EnvelopeKind[]>> = {
-  admin: ["claim", "propose", "note", "review", "check", "land", "release", "renew", "roster"],
-  maintainer: ["claim", "propose", "note", "review", "land", "release", "renew", "roster"],
-  member: ["claim", "propose", "note", "review", "land", "release", "renew", "roster"],
-  agent: ["claim", "propose", "note", "review", "land", "release", "renew", "roster"],
-  checker: ["check", "note", "roster"],
-};
+/** Kinds each role may sign under the legacy vocabulary (R-GEN-5), from the one source (policy vocabulary.ts). */
+const ROLE_KINDS: Readonly<Record<Role, readonly EnvelopeKind[]>> = LEGACY_ROLE_KINDS;
 
 /** Roster ops each role may sign (R-GEN-4). The non-admin roles may only delegate. */
-const MEMBER_ROSTER_OPS: readonly RosterOp["op"][] = ["delegate", "undelegate"];
-export const ADMIN_ROSTER_OPS: readonly RosterOp["op"][] = ["invite", "set-role", "remove", "revoke-key", "team", "delegate", "undelegate"];
+const MEMBER_ROSTER_OPS: readonly RosterOp["op"][] = ROSTER_OPS.others;
+export const ADMIN_ROSTER_OPS: readonly RosterOp["op"][] = ROSTER_OPS.admin;
 /** The recovery key may sign any roster op except these (R-GEN-3). */
 export const NOT_RECOVERY_OPS: readonly RosterOp["op"][] = ["join", "delegate", "undelegate"];
 
-/** May a role sign this kind, and for `roster`, this op (R-GEN-4, R-GEN-5)? */
-export function roleMaySign(role: Role, kind: EnvelopeKind, op?: RosterOp["op"]): boolean {
-  if (!ROLE_KINDS[role].includes(kind)) return false;
+/**
+ * May a role sign this kind, and for `roster`, this op (R-GEN-4, R-GEN-5)?
+ * With a `v2` document, a declared kind is decided by its `who.roles`, with
+ * `admin` implicit (R-DECL-11); `renew` and `roster` keep the legacy table.
+ */
+export function roleMaySign(role: Role, kind: string, op?: RosterOp["op"], doc?: AnyPolicyDocument): boolean {
+  if (doc !== undefined && kind !== "roster") return vocabularyMaySign(doc, role, kind);
+  if (!(ROLE_KINDS[role] as readonly string[]).includes(kind)) return false;
   if (kind !== "roster") return true;
   if (op === "join" || op === "rotate-recovery") return false;
   return role === "admin" ? ADMIN_ROSTER_OPS.includes(op!) : MEMBER_ROSTER_OPS.includes(op!);
 }
 
-/** Kinds a delegation may grant from this role: the role's kinds, never `roster` (R-ADM-5). */
+/** Kinds a legacy delegation may grant from this role: the role's kinds, never `roster` (R-ADM-5). */
 export function delegableBy(role: Role): DelegableKind[] {
   return ROLE_KINDS[role].filter((k): k is DelegableKind => k !== "roster");
 }
@@ -130,15 +132,22 @@ export function teamMembers(sql: Sql, team: string): MemberId[] {
   return json<MemberId[]>(one(sql, "SELECT members FROM teams WHERE team = ?", team), "members") ?? [];
 }
 
-export function delegation(sql: Sql, id: string): (Delegation & { readonly expiresMs: number }) | null {
+/**
+ * A delegation as stored. `acts` is the signed grant map of one admitted in
+ * a `v2` room (R-DECL-17); a delegation without it was admitted under a `v1`
+ * document.
+ */
+export function delegation(sql: Sql, id: string): (Delegation & { readonly expiresMs: number; readonly acts?: GrantMap }) | null {
   const r = one(sql, "SELECT * FROM delegations WHERE id = ?", id);
   if (!r) return null;
   const revoked = num(r, "revoked");
+  const acts = json<GrantMap>(r, "acts");
   return {
     id: str(r, "id") as DelegationId,
     grantor: str(r, "grantor") as KeyId,
     grantee: str(r, "grantee") as KeyId,
     kinds: JSON.parse(str(r, "kinds")!) as Delegation["kinds"],
+    ...(acts !== null ? { acts } : {}),
     lanes: JSON.parse(str(r, "lanes")!) as Delegation["lanes"],
     expiresAt: str(r, "expires_at")!,
     expiresMs: num(r, "expires_ms")!,
@@ -146,7 +155,8 @@ export function delegation(sql: Sql, id: string): (Delegation & { readonly expir
   };
 }
 
-export function invitation(sql: Sql, id: string): (Invitation & { readonly expiresMs: number }) | null {
+/** An invitation as stored. `declared` says it was admitted under a `v2` document (R-DECL-17). */
+export function invitation(sql: Sql, id: string): (Invitation & { readonly expiresMs: number; readonly declared: boolean }) | null {
   const r = one(sql, "SELECT * FROM invitations WHERE id = ?", id);
   if (!r) return null;
   const role = str(r, "role");
@@ -162,6 +172,7 @@ export function invitation(sql: Sql, id: string): (Invitation & { readonly expir
     secretHash: str(r, "secret_hash") as Invitation["secretHash"],
     ...(session ? { session } : {}),
     ...(used !== null ? { used } : {}),
+    declared: num(r, "declared") === 1,
   };
 }
 

@@ -11,6 +11,11 @@
  *   `RoomWire.bearerRequest` (`RpcBearer`). `roster` is refused locally,
  *   because no delegation can grant it (R-ADM-5).
  *
+ * A declared act goes with the binding its caller read (R-CRED-10 as
+ * amended): over HTTPS as one call of the MCP tool `act`, over RPC as a
+ * `DeclaredBearerAct`. The handle never chooses the binding. A declared
+ * check step may go this way; the legacy `check` and `roster` stay refused.
+ *
  * A retry sends the same act and idempotency key. While the token is valid
  * the room returns the original result; after it is revoked or expires the
  * room throws `unauthenticated`, and there is nothing to replay (R-CRED-10).
@@ -21,7 +26,8 @@ import {
   isRefusal,
   type ActRecord,
   type ArtroomError,
-  type BearerAct,
+  type AnyBearerAct,
+  type Binding,
   type RoomWire,
   type SessionToken,
   type EnvelopeKind,
@@ -41,7 +47,8 @@ export const MCP_PROTOCOL_VERSION = "2025-06-18";
 
 /** How a handle acts for a bearer session. */
 export interface BearerActor {
-  act(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey: string): Promise<Result<ActRecord>>;
+  /** `binding` is given for a generic declared act, and only then; the named methods give none. */
+  act(kind: string, target: unknown, body: unknown, idempotencyKey: string, binding?: Binding): Promise<Result<ActRecord>>;
   request(req: RequestBody): Promise<Result<RequestResult>>;
 }
 
@@ -102,13 +109,15 @@ export class McpBearer implements BearerActor {
     return structured ?? null;
   }
 
-  /** One act, as the matching MCP tool call. */
-  async act(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey: string): Promise<Result<ActRecord>> {
+  /** One act, as the matching MCP tool call: `act` for a generic declared act, the named tool otherwise. */
+  async act(kind: string, target: unknown, body: unknown, idempotencyKey: string, binding?: Binding): Promise<Result<ActRecord>> {
+    // The generic act: the caller's kind, target, body and binding, unchanged (R-CRED-10 as amended).
+    if (binding !== undefined) return (await this.tool("act", { kind, target, body, binding, idempotencyKey })) as Result<ActRecord>; // G5:mcp-bearer-generic
     const t = (target ?? {}) as Obj;
     const b = body as Obj;
     const key = { idempotencyKey };
     let out: unknown;
-    switch (kind) {
+    switch (kind as EnvelopeKind) {
       case "claim": {
         if (b["purpose"] !== undefined) {
           throw artroomError("forbidden", "A configuration-recovery claim needs the admin's own key, not a delegation (R-ADMIN-5).");
@@ -146,6 +155,8 @@ export class McpBearer implements BearerActor {
       case "check":
       case "roster":
         throw artroomError("forbidden", `A bearer session cannot sign ${kind} acts over HTTPS. Use a key: \`artroom login\`, or a Worker delegation.`);
+      default:
+        throw artroomError("bad-request", `There is no named tool for ${kind}. Use act() with the binding you read from acts().`); // G5:mcp-bearer-unnamed
     }
     return out as Result<ActRecord>;
   }
@@ -211,10 +222,11 @@ export class RpcBearer implements BearerActor {
     this.#clean = guard;
   }
 
-  async act(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey: string): Promise<Result<ActRecord>> {
+  async act(kind: string, target: unknown, body: unknown, idempotencyKey: string, binding?: Binding): Promise<Result<ActRecord>> {
     if (kind === "roster") throw artroomError("forbidden", "A bearer session cannot sign roster acts: no delegation grants them (R-ADM-5).");
-    const act = { kind, target, body, idempotencyKey } as BearerAct;
-    return this.#clean(() => this.#wire.bearerAct(this.#token, act));
+    // With a binding, the room signs `v: 2` with exactly that binding; without one, the legacy act (R-CRED-10 as amended).
+    const act = (binding !== undefined ? { kind, binding, target, body, idempotencyKey } : { kind, target, body, idempotencyKey }) as AnyBearerAct; // G5:rpc-bearer-binding
+    return this.#clean(async () => (await this.#wire.bearerAct(this.#token, act)) as Result<ActRecord>);
   }
 
   async request(req: RequestBody): Promise<Result<RequestResult>> {

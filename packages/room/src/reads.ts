@@ -6,7 +6,12 @@
 
 import type {
   ActId,
+  AnyPolicyDocument,
   AttentionItem,
+  Binding,
+  Catalogue,
+  CatalogueAct,
+  PolicyVersion,
   AttentionPage,
   Cursor,
   EntrySummary,
@@ -29,7 +34,8 @@ import type {
   Update,
 } from "@generalbusiness/artroom-contract";
 import type { RoomCore } from "./core.ts";
-import { b64url, unb64url } from "./crypto.ts";
+import { bindingSubject, declarationOf, isDeclared, meaningOf } from "@generalbusiness/artroom-policy";
+import { b64url, digestJson, unb64url } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { globsOverlap } from "./glob.ts";
 import { entriesAfter, entryById, idOf } from "./log.ts";
@@ -122,7 +128,61 @@ async function readAny(core: RoomCore, member: MemberId, q: ReadQuery): Promise<
       return explain(core, q.act);
     case "members":
       return rosterView(core.sql, core.headSeq());
+    case "acts":
+      return catalogue(core, q);
   }
+}
+
+// ------------------------------------------------------------ declarations (R-API-9 as amended, R-DECL-23)
+
+const POLICY_VERSION = /^act_(0|[1-9][0-9]{0,15})_[0-9a-f]{8}$/;
+
+/**
+ * The declarations of one policy version, with each kind's binding
+ * (`Catalogue`). With neither `at` nor `policy`: the active version. `at`
+ * is an entry's seq, and the answer is the version in force there, `D(s)`.
+ * `policy` names a version. Null when the room retains no such version: a
+ * seq before the first activation, or an unknown version.
+ *
+ * A `v1` version answers with the legacy catalogue: it has no declarations
+ * and no bindings (R-DECL-1). For a `v2` version, each kind carries the seq
+ * of the first later activation that dropped it (R-DECL-23), whether or not
+ * a still later document declares the name again.
+ */
+export function catalogue(core: RoomCore, q: { readonly at?: unknown; readonly policy?: unknown }): Catalogue | null {
+  if (q.at !== undefined && q.policy !== undefined) throw artroomError("bad-request", "Give at or policy, not both."); // G5:read-one-selector
+  let row: ReturnType<typeof one>;
+  if (q.policy !== undefined) {
+    if (typeof q.policy !== "string" || !POLICY_VERSION.test(q.policy)) throw artroomError("bad-request", "policy must be a policy version, the ID of a policy-activated entry."); // G5:read-policy-format
+    row = one(core.sql, "SELECT version, seq, doc FROM policies WHERE version = ?", q.policy);
+  } else if (q.at !== undefined) {
+    if (typeof q.at !== "number" || !Number.isSafeInteger(q.at) || q.at < 0) throw artroomError("bad-request", "at must be an entry's seq, a whole number from 0."); // G5:read-at-format
+    row = one(core.sql, "SELECT version, seq, doc FROM policies WHERE seq <= ? ORDER BY seq DESC LIMIT 1", q.at); // G5:read-at
+  } else {
+    row = one(core.sql, "SELECT version, seq, doc FROM policies WHERE version = ?", getMeta(core.sql, "policy"));
+  }
+  if (!row) return null;
+  const policy = str(row, "version") as PolicyVersion;
+  const since = num(row, "seq")!;
+  const until = num(one(core.sql, "SELECT MIN(seq) AS s FROM policies WHERE seq > ?", since), "s"); // G5:read-until
+  const doc = JSON.parse(str(row, "doc")!) as AnyPolicyDocument;
+  if (!isDeclared(doc)) return { vocabulary: "artroom-legacy-v1", policy, since, until }; // G5:read-legacy
+  // The first later version that does not declare each kind. Later documents are read in order, and only until every kind has one.
+  const retired = new Map<string, number>();
+  const kinds = Object.keys(doc.acts);
+  if (until !== null) {
+    for (const later of core.sql.all("SELECT seq, doc FROM policies WHERE seq > ? ORDER BY seq ASC", since)) {
+      const d = JSON.parse(str(later, "doc")!) as AnyPolicyDocument;
+      for (const kind of kinds) if (!retired.has(kind) && declarationOf(d, kind) === null) retired.set(kind, num(later, "seq")!); // G5:read-retired
+      if (retired.size === kinds.length) break;
+    }
+  }
+  const acts: Record<string, CatalogueAct> = {};
+  for (const kind of kinds) {
+    const r = retired.get(kind);
+    acts[kind] = { declaration: doc.acts[kind]!, binding: digestJson(bindingSubject(doc, kind)) as Binding, ...(r !== undefined ? { retired: r } : {}) }; // G5:read-binding
+  }
+  return { vocabulary: "declared", policy, since, until, steps: doc.steps, lanes: doc.lanes, acts };
 }
 
 export function laneOf(core: RoomCore, id: LaneId): Lane | null {
@@ -272,16 +332,19 @@ function explain(core: RoomCore, act: ActId): Explanation | null {
   const e = entry.entry;
   const decisions = e.type === "system" ? (e.event.type === "notified" ? e.event.decisions : []) : e.receipt.decisions;
   let evidence: Explanation["evidence"];
-  if (e.type === "act" && e.act.envelope.kind === "propose") {
-    const t = e.act.envelope.target as { lane: LaneId };
-    const g = one(core.sql, "SELECT generation FROM generations WHERE act = ?", act);
-    if (g) {
+  // An act with step `version`, whatever its kind is called: the version row names the act that made it.
+  if (e.type === "act") {
+    const t = e.act.envelope.target as { lane: LaneId } | null;
+    const g = t && typeof t.lane === "string" ? one(core.sql, "SELECT generation FROM generations WHERE act = ?", act) : undefined; // G2:explain-version
+    if (g && t) {
       const gen = generationRow(core.sql, t.lane, num(g, "generation")!)!;
       evidence = obligationsFor(core.sql, t.lane, gen.generation, { doc: core.activePolicy().doc })
         .map(publicObligation)
         .map((o) => ({ obligation: o.id, evidence: o.evidence, notCarried: gen.notCarried }));
     }
   }
+  // What the kind meant at this entry's own seq, D(s), never under the active document (R-DECL-23).
+  const at = e.type === "system" ? null : catalogue(core, { at: entry.seq }); // G5:explain-at-seq
   return {
     act,
     kind: e.type === "system" ? "system" : e.act.envelope.kind,
@@ -291,6 +354,7 @@ function explain(core: RoomCore, act: ActId): Explanation | null {
     invariants,
     ...(evidence ? { evidence } : {}),
     published: entry.seq <= publishedThrough(core),
+    ...(at !== null && e.type !== "system" ? { meaning: meaningOf(at, e.act.envelope.kind) } : {}),
   };
 }
 
@@ -304,7 +368,8 @@ export function summary(e: LogEntry): EntrySummary {
   }
   const env = x.act.envelope;
   const t = env.target as { lane?: LaneId } | null;
-  const lane = t?.lane ?? (env.kind === "claim" && env.target === null && x.type === "act" ? idOf(e) : undefined);
+  // An act that opened a thread, whatever its kind is called: its receipt has the `opened` effect, and the thread's ID is its own.
+  const lane = t?.lane ?? (x.type === "act" && x.receipt.effects.some((f) => f.type === "opened") ? idOf(e) : undefined); // G2:summary-opened
   return { id: idOf(e), seq: e.seq, type: x.type, kind: env.kind, ...(lane ? { lane } : {}), by: x.receipt.authority.member, at: e.at };
 }
 

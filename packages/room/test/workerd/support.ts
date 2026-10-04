@@ -41,6 +41,7 @@ import { b64url, digestBytes, hex, keyPairFromSeed, newKeyPair, randomBytes, ran
 import { iso, roomIdOf } from "../../src/ids.ts";
 import { unwire, type Wire } from "../../src/errors.ts";
 import type { Diagnosis } from "../../src/diag.ts";
+import { actInVocabulary, filesInVocabulary, inVocabulary, noteRecovery, refresh } from "./vocabulary.ts";
 
 // ------------------------------------------------------------ the clock
 
@@ -332,14 +333,17 @@ export class Client {
     return this.keys.key;
   }
 
+  /** The envelope of an act, in the run's vocabulary (test/workerd/vocabulary.ts): as written in the legacy run. */
   envelope(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey = randomToken().slice(0, 24)): Envelope {
+    const a = actInVocabulary(this.room.id, this.keys.key, kind, target, body);
     return {
-      v: 1,
+      v: a.v,
       room: this.room.id,
       actor: this.keys.key,
-      kind,
-      target,
-      body,
+      kind: a.kind,
+      ...(a.binding !== undefined ? { binding: a.binding } : {}),
+      target: a.target,
+      body: a.body,
       idempotencyKey,
       ...(this.delegation ? { delegation: this.delegation } : {}),
     } as Envelope;
@@ -352,7 +356,11 @@ export class Client {
 
   /** Submit an act; returns the record or the refusal; a thrown failure fails the test. */
   async act<T extends ActRecord = ActRecord>(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey?: string): Promise<T | Refusal> {
-    return call<T | Refusal>(this.room.stub.submit(this.signed(kind, target, body, idempotencyKey)));
+    await refresh(this.room.id, this.room.stub);
+    const signed = this.signed(kind, target, body, idempotencyKey);
+    const out = await call<T | Refusal>(this.room.stub.submit(signed));
+    if ((signed.envelope.kind as string) === "recover" && !isRefusal(out)) noteRecovery(this.room.id, out as unknown as { id: string; lane?: string });
+    return out;
   }
 
   /** Submit and expect acceptance. */
@@ -378,8 +386,29 @@ export class Client {
     return s.token;
   }
 
+  /** The session `read` made when a test gave it no token, and the room times between which it is used again. */
+  private kept: { readonly token: string; readonly from: number; readonly until: number } | null = null;
+
+  /**
+   * A read. With no token, the client makes a read session and keeps it for
+   * its later reads: a session request is a signed write, about 2.5 ms, and
+   * a test reads many times. If the room no longer accepts the kept session
+   * (its key was revoked, or it ran out), the client asks for a new one, so
+   * the caller sees what a new session request gives, as before.
+   */
   async read<Q extends ReadQuery>(q: Q, token?: string): Promise<ReadResults[Q["q"]]> {
-    return call<ReadResults[Q["q"]]>(this.room.stub.read(token ?? (await this.session()), q));
+    if (token !== undefined) return call<ReadResults[Q["q"]]>(this.room.stub.read(token, q));
+    const kept = this.kept;
+    if (kept && clock.now >= kept.from && clock.now < kept.until) {
+      const w = (await this.room.stub.read(kept.token, q)) as unknown as Wire<ReadResults[Q["q"]]>;
+      if (!("error" in w) || w.error.code !== "unauthenticated") return unwire(w);
+    }
+    this.kept = null;
+    const from = clock.now;
+    const fresh = await this.session();
+    // A session lasts an hour of room time; the last minute is left unused.
+    this.kept = { token: fresh, from, until: from + 59 * 60_000 };
+    return call<ReadResults[Q["q"]]>(this.room.stub.read(fresh, q));
   }
 }
 
@@ -415,8 +444,10 @@ export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<s
   // An imported repository, with an operator's grant (R-GEN-12), bound in the registry before founding (R-GEN-13).
   // With `importNamespace`, it is in the deployment's second namespace (`world.imports`), and the primary is left empty.
   const repo = `${opts.importNamespace ?? "test-import"}/${hex(randomBytes(16))}`;
-  const files: Record<string, string> = { "README.md": "# test\n", "src/app.ts": "export const app = 1;\n", ...(opts.files ?? {}) };
-  if (opts.policy) files[".artroom/policy.json"] = JSON.stringify(opts.policy);
+  // In the declared run every room has a v2 document (test/workerd/vocabulary.ts); the legacy run is unchanged.
+  const policyDoc = opts.policy ?? (DECLARED ? defaultPolicy() : undefined);
+  const files: Record<string, string> = filesInVocabulary({ "README.md": "# test\n", "src/app.ts": "export const app = 1;\n", ...(opts.files ?? {}) });
+  if (policyDoc) files[".artroom/policy.json"] = JSON.stringify(inVocabulary(policyDoc));
   if (opts.importNamespace) {
     const imports = new FakeArtifactsHost(opts.importNamespace, () => clock.now);
     imports.canonical = repo.split("/")[1]!;
@@ -446,6 +477,7 @@ export async function makeRoom(opts: { policy?: PolicyDocument; files?: Record<s
   await call((env.REGISTRY.get(env.REGISTRY.idFromName("registry")) as unknown as DurableObjectStub<Registry>).bind(repo, id, genesis.name));
   const stub = env.ROOMS.get(objectId) as unknown as RoomStub;
   await call(stub.found(genesis, sign(admin.seed, "artroom-genesis-v1", genesis), b64url(seed)));
+  await refresh(id, stub);
   const base = { id, stub };
   const room: TestRoom = {
     id,
@@ -479,7 +511,7 @@ export async function addMember(room: TestRoom, handle: MemberId, role: Role): P
 /** Commit on top of main and push it to a lane's fork. */
 export function pushChange(room: TestRoom, lane: LaneId, changes: Record<string, string | null>, parent?: Sha): Sha {
   const a = room.world.artifacts;
-  const head = a.commit(parent ?? a.main!, changes);
+  const head = a.commit(parent ?? a.main!, filesInVocabulary(changes));
   a.push(lane, head);
   return head;
 }
@@ -513,6 +545,10 @@ export function expectOk<T>(r: T | Refusal): T {
   if (isRefusal(r)) throw new Error(`unexpected refusal ${r.rule}: ${r.reason}`);
   return r;
 }
+
+export { DECLARED, checkerInVocabulary, configDigest, converted, coveredKinds, defaultDocument, inVocabulary } from "./vocabulary.ts";
+import { DECLARED } from "./vocabulary.ts";
+import { defaultPolicy } from "@generalbusiness/artroom-policy";
 
 export const hour = 3600 * 1000;
 export const day = 24 * hour;

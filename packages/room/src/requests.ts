@@ -9,8 +9,10 @@
 
 import type {
   ActRecord,
+  AnyPolicyDocument,
   DelegationId,
   Envelope,
+  GrantMap,
   InvitationId,
   Joined,
   KeyId,
@@ -18,6 +20,7 @@ import type {
   MemberId,
   Redeemed,
   Refusal,
+  Role,
   RosterRecord,
   Session,
   SessionToken,
@@ -26,17 +29,19 @@ import type {
   WorkspaceGrant,
   WorkspaceOp,
 } from "@generalbusiness/artroom-contract";
+import { CODE_REVIEW_ACTS, DELEGABLE_PLATFORM, bindingSubject, delegableBy as grantable, isDeclared, isPlatformKind, stepsOf } from "@generalbusiness/artroom-policy";
 import { isRefusal } from "@generalbusiness/artroom-contract";
 import { admit, commit, decide, earlySteps, finalBoundary, refuseApplies, refuseInput, submit, type DecideOptions } from "./admission.ts";
-import { judge, refusal } from "./authority.ts";
+import { judge, refusal, type Judged } from "./authority.ts";
+import { entryAt } from "./log.ts";
 import { utf8 } from "./canonical.ts";
 import { fault, Moved, type RoomCore } from "./core.ts";
 import { digestBytes, digestJson, newKeyPair, randomToken, sha256Hex, sign, unb64url, verify } from "./crypto.ts";
 import { artroomError } from "./errors.ts";
 import { iso, parseTime, RE } from "./ids.ts";
-import { laneRow } from "./model.ts";
+import { laneRow, type LaneRow } from "./model.ts";
 import { limitAddress, limitInvitation } from "./ratelimit.ts";
-import { delegation, invitation, keyRow, memberRow, revocationOf } from "./roster.ts";
+import { delegation, delegableBy, invitation, keyRow, memberRow, revocationOf } from "./roster.ts";
 import { checkRedemption, checkSignedRequest, isPlainObject, ShapeError } from "./schema.ts";
 import { num, one, str } from "./store.ts";
 
@@ -73,8 +78,9 @@ export async function request(core: RoomCore, input: unknown): Promise<Workspace
 
 /**
  * `workspace` and `workspace-token`, for a signed request or for a bearer
- * session (R-CRED-5, R-CRED-10): judged as for `propose` on that lane, now,
- * under the key and delegation given (R-WS-2).
+ * session (R-CRED-5, R-CRED-10): judged as for an act with step `version` on
+ * that lane (`propose` under the legacy vocabulary), now, under the key and
+ * delegation given (R-WS-2).
  */
 async function workspaceRequest(
   core: RoomCore,
@@ -105,9 +111,29 @@ async function workspaceRequest(
   return ws.grant(lane.id, lane.leaseGen);
 }
 
+/**
+ * The kinds whose step `version` acts on this thread (R-CRED-5 as amended):
+ * `propose` under the legacy vocabulary; in a `v2` room, `recover` on a
+ * configuration-recovery thread, and otherwise each declared act with step
+ * `version` whose `threads` name the thread's kind.
+ */
+function versionKinds(core: RoomCore, lane: LaneRow | null): string[] {
+  const doc = core.activePolicy().doc as AnyPolicyDocument;
+  if (!isDeclared(doc)) return ["propose"];
+  if (lane?.purpose === "config-recovery") return ["recover"]; // G2:workspace-recover
+  return Object.keys(doc.acts).filter((k) => stepsOf(doc, k, { lane: lane?.id ?? "" })?.includes("version") && (!lane || doc.acts[k]!.threads?.includes(lane.kind))); // G2:workspace-kinds
+}
+
 function workspaceAuthority(core: RoomCore, actor: KeyId, delegationId: DelegationId | undefined, laneId: LaneId, lease: number) {
-  const env = { actor, kind: "propose" as const, target: { lane: laneId }, body: {} as never, ...(delegationId ? { delegation: delegationId } : {}) };
-  const j = judge(core.sql, env as Pick<Envelope, "actor" | "kind" | "target" | "body" | "delegation">, "submitted", core.now(), { kind: "propose", lane: laneId });
+  const doc = core.activePolicy().doc;
+  const found = laneRow(core.sql, laneId);
+  let j: Judged | null = null;
+  for (const kind of versionKinds(core, found)) {
+    const env = { actor, kind, target: { lane: laneId }, body: {}, ...(delegationId ? { delegation: delegationId } : {}) };
+    j = judge(core.sql, env, "submitted", core.now(), doc, { kind, lane: laneId, ...(isPlatformKind(kind) ? {} : { binding: core.declaredBinding(kind) ?? "" }) });
+    if (j.ok) break;
+  }
+  if (!j) return found ? refusal("wrong-thread", `No declared act makes versions on ${laneId}, a ${found.kind} thread.`, "Declare an act with step version whose threads name this kind.") : refusal("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane.");
   if (!j.ok) return j.refusal;
   const lane = laneRow(core.sql, laneId);
   if (!lane) return refusal("lane-unknown", `There is no lane ${laneId}.`, "Name an existing lane.");
@@ -171,6 +197,35 @@ export function authenticateHash(core: RoomCore, h: string): MemberId {
   return m.handle;
 }
 
+/** A caller's authorization, as the MCP endpoint's `tools/list` asks for it (R-API-14). */
+export interface CallerView {
+  /** The current roster role of the member behind the token: under a delegation, the grantor's member. */
+  readonly role: Role;
+  /** The delegation the token's key acts under, with `kinds` and the signed map `acts` exactly as recorded. */
+  readonly delegation?: { readonly kinds: readonly string[] | "*"; readonly acts?: GrantMap };
+}
+
+/**
+ * The authorization behind a session or bearer token, judged now exactly as
+ * a read judges the token (R-CRED-7, R-CRED-10). A read: it records nothing
+ * and changes no grant. The signed map is returned as it was signed, stale
+ * entries included; choosing what to list from it is the MCP server's.
+ */
+export function callerOf(core: RoomCore, token: string): CallerView {
+  const h = tokenHash(token);
+  const member = authenticateHash(core, h); // GM:caller-judged
+  const sql = core.sql;
+  const s = one(sql, "SELECT delegation FROM sessions WHERE hash = ?", h) ?? one(sql, "SELECT delegation FROM bearers WHERE hash = ?", h);
+  const id = s ? str(s, "delegation") : null;
+  const d = id ? delegation(sql, id) : null;
+  if (!d) return { role: memberRow(sql, member)!.role };
+  // Under a delegation the grantor's role decides, as it does at admission (R-ADM-5).
+  const grantor = keyRow(sql, d.grantor);
+  const m = grantor ? memberRow(sql, grantor.member) : null;
+  if (!m || m.state !== "active") throw artroomError("unauthenticated", "The session or bearer token is not valid.");
+  return { role: m.role, delegation: { kinds: d.kinds, ...(d.acts !== undefined ? { acts: d.acts } : {}) } }; // GM:caller-grant
+}
+
 // ------------------------------------------------------------ redemption (R-CRED-9)
 
 /**
@@ -179,7 +234,7 @@ export function authenticateHash(core: RoomCore, h: string): MemberId {
  */
 export async function redeem(core: RoomCore, input: unknown, address: string | null, mcpBase: string): Promise<Joined | Redeemed | Refusal> {
   try {
-    checkRedemption(input);
+    checkRedemption(input, core.founded ? core.activePolicy().doc : undefined);
   } catch (e) {
     throw artroomError("bad-request", e instanceof ShapeError ? e.message : "The redemption is not valid.");
   }
@@ -203,6 +258,80 @@ export async function redeem(core: RoomCore, input: unknown, address: string | n
   }
   limitInvitation(core, r.invitation);
   return redeemRoom(core, r.invitation, r.secret, mcpBase);
+}
+
+/**
+ * What a room-custody session's delegation grants (R-CRED-3 as amended).
+ * Under a `v1` document: the session's kinds, or `*`. Under a `v2` one: a
+ * `v2` session's platform kinds and signed map, which the grant's admission
+ * checks against the active bindings, so a stale one refuses the redemption
+ * with `binding-stale` (R-DECL-17). An invitation with no `v2` session, new
+ * or from before declared acts, grants no declared kind, only the delegable
+ * platform kinds of what it covered: intersection, never acquisition.
+ */
+function sessionGrant(core: RoomCore, inv: NonNullable<ReturnType<typeof invitation>>): { kinds: readonly string[] | "*"; acts?: Readonly<Record<string, string>> } | { refusal: Refusal } {
+  const policy = core.activePolicy();
+  const doc = policy.doc as AnyPolicyDocument;
+  const session = inv.session as (NonNullable<typeof inv.session> & { acts?: Readonly<Record<string, string>> }) | undefined;
+  if (!isDeclared(doc)) {
+    // A session signed under a v2 document, redeemed after the room returned to v1: no binding of its map is the active
+    // one, so the redemption is refused binding-stale and the invitation stays unused (R-DECL-17). The map is never
+    // dropped silently.
+    const named = Object.keys(session?.acts ?? {});
+    if (named.length > 0)
+      return {
+        refusal: refusal(
+          "binding-stale",
+          `The invitation's session was prepared for ${named[0]} as ${session!.acts![named[0]!]}; the room's active policy, version ${policy.version}, declares no acts.`,
+          "Ask an admin to invite again.",
+          { current: { policy: policy.version } },
+        ), // G2:session-v1
+      };
+    // An invitation admitted under a v2 document never gains a kind by a later return to v1: with no session it
+    // granted the delegable platform kinds of its role, and it still grants only those.
+    if (inv.declared && session === undefined) { // G2:invitation-no-gain
+      const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
+      return emptyUnderV1({ kinds: role ? DELEGABLE_PLATFORM.filter((k) => (delegableBy(role) as readonly string[]).includes(k)) : [] }, policy.version);
+    }
+    return emptyUnderV1({ kinds: session?.kinds ?? "*" }, policy.version);
+  }
+  if (session?.acts !== undefined) {
+    // A kind the session's map names that the active document no longer declares: no binding of it is the active one,
+    // so the redemption is binding-stale, as R-DECL-17 words it for a redemption, not the grant's kind-undeclared.
+    const gone = Object.keys(session.acts).find((k) => core.declaredBinding(k) === null);
+    if (gone !== undefined)
+      return {
+        refusal: refusal(
+          "binding-stale",
+          `The invitation's session was prepared for ${gone} as ${session.acts[gone]}; the room's active policy, version ${policy.version}, no longer declares ${gone}.`,
+          "Ask an admin to invite again.",
+          { current: { policy: policy.version } },
+        ), // G2:session-retired
+      };
+    return { kinds: session.kinds as readonly string[], acts: session.acts }; // G2:session-map
+  }
+  const role = inv.role ?? memberRow(core.sql, inv.member)?.role;
+  if (!role) return { kinds: [], acts: {} };
+  const covered: readonly string[] = session === undefined || session.kinds === "*" ? delegableBy(role) : session.kinds;
+  return { kinds: grantable(doc, role).platform.filter((k) => covered.includes(k)), acts: {} }; // G2:session-intersection
+}
+
+/**
+ * Under a `v1` document a session's delegation must name at least one kind
+ * (R-ADM-5). A session from a `v2` document may grant none there: a role
+ * that may not sign `renew`, or a map with no kinds. It is refused with a
+ * reason that says so, and the invitation stays unused, instead of failing
+ * on the delegate's shape.
+ */
+function emptyUnderV1(grant: { kinds: readonly string[] | "*" }, version: string): { kinds: readonly string[] | "*" } | { refusal: Refusal } {
+  if (grant.kinds === "*" || grant.kinds.length > 0) return grant;
+  return {
+    refusal: refusal(
+      "delegation-invalid",
+      `This invitation's session grants no kind under the room's active policy, version ${version}.`,
+      "Ask an admin to invite again.",
+    ), // G2:session-empty
+  };
 }
 
 class Abort extends Error {
@@ -249,27 +378,33 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
     body: { op: "join", invitation: inv.id, secret: secretText },
     idempotencyKey: `redeem-${randomToken().slice(0, 32)}`,
   });
-  const grant = signed({
-    v: 1,
-    room: core.roomId,
-    actor: memberKey.key,
-    kind: "roster",
-    target: null,
-    body: { op: "delegate", to: sessionKey.key, kinds: inv.session?.kinds ?? "*", lanes: "*", expiresAt: iso(expiresMs) },
-    idempotencyKey: `session-${randomToken().slice(0, 32)}`,
-  });
+  const grantKey = `session-${randomToken().slice(0, 32)}`;
 
   return core.serial(async () => {
     for (let attempt = 0; attempt < 6; attempt++) {
       core.expireDueSync();
       const snap = core.headSeq();
+      // The session's grant, under the document in force at `snap`: an activation while this redemption waited in the
+      // queue changes what the session may grant, and its shape. An activation after this moves the head, and the
+      // attempt is made again.
+      const granted = sessionGrant(core, inv);
+      if ("refusal" in granted) return granted.refusal;
+      const grant = signed({
+        v: 1,
+        room: core.roomId,
+        actor: memberKey.key,
+        kind: "roster",
+        target: null,
+        body: { op: "delegate", to: sessionKey.key, ...granted, lanes: "*", expiresAt: iso(expiresMs) } as never,
+        idempotencyKey: grantKey,
+      });
       const joinPlan = await decide(core, join, "room-redemption", {});
       if (joinPlan.t === "replay") throw artroomError("internal", "A fresh redemption key was already used.");
       if (joinPlan.t !== "accept") return joinPlan.refusal;
       // The delegate, as it would be judged after the join (simulated, then rolled back).
       const sim = core.simulate(() => {
         commit(core, joinPlan, {});
-        const j = judge(core.sql, grant.envelope, "submitted", core.now());
+        const j = judge(core.sql, grant.envelope, "submitted", core.now(), core.activePolicy().doc);
         if (!j.ok) return { refusal: j.refusal } as const;
         const early = earlySteps(core, grant, "submitted", digestJson(grant.envelope), j.authority);
         if (early) return { refusal: early.t === "unrecorded" ? early.refusal : refusal("invalid-body", "The session grant was refused.") } as const;
@@ -294,10 +429,10 @@ async function redeemRoom(core: RoomCore, invitationId: InvitationId, secretText
           fault("redemption:after-join");
           const late2 = finalBoundary(core, grantPlan);
           if (late2) throw new Abort(late2);
-          const granted = commit(core, grantPlan, { heldKeys: [{ key: sessionKey.key, seed: sessionKey.seed, purpose: "session" }] });
+          const delegated = commit(core, grantPlan, { heldKeys: [{ key: sessionKey.key, seed: sessionKey.seed, purpose: "session" }] });
           fault("redemption:after-delegate");
-          core.sql.all("INSERT INTO bearers (hash, member, key, delegation, expires_ms) VALUES (?, ?, ?, ?, ?)", tokenHash(bearer), (joined.result as RosterRecord).by.member, sessionKey.key, granted.id, expiresMs);
-          return { joined: joined.result as RosterRecord, delegation: granted.id };
+          core.sql.all("INSERT INTO bearers (hash, member, key, delegation, expires_ms) VALUES (?, ?, ?, ?, ?)", tokenHash(bearer), (joined.result as RosterRecord).by.member, sessionKey.key, delegated.id, expiresMs);
+          return { joined: joined.result as RosterRecord, delegation: delegated.id };
         });
         core.committed();
         const by = out.joined.by as Extract<RosterRecord["by"], { via: "join" }>;
@@ -352,11 +487,63 @@ function judgeBearer(core: RoomCore, bearer: unknown): { readonly key: KeyId; re
  */
 export async function bearerAct(core: RoomCore, bearer: unknown, act: unknown): Promise<ActRecord | Refusal> {
   const b = judgeBearer(core, bearer);
-  if (!isPlainObject(act) || Object.keys(act).some((k) => !["kind", "target", "body", "idempotencyKey"].includes(k)))
-    throw artroomError("bad-request", "A bearer act has only kind, target, body and idempotencyKey.");
-  const a = act as Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey">;
-  const env = { v: 1, room: core.roomId, actor: b.key, kind: a.kind, target: a.target, body: a.body, idempotencyKey: a.idempotencyKey, delegation: b.delegation } as Envelope;
+  if (!isPlainObject(act) || Object.keys(act).some((k) => !["kind", "target", "body", "idempotencyKey", "binding"].includes(k)))
+    throw artroomError("bad-request", "A bearer act has only kind, target, body, idempotencyKey and, for a declared kind, binding.");
+  const a = act as Pick<Envelope, "kind" | "target" | "body" | "idempotencyKey"> & { binding?: unknown };
+  // A retry of an act this session already made is built as it was built then, so the same act and key give the same
+  // bytes and the original result, whatever the room's document is now (R-IDEM-2, R-DECL-16).
+  const build = (v: 1 | 2 | null, binding: unknown): Envelope =>
+    ({
+      v: v ?? (binding === undefined ? 1 : 2),
+      room: core.roomId,
+      actor: b.key,
+      kind: a.kind,
+      ...(binding !== undefined ? { binding } : {}),
+      target: a.target,
+      body: a.body,
+      idempotencyKey: a.idempotencyKey,
+      delegation: b.delegation,
+    }) as unknown as Envelope;
+  const earlier = a.binding === undefined ? builtBefore(core, b.key, a.idempotencyKey, a.kind) : null; // G2:bearer-retry
+  let env = build(null, a.binding !== undefined ? a.binding : builtFor(core, a.kind)); // G2:bearer-binding
+  if (earlier) {
+    // Built as it was then, it is a retry only if that gives the same bytes. If it does not, this is another act
+    // under a used key: it stays built for the document in force, and admission answers idempotency-mismatch,
+    // naming the original entry (R-IDEM-3), not a field the caller never sent.
+    const again = build(earlier.v, earlier.binding);
+    if (digestJson(again) === earlier.digest) env = again; // G2:bearer-same-act
+  }
   return submit(core, { envelope: env, sig: sign(b.seed, "artroom-envelope-v1", env) }, "submitted");
+}
+
+/**
+ * The envelope version and binding the room gave this session's earlier act
+ * under the same idempotency key and kind, or null when there is none. The
+ * recorded entry holds the envelope the room signed then.
+ */
+function builtBefore(core: RoomCore, key: string, ikey: unknown, kind: unknown): { readonly v: 1 | 2; readonly binding: string | undefined; readonly digest: string } | null {
+  if (typeof ikey !== "string" || typeof kind !== "string") return null;
+  const prior = one(core.sql, "SELECT seq, digest FROM idem WHERE actor = ? AND ikey = ?", key, ikey);
+  const entry = prior ? entryAt(core.sql, num(prior, "seq")! as never) : null;
+  if (!entry || entry.entry.type === "system") return null; // G2:bearer-refusal: an accepted act or a recorded refusal, both hold the envelope the room signed
+  const env = entry.entry.act.envelope as unknown as { v: 1 | 2; kind: string; binding?: string };
+  return env.kind === kind ? { v: env.v, binding: env.binding, digest: str(prior!, "digest")! } : null;
+}
+
+/**
+ * The binding a bearer act carries when its caller gave none, in a `v2`
+ * room (R-API-9 as amended): bearer acts come from the named MCP tools,
+ * each built for one code-review declaration, so it is that declaration's
+ * binding under this room's steps version and `lanes`. A room whose
+ * declaration of the kind differs refuses the act: `delegation-invalid` at
+ * step 4 when the session's grant names the room's own binding, and
+ * `binding-stale` at step 4a when the grant names the code-review binding.
+ * The room never gives an act the meaning its own declaration has.
+ */
+function builtFor(core: RoomCore, kind: unknown): string | undefined {
+  const doc = core.activePolicy().doc as AnyPolicyDocument;
+  if (!isDeclared(doc) || typeof kind !== "string" || isPlatformKind(kind) || !Object.hasOwn(CODE_REVIEW_ACTS, kind)) return undefined;
+  return digestJson(bindingSubject({ ...doc, acts: CODE_REVIEW_ACTS }, kind)); // G2:bearer-builtfor
 }
 
 /** `workspace` or `workspace-token` for a bearer session, judged under its delegation (R-CRED-10, R-WS-2). */

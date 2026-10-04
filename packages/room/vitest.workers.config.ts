@@ -18,6 +18,13 @@ export default defineConfig({
   ],
   test: {
     include: ["test/workerd/**/*.test.ts"],
+    // The declared witness set loads other test files a second time under another vocabulary, so it needs an isolate
+    // of its own: vitest.declared.config.ts runs it.
+    exclude: ["test/workerd/declared-run.test.ts"],
     testTimeout: 60_000,
+    // The files share isolates: loading the Worker is paid once per worker, not once per file. Every room has its
+    // own Durable Object and its own storage, and no test depends on another file's rooms.
+    isolate: false,
+    maxWorkers: 4,
   },
 });

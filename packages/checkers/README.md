@@ -199,38 +199,47 @@ From the repository root, after `npm install`:
 ```sh
 cd packages/checkers
 npm run typecheck
-npm test            # vitest, in Node: real git, real npm, a local runner
+npm test            # vitest, in Node; about 3 seconds
 ```
 
-The tests cover job binding, signing, checkout and its confirmations, the
-filtered snapshot and attempts to read excluded data, the tests checker
-(pass, fail, a changed test with unchanged source), the room stand-in's
-refusals, and the LLM reviewer with a fake model.
+The tests are split by what they need.
 
-`test/carry.test.ts` covers amendment 3's job rules: a runner pin that
-does not match the measured digest, and a volatile checker given
-`volatile: false`, are refused before anything runs; the check states
-`volatile` as the job does and shows the runner digest; each job's check
-goes to its own room through the `ROOM` binding, which production requires;
-and the production Worker has no route and no harness.
+`test/job.test.ts` and `test/worker.test.ts` start nothing. They cover the
+decisions about a job or an envelope alone (binding, the accepted
+namespaces, signing, the model's answer), and the production Worker: no
+route, the `ROOM` binding, `ARTIFACTS_NAMESPACES`, and the shipped
+configurations.
 
-`test/snapshot-isolation.test.ts` runs the publisher's real
-`writeSnapshot`, the git package's `SnapshotRepos` and the real runner over
-a model of Artifacts in which every repository serves any object it holds by
-ID. It covers the acceptance cases of R-CARRY-16: an older, wider snapshot's
-commit, trees and excluded blob cannot be read by known ID or seen
-advertised; the exact current commit fetches; a configuration that narrows
-the inputs gets a new repository; concurrent jobs on different snapshots
-reach only their own; and retirement, including an Artifacts outage.
+`test/handle.test.ts` covers what the service does with a job: what it
+refuses, runs, signs and sends, and for whom. The provider, `RunnerHost`,
+the gateway rule and the checkout are the real ones. The container is in
+memory (`MemoryContainer` in `test/containers.ts`): it answers the commands
+the service sends from a model repository, and keeps every command and
+environment it was given. No test here starts a process. It covers: the
+check binds its job and states `volatile` and the runner digest; the kind
+and binding a v2 room's job names; the read token reaches the gateway and
+never the sandbox; exit codes; a checkout that cannot be confirmed; a
+runner pin or a `volatile` flag that does not match; a room for each job;
+a new container for every job; the service's own copy of the job; and
+output that is whole, or refused over the limit.
 
-`test/isolation.test.ts` runs the real runner life cycle (`RunnerHost`,
-`runnerProvider`) over a container modelled on the host
-(`test/fake-container.ts`): a job that replaces a trusted tool and leaves a
-process running cannot change the next job's result; one owner per runner;
-concurrent and repeated jobs each get their own runner and grant; a caller
-changing its job mid-run changes nothing signed; large and
-credential-shaped snapshot listings verify; and output over the limit is an
-explicit error.
+`test/sandbox.test.ts` covers the runner's life cycle: one owner for each
+runner, and a grant for each job. One test runs real processes in a
+container modelled on the host (`ProcessContainer`): a replaced tool and a
+process left running do not outlive their container.
+
+`test/git.test.ts` holds what only real git and real npm can show. It
+builds one canonical repository for the file and only reads it. It covers:
+the checkout is the exact integration with no history; a scoped job cannot
+read a file left out of its snapshot by any route, nor an older, wider
+snapshot's objects by known ID (R-CARRY-16), with the publisher's real
+`writeSnapshot` and the git package's `SnapshotRepos`; the snapshot commit
+ID the Room derives is the one the publisher writes; one real `npm ci` and
+`npm test`; and the LLM reviewer's diff against the job's base.
+
+Snapshot retirement and the rule of one repository for each snapshot commit
+are tested in the git package (`test/snapshots.test.ts`,
+`test/gitops.test.ts`).
 
 ## Live runs
 

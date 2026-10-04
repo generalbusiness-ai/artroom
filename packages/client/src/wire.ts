@@ -21,7 +21,7 @@ import {
   type RoomWire,
   type Session,
   type SessionToken,
-  type SignedEnvelope,
+  type AnySignedEnvelope,
   type SignedRequest,
   type Update,
   type WorkspaceGrant,
@@ -44,12 +44,20 @@ export interface ClientOptions {
   readonly retries?: number;
   /** The clock, for tests. Default `Date.now`. */
   readonly now?: () => number;
+  /**
+   * The time to wait before another attempt, given the wait the client
+   * chose, in milliseconds: a retry's backoff or a watch's reconnect delay.
+   * For tests, which pass a function that shortens it. Default: the wait
+   * unchanged.
+   */
+  readonly backoff?: (ms: number) => number;
 }
 
 export type RequestResult = WorkspaceOp | WorkspaceGrant | Session;
 
 export interface Wire {
-  submit(act: SignedEnvelope): Promise<Result<ActRecord>>;
+  /** A signed envelope of either version (R-API-3 as amended). A declared act's record has the act's own kind. */
+  submit(act: AnySignedEnvelope): Promise<Result<ActRecord>>;
   request(req: SignedRequest): Promise<Result<RequestResult>>;
   redeem(redemption: Redemption): Promise<Result<Joined | Redeemed>>;
   read<Q extends ReadQuery>(auth: string, query: Q): Promise<ReadResults[Q["q"]]>;
@@ -173,7 +181,7 @@ export class HttpWire implements Wire {
     return artroomError(code, `The room answered with HTTP ${res.status}.`, post && res.status >= 500 ? { maybeRecorded: true } : {});
   }
 
-  async submit(act: SignedEnvelope): Promise<Result<ActRecord>> {
+  async submit(act: AnySignedEnvelope): Promise<Result<ActRecord>> {
     return this.outcome(await this.call("POST", "/acts", { body: act }));
   }
 
@@ -225,6 +233,10 @@ export class HttpWire implements Wire {
       case "members":
         out = await get("/members");
         break;
+      case "acts":
+        // No version retained for the seq or policy asked is `null`, as a missing lane is.
+        out = await get("/declarations", { at: query.at, policy: query.policy }, undefined, true);
+        break;
     }
     return out as ReadResults[Q["q"]];
   }
@@ -266,8 +278,8 @@ export class RpcWire implements Wire {
     }
   }
 
-  submit(act: SignedEnvelope): Promise<Result<ActRecord>> {
-    return this.guard(async () => this.#clean(await this.#wire.submit(act)));
+  submit(act: AnySignedEnvelope): Promise<Result<ActRecord>> {
+    return this.guard(async () => this.#clean((await this.#wire.submit(act)) as Result<ActRecord>));
   }
 
   request(req: SignedRequest): Promise<Result<RequestResult>> {

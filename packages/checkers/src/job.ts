@@ -10,7 +10,7 @@
  * gateway; it never enters the runner's environment.
  */
 
-import type { CheckJob, GitAuthEnv, Refusal, RoomId } from "@generalbusiness/artroom-contract";
+import type { CheckJob, CheckJobV2, GitAuthEnv, Refusal, RoomId } from "@generalbusiness/artroom-contract";
 import { isGlob } from "@generalbusiness/artroom-policy";
 
 export interface JobExpectations {
@@ -63,6 +63,8 @@ const ROOM_ID = /^room_[0-9a-f]{32}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const JOB_ID = /^job_[A-Za-z0-9_-]{1,60}$/;
 const OBLIGATION = /^obl_[a-z][a-z0-9-]{0,63}$/;
+/** A declared kind's name (R-DECL-2). */
+const KIND = /^[a-z][a-z0-9-]{0,31}$/;
 const ACT = /^act_(0|[1-9][0-9]{0,15})_[0-9a-f]{8}$/;
 
 function refuse(reason: string, fix = "Send a job the room built for this checker."): Refusal {
@@ -105,6 +107,12 @@ export function ownJob(job: CheckJob): CheckJob | Refusal {
   }
 }
 
+/** The kind and binding a job from a v2 room tells the service to sign (R-DECL-18), or null for a v1 room's job. `checkJob` has checked them. */
+export function signedAs(job: CheckJob): { readonly kind: string; readonly binding: string } | null {
+  const { kind, binding } = job as Partial<CheckJobV2>;
+  return typeof kind === "string" && typeof binding === "string" ? { kind, binding } : null;
+}
+
 export function checkJob(job: CheckJob, exp: JobExpectations): BoundJob | Refusal {
   if (!JOB_ID.test(job.id)) return refuse("The job ID is malformed.");
   if (typeof job.room !== "string" || !ROOM_ID.test(job.room)) return refuse("The job's room is not a room ID.");
@@ -120,6 +128,13 @@ export function checkJob(job: CheckJob, exp: JobExpectations): BoundJob | Refusa
     return refuse("The obligation is not a check obligation.");
   }
   if (!DIGEST.test(job.config)) return refuse("The configuration digest is malformed.");
+  // R-DECL-18: a v2 room's job names the kind and the binding to sign, both or neither.
+  const { kind, binding } = job as Partial<CheckJobV2>;
+  if (kind !== undefined || binding !== undefined) {
+    if (typeof kind !== "string" || typeof binding !== "string") return refuse("The job names a kind or a binding, but not both."); // G2:job-both
+    if (!KIND.test(kind)) return refuse("The job's kind is malformed."); // G2:job-kind
+    if (!DIGEST.test(binding)) return refuse("The job's binding is malformed."); // G2:job-binding-form
+  }
   if (job.input.kind === "tree") {
     if (!SHA.test(job.input.tree)) return refuse("The tree is not a 40-character SHA-1.");
   } else if (job.input.kind === "filtered") {

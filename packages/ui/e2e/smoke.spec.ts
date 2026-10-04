@@ -191,3 +191,32 @@ test("screenshot, phone width", async ({ page }) => {
   await expect(page.locator("[data-file='src/lib/authz/check.ts']")).toBeVisible();
   await capture(page, "proposal-phone");
 });
+
+test("a room that declares its own acts: the feed, the acts and a form, in its own words", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page.goto("/?app=setlist#/room");
+  await expect(page.locator("a.lane-goal", { hasText: "Start a song: Footprints" })).toBeVisible();
+  await expect(page.locator("[data-record='wrap-up']")).toContainText("Retired at seq");
+  await capture(page, "declared-room-light");
+
+  await page.getByRole("navigation", { name: "Screens" }).getByRole("link", { name: "Acts" }).click();
+  await expect(page.locator("li[data-act]")).toHaveCount(4);
+  await capture(page, "declared-acts-light");
+
+  await page.getByRole("button", { name: "Prepare “Start a song”" }).click();
+  await page.getByLabel(/^scope/).fill("songs/so-what/**");
+  await page.getByLabel(/^title/).fill("So What");
+  await page.getByLabel(/^tempo/).fill("999");
+  await page.getByRole("button", { name: "Send “Start a song”" }).click();
+  await expect(page.locator("[data-field='tempo']")).toContainText("tempo must be 240 or less.");
+  await expect(page.locator("[data-field='key']")).toContainText("key is required.");
+  await capture(page, "declared-form-light");
+  await page.getByLabel(/^tempo/).fill("136");
+  await page.getByLabel(/^key/).selectOption("d");
+  await page.getByRole("button", { name: "Send “Start a song”" }).click();
+  await expect(page.locator("[data-recorded]")).toContainText("Recorded as entry");
+  await page.getByRole("navigation", { name: "Screens" }).getByRole("link", { name: "Room" }).click();
+  await expect(page.locator("a.lane-goal", { hasText: "Start a song: So What" })).toBeVisible();
+  expect(errors).toEqual([]);
+});

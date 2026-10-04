@@ -54,6 +54,12 @@ export interface Delegation {
   readonly grantor: KeyId;
   readonly grantee: KeyId;
   readonly kinds: readonly DelegableKind[] | "*";
+  /**
+   * The signed map from declared kind to binding, for a delegation admitted
+   * in a room whose active document is `v2` (R-DECL-17, stage 2). Absent: it
+   * was admitted under a `v1` document.
+   */
+  readonly acts?: import("./declarations.ts").GrantMap;
   readonly lanes: readonly LaneId[] | "*";
   readonly expiresAt: Timestamp;
   readonly revoked?: Seq;

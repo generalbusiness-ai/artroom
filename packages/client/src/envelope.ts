@@ -4,6 +4,11 @@
  */
 
 import type {
+  AnyEnvelope,
+  AnySignedEnvelope,
+  Binding,
+  DeclaredEnvelope,
+  DeclaredTarget,
   DelegationId,
   Envelope,
   EnvelopeKind,
@@ -51,8 +56,48 @@ export function buildEnvelope(
   } as Envelope;
 }
 
-export async function signEnvelope<E extends Envelope>(envelope: E, signer: Signer): Promise<SignedEnvelope<E>> {
+const BINDING = /^sha256:[0-9a-f]{64}$/;
+
+/** A binding is `sha256:` and 64 lowercase hex digits (R-DECL-15). */
+export function checkBinding(binding: unknown): Binding {
+  if (typeof binding !== "string" || !BINDING.test(binding))
+    throw artroomError("bad-request", "A declared act needs the binding of its kind, sha256: and 64 lowercase hex digits. Read it from acts() (R-DECL-16)."); // G5:binding-required
+  return binding as Binding;
+}
+
+/**
+ * The unsigned envelope of a declared act (R-DECL-16): `v: 2`, with the
+ * binding the caller read. `binding` sits after `kind`, where the room's own
+ * bearer envelope puts it; the signed bytes are canonical JSON, so the order
+ * here is for readers only.
+ */
+export function buildDeclaredEnvelope(
+  room: RoomId,
+  who: Identity,
+  kind: string,
+  binding: Binding,
+  target: DeclaredTarget,
+  body: unknown,
+  idempotencyKey: IdempotencyKey,
+): DeclaredEnvelope {
+  return {
+    v: 2,
+    room,
+    actor: who.signer.key,
+    kind,
+    binding: checkBinding(binding),
+    target,
+    body,
+    idempotencyKey: checkIdempotencyKey(idempotencyKey),
+    ...(who.delegation !== undefined ? { delegation: who.delegation } : {}),
+  } as DeclaredEnvelope;
+}
+
+export async function signEnvelope<E extends Envelope>(envelope: E, signer: Signer): Promise<SignedEnvelope<E>>;
+export async function signEnvelope<E extends AnyEnvelope>(envelope: E, signer: Signer): Promise<AnySignedEnvelope<E>>;
+export async function signEnvelope(envelope: AnyEnvelope, signer: Signer): Promise<AnySignedEnvelope> {
   if (envelope.actor !== signer.key) throw artroomError("bad-request", "The envelope's actor must be the signing key (R-ADM-2).");
+  // Both versions are signed under the same domain tag; `v` is inside the signed bytes (R-SIG-1 as amended).
   return { envelope, sig: await signValue("artroom-envelope-v1", envelope, signer) };
 }
 

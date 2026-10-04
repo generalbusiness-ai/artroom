@@ -35,12 +35,12 @@
  * step 4).
  */
 
-import type { CheckInput, CheckJob, Digest, Glob, LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
+import type { AnyPolicyDocument, Binding, CheckerConfig, CheckerConfigV2, CheckInput, CheckJob, CheckJobV2, Digest, Glob, LaneId, OpId, Sha } from "@generalbusiness/artroom-contract";
 import { isRefusal } from "@generalbusiness/artroom-contract";
-import { checkerInputs } from "@generalbusiness/artroom-policy";
+import { bindingSubject, checkerInputs, isDeclared } from "@generalbusiness/artroom-policy";
 import { MINT_WAIT_MS, OVERDUE_STEP_MS, errorNote, within, type MintLedger } from "@generalbusiness/artroom-git";
 import type { ActivePolicyFull, RoomCore } from "./core.ts";
-import { hex, randomBytes } from "./crypto.ts";
+import { digestJson, hex, randomBytes } from "./crypto.ts";
 import { iso } from "./ids.ts";
 import { generationRow, laneRow } from "./model.ts";
 import { obligationsFor } from "./obligations.ts";
@@ -362,6 +362,26 @@ function current(core: RoomCore, j: JobRow) {
   return owner ? { policy, cfg, gen, owner } : null;
 }
 
+/** The kind and binding a v2 room's job tells its checker to sign (R-DECL-18, `CheckJobV2`); nothing under a v1 document. */
+function signedAs(policy: ActivePolicyFull, config: CheckerConfig): { readonly kind?: string; readonly binding?: Binding } {
+  const doc = policy.doc as AnyPolicyDocument;
+  // A v2 document activates only with `artroom-checker-v2` configurations, each naming an act it declares (R-DECL-18).
+  if (!isDeclared(doc)) return {};
+  const act = (config as unknown as CheckerConfigV2).act;
+  return { kind: act, binding: digestJson(bindingSubject(doc, act)) as Binding };
+}
+
+/**
+ * Has an activation replaced the binding this job named, while the job is
+ * still needed? Judged from the Room's own state, never from what the
+ * checker service answered: a service cannot make the Room send a job again.
+ */
+function reboundSince(core: RoomCore, j: JobRow, job: CheckJob): boolean {
+  const now = current(core, j);
+  if (!now) return false; // G2:job-rebound-needed
+  return signedAs(now.policy, now.cfg.config).binding !== (job as Partial<CheckJobV2>).binding; // G2:job-rebound
+}
+
 async function issue(core: RoomCore, j: JobRow): Promise<void> {
   const now = current(core, j);
   if (!now) return void move(core, j, "state = 'done', outcome = 'not-needed', token = NULL");
@@ -442,7 +462,8 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
     await end();
     return;
   }
-  if (!current(core, mine)) {
+  const fresh = current(core, mine);
+  if (!fresh) {
     move(core, mine, "state = 'done', outcome = 'not-needed', token = NULL");
     await end();
     return;
@@ -470,6 +491,9 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
     ...(owner.landOp ? { landOp: owner.landOp } : {}),
     // The token expires no later than the job's deadline (R-EXEC-9).
     deadline: iso(deadline),
+    // R-DECL-18: in a v2 room the job names the kind its check is signed as and that kind's binding, from the
+    // policy judged current just above, with no await since: an activation while the job was prepared is seen here.
+    ...signedAs(fresh.policy, fresh.cfg.config), // G2:job-binding
   };
   const sent: JobRow = { ...mine, token: tokenId };
   core.kick(`job:${job.id}`, async () => {
@@ -477,7 +501,11 @@ async function issue(core: RoomCore, j: JobRow): Promise<void> {
     const expired = new Promise<null>((resolve) => waitsOf(core).set(job.id, () => resolve(null)));
     try {
       const result = await Promise.race([service.handle(job), expired]);
-      if (result !== null) move(core, sent, "state = 'done', outcome = ?, token = NULL", isRefusal(result) ? `refused: ${result.rule}` : result.id);
+      // R-DECL-18: a check signed under a binding an activation has since replaced is refused binding-stale. The job
+      // is then due again, and its next attempt names the binding in force, or ends as no longer needed. A checker
+      // that was given the active binding and is still refused is not asked again.
+      if (result !== null && isRefusal(result) && result.rule === "binding-stale" && reboundSince(core, sent, job)) move(core, sent, "state = 'owed', next_ms = ?, token = NULL", core.now() + JOB_RETRY_MS); // G2:job-reissue
+      else if (result !== null) move(core, sent, "state = 'done', outcome = ?, token = NULL", isRefusal(result) ? `refused: ${result.rule}` : result.id);
     } catch {
       // No answer: due again soon, if this attempt is still the current one.
       move(core, sent, "state = 'owed', next_ms = ?", core.now() + JOB_RETRY_MS);
