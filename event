@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"docs/protocol.md at exact 26872bac08efb220d90ee218ac31a4034b90e98e on request/test-overhead, under promise git:sha1…0a8b8c7 on request git:sha1…500f079","body":{"commit":"26872bac08efb220d90ee218ac31a4034b90e98e","path":"docs/protocol.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8ac5774c299d3a0b4b4cd73ba8655addb39e8fbc","text":"Filed by mistake: a stage 2 artifact at 26872bac, the head of the stage 3 review 58623b2a. One head carries one lane's review. The stage 2 delta is filed at its own head."}
