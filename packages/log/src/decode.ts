@@ -530,7 +530,11 @@ export function decodeRetained(kind: "json" | "input" | "policy" | "checker", by
           if (oneOf(change["status"], `${at}.status`, ["added", "modified", "deleted", "renamed"]) === "renamed") str(change["from"], `${at}.from`);
         }); // V:d-context-changed
       }
-      if (c.kind === "carry" && input["changedSince"] !== undefined) strs(input["changedSince"], "context.input.changedSince");
+      if (c.kind === "carry") {
+        // A carry call is matched to its step by the evidence it names, before anything is replayed.
+        str(obj(input["evidence"], "context.input.evidence")["act"], "context.input.evidence.act"); // V:d-context-evidence
+        if (input["changedSince"] !== undefined) strs(input["changedSince"], "context.input.changedSince");
+      }
       if (c.kind === "land") {
         arr(input["obligations"], "context.input.obligations").forEach((o, n) => str(obj(o, `context.input.obligations[${n}]`)["id"], `context.input.obligations[${n}].id`));
         arr(input["reviews"], "context.input.reviews").forEach((r, n) => str(obj(r, `context.input.reviews[${n}]`)["act"], `context.input.reviews[${n}].act`));
