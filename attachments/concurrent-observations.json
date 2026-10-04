@@ -1,0 +1,3173 @@
+{
+  "head": "048c74113b19e56e5e3def0a9e0244209f6015dc",
+  "fidelity": "exact client against unchanged FakeRoom HTTPS seam; generated local Ed25519 signer instrumented without changing signatures; no real Room/provider",
+  "before": {
+    "accepted": 63,
+    "signed": 63,
+    "prepared": 63,
+    "posts": 63
+  },
+  "afterPair": {
+    "accepted": 65,
+    "signed": 65,
+    "prepared": 65,
+    "posts": 65,
+    "results": [
+      {
+        "status": "rejected",
+        "reason": {
+          "name": "ArtroomError",
+          "code": "unavailable",
+          "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key parallel-left: if the act was recorded, the room returns the original result (R-IDEM-2).",
+          "retryable": true,
+          "maybeRecorded": true
+        }
+      },
+      {
+        "status": "rejected",
+        "reason": {
+          "name": "ArtroomError",
+          "code": "unavailable",
+          "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key parallel-right: if the act was recorded, the room returns the original result (R-IDEM-2).",
+          "retryable": true,
+          "maybeRecorded": true
+        }
+      }
+    ]
+  },
+  "deltas": {
+    "accepted": 2,
+    "signed": 2,
+    "prepared": 2,
+    "posts": 2
+  },
+  "seedLosses": [
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-0: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-1: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-2: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-3: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-4: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-5: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-6: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-7: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-8: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-9: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-10: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-11: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-12: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-13: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-14: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-15: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-16: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-17: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-18: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-19: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-20: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-21: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-22: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-23: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-24: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-25: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-26: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-27: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-28: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-29: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-30: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-31: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-32: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-33: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-34: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-35: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-36: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-37: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-38: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-39: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-40: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-41: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-42: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-43: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-44: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-45: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-46: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-47: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-48: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-49: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-50: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-51: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-52: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-53: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-54: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-55: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-56: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-57: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-58: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-59: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-60: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-61: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    },
+    {
+      "name": "ArtroomError",
+      "code": "unavailable",
+      "message": "The room could not be reached, or the connection closed before the response arrived. Retry with idempotency key held-62: if the act was recorded, the room returns the original result (R-IDEM-2).",
+      "retryable": true,
+      "maybeRecorded": true
+    }
+  ],
+  "replays": [
+    {
+      "key": "held-0",
+      "result": {
+        "id": "act_3_5087cf9b",
+        "seq": 3,
+        "kind": "claim",
+        "by": {
+          "via": "member",
+          "member": "@alice",
+          "role": "member",
+          "key": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI"
+        },
+        "at": "2026-10-04T05:12:42.091Z",
+        "flags": [],
+        "lane": "act_3_5087cf9b",
+        "purpose": "ordinary",
+        "goal": "held-0",
+        "scope": [
+          "src/held_0/**"
+        ],
+        "lease": {
+          "holder": "@alice",
+          "generation": 1,
+          "expiresAt": "2026-10-04T05:27:42.091Z"
+        },
+        "overlaps": [],
+        "effect": {
+          "type": "opened",
+          "purpose": "ordinary",
+          "lease": {
+            "holder": "@alice",
+            "generation": 1,
+            "expiresAt": "2026-10-04T05:27:42.091Z"
+          }
+        }
+      },
+      "saved": {
+        "kind": "claim",
+        "target": null,
+        "body": {
+          "goal": "held-0",
+          "scope": [
+            "src/held_0/**"
+          ]
+        },
+        "idempotencyKey": "held-0",
+        "signed": {
+          "envelope": {
+            "v": 1,
+            "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+            "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+            "kind": "claim",
+            "target": null,
+            "body": {
+              "goal": "held-0",
+              "scope": [
+                "src/held_0/**"
+              ]
+            },
+            "idempotencyKey": "held-0"
+          },
+          "sig": "wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw"
+        }
+      },
+      "repeated": {
+        "kind": "claim",
+        "target": null,
+        "body": {
+          "goal": "held-0",
+          "scope": [
+            "src/held_0/**"
+          ]
+        },
+        "idempotencyKey": "held-0",
+        "signed": {
+          "envelope": {
+            "v": 1,
+            "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+            "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+            "kind": "claim",
+            "target": null,
+            "body": {
+              "goal": "held-0",
+              "scope": [
+                "src/held_0/**"
+              ]
+            },
+            "idempotencyKey": "held-0"
+          },
+          "sig": "wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw"
+        }
+      },
+      "savedCanonical": "{\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1},\"sig\":\"wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw\"},\"target\":null}",
+      "repeatedCanonical": "{\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1},\"sig\":\"wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw\"},\"target\":null}",
+      "originalWire": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\"},\"sig\":\"wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw\"}",
+      "repeatedWire": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\"},\"sig\":\"wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw\"}"
+    },
+    {
+      "key": "parallel-left",
+      "result": {
+        "id": "act_66_262687d0",
+        "seq": 66,
+        "kind": "claim",
+        "by": {
+          "via": "member",
+          "member": "@alice",
+          "role": "member",
+          "key": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI"
+        },
+        "at": "2026-10-04T05:12:42.134Z",
+        "flags": [],
+        "lane": "act_66_262687d0",
+        "purpose": "ordinary",
+        "goal": "left",
+        "scope": [
+          "src/left/**"
+        ],
+        "lease": {
+          "holder": "@alice",
+          "generation": 1,
+          "expiresAt": "2026-10-04T05:27:42.134Z"
+        },
+        "overlaps": [
+          {
+            "lane": "act_3_5087cf9b",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_0/**",
+            "certain": false
+          },
+          {
+            "lane": "act_4_a6048dc7",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_1/**",
+            "certain": false
+          },
+          {
+            "lane": "act_5_373d0cad",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_2/**",
+            "certain": false
+          },
+          {
+            "lane": "act_6_497edcd0",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_3/**",
+            "certain": false
+          },
+          {
+            "lane": "act_7_fbe6beb5",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_4/**",
+            "certain": false
+          },
+          {
+            "lane": "act_8_a5b002e6",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_5/**",
+            "certain": false
+          },
+          {
+            "lane": "act_9_559f2d54",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_6/**",
+            "certain": false
+          },
+          {
+            "lane": "act_10_fc5948c4",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_7/**",
+            "certain": false
+          },
+          {
+            "lane": "act_11_13cf8d24",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_8/**",
+            "certain": false
+          },
+          {
+            "lane": "act_12_e7f2d282",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_9/**",
+            "certain": false
+          },
+          {
+            "lane": "act_13_ed2ad6fc",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_10/**",
+            "certain": false
+          },
+          {
+            "lane": "act_14_66664e3f",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_11/**",
+            "certain": false
+          },
+          {
+            "lane": "act_15_5a1e930a",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_12/**",
+            "certain": false
+          },
+          {
+            "lane": "act_16_7e830f78",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_13/**",
+            "certain": false
+          },
+          {
+            "lane": "act_17_812d80a1",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_14/**",
+            "certain": false
+          },
+          {
+            "lane": "act_18_1623134b",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_15/**",
+            "certain": false
+          },
+          {
+            "lane": "act_19_a6c09bcc",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_16/**",
+            "certain": false
+          },
+          {
+            "lane": "act_20_cee38984",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_17/**",
+            "certain": false
+          },
+          {
+            "lane": "act_21_ccf4da38",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_18/**",
+            "certain": false
+          },
+          {
+            "lane": "act_22_23f0a0c6",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_19/**",
+            "certain": false
+          },
+          {
+            "lane": "act_23_5d79426d",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_20/**",
+            "certain": false
+          },
+          {
+            "lane": "act_24_4be7be3b",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_21/**",
+            "certain": false
+          },
+          {
+            "lane": "act_25_3c053046",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_22/**",
+            "certain": false
+          },
+          {
+            "lane": "act_26_153385d0",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_23/**",
+            "certain": false
+          },
+          {
+            "lane": "act_27_6dc20404",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_24/**",
+            "certain": false
+          },
+          {
+            "lane": "act_28_e0b71c17",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_25/**",
+            "certain": false
+          },
+          {
+            "lane": "act_29_04eba299",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_26/**",
+            "certain": false
+          },
+          {
+            "lane": "act_30_ee44ea0e",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_27/**",
+            "certain": false
+          },
+          {
+            "lane": "act_31_949ce064",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_28/**",
+            "certain": false
+          },
+          {
+            "lane": "act_32_195b45cb",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_29/**",
+            "certain": false
+          },
+          {
+            "lane": "act_33_87108f84",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_30/**",
+            "certain": false
+          },
+          {
+            "lane": "act_34_25e736b9",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_31/**",
+            "certain": false
+          },
+          {
+            "lane": "act_35_c73434a8",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_32/**",
+            "certain": false
+          },
+          {
+            "lane": "act_36_b594720f",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_33/**",
+            "certain": false
+          },
+          {
+            "lane": "act_37_2b64fbf7",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_34/**",
+            "certain": false
+          },
+          {
+            "lane": "act_38_88a6aeb3",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_35/**",
+            "certain": false
+          },
+          {
+            "lane": "act_39_ea66e6ef",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_36/**",
+            "certain": false
+          },
+          {
+            "lane": "act_40_090c3bf3",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_37/**",
+            "certain": false
+          },
+          {
+            "lane": "act_41_32853003",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_38/**",
+            "certain": false
+          },
+          {
+            "lane": "act_42_abfb85f0",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_39/**",
+            "certain": false
+          },
+          {
+            "lane": "act_43_7d7a0745",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_40/**",
+            "certain": false
+          },
+          {
+            "lane": "act_44_1154449b",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_41/**",
+            "certain": false
+          },
+          {
+            "lane": "act_45_9f92c2d4",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_42/**",
+            "certain": false
+          },
+          {
+            "lane": "act_46_19ce769b",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_43/**",
+            "certain": false
+          },
+          {
+            "lane": "act_47_11a0e4a3",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_44/**",
+            "certain": false
+          },
+          {
+            "lane": "act_48_efec8192",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_45/**",
+            "certain": false
+          },
+          {
+            "lane": "act_49_46ee9665",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_46/**",
+            "certain": false
+          },
+          {
+            "lane": "act_50_06d7250a",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_47/**",
+            "certain": false
+          },
+          {
+            "lane": "act_51_e748a289",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_48/**",
+            "certain": false
+          },
+          {
+            "lane": "act_52_544d1b2f",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_49/**",
+            "certain": false
+          },
+          {
+            "lane": "act_53_1e04d75a",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_50/**",
+            "certain": false
+          },
+          {
+            "lane": "act_54_7a3a4b66",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_51/**",
+            "certain": false
+          },
+          {
+            "lane": "act_55_25e992f9",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_52/**",
+            "certain": false
+          },
+          {
+            "lane": "act_56_deb4d3aa",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_53/**",
+            "certain": false
+          },
+          {
+            "lane": "act_57_328f7136",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_54/**",
+            "certain": false
+          },
+          {
+            "lane": "act_58_88b76b1e",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_55/**",
+            "certain": false
+          },
+          {
+            "lane": "act_59_d31606cc",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_56/**",
+            "certain": false
+          },
+          {
+            "lane": "act_60_135759fd",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_57/**",
+            "certain": false
+          },
+          {
+            "lane": "act_61_bfe339a7",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_58/**",
+            "certain": false
+          },
+          {
+            "lane": "act_62_3eedf036",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_59/**",
+            "certain": false
+          },
+          {
+            "lane": "act_63_7da9009a",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_60/**",
+            "certain": false
+          },
+          {
+            "lane": "act_64_c9b55b6b",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_61/**",
+            "certain": false
+          },
+          {
+            "lane": "act_65_792b37f3",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/held_62/**",
+            "certain": false
+          },
+          {
+            "lane": "act_66_e65e717a",
+            "holder": "@alice",
+            "mine": "src/left/**",
+            "theirs": "src/right/**",
+            "certain": false
+          }
+        ],
+        "effect": {
+          "type": "opened",
+          "purpose": "ordinary",
+          "lease": {
+            "holder": "@alice",
+            "generation": 1,
+            "expiresAt": "2026-10-04T05:27:42.134Z"
+          }
+        }
+      },
+      "saved": {
+        "kind": "claim",
+        "target": null,
+        "body": {
+          "goal": "left",
+          "scope": [
+            "src/left/**"
+          ]
+        },
+        "idempotencyKey": "parallel-left",
+        "signed": {
+          "envelope": {
+            "v": 1,
+            "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+            "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+            "kind": "claim",
+            "target": null,
+            "body": {
+              "goal": "left",
+              "scope": [
+                "src/left/**"
+              ]
+            },
+            "idempotencyKey": "parallel-left"
+          },
+          "sig": "KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg"
+        }
+      },
+      "repeated": {
+        "kind": "claim",
+        "target": null,
+        "body": {
+          "goal": "left",
+          "scope": [
+            "src/left/**"
+          ]
+        },
+        "idempotencyKey": "parallel-left",
+        "signed": {
+          "envelope": {
+            "v": 1,
+            "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+            "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+            "kind": "claim",
+            "target": null,
+            "body": {
+              "goal": "left",
+              "scope": [
+                "src/left/**"
+              ]
+            },
+            "idempotencyKey": "parallel-left"
+          },
+          "sig": "KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg"
+        }
+      },
+      "savedCanonical": "{\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1},\"sig\":\"KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg\"},\"target\":null}",
+      "repeatedCanonical": "{\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1},\"sig\":\"KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg\"},\"target\":null}",
+      "originalWire": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\"},\"sig\":\"KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg\"}",
+      "repeatedWire": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\"},\"sig\":\"KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg\"}"
+    },
+    {
+      "key": "parallel-right",
+      "result": {
+        "id": "act_66_e65e717a",
+        "seq": 66,
+        "kind": "claim",
+        "by": {
+          "via": "member",
+          "member": "@alice",
+          "role": "member",
+          "key": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI"
+        },
+        "at": "2026-10-04T05:12:42.134Z",
+        "flags": [],
+        "lane": "act_66_e65e717a",
+        "purpose": "ordinary",
+        "goal": "right",
+        "scope": [
+          "src/right/**"
+        ],
+        "lease": {
+          "holder": "@alice",
+          "generation": 1,
+          "expiresAt": "2026-10-04T05:27:42.134Z"
+        },
+        "overlaps": [
+          {
+            "lane": "act_3_5087cf9b",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_0/**",
+            "certain": false
+          },
+          {
+            "lane": "act_4_a6048dc7",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_1/**",
+            "certain": false
+          },
+          {
+            "lane": "act_5_373d0cad",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_2/**",
+            "certain": false
+          },
+          {
+            "lane": "act_6_497edcd0",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_3/**",
+            "certain": false
+          },
+          {
+            "lane": "act_7_fbe6beb5",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_4/**",
+            "certain": false
+          },
+          {
+            "lane": "act_8_a5b002e6",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_5/**",
+            "certain": false
+          },
+          {
+            "lane": "act_9_559f2d54",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_6/**",
+            "certain": false
+          },
+          {
+            "lane": "act_10_fc5948c4",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_7/**",
+            "certain": false
+          },
+          {
+            "lane": "act_11_13cf8d24",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_8/**",
+            "certain": false
+          },
+          {
+            "lane": "act_12_e7f2d282",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_9/**",
+            "certain": false
+          },
+          {
+            "lane": "act_13_ed2ad6fc",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_10/**",
+            "certain": false
+          },
+          {
+            "lane": "act_14_66664e3f",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_11/**",
+            "certain": false
+          },
+          {
+            "lane": "act_15_5a1e930a",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_12/**",
+            "certain": false
+          },
+          {
+            "lane": "act_16_7e830f78",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_13/**",
+            "certain": false
+          },
+          {
+            "lane": "act_17_812d80a1",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_14/**",
+            "certain": false
+          },
+          {
+            "lane": "act_18_1623134b",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_15/**",
+            "certain": false
+          },
+          {
+            "lane": "act_19_a6c09bcc",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_16/**",
+            "certain": false
+          },
+          {
+            "lane": "act_20_cee38984",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_17/**",
+            "certain": false
+          },
+          {
+            "lane": "act_21_ccf4da38",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_18/**",
+            "certain": false
+          },
+          {
+            "lane": "act_22_23f0a0c6",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_19/**",
+            "certain": false
+          },
+          {
+            "lane": "act_23_5d79426d",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_20/**",
+            "certain": false
+          },
+          {
+            "lane": "act_24_4be7be3b",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_21/**",
+            "certain": false
+          },
+          {
+            "lane": "act_25_3c053046",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_22/**",
+            "certain": false
+          },
+          {
+            "lane": "act_26_153385d0",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_23/**",
+            "certain": false
+          },
+          {
+            "lane": "act_27_6dc20404",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_24/**",
+            "certain": false
+          },
+          {
+            "lane": "act_28_e0b71c17",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_25/**",
+            "certain": false
+          },
+          {
+            "lane": "act_29_04eba299",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_26/**",
+            "certain": false
+          },
+          {
+            "lane": "act_30_ee44ea0e",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_27/**",
+            "certain": false
+          },
+          {
+            "lane": "act_31_949ce064",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_28/**",
+            "certain": false
+          },
+          {
+            "lane": "act_32_195b45cb",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_29/**",
+            "certain": false
+          },
+          {
+            "lane": "act_33_87108f84",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_30/**",
+            "certain": false
+          },
+          {
+            "lane": "act_34_25e736b9",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_31/**",
+            "certain": false
+          },
+          {
+            "lane": "act_35_c73434a8",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_32/**",
+            "certain": false
+          },
+          {
+            "lane": "act_36_b594720f",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_33/**",
+            "certain": false
+          },
+          {
+            "lane": "act_37_2b64fbf7",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_34/**",
+            "certain": false
+          },
+          {
+            "lane": "act_38_88a6aeb3",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_35/**",
+            "certain": false
+          },
+          {
+            "lane": "act_39_ea66e6ef",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_36/**",
+            "certain": false
+          },
+          {
+            "lane": "act_40_090c3bf3",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_37/**",
+            "certain": false
+          },
+          {
+            "lane": "act_41_32853003",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_38/**",
+            "certain": false
+          },
+          {
+            "lane": "act_42_abfb85f0",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_39/**",
+            "certain": false
+          },
+          {
+            "lane": "act_43_7d7a0745",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_40/**",
+            "certain": false
+          },
+          {
+            "lane": "act_44_1154449b",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_41/**",
+            "certain": false
+          },
+          {
+            "lane": "act_45_9f92c2d4",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_42/**",
+            "certain": false
+          },
+          {
+            "lane": "act_46_19ce769b",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_43/**",
+            "certain": false
+          },
+          {
+            "lane": "act_47_11a0e4a3",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_44/**",
+            "certain": false
+          },
+          {
+            "lane": "act_48_efec8192",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_45/**",
+            "certain": false
+          },
+          {
+            "lane": "act_49_46ee9665",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_46/**",
+            "certain": false
+          },
+          {
+            "lane": "act_50_06d7250a",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_47/**",
+            "certain": false
+          },
+          {
+            "lane": "act_51_e748a289",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_48/**",
+            "certain": false
+          },
+          {
+            "lane": "act_52_544d1b2f",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_49/**",
+            "certain": false
+          },
+          {
+            "lane": "act_53_1e04d75a",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_50/**",
+            "certain": false
+          },
+          {
+            "lane": "act_54_7a3a4b66",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_51/**",
+            "certain": false
+          },
+          {
+            "lane": "act_55_25e992f9",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_52/**",
+            "certain": false
+          },
+          {
+            "lane": "act_56_deb4d3aa",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_53/**",
+            "certain": false
+          },
+          {
+            "lane": "act_57_328f7136",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_54/**",
+            "certain": false
+          },
+          {
+            "lane": "act_58_88b76b1e",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_55/**",
+            "certain": false
+          },
+          {
+            "lane": "act_59_d31606cc",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_56/**",
+            "certain": false
+          },
+          {
+            "lane": "act_60_135759fd",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_57/**",
+            "certain": false
+          },
+          {
+            "lane": "act_61_bfe339a7",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_58/**",
+            "certain": false
+          },
+          {
+            "lane": "act_62_3eedf036",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_59/**",
+            "certain": false
+          },
+          {
+            "lane": "act_63_7da9009a",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_60/**",
+            "certain": false
+          },
+          {
+            "lane": "act_64_c9b55b6b",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_61/**",
+            "certain": false
+          },
+          {
+            "lane": "act_65_792b37f3",
+            "holder": "@alice",
+            "mine": "src/right/**",
+            "theirs": "src/held_62/**",
+            "certain": false
+          }
+        ],
+        "effect": {
+          "type": "opened",
+          "purpose": "ordinary",
+          "lease": {
+            "holder": "@alice",
+            "generation": 1,
+            "expiresAt": "2026-10-04T05:27:42.134Z"
+          }
+        }
+      },
+      "saved": {
+        "kind": "claim",
+        "target": null,
+        "body": {
+          "goal": "right",
+          "scope": [
+            "src/right/**"
+          ]
+        },
+        "idempotencyKey": "parallel-right",
+        "signed": {
+          "envelope": {
+            "v": 1,
+            "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+            "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+            "kind": "claim",
+            "target": null,
+            "body": {
+              "goal": "right",
+              "scope": [
+                "src/right/**"
+              ]
+            },
+            "idempotencyKey": "parallel-right"
+          },
+          "sig": "vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ"
+        }
+      },
+      "repeated": {
+        "kind": "claim",
+        "target": null,
+        "body": {
+          "goal": "right",
+          "scope": [
+            "src/right/**"
+          ]
+        },
+        "idempotencyKey": "parallel-right",
+        "signed": {
+          "envelope": {
+            "v": 1,
+            "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+            "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+            "kind": "claim",
+            "target": null,
+            "body": {
+              "goal": "right",
+              "scope": [
+                "src/right/**"
+              ]
+            },
+            "idempotencyKey": "parallel-right"
+          },
+          "sig": "vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ"
+        }
+      },
+      "savedCanonical": "{\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1},\"sig\":\"vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ\"},\"target\":null}",
+      "repeatedCanonical": "{\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\",\"kind\":\"claim\",\"signed\":{\"envelope\":{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1},\"sig\":\"vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ\"},\"target\":null}",
+      "originalWire": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\"},\"sig\":\"vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ\"}",
+      "repeatedWire": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\"},\"sig\":\"vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ\"}"
+    }
+  ],
+  "afterRetry": {
+    "accepted": 65,
+    "signed": 65,
+    "posts": 68
+  },
+  "claimSigningBytes": [
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-1\",\"scope\":[\"src/held_1/**\"]},\"idempotencyKey\":\"held-1\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-2\",\"scope\":[\"src/held_2/**\"]},\"idempotencyKey\":\"held-2\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-3\",\"scope\":[\"src/held_3/**\"]},\"idempotencyKey\":\"held-3\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-4\",\"scope\":[\"src/held_4/**\"]},\"idempotencyKey\":\"held-4\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-5\",\"scope\":[\"src/held_5/**\"]},\"idempotencyKey\":\"held-5\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-6\",\"scope\":[\"src/held_6/**\"]},\"idempotencyKey\":\"held-6\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-7\",\"scope\":[\"src/held_7/**\"]},\"idempotencyKey\":\"held-7\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-8\",\"scope\":[\"src/held_8/**\"]},\"idempotencyKey\":\"held-8\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-9\",\"scope\":[\"src/held_9/**\"]},\"idempotencyKey\":\"held-9\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-10\",\"scope\":[\"src/held_10/**\"]},\"idempotencyKey\":\"held-10\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-11\",\"scope\":[\"src/held_11/**\"]},\"idempotencyKey\":\"held-11\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-12\",\"scope\":[\"src/held_12/**\"]},\"idempotencyKey\":\"held-12\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-13\",\"scope\":[\"src/held_13/**\"]},\"idempotencyKey\":\"held-13\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-14\",\"scope\":[\"src/held_14/**\"]},\"idempotencyKey\":\"held-14\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-15\",\"scope\":[\"src/held_15/**\"]},\"idempotencyKey\":\"held-15\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-16\",\"scope\":[\"src/held_16/**\"]},\"idempotencyKey\":\"held-16\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-17\",\"scope\":[\"src/held_17/**\"]},\"idempotencyKey\":\"held-17\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-18\",\"scope\":[\"src/held_18/**\"]},\"idempotencyKey\":\"held-18\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-19\",\"scope\":[\"src/held_19/**\"]},\"idempotencyKey\":\"held-19\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-20\",\"scope\":[\"src/held_20/**\"]},\"idempotencyKey\":\"held-20\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-21\",\"scope\":[\"src/held_21/**\"]},\"idempotencyKey\":\"held-21\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-22\",\"scope\":[\"src/held_22/**\"]},\"idempotencyKey\":\"held-22\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-23\",\"scope\":[\"src/held_23/**\"]},\"idempotencyKey\":\"held-23\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-24\",\"scope\":[\"src/held_24/**\"]},\"idempotencyKey\":\"held-24\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-25\",\"scope\":[\"src/held_25/**\"]},\"idempotencyKey\":\"held-25\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-26\",\"scope\":[\"src/held_26/**\"]},\"idempotencyKey\":\"held-26\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-27\",\"scope\":[\"src/held_27/**\"]},\"idempotencyKey\":\"held-27\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-28\",\"scope\":[\"src/held_28/**\"]},\"idempotencyKey\":\"held-28\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-29\",\"scope\":[\"src/held_29/**\"]},\"idempotencyKey\":\"held-29\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-30\",\"scope\":[\"src/held_30/**\"]},\"idempotencyKey\":\"held-30\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-31\",\"scope\":[\"src/held_31/**\"]},\"idempotencyKey\":\"held-31\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-32\",\"scope\":[\"src/held_32/**\"]},\"idempotencyKey\":\"held-32\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-33\",\"scope\":[\"src/held_33/**\"]},\"idempotencyKey\":\"held-33\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-34\",\"scope\":[\"src/held_34/**\"]},\"idempotencyKey\":\"held-34\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-35\",\"scope\":[\"src/held_35/**\"]},\"idempotencyKey\":\"held-35\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-36\",\"scope\":[\"src/held_36/**\"]},\"idempotencyKey\":\"held-36\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-37\",\"scope\":[\"src/held_37/**\"]},\"idempotencyKey\":\"held-37\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-38\",\"scope\":[\"src/held_38/**\"]},\"idempotencyKey\":\"held-38\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-39\",\"scope\":[\"src/held_39/**\"]},\"idempotencyKey\":\"held-39\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-40\",\"scope\":[\"src/held_40/**\"]},\"idempotencyKey\":\"held-40\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-41\",\"scope\":[\"src/held_41/**\"]},\"idempotencyKey\":\"held-41\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-42\",\"scope\":[\"src/held_42/**\"]},\"idempotencyKey\":\"held-42\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-43\",\"scope\":[\"src/held_43/**\"]},\"idempotencyKey\":\"held-43\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-44\",\"scope\":[\"src/held_44/**\"]},\"idempotencyKey\":\"held-44\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-45\",\"scope\":[\"src/held_45/**\"]},\"idempotencyKey\":\"held-45\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-46\",\"scope\":[\"src/held_46/**\"]},\"idempotencyKey\":\"held-46\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-47\",\"scope\":[\"src/held_47/**\"]},\"idempotencyKey\":\"held-47\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-48\",\"scope\":[\"src/held_48/**\"]},\"idempotencyKey\":\"held-48\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-49\",\"scope\":[\"src/held_49/**\"]},\"idempotencyKey\":\"held-49\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-50\",\"scope\":[\"src/held_50/**\"]},\"idempotencyKey\":\"held-50\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-51\",\"scope\":[\"src/held_51/**\"]},\"idempotencyKey\":\"held-51\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-52\",\"scope\":[\"src/held_52/**\"]},\"idempotencyKey\":\"held-52\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-53\",\"scope\":[\"src/held_53/**\"]},\"idempotencyKey\":\"held-53\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-54\",\"scope\":[\"src/held_54/**\"]},\"idempotencyKey\":\"held-54\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-55\",\"scope\":[\"src/held_55/**\"]},\"idempotencyKey\":\"held-55\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-56\",\"scope\":[\"src/held_56/**\"]},\"idempotencyKey\":\"held-56\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-57\",\"scope\":[\"src/held_57/**\"]},\"idempotencyKey\":\"held-57\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-58\",\"scope\":[\"src/held_58/**\"]},\"idempotencyKey\":\"held-58\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-59\",\"scope\":[\"src/held_59/**\"]},\"idempotencyKey\":\"held-59\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-60\",\"scope\":[\"src/held_60/**\"]},\"idempotencyKey\":\"held-60\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-61\",\"scope\":[\"src/held_61/**\"]},\"idempotencyKey\":\"held-61\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"held-62\",\"scope\":[\"src/held_62/**\"]},\"idempotencyKey\":\"held-62\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}",
+    "artroom-envelope-v1\n{\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\",\"kind\":\"claim\",\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"target\":null,\"v\":1}"
+  ],
+  "wire": [
+    {
+      "key": "held-0",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\"},\"sig\":\"wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-0",
+            "scope": [
+              "src/held_0/**"
+            ]
+          },
+          "idempotencyKey": "held-0"
+        },
+        "sig": "wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw"
+      }
+    },
+    {
+      "key": "held-1",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-1\",\"scope\":[\"src/held_1/**\"]},\"idempotencyKey\":\"held-1\"},\"sig\":\"Yt8rjun9JKkwF3pK-ipGHl9yNUCTFW278gIyawDy42nFZf-rCT2ooK59T325Fzli1kUL9C-Otqsyh7iofqwNAg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-1",
+            "scope": [
+              "src/held_1/**"
+            ]
+          },
+          "idempotencyKey": "held-1"
+        },
+        "sig": "Yt8rjun9JKkwF3pK-ipGHl9yNUCTFW278gIyawDy42nFZf-rCT2ooK59T325Fzli1kUL9C-Otqsyh7iofqwNAg"
+      }
+    },
+    {
+      "key": "held-2",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-2\",\"scope\":[\"src/held_2/**\"]},\"idempotencyKey\":\"held-2\"},\"sig\":\"CIZujCfqQXyROE6IpZl5w4zlYaWGav3g1wZXBZkZTJs4D5kHP8SCvRssgPKOO_yVLNkgbRR1pckgUc1_rCgqDQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-2",
+            "scope": [
+              "src/held_2/**"
+            ]
+          },
+          "idempotencyKey": "held-2"
+        },
+        "sig": "CIZujCfqQXyROE6IpZl5w4zlYaWGav3g1wZXBZkZTJs4D5kHP8SCvRssgPKOO_yVLNkgbRR1pckgUc1_rCgqDQ"
+      }
+    },
+    {
+      "key": "held-3",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-3\",\"scope\":[\"src/held_3/**\"]},\"idempotencyKey\":\"held-3\"},\"sig\":\"sYmkHO5O7DR9epFc0pS9O91spEVw2DjfTr8uyFPv2upZ12LTOKVcXjfEwRapGrGi4gQH2_UP4MP0STr11KV-BQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-3",
+            "scope": [
+              "src/held_3/**"
+            ]
+          },
+          "idempotencyKey": "held-3"
+        },
+        "sig": "sYmkHO5O7DR9epFc0pS9O91spEVw2DjfTr8uyFPv2upZ12LTOKVcXjfEwRapGrGi4gQH2_UP4MP0STr11KV-BQ"
+      }
+    },
+    {
+      "key": "held-4",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-4\",\"scope\":[\"src/held_4/**\"]},\"idempotencyKey\":\"held-4\"},\"sig\":\"TVSmQh0MM_B0hKxallZoGj55PYFwTRAT5N6-Xjy0TeQN3dQOIKw6_W7XRUh8M05GkH7mMkIHilPsIngxDRFpDA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-4",
+            "scope": [
+              "src/held_4/**"
+            ]
+          },
+          "idempotencyKey": "held-4"
+        },
+        "sig": "TVSmQh0MM_B0hKxallZoGj55PYFwTRAT5N6-Xjy0TeQN3dQOIKw6_W7XRUh8M05GkH7mMkIHilPsIngxDRFpDA"
+      }
+    },
+    {
+      "key": "held-5",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-5\",\"scope\":[\"src/held_5/**\"]},\"idempotencyKey\":\"held-5\"},\"sig\":\"NA4HeWPkgWdvLgDvrw6wqxyOWrWh-SCv8Kf055lLgY61LA_arx6zmEHONu1QHBQ1aqXd2I9MDgtzKZ-Ij_wYDQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-5",
+            "scope": [
+              "src/held_5/**"
+            ]
+          },
+          "idempotencyKey": "held-5"
+        },
+        "sig": "NA4HeWPkgWdvLgDvrw6wqxyOWrWh-SCv8Kf055lLgY61LA_arx6zmEHONu1QHBQ1aqXd2I9MDgtzKZ-Ij_wYDQ"
+      }
+    },
+    {
+      "key": "held-6",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-6\",\"scope\":[\"src/held_6/**\"]},\"idempotencyKey\":\"held-6\"},\"sig\":\"IyOVxO3KOftNcTOcM-qfrNyqfGx0g4SYYggzrzOFu-ri_dYB-rE48YOji_sQ2huLFCsXNIGdG9I7H81AQ0bbBg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-6",
+            "scope": [
+              "src/held_6/**"
+            ]
+          },
+          "idempotencyKey": "held-6"
+        },
+        "sig": "IyOVxO3KOftNcTOcM-qfrNyqfGx0g4SYYggzrzOFu-ri_dYB-rE48YOji_sQ2huLFCsXNIGdG9I7H81AQ0bbBg"
+      }
+    },
+    {
+      "key": "held-7",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-7\",\"scope\":[\"src/held_7/**\"]},\"idempotencyKey\":\"held-7\"},\"sig\":\"HQOMeQSw_FHkF-pHIAnMT4c5OuTxcqRwF9pMrUWwuNMeKh8LEwquTpQ2jvaNIeJWfJIyrh0Mo5YVyCPiZ_mECw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-7",
+            "scope": [
+              "src/held_7/**"
+            ]
+          },
+          "idempotencyKey": "held-7"
+        },
+        "sig": "HQOMeQSw_FHkF-pHIAnMT4c5OuTxcqRwF9pMrUWwuNMeKh8LEwquTpQ2jvaNIeJWfJIyrh0Mo5YVyCPiZ_mECw"
+      }
+    },
+    {
+      "key": "held-8",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-8\",\"scope\":[\"src/held_8/**\"]},\"idempotencyKey\":\"held-8\"},\"sig\":\"8t7Ce_4ZDnYbigGq1oSqqhP9K01KUXkbTRQv8LWAPlv4f_JeSy8D4g4TKPA8iyzghiF_9UhWT_GdDGdWklaACA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-8",
+            "scope": [
+              "src/held_8/**"
+            ]
+          },
+          "idempotencyKey": "held-8"
+        },
+        "sig": "8t7Ce_4ZDnYbigGq1oSqqhP9K01KUXkbTRQv8LWAPlv4f_JeSy8D4g4TKPA8iyzghiF_9UhWT_GdDGdWklaACA"
+      }
+    },
+    {
+      "key": "held-9",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-9\",\"scope\":[\"src/held_9/**\"]},\"idempotencyKey\":\"held-9\"},\"sig\":\"A_C1mYovHZRgeSiXipHH2YIA4qH6XOZ1DreSxcFyC7rVICaMyQU9Q1jAtSLMvpEpr6VOrpNKpAWC94o7itBrCA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-9",
+            "scope": [
+              "src/held_9/**"
+            ]
+          },
+          "idempotencyKey": "held-9"
+        },
+        "sig": "A_C1mYovHZRgeSiXipHH2YIA4qH6XOZ1DreSxcFyC7rVICaMyQU9Q1jAtSLMvpEpr6VOrpNKpAWC94o7itBrCA"
+      }
+    },
+    {
+      "key": "held-10",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-10\",\"scope\":[\"src/held_10/**\"]},\"idempotencyKey\":\"held-10\"},\"sig\":\"LndTO9U8vNCDckoTzwNhJRUbgfZ1ugEKMFk0AXFAChhsu0hIkQUSgpJS-ilCmSanjHrSfVgu0KAxuu1geEdKAA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-10",
+            "scope": [
+              "src/held_10/**"
+            ]
+          },
+          "idempotencyKey": "held-10"
+        },
+        "sig": "LndTO9U8vNCDckoTzwNhJRUbgfZ1ugEKMFk0AXFAChhsu0hIkQUSgpJS-ilCmSanjHrSfVgu0KAxuu1geEdKAA"
+      }
+    },
+    {
+      "key": "held-11",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-11\",\"scope\":[\"src/held_11/**\"]},\"idempotencyKey\":\"held-11\"},\"sig\":\"NClWilDGzwFUPR0fq40dGkY-KEq1EIHVh9y4yp4JR57QTGMAGwOHBvSKMAQN9JXzb0w4MCMuBk0v2YdbROs0AQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-11",
+            "scope": [
+              "src/held_11/**"
+            ]
+          },
+          "idempotencyKey": "held-11"
+        },
+        "sig": "NClWilDGzwFUPR0fq40dGkY-KEq1EIHVh9y4yp4JR57QTGMAGwOHBvSKMAQN9JXzb0w4MCMuBk0v2YdbROs0AQ"
+      }
+    },
+    {
+      "key": "held-12",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-12\",\"scope\":[\"src/held_12/**\"]},\"idempotencyKey\":\"held-12\"},\"sig\":\"5hKOY_4NrCIyWToIw-NDOAP-FIz6AycfT_g9zB4gBxLjG_lxzLQE7IpAObOlBrd-flyU3TMUJYg59pYov3-pBA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-12",
+            "scope": [
+              "src/held_12/**"
+            ]
+          },
+          "idempotencyKey": "held-12"
+        },
+        "sig": "5hKOY_4NrCIyWToIw-NDOAP-FIz6AycfT_g9zB4gBxLjG_lxzLQE7IpAObOlBrd-flyU3TMUJYg59pYov3-pBA"
+      }
+    },
+    {
+      "key": "held-13",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-13\",\"scope\":[\"src/held_13/**\"]},\"idempotencyKey\":\"held-13\"},\"sig\":\"uX_AN0CgT3i3lf1jNFeojESbKLMs51pufhVSrtItPSknYbNGWtE35VROlmdRKaC2S9StSpA-uRwWDvz5KTDoDg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-13",
+            "scope": [
+              "src/held_13/**"
+            ]
+          },
+          "idempotencyKey": "held-13"
+        },
+        "sig": "uX_AN0CgT3i3lf1jNFeojESbKLMs51pufhVSrtItPSknYbNGWtE35VROlmdRKaC2S9StSpA-uRwWDvz5KTDoDg"
+      }
+    },
+    {
+      "key": "held-14",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-14\",\"scope\":[\"src/held_14/**\"]},\"idempotencyKey\":\"held-14\"},\"sig\":\"HJ07XoBmrYM6SN1zCjAWNwlGCWY1RmWl7-Sz3sY94FDjevgU3hVZUzfsKbpKcZ5MG1uMIo-sZ17TEhaD654EBQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-14",
+            "scope": [
+              "src/held_14/**"
+            ]
+          },
+          "idempotencyKey": "held-14"
+        },
+        "sig": "HJ07XoBmrYM6SN1zCjAWNwlGCWY1RmWl7-Sz3sY94FDjevgU3hVZUzfsKbpKcZ5MG1uMIo-sZ17TEhaD654EBQ"
+      }
+    },
+    {
+      "key": "held-15",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-15\",\"scope\":[\"src/held_15/**\"]},\"idempotencyKey\":\"held-15\"},\"sig\":\"iuVp1AM-qfVnLqzas3ao1coCvdwaZlJpyPS6rSzqP96_K8gBhHXhvZwRDzS445POE2AvLnLtYySiTjmkeYnfBw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-15",
+            "scope": [
+              "src/held_15/**"
+            ]
+          },
+          "idempotencyKey": "held-15"
+        },
+        "sig": "iuVp1AM-qfVnLqzas3ao1coCvdwaZlJpyPS6rSzqP96_K8gBhHXhvZwRDzS445POE2AvLnLtYySiTjmkeYnfBw"
+      }
+    },
+    {
+      "key": "held-16",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-16\",\"scope\":[\"src/held_16/**\"]},\"idempotencyKey\":\"held-16\"},\"sig\":\"P5yTPpV4oiLxohbI0yOuvAvO6h613tx9H6t6NHn8X0yIY9KLFFaZ0bi2ZYO2JZbIVzWygb77QIl0vmK8JCW6Bg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-16",
+            "scope": [
+              "src/held_16/**"
+            ]
+          },
+          "idempotencyKey": "held-16"
+        },
+        "sig": "P5yTPpV4oiLxohbI0yOuvAvO6h613tx9H6t6NHn8X0yIY9KLFFaZ0bi2ZYO2JZbIVzWygb77QIl0vmK8JCW6Bg"
+      }
+    },
+    {
+      "key": "held-17",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-17\",\"scope\":[\"src/held_17/**\"]},\"idempotencyKey\":\"held-17\"},\"sig\":\"ihvFmNwvCXP0xnYWlzAeoiIqMBrndOtvE0nMMAkbN0fdVLpCZf1EBj7DH5Ab6OkX56kf0h7H1FGvYck1QtxTBA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-17",
+            "scope": [
+              "src/held_17/**"
+            ]
+          },
+          "idempotencyKey": "held-17"
+        },
+        "sig": "ihvFmNwvCXP0xnYWlzAeoiIqMBrndOtvE0nMMAkbN0fdVLpCZf1EBj7DH5Ab6OkX56kf0h7H1FGvYck1QtxTBA"
+      }
+    },
+    {
+      "key": "held-18",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-18\",\"scope\":[\"src/held_18/**\"]},\"idempotencyKey\":\"held-18\"},\"sig\":\"KEVlZZh-jsOuiEEkN9uglgCkcuRVpQp6Ss0hVjm14p5HI9AU-1sF4UDxQ7X2nqHg5t7S1YIu9z2-iWMr5OSaAA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-18",
+            "scope": [
+              "src/held_18/**"
+            ]
+          },
+          "idempotencyKey": "held-18"
+        },
+        "sig": "KEVlZZh-jsOuiEEkN9uglgCkcuRVpQp6Ss0hVjm14p5HI9AU-1sF4UDxQ7X2nqHg5t7S1YIu9z2-iWMr5OSaAA"
+      }
+    },
+    {
+      "key": "held-19",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-19\",\"scope\":[\"src/held_19/**\"]},\"idempotencyKey\":\"held-19\"},\"sig\":\"LONS4apUgbNuFTnWLEtfDz9xssN-1Z0Kzbu2kLiMj_dA3m7HfRDuNOqbeMKnKoljEQujMSn1sKKswOuQjJYRCw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-19",
+            "scope": [
+              "src/held_19/**"
+            ]
+          },
+          "idempotencyKey": "held-19"
+        },
+        "sig": "LONS4apUgbNuFTnWLEtfDz9xssN-1Z0Kzbu2kLiMj_dA3m7HfRDuNOqbeMKnKoljEQujMSn1sKKswOuQjJYRCw"
+      }
+    },
+    {
+      "key": "held-20",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-20\",\"scope\":[\"src/held_20/**\"]},\"idempotencyKey\":\"held-20\"},\"sig\":\"TI2cdHGB9DYwCoX5iS04doAOb18ARbOn3X9eM1ljVPINkpdh6B8OHEznCQJgcvGyQnNkksRD1B9DuEtyMhbACQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-20",
+            "scope": [
+              "src/held_20/**"
+            ]
+          },
+          "idempotencyKey": "held-20"
+        },
+        "sig": "TI2cdHGB9DYwCoX5iS04doAOb18ARbOn3X9eM1ljVPINkpdh6B8OHEznCQJgcvGyQnNkksRD1B9DuEtyMhbACQ"
+      }
+    },
+    {
+      "key": "held-21",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-21\",\"scope\":[\"src/held_21/**\"]},\"idempotencyKey\":\"held-21\"},\"sig\":\"pCTT0bagTmAhWwPl2xwaTJKQuFwd4oG9NuGaPEX23Os3TCQgcEX5dbH6udqfYWNGL14Wipc_XHrXLCfEpG5qBA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-21",
+            "scope": [
+              "src/held_21/**"
+            ]
+          },
+          "idempotencyKey": "held-21"
+        },
+        "sig": "pCTT0bagTmAhWwPl2xwaTJKQuFwd4oG9NuGaPEX23Os3TCQgcEX5dbH6udqfYWNGL14Wipc_XHrXLCfEpG5qBA"
+      }
+    },
+    {
+      "key": "held-22",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-22\",\"scope\":[\"src/held_22/**\"]},\"idempotencyKey\":\"held-22\"},\"sig\":\"GSEEJVA1q1TyJkxtrvJV4h3JnRxCoINYoY-OMyhDk_BUw3VikpaYPt11bc4E0Z4N3mvhxpjch2oCUehzHALACA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-22",
+            "scope": [
+              "src/held_22/**"
+            ]
+          },
+          "idempotencyKey": "held-22"
+        },
+        "sig": "GSEEJVA1q1TyJkxtrvJV4h3JnRxCoINYoY-OMyhDk_BUw3VikpaYPt11bc4E0Z4N3mvhxpjch2oCUehzHALACA"
+      }
+    },
+    {
+      "key": "held-23",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-23\",\"scope\":[\"src/held_23/**\"]},\"idempotencyKey\":\"held-23\"},\"sig\":\"g2Bivb_BAHHOezzrzZU15s7y51JFbGeO3S0_JsQAgdnvJ6L1GauKwykOPzX3r4NgvzIIy9CuBaeImoDUTEdIAw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-23",
+            "scope": [
+              "src/held_23/**"
+            ]
+          },
+          "idempotencyKey": "held-23"
+        },
+        "sig": "g2Bivb_BAHHOezzrzZU15s7y51JFbGeO3S0_JsQAgdnvJ6L1GauKwykOPzX3r4NgvzIIy9CuBaeImoDUTEdIAw"
+      }
+    },
+    {
+      "key": "held-24",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-24\",\"scope\":[\"src/held_24/**\"]},\"idempotencyKey\":\"held-24\"},\"sig\":\"-komG8lW7yWoBwbWWC8zepz2iLsXx_OVEfN0Ri_iG-eI-K89ZCBo79C4fWpWJEq7NZ_7MQIwFh88tgUZdukCDw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-24",
+            "scope": [
+              "src/held_24/**"
+            ]
+          },
+          "idempotencyKey": "held-24"
+        },
+        "sig": "-komG8lW7yWoBwbWWC8zepz2iLsXx_OVEfN0Ri_iG-eI-K89ZCBo79C4fWpWJEq7NZ_7MQIwFh88tgUZdukCDw"
+      }
+    },
+    {
+      "key": "held-25",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-25\",\"scope\":[\"src/held_25/**\"]},\"idempotencyKey\":\"held-25\"},\"sig\":\"2yt4Jl3hZOy7u0SriJeUwbsXskWo34Wm0imiCd1AmoVRkBQXWqpQmCHeEISDzg-whs-tLMqlwA6y_hkqUE7nDQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-25",
+            "scope": [
+              "src/held_25/**"
+            ]
+          },
+          "idempotencyKey": "held-25"
+        },
+        "sig": "2yt4Jl3hZOy7u0SriJeUwbsXskWo34Wm0imiCd1AmoVRkBQXWqpQmCHeEISDzg-whs-tLMqlwA6y_hkqUE7nDQ"
+      }
+    },
+    {
+      "key": "held-26",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-26\",\"scope\":[\"src/held_26/**\"]},\"idempotencyKey\":\"held-26\"},\"sig\":\"GoDiTMTk41_I_zCMyEtLUCsmaH44jXP5rrJ7WXtKePwV9IEAhhIyAkZng9CKPsDkmz6ue_FI4txCcdvdAQoYAQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-26",
+            "scope": [
+              "src/held_26/**"
+            ]
+          },
+          "idempotencyKey": "held-26"
+        },
+        "sig": "GoDiTMTk41_I_zCMyEtLUCsmaH44jXP5rrJ7WXtKePwV9IEAhhIyAkZng9CKPsDkmz6ue_FI4txCcdvdAQoYAQ"
+      }
+    },
+    {
+      "key": "held-27",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-27\",\"scope\":[\"src/held_27/**\"]},\"idempotencyKey\":\"held-27\"},\"sig\":\"gLWzBIRHbsJ0_uMtpt4p23IwxCNL2Tx-x7w4p4coy5UWZjaYY1hb-mTEJZfbRkfUm78e0zs5U2FVbQYMCBtiAA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-27",
+            "scope": [
+              "src/held_27/**"
+            ]
+          },
+          "idempotencyKey": "held-27"
+        },
+        "sig": "gLWzBIRHbsJ0_uMtpt4p23IwxCNL2Tx-x7w4p4coy5UWZjaYY1hb-mTEJZfbRkfUm78e0zs5U2FVbQYMCBtiAA"
+      }
+    },
+    {
+      "key": "held-28",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-28\",\"scope\":[\"src/held_28/**\"]},\"idempotencyKey\":\"held-28\"},\"sig\":\"NqWRGb4p6E3xWAWABFXTM6i5khbCovLPRR0IslXMpwU6VESXQWV_mVvbq-Uz27AGURhpRwoyGEAtn2m4E39KBg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-28",
+            "scope": [
+              "src/held_28/**"
+            ]
+          },
+          "idempotencyKey": "held-28"
+        },
+        "sig": "NqWRGb4p6E3xWAWABFXTM6i5khbCovLPRR0IslXMpwU6VESXQWV_mVvbq-Uz27AGURhpRwoyGEAtn2m4E39KBg"
+      }
+    },
+    {
+      "key": "held-29",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-29\",\"scope\":[\"src/held_29/**\"]},\"idempotencyKey\":\"held-29\"},\"sig\":\"lVC6F_QL_GbrKfYIdpsH-azEXT_kMORhzVOhXYPMynaIBGpEGYyRXDnjf8lEXTn2ihd1TpTZntPlA7cc45DYAQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-29",
+            "scope": [
+              "src/held_29/**"
+            ]
+          },
+          "idempotencyKey": "held-29"
+        },
+        "sig": "lVC6F_QL_GbrKfYIdpsH-azEXT_kMORhzVOhXYPMynaIBGpEGYyRXDnjf8lEXTn2ihd1TpTZntPlA7cc45DYAQ"
+      }
+    },
+    {
+      "key": "held-30",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-30\",\"scope\":[\"src/held_30/**\"]},\"idempotencyKey\":\"held-30\"},\"sig\":\"n9KgupWqduZ4izGusdAw09vdnoyldi-yzgeqjwqGLgxAgHlqQu_34ZfEMkry9z6jNnsqweRXil0p3ujJsA3UBA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-30",
+            "scope": [
+              "src/held_30/**"
+            ]
+          },
+          "idempotencyKey": "held-30"
+        },
+        "sig": "n9KgupWqduZ4izGusdAw09vdnoyldi-yzgeqjwqGLgxAgHlqQu_34ZfEMkry9z6jNnsqweRXil0p3ujJsA3UBA"
+      }
+    },
+    {
+      "key": "held-31",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-31\",\"scope\":[\"src/held_31/**\"]},\"idempotencyKey\":\"held-31\"},\"sig\":\"HL926P5bGVBxmTHzWAwlf5iIJenD1Gj5-0Z5mG46McopYlkijSfVjzN_l3S9xricJyNuaIeMx6JnNnU1yo_XDA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-31",
+            "scope": [
+              "src/held_31/**"
+            ]
+          },
+          "idempotencyKey": "held-31"
+        },
+        "sig": "HL926P5bGVBxmTHzWAwlf5iIJenD1Gj5-0Z5mG46McopYlkijSfVjzN_l3S9xricJyNuaIeMx6JnNnU1yo_XDA"
+      }
+    },
+    {
+      "key": "held-32",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-32\",\"scope\":[\"src/held_32/**\"]},\"idempotencyKey\":\"held-32\"},\"sig\":\"8GocoB-_nI-_ayJRcVMwtnONZ9fHdYFfp56PoAbcrWTC1PgsV7tuSeo5W51a-qm__fBrF0R3QlpwDvOwgWtUCg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-32",
+            "scope": [
+              "src/held_32/**"
+            ]
+          },
+          "idempotencyKey": "held-32"
+        },
+        "sig": "8GocoB-_nI-_ayJRcVMwtnONZ9fHdYFfp56PoAbcrWTC1PgsV7tuSeo5W51a-qm__fBrF0R3QlpwDvOwgWtUCg"
+      }
+    },
+    {
+      "key": "held-33",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-33\",\"scope\":[\"src/held_33/**\"]},\"idempotencyKey\":\"held-33\"},\"sig\":\"Tgip2UWzTJZauhghpgDXDq01zP1qxLqK9LYPFwz1wqlD8mfGV_c3F9gP3-k0pV-6UZCw35bUxPGMrcUthLzyBQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-33",
+            "scope": [
+              "src/held_33/**"
+            ]
+          },
+          "idempotencyKey": "held-33"
+        },
+        "sig": "Tgip2UWzTJZauhghpgDXDq01zP1qxLqK9LYPFwz1wqlD8mfGV_c3F9gP3-k0pV-6UZCw35bUxPGMrcUthLzyBQ"
+      }
+    },
+    {
+      "key": "held-34",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-34\",\"scope\":[\"src/held_34/**\"]},\"idempotencyKey\":\"held-34\"},\"sig\":\"esfcczb4HKe2_Y0w1uSv0l0E7mOwnxk6sPF9bbImCvRGicEkt4Jg5V9l61X1d1Srov9qoRm9JP4BnbcAzMCyDQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-34",
+            "scope": [
+              "src/held_34/**"
+            ]
+          },
+          "idempotencyKey": "held-34"
+        },
+        "sig": "esfcczb4HKe2_Y0w1uSv0l0E7mOwnxk6sPF9bbImCvRGicEkt4Jg5V9l61X1d1Srov9qoRm9JP4BnbcAzMCyDQ"
+      }
+    },
+    {
+      "key": "held-35",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-35\",\"scope\":[\"src/held_35/**\"]},\"idempotencyKey\":\"held-35\"},\"sig\":\"Q0ezW3x-0pf3ki2y85D2Jsgi2Y9MgfXOStPY9ITiUdI7dmslE5AkIOlmPJt85kfk0kwkUm2Ub4vSi9Oma5RPAg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-35",
+            "scope": [
+              "src/held_35/**"
+            ]
+          },
+          "idempotencyKey": "held-35"
+        },
+        "sig": "Q0ezW3x-0pf3ki2y85D2Jsgi2Y9MgfXOStPY9ITiUdI7dmslE5AkIOlmPJt85kfk0kwkUm2Ub4vSi9Oma5RPAg"
+      }
+    },
+    {
+      "key": "held-36",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-36\",\"scope\":[\"src/held_36/**\"]},\"idempotencyKey\":\"held-36\"},\"sig\":\"PxQLeK4YF5w_nMTzLGHloVKEhg2JAchoqesgmOvAY6usePFRLSd_HN-iYpxyedBAQ0mHDmPdOHP5IhXRj9RFAw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-36",
+            "scope": [
+              "src/held_36/**"
+            ]
+          },
+          "idempotencyKey": "held-36"
+        },
+        "sig": "PxQLeK4YF5w_nMTzLGHloVKEhg2JAchoqesgmOvAY6usePFRLSd_HN-iYpxyedBAQ0mHDmPdOHP5IhXRj9RFAw"
+      }
+    },
+    {
+      "key": "held-37",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-37\",\"scope\":[\"src/held_37/**\"]},\"idempotencyKey\":\"held-37\"},\"sig\":\"tDiyBHJRrFSNi3lbB3PJBbL6BMOBGcONLaB_cyy1Q9gCd-71G4iYk_78CsZ6_pQ8J6jRhM0mwMdLx3w21Tp4Dw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-37",
+            "scope": [
+              "src/held_37/**"
+            ]
+          },
+          "idempotencyKey": "held-37"
+        },
+        "sig": "tDiyBHJRrFSNi3lbB3PJBbL6BMOBGcONLaB_cyy1Q9gCd-71G4iYk_78CsZ6_pQ8J6jRhM0mwMdLx3w21Tp4Dw"
+      }
+    },
+    {
+      "key": "held-38",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-38\",\"scope\":[\"src/held_38/**\"]},\"idempotencyKey\":\"held-38\"},\"sig\":\"72ftQ8HSUIU6nDL34c3uGPQLPJS_RjsDCLMmz8n-wjhYQ8BsMMiMbjLjnF-dlt6XoDcFf3dSMNOsQJCprDGXDQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-38",
+            "scope": [
+              "src/held_38/**"
+            ]
+          },
+          "idempotencyKey": "held-38"
+        },
+        "sig": "72ftQ8HSUIU6nDL34c3uGPQLPJS_RjsDCLMmz8n-wjhYQ8BsMMiMbjLjnF-dlt6XoDcFf3dSMNOsQJCprDGXDQ"
+      }
+    },
+    {
+      "key": "held-39",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-39\",\"scope\":[\"src/held_39/**\"]},\"idempotencyKey\":\"held-39\"},\"sig\":\"bmPA1SKQr0qcfeX4O2605dasPWAmQHfZe4BA7uxd2vggHybSs7XE5ZPhz89Oufb9lqeNwFTZpzAYZkrPEFJSCA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-39",
+            "scope": [
+              "src/held_39/**"
+            ]
+          },
+          "idempotencyKey": "held-39"
+        },
+        "sig": "bmPA1SKQr0qcfeX4O2605dasPWAmQHfZe4BA7uxd2vggHybSs7XE5ZPhz89Oufb9lqeNwFTZpzAYZkrPEFJSCA"
+      }
+    },
+    {
+      "key": "held-40",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-40\",\"scope\":[\"src/held_40/**\"]},\"idempotencyKey\":\"held-40\"},\"sig\":\"sadGWU8rSdrgZFzQpr3waUDL7qZfnzci7DRQgdZNXKHWMxln9eMaC2Llc8GZcr6FmtHFmIGuHzpXOJFU06TADw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-40",
+            "scope": [
+              "src/held_40/**"
+            ]
+          },
+          "idempotencyKey": "held-40"
+        },
+        "sig": "sadGWU8rSdrgZFzQpr3waUDL7qZfnzci7DRQgdZNXKHWMxln9eMaC2Llc8GZcr6FmtHFmIGuHzpXOJFU06TADw"
+      }
+    },
+    {
+      "key": "held-41",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-41\",\"scope\":[\"src/held_41/**\"]},\"idempotencyKey\":\"held-41\"},\"sig\":\"8DBbWm0V-zHyp0b2DlBMHP7wHCI3sEvgwHtXAUknH2VvW1S9dcFeDl99QD7GYOw6QkHM63mvxxSNDhPeZCg1CQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-41",
+            "scope": [
+              "src/held_41/**"
+            ]
+          },
+          "idempotencyKey": "held-41"
+        },
+        "sig": "8DBbWm0V-zHyp0b2DlBMHP7wHCI3sEvgwHtXAUknH2VvW1S9dcFeDl99QD7GYOw6QkHM63mvxxSNDhPeZCg1CQ"
+      }
+    },
+    {
+      "key": "held-42",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-42\",\"scope\":[\"src/held_42/**\"]},\"idempotencyKey\":\"held-42\"},\"sig\":\"Wv-P2Upd3TiPnUUcqLrBDuttPxKQakVDsjp0l5gZX82_VFYuvRCL7zGZm-CeaOr6_AK4vK36qzAdfyRmgpW_Bg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-42",
+            "scope": [
+              "src/held_42/**"
+            ]
+          },
+          "idempotencyKey": "held-42"
+        },
+        "sig": "Wv-P2Upd3TiPnUUcqLrBDuttPxKQakVDsjp0l5gZX82_VFYuvRCL7zGZm-CeaOr6_AK4vK36qzAdfyRmgpW_Bg"
+      }
+    },
+    {
+      "key": "held-43",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-43\",\"scope\":[\"src/held_43/**\"]},\"idempotencyKey\":\"held-43\"},\"sig\":\"u5BPpdj5DWXRxq35vq3NjJLIRoAlFKv8GnNDivvMNofOMLS1I2O1EsMwfvY5gpFGezEEdO6GxCk5DUSmRbIiDQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-43",
+            "scope": [
+              "src/held_43/**"
+            ]
+          },
+          "idempotencyKey": "held-43"
+        },
+        "sig": "u5BPpdj5DWXRxq35vq3NjJLIRoAlFKv8GnNDivvMNofOMLS1I2O1EsMwfvY5gpFGezEEdO6GxCk5DUSmRbIiDQ"
+      }
+    },
+    {
+      "key": "held-44",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-44\",\"scope\":[\"src/held_44/**\"]},\"idempotencyKey\":\"held-44\"},\"sig\":\"sGmog9EKVJTOmx_SA6n3K62nK2XxHSJOacuT27OM8nJAzXsTaE9PphLyR1VfhZ4tAGSciMCHGx0-yCb7X2oLBw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-44",
+            "scope": [
+              "src/held_44/**"
+            ]
+          },
+          "idempotencyKey": "held-44"
+        },
+        "sig": "sGmog9EKVJTOmx_SA6n3K62nK2XxHSJOacuT27OM8nJAzXsTaE9PphLyR1VfhZ4tAGSciMCHGx0-yCb7X2oLBw"
+      }
+    },
+    {
+      "key": "held-45",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-45\",\"scope\":[\"src/held_45/**\"]},\"idempotencyKey\":\"held-45\"},\"sig\":\"_oPK1GUPooMAoDl-EIhmfiIgULhF_zU6r28O4ijqJ0pqqpz03OdhDASRqRTZ1oe8u6sh5LUaD-nLyzJLfEtZCw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-45",
+            "scope": [
+              "src/held_45/**"
+            ]
+          },
+          "idempotencyKey": "held-45"
+        },
+        "sig": "_oPK1GUPooMAoDl-EIhmfiIgULhF_zU6r28O4ijqJ0pqqpz03OdhDASRqRTZ1oe8u6sh5LUaD-nLyzJLfEtZCw"
+      }
+    },
+    {
+      "key": "held-46",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-46\",\"scope\":[\"src/held_46/**\"]},\"idempotencyKey\":\"held-46\"},\"sig\":\"rpiVg2YqgcdiX3sCvp6QTO7865KrKebBVQuwDYZKxNu16PzL_awoPwQT7EQUFotxJ-a3ThqF_e2zorca2-g2DA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-46",
+            "scope": [
+              "src/held_46/**"
+            ]
+          },
+          "idempotencyKey": "held-46"
+        },
+        "sig": "rpiVg2YqgcdiX3sCvp6QTO7865KrKebBVQuwDYZKxNu16PzL_awoPwQT7EQUFotxJ-a3ThqF_e2zorca2-g2DA"
+      }
+    },
+    {
+      "key": "held-47",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-47\",\"scope\":[\"src/held_47/**\"]},\"idempotencyKey\":\"held-47\"},\"sig\":\"Gepgu47NMs13wqfYmaFxlXBrkyJ0wr_jnAsJkzztSnOKS3GnYwIjBV0t6t8LHYJGO-LKUaK2cuDdyyWrDq3TAg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-47",
+            "scope": [
+              "src/held_47/**"
+            ]
+          },
+          "idempotencyKey": "held-47"
+        },
+        "sig": "Gepgu47NMs13wqfYmaFxlXBrkyJ0wr_jnAsJkzztSnOKS3GnYwIjBV0t6t8LHYJGO-LKUaK2cuDdyyWrDq3TAg"
+      }
+    },
+    {
+      "key": "held-48",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-48\",\"scope\":[\"src/held_48/**\"]},\"idempotencyKey\":\"held-48\"},\"sig\":\"xLTFebpya5YqeBzKI9D17WdXk3e4n-kNdXamJmx0HMNJI6YkvedDcpZVj4QlSEy91xzM-4XEwA-0gDwfUdxoBg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-48",
+            "scope": [
+              "src/held_48/**"
+            ]
+          },
+          "idempotencyKey": "held-48"
+        },
+        "sig": "xLTFebpya5YqeBzKI9D17WdXk3e4n-kNdXamJmx0HMNJI6YkvedDcpZVj4QlSEy91xzM-4XEwA-0gDwfUdxoBg"
+      }
+    },
+    {
+      "key": "held-49",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-49\",\"scope\":[\"src/held_49/**\"]},\"idempotencyKey\":\"held-49\"},\"sig\":\"arovBR_GU7WOArlNRNafTEze22KXGy2fdhaSI3MAYfUk9z6xvuCECQh4InR1DXaUgk3NLZwmFOxMd0WI9iuNDg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-49",
+            "scope": [
+              "src/held_49/**"
+            ]
+          },
+          "idempotencyKey": "held-49"
+        },
+        "sig": "arovBR_GU7WOArlNRNafTEze22KXGy2fdhaSI3MAYfUk9z6xvuCECQh4InR1DXaUgk3NLZwmFOxMd0WI9iuNDg"
+      }
+    },
+    {
+      "key": "held-50",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-50\",\"scope\":[\"src/held_50/**\"]},\"idempotencyKey\":\"held-50\"},\"sig\":\"LURv8D8cNkkA0EZH53GAKISI65gv7Z9xSvS7lrzFoqBSBt5l0EVDZtx2aewldAX8bCj5yLhTaHtmVNk2hlu_DQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-50",
+            "scope": [
+              "src/held_50/**"
+            ]
+          },
+          "idempotencyKey": "held-50"
+        },
+        "sig": "LURv8D8cNkkA0EZH53GAKISI65gv7Z9xSvS7lrzFoqBSBt5l0EVDZtx2aewldAX8bCj5yLhTaHtmVNk2hlu_DQ"
+      }
+    },
+    {
+      "key": "held-51",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-51\",\"scope\":[\"src/held_51/**\"]},\"idempotencyKey\":\"held-51\"},\"sig\":\"iVEZhA0eOKt9baa5aGXtpOIvlbze8CgvY7S7OdeyEhAzMVRmV8qfSIfDJqdBSWr69dvWThjH-e5D73vrRtWqCw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-51",
+            "scope": [
+              "src/held_51/**"
+            ]
+          },
+          "idempotencyKey": "held-51"
+        },
+        "sig": "iVEZhA0eOKt9baa5aGXtpOIvlbze8CgvY7S7OdeyEhAzMVRmV8qfSIfDJqdBSWr69dvWThjH-e5D73vrRtWqCw"
+      }
+    },
+    {
+      "key": "held-52",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-52\",\"scope\":[\"src/held_52/**\"]},\"idempotencyKey\":\"held-52\"},\"sig\":\"Wbc1kNEemmdWKl4vsDeTfeVCfkEd32oPuR6TiUBMz7zJErh3AbtUjAf2qMRHHy0qAxSkJ2zbbTlskJljGXKQAA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-52",
+            "scope": [
+              "src/held_52/**"
+            ]
+          },
+          "idempotencyKey": "held-52"
+        },
+        "sig": "Wbc1kNEemmdWKl4vsDeTfeVCfkEd32oPuR6TiUBMz7zJErh3AbtUjAf2qMRHHy0qAxSkJ2zbbTlskJljGXKQAA"
+      }
+    },
+    {
+      "key": "held-53",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-53\",\"scope\":[\"src/held_53/**\"]},\"idempotencyKey\":\"held-53\"},\"sig\":\"nVlVmvwRxS9XXhbLJVx1PdsWKLYMQ1uzkVS_qI5tMO_Fxb7xfpoliS36ivdx7RBa0XzyDOVkyeDiGn7dIAjzDA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-53",
+            "scope": [
+              "src/held_53/**"
+            ]
+          },
+          "idempotencyKey": "held-53"
+        },
+        "sig": "nVlVmvwRxS9XXhbLJVx1PdsWKLYMQ1uzkVS_qI5tMO_Fxb7xfpoliS36ivdx7RBa0XzyDOVkyeDiGn7dIAjzDA"
+      }
+    },
+    {
+      "key": "held-54",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-54\",\"scope\":[\"src/held_54/**\"]},\"idempotencyKey\":\"held-54\"},\"sig\":\"ft67K6CJ_upblV5IyEfYZDEEryVvVnyRzC4M5b7Q9abCB2bt8PI97ZN7qZadz4SQRAt11dOFeIC6WxRq-2G8DQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-54",
+            "scope": [
+              "src/held_54/**"
+            ]
+          },
+          "idempotencyKey": "held-54"
+        },
+        "sig": "ft67K6CJ_upblV5IyEfYZDEEryVvVnyRzC4M5b7Q9abCB2bt8PI97ZN7qZadz4SQRAt11dOFeIC6WxRq-2G8DQ"
+      }
+    },
+    {
+      "key": "held-55",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-55\",\"scope\":[\"src/held_55/**\"]},\"idempotencyKey\":\"held-55\"},\"sig\":\"kUaZSBECe4zTA48uRrsocu5-QRVG-NMUl2hZ84NhDvY769D7YbqvY91J89itOG9uHVFvzmpXB-c_cAFQ6DMMCQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-55",
+            "scope": [
+              "src/held_55/**"
+            ]
+          },
+          "idempotencyKey": "held-55"
+        },
+        "sig": "kUaZSBECe4zTA48uRrsocu5-QRVG-NMUl2hZ84NhDvY769D7YbqvY91J89itOG9uHVFvzmpXB-c_cAFQ6DMMCQ"
+      }
+    },
+    {
+      "key": "held-56",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-56\",\"scope\":[\"src/held_56/**\"]},\"idempotencyKey\":\"held-56\"},\"sig\":\"5oGpykoQD-2zwu0d-RgyXK72zST3zJ5XLGsqD3pw5MaE8ZZAkI5q-N4j72QPEY_HiBJ-yjlgzqPBcaGIy8IgAw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-56",
+            "scope": [
+              "src/held_56/**"
+            ]
+          },
+          "idempotencyKey": "held-56"
+        },
+        "sig": "5oGpykoQD-2zwu0d-RgyXK72zST3zJ5XLGsqD3pw5MaE8ZZAkI5q-N4j72QPEY_HiBJ-yjlgzqPBcaGIy8IgAw"
+      }
+    },
+    {
+      "key": "held-57",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-57\",\"scope\":[\"src/held_57/**\"]},\"idempotencyKey\":\"held-57\"},\"sig\":\"4ptlQVXWgU38yQxEdkYv2nK90l5PEtRjTFDs_jtlwNwfd-XscfMcRupdgvEOoE1R_apGRaLFPOCqVRCvxQQYCA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-57",
+            "scope": [
+              "src/held_57/**"
+            ]
+          },
+          "idempotencyKey": "held-57"
+        },
+        "sig": "4ptlQVXWgU38yQxEdkYv2nK90l5PEtRjTFDs_jtlwNwfd-XscfMcRupdgvEOoE1R_apGRaLFPOCqVRCvxQQYCA"
+      }
+    },
+    {
+      "key": "held-58",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-58\",\"scope\":[\"src/held_58/**\"]},\"idempotencyKey\":\"held-58\"},\"sig\":\"rb3YiiygAjnVtBldU-sZEJucXgqx90H0UL4M-EfJt3Ad_CjXdTk1-17JP8-r3q332mLwbRD6NzqFH5DKKivbBQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-58",
+            "scope": [
+              "src/held_58/**"
+            ]
+          },
+          "idempotencyKey": "held-58"
+        },
+        "sig": "rb3YiiygAjnVtBldU-sZEJucXgqx90H0UL4M-EfJt3Ad_CjXdTk1-17JP8-r3q332mLwbRD6NzqFH5DKKivbBQ"
+      }
+    },
+    {
+      "key": "held-59",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-59\",\"scope\":[\"src/held_59/**\"]},\"idempotencyKey\":\"held-59\"},\"sig\":\"1WiAmI0gbxLjMQQQyaGwo2aSljgWUHZ6Rxdj1xfy5__dJ54KCiq1L7wQU-J9L_iF4NfRezg3f71N4di8DnYeAA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-59",
+            "scope": [
+              "src/held_59/**"
+            ]
+          },
+          "idempotencyKey": "held-59"
+        },
+        "sig": "1WiAmI0gbxLjMQQQyaGwo2aSljgWUHZ6Rxdj1xfy5__dJ54KCiq1L7wQU-J9L_iF4NfRezg3f71N4di8DnYeAA"
+      }
+    },
+    {
+      "key": "held-60",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-60\",\"scope\":[\"src/held_60/**\"]},\"idempotencyKey\":\"held-60\"},\"sig\":\"d3AheuwB1tGiEJWHRODG1yg_QARbMYSwom2_TPVrgPMD5rSRl1SWfqPc9kEr7n9v4kCrDhMnM-d5hgmX4C8oDA\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-60",
+            "scope": [
+              "src/held_60/**"
+            ]
+          },
+          "idempotencyKey": "held-60"
+        },
+        "sig": "d3AheuwB1tGiEJWHRODG1yg_QARbMYSwom2_TPVrgPMD5rSRl1SWfqPc9kEr7n9v4kCrDhMnM-d5hgmX4C8oDA"
+      }
+    },
+    {
+      "key": "held-61",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-61\",\"scope\":[\"src/held_61/**\"]},\"idempotencyKey\":\"held-61\"},\"sig\":\"vhmiSLzRt7Pw9oI4byGjR45Jm0e3mN9IavtAsz-Gyqm7eOQpPeTKzip8OLeTz8l3Sih8V_6l105109TZAiFCCg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-61",
+            "scope": [
+              "src/held_61/**"
+            ]
+          },
+          "idempotencyKey": "held-61"
+        },
+        "sig": "vhmiSLzRt7Pw9oI4byGjR45Jm0e3mN9IavtAsz-Gyqm7eOQpPeTKzip8OLeTz8l3Sih8V_6l105109TZAiFCCg"
+      }
+    },
+    {
+      "key": "held-62",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-62\",\"scope\":[\"src/held_62/**\"]},\"idempotencyKey\":\"held-62\"},\"sig\":\"aiEdYJJgYLim4mZ-n97Zi-MwDSC6Q7gUttGess8EOK9g1lXscGqyfawErcRvRSkasCt2bzLGEXXjEhzACGXyBQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-62",
+            "scope": [
+              "src/held_62/**"
+            ]
+          },
+          "idempotencyKey": "held-62"
+        },
+        "sig": "aiEdYJJgYLim4mZ-n97Zi-MwDSC6Q7gUttGess8EOK9g1lXscGqyfawErcRvRSkasCt2bzLGEXXjEhzACGXyBQ"
+      }
+    },
+    {
+      "key": "parallel-left",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\"},\"sig\":\"KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "left",
+            "scope": [
+              "src/left/**"
+            ]
+          },
+          "idempotencyKey": "parallel-left"
+        },
+        "sig": "KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg"
+      }
+    },
+    {
+      "key": "parallel-right",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\"},\"sig\":\"vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "right",
+            "scope": [
+              "src/right/**"
+            ]
+          },
+          "idempotencyKey": "parallel-right"
+        },
+        "sig": "vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ"
+      }
+    },
+    {
+      "key": "held-0",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"held-0\",\"scope\":[\"src/held_0/**\"]},\"idempotencyKey\":\"held-0\"},\"sig\":\"wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "held-0",
+            "scope": [
+              "src/held_0/**"
+            ]
+          },
+          "idempotencyKey": "held-0"
+        },
+        "sig": "wAhuUhWUerQhmNOTbYSRTZFseSweka7AjHK2_Sgccuzkhfnb02wfDC3pTHQMTDgeH1oXAzv7kZkWIZEiiqj9Cw"
+      }
+    },
+    {
+      "key": "parallel-left",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"left\",\"scope\":[\"src/left/**\"]},\"idempotencyKey\":\"parallel-left\"},\"sig\":\"KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "left",
+            "scope": [
+              "src/left/**"
+            ]
+          },
+          "idempotencyKey": "parallel-left"
+        },
+        "sig": "KNANoA3tTzLDfS6-Oow-A4AW_NTlOJRaC1acd0Deky_fwrcjUYnLO9IH08cQdg_GKeLNSwEM_j9GW1Ilyj8XCg"
+      }
+    },
+    {
+      "key": "parallel-right",
+      "literalBody": "{\"envelope\":{\"v\":1,\"room\":\"room_4eba159fbd2ddf59b0974b620158c2ca\",\"actor\":\"key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI\",\"kind\":\"claim\",\"target\":null,\"body\":{\"goal\":\"right\",\"scope\":[\"src/right/**\"]},\"idempotencyKey\":\"parallel-right\"},\"sig\":\"vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ\"}",
+      "signed": {
+        "envelope": {
+          "v": 1,
+          "room": "room_4eba159fbd2ddf59b0974b620158c2ca",
+          "actor": "key_Lp2LVAQIfAUjcB-Kfokj11OV9wj6c08d6a7bebMv3aI",
+          "kind": "claim",
+          "target": null,
+          "body": {
+            "goal": "right",
+            "scope": [
+              "src/right/**"
+            ]
+          },
+          "idempotencyKey": "parallel-right"
+        },
+        "sig": "vk_2p3n3SMomFwahjbwMVmLrrhkQxoinHNFvm_y_2QZCL91ceEK-QpJhLQ27mJH4tj2frUqS8OySomMaVR-fBQ"
+      }
+    }
+  ]
+}

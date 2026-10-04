@@ -1,0 +1,22 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-checker-stage5-048c-cwox6gjb/fixture
+
+ × checker-concurrent.test.ts > 63 retained unanswered keys plus two concurrent calls reserve at most the one remaining slot 65ms
+   → both concurrent calls consumed the one remaining slot; the promised 64 bound was bypassed: expected 2 to be less than or equal to 1
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  01:12:41
+   Duration  167ms (transform 48ms, setup 0ms, import 70ms, tests 66ms, environment 0ms)
+
+JSON report written to /tmp/artroom-checker-stage5-048c-cwox6gjb/concurrent-vitest.json
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  checker-concurrent.test.ts > 63 retained unanswered keys plus two concurrent calls reserve at most the one remaining slot
+AssertionError: both concurrent calls consumed the one remaining slot; the promised 64 bound was bypassed: expected 2 to be less than or equal to 1
+ ❯ checker-concurrent.test.ts:58:137
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

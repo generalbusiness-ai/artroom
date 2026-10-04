@@ -1,0 +1,76 @@
+{
+  "head": "048c74113b19e56e5e3def0a9e0244209f6015dc",
+  "fixture": "/tmp/artroom-checker-stage5-048c-cwox6gjb/fixture",
+  "archiveSha256": "2a08d7e2fa826f2e83ce26adb224e2442bcf26b3baf8ad2d1c991a3b24456ce3",
+  "files": {
+    "packages/client/src/room.ts": {
+      "blob": "dbdb2078fb3fe6ea4460ae4fac3d93e405855d52",
+      "sha256": "5500c0a849816dcdbfebb00618739a0d7a339d2746c7e179b517e9f2375b7f4d"
+    },
+    "packages/client/src/wire.ts": {
+      "blob": "a0a97704d63b7c8e7ebb4a0b7aa14453107c42a3",
+      "sha256": "5e83b711533e0ff1f4c569b9e303830aed372b44916920c22d56186eaddc9a4b"
+    },
+    "packages/client/src/envelope.ts": {
+      "blob": "790c7c97f37841fbfb032118ba31264c1fd1c2be",
+      "sha256": "38cbb7195014193199db8860772cadcec79d5f7ee8035ff3c7bff731e34ffef9"
+    },
+    "packages/client/src/canonical.ts": {
+      "blob": "bfc51144a5ba49bc68813dee8c93250b4414cb41",
+      "sha256": "ea1049a3fbbe717cc6122351758de5a13fe8ae84af0a58d30eff8d815cfce680"
+    },
+    "packages/client/test/prepared.test.ts": {
+      "blob": "58d5b5ff8bf63ea7aace7b6fd7c2fb2887abdc1d",
+      "sha256": "dca10dee00812f6f01c139b7f235a69cf0ea269ef697034189bfedceacd008b9"
+    },
+    "packages/client/test/support/fake-room.ts": {
+      "blob": "b5b2c850a46edceb62a4bfa9d772a09fd758039a",
+      "sha256": "b91210865cbcfbe96f08cd2fd42ec676924c2271bd3cb4e167003ab5a09fb909"
+    },
+    "packages/client/test/support/setup.ts": {
+      "blob": "2a54a072fa2dbba616f7f4f6ae4160976bd63dc2",
+      "sha256": "b412811896929e645d3b7e0955d6f778fcc215f35c4a711e945226d06d9c2f9e"
+    },
+    "packages/policy/src/declared.ts": {
+      "blob": "329b157fc1b6709a6f24772943ef43460209764e",
+      "sha256": "ba969b132a6317f88925038e4b4be4e8059f816d27deb5c066101a59b9d2f3ab"
+    },
+    "packages/contract/src/index.ts": {
+      "blob": "2e72d9f1bfbdad182c01bfe8ceda4acafec730b8",
+      "sha256": "8d5dd070913949122e178c48e9de2e6dd4e4913503eea8f17aa7ef7179bc902e"
+    },
+    "packages/client/README.md": {
+      "blob": "0c4b119be0008d02e9a5567cdcb63d13092bc80f",
+      "sha256": "0b95376e59934c0dbf759c3e653ac3e401cafd9fe490aa22bd3969b7f68e0494"
+    },
+    "plans/README.md": {
+      "blob": "95f85009ca500777106d6385e30f62d43b539ad2",
+      "sha256": "8958408298ecd7123b66e262d250ca14e990eb48bf83dcdf20649a9d9649e3fd"
+    },
+    "plans/test-invariants.md": {
+      "blob": "6b00f170540f4270de65d4b49a22e6c3469817a0",
+      "sha256": "eee76d139e7a9dcd87e5e5aeb3c5df7efda6ae4fd9ee1b0519d3c4496eb52187"
+    },
+    "packages/ui/src/screens/Acts.tsx": {
+      "blob": "dc3c71ca05ca2dbef60e0287e26c39f2301efbba",
+      "sha256": "14bc851c102b35c1730d8cb69431090279e25706c76d2edb017837577ce0ae1b"
+    },
+    "packages/ui/src/room/live/live-room.ts": {
+      "blob": "2056c6d8a3ad4038e88183bd0b9fb15ddaf5a305",
+      "sha256": "c173475947eae8824a1911c194601837827db9c5bf667cb24dcca8878c0b8979"
+    },
+    "packages/ui/src/main.tsx": {
+      "blob": "aa1c2565b502b76a1bd567396601a63421409e7c",
+      "sha256": "2f98a436548415fcdb10c8d1870d01281f47c7e5ba5932e863e18fc41d7c374d"
+    }
+  },
+  "configSha256": "1c7728c3ac6b82aab9a9aa626a2d2eff647af1b2b88ff7eae520b12d1291ad9d",
+  "probeFiles": {
+    "checker-concurrent.test.ts": {
+      "sha256": "8c132abbc0950088f4dd25ad123126b4d7514ad9ec7f727aad76fd3a0b73b68f"
+    },
+    "checker-concurrent.config.ts": {
+      "sha256": "6f056d02f158576ddfb7d9112f0153bf3554c8bcefd1f016d577aa1440d97ceb"
+    }
+  }
+}

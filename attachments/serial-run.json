@@ -1,0 +1,18 @@
+{
+  "command": [
+    "node",
+    "/Users/hughpyle/play/artroom/node_modules/vitest/vitest.mjs",
+    "run",
+    "packages/client/test/prepared.test.ts",
+    "--config",
+    "checker-selected.config.ts",
+    "-t",
+    "a handle that holds 64 acts with no answer refuses a new one",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile=/tmp/artroom-checker-stage5-048c-cwox6gjb/serial-vitest.json"
+  ],
+  "cwd": "/tmp/artroom-checker-stage5-048c-cwox6gjb/fixture",
+  "exitCode": 0,
+  "elapsed": 0.6863284999853931
+}
