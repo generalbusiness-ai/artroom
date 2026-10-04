@@ -306,9 +306,9 @@ describe("a retry sends what was first built, whatever the room's document is no
     const { invitation, secret } = await room.invite("@agent", { role: "agent", custody: "room", kinds: [], acts: { claim: (await room.bindingOf("claim"))! } });
     const b = await redeem({ url }, room.id, { invitation, secret });
     if (isRefusal(b)) throw new Error(b.rule);
-    let posts = 0;
+    let calls = 0; // calls of bearerAct on the room's wire
     const wire = room.wire();
-    const rpc = (await connect({ room: async (): Promise<RoomWire> => ({ ...wire, bearerAct: (tok, act) => (posts++, wire.bearerAct(tok, act)) }) }, room.id, { kind: "bearer", token: b.bearer })) as unknown as HttpRoomClient;
+    const rpc = (await connect({ room: async (): Promise<RoomWire> => ({ ...wire, bearerAct: (tok, act) => (calls++, wire.bearerAct(tok, act)) }) }, room.id, { kind: "bearer", token: b.bearer })) as unknown as HttpRoomClient;
     const input = { goal: "g", scope: ["src/**"] };
     const inside: unknown[] = [];
     let hooks = 0;
@@ -318,7 +318,7 @@ describe("a retry sends what was first built, whatever the room's document is no
     expect(inside[0]).toBe(first);
     const claim = (await first) as Claim;
     expect(await inside[0]).toBe(claim);
-    expect([hooks, posts]).toEqual([1, 1]);
+    expect([hooks, calls]).toEqual([1, 1]);
     // The control: the same call made after the first has returned gets the same promise.
     const one = rpc.claim(input, { idempotencyKey: "after" });
     expect(rpc.claim(input, { idempotencyKey: "after" })).toBe(one);
