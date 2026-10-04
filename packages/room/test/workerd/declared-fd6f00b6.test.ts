@@ -1030,7 +1030,9 @@ describe("a document the room cannot store or run is refused before it can activ
     expect(await parse(sized("x".repeat(1_048_576)))).toEqual({ ok: false, problems: ["policy: the document's canonical JSON must be at most 1048576 bytes"] });
     expect((await parse(sized("x"))).ok).toBe(true);
   });
+});
 
+describe("the active document as the room keeps it (a resource bound of request fd6f00b6)", () => {
   it("the active document is parsed once per version, not once per kind, and a kept policy cannot be changed by its reader", async () => {
     const doc = v2((a) => {
       for (let i = 0; i < 10; i++) a[`k${i}`] = { label: `K${i}`, targets: { thread: ["version"] }, threads: ["claim"], body: { summary: { type: "text", max: 10 } }, who: { roles: ["member"] } };
