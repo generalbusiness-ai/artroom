@@ -3051,7 +3051,37 @@ Not run at the present head: root `npm ci`, root `npm test`, the Room suites, an
 
 ## MCP core runtime (request 9ca1d290)
 
-### State at the integration head (written last)
+### State at the composed head, 2026-10-04 (written last)
+
+This is the head for condition 7: one composed head, reviewed for both scopes. It is the commit that adds this subsection, on `request/mcp-core-composed`, one commit after the integration head `d691e6e9` of `request/test-overhead`, which stays frozen for the verifier review (planner decision `5c020815`). The commit changes only this file, so source and tests are those of `d691e6e9`. Read this subsection first. The two below it are still right about what was built and repaired.
+
+**What the head contains, and the review each part has.**
+
+| Part | Request | Review |
+|---|---|---|
+| Test practice and reduction | `ecbc722a` | approved `b1738122` at `f6212850` |
+| Declared acts stage 2 | `fd6f00b6` | approved `9cb05da9` at `39430e23` |
+| Bearer sessions end with their grantor | `5d41ea36` | approved `65df0958` at `87cd5804` |
+| Declared acts stage 5 | `a5d64b35` | approved `b90f2211` at `6b877f6b` |
+| Installable packed packages | `7e82100b` | approved `81478e2d` at `1e444739` |
+| Intermediate verifier release | `42342e35` | awaiting an independent verdict at `d691e6e9` (invitation `a23cfe01`); not claimed here |
+| Declared acts stage 3, complete carry accounting | `1e8fee4b` | open and owed; not claimed here |
+| MCP core runtime | `9ca1d290` | this review |
+| MCP core contract, the planner's four paths | `a9788a59` / `ee3d9036` | this review, on the planner's artifacts published at this head |
+
+**What changed for the MCP core since the review `bc0d7f6b` at `50216bb1`.** No MCP source or test changed. The review's three points:
+
+- *Condition 7.* The planner publishes `docs/protocol.md`, `packages/contract/src/transports.ts`, `packages/contract/src/index.ts` and `packages/contract/examples/demo-loop.ts` at this head under `ee3d9036`. The review invitation names both scopes.
+- *The grantor rule.* Decided and built under request `5d41ea36`: a bearer session ends when its grantor's key is revoked, for a read, an act and an exact retry alike. R-CRED-10 says so, and the witness runs against a real Room.
+- *Dependencies with open findings.* Stage 2 and stage 5 are repaired and approved, as the table shows. The verifier release has no verdict yet; the whole head lands only after it has one (`5c020815`). No earlier approval is carried across a repair: each row names the review of the repaired head.
+
+Other changes on the branch since `50216bb1` that touch files this request lists: `packages/client/src/room.ts` and its tests (stage 5's repairs, reviewed there); `docs/protocol.md` (R-CRED-10 for the grantor rule, R-DECL-25 for the verifier's report, both reviewed in their own lanes); the six package manifests and `tsconfig.build.json` files (packaging). The MCP package's source and its tests are as they were at `50216bb1`.
+
+**Conditions of the request.** As in the table of the next subsection: conditions 1 to 6 delivered, and condition 7 met by this head, the planner's publication and this review.
+
+**Limits, restated.** No test runs the real `artroom mcp` binary against a real Room, or an expired bearer over stdio. Neither is a condition of the request, and the planner has confirmed that (chat, 2026-10-04). The Room method `caller(token)` is a seam outside `RoomWire`; the planner accepted it in `3d8a74a9`. The gate's result at this head is in the review invitation.
+
+### State at the integration head (written earlier, at `50216bb1`)
 
 The MCP core is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), composed with stage 2 (approved at `4ec48aa1`, review `25bede37`), stage 3 and stage 5. The branch `request/mcp-core-runtime` stays at `729fb330`. Read this subsection first, then "State at `8b46e825`", which is still right about what was built and repaired. This subsection replaces that note's "Stopped, and owed" list and the provisional status below it.
 
