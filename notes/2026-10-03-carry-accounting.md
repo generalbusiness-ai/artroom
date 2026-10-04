@@ -127,8 +127,10 @@ position no longer gives. Verify would fail that honest log today with
 `context-mismatch`, and with Rule 1 as well. The same is true of a
 `check-carried` event: its facts are read before the policy evaluation and
 only the judged key is checked again at the seal. The checker and the
-planner pointed this out from the source (`060828bb`); no failing run was
-produced.
+planner pointed this out from the source (`060828bb`), with no failing run
+at that time. It was then reproduced for the carry event: with the
+checker's key revoked while the carry rules were evaluated, the Room sealed
+a "carried" event after the revocation. That run is now a test.
 
 The decision: an event that records a judgment is sealed only if the facts
 it was judged on still hold at the seal.
@@ -141,6 +143,19 @@ it was judged on still hold at the seal.
 - **`check-carried`.** In the transaction that seals it, the Room builds
   the carry input and its facts again. If they differ from what was judged,
   nothing is sealed, and that check is judged again.
+
+Which facts are fenced, and which stay as they were read, follows from
+what each event names and from where verify reads each fact.
+
+| Fact | `land-evaluated` | `check-carried` |
+|---|---|---|
+| The policy version | Not named in the event. Verify uses the version active at the event's position. Fenced: the event is sealed only under the version that was evaluated | Named in the event. Verify reads the document, the checker configuration, the pinned runner and the owners from the named version, wherever the event is. Pinned by name: an activation during the evaluation does not stop the seal, and the carry then does not count under the new version (R-CARRY-13) |
+| The lane and generation | Named through the operation. Their head and changed paths do not change. The obligations' states and the reviews are part of the land input, so they are fenced with it | Named in the event. Pinned by name. A newer generation does not stop the seal; the judgment is of the generation it names |
+| The integration, its tree and snapshot | Named. A commit does not change | Named. A commit does not change |
+| Whether the evidence is revoked or retired | Part of the land input: fenced | Read at the event's position by verify: fenced |
+| The acting member's role and teams | The initiator's, part of the land input: fenced | The checker's, read at the event's position by verify: fenced |
+| Whether the obligation is still open | Fenced, as part of the land input | Not fenced. A judgment of an obligation that a direct check met meanwhile is extra history, and verify accepts it |
+| Whether the check was already judged | | Checked again at the seal, as before |
 
 A sealed `land-evaluated` event is then what verify takes it to be: an
 evaluation of the state at its own position, with no blocking obligation
