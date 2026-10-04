@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bb640b871987eea8f294afe614d4dad204fb79ec","text":"Merge retired a covered predecessor; the successor is at packages/ui/screenshots/policy-light.png."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bb846f5d44b338a8db396ca66346ddaa3eaf926e","text":"Merge retired a covered predecessor with no successor at its old path."}
