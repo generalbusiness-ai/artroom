@@ -1,0 +1,93 @@
+{
+  "head": "26872bac08efb220d90ee218ac31a4034b90e98e",
+  "controls": [
+    {
+      "head": "26872bac08efb220d90ee218ac31a4034b90e98e",
+      "args": [
+        "node",
+        "scripts/control.mjs",
+        "packages/room/src/core.ts",
+        "if (!still()) {",
+        "if (false && !still()) {",
+        "--expect",
+        "a land evaluation is sealed only for the state at its own place in the log",
+        "--",
+        "packages/room",
+        "--config",
+        "vitest.workers.config.ts",
+        "test/workerd/acts.test.ts",
+        "-t",
+        "a land evaluation is sealed only for the state at its own place in the log"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 4.781,
+      "restoredSha256": "2918c8e08b0d9a62e5364d4bcbe873e3d095200084f902203b9344f71c760343"
+    },
+    {
+      "head": "26872bac08efb220d90ee218ac31a4034b90e98e",
+      "args": [
+        "node",
+        "scripts/control.mjs",
+        "packages/room/src/core.ts",
+        "if (runner && digestJson(read()) !== digestJson(on)) {",
+        "if (false && runner && digestJson(read()) !== digestJson(on)) {",
+        "--expect",
+        "a carry judgment is sealed only on the facts at its own place in the log",
+        "--",
+        "packages/room",
+        "--config",
+        "vitest.workers.config.ts",
+        "test/workerd/acts.test.ts",
+        "-t",
+        "a carry judgment is sealed only on the facts at its own place in the log"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 4.478,
+      "restoredSha256": "2918c8e08b0d9a62e5364d4bcbe873e3d095200084f902203b9344f71c760343"
+    }
+  ],
+  "runs": [
+    {
+      "n": 1,
+      "passed": 1,
+      "failed": 0,
+      "pending": 59,
+      "failedTests": []
+    },
+    {
+      "n": 2,
+      "passed": 0,
+      "failed": 1,
+      "pending": 59,
+      "failedTests": [
+        {
+          "name": "landing, policy activation and checks R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event a land evaluation is sealed only for the state at its own place in the log: a revocation admitted while the rules are evaluated reopens the obligation, and no land-evaluated event is sealed for the input that was true before it",
+          "failureMessages": [
+            "AssertionError: expected [ { seq: 12, …(2) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (Users/hughpyle/play/artroom/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (Users/hughpyle/play/artroom/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (Users/hughpyle/play/artroom/node_modules/chai/index.js:1737:25)\n    at /private/tmp/artroom-checker-stage3-26872-control-6Qkoc4/fixture/packages/room/test/workerd/acts.test.ts:811:61\n    at Users/hughpyle/play/artroom/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ]
+        }
+      ]
+    },
+    {
+      "n": 3,
+      "passed": 1,
+      "failed": 0,
+      "pending": 59,
+      "failedTests": []
+    },
+    {
+      "n": 4,
+      "passed": 0,
+      "failed": 1,
+      "pending": 59,
+      "failedTests": [
+        {
+          "name": "landing, policy activation and checks R-CARRY-13: every check carry judgment is a sealed check-carried event a carry judgment is sealed only on the facts at its own place in the log: the checker's key is revoked while the carry rules are evaluated, and the one sealed event says the check does not carry",
+          "failureMessages": [
+            "AssertionError: expected [ [ 'act_15_ae8e6a7e', true ] ] to deeply equal [ [ 'act_15_ae8e6a7e', false ] ]\n    at /private/tmp/artroom-checker-stage3-26872-control-6Qkoc4/fixture/packages/room/test/workerd/acts.test.ts:1080:58\n    at Users/hughpyle/play/artroom/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ]
+        }
+      ]
+    }
+  ]
+}
