@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c058ae11727392dbb0fa3247a7b6bdcc56bd4b1f","text":"Merge retired a covered predecessor; the successor is at packages/room/src/requests.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d4a113d2c4508790d7f9f0f3c9583218aaaaaad0","text":"Merge retired a covered predecessor; the successor is at packages/room/test/workerd/review-aabda1ed.cases.ts."}
