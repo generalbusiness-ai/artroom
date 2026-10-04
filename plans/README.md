@@ -3160,7 +3160,7 @@ By the same method on both sides, the sum of steps, the gate costs 10.1 times le
 
 | Every suite, one worker each | Sum of the suites' elapsed time | CPU |
 |---|---|---|
-| Before, at `a1990c94`, 15 suites | 742.2 s | 691.3 s |
+| Before, at `a1990c94`, 15 suites | 742.2 s | 691.2 s |
 | After, at `64a379c2`, 14 suites | 59.7 s | 64.8 s |
 
 That is 12.4 times less. The largest parts before were the log package in workerd (299.2 s) and in Node (115.1 s), the git package (71.2 s), the Room's two workerd runs (68.0 s and 60.8 s) and the CLI (51.5 s). The largest part after is the Room's workerd run, 26.6 s: with one worker, one isolate makes every room, and the pool's nested proxies (see "Found on the way") cost most there. With the gate's four workers the same run takes 6 s.
