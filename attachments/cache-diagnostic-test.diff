@@ -1,0 +1,50 @@
+--- /tmp/artroom-checker-stage3-26872-land-cache-j5egjrev/eligibility-before-cache.test.ts.snapshot	2026-10-04 00:22:31
++++ /tmp/artroom-checker-stage3-26872-land-cache-j5egjrev/cache-probe.test.ts.snapshot	2026-10-04 00:27:00
+@@ -55,6 +55,7 @@
+ import type { SnapshotPort } from "../../src/index.ts";
+ import { canonicalize } from "../../src/canonical.ts";
+ import { digestJson, verify } from "../../src/crypto.ts";
++import { laneRow, generationRow } from "../../src/model.ts";
+ import { roomIdOf } from "../../src/ids.ts";
+ import { obligationsFor } from "../../src/obligations.ts";
+ import type { ActivePolicyFull } from "../../src/core.ts";
+@@ -812,6 +813,39 @@
+       expect(events(await entries(room), "land-evaluated")).toHaveLength(0);
+       expect(room.world.artifacts.main).not.toBe(head);
+       expect((await op(room, l.op.id)).state).not.toBe("landed");
++    });
++
++    it("CHECKER CACHE PROBE: a new blocking policy reevaluates the same operation and input", async () => {
++      runDeclared();
++      const { room, alice, lane, head } = await approved(withLandRule("false"));
++      await hold(room, "landing", "recompute");
++      const l = await land(alice, lane, head);
++      await inDO(room, (r) => r.core.landing.prepare(l.op.id));
++      const before = await op(room, l.op.id);
++      expect(before.state).toBe("ready");
++      const beforePolicy = await inDO(room, (r) => r.core.activePolicy().version);
++      const beforeCalls = room.world.policy.calls.reservation;
++      expect(beforeCalls).toBe(1);
++      const beforeCache = await inDO(room, (r) => r.core.sql.all("SELECT op, digest, body FROM land_evals WHERE op = ?", l.op.id));
++      expect(beforeCache).toHaveLength(1);
++      await activate(room, (p) => ({ doc: { ...p.doc, rules: p.doc.rules.map((rule) => rule.id === "stage-rule" ? { ...rule, block: "true" } : rule) }, checkers: p.checkers }));
++      await inDO(room, (r) => r.core.recompute());
++      const activated = events(await entries(room), "policy-activated").at(-1)!;
++      const recomputed = events(await entries(room), "obligations-recomputed").filter((e) => e.event.lane === lane).at(-1)!;
++      expect(recomputed.seq).toBeGreaterThan(activated.seq);
++      await inDO(room, (r) => r.core.landing.prepare(l.op.id));
++      const after = await op(room, l.op.id);
++      const fresh = await inDO(room, (r) => {
++        const current = r.core.landing.core.get(l.op.id)!;
++        const input = r.core.landInput(current, laneRow(r.core.sql, lane)!, generationRow(r.core.sql, lane, 1)!, r.core.activePolicy(), "reservation");
++        return { digest: digestJson(input), policy: r.core.activePolicy().version, opPolicy: current.policyVersion, rules: r.core.activePolicy().doc.rules.filter((rule) => rule.kind === "land"), cache: r.core.sql.all("SELECT op, digest, body FROM land_evals WHERE op = ?", l.op.id) };
++      });
++      const reserved = await inDO(room, (r) => r.core.landing.reserve(l.op.id));
++      const afterReserve = await op(room, l.op.id);
++      const log = await entries(room);
++      const observed = { op: l.op.id, beforePolicy, beforeCalls, before, beforeCache, activation: { seq: activated.seq, policy: activated.id }, recomputation: { seq: recomputed.seq, obligations: recomputed.event.obligations }, after, afterCalls: room.world.policy.calls.reservation, fresh, reservation: reserved, afterReserve, evaluated: events(log, "land-evaluated").map((e) => ({ seq: e.seq, ...e.event })), reservedEvents: events(log, "land-reserved").map((e) => ({ seq: e.seq, ...e.event })) };
++      expect(after.state, "LAND-CACHE-PROBE " + JSON.stringify(observed)).toBe("failed");
++      expect(reserved.kind).not.toBe("reserved");
+     });
+ 
+     it("section 23: a rule that passes at both stages: ready with a land input digest, and unchanged state builds the same bytes at reservation and lands", async () => {

@@ -1,0 +1,152 @@
+{
+  "op": "op_land_9",
+  "beforePolicy": "act_1_2bf68f19",
+  "beforeCalls": 1,
+  "before": {
+    "id": "op_land_9",
+    "kind": "land",
+    "updatedAt": "2026-10-01T12:00:00.000Z",
+    "lane": "act_6_ff3a328a",
+    "generation": 1,
+    "head": "13bf181bee92b9f747824f934747f5fad0d4a4e2",
+    "act": "act_9_366570de",
+    "leaseGeneration": 1,
+    "expectedMain": "835ca78192256e2c1d0e98887d0ed5c3ce48d54f",
+    "policyVersion": "act_1_2bf68f19",
+    "attempts": 1,
+    "state": "ready",
+    "integration": "13bf181bee92b9f747824f934747f5fad0d4a4e2",
+    "evidence": [
+      "act_8_6092c5b3"
+    ],
+    "landInput": "sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b"
+  },
+  "beforeCache": [
+    {
+      "op": "op_land_9",
+      "digest": "sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b",
+      "body": "{\"refusal\":null,\"decisions\":[{\"rule\":\"stage-rule\",\"kind\":\"land\",\"policy\":\"act_1_2bf68f19\",\"stamp\":{\"profile\":\"artroom-jsonata-v1\",\"jsonata\":\"2.2.2\",\"accounting\":\"artroom-act-budget-v1\"},\"input\":\"sha256:f73c28f4c76f501c64e867046ffe9ead4badcbec37074d04f1dee4f0b5efc0e7\",\"outcome\":{\"result\":\"pass\"},\"usage\":{\"steps\":1,\"inspectedBytes\":5}}],\"retained\":{\"stage\":\"reservation\",\"canonical\":\"{\\\"actor\\\":{\\\"delegated\\\":false,\\\"member\\\":\\\"@alice\\\",\\\"role\\\":\\\"member\\\",\\\"teams\\\":[]},\\\"kind\\\":\\\"land\\\",\\\"lane\\\":{\\\"claimed\\\":true,\\\"generation\\\":1,\\\"holder\\\":\\\"@alice\\\",\\\"id\\\":\\\"act_6_ff3a328a\\\",\\\"kind\\\":\\\"claim\\\",\\\"purpose\\\":\\\"ordinary\\\",\\\"scope\\\":[\\\"src/**\\\"]},\\\"obligations\\\":[{\\\"id\\\":\\\"obl_code-review\\\",\\\"met\\\":true}],\\\"proposal\\\":{\\\"base\\\":\\\"835ca78192256e2c1d0e98887d0ed5c3ce48d54f\\\",\\\"changed\\\":[{\\\"path\\\":\\\"src/app.ts\\\",\\\"status\\\":\\\"modified\\\"}],\\\"generation\\\":1,\\\"head\\\":\\\"13bf181bee92b9f747824f934747f5fad0d4a4e2\\\",\\\"owners\\\":[{\\\"owners\\\":[],\\\"path\\\":\\\"src/app.ts\\\"}],\\\"paths\\\":[\\\"src/app.ts\\\"]},\\\"reviews\\\":[{\\\"act\\\":\\\"act_8_6092c5b3\\\",\\\"basis\\\":\\\"here\\\",\\\"by\\\":{\\\"delegated\\\":false,\\\"member\\\":\\\"@bob\\\",\\\"role\\\":\\\"maintainer\\\",\\\"teams\\\":[]},\\\"verdict\\\":\\\"approve\\\"}],\\\"stage\\\":\\\"reservation\\\"}\",\"digest\":\"sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b\"}}"
+    }
+  ],
+  "activation": {
+    "seq": 11,
+    "policy": "act_11_d13f4f37"
+  },
+  "recomputation": {
+    "seq": 12,
+    "obligations": [
+      "obl_code-review"
+    ]
+  },
+  "after": {
+    "id": "op_land_9",
+    "kind": "land",
+    "updatedAt": "2026-10-01T12:00:00.000Z",
+    "lane": "act_6_ff3a328a",
+    "generation": 1,
+    "head": "13bf181bee92b9f747824f934747f5fad0d4a4e2",
+    "act": "act_9_366570de",
+    "leaseGeneration": 1,
+    "expectedMain": "835ca78192256e2c1d0e98887d0ed5c3ce48d54f",
+    "policyVersion": "act_11_d13f4f37",
+    "attempts": 2,
+    "state": "ready",
+    "integration": "13bf181bee92b9f747824f934747f5fad0d4a4e2",
+    "evidence": [
+      "act_8_6092c5b3"
+    ],
+    "landInput": "sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b"
+  },
+  "afterCalls": 1,
+  "fresh": {
+    "digest": "sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b",
+    "policy": "act_11_d13f4f37",
+    "opPolicy": "act_11_d13f4f37",
+    "rules": [
+      {
+        "block": "true",
+        "fix": "None.",
+        "id": "stage-rule",
+        "kind": "land",
+        "reason": "Blocked at this stage."
+      }
+    ],
+    "cache": [
+      {
+        "op": "op_land_9",
+        "digest": "sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b",
+        "body": "{\"refusal\":null,\"decisions\":[{\"rule\":\"stage-rule\",\"kind\":\"land\",\"policy\":\"act_1_2bf68f19\",\"stamp\":{\"profile\":\"artroom-jsonata-v1\",\"jsonata\":\"2.2.2\",\"accounting\":\"artroom-act-budget-v1\"},\"input\":\"sha256:f73c28f4c76f501c64e867046ffe9ead4badcbec37074d04f1dee4f0b5efc0e7\",\"outcome\":{\"result\":\"pass\"},\"usage\":{\"steps\":1,\"inspectedBytes\":5}}],\"retained\":{\"stage\":\"reservation\",\"canonical\":\"{\\\"actor\\\":{\\\"delegated\\\":false,\\\"member\\\":\\\"@alice\\\",\\\"role\\\":\\\"member\\\",\\\"teams\\\":[]},\\\"kind\\\":\\\"land\\\",\\\"lane\\\":{\\\"claimed\\\":true,\\\"generation\\\":1,\\\"holder\\\":\\\"@alice\\\",\\\"id\\\":\\\"act_6_ff3a328a\\\",\\\"kind\\\":\\\"claim\\\",\\\"purpose\\\":\\\"ordinary\\\",\\\"scope\\\":[\\\"src/**\\\"]},\\\"obligations\\\":[{\\\"id\\\":\\\"obl_code-review\\\",\\\"met\\\":true}],\\\"proposal\\\":{\\\"base\\\":\\\"835ca78192256e2c1d0e98887d0ed5c3ce48d54f\\\",\\\"changed\\\":[{\\\"path\\\":\\\"src/app.ts\\\",\\\"status\\\":\\\"modified\\\"}],\\\"generation\\\":1,\\\"head\\\":\\\"13bf181bee92b9f747824f934747f5fad0d4a4e2\\\",\\\"owners\\\":[{\\\"owners\\\":[],\\\"path\\\":\\\"src/app.ts\\\"}],\\\"paths\\\":[\\\"src/app.ts\\\"]},\\\"reviews\\\":[{\\\"act\\\":\\\"act_8_6092c5b3\\\",\\\"basis\\\":\\\"here\\\",\\\"by\\\":{\\\"delegated\\\":false,\\\"member\\\":\\\"@bob\\\",\\\"role\\\":\\\"maintainer\\\",\\\"teams\\\":[]},\\\"verdict\\\":\\\"approve\\\"}],\\\"stage\\\":\\\"reservation\\\"}\",\"digest\":\"sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b\"}}"
+      }
+    ]
+  },
+  "reservation": {
+    "kind": "reserved",
+    "publication": 1,
+    "reservedAt": 13
+  },
+  "afterReserve": {
+    "id": "op_land_9",
+    "kind": "land",
+    "updatedAt": "2026-10-01T12:00:00.000Z",
+    "lane": "act_6_ff3a328a",
+    "generation": 1,
+    "head": "13bf181bee92b9f747824f934747f5fad0d4a4e2",
+    "act": "act_9_366570de",
+    "leaseGeneration": 1,
+    "expectedMain": "835ca78192256e2c1d0e98887d0ed5c3ce48d54f",
+    "policyVersion": "act_11_d13f4f37",
+    "attempts": 2,
+    "integration": "13bf181bee92b9f747824f934747f5fad0d4a4e2",
+    "evidence": [
+      "act_8_6092c5b3"
+    ],
+    "publication": 1,
+    "reservedAt": 13,
+    "state": "publishing",
+    "pushes": 0
+  },
+  "evaluated": [
+    {
+      "seq": 10,
+      "decisions": [
+        {
+          "input": "sha256:f73c28f4c76f501c64e867046ffe9ead4badcbec37074d04f1dee4f0b5efc0e7",
+          "kind": "land",
+          "outcome": {
+            "result": "pass"
+          },
+          "policy": "act_1_2bf68f19",
+          "rule": "stage-rule",
+          "stamp": {
+            "accounting": "artroom-act-budget-v1",
+            "jsonata": "2.2.2",
+            "profile": "artroom-jsonata-v1"
+          },
+          "usage": {
+            "inspectedBytes": 5,
+            "steps": 1
+          }
+        }
+      ],
+      "integration": "13bf181bee92b9f747824f934747f5fad0d4a4e2",
+      "landInput": "sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b",
+      "op": "op_land_9",
+      "type": "land-evaluated"
+    }
+  ],
+  "reservedEvents": [
+    {
+      "seq": 13,
+      "evidence": [
+        "act_8_6092c5b3"
+      ],
+      "expectedMain": "835ca78192256e2c1d0e98887d0ed5c3ce48d54f",
+      "generation": 1,
+      "integration": "13bf181bee92b9f747824f934747f5fad0d4a4e2",
+      "lane": "act_6_ff3a328a",
+      "op": "op_land_9",
+      "publication": 1,
+      "type": "land-reserved"
+    }
+  ]
+}

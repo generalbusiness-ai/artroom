@@ -1,0 +1,34 @@
+{
+  "head": "26872bac08efb220d90ee218ac31a4034b90e98e",
+  "finding": {
+    "severity": "HIGH",
+    "confidence": "High; source plus one actual workerd probe with paired baseline/new-policy phases",
+    "title": "Separate reservation rule cache entries by policy version",
+    "source": [
+      "packages/room/src/core.ts:1289-1294",
+      "packages/room/src/core.ts:1165-1187",
+      "packages/room/src/store.ts:74",
+      "packages/policy/src/rules.ts:439-455",
+      "packages/git/src/landing/core.ts:613-622",
+      "packages/git/src/landing/core.ts:648-657"
+    ],
+    "trigger": "An operation reaches ready under a passing land rule. Activation changes only that land rule to block while keeping the reservation input bytes unchanged. Recompute and reprepare the same operation.",
+    "reason": "land_evals is keyed only by op and input digest; kept is returned before policy evaluation or the new still callback. Input/retained bytes omit policy version. Activation updates operation policyVersion, so reservation current-policy checks do not distinguish the cached verdict historical policy. There is no cache invalidation query.",
+    "impact": "The changed land policy can be bypassed by a previously cached passing reservation result. This behavior was already present at4ec and is not claimed as a newly introduced regression.",
+    "fix_sketch": "Scope the evaluation cache by policy version (stored key or separately validated body), including the initial read, competing-record branch, write and final read. Do not put a policy field into RuleInput merely for cache bookkeeping.",
+    "effort": "S",
+    "fix_risk": "MED",
+    "test_suggestion": "One controlled ready operation under block=false, activate block=true with unchanged requirements/input, reprepare, and require failed/no reservation under the new rule; retain digests/evaluation policy names.",
+    "observed": "Before: op_land_9 ready under act_1_2bf68f19, one reservation evaluation. Activation11 changes only stage-rule.block to true; recomputation12 retains obl_code-review; after reprepare the same op is ready under act_11_d13f4f37, attempts2. Fresh/current input digest equals old cached digest sha256:3fb82281bf6deafe3a43deca97ebbec94af13f3a1824d0e90a38ef4bcbe9ae0b; callcount remains1 and sole cached decision names old policy. reserve succeeds at13; statepublishing with zero pushes.",
+    "runtime": "One selected declared-v2 Room test; passing original preparation paired with block-only activation; 1 loaded AssertionError,61unselected,2.174s. Existing dependencies, no production source edits or installs."
+  },
+  "scope": "Exactly one selected runtime cache test, paired old-policy/new-policy phases. No production source edits, installs, broad suite or additional cache scenario.",
+  "run": "cache-probe-run.json",
+  "observation": "cache-observed.json",
+  "test_source_sha256": "42911611282a16eff9996728885d8094d3e4bd4ef4a94805920f221412143b02",
+  "test_diff": "cache-diagnostic-test.diff",
+  "pre_existing_at": "4ec48aa162413302f066e78790a240f810d24525",
+  "pre_existing_basis": "Same op/digest cache key, initial kept return, no policy-key or activation invalidation in exact4ec source; no4ec runtime rerun claimed.",
+  "fixture_cwd_at_execution": "/tmp/artroom-checker-stage3-26872-carry-eligibility-ap8ck5r4/fixture/packages/room",
+  "dependencies": "Previously installed Vitest4.1.11/pool0.22.0 reused through fixture-local workspace aliases."
+}
