@@ -46,7 +46,7 @@ Files are in `packages/client/test/`.
 | Canonical bytes and signatures are fixed vectors, and a declared envelope's binding is inside the signed bytes. | R-SIG-1 to 3, R-ID-4, R-ID-10, R-DECL-16 | `signing.test.ts`; `workerd/signing.test.ts` |
 | A prepared act is the handle's own frozen copy. | R-IDEM-2, review 43e8fe3b | `prepared.test.ts`: "a prepared act is the handle's own copy" |
 | A target or body that is not plain data is `bad-request` before anything is signed, copied or sent. | R-SIG-6, review 61b68774 | `prepared.test.ts`: "a target or body that is not plain data" |
-| A retry sends what was first built, also after the vocabulary changed. | R-IDEM-1, R-IDEM-2, R-DECL-16 | `prepared.test.ts`: "a retry sends what was first built" |
+| A retry sends what was first built, also after the vocabulary changed. A handle drops no unanswered act: at 64 it refuses a new one. | R-IDEM-1, R-IDEM-2, R-DECL-16, review 6bf8d38a | `prepared.test.ts`: "a retry sends what was first built" |
 | A lost or cut-off answer is retried with the same bytes, a bounded number of times, with backoff. | R-IDEM-1 to 3, R-IDEM-6 | `room.test.ts`: "idempotent retries" |
 | Refusals are values and failures are `ArtroomError`s. | R-API-1, R-ID-3 | `room.test.ts`: "refusals are values" |
 | A watch resumes from its cursor, stops once when its credential is refused, and never reconnects after it is closed. | R-API-6 to 8, R-CRED-7 | `room.test.ts`: "resumable cursors" |

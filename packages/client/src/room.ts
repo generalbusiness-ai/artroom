@@ -202,6 +202,9 @@ export interface ClientGenericActOptions extends GenericActOptions {
 /** The seven code-review kinds the named methods sign. `renew` and `roster` are platform kinds and stay `v: 1`. */
 const NAMED_DECLARED: ReadonlySet<string> = new Set(["claim", "propose", "note", "review", "check", "land", "release"]);
 
+/** How many named acts with no answer a handle keeps for exact retry (R-IDEM-2). */
+const UNANSWERED_MAX = 64;
+
 /** The shared core of every handle. */
 abstract class RoomCore {
   readonly id: RoomId;
@@ -229,6 +232,11 @@ abstract class RoomCore {
    * sent again, as first built, also when the room's vocabulary changed in
    * between (R-IDEM-2, R-DECL-16). Building the act again under the
    * vocabulary now in force would be a different act under the same key.
+   *
+   * None is ever dropped. A handle that holds `UNANSWERED_MAX` of them
+   * refuses a new named act before it is signed or sent, until one is
+   * answered: forgetting an act the room may have recorded would turn its
+   * repeat into another act.
    */
   readonly #unanswered = new Map<string, PreparedAct>();
 
@@ -368,6 +376,8 @@ abstract class RoomCore {
     const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
     const { target, body } = ownedIntent(givenTarget, givenBody); // G5:named-owned
     const kept = this.#unanswered.get(idempotencyKey);
+    if (kept === undefined && this.#unanswered.size >= UNANSWERED_MAX)
+      throw artroomError("rate-limited", `This handle has ${UNANSWERED_MAX} acts with no answer yet. Repeat one of them with its idempotency key, so that it is answered, before making another act.`); // G5:named-unanswered-full
     let prepared: PreparedAct;
     if (kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)) {
       prepared = kept; // G5:named-retry-kept
@@ -394,7 +404,6 @@ abstract class RoomCore {
         this.#unanswered.delete(idempotencyKey);
       } else {
         // No answer: the room may have recorded it. A repeat with this key sends these bytes.
-        if (this.#unanswered.size >= 64 && !this.#unanswered.has(idempotencyKey)) this.#unanswered.delete(this.#unanswered.keys().next().value!);
         this.#unanswered.set(idempotencyKey, prepared); // G5:named-retry-keep
       }
       throw e;
