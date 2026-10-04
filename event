@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/cli/src/main.ts at exact c38c23ce3760f041d75678cf6c5d4c109c62e5da on request/test-overhead, under promise git:sha1…6aceb2b on request git:sha1…261aacb","body":{"commit":"c38c23ce3760f041d75678cf6c5d4c109c62e5da","path":"packages/cli/src/main.ts"}}
+{"kind":"artifact","text":"packages/cli/test/cli.test.ts at exact c38c23ce3760f041d75678cf6c5d4c109c62e5da on request/test-overhead, under promise git:sha1…6aceb2b on request git:sha1…261aacb","body":{"commit":"c38c23ce3760f041d75678cf6c5d4c109c62e5da","path":"packages/cli/test/cli.test.ts"}}
