@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/log/src/declared.ts at exact fc376ecc7e2674e295a74e66d697ddf0297183fc on request/test-overhead, under promise git:sha1…4f63448 on request git:sha1…8f44f6f","body":{"commit":"fc376ecc7e2674e295a74e66d697ddf0297183fc","path":"packages/log/src/declared.ts"}}
+{"kind":"artifact","text":"packages/log/src/decode.ts at exact fc376ecc7e2674e295a74e66d697ddf0297183fc on request/test-overhead, under promise git:sha1…4f63448 on request git:sha1…8f44f6f","body":{"commit":"fc376ecc7e2674e295a74e66d697ddf0297183fc","path":"packages/log/src/decode.ts"}}
