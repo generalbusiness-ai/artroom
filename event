@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fd53f07129782f909d9a80c6ebf46f91529a9d8f","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fe05ec7cd36f4c87d1a471471808eff1bbdf2da5","text":"Merge retired a covered predecessor; the successor is at packages/ui/src/ui/WhyDialog.tsx."}
