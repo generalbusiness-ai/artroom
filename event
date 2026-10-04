@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:49f4f64f58375db7c7003f5a49d3c63104e4608f","text":"Republished at 4ec48aa162413302f066e78790a240f810d24525, which no longer changes packages/room/test/workerd/declared-rows-fd6f00b6.test.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:74cf382d065194dc4f6b8ee519b9d8029ffb9ccf","text":"Republished at 4ec48aa162413302f066e78790a240f810d24525; the successor stands at packages/room/test/workerd/declared-support.ts."}
