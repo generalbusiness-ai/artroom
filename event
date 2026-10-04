@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:25de396eca66d4340645b55f606d547abed499de","text":"Merge retired a covered predecessor; the successor is at scripts/release-manifest.test.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2972f20a5211270bf298dc1462056efd6b51ce45","text":"Merge retired a covered predecessor; the successor is at packages/ui/test/acts-screen.test.tsx."}
