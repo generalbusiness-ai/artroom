@@ -60,6 +60,9 @@ function prefix(f: Fixture, through: number): Log {
   return log;
 }
 
+/** A retained context, as far as the tests below change it. */
+type Shaped = { input: { proposal?: { changed: unknown }; obligations?: unknown } };
+
 /** Verify `log` and expect `reason` at `seq`, with the verified prefix ending just before it. */
 async function expectFailure(log: Log, reason: VerifyReason, seq: number, opts: Parameters<typeof verify>[1] = {}) {
   const r = await verify(log, opts);
@@ -537,6 +540,31 @@ describe("check-carried events are judged (R-CARRY-6 to R-CARRY-14)", () => {
     await evaluatedAt(rule, S.t5revoked + 1, S.t5land, { obligations: (o) => o.map((x) => ({ ...x, met: true })), policy: idOf(rule, S.activated3) });
     expect(await verify(rule, { replayDecisions: false })).toMatchObject({ ok: true, mode: "integrity", failures: [] });
     expect((await expectFailure(rule, "guard-failed", S.t5revoked + 1)).detail).toMatch(/the obligation obl_tests is not met/);
+  });
+
+  test.each([
+    { name: "a proposal's changed list holds null", at: "propose2" as const, change: (c: Shaped): void => { c.input.proposal!.changed = [null]; }, says: /context\.input\.proposal\.changed\[0\] is not an object/ },
+    { name: "a proposal's changed list is not a list", at: "propose2" as const, change: (c: Shaped): void => { c.input.proposal!.changed = "src/a.ts"; }, says: /context\.input\.proposal\.changed is not an array/ },
+    { name: "a renamed path has no from", at: "propose2" as const, change: (c: Shaped): void => { c.input.proposal!.changed = [{ status: "renamed", path: "src/a.ts" }]; }, says: /changed\[0\]\.from is not a string/ },
+    { name: "a land input's obligations hold null", at: "land" as const, change: (c: Shaped): void => { c.input.obligations = [null]; }, says: /context\.input\.obligations\[0\] is not an object/ },
+  ])("a retained context that verify reads by shape is malformed when that shape is wrong, in a report and not a throw: $name", async ({ at, change, says }) => {
+    const seq = S[at];
+    // The control: the log cut after this entry verifies, with replay on and off.
+    for (const replayDecisions of [true, false]) expect(await verify(prefix(CARRY, seq), { replayDecisions })).toMatchObject({ ok: true, verifiedThrough: seq });
+    // The same log, with one recorded context changed in that one place, kept under its own digest and resealed.
+    const forged = prefix(CARRY, seq);
+    const recorded = decisionsAt(forged, seq);
+    const first = recorded.find((d) => (at === "land" ? d.kind === "land" : (contextOf(forged, d) as unknown as Shaped).input.proposal))!;
+    const context = structuredClone(contextOf(forged, first)) as unknown as Shaped;
+    change(context);
+    const digest = keep(forged, context);
+    setDecisions(forged, seq, recorded.map((d) => (d.input === first.input ? { ...d, input: digest } : d)));
+    expect((await expectFailure(forged, "malformed", seq)).detail).toMatch(says);
+    // With replay off the entry is not judged by its context, and the retained file is still reported malformed.
+    const integrity = await verify(forged, { replayDecisions: false });
+    expect(integrity).toMatchObject({ ok: false, mode: "integrity" });
+    expect(integrity.failures.map((x) => x.reason)).toEqual(["malformed"]);
+    expect(integrity.failures[0]!.detail).toMatch(says);
   });
 
   test("decision-extra: a judgement no landing of that version owes: one naming another version's landing, one for a failing check, and one for an obligation the version does not have", async () => {

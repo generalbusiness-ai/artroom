@@ -515,8 +515,26 @@ export function decodeRetained(kind: "json" | "input" | "policy" | "checker", by
     case "input": {
       const c = obj(v, "context");
       oneOf(c.kind, "context.kind", CONTEXT_KINDS);
-      obj(c.input, "context.input");
+      const input = obj(c.input, "context.input");
       obj(c.budget, "context.budget");
+      // The parts of a recorded context that verify reads by shape, before or without replaying it. The rest is
+      // compared as a whole, by digest, with the context rebuilt from the log.
+      const proposal = input["proposal"];
+      if (proposal !== undefined && proposal !== null) {
+        const p = obj(proposal, "context.input.proposal");
+        str(p["base"], "context.input.proposal.base");
+        arr(p["changed"], "context.input.proposal.changed").forEach((item, n) => {
+          const at = `context.input.proposal.changed[${n}]`;
+          const change = obj(item, at);
+          str(change["path"], `${at}.path`);
+          if (oneOf(change["status"], `${at}.status`, ["added", "modified", "deleted", "renamed"]) === "renamed") str(change["from"], `${at}.from`);
+        }); // V:d-context-changed
+      }
+      if (c.kind === "carry" && input["changedSince"] !== undefined) strs(input["changedSince"], "context.input.changedSince");
+      if (c.kind === "land") {
+        arr(input["obligations"], "context.input.obligations").forEach((o, n) => str(obj(o, `context.input.obligations[${n}]`)["id"], `context.input.obligations[${n}].id`));
+        arr(input["reviews"], "context.input.reviews").forEach((r, n) => str(obj(r, `context.input.reviews[${n}]`)["act"], `context.input.reviews[${n}].act`));
+      }
       return v;
     }
   }
