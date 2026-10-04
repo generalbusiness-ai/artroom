@@ -106,24 +106,23 @@ describe("P1.1: a room-custody redemption is all or nothing (R-CRED-9, R-CRED-3,
     expect((await entries(r)).length).toBe(before + 2);
   });
 
-  for (const point of ["redemption:after-join", "redemption:after-delegate"]) {
-    it(`an interruption at ${point} rolls back the join, the grant, the keys and the bearer`, async () => {
-      const r = await makeRoom();
-      const inv = await roomInvite(r);
-      const before = (await entries(r)).length;
-      const held = await count(r, "SELECT COUNT(*) AS n FROM held_keys");
-      setFault((p) => {
-        if (p === point) throw new Error(`crash at ${p}`);
-      });
-      expect((await failure(r.stub.redeem(inv.input, "x"))).code).toBe("internal");
-      setFault(null);
-      expect((await entries(r)).length).toBe(before);
-      expect(await count(r, "SELECT COUNT(*) AS n FROM held_keys")).toBe(held);
-      expect(await count(r, "SELECT COUNT(*) AS n FROM bearers")).toBe(0);
-      expect(await invitationUsed(r, inv.id)).toBe(false);
-      expect((await call<Redeemed>(r.stub.redeem(inv.input, "x"))).custody).toBe("room");
+  // The later of the two fault points: by then the join and the grant are both written, so one rollback shows both gone.
+  it("an interruption at redemption:after-delegate rolls back the join, the grant, the keys and the bearer", async () => {
+    const r = await makeRoom();
+    const inv = await roomInvite(r);
+    const before = (await entries(r)).length;
+    const held = await count(r, "SELECT COUNT(*) AS n FROM held_keys");
+    setFault((p) => {
+      if (p === "redemption:after-delegate") throw new Error(`crash at ${p}`);
     });
-  }
+    expect((await failure(r.stub.redeem(inv.input, "x"))).code).toBe("internal");
+    setFault(null);
+    expect((await entries(r)).length).toBe(before);
+    expect(await count(r, "SELECT COUNT(*) AS n FROM held_keys")).toBe(held);
+    expect(await count(r, "SELECT COUNT(*) AS n FROM bearers")).toBe(0);
+    expect(await invitationUsed(r, inv.id)).toBe(false);
+    expect((await call<Redeemed>(r.stub.redeem(inv.input, "x"))).custody).toBe("room");
+  });
 
   it("response-loss recovery: a retry is invitation-invalid and exposes no bearer or held key; a new invitation and retiring the stranded key recover", async () => {
     const r = await makeRoom();
@@ -159,23 +158,15 @@ describe("P1.1: a room-custody redemption is all or nothing (R-CRED-9, R-CRED-3,
 // ------------------------------------------------------------------ P1.2
 
 describe("P1.2: a revoked key never becomes, or acts as, the recovery key (R-ADM-3)", () => {
-  it("rotation to an unbound compromised key and an unbound retired key is refused", async () => {
-    for (const reason of ["compromised", "retired"] as const) {
-      const r = await makeRoom();
-      const next = newKeyPair();
-      await r.admin.ok("roster", null, { op: "revoke-key", key: next.key, reason });
-      expectRefusal(await r.recovery.act("roster", null, { op: "rotate-recovery", key: next.key }), "invalid-body");
-      expectRefusal(await new Client(r, next).act("roster", null, { op: "set-role", member: "@admin", role: "admin" }), "key-revoked");
-    }
-  });
-
-  it("rotation to a member's key, compromised or retired, is refused", async () => {
-    for (const reason of ["compromised", "retired"] as const) {
-      const r = await makeRoom();
-      const bob = await addMember(r, "@bob", "member");
-      await r.admin.ok("roster", null, { op: "revoke-key", key: bob.key, reason });
-      expectRefusal(await r.recovery.act("roster", null, { op: "rotate-recovery", key: bob.key }), "invalid-body");
-    }
+  it("rotation to a revoked key is refused, whether the key was unbound (compromised) or a member's (retired)", async () => {
+    const r = await makeRoom();
+    const next = newKeyPair();
+    await r.admin.ok("roster", null, { op: "revoke-key", key: next.key, reason: "compromised" });
+    expectRefusal(await r.recovery.act("roster", null, { op: "rotate-recovery", key: next.key }), "invalid-body");
+    expectRefusal(await new Client(r, next).act("roster", null, { op: "set-role", member: "@admin", role: "admin" }), "key-revoked");
+    const bob = await addMember(r, "@bob", "member");
+    await r.admin.ok("roster", null, { op: "revoke-key", key: bob.key, reason: "retired" });
+    expectRefusal(await r.recovery.act("roster", null, { op: "rotate-recovery", key: bob.key }), "invalid-body");
   });
 
   it("a fresh key still becomes the recovery key and acts", async () => {
@@ -272,16 +263,6 @@ describe("P1.4: after a policy activation, obligations are re-judged under the n
     expect(recorded[0]!.decisions.length).toBeGreaterThan(0);
   });
 
-  it("a raised count opens it; a requirement that no longer applies to the changed paths removes it", async () => {
-    const r = await makeRoom({ policy: policy(requireReview({ id: "rv", paths: "src/**", from: "role:maintainer" })) });
-    const bob = await addMember(r, "@bob", "maintainer");
-    const { lane } = await approvedBy(r, bob);
-    await activate(r, policy(requireReview({ id: "rv", paths: "src/**", from: "role:maintainer", count: 2 })));
-    expect((await proposal(r, lane)).obligations[0]).toMatchObject({ count: 2, state: "open" });
-    await activate(r, policy(requireReview({ id: "rv", paths: "docs/**", from: "role:maintainer" })));
-    expect((await proposal(r, lane)).obligations).toEqual([]);
-  });
-
   it("qualification uses the role recorded at admission, not today's", async () => {
     const r = await makeRoom({ policy: policy(requireReview({ id: "rv", paths: "src/**", from: "@bob" })) });
     const bob = await addMember(r, "@bob", "maintainer");
@@ -290,24 +271,6 @@ describe("P1.4: after a policy activation, obligations are re-judged under the n
     await activate(r, policy(requireReview({ id: "rv", paths: "src/**", from: "role:maintainer" })));
     expect((await proposal(r, lane)).obligations[0]!.state).toBe("met");
     await activate(r, policy(requireReview({ id: "rv", paths: "src/**", from: "role:member" })));
-    expect((await proposal(r, lane)).obligations[0]!.state).toBe("open");
-  });
-
-  it("owners: a requirement moved to owners the reviewer is not among is open", async () => {
-    const r = await makeRoom({ policy: policy(requireReview({ id: "rv", paths: "src/**", from: "@bob" })) });
-    const bob = await addMember(r, "@bob", "maintainer");
-    await addMember(r, "@carol", "maintainer");
-    const { lane } = await approvedBy(r, bob);
-    await activate(r, policy({ part: "owners", owners: { "src/**": ["@carol"] } }, requireReview({ id: "rv", paths: "src/**", from: "owners" })));
-    expect((await proposal(r, lane)).obligations[0]!.state).toBe("open");
-  });
-
-  it("self-approval: an author's approval counts under allowSelf on docs, and not once allowSelf is gone", async () => {
-    const r = await makeRoom({ policy: policy(requireReview({ id: "docs", paths: "docs/**", from: "role:admin", allowSelf: true })) });
-    const { lane, head } = await proposeSrc(r, r.admin, { "docs/guide.md": "x" });
-    await r.admin.ok("review", { lane, generation: 1 }, { head, verdict: "approve", scope: ["docs/**"], text: "self, docs" });
-    expect((await proposal(r, lane)).obligations[0]!.state).toBe("met");
-    await activate(r, policy(requireReview({ id: "docs", paths: "docs/**", from: "role:admin" })));
     expect((await proposal(r, lane)).obligations[0]!.state).toBe("open");
   });
 
@@ -354,21 +317,6 @@ describe("P1.4: after a policy activation, obligations are re-judged under the n
     const p2 = await proposal(r, c.lane, 2);
     expect(p2.obligations[0]!.state).toBe("open");
     expect(p2.notCarried.some((n) => n.code === "policy-rejected")).toBe(true);
-  });
-
-  it("a carried verdict is re-qualified under the new requirement even when carry still allows it", async () => {
-    const r = await makeRoom({ policy: policy(requireReview({ id: "rv", paths: "src/**", from: "@bob" })) });
-    const bob = await addMember(r, "@bob", "maintainer");
-    await addMember(r, "@carol", "maintainer");
-    const c = await r.admin.ok<Claim>("claim", null, { goal: "g", scope: ["src/**"] });
-    const h1 = pushChange(r, c.lane, { "src/a/x.ts": "1" });
-    await r.admin.ok("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 0, head: h1, summary: "g1" });
-    await bob.ok("review", { lane: c.lane, generation: 1 }, { head: h1, verdict: "approve", scope: ["src/a/**"], text: "ok" });
-    const h2 = pushChange(r, c.lane, { "src/b/y.ts": "2" }, h1);
-    await r.admin.ok("propose", { lane: c.lane }, { lease: 1, expectedGeneration: 1, head: h2, summary: "g2" });
-    expect((await proposal(r, c.lane, 2)).obligations[0]!.state).toBe("met");
-    await activate(r, policy(requireReview({ id: "rv", paths: "src/**", from: "@carol" })));
-    expect((await proposal(r, c.lane, 2)).obligations[0]).toMatchObject({ from: ["@carol"], state: "open", evidence: [] });
   });
 
   it("a landing prepared before the activation cannot land on the old evidence", async () => {

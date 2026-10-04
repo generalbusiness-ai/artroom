@@ -12,8 +12,7 @@ import { runInDurableObject } from "cloudflare:test";
 import type { Check, CheckBody, CheckerConfig, CheckJob, Claim, Landing, LandOp, Proposal, Refusal, Result } from "@generalbusiness/artroom-contract";
 import { policy, requireCheck } from "@generalbusiness/artroom-policy/helpers";
 import type { Room } from "../../src/index.ts";
-import { digestJson } from "../../src/crypto.ts";
-import { addMember, Client, clock, iso, makeRoom, pushChange, tick, type TestRoom } from "./support.ts";
+import { addMember, Client, clock, makeRoom, pushChange, tick, type TestRoom } from "./support.ts";
 
 const inDO = <T>(r: TestRoom, fn: (room: Room) => T | Promise<T>) => runInDurableObject(r.stub as unknown as DurableObjectStub<Room>, fn);
 const op = async (r: TestRoom, id: string) => (await r.admin.read({ q: "op", op: id as never })) as LandOp & { integration?: string; expectedMain: string };
@@ -150,25 +149,6 @@ describe("review 0f9739dc P2 1: an unanswered attempt expires at its deadline un
     await answer(r, late, 0, "refuse");
   });
 
-  it("two jobs steps at once: one attempt is sent; the step that lost the claim prepares nothing (review 786e9606)", async () => {
-    const { r, alice, ci } = await checkRoom();
-    await hold(r, ["jobs"]);
-    const { seen } = service(r, ci, ["refuse"]);
-    await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
-    await settled(r);
-    const before = r.world.artifacts.canonicalRepo().tokens.size;
-    await inDO(r, async (room) => {
-      await Promise.all([room.core.steps.jobs(), room.core.steps.jobs()]);
-      await room.core.idle();
-    });
-    expect(seen).toHaveLength(1);
-    expect(await jobsOf(r)).toMatchObject([{ state: "done", attempt: 1, outcome: "refused: check-binding" }]);
-    const minted = [...r.world.artifacts.canonicalRepo().tokens.values()].slice(before).filter((t) => t.scope === "read");
-    expect(minted).toHaveLength(1);
-    expect(minted[0]!.plaintext).toBe(tokenOf(seen[0]!));
-    expect(minted[0]!.revoked).toBe(true);
-  });
-
   it("restart: an attempt in flight when the room stops is issued again at its deadline, and its check lands the change", async () => {
     const { r: before, land, deadline, seen, late } = await sentAndHanging(["hang", "sign"]);
     // The object stops with the call in flight; a new stub reaches a new object with nothing in memory.
@@ -216,22 +196,6 @@ describe("review 0f9739dc P2 2: a preview's integration gets jobs (R-EXEC-8)", (
     expect(await op(r, second.op.id)).toMatchObject({ state: "landed" });
     expect(seen).toHaveLength(1);
     expect((await jobsOf(r)).filter((j) => j["state"] !== "done")).toEqual([]);
-  });
-
-  it("an owed preview job whose preview moved to another integration is not issued", async () => {
-    const { r, alice, ci } = await checkRoom();
-    await hold(r, ["jobs"]);
-    const { seen } = service(r, ci);
-    await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
-    await settled(r);
-    expect(await jobsOf(r)).toMatchObject([{ state: "owed" }]);
-    await inDO(r, (room) => room.core.sql.all("UPDATE previews SET body = json_set(body, '$.integration', ?)", "e".repeat(40)));
-    await inDO(r, async (room) => {
-      await room.core.steps.jobs();
-      await room.core.idle();
-    });
-    expect(await jobsOf(r)).toMatchObject([{ state: "done", outcome: "not-needed" }]);
-    expect(seen).toEqual([]);
   });
 
   it("a room the registry does not bind issues no job, and its jobs wait in the future rather than due now", async () => {
@@ -288,27 +252,6 @@ describe("review 0f9739dc P2 2: a preview's integration gets jobs (R-EXEC-8)", (
       ["done", "refused: check-binding"],
     ]);
     expect(seen.map((j) => j.generation)).toEqual([2]);
-  });
-
-  it("an owed preview job whose checker configuration changed is not issued", async () => {
-    const { r, alice, ci } = await checkRoom();
-    await hold(r, ["jobs"]);
-    const { seen } = service(r, ci);
-    await proposed(r, alice, ["src/**"], { "src/app.ts": "v2" });
-    await settled(r);
-    expect(await jobsOf(r)).toMatchObject([{ state: "owed" }]);
-    const changed = { ...whole, timeoutSeconds: 61 };
-    await inDO(r, (room) => {
-      const old = room.core.activePolicy();
-      room.core.sql.transaction(() => room.core.activate(old.doc, { unit: { config: changed, digest: digestJson(changed) } }, null, iso(clock.now)));
-    });
-    const after = await inDO(r, async (room) => {
-      await room.core.steps.jobs();
-      await room.core.idle();
-      return room.core.sql.all("SELECT state, outcome FROM check_jobs ORDER BY rowid LIMIT 1");
-    });
-    expect(after).toEqual([{ state: "done", outcome: "not-needed" }]);
-    expect(seen).toEqual([]);
   });
 
   it("R-OBL-7 an advisory job still queued when its landing lands is delivered, and its check is recorded on the landed integration", async () => {

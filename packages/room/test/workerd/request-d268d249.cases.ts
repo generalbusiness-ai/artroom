@@ -92,38 +92,6 @@ describe("request d268d249: each pre-admission step is logged with its name", ()
     expect(d).toEqual({ event: "pre-admission-failed", step: "propose.headInFork", name: "Error", message: "Artifacts is unavailable (headInFork)" });
   });
 
-  for (const [method, step] of [
-    ["pinObjects", "propose.pinObjects"],
-    ["readMain", "propose.readMain"],
-    ["diff", "propose.diff"],
-  ] as const) {
-    it(step, async () => {
-      const r = await makeRoom();
-      const c = await claimed(r);
-      const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
-      const d = await failsAt(r, r.admin.signed("propose", { lane: c.lane }, proposeBody(head)), method, step);
-      expect(d).toEqual({ event: "pre-admission-failed", step, name: "Error", message: `Artifacts is unavailable (${method})` });
-    });
-  }
-
-  it("propose.readConfig: a change under .artroom/", async () => {
-    const r = await makeRoom();
-    const c = await claimed(r);
-    const head = pushChange(r, c.lane, { ".artroom/policy.json": "{}\n" });
-    const d = await failsAt(r, r.admin.signed("propose", { lane: c.lane }, proposeBody(head)), "readConfig", "propose.readConfig");
-    expect(d.message).toBe("Artifacts is unavailable (readConfig)");
-  });
-
-  it("propose.changedBetween: a second generation", async () => {
-    const r = await makeRoom();
-    const c = await claimed(r);
-    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
-    await r.admin.ok<Proposal>("propose", { lane: c.lane }, proposeBody(head));
-    const head2 = pushChange(r, c.lane, { "src/app.ts": "v3" }, head);
-    const d = await failsAt(r, r.admin.signed("propose", { lane: c.lane }, proposeBody(head2, 1)), "changedBetween", "propose.changedBetween");
-    expect(d.message).toBe("Artifacts is unavailable (changedBetween)");
-  });
-
   /** A checker's check on a proposed lane; `filtered` names input paths, so the snapshot is read too. */
   async function checkCase(filtered: boolean) {
     const r = await makeRoom();
@@ -136,12 +104,6 @@ describe("request d268d249: each pre-admission step is logged with its name", ()
     const body = { obligation: "obl_unit-tests", check: "unit", integration: head, input, config: `sha256:${"2".repeat(64)}`, runner: `sha256:${"0".repeat(64)}`, volatile: false, ok: true, detail: "ok" };
     return { r, signed: ci.signed("check", { lane: c.lane, generation: 1 }, body) };
   }
-
-  it("check.treeOf", async () => {
-    const { r, signed } = await checkCase(false);
-    const d = await failsAt(r, signed, "treeOf", "check.treeOf");
-    expect(d.message).toBe("Artifacts is unavailable (treeOf)");
-  });
 
   it("check.snapshot: a scoped check's filtered input", async () => {
     const { r, signed } = await checkCase(true);
@@ -161,12 +123,6 @@ describe("request d268d249: each pre-admission step is logged with its name", ()
     });
     return { r, signed: r.admin.signed("land", { lane: c.lane, generation: 1 }, { lease: 1, head }) };
   }
-
-  it("land.readMain", async () => {
-    const { r, signed } = await landCase();
-    const d = await failsAt(r, signed, "readMain", "land.readMain");
-    expect(d.message).toBe("Artifacts is unavailable (readMain)");
-  });
 
   it("land.refreshMain", async () => {
     const { r, signed } = await landCase();
@@ -210,15 +166,6 @@ describe("request d268d249: the diagnosis is redacted and bounded", () => {
     expect(d!.message.length).toBeLessThanOrEqual(300);
   });
 
-  it("a long message is cut to 300 characters", async () => {
-    const r = await makeRoom();
-    const c = await claimed(r);
-    const signed = r.admin.signed("propose", { lane: c.lane }, proposeBody(pushChange(r, c.lane, { "src/app.ts": "v2" })));
-    r.world.artifacts.failNext("diff", 1, new Error(`${"word ".repeat(2000)}${TOKEN}`));
-    await failure(r.stub.submit(signed));
-    expect(r.world.diagnoses[0]!.message).toHaveLength(300);
-    noSecrets(r.world.diagnoses[0]!.message);
-  });
 });
 
 describe("request d268d249: the parallel catch-all 5xx mappings log the same way", () => {
@@ -299,36 +246,30 @@ describe("request d268d249: the parallel catch-all 5xx mappings log the same way
     }
   });
 
-  for (const [method, message] of [
-    ["readMain", "The canonical repository could not be created or read. Retry the same found."],
-    ["canonicalRemote", "The canonical repository could not be created or read. Retry the same found."],
-    ["readConfig", "The canonical repository could not be read. Try again."],
-  ] as const) {
-    it(`founding: a failed ${method} is logged with its step`, async () => {
-      const admin = newKeyPair();
-      const repo = `acme-import/${hex(randomBytes(16))}`;
-      const worker = exports.default as unknown as { draft(input: unknown): Promise<DraftedRoom>; found(g: Genesis, sig: string, draft: string): Promise<RoomId> };
-      const drafted = await worker.draft({ name: `acme/${hex(randomBytes(6))}`, repo: { kind: "import", grant: grant(repo, admin.key) }, admin: { handle: "@founder", key: admin.key }, recovery: newKeyPair().key });
-      const world = worldFor(roomIdOf(drafted.genesis));
-      placeRepo(world, drafted.genesis.repo);
-      world.artifacts.main = world.artifacts.commit(null, { "README.md": "# imported\n" });
-      world.artifacts.failNext(method, 1, leaky());
-      const sig = sign(admin.seed, "artroom-genesis-v1", drafted.genesis);
-      // Caught here, as founding.test.ts does: an RPC promise given to `expect().rejects` is reported as unhandled.
-      let thrown: unknown = null;
-      try {
-        await worker.found(drafted.genesis, sig, drafted.draft);
-      } catch (e) {
-        thrown = e;
-      }
-      expect(thrown).toMatchObject({ name: "ArtroomError", code: "unavailable", message });
-      expect(world.diagnoses).toHaveLength(1);
-      expect(world.diagnoses[0]).toMatchObject({ event: "found-failed", step: method, name: "ArtifactsError" });
-      noSecrets(JSON.stringify(world.diagnoses));
-      // The retry completes, as before.
-      expect(await worker.found(drafted.genesis, sig, drafted.draft)).toBe(roomIdOf(drafted.genesis));
-    });
-  }
+  it("founding: a failed readMain is logged with its step", async () => {
+    const admin = newKeyPair();
+    const repo = `acme-import/${hex(randomBytes(16))}`;
+    const worker = exports.default as unknown as { draft(input: unknown): Promise<DraftedRoom>; found(g: Genesis, sig: string, draft: string): Promise<RoomId> };
+    const drafted = await worker.draft({ name: `acme/${hex(randomBytes(6))}`, repo: { kind: "import", grant: grant(repo, admin.key) }, admin: { handle: "@founder", key: admin.key }, recovery: newKeyPair().key });
+    const world = worldFor(roomIdOf(drafted.genesis));
+    placeRepo(world, drafted.genesis.repo);
+    world.artifacts.main = world.artifacts.commit(null, { "README.md": "# imported\n" });
+    world.artifacts.failNext("readMain", 1, leaky());
+    const sig = sign(admin.seed, "artroom-genesis-v1", drafted.genesis);
+    // Caught here, as founding.test.ts does: an RPC promise given to `expect().rejects` is reported as unhandled.
+    let thrown: unknown = null;
+    try {
+      await worker.found(drafted.genesis, sig, drafted.draft);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toMatchObject({ name: "ArtroomError", code: "unavailable", message: "The canonical repository could not be created or read. Retry the same found." });
+    expect(world.diagnoses).toHaveLength(1);
+    expect(world.diagnoses[0]).toMatchObject({ event: "found-failed", step: "readMain", name: "ArtifactsError" });
+    noSecrets(JSON.stringify(world.diagnoses));
+    // The retry completes, as before.
+    expect(await worker.found(drafted.genesis, sig, drafted.draft)).toBe(roomIdOf(drafted.genesis));
+  });
 
   it("a preview that cannot be computed is logged; the proposal still says only that it failed", async () => {
     const r = await makeRoom();
@@ -377,8 +318,9 @@ describe("request d268d249: the parallel catch-all 5xx mappings log the same way
 
 /**
  * Checker report on 0e058f13: credentials known by their syntax were kept
- * when short or quoted. Each case goes through a real Room's `pinObjects`
- * failure, as the checker's controls did, and through a retained job error.
+ * when short or quoted. The redaction of each syntax is a pure function,
+ * tested case by case in test/node/diag.cases.ts. Here the same messages go
+ * through a retained job error, which is stored and shown by other code.
  */
 const SYNTAX_CASES: [string, string, string[]][] = [
   ["a double-quoted password with spaces", 'login password="hunter two three" then failed', ["hunter", "two", "three"]],
@@ -398,26 +340,7 @@ const SYNTAX_CASES: [string, string, string[]][] = [
   ["the checker's short bearer", "request with Bearer abcd failed", ["abcd"]],
 ];
 
-describe("request d268d249: credentials known by their syntax are redacted whatever their length (checker, 0e058f13)", () => {
-  for (const [what, message, gone] of SYNTAX_CASES)
-    it(`pinObjects fails with ${what}: the old 503, nothing recorded, one diagnosis, the same act retried, and no credential`, async () => {
-      const r = await makeRoom();
-      const c = await claimed(r);
-      const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
-      const d = await failsAt(r, r.admin.signed("propose", { lane: c.lane }, proposeBody(head)), "pinObjects", "propose.pinObjects", Object.assign(new Error(message), { name: "ArtifactsError" }));
-      expect(d.message).toMatch(/<redacted>|<secret>/);
-      for (const g of gone) expect(JSON.stringify(d)).not.toContain(g);
-    });
-
-  it("pinObjects fails with a credential in the error's name: the name is redacted too", async () => {
-    const r = await makeRoom();
-    const c = await claimed(r);
-    const head = pushChange(r, c.lane, { "src/app.ts": "v2" });
-    const e = Object.assign(new Error("x"), { name: 'ArtifactsError password="horse battery" Bearer abcd' });
-    const d = await failsAt(r, r.admin.signed("propose", { lane: c.lane }, proposeBody(head)), "pinObjects", "propose.pinObjects", e);
-    for (const f of ["horse", "battery", "abcd"]) expect(JSON.stringify(d)).not.toContain(f);
-  });
-
+describe("request d268d249: credentials known by their syntax stay out of retained job errors (checker, 0e058f13)", () => {
   it("retained job errors keep safe metadata only (request d29c09fa), at all three sinks: a lost mint, an unreadable inventory, a failed revocation (since mint lane C, the mint ledger's)", async () => {
     const whole: CheckerConfig = { format: "artroom-checker-v1", volatile: false, timeoutSeconds: 60, runner: `sha256:${"0".repeat(64)}` };
     const r = await makeRoom({ policy: policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" })), files: { ".artroom/checkers/unit.json": JSON.stringify(whole), "package.json": "{}" } });

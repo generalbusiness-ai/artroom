@@ -131,7 +131,9 @@ const EXECUTABLE: ReadonlySet<string> = new Set([
 const NAME = "createToken";
 /** A key or property that is the literal name: an identifier (not computed), a string, or a template with no substitution. */
 function names(key: unknown, computed: boolean): boolean {
-  const k = key as AstNode | null;
+  let k = key as AstNode | null;
+  // A TypeScript assertion around a computed key is erased: `repo["createToken" as "createToken"]` takes the method.
+  while (k && computed && (k.type === "TSAsExpression" || k.type === "TSSatisfiesExpression" || k.type === "TSNonNullExpression" || k.type === "TSTypeAssertion")) k = k["expression"] as AstNode | null;
   if (!k) return false;
   if (k.type === "Identifier") return !computed && k["name"] === NAME;
   if (k.type === "StringLiteral") return k["value"] === NAME;
@@ -171,11 +173,25 @@ function reaches(text: string, jsx = false): { line: number; inside: string | nu
   return out;
 }
 
+/**
+ * Could this source hold the name at all? A reach is an identifier, a string
+ * or a template whose value is the name. Its text is then the name itself;
+ * or the name with a backslash before some characters (`"cre\ateToken"` is
+ * the same string); or it has a numbered escape (`\u`, `\x`, a digit) or a
+ * line continuation. A file with none of these has no reach, and is not
+ * parsed: most of the 190 source files are not, which is most of the scan's
+ * cost.
+ */
+function mayName(text: string): boolean {
+  if (/\\(?:[0-9ux]|\r?\n|\u2028|\u2029)/.test(text)) return true;
+  return text.replace(/\\/g, "").includes(NAME);
+}
+
 /** What breaks the rule in these files: one line each, or none. */
 function violations(files: readonly { readonly path: string; readonly text: string }[]): string[] {
   const out: string[] = [];
   for (const { path, text } of files) {
-    const found = reaches(text, /\.[jt]sx$/.test(path));
+    const found = mayName(text) ? reaches(text, /\.[jt]sx$/.test(path)) : [];
     const allowed = ALLOWED[path];
     if (!allowed) {
       for (const r of found) out.push(`${path}:${r.line}: reaches createToken outside the allowed files`);
@@ -245,6 +261,24 @@ describe("mint lane C (6): who reaches createToken", () => {
     expect(marked).toHaveLength(20);
     expect(lines.some((l) => l.includes("repo.createToken?.(\"read\", 60); // reach"))).toBe(true);
     expect(violations([{ path, text }])).toEqual(marked.map((n) => `${path}:${n}: reaches createToken outside the allowed files`));
+  });
+
+  it("a name written with escapes, or under a type assertion, is still a reach; a file that cannot hold the name is not parsed", () => {
+    const path = "packages/room/src/escaped-probe.ts";
+    for (const [what, form] of [
+      ["a backslash before a letter", String.raw`repo["cre\ateToken"]("read", 60);`],
+      ["a unicode escape in a string", String.raw`repo["create\u0054oken"]("read", 60);`],
+      ["a hex escape in a template", "repo[`create" + String.raw`\x54` + "oken`](\"read\", 60);"],
+      ["a unicode escape in an identifier", String.raw`repo.cre\u0061teToken("read", 60);`],
+      ["a line continuation", 'repo["create\\\nToken"]("read", 60);'],
+    ] as const)
+      expect(violations([{ path, text: `declare const repo: any;\n${form}\n` }]), what).toEqual([`${path}:2: reaches createToken outside the allowed files`]);
+    // A computed key under a TypeScript assertion is the same key.
+    for (const form of ['repo["createToken" as "createToken"]', 'repo[<"createToken">"createToken"]', 'repo["createToken"!]', 'repo[("createToken" satisfies string) as "createToken"]'])
+      expect(violations([{ path, text: `declare const repo: any;\n${form}("read", 60);\n` }]), form).toEqual([`${path}:2: reaches createToken outside the allowed files`]);
+    // Not parsed: this text is not TypeScript, and the scan would throw on it.
+    expect(violations([{ path, text: "this is not a program {" }])).toEqual([]);
+    expect(() => violations([{ path, text: "this is not a program { createToken" }])).toThrow();
   });
 
   it("the checker's namespace probe in a new production file fails", () => {

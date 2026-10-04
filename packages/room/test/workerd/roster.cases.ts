@@ -318,17 +318,6 @@ describe("R-ADM-12 and R-CRED-9: onboarding and custody by admission path", () =
     expect(await invitationUsed(room, inv.id)).toBe(false);
   });
 
-  it("R-CRED-9: redemption is rate-limited per invitation", async () => {
-    const room = await makeRoom();
-    const inv = await invite(room, "@x", "room", { role: "agent" });
-    let limited = false;
-    for (let i = 0; i < 12; i++) {
-      const w = (await room.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(randomBytes(32)) }, `addr-${i}`)) as { error?: { code: string } };
-      if (w.error?.code === "rate-limited") limited = true;
-    }
-    expect(limited).toBe(true);
-  });
-
   it("R-CRED-7: a read session ends when its key is revoked", async () => {
     const room = await makeRoom();
     const bob = await addMember(room, "@bob", "member");

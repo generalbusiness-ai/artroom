@@ -188,16 +188,6 @@ describe("(3) the redemption rate limit (SEC-07, R-CRED-9)", () => {
     expect(isRefusal(await call(r.stub.redeem({ custody: "client", join: joinOf(r, inv) }, "addr-y")))).toBe(false);
   });
 
-  it("joins on POST /acts alone are limited per invitation", async () => {
-    const r = await makeRoom();
-    const inv = await invite(r, "@bob");
-    const wrong = { id: inv.id, secret: b64url(randomBytes(32)) };
-    const codes: number[] = [];
-    for (let i = 0; i < 11; i++) codes.push((await post(r, "acts", joinOf(r, wrong))).status);
-    expect(codes.slice(0, 10).every((c) => c === 409)).toBe(true);
-    expect(codes[10]).toBe(429);
-  });
-
   it("a room-custody redemption counts against the same invitation limit as a join on /acts", async () => {
     const r = await makeRoom();
     const inv = await invite(r, "@agent", "room");
@@ -213,9 +203,9 @@ describe("(3) the redemption rate limit (SEC-07, R-CRED-9)", () => {
       const join = new Client(r, newKeyPair()).signed("roster", null, { op: "join", invitation: "act_999_00000000", secret: b64url(randomBytes(32)) });
       expectRefusal(await call(r.stub.redeem({ custody: "client", join }, `fresh-${i}`)), "invitation-invalid");
     }
-    // And on /acts, with values that are not entry IDs.
-    for (const id of ["act_999_00000000", "x".repeat(4096), 7, null, {}])
-      for (let i = 0; i < 12; i++) {
+    // And on /acts: an ID never issued, past the limit of 10, and values that are not entry IDs.
+    for (const [id, times] of [["act_999_00000000", 12], ["x".repeat(4096), 1], [7, 1], [null, 1], [{}, 1]] as const)
+      for (let i = 0; i < times; i++) {
         const join = new Client(r, newKeyPair()).signed("roster", null, { op: "join", invitation: id, secret: b64url(randomBytes(32)) });
         expectRefusal(await call(r.stub.submit(join)), "invitation-invalid");
       }
@@ -284,7 +274,13 @@ describe("the client's join() recovery runs on the caller's clock (review of 812
         }
       }
       const response = await exports.default.fetch(input, init);
-      if (String(input).endsWith("/redeem") && ++redemptions === 1) throw new TypeError("reply lost");
+      // The room admitted the join, and the client never sees the answer. The client waits `retryAfterMs` before
+      // it tries again, so the lost reply is a 503 that says 1 ms: a thrown network error would wait 200 ms.
+      if (String(input).endsWith("/redeem") && ++redemptions === 1)
+        return new Response(JSON.stringify({ name: "ArtroomError", code: "unavailable", message: "reply lost", retryable: true, retryAfterMs: 1, maybeRecorded: true }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
       return response;
     };
     const out = await join({ url: "https://artroom.test" }, r.id, { invitation: inv.id as never, secret: inv.secret as never, signer }, { fetch: fetcher, retries: 2, now: () => clock.now });

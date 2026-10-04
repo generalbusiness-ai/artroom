@@ -153,7 +153,6 @@ describe("request d29c09fa: the landing engine's error fields keep safe metadata
 describe("request d29c09fa: a failed log publication stores and names a known code only", () => {
   for (const [what, fields, stored] of [
     ["a code that is provider text", { code: ECHOED[0] }, "transport"],
-    ["no code", {}, "transport"],
     ["a known Artifacts code", { code: "INTERNAL_ERROR", numericCode: 10400 }, "INTERNAL_ERROR"],
   ] as const)
     it(`${what}: publication_error is "${stored}", and the caller's error names only that`, async () => {

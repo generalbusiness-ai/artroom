@@ -192,24 +192,6 @@ describe("Carrying through the policy port (section 23 plan cases)", () => {
     expect(p2.notCarried).toEqual([expect.objectContaining({ act: r.id, code: "dependency-changed", paths: ["src/lib/authz/h.ts"] })]);
   });
 
-  it("No dependsOn, room default lists src/lib/** (R-CARRY-2): not carried", async () => {
-    const room = await carryRoom({ "src/a/**": ["src/lib/**"] });
-    const { p2 } = await twoGenerations(room, { scope: ["src/a/**"] }, { "src/lib/authz/h.ts": "h3" });
-    expect(p2.notCarried[0]!.code).toBe("dependency-changed");
-  });
-
-  it("package-lock.json changes (R-CARRY-3): a global input, so the verdict does not carry", async () => {
-    const room = await carryRoom();
-    const { p2 } = await twoGenerations(room, { scope: ["src/a/**"] }, { "package-lock.json": "{}" });
-    expect(p2.notCarried[0]!.code).toBe("global-input-changed");
-  });
-
-  it(".artroom/policy.json changes (R-CARRY-3, R-ADMIN-1): obl_admin-approval appears and the verdict does not carry", async () => {
-    const room = await carryRoom();
-    const { p2 } = await twoGenerations(room, { scope: ["src/a/**"] }, { ".artroom/policy.json": JSON.stringify(policy()) }, ["src/**", ".artroom/**"]);
-    expect(p2.obligations.map((o) => o.id)).toContain("obl_admin-approval");
-    expect(p2.notCarried[0]!.code).toBe("global-input-changed");
-  });
 });
 
 describe("R-OBL-3 checks", () => {

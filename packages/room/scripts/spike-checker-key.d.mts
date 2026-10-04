@@ -1,4 +1,4 @@
-// Types for spike-checker-key.mjs, which test/node/checks.test.ts imports.
+// Types for spike-checker-key.mjs, which test/node/checks.cases.ts imports.
 
 export declare const SEED_VAR: string;
 export function envValue(text: string, name: string): string | null;

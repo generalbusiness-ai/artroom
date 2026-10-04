@@ -105,27 +105,25 @@ async function driveToEnd(r: TestRoom, opId: string) {
 // ------------------------------------------------------------------ 1. P1
 
 describe("1. a stored check carry counts only under the policy version that judged it", () => {
-  for (const mode of ["checks: false", "a carry rule that refuses checks"] as const)
-    it(`an activation with ${mode}: the carried check no longer counts, the obligation is open, and the landing is not reserved`, async () => {
-      const { r, l, mine, ready } = await carriedAndReady();
-      expect((await statusOn(r, mine.lane, ready.integration!)).state).toBe("met");
-      await inDO(r, (room) => {
-        const old = room.core.activePolicy();
-        const doc: PolicyDocument =
-          mode === "checks: false"
-            ? { ...old.doc, carry: { ...old.doc.carry, checks: false } }
-            : { ...old.doc, rules: [...old.doc.rules, { id: "stop", kind: "carry", evidence: "check", allow: "false" }] };
-        room.core.sql.transaction(() => room.core.activate(doc, old.checkers, null, iso(clock.now)));
-      });
-      const now = await statusOn(r, mine.lane, ready.integration!);
-      expect(now.state).toBe("open");
-      expect(now.evidence).toEqual([]);
-      await driveToEnd(r, l.op.id);
-      const after = await op(r, l.op.id);
-      expect(after.state).not.toBe("landed");
-      expect(after).toMatchObject({ waiting: ["obl_unit-tests"] });
-      expect(r.world.artifacts.main).not.toBe(ready.integration);
+  // The new version refuses the carry by a rule. `carry.checks: false` reaches the same judgement, which the
+  // policy package tests (packages/policy/test/carry.test.ts).
+  it("an activation with a carry rule that refuses checks: the carried check no longer counts, the obligation is open, and the landing is not reserved", async () => {
+    const { r, l, mine, ready } = await carriedAndReady();
+    expect((await statusOn(r, mine.lane, ready.integration!)).state).toBe("met");
+    await inDO(r, (room) => {
+      const old = room.core.activePolicy();
+      const doc: PolicyDocument = { ...old.doc, rules: [...old.doc.rules, { id: "stop", kind: "carry", evidence: "check", allow: "false" }] };
+      room.core.sql.transaction(() => room.core.activate(doc, old.checkers, null, iso(clock.now)));
     });
+    const now = await statusOn(r, mine.lane, ready.integration!);
+    expect(now.state).toBe("open");
+    expect(now.evidence).toEqual([]);
+    await driveToEnd(r, l.op.id);
+    const after = await op(r, l.op.id);
+    expect(after.state).not.toBe("landed");
+    expect(after).toMatchObject({ waiting: ["obl_unit-tests"] });
+    expect(r.world.artifacts.main).not.toBe(ready.integration);
+  });
 
   it("reservation itself refuses a ready landing whose carried check stopped counting: retryable, evidence-invalid", async () => {
     const { r, l, ready } = await carriedAndReady();
@@ -171,9 +169,8 @@ describe("1. a stored check carry counts only under the policy version that judg
 // ------------------------------------------------------------------ 4b, 4c, 4e
 
 describe("4. check carry needs a pinned runner; the signed volatile flag must be the configuration's", () => {
-  async function carryUnder(pinned: boolean, extraRule?: PolicyDocument["rules"][number]) {
-    const base = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
-    const doc: PolicyDocument = extraRule ? { ...base, rules: [...base.rules, extraRule] } : base;
+  async function carryUnder(pinned: boolean) {
+    const doc = policy(requireCheck("unit", { paths: "src/**", by: "@ci", id: "unit-tests" }));
     const { runner: _pin, ...unpinned } = scoped;
     void _pin;
     const cfg: CheckerConfig = pinned ? scoped : unpinned;
@@ -199,11 +196,6 @@ describe("4. check carry needs a pinned runner; the signed volatile flag must be
 
   it("the pinned runner: the check carries and the landing completes", async () => {
     expect(await carryUnder(true)).toMatchObject({ state: "landed" });
-  });
-
-  it("a carry rule for reviews only does not stop a check carrying; one for checks is evaluated, and allows it (amendment 3 seals its decision)", async () => {
-    expect(await carryUnder(true, { id: "reviews", kind: "carry", evidence: "review", allow: "true" })).toMatchObject({ state: "landed" });
-    expect(await carryUnder(true, { id: "checks", kind: "carry", evidence: "any", allow: "true" })).toMatchObject({ state: "landed" });
   });
 
   for (const configured of [false, true])

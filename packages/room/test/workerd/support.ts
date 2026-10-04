@@ -43,6 +43,45 @@ import { unwire, type Wire } from "../../src/errors.ts";
 import type { Diagnosis } from "../../src/diag.ts";
 import { actInVocabulary, filesInVocabulary, inVocabulary, noteRecovery, refresh } from "./vocabulary.ts";
 
+// ------------------------------------------------------------ the test pool's object wrappers
+
+/**
+ * A workaround for @cloudflare/vitest-pool-workers 0.22.0. Each time the pool
+ * constructs a Durable Object or a Worker entrypoint, it wraps the wrapper
+ * class's prototype in one more `Proxy` (`createProxyPrototypeClass`). The
+ * proxies nest, so every call on the 500th room made in one isolate passes
+ * through 500 `get` traps: measured, a room cost 9 ms to make at first and
+ * 64 ms after 450 rooms.
+ *
+ * This keeps the pool's prototype one proxy deep. When `new Proxy` is given a
+ * target that is itself such a proxy, with a handler that has the same single
+ * `get` trap, the new proxy is made over the first proxy's target. The trap
+ * is the same code either way, so every lookup has the same result. Any other
+ * use of `Proxy` is untouched.
+ */
+const POOL_PROXY = Symbol.for("artroom.test.pool-proxy");
+if (!(globalThis as Record<symbol, unknown>)[POOL_PROXY]) {
+  (globalThis as Record<symbol, unknown>)[POOL_PROXY] = true;
+  const RealProxy = globalThis.Proxy;
+  const firsts = new WeakMap<object, { readonly target: object; readonly trap: string }>();
+  globalThis.Proxy = new RealProxy(RealProxy, {
+    construct(Target, args: [object, ProxyHandler<object>]) {
+      const [target, handler] = args;
+      const keys = Object.keys(handler);
+      const trap = keys.length === 1 && keys[0] === "get" ? String(handler.get) : null;
+      const first = trap !== null ? firsts.get(target) : undefined;
+      if (first !== undefined && first.trap === trap) {
+        const flat = new Target(first.target, handler);
+        firsts.set(flat, first);
+        return flat;
+      }
+      const made = new Target(target, handler);
+      if (trap !== null) firsts.set(made, { target, trap });
+      return made;
+    },
+  }) as ProxyConstructor;
+}
+
 // ------------------------------------------------------------ the clock
 
 export const clock = { now: Date.UTC(2026, 9, 1, 12, 0, 0) };
@@ -386,8 +425,29 @@ export class Client {
     return s.token;
   }
 
+  /** The session `read` made when a test gave it no token, and the room times between which it is used again. */
+  private kept: { readonly token: string; readonly from: number; readonly until: number } | null = null;
+
+  /**
+   * A read. With no token, the client makes a read session and keeps it for
+   * its later reads: a session request is a signed write, about 2.5 ms, and
+   * a test reads many times. If the room no longer accepts the kept session
+   * (its key was revoked, or it ran out), the client asks for a new one, so
+   * the caller sees what a new session request gives, as before.
+   */
   async read<Q extends ReadQuery>(q: Q, token?: string): Promise<ReadResults[Q["q"]]> {
-    return call<ReadResults[Q["q"]]>(this.room.stub.read(token ?? (await this.session()), q));
+    if (token !== undefined) return call<ReadResults[Q["q"]]>(this.room.stub.read(token, q));
+    const kept = this.kept;
+    if (kept && clock.now >= kept.from && clock.now < kept.until) {
+      const w = (await this.room.stub.read(kept.token, q)) as unknown as Wire<ReadResults[Q["q"]]>;
+      if (!("error" in w) || w.error.code !== "unauthenticated") return unwire(w);
+    }
+    this.kept = null;
+    const from = clock.now;
+    const fresh = await this.session();
+    // A session lasts an hour of room time; the last minute is left unused.
+    this.kept = { token: fresh, from, until: from + 59 * 60_000 };
+    return call<ReadResults[Q["q"]]>(this.room.stub.read(fresh, q));
   }
 }
 

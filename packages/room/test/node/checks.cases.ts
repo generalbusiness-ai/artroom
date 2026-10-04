@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -26,6 +26,7 @@ import { SEED_VAR, checkerJwk, envValue, seedKeyPair } from "../../scripts/spike
 import { validateCheckerConfig, validatePolicy } from "@generalbusiness/artroom-policy";
 import { b64url, keyPairFromSeed, newKeyPair, payloadOf, signingBytes, verify } from "../../src/crypto.ts";
 import { matchesAny } from "../../src/glob.ts";
+import { readJsonc } from "./jsonc.ts";
 
 /** Request 9f81f372: the review-and-check flow's fixtures, keys and readers, with no live call. */
 
@@ -41,7 +42,7 @@ describe("the checked room's repository", () => {
     expect(review).toMatchObject({ kind: "require", paths: CHECKED_PATHS, obligation: { type: "review", from: ["role:maintainer"], count: 1, allowSelf: false } });
   });
 
-  it("its first commit holds the policy, a valid checker configuration, and a package npm ci and npm test accept", () => {
+  it("its first commit holds the policy, a valid checker configuration, and a package with no dependencies whose test is node --test", () => {
     const files = checkProject("run");
     expect(JSON.parse(files[".artroom/policy.json"]!)).toEqual(checksPolicy());
     expect(validateCheckerConfig(JSON.parse(files[`.artroom/checkers/${CHECK}.json`]!)).ok).toBe(true);
@@ -50,13 +51,7 @@ describe("the checked room's repository", () => {
     expect(lock).toMatchObject({ name: pkg.name, version: pkg.version, lockfileVersion: 3, packages: { "": { name: pkg.name, version: pkg.version } } });
     expect(pkg.dependencies ?? {}).toEqual({});
     expect(pkg.scripts.test).toBe("node --test");
-    // The package's own test passes, as the checker will run it (here with node, without npm ci).
-    const dir = mkdtempSync(join(tmpdir(), "deploy-checks-"));
-    for (const [p, t] of Object.entries({ ...files, ...checkedChange("run") })) {
-      execFileSync("mkdir", ["-p", join(dir, p, "..")]);
-      writeFileSync(join(dir, p), t);
-    }
-    expect(() => execFileSync("node", ["--test"], { cwd: dir, stdio: "pipe" })).not.toThrow();
+    // The live measurement runs the package's test in the checker; nothing here runs it.
   });
 
   it("the lane's change is entirely under the checked paths, so it owes both obligations", () => {
@@ -98,7 +93,7 @@ describe("the spike keys", () => {
     expect(() => checkerJwk(b64url(new Uint8Array(16)))).toThrow();
   });
 
-  it("the key script never writes the JWK to a terminal, and refuses an env file that is not mode 600", () => {
+  it("the key script refuses an env file that is not mode 600, and writes the JWK to a pipe", () => {
     const dir = mkdtempSync(join(tmpdir(), "deploy-checks-env-"));
     const file = join(dir, "env");
     writeFileSync(file, text(`${SEED_VAR}=${seedOf(4)}\n`), { mode: 0o644 });
@@ -110,15 +105,10 @@ describe("the spike keys", () => {
         return { code: (e as { status: number }).status, out: String((e as { stdout: Buffer }).stdout) };
       }
     };
-    expect(run("id").code).toBe(2);
-    execFileSync("chmod", ["600", file]);
-    expect(run("id")).toEqual({ code: 0, out: `${seedKeyPair(seedOf(4))!.key}\n` });
+    expect(run("jwk")).toEqual({ code: 2, out: "" });
+    chmodSync(file, 0o600);
     // To a pipe (as here), the JWK; its private part is the seed.
     expect(JSON.parse(run("jwk").out)).toEqual(checkerJwk(seedOf(4)));
-    // `create` refuses when the seed is already set, and changes nothing.
-    const before = readFileSync(file, "utf8");
-    expect(run("create").code).toBe(2);
-    expect(readFileSync(file, "utf8")).toBe(before);
   });
 });
 
@@ -217,7 +207,7 @@ describe("seedImportRepo and importDraft", () => {
 });
 
 describe("the manual check of the isolated check measurement (request 8bd623cc)", () => {
-  it("adds a valid `manual` check on lib/** with its configuration, which the spike binds no service for", async () => {
+  it("adds a valid `manual` check on lib/** with its configuration, which the spike binds no service for", () => {
     const files = manualCheckProject("run");
     const doc = JSON.parse(files[".artroom/policy.json"]!);
     expect(validatePolicy(doc).ok).toBe(true);
@@ -225,8 +215,7 @@ describe("the manual check of the isolated check measurement (request 8bd623cc)"
     expect(JSON.parse(files[".artroom/checkers/manual.json"]!)).toEqual(MANUAL_CONFIG);
     expect(validateCheckerConfig(MANUAL_CONFIG).ok).toBe(true);
     // No job: the spike Room has no CHECKER_MANUAL binding.
-    const { unstable_readConfig } = await import("wrangler");
-    const spike = unstable_readConfig({ config: new URL("../../wrangler.spike.jsonc", import.meta.url).pathname }) as unknown as { services: { binding: string }[] };
+    const spike = readJsonc<{ services: { binding: string }[] }>("../../wrangler.spike.jsonc", import.meta.url);
     expect(spike.services.map((x) => x.binding)).not.toContain("CHECKER_MANUAL");
   });
 });

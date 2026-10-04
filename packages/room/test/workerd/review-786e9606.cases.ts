@@ -191,11 +191,14 @@ describe("review 786e9606 P2 1: a preparation that outlives its deadline sends n
 type Change = "owner" | "generation" | "configuration" | "obligation";
 
 describe("review 786e9606 P2 2: work that changed while its credentials were prepared is not sent, and its credentials are retired", () => {
-  for (const [kind, cfg] of [
-    ["whole-tree", whole],
-    ["filtered", scoped],
-  ] as const)
-    for (const change of ["owner", "generation", "configuration", "obligation"] as Change[])
+  // The dispatch claim judges the four facts in one place, for both kinds of preparation: each change has a
+  // witness, and each kind of preparation has two.
+  for (const [kind, cfg, change] of [
+    ["whole-tree", whole, "owner"],
+    ["filtered", scoped, "generation"],
+    ["whole-tree", whole, "configuration"],
+    ["filtered", scoped, "obligation"],
+  ] as const satisfies readonly (readonly [string, CheckerConfig, Change])[])
       it(`${kind} preparation, ${change} changed while a read token was being minted`, async () => {
         const { r, doc, alice, ci } = await checkRoom(cfg);
         const { seen } = service(r);

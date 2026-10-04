@@ -29,8 +29,9 @@ const positives: [string, string][] = [
 ];
 
 describe("R-SEC-1 detectors", () => {
-  for (const [detector, text] of positives)
-    it(`detects ${detector}`, () => expect(scanString(text, "body.text", false)).toEqual({ path: "body.text", detector }));
+  it("each detector finds its sample, and names itself and the field", () => {
+    for (const [detector, text] of positives) expect(scanString(text, "body.text", false), detector).toEqual({ path: "body.text", detector });
+  });
 
   it("does not flag commit SHAs, digests, key IDs, entry IDs, paths or prose", () => {
     for (const ok of [

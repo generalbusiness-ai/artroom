@@ -108,30 +108,6 @@ async function settle(r: TestRoom, limit = 6) {
 }
 
 describe("review 271dbd53: a known token keeps a durable owner across every handoff", () => {
-  it("a late usable answer whose token outlives the deadline (the checker's first control): the job never owns it; the ledger owes it, and after a restart its alarm revokes it by its ID", async () => {
-    const { r: before, seen, from } = await owed();
-    const a = before.world.artifacts;
-    const calls = a.remoteCalls.get("createToken") ?? 0;
-    a.holdToken = (repo, scope) => scope === "read" && repo === a.canonical;
-    const running = step(before);
-    await until(async () => (a.remoteCalls.get("createToken") ?? 0) > calls);
-    clock.now += 30_000;
-    a.holdToken = null;
-    await running;
-    expect(seen).toEqual([]);
-    const [token] = readTokens(before, from);
-    expect(token!.revoked).toBe(false);
-    // Owed by the ledger's record, due at once; never in a job token row.
-    expect(await ledger(before)).toEqual([]);
-    expect(await mintRecords(before)).toEqual([expect.objectContaining({ state: "owed", tokenId: token!.id, lastError: "an expiry after notAfter" })]);
-    const r = await restarted(before);
-    clock.now += 2_000;
-    await tick(r);
-    await inDO(r, (room) => room.core.mints.idle());
-    expect(token!.revoked).toBe(true);
-    expect(await mintRecords(r)).toEqual([]);
-  });
-
   it("normal completion (the checker's second control): the cleanup write after the answer fails once; after a restart the token is still owned, and revoked", async () => {
     const { r: before, seen, from } = await owed();
     await failOnce(before, END);

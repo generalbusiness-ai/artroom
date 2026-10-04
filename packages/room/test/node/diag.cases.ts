@@ -28,12 +28,13 @@ describe("redact", () => {
     ["a GitHub token by the secret scan's detector", `using ${join("gh", "p_", fill(36))}`, join("gh", "p_"), "using <secret>"],
     ["a long random token", `id ${fill(48, RANDOM)} rejected`, fill(48, RANDOM), "id <secret> rejected"],
   ];
-  for (const [what, input, secret, out] of cases)
-    it(`removes ${what}`, () => {
+  it("removes each kind of credential, and leaves the rest of the message", () => {
+    for (const [what, input, secret, out] of cases) {
       const r = redact(input);
-      expect(r).not.toContain(secret);
-      expect(r).toBe(out);
-    });
+      expect(r, what).not.toContain(secret);
+      expect(r, what).toBe(out);
+    }
+  });
 
   it("keeps what diagnoses need: commit IDs, key IDs, room IDs and plain words", () => {
     const sha = "0123456789abcdef0123456789abcdef01234567";
@@ -102,26 +103,28 @@ describe("redact: credentials known by their syntax, whatever their length or en
     ["a private key block's body", join("-----BEGIN ", "PRIVATE KEY-----\nq1w2\ne3r4\n-----END ", "PRIVATE KEY-----\nnext"), ["q1w2", "e3r4"], "<secret>\nnext"],
     ["a private key block cut before its END line, to the end", join("key -----BEGIN ", "RSA PRIVATE KEY-----\nq1w2 e3r4"), ["q1w2", "e3r4"], "key <secret>"],
   ];
-  for (const [what, input, gone, out] of cases)
-    it(`removes ${what}`, () => {
+  it("removes each of them, short or quoted, and leaves the rest of the message", () => {
+    for (const [what, input, gone, out] of cases) {
       const r = redact(input);
-      for (const g of gone) expect(r).not.toContain(g);
-      expect(r).toBe(out);
-    });
+      for (const g of gone) expect(r, what).not.toContain(g);
+      expect(r, what).toBe(out);
+    }
+  });
 });
 
 describe("redact: the checker's controls (report e6a9016b)", () => {
   // The checker's three cases, verbatim, through `diagnosis` as the Room calls it.
-  for (const [what, text, fragments] of [
-    ["quoted spaces", 'password: "horse battery staple"', ["horse", "battery", "staple"]],
-    ["quoted escaped quote", JSON.stringify({ password: 'horse"battery' }), ["horse", "battery"]],
-    ["short bearer", "request with Bearer abcd failed", ["abcd"]],
-  ] as const)
-    it(what, () => {
+  it("quoted spaces, a quoted escaped quote and a short bearer are redacted", () => {
+    for (const [what, text, fragments] of [
+      ["quoted spaces", 'password: "horse battery staple"', ["horse", "battery", "staple"]],
+      ["quoted escaped quote", JSON.stringify({ password: 'horse"battery' }), ["horse", "battery"]],
+      ["short bearer", "request with Bearer abcd failed", ["abcd"]],
+    ] as const) {
       const d = diagnosis("pre-admission-failed", "propose.pinObjects", new Error(text));
-      for (const f of fragments) expect(d.message).not.toContain(f);
-      expect(d.message).toContain("<redacted>");
-    });
+      for (const f of fragments) expect(d.message, what).not.toContain(f);
+      expect(d.message, what).toContain("<redacted>");
+    }
+  });
 
   it("the error's name is redacted too", () => {
     const e = Object.assign(new Error("x"), { name: 'ArtifactsError password="horse battery" Bearer abcd' });

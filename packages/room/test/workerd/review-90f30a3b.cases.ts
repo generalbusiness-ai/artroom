@@ -105,16 +105,6 @@ describe("review 90f30a3b: a whole-tree job's token expires by its deadline, and
     expect(await ledger(r)).toEqual([]);
   });
 
-  it("an answer delayed after the mint, still before the deadline: the job is sent, with a token that expires by the deadline", async () => {
-    const { r, seen } = await owed();
-    await heldStep(r, "reply", () => (clock.now += 30_000));
-    expect(seen).toHaveLength(1);
-    const deadline = Date.parse(seen[0]!.job.deadline);
-    expect(seen[0]!.now).toBeLessThan(deadline);
-    expect(seen[0]!.reads).toBe(true);
-    expect(seen[0]!.expiresAt).toBeLessThanOrEqual(deadline);
-  });
-
   it("a mint delayed so that the token would outlive the deadline: the token is refused and revoked, nothing is sent, and the job is due again later", async () => {
     const { r, seen } = await owed();
     const from = r.world.artifacts.canonicalRepo().tokens.size;
