@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a7585586c27b14557a35733f5920f68978298038","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/canonical.cases.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a7922f28da4f13eeb8c410bd75da9e3ecfb5fe5c","text":"Merge retired a covered predecessor; the successor is at packages/contract/src/declarations.ts."}
