@@ -1755,6 +1755,8 @@ This branch changes `packages/log` and this file, and nothing else.
 
 Stage 3 is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), where it is composed with stage 2. The branch `request/decl-stage3` stays at `5449d19c`. Read this subsection first. Below it, "Mutation table" and the test names describe a layout that request `ecbc722a` replaced; "Prerequisite and composition" is done: the head contains stage 2, and the Room test that publishes and verifies a `v2` session runs.
 
+**Where each part is reviewed.** `packages/log` and the two notes are reviewed under this request. The changes to `packages/room/src/core.ts` described below are stage 2's source and are reviewed under stage 2 (request `fd6f00b6`, review request `5612131b` at `39430e23`). Each lane has its review request at a head of its own on this branch; the source of `packages/log` has not changed since `26872bac`.
+
 **Not complete.** Condition 2 asks verify to detect omitted, extra and substituted evaluation calls. For carry judgments it now does so in part. Complete accounting needs the Room to record each carry pass, which is a contract amendment. The design is [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md). The planner has said it stays owed under this request.
 
 **Repaired since `5449d19c`**, each from a checker finding:
