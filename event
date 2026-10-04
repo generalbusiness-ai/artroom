@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/mcp/package.json","body":{"commit":"08c6a0fac5d1f71e8ba2d68719d7f9ba76ec127b","path":"packages/mcp/package.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/mcp/src/index.ts","body":{"commit":"08c6a0fac5d1f71e8ba2d68719d7f9ba76ec127b","path":"packages/mcp/src/index.ts"}}
