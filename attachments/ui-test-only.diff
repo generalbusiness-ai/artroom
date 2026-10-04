@@ -1,0 +1,85 @@
+diff --git a/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/fixture/packages/ui/probe-catalogue.config.ts b/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/fixture/packages/ui/probe-catalogue.config.ts
+new file mode 100644
+index 00000000..999d44a5
+--- /dev/null
++++ b/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/fixture/packages/ui/probe-catalogue.config.ts
+@@ -0,0 +1,14 @@
++import { defineConfig } from "vitest/config";
++import { fileURLToPath } from "node:url";
++import base from "./vite.config.ts";
++const at = (path: string) => fileURLToPath(new URL(path, import.meta.url));
++export default defineConfig({
++  ...base,
++  resolve: { alias: [
++    { find: "@generalbusiness/artroom-policy/declared", replacement: at("../policy/src/declared.ts") },
++    { find: "@generalbusiness/artroom-policy", replacement: at("../policy/src/index.ts") },
++    { find: "@generalbusiness/artroom-contract", replacement: at("../contract/src/index.ts") },
++    { find: "@generalbusiness/artroom-git", replacement: at("../git/src/index.ts") },
++  ] },
++  test: { ...base.test, include: ["test/probe-catalogue-loss.test.tsx"], maxWorkers: 1, testTimeout: 10000 },
++});
+diff --git a/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/fixture/packages/ui/test/probe-catalogue-loss.test.tsx b/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/fixture/packages/ui/test/probe-catalogue-loss.test.tsx
+new file mode 100644
+index 00000000..51511d79
+--- /dev/null
++++ b/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/fixture/packages/ui/test/probe-catalogue-loss.test.tsx
+@@ -0,0 +1,59 @@
++import { cleanup, fireEvent, screen } from "@testing-library/preact";
++import { afterEach, expect, test } from "vitest";
++import { writeFileSync } from "node:fs";
++import type { HttpRoom } from "../src/room/contract.ts";
++import { LiveRoom } from "../src/room/live/live-room.ts";
++import { BAND } from "../src/room/mock/declared-room.ts";
++import { MemoryRoom } from "../src/room/mock/memory-room.ts";
++import { SETLIST_ACTS } from "../src/room/mock/setlist.ts";
++import { renderAt, waitFor } from "./helpers.tsx";
++const adapters: LiveRoom[] = [];
++afterEach(() => { cleanup(); for (const adapter of adapters.splice(0)) adapter.stop(); location.hash = ""; });
++const form = () => document.querySelector<HTMLFormElement>("form[data-act-form]")!;
++const uncertainty = () => document.querySelector<HTMLElement>("[data-unresolved]");
++const fresh = () => screen.queryByRole("button", { name: "Send “Start a song”" });
++const again = () => screen.queryByRole("button", { name: "Ask again, the same act" });
++function fill(title: string, scope: string) {
++  fireEvent.input(screen.getByLabelText(/^scope/), { target: { value: scope } });
++  fireEvent.input(screen.getByLabelText(/^title/), { target: { value: title } });
++  fireEvent.change(screen.getByLabelText(/^key/), { target: { value: "c" } });
++  fireEvent.input(screen.getByLabelText(/^tempo/), { target: { value: "120" } });
++}
++async function opened() {
++  const room = await MemoryRoom.found("the-band/setlist", BAND, { acts: SETLIST_ACTS }); room.me = "@noor";
++  const adapter = new LiveRoom(room as unknown as HttpRoom, "@noor", () => new Date("2026-10-03T10:00:00Z")); adapters.push(adapter);
++  await adapter.start(); renderAt("#/acts", adapter);
++  fireEvent.click(screen.getByRole("button", { name: "Prepare “Start a song”" }));
++  await waitFor(() => expect(form()).not.toBeNull()); fill("Original", "songs/original/**");
++  const send = room.act.bind(room); let lost = false;
++  room.act = async (...args) => { const result = await send(...args); if (!lost) { lost = true; expect("refused" in result).toBe(false); throw { name: "ArtroomError", code: "timeout", retryable: true, maybeRecorded: true, message: "The room's reply did not arrive." }; } return result; };
++  fireEvent.submit(form()); await waitFor(() => expect(uncertainty()).not.toBeNull());
++  await waitFor(() => expect(adapter.snapshot()!.lanes).toHaveLength(1));
++  expect(room.sent).toHaveLength(1); expect(room.keys[0]).toBeDefined(); expect(fresh()).toBeNull();
++  return { room, adapter };
++}
++test("an unresolved form keeps its original key through a failed catalogue refresh on the same page", async () => {
++  const control = await opened();
++  const controlBefore = { hash: location.hash, uncertainty: uncertainty()!.textContent, keys: [...control.room.keys], sent: structuredClone(control.room.sent) };
++  fireEvent.click(again()!); await waitFor(() => expect(document.querySelector("[data-recorded]")).not.toBeNull());
++  expect(control.room.keys).toEqual([control.room.keys[0], control.room.keys[0]]);
++  expect(control.room.sent[1]).toEqual(control.room.sent[0]); expect(control.adapter.snapshot()!.lanes).toHaveLength(1);
++  const controlAfter = { keys: [...control.room.keys], sent: structuredClone(control.room.sent), effects: control.adapter.snapshot()!.lanes.length, receipt: document.querySelector<HTMLElement>("[data-recorded]")!.dataset["recorded"] };
++  control.adapter.stop(); cleanup(); location.hash = "";
++  const target = await opened(); const originalCatalogue = target.adapter.snapshot()!.catalogue;
++  const before = { hash: location.hash, uncertainty: uncertainty()!.textContent, keys: [...target.room.keys], sent: structuredClone(target.room.sent), effects: target.adapter.snapshot()!.lanes.length };
++  const acts = target.room.acts.bind(target.room); let fail = true;
++  target.room.acts = async () => { if (fail) throw new Error("controlled catalogue read failure"); return acts(); };
++  target.room.publish(); await waitFor(() => expect(target.adapter.snapshot()!.catalogue).toBeNull());
++  await waitFor(() => expect(document.querySelector("[data-acts='unavailable']")).not.toBeNull());
++  const during = { hash: location.hash, formMounted: form() !== null, uncertainty: uncertainty()?.textContent ?? null, keys: [...target.room.keys], effects: target.adapter.snapshot()!.lanes.length };
++  fail = false; target.room.publish(); await waitFor(() => expect(target.adapter.snapshot()!.catalogue).toEqual(originalCatalogue));
++  await waitFor(() => expect(form()).not.toBeNull());
++  const restored = { hash: location.hash, uncertainty: uncertainty()?.textContent ?? null, sameActButton: again() !== null, freshSendButton: fresh() !== null, keys: [...target.room.keys], fieldValues: [...document.querySelectorAll<HTMLInputElement>("form input, form textarea, form select")].map((e) => [e.id, e.value]) };
++  // Demonstrate whether a new act can go before the original key is settled; do not broaden the scenario.
++  if (fresh()) { fill("Fresh without settling Original", "songs/fresh/**"); fireEvent.submit(form()); await waitFor(() => expect(target.room.sent).toHaveLength(2)); await waitFor(() => expect(target.adapter.snapshot()!.lanes).toHaveLength(2)); }
++  const after = { keys: [...target.room.keys], sent: structuredClone(target.room.sent), effects: target.adapter.snapshot()!.lanes.length, acceptedActs: target.adapter.snapshot()!.feed.filter((e) => e.type === "act").map((e) => e.id) };
++  writeFileSync("/tmp/artroom-checker-stage5-c38-eviction-st4tv4kb/ui-observations.json", JSON.stringify({ head: "c38c23ce3760f041d75678cf6c5d4c109c62e5da", fidelity: "exact ActsScreen and LiveRoom over unchanged MemoryRoom; happy-dom, no signatures, real Room, provider or browser", controlBefore, controlAfter, before, during, restored, after }, null, 2) + "\n");
++  expect(restored.sameActButton, "catalogue refresh discarded the unresolved original key and allowed a fresh act on the same open page").toBe(true);
++  expect(new Set(after.keys).size).toBe(1);
++});
