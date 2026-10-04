@@ -249,13 +249,16 @@ abstract class RoomCore {
    */
   readonly #unanswered = new Map<string, PreparedAct>();
   /**
-   * Named acts under way that are not in `#unanswered` yet, by idempotency
-   * key, with how many calls are under way for each. A call takes its place
-   * here before its first await, so two calls started together cannot both
-   * pass the bound. The place is given up when the call ends: by then the
-   * act is answered, was never sent, or is kept in `#unanswered`.
+   * Named acts under way, by idempotency key: the intent, as canonical
+   * text, and the one call that is carrying it. A call takes its place here
+   * before its first await. So two calls started together cannot both pass
+   * the bound, and a key carries one intent at a time: a second call with
+   * the same key and the same intent shares the first call's outcome, and
+   * one with another intent is refused before anything is signed. The place
+   * is given up when the call ends: by then the act is answered, was never
+   * sent, or is kept in `#unanswered`.
    */
-  readonly #underWay = new Map<string, number>();
+  readonly #underWay = new Map<string, { readonly intent: string; run: Promise<Result<ActRecord>> }>();
 
   constructor(wire: Wire & { redactor: import("./errors.ts").Redactor }, creds: Credentials, id: RoomId, name: RoomName, opts: ClientOptions, bearer?: BearerActor) {
     this.wire = wire;
@@ -389,61 +392,86 @@ abstract class RoomCore {
   }
 
   /** One of the named methods' acts: built, signed for a key, and sent. */
-  protected async named<T>(kind: EnvelopeKind, givenTarget: unknown, givenBody: unknown, opts?: ClientActOptions): Promise<Result<T>> {
-    const idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
-    const { target, body } = ownedIntent(givenTarget, givenBody); // G5:named-owned
-    const kept = this.#unanswered.get(idempotencyKey);
-    const counted = kept !== undefined || this.#underWay.has(idempotencyKey);
-    if (!counted && this.#unanswered.size + this.#underWay.size >= UNANSWERED_MAX)
-      throw artroomError("rate-limited", `This handle has ${UNANSWERED_MAX} acts with no answer yet. Repeat one of them with its idempotency key, so that it is answered, before making another act.`); // G5:named-unanswered-full
-    // Taken before the first await below.
-    if (kept === undefined) this.#underWay.set(idempotencyKey, (this.#underWay.get(idempotencyKey) ?? 0) + 1); // G5:named-under-way
+  protected named<T>(kind: EnvelopeKind, givenTarget: unknown, givenBody: unknown, opts?: ClientActOptions): Promise<Result<T>> {
+    // Everything down to the entry in `#underWay` runs before any await: it decides, at once, whose intent a key carries.
+    let idempotencyKey: IdempotencyKey;
+    let owned: { readonly target: unknown; readonly body: unknown };
+    let intent: string;
     try {
-      let prepared: PreparedAct;
-      if (kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)) {
-        prepared = kept; // G5:named-retry-kept
-      } else if (this.bearer !== undefined) {
-        // The room signs. For a named tool in a `v2` room it adds the built-for binding itself (R-CRED-10).
-        prepared = { kind, target, body, idempotencyKey };
-      } else {
-        const binding = await this.#builtFor(kind);
-        const envelope =
-          binding === undefined
-            ? buildEnvelope(this.id, this.identity, kind, target, body, idempotencyKey)
-            : buildDeclaredEnvelope(this.id, this.identity, kind, binding, target as DeclaredTarget, body, idempotencyKey); // G5:named-v2
-        prepared = { kind, target, body, idempotencyKey, signed: await signEnvelope(envelope, this.identity.signer) };
-      }
-      await opts?.onPrepared?.(prepared);
-      // The handle keeps one act under a key, and only an outcome of that very act changes what is kept. A different
-      // act sent under a held key, by this call or by one started beside it, gets the room's mismatch; that says
-      // nothing about the kept act, which stays until it has an answer of its own.
-      const keeps = () => this.#unanswered.get(idempotencyKey);
-      let out: Result<ActRecord>;
-      try {
-        out = await this.replay(prepared);
-      } catch (e) {
-        // A room that left the vocabulary this handle read answers `bad-request` at step 1: read again next time.
-        if (isArtroomError(e) && e.code === "bad-request") {
-          this.#vocabulary = undefined; // G5:named-forget-vocabulary
-          // The room answers an exact retry of an accepted act before step 1, so it never accepted this one.
-          if (keeps() === prepared) this.#unanswered.delete(idempotencyKey);
-        } else if (keeps() === undefined) {
-          // No answer: the room may have recorded it. A repeat with this key sends these bytes.
-          this.#unanswered.set(idempotencyKey, prepared); // G5:named-retry-keep
-        }
-        throw e;
-      }
-      if (keeps() === prepared) this.#unanswered.delete(idempotencyKey); // G5:named-own
-      this.#vocabularyStale(out);
-      this.sawRefusal(out);
-      return out as Result<T>;
-    } finally {
-      if (kept === undefined) {
-        const n = (this.#underWay.get(idempotencyKey) ?? 1) - 1;
-        if (n > 0) this.#underWay.set(idempotencyKey, n);
-        else this.#underWay.delete(idempotencyKey);
-      }
+      idempotencyKey = checkIdempotencyKey(opts?.idempotencyKey ?? newIdempotencyKey());
+      owned = ownedIntent(givenTarget, givenBody); // G5:named-owned
+      intent = canonicalize({ kind, target: owned.target, body: owned.body });
+    } catch (e) {
+      return Promise.reject(e);
     }
+    const flying = this.#underWay.get(idempotencyKey);
+    if (flying !== undefined) {
+      if (flying.intent === intent) return flying.run as Promise<Result<T>>; // G5:named-share
+      return Promise.reject(
+        artroomError("bad-request", "Another act with this idempotency key is under way, with another kind, target or body. Nothing was sent. Use a new key for a new act, or wait for the first to end."), // G5:named-one-intent
+      );
+    }
+    const kept = this.#unanswered.get(idempotencyKey);
+    if (kept === undefined) {
+      let places = this.#unanswered.size;
+      for (const key of this.#underWay.keys()) if (!this.#unanswered.has(key)) places++;
+      if (places >= UNANSWERED_MAX)
+        return Promise.reject(
+          artroomError("rate-limited", `This handle has ${UNANSWERED_MAX} acts with no answer yet. Repeat one of them with its idempotency key, so that it is answered, before making another act.`), // G5:named-unanswered-full
+        );
+    }
+    const entry = { intent, run: undefined as unknown as Promise<Result<ActRecord>> };
+    this.#underWay.set(idempotencyKey, entry); // G5:named-under-way
+    entry.run = (async () => {
+      try {
+        return await this.#sendNamed(kind, owned.target, owned.body, idempotencyKey, kept, opts);
+      } finally {
+        if (this.#underWay.get(idempotencyKey) === entry) this.#underWay.delete(idempotencyKey);
+      }
+    })();
+    return entry.run as Promise<Result<T>>;
+  }
+
+  /** The awaited part of `named`: build or reuse the prepared act, send it, and settle what the handle keeps. */
+  async #sendNamed(kind: EnvelopeKind, target: unknown, body: unknown, idempotencyKey: IdempotencyKey, kept: PreparedAct | undefined, opts?: ClientActOptions): Promise<Result<ActRecord>> {
+    let prepared: PreparedAct;
+    if (kept !== undefined && kept.kind === kind && canonicalize(kept.target) === canonicalize(target) && canonicalize(kept.body) === canonicalize(body)) {
+      prepared = kept; // G5:named-retry-kept
+    } else if (this.bearer !== undefined) {
+      // The room signs. For a named tool in a `v2` room it adds the built-for binding itself (R-CRED-10).
+      prepared = { kind, target, body, idempotencyKey };
+    } else {
+      const binding = await this.#builtFor(kind);
+      const envelope =
+        binding === undefined
+          ? buildEnvelope(this.id, this.identity, kind, target, body, idempotencyKey)
+          : buildDeclaredEnvelope(this.id, this.identity, kind, binding, target as DeclaredTarget, body, idempotencyKey); // G5:named-v2
+      prepared = { kind, target, body, idempotencyKey, signed: await signEnvelope(envelope, this.identity.signer) };
+    }
+    await opts?.onPrepared?.(prepared);
+    // The handle keeps one act under a key, and only an outcome of that very act changes what is kept. A different
+    // act sent under a held key gets the room's mismatch; that says nothing about the kept act, which stays until it
+    // has an answer of its own.
+    const keeps = () => this.#unanswered.get(idempotencyKey);
+    let out: Result<ActRecord>;
+    try {
+      out = await this.replay(prepared);
+    } catch (e) {
+      // A room that left the vocabulary this handle read answers `bad-request` at step 1: read again next time.
+      if (isArtroomError(e) && e.code === "bad-request") {
+        this.#vocabulary = undefined; // G5:named-forget-vocabulary
+        // The room answers an exact retry of an accepted act before step 1, so it never accepted this one.
+        if (keeps() === prepared) this.#unanswered.delete(idempotencyKey);
+      } else if (keeps() === undefined) {
+        // No answer: the room may have recorded it. A repeat with this key sends these bytes.
+        this.#unanswered.set(idempotencyKey, prepared); // G5:named-retry-keep
+      }
+      throw e;
+    }
+    if (keeps() === prepared) this.#unanswered.delete(idempotencyKey); // G5:named-own
+    this.#vocabularyStale(out);
+    this.sawRefusal(out);
+    return out;
   }
 
   /**

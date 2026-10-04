@@ -184,7 +184,11 @@ bytes when you repeat the call with the same idempotency key, even if the
 room's vocabulary changed in between. It keeps at most 64 and drops none:
 with 64 unanswered or under way, a new named act is refused `rate-limited`
 before it is signed or sent. Acts started together are counted before
-either waits, so they cannot both take the last place. Repeat one of the unanswered acts, so that it is answered,
+either waits, so they cannot both take the last place. A key carries one
+intent at a time: a second call with the same key and the same kind,
+target and body, made while the first is under way, gets the first call's
+outcome; one with another intent is refused `bad-request` and nothing is
+sent. Repeat one of the unanswered acts, so that it is answered,
 and then make the new one.
 
 ## Choices this package makes
