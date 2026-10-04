@@ -7,6 +7,20 @@ same code works on both.
 It uses only Web APIs (`fetch`, WebCrypto, `WebSocket`), so it runs in
 Workers, Node 22 or later, and current browsers.
 
+## Install
+
+The package is released as a tarball of built JavaScript and declarations.
+Install it in one command with the two Artroom packages it depends on:
+
+```sh
+npm install --save-exact ./generalbusiness-artroom-contract-<version>.tgz \
+  ./generalbusiness-artroom-policy-<version>.tgz ./generalbusiness-artroom-client-<version>.tgz
+```
+
+It is not in a registry. [docs/release.md](../../docs/release.md) says how a release is made and checked.
+A TypeScript project without Node's types needs `"ESNext.Disposable"` in
+`lib`.
+
 ## Connect and act
 
 ```ts
@@ -168,8 +182,13 @@ needs a valid token (R-CRED-10). The CLI uses both for its journal.
 A handle also keeps each named act that got no answer, and sends the same
 bytes when you repeat the call with the same idempotency key, even if the
 room's vocabulary changed in between. It keeps at most 64 and drops none:
-with 64 unanswered, a new named act is refused `rate-limited` before it is
-signed or sent. Repeat one of the unanswered acts, so that it is answered,
+with 64 unanswered or under way, a new named act is refused `rate-limited`
+before it is signed or sent. Acts started together are counted before
+either waits, so they cannot both take the last place. A key carries one
+intent at a time: a second call with the same key and the same kind,
+target and body, made while the first is under way, gets the first call's
+outcome; one with another intent is refused `bad-request` and nothing is
+sent. Repeat one of the unanswered acts, so that it is answered,
 and then make the new one.
 
 ## Choices this package makes

@@ -1,6 +1,6 @@
 {
   "name": "@generalbusiness/artroom-cli",
-  "version": "0.0.0",
+  "version": "0.1.0-dev.1",
   "description": "The artroom command: join a room, claim a lane, push with git, propose, review and land. Plain text by default, --json for scripts.",
   "license": "Apache-2.0",
   "type": "module",
@@ -13,13 +13,11 @@
     "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/artroom.js --banner:js=\"import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);\"",
     "prepack": "npm run build"
   },
-  "dependencies": {
-    "@generalbusiness/artroom-client": "0.0.0",
-    "@generalbusiness/artroom-contract": "0.0.0",
-    "@generalbusiness/artroom-mcp": "0.0.0"
-  },
   "devDependencies": {
-    "@generalbusiness/artroom-policy": "0.0.0",
+    "@generalbusiness/artroom-client": "0.1.0-dev.1",
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+    "@generalbusiness/artroom-mcp": "0.1.0-dev.1",
+    "@generalbusiness/artroom-policy": "0.1.0-dev.1",
     "@types/node": "22.20.4",
     "esbuild": "0.28.1",
     "vitest": "4.1.11"
@@ -29,7 +27,6 @@
   },
   "files": [
     "bin",
-    "dist",
-    "README.md"
+    "dist"
   ]
 }

@@ -46,7 +46,7 @@ Files are in `packages/client/test/`.
 | Canonical bytes and signatures are fixed vectors, and a declared envelope's binding is inside the signed bytes. | R-SIG-1 to 3, R-ID-4, R-ID-10, R-DECL-16 | `signing.test.ts`; `workerd/signing.test.ts` |
 | A prepared act is the handle's own frozen copy. | R-IDEM-2, review 43e8fe3b | `prepared.test.ts`: "a prepared act is the handle's own copy" |
 | A target or body that is not plain data is `bad-request` before anything is signed or sent; a getter is refused and not called. | R-SIG-6, reviews 61b68774, b2043423 | `prepared.test.ts`: "a target or body that is not plain data" |
-| A retry sends what was first built, also after the vocabulary changed. A handle drops no unanswered act: at 64 it refuses a new one. | R-IDEM-1, R-IDEM-2, R-DECL-16, review 6bf8d38a | `prepared.test.ts`: "a retry sends what was first built" |
+| A retry sends what was first built, also after the vocabulary changed. A handle drops no unanswered act: at 64, counting acts under way, it refuses a new one; a different act under a held key does not replace the one kept; a key carries one intent at a time. | R-IDEM-1, R-IDEM-2, R-DECL-16, reviews 6bf8d38a, 0b33e8cc, 2ee996f4, 17ce6443 | `prepared.test.ts`: "a retry sends what was first built" |
 | A lost or cut-off answer is retried with the same bytes, a bounded number of times, with backoff. | R-IDEM-1 to 3, R-IDEM-6 | `room.test.ts`: "idempotent retries" |
 | Refusals are values and failures are `ArtroomError`s. | R-API-1, R-ID-3 | `room.test.ts`: "refusals are values" |
 | A watch resumes from its cursor, stops once when its credential is refused, and never reconnects after it is closed. | R-API-6 to 8, R-CRED-7 | `room.test.ts`: "resumable cursors" |
@@ -93,10 +93,11 @@ Files are in `packages/log/test/`. Only `golden.test.ts` also runs in workerd.
 | Recomputed, land and `notified` decisions replay under the policy pinned with their act. | R-LOG-13, section 27 | `amendment-2.test.ts`; `review-ea4a9bd0.test.ts`: "finding 5" |
 | `check-carried` events replay under the version they name. | R-CARRY-13, section 29.8 | `amendment-3.test.ts` |
 | A time that bounds authority is a valid RFC 3339 UTC time, and retained evidence is decoded per contract and digest. | reviews 07d3150e, a454cbaf | `review-07d3150e.test.ts`; `review-a454cbaf.test.ts` |
-| `artroom verify` exits 0, 1 or 2, and fetches the room's pinned heads. | R-LOG-10 | `cli.node.test.ts` |
+| `artroom verify` exits 0, 1 or 2, fetches the room's pinned heads, and says to a program and to a person what the run checked and that carry judgments are accounted for in part; with replay off it claims none of the checks it skipped. | R-LOG-10, R-DECL-25, request 42342e35 | `cli.node.test.ts`; `declared-obligations.test.ts`: "with replay off the report says so" |
+| A signed check whose body lacks what verify reads later is `malformed` at its entry, never a throw. | R-OBL-3, review 63af1ce0 | `amendment-3.test.ts`: "a signed check with no input, or no integration" |
 | A declared log is decoded by grammar, and an entry outside it is `malformed` at its seq. | R-SIG-4, R-DECL-2, R-DECL-16 | `declared-stage3.test.ts`: "condition 1: decoding by grammar (R-SIG-4" |
 | Kind, binding, body, target and grants are judged under the document in force at the entry's seq. | R-DECL-1, 4, 5, 10 to 12, 16, 17, 21; R-ADM-5 | `declared-stage3.test.ts`: "condition 1: decoding by grammar, and kind" |
-| A `v1` log verifies as it did. | R-DECL-1 | `declared-stage3.test.ts`: "the legacy rule:"; "condition 3:" |
+| A `v1` log verifies as it did, and a verifier that judged its `v1`-era entries by the `v2` declarations would fail it. | R-DECL-1, R-DECL-21, R-DECL-25 | `declared-stage3.test.ts`: "the legacy rule:"; "condition 3:"; `declared-legacy-negative.test.ts` (the whole log, under a verifier with that one fault) |
 | A steps version or profile the verifier lacks stops verification as a limit, not as a failure. | R-DECL-14, R-DECL-22 | `declared-stage3.test.ts`: "condition 1: the steps version" |
 | The calls admission had to make are derived, and a missing, extra or differing one is named. | R-DECL-20, R-DECL-25, R-ADM-1 | `declared-stage3.test.ts`: "condition 2:" |
 | A `recover` op is judged by the role table of the legacy act it stands for, and is accepted only from an admin's own key. | R-DECL-21, R-GEN-5, R-ADMIN-5 | `declared-stage3.test.ts`: "a recover op is judged by the role table" |
@@ -463,6 +464,7 @@ Files are in `packages/ui/test/`. The browser suite `packages/ui/e2e` is not in 
 | Invariant | Rule | Witness |
 |---|---|---|
 | A stale meaning is never sent without the person confirming. | R-DECL-16 | `acts-screen.test.tsx`: "a meaning that changed behind the form" |
+| An act whose outcome is unknown outlasts a failed read of the room's acts: no new act is sent, by the form or by confirming a new meaning, and asking again settles the same act once. | R-IDEM-2, reviews 0b33e8cc, 12b1e0a9 | `acts-screen.test.tsx`: "an unresolved act outlasts a failed read"; "confirming the new meaning sends nothing while" |
 | A lost answer is shown as unresolved, and asking again sends the same act with the same key. | R-IDEM-2, review fb27de86 | `acts-screen.test.tsx`: "an answer that was lost" |
 | A form is built from the declaration, and the declared limits are checked before anything is sent. | R-DECL-12 | `acts-screen.test.tsx`: "the form is built"; `acts-fields.test.ts` |
 | The page's catalogue never goes back behind an activation it confirmed. | R-DECL-23 | `live-catalogue.test.ts` |
@@ -481,6 +483,16 @@ Files are in `packages/ui/test/`. The browser suite `packages/ui/e2e` is not in 
 - 24 tests of the stand-in room's own scenario, data and rules. They show nothing about the product.
 - Four rounds of review findings on the catalogue invariant (27 tests) became `live-catalogue.test.ts` (18).
 - Tables of 14, 5 and 4 cases became one test each.
+
+## Release
+
+The scripts are in `scripts/`. The consumer fixture is `release/consumer/`.
+
+| Invariant | Rule | Witness |
+|---|---|---|
+| The six released packages can be built and packed as their manifests claim: one nonzero version, exact dependencies between them, a command with no runtime dependency, and every export and bin naming a source file the build covers. | request 7e82100b | `scripts/release-manifest.test.mjs` (in the gate) |
+| The packed tarballs install outside the repository, every claimed Node subpath loads, a consumer typechecks under NodeNext and bundler resolution, both commands run, the command installs alone, and every export, type and bin in a tarball is a file in it. | request 7e82100b | `scripts/check-release.mjs` (`npm run release:check`; outside the gate, because it installs from the network) |
+| The command's tarball carries the complete licence text of every third-party package whose code its bundle contains, bundled directly or embedded in a bundled package's own build. The recorded texts have their recorded hashes, and a directly bundled package's installed licence file is the recorded one. | request 7e82100b, review 59605d51 | `scripts/release-manifest.test.mjs`: "the recorded third-party licence texts are intact ..."; "a bundle is compared with the record by what it contains ..." (in the gate). The real bundle is compared in `scripts/pack-release.mjs` and `scripts/check-release.mjs` |
 
 ## The 36 repaired defects of declared acts stage 2
 

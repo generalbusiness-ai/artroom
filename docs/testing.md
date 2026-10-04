@@ -69,12 +69,14 @@ npm test --workspace packages/git    # the git package (Node's test runner)
 npm test --workspace packages/ui     # the ui package (its own vitest)
 ```
 
-`npm run test:changed` covers all three test runners
+`npm run test:changed` covers every test runner
 ([scripts/test-changed.mjs](../scripts/test-changed.mjs)). The root vitest
 run picks the test files that import a changed file, in every package but
 git and ui. Those two have their own runners. Each runs whole, in a few
 seconds, when a changed file is in the package or in a workspace package it
-depends on. The last lines say which of the three ran, and why one did not.
+depends on. The test of the release manifests runs when a package
+manifest, a build configuration or a release script changed. The last
+lines say which ran, and why one did not.
 
 A change to a root file (`package.json`, the lock file, a root
 `tsconfig`, the root `vitest.config.ts`) runs every test of all three.
@@ -99,7 +101,10 @@ npm run gate
 It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project per package
-and runtime), then the git and ui packages. It prints the head, the tree
+and runtime), then the git and ui packages, then the test of the release
+manifests. Packing the packages and installing them outside the
+repository is not in the gate: it needs the network, and
+[docs/release.md](release.md) says when to run it. It prints the head, the tree
 and each step's elapsed and CPU time. It also fails on a whitespace error
 in what the branch changed. On an 18-core machine it takes about 30
 seconds. `npm run gate -- --ci` reinstalls first.

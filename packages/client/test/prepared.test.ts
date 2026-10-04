@@ -210,6 +210,96 @@ describe("a retry sends what was first built, whatever the room's document is no
     expect(posts()).toBeGreaterThan(sent);
   });
 
+  test("two new acts started together cannot both take the last place: with 63 unanswered, one is sent and one is refused before it is signed, and 64 are held", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = alice.api as HttpRoomClient;
+    room.faults.push({ route: "POST /acts", kind: "drop", times: 64 * 4 });
+    for (let i = 0; i < 63; i++) await caught(api.claim({ goal: "g", scope: [`src/b${i}/**`] }, { idempotencyKey: `held-${i}` }));
+    const prepared: string[] = [];
+    const together = await Promise.allSettled(
+      ["pair-a", "pair-b"].map((key) => api.claim({ goal: "g", scope: [`src/${key}/**`] }, { idempotencyKey: key, onPrepared: (p) => void prepared.push(p.idempotencyKey) })),
+    );
+    const errors = together.map((r) => (r.status === "rejected" ? (r.reason as { code?: string; maybeRecorded?: boolean }) : null));
+    // One reached the room and lost its answer; the other was refused with nothing signed.
+    expect(errors.map((e) => e?.code).sort()).toEqual(["rate-limited", "unavailable"]);
+    expect(errors.find((e) => e?.code === "unavailable")?.maybeRecorded).toBe(true);
+    expect(prepared).toHaveLength(1);
+    const claims = room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim");
+    expect(claims).toHaveLength(64);
+    // The handle is full: a third new act is refused, and the oldest is still repeated to its first record.
+    expect((await caught(api.claim({ goal: "g", scope: ["src/z/**"] }, { idempotencyKey: "one-more" }))).code).toBe("rate-limited");
+    expect(((await api.claim({ goal: "g", scope: ["src/b0/**"] }, { idempotencyKey: "held-0" })) as Claim).seq).toBe(claims[0]!.seq);
+  });
+
+  test("a different act sent under a held key does not replace the act that is kept: after its idempotency-mismatch and a change of vocabulary, the original is repeated as first signed and gets its record", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = alice.api as HttpRoomClient;
+    const input = { goal: "g", scope: ["src/**"] };
+    let first: PreparedAct | undefined;
+    room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    expect((await caught(api.claim(input, { idempotencyKey: "held", onPrepared: (p) => void (first = p) }))).maybeRecorded).toBe(true);
+    // Another act under the same key: the room names the mismatch. That is not an answer for the first act.
+    const other = await api.claim({ goal: "another", scope: ["docs/**"] }, { idempotencyKey: "held" });
+    expect(isRefusal(other) && other.rule).toBe("idempotency-mismatch");
+    // The room moves to v2, and the handle reads the new vocabulary through another named act.
+    await room.activate(withAsk());
+    await api.claim({ goal: "g", scope: ["lib/**"] }, { idempotencyKey: "fresh" });
+    await api.claim({ goal: "g", scope: ["lib/**"] }, { idempotencyKey: "fresh-2" });
+    let again: PreparedAct | undefined;
+    const done = (await api.claim(input, { idempotencyKey: "held", onPrepared: (p) => void (again = p) })) as Claim;
+    expect(again).toBe(first);
+    const claims = room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim" && e.entry.act.envelope.idempotencyKey === "held");
+    expect(claims).toHaveLength(1);
+    expect(done.seq).toBe(claims[0]!.seq);
+    expect(claims[0]!.entry.type === "act" && claims[0]!.entry.act).toEqual(first!.signed);
+  });
+
+  test("a key carries one intent at a time: of two different acts started together under a new key, the second is refused before it is signed, and the first is what the handle keeps and repeats", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = alice.api as HttpRoomClient;
+    const input = { goal: "g", scope: ["src/**"] };
+    const prepared: PreparedAct[] = [];
+    const onPrepared = (p: PreparedAct) => void prepared.push(p);
+    room.faults.push({ route: "POST /acts", kind: "drop", times: 4 });
+    const posts = () => room.requests.filter((r) => r.method === "POST" && r.route === "/acts").length;
+    const before = posts();
+    const [first, second] = await Promise.allSettled([
+      api.claim(input, { idempotencyKey: "raced", onPrepared }),
+      api.claim({ goal: "another", scope: ["docs/**"] }, { idempotencyKey: "raced", onPrepared }),
+    ]);
+    // The first was sent and lost its answer. The second never left: nothing was signed for it or sent.
+    expect(first.status === "rejected" && (first.reason as { maybeRecorded?: boolean }).maybeRecorded).toBe(true);
+    expect(second.status === "rejected" && (second.reason as { code?: string }).code).toBe("bad-request");
+    expect(prepared).toHaveLength(1);
+    expect(posts() - before).toBe(4);
+    // The room moves to v2 and the handle reads the new vocabulary. The first act is still repeated as first signed.
+    await room.activate(withAsk());
+    await api.claim({ goal: "g", scope: ["lib/**"] }, { idempotencyKey: "fresh" });
+    await api.claim({ goal: "g", scope: ["lib/**"] }, { idempotencyKey: "fresh-2" });
+    const done = (await api.claim(input, { idempotencyKey: "raced", onPrepared })) as Claim;
+    expect(prepared.at(-1)).toBe(prepared[0]);
+    const claims = room.entries.filter((e) => e.entry.type === "act" && e.entry.act.envelope.kind === "claim" && e.entry.act.envelope.idempotencyKey === "raced");
+    expect(claims).toHaveLength(1);
+    expect(done.seq).toBe(claims[0]!.seq);
+    expect(claims[0]!.entry.type === "act" && claims[0]!.entry.act).toEqual(prepared[0]!.signed);
+  });
+
+  test("the same act started twice together under one key is one act: both calls get the one result, and it is prepared and sent once", async () => {
+    const alice = await joinAs(room, "@alice");
+    const api = alice.api as HttpRoomClient;
+    const input = { goal: "g", scope: ["src/**"] };
+    let hooks = 0;
+    const posts = () => room.requests.filter((r) => r.method === "POST" && r.route === "/acts").length;
+    const before = posts();
+    const [a, b] = await Promise.allSettled([
+      api.claim(input, { idempotencyKey: "twice", onPrepared: () => void hooks++ }),
+      api.claim({ scope: ["src/**"], goal: "g" }, { idempotencyKey: "twice", onPrepared: () => void hooks++ }),
+    ]);
+    expect([a.status, b.status]).toEqual(["fulfilled", "fulfilled"]);
+    expect((b as PromiseFulfilledResult<unknown>).value).toBe((a as PromiseFulfilledResult<unknown>).value);
+    expect([hooks, posts() - before]).toEqual([1, 1]);
+  });
+
   test("an act prepared for another room is refused before it is sent", async () => {
     const alice = await joinAs(room, "@alice");
     let prepared: PreparedAct | undefined;

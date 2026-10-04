@@ -317,6 +317,11 @@ key as the Room does (R-IDEM-2 to R-IDEM-4).
 - The form has no input for `because` (the reasons an act rests on).
 - The form does not send `recover` or the platform kinds.
 - After a lost answer the form asks again only when the person says so.
+- An act whose outcome is unknown belongs to the Acts screen, not to the
+  form, so it outlasts a failed read of the room's acts. While the acts
+  cannot be read the page says so, sends no new act, and still offers
+  "Ask again, the same act" and "Leave it". "Send it with the new meaning"
+  waits too (reviews `0b33e8cc`, `12b1e0a9`).
   It keeps the act and its idempotency key for as long as the form stays
   open: it does not store them, so closing the page loses them, and the
   act's outcome is then read from the feed.

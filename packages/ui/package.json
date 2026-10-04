@@ -15,9 +15,9 @@
     "screenshots": "playwright test --update-snapshots"
   },
   "dependencies": {
-    "@generalbusiness/artroom-contract": "0.0.0",
+    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
     "@generalbusiness/artroom-git": "0.0.0",
-    "@generalbusiness/artroom-policy": "0.0.0",
+    "@generalbusiness/artroom-policy": "0.1.0-dev.1",
     "preact": "^11.0.0"
   },
   "devDependencies": {

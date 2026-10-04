@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Run the tests that a change affects, in each of the repository's three test runners.
+// Run the tests that a change affects, in each of the repository's test runners.
 //
 //   npm run test:changed                 what you changed and have not committed
 //   npm run test:changed -- origin/main  everything that differs from origin/main
@@ -78,6 +78,11 @@ for (const [label, name] of [["git package", "@generalbusiness/artroom-git"], ["
   if (because) run(label, `the whole package, because ${because} changed`, "npm", ["test", "--workspace", name]);
   else results.push({ label, text: "not run: no changed file is in the package or in a package it depends on", ok: true });
 }
+
+// The release manifests have a test of their own, which reads only manifests and build configurations.
+const release = rootFile ?? changed.find((f) => /^packages\/[^/]+\/(package|tsconfig\.build)\.json$/.test(f) || /^scripts\/(release-|pack-release|check-release)/.test(f) || /^release\/third-party\//.test(f));
+if (release) run("release manifests", `because ${release} changed`, "node", ["--test", "scripts/release-manifest.test.mjs"]);
+else results.push({ label: "release manifests", text: "not run: no package manifest, build configuration, release script or third-party record changed", ok: true });
 
 console.error(`\nChanged files: ${changed.length}, compared with ${since ?? "HEAD"}.`);
 for (const r of results) console.error(`  ${r.label}: ${r.text}`);

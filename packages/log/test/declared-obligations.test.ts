@@ -491,6 +491,22 @@ describe("check-carried events are judged (R-CARRY-6 to R-CARRY-14)", () => {
     await expectFailure(log, "carried-outcome-mismatch", S.notCarried);
   });
 
+  test("with replay off the report says so: a log with a carry judgement that a full run refuses passes the integrity run, which claims no replay, no carry accounting and none of the checks it skipped", async () => {
+    const forged = prefix(CARRY, S.carried);
+    withEvent(forged, S.carried, (ev) => ({ ...ev, generation: 1 }));
+    const full = await verify(forged);
+    expect(full).toMatchObject({ ok: false, mode: "full", carryAccounting: "partial", verifiedThrough: S.carried - 1 });
+    expect(full.failures[0]).toMatchObject({ reason: "decision-extra", seq: S.carried });
+    const integrity = await verify(forged, { replayDecisions: false });
+    expect(integrity).toMatchObject({ ok: true, mode: "integrity", carryAccounting: "none", verifiedThrough: S.carried, decisionsReplayed: 0, failures: [] });
+    const said = integrity.cannotProve.join("\n");
+    expect(said).toContain("Policy was not replayed in this run");
+    for (const claim of ["replays every policy decision", "Verify replays each check-carried judgement", "required evaluation calls are derived", "checked against Git objects"]) {
+      expect(said).not.toContain(claim);
+      expect(full.cannotProve.join("\n")).toContain(claim);
+    }
+  });
+
   test("decision-extra: a judgement no landing of that version owes: one naming another version's landing, one for a failing check, and one for an obligation the version does not have", async () => {
     const other = prefix(CARRY, S.carried);
     withEvent(other, S.carried, (ev) => ({ ...ev, generation: 1 }));

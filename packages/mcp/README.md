@@ -4,6 +4,19 @@ The Artroom MCP server: the contract's sixteen tools (R-API-9), for any
 `RoomApi`. Fourteen are named for the code-review loop. Two, `acts` and
 `act`, serve any act a room declares.
 
+## Install
+
+The package is released as a tarball of built JavaScript and declarations.
+Install it in one command with the tarballs of `contract`, `policy` and
+`client`, which it depends on. It is not in a registry. [docs/release.md](../../docs/release.md) says how a release is made and checked.
+
+The exports are `.` (the tools and the server), `./worker` (the handler for
+a Cloudflare Worker) and `./stdio` (a server on a Node process's standard
+streams). An agent on your machine does not need this package: run
+`artroom mcp` from the CLI.
+
+## The tools
+
 | Tool | Does |
 |---|---|
 | `claim` | Claims paths, opening a lane you hold under a lease |

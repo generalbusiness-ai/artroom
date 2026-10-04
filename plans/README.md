@@ -3324,7 +3324,9 @@ I then read the rest of the Room's landing code for the same pattern, a read, an
 
 **Controls**, each one change with `scripts/control.mjs`, each "distinguishes": the recover role lookup; the check-step lookup; the admin-only acceptance of `recover`; Rule 1 as a whole; Rule 1's owed-carry branch; Rule 2; the land fence; the carry fence; the policy match of a kept land evaluation; the end of a carry pass.
 
-**Still open in this request.** Complete carry accounting, above. The acceptance case "legacy recovery replay" asks that a verifier changed to judge the `v1`-era entries under the `v2` declarations fails; the test shows this for the judging function, not for a whole verify run, as it did before the test reduction.
+**The legacy recovery replay, its negative half** (review `6263fdec`). The acceptance case asks that a verifier changed to judge the `v1`-era entries under the `v2` declarations fails. The test showed this for the judging function only. `packages/log/test/declared-legacy-negative.test.ts` now runs the whole shipped verifier over the whole published log with one thing replaced in its module graph, the vocabulary a `v1` document means, and it fails at the first `v1`-era envelope, entry 2, with `binding-stale`. No seam was added to the source for this.
+
+**Still open in this request.** Complete carry accounting, above. The planner's review of the proposed amendment asked for changes A to F (`85032553`); the revision is owed, then the build with the `prepared` event.
 
 ### Prerequisite and composition (assert 869d9aad)
 
@@ -3571,7 +3573,7 @@ Stage 5 is now reviewed on `request/test-overhead`, the integration branch (asse
 
 | Condition | State |
 |---|---|
-| (1) every stage 5 surface: the declarations read, the generic signed act, the MCP `act` and `acts` tools, CLI submission and discovery, a UI that prepares and submits an application act | Delivered. The UI page is not wired to a live room (see limits) |
+| (1) every stage 5 surface: the declarations read, the generic signed act, the MCP `act` and `acts` tools, CLI submission and discovery, a UI that prepares and submits an application act | Delivered, as amended by `98a292d4`: the UI's generic form and adapter are delivered and tested as components; the authenticated page entry against a live room belongs to `cfbde32f` |
 | (2) signed meaning preserved: no silent rebind, exact retries, grant maps expanded before signing | Delivered. Witnesses in the map, under Client and Room |
 | (3) an act the client binary does not know, over HTTPS and MCP, and the listed refusals | Delivered. The stage 5 acceptance cases of the protocol (section 33.10) each have a witness; an audit of them against the test code found one part missing after the test reduction, since restored |
 | (4) stage ownership and the read-route seam | "Edits to files other stages own", below, stands |
@@ -3591,6 +3593,21 @@ A third finding came from the review of this head's parent `c38c23ce`, and is re
 | `6bf8d38a` (P2): the client dropped the oldest unanswered named act when a 65th had no answer | A later repeat of the dropped key was built again under the vocabulary then in force: another act under the same key, refused `idempotency-mismatch` | A handle drops none. With 64 unanswered, a new named act is refused `rate-limited` before it is signed or sent, until one is answered | `packages/client/test/prepared.test.ts`: "a handle that holds 64 acts with no answer ..." |
 
 | `b2043423` (P2): the plain-data check read a getter once and the copy read it again | A getter could answer plain text to the check and a class instance to the copy, which was then signed and sent as a plain object | The check and the copy are one pass. Each property is read once, through its descriptor, and what is read is what is copied. A getter is refused and never called | the same table test, rows "a getter" and "a nested getter"; it also asserts the getter was not called |
+
+Two more came from the review of `736f4953` (changes requested, `0b33e8cc`), and are repaired:
+
+| Finding | What was wrong | Repair | Witness |
+|---|---|---|---|
+| Item 1 (P2): two new acts started together both passed the bound of 64 | The bound was checked before the first await and the place taken after the answer | A call takes its place before its first await and gives it up when it ends. The bound counts acts unanswered and acts under way | `packages/client/test/prepared.test.ts`: "two new acts started together cannot both take the last place ..." |
+| Item 2 (P2): a failed read of the room's acts unmounted the form that owned an unresolved act | When the acts could be read again the form was fresh: the uncertainty and the same-act retry were gone, and a new act could be sent first | The Acts screen owns the unresolved act and its status. While the acts cannot be read the page says so, sends no new act, and still offers "Ask again, the same act" and "Leave it" | `packages/ui/test/acts-screen.test.tsx`: "an unresolved act outlasts a failed read of the room's acts ..." |
+
+A further finding, `2ee996f4` (P2), was recorded during that review and is repaired: a different act sent under a key the handle holds got the room's `idempotency-mismatch`, and the handle then forgot the original act, so that a later repeat of the original was built again and refused. The handle now changes what it keeps under a key only on an outcome of that very act. Witness: `packages/client/test/prepared.test.ts`, "a different act sent under a held key does not replace the act that is kept ...". One control distinguishes.
+
+The review of `7931d5e8` (changes requested, `12b1e0a9`) added one: while the room's acts could not be read, "Send it with the new meaning" still sent a new act, under a banner that said none would be sent. The button is now disabled then, and its handler sends nothing. Witness: `packages/ui/test/acts-screen.test.tsx`, "confirming the new meaning sends nothing while the room's acts cannot be read, and sends once they can". Two controls distinguish, one for the button and one for the handler. The form's other routes to a new act were read again: the submit is guarded, and "Ask again, the same act" sends only the kept act.
+
+The review of `9451aa24` (changes requested, `17ce6443`) found one more case of the same kind: two different acts started together under a key the handle did not yet hold. Whichever lost its answer first became the kept act, and the other could not replace it, so a repeat of the act the room had accepted was built again and refused. A key now carries one intent at a time, decided before anything is awaited or signed: a second call with the same key and the same intent shares the first call's outcome, and one with another intent is refused `bad-request` with nothing signed or sent. Witnesses in `packages/client/test/prepared.test.ts`: "a key carries one intent at a time ..." and "the same act started twice together under one key is one act ...". Three controls distinguish: the shared call, the one intent per key, and the count of places before any await.
+
+The authenticated UI entry is no longer in this request. The planner's decision `bdd0ebd5` (scope amendment `98a292d4`) moves the live Acts page entry and its real-browser, real-Room witness to request `cfbde32f`, which depends on `18815307` for the browser's credential. Stage 5 keeps authenticated access by the client, HTTPS, MCP and the command line, the generic typed form and its LiveRoom adapter with their component tests, and every other original condition.
 
 One consequence of the first repair: a bearer session now refuses input that is not plain data too. Before, only a key handle did, at signing; a bearer would have sent it as JSON.
 
@@ -4833,6 +4850,128 @@ The declared run's skips are the tests that found their own rooms (stage 2's, st
 3. **Section 34.2's CLI line** says no source change is required. One was: choice 2.
 4. **Section 23's "MCP descriptors" row** holds only in a `v2` room: choice 14.
 5. **The planner's artifacts.** The planner republishes them at the final head. That head does not exist yet: it needs stage 5 reviewed and landed, then this branch composed on main.
+
+## Installable packed packages (request 7e82100b)
+
+Status: implemented, repaired after review `59605d51` (changes requested), pending review again. Gitseq request `7e82100b` (planner to builder, replacing `64dc6f04`), promise `1eb5788c`, under the planner's note `plans/013-2026-10-04-first-jam-release.md` (decision `b6dd55dc`). On `request/test-overhead`. Nothing was published to a registry, and no provider was contacted.
+
+**What this is.** Six packages that a repository outside this one can install: contract, policy, client, mcp, log and the `artroom` command. It is the installability the first jam task needs. The public-package starter and its conformance route stay owed under request `f3299ab4`. Publishing to a public registry is the owner's decision and is not part of this.
+
+**How it works.** [docs/release.md](../docs/release.md) is the instruction. Inside the repository each package's `exports` and `bin` still name TypeScript source, so the tests, the typecheck and the Workers run the source as before; no test or resolution setting changed. npm does not rewrite `exports` or `bin` from `publishConfig` when it packs (tried with npm 11.19.1), so the release script writes the tarball's manifest itself: it builds `src` to `dist` (JavaScript and declarations), copies `dist`, the README, `LICENSE` and `NOTICE` into a staging directory outside the repository, turns each `./src/x.ts` export into its built file and declaration, drops scripts and development dependencies, and packs there. No source file changed.
+
+**The release candidate.** Version `0.1.0-dev.1`, built and packed from source commit `1b40b7ec1ca8051900233123f95ac85c8a69fe81` (tree `6c8c82edc031d9b739277981b607dacb42930aaa`, clean), with Node 26.10.0 and npm 11.19.1, in a clean checkout:
+
+```
+npm ci
+npm run release:pack -- /Users/hughpyle/play/artroom-releases/candidates/1b40b7ec
+npm run release:check -- /Users/hughpyle/play/artroom-releases/candidates/1b40b7ec
+```
+
+| Package | Tarball | Bytes | SHA-256 |
+|---|---|---|---|
+| `@generalbusiness/artroom-contract` | `generalbusiness-artroom-contract-0.1.0-dev.1.tgz` | 51,379 | `834e61bad0d625cdbd85b7cc16c8fe17d0abd17c87e86f00671c7ca7e1fe23ef` |
+| `@generalbusiness/artroom-policy` | `generalbusiness-artroom-policy-0.1.0-dev.1.tgz` | 75,663 | `1ae1d1be10fc804c4f9687f4eb2187cd46bf720034de4604cf1b7c49e3feaedb` |
+| `@generalbusiness/artroom-client` | `generalbusiness-artroom-client-0.1.0-dev.1.tgz` | 51,184 | `98c9183ab73d4f13750da8ea97af3bf5fb7b91202455260e034839edd048d24a` |
+| `@generalbusiness/artroom-mcp` | `generalbusiness-artroom-mcp-0.1.0-dev.1.tgz` | 34,476 | `8a69286e0d285c245b4731318686785e0125b6c01d8e28540eb907673f60b8aa` |
+| `@generalbusiness/artroom-log` | `generalbusiness-artroom-log-0.1.0-dev.1.tgz` | 126,796 | `6f27164e7e4939ff6b24e0817d2e1de159938e26eed6f559394301b01d807d5d` |
+| `@generalbusiness/artroom-cli` | `generalbusiness-artroom-cli-0.1.0-dev.1.tgz` | 227,449 | `40084846d1cb32ffedb426c92be54a4e93395d877552c5688173ee7866d64e41` |
+
+Packing the same source twice gave the same bytes: a trial run from the working tree, and this run from a clean checkout, have the same six hashes. The contract, policy and MCP tarballs have the bytes they had in the candidate packed from `980618d1`. The client and log tarballs differ because their source changed on the branch since then. The command's tarball differs for that reason and because it now carries the licence texts.
+
+This is a candidate. The release the jam installs is packed again from the commit that lands on main.
+
+**Third-party code in the command (review `59605d51`).** The finding: the command's tarball is one bundled file holding other packages' code, and it carried only Artroom's own `LICENSE` and `NOTICE`. The repair:
+
+- The tarball now holds `THIRD-PARTY-NOTICES.txt`: for each package in the bundle, its name, version, declared licence and the complete text of the licence file that package ships. npm installs it with the command.
+- The bundle holds more than the finding named. The MCP server package's published build already contains a schema validator and its helpers, and the bundle takes them with it. Nine packages are recorded:
+
+| Package | Version | Declared licence | How it is in the bundle |
+|---|---|---|---|
+| `@modelcontextprotocol/core` | 2.0.0 | MIT | bundled directly |
+| `@modelcontextprotocol/server` | 2.0.0 | MIT | bundled directly |
+| `ajv` | 8.18.0 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `ajv-formats` | 3.0.1 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `content-type` | 1.0.5 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `fast-deep-equal` | 3.1.3 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `fast-uri` | 3.1.0 | BSD-3-Clause | embedded in the published build of `@modelcontextprotocol/server` |
+| `json-schema-traverse` | 1.0.0 | MIT | embedded in the published build of `@modelcontextprotocol/server` |
+| `zod` | 4.4.3 | MIT | bundled directly |
+
+- The record is `release/third-party`: `packages.json` and one licence file per package, copied unchanged from the published package at that exact version, with its SHA-256. For the six that are installed here at the recorded version, the installed licence file has the same hash. `ajv` 8.18.0 and `fast-uri` 3.1.0 are installed here at other versions, so their files were fetched from npm's public registry at the embedded versions. No package ships a separate notice file.
+- Nobody lists the bundle's contents by hand. The scripts read them from the bundle: the bundler's comment for each module file, and, where such a file has a source map, the packages and versions the map names. `release:pack` stops if the bundle and the record differ in either direction. `release:check` makes the same comparison on the bundle inside the tarball, compares the notices file in the tarball and in the installed package with the text built from the record, and checks each licence text is in it. The release manifest records the nine with their licence hashes.
+- The command is still self-contained, with no runtime dependency, and the scope is still six packages. The five libraries are compiled, not bundled, so their tarballs hold only Artroom code.
+
+Controls, by hand, each restored afterwards: one byte added to a recorded licence text failed the gate's test ("does not have the recorded SHA-256"); a package removed from the record made the comparison, and `release:check` on a packed tarball, fail by naming it ("the bundle contains fast-uri 3.1.0 (embedded in @modelcontextprotocol/server), which release/third-party/packages.json does not record").
+
+Limits of this repair: the embedded packages are found through the source maps the MCP server package publishes; a bundled package that embedded other code and published no source map would not be found this way. The record says what each package declares and ships. It is not legal advice.
+
+**Where it is.** The directory `/Users/hughpyle/play/artroom-releases/candidates/1b40b7ec/` on the development machine holds the six tarballs, `release-manifest.json`, the consumer's lock file (`consumer-package-lock.json`), the lock file of the command installed alone (`cli-only-package-lock.json`) and the check's output (`release-check.log`). The manifest, the two lock files and the log are also attached to the review request in the workroom. The jam repository installs from that directory by file path. This is a local route, chosen because the first jam task runs on this machine; it is not a public release.
+
+**The consumer check** (`npm run release:check`, [scripts/check-release.mjs](../scripts/check-release.mjs)): 55 checks passed, in 7 seconds. It copies [release/consumer](../release/consumer) to a fresh directory outside the repository and:
+
+- installs the six tarballs with npm, with a saved lock file that names each by file and integrity, no link, and no other Artroom package (239 packages with third-party dependencies, from the public registry);
+- imports each of the 14 library subpaths from plain Node;
+- typechecks the fixture under NodeNext and under bundler resolution, with ordinary settings, and runs it compiled;
+- runs `artroom-verify` to its usage line;
+- installs the command's tarball alone in a second fresh directory, where it is the only package, reads the third-party licence texts from the installed package, and runs `npx artroom --help`;
+- checks, for each tarball, its identity against the manifest, that every export, declaration and bin is a file in it, that `LICENSE` and `NOTICE` are there, that the command's tarball has the licence text of every package in its bundle, that it holds only built files, and its version, internal dependencies and `engines`.
+
+This shows the packages install and load. It does not show Room admission: no room was contacted.
+
+**Subpaths.** All 14 load under plain Node; none is for a Worker only. contract, policy and client import no Node or Cloudflare module and also run in a browser and a Worker. `mcp`'s `./stdio` and `log`'s `./git-cli` and its command need Node. `mcp`'s `./worker` is written for a Worker and also loads under Node.
+
+**In the gate.** `scripts/release-manifest.test.mjs`, four tests in about 0.1 s, reads the six manifests, the build configurations and the third-party record: one nonzero version, exact dependencies between the six, a command with no runtime dependency, every export and bin naming a source file the build covers, and recorded licence texts that have their recorded hashes. Four hand-made controls each failed the test they should: a version mismatch, an export naming a missing source file, an Artroom runtime dependency on the command, and a build that leaves out the bin's source. The pack-and-install check is outside the gate because it installs from the network.
+
+**Changed.** The six package manifests (version, exact internal versions, `engines`, `files`, a `build` script for the five libraries; the command's Artroom packages moved to development dependencies, since its bundle holds what it runs); a `tsconfig.build.json` in each library; `packages/ui/package.json`, two lines, so that the workspace still links contract and policy at the new version; `package-lock.json`; the root `package.json` (two release scripts, and the manifest test in `npm test`); `scripts/pack-release.mjs`, `scripts/check-release.mjs`, `scripts/release-lib.mjs`, `scripts/release-manifest.test.mjs`; `scripts/test-changed.mjs` (runs the manifest test when a manifest changed); `release/consumer/`; `docs/release.md`; a short "Installing" section in five READMEs; [docs/testing.md](../docs/testing.md) and [test-invariants.md](test-invariants.md). For review `59605d51`: `release/third-party/` (the record and nine licence files), `.gitattributes` (the licence files are kept byte for byte), the three release scripts and their test, `scripts/test-changed.mjs` (a change to the record runs the test), `docs/release.md` and one row in `plans/test-invariants.md`.
+
+**Limits.**
+
+- The declarations keep `.ts` in relative specifiers; TypeScript rewrites only the JavaScript. They typecheck for a consumer on TypeScript 7.0.2, and did in one trial on 5.9.3. Earlier versions are untried.
+- A consumer that uses bundler resolution without Node's types needs `ESNext.Disposable` in its `lib`, because the contract's declarations use `Disposable`.
+- Running `npm pack` in a library's own directory still packs the source-pointing manifest. The release instruction warns against it; nothing prevents it.
+- The contract package has no README, so its tarball has none.
+- Not tried: `npm ci` in a consumer from the saved lock file, and a global install of the command.
+
+**Gates.** The review request gives the gate's result at the head sent. The packaging source is that of `1b40b7ec`; the head for review adds only this section. The earlier candidate, packed from `980618d1`, is still at `/Users/hughpyle/play/artroom-releases/0.1.0-dev.1/`; it lacks the licence texts and is not to be installed.
+
+## Intermediate verifier release (request 42342e35)
+
+Status: implemented, pending review. Gitseq request `42342e35` (planner to builder, replacing `34c87678`), promise `4e66accc`, under the planner's note `plans/013-2026-10-04-first-jam-release.md` (decision `a6824b80`). On `request/test-overhead`.
+
+**What this is.** Main cannot read a `v2` room's log. This delivery is the verifier that the integration branch has, sent for review as a bounded release of its own so that reviewed declared-acts code can reach main. It is not declared acts stage 3. Request `1e8fee4b` and promise `3af8ebc7` stay open and promised, and this section claims none of their conditions as complete.
+
+**What a review of this release assesses.** The delivered verifier, as it is:
+
+| Scope | What is delivered | Where to read |
+|---|---|---|
+| Stage 3 condition 1 | Decoding by grammar; kind, binding, body, target and `who` judged under the document in force at each entry; the legacy rule for `v1`; a steps version or profile the verifier lacks reported as a limit | The stage 3 section, "What was built"; map rows under Log |
+| The delivered part of condition 2 | The calls admission had to make are derived per entry, and their inputs and budget rebuilt from the fold; a missing, extra or differing call is named. For check carries: recorded judgments are replayed; a duplicate, a carry that skipped a newer check, and a land evaluation with a blocking obligation open are refused | The stage 3 section, "State at the integration head"; [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md) |
+| Condition 3's fixtures | The fresh-clone replay with a forged undeclared kind; the old `v1` log; two steps versions; the legacy recovery sequence, with its negative half run over the whole log by a verifier with the wrong vocabulary (`declared-legacy-negative.test.ts`); forged logs with a call removed or a context changed; a forged stale binding | Map rows under Log |
+| Conditions 4 and 5 | As reconciled by request `ecbc722a`: useful witnesses and one-change controls, the gate once at the head, changed paths disclosed. No mutation count | [docs/testing.md](../docs/testing.md) |
+
+**What changed for this release.** The verifier's own output now states the limit of its carry accounting, as the commission asks:
+
+- `VerifyReport.carryAccounting` is `"partial"`, for a program.
+- The list `cannotProve` replaces its one line about carry with two entries. The first says what is done and what is not: recorded judgments are replayed and three omissions are detected, but verify cannot show a missing judgment that did not carry when no later one carried, a missing whole pass, the order, inputs and budget of the judgments, or an extra judgment that belongs to no pass, and the log does not record waiting, cancellation, repeated preparation or what a recovery landing skipped. The second says what a verified prefix means and does not mean.
+- `artroom-verify` prints "Carry accounting: partial." and each of those entries, whether verification passed or failed. Its first line on success is now "Verified. Every check this verifier makes passed; what it cannot prove is listed below."
+- R-DECL-25 in [docs/protocol.md](../docs/protocol.md) and the log package's README say the same.
+
+Witness: `packages/log/test/cli.node.test.ts`, "the report says, for a program and for a person, that carry judgements are accounted for only in part ...".
+
+**Two repairs from the review of `391d20cd`** (changes requested, `63af1ce0`):
+
+| Finding | What was wrong | Repair | Witness |
+|---|---|---|---|
+| The report claimed checks that `--no-replay` skips | With replay off, verify skips every policy evaluation, yet the list of what it cannot prove still said that decisions and carry judgments were replayed and calls derived, and `carryAccounting` said `partial`. A log with a judgment that a full run refuses passed, under those claims | The report has `mode`: `full` or `integrity`. In an integrity run `carryAccounting` is `none`, and the statements about replay, derived calls, Git witnesses and carry are replaced by one that says none of it was done and what such a run lets through. The text output prints the mode | `declared-obligations.test.ts`: "with replay off the report says so ..."; `cli.node.test.ts` |
+| A signed legacy check with no `input` made verify throw | The decoder checked a legacy check's obligation, checker and configuration, not the `input` and `integration` that verify reads later, so a `TypeError` escaped and the command printed no report | The decoder requires both. Such an entry is `malformed` at its seq, with the verified prefix, with replay on or off | `amendment-3.test.ts`: "a signed check with no input, or no integration, is malformed at its entry ..." |
+
+Controls: the decoder's check; the mode and its statements. Each distinguishes.
+
+**The argument that needs its own review.** [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md), "What an omission can do" (2026-10-03), argues that a removed judgment which did not carry cannot admit a landing that should not be admitted. That is an argument from the source, not something a test shows, and stage 2's approval does not establish it. The verifier's output does not rely on it and does not repeat it: it says only what verify checks and what it does not.
+
+**Still owed, in full, under `1e8fee4b` / `3af8ebc7`.** Complete carry accounting: every pass and every judgment the Room owed, missing, extra and substituted, with all ten acceptance cases of the carry-pass amendment and the planner's points A to F. The amendment is not adopted: draft 2 was returned with changes (`794e6f86`), and its revision is owed. The Room's side, with the `prepared` event, is stage 4's (`48c021ea`). Stage 6 keeps the derivation of lane, lease and landing transitions.
+
+**Gates.** The review request gives the gate's result at the head sent.
 
 ## Bearer sessions end with their grantor (request 5d41ea36)
 

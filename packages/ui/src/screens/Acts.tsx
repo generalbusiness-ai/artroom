@@ -166,11 +166,33 @@ function TargetInputs({ kind, declaration, shape, values, problems, onInput }: {
 }
 
 /**
+ * The act a person has open: the declarations they chose it from, and where
+ * its sending stands. The screen owns it, not the form, so an act whose
+ * outcome is not known yet outlasts anything that hides or rebuilds the form.
+ */
+interface Opened {
+  readonly kind: string;
+  catalogue: ActsCatalogue;
+  status: Status;
+}
+
+interface ActFormProps {
+  readonly held: ActsCatalogue;
+  readonly kind: string;
+  readonly status: Status;
+  readonly setStatus: (s: Status) => void;
+  /** False while the room's acts cannot be read. The form then sends no new act; an act already sent can still be asked again. */
+  readonly available: boolean;
+  readonly onBack: () => void;
+  readonly onAccept: (fresh: ActsCatalogue) => void;
+}
+
+/**
  * The form for one act. `held` is the declarations the person is looking at:
  * the catalogue they chose the act from, until they accept a new meaning
- * (`onAccept`). Its binding is what gets sent.
+ * (`onAccept`). Its binding is what gets sent. `status` is the screen's.
  */
-function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: string; onBack: () => void; onAccept: (fresh: ActsCatalogue) => void }) {
+function ActForm({ held, kind, status, setStatus, available, onBack, onAccept }: ActFormProps) {
   const { adapter } = useApp();
   const act = held.acts[kind]!;
   const d = act.declaration;
@@ -179,7 +201,6 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
   const [target, setTarget] = useState<Record<string, string>>({});
   const [values, setValues] = useState<Record<string, string>>({});
   const [problems, setProblems] = useState<{ target: Readonly<Record<string, string>>; body: Readonly<Record<string, string>> }>({ target: {}, body: {} });
-  const [status, setStatus] = useState<Status>({ state: "editing" });
   const fields = fieldsOf(d, shape) ?? [];
 
   /** Send once, under `under`'s binding. Nothing is sent when a field or the target is wrong. */
@@ -229,8 +250,14 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
     setStatus({ state: "refused", refusal: r });
   };
 
-  /** The person accepts the new meaning: the form now shows it, and sends under it. */
+  /**
+   * The person accepts the new meaning: the form now shows it, and sends
+   * under it. That is a new act, so it waits like any other new act while
+   * the room's acts cannot be read: the meaning shown may no longer be the
+   * room's.
+   */
   const confirm = (fresh: ActsCatalogue) => {
+    if (!available) return; // G5U:confirm-available
     onAccept(fresh);
     if (!targetsOf(fresh.acts[kind]!.declaration).includes(shape)) {
       setShape(targetsOf(fresh.acts[kind]!.declaration)[0] ?? "none");
@@ -266,7 +293,7 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
       onSubmit={(e) => {
         e.preventDefault();
         // While an answer is unresolved, the form sends no new act: only the same one can be asked again.
-        if (status.state !== "sending" && status.state !== "stale" && status.state !== "unresolved") void send(held); // G5U:unresolved-no-new
+        if (available && status.state !== "sending" && status.state !== "stale" && status.state !== "unresolved") void send(held); // G5U:unresolved-no-new
       }}
     >
       <div class="stack-sm">
@@ -315,7 +342,7 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
           )}
           <p class="small">Check that the new meaning is still what you intend. Nothing is sent until you say so.</p>
           <div class="row">
-            <button class="btn primary" type="button" onClick={() => confirm(status.fresh)}>
+            <button class="btn primary" type="button" disabled={!available} onClick={() => confirm(status.fresh)}>
               Send it with the new meaning
             </button>
             <button class="btn" type="button" onClick={onBack}>
@@ -362,7 +389,7 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
 
       {status.state !== "stale" && status.state !== "unresolved" && (
         <div class="row">
-          <button class="btn primary" type="submit" disabled={status.state === "sending"}>
+          <button class="btn primary" type="submit" disabled={status.state === "sending" || !available}>
             {status.state === "sending" ? "Sending…" : `Send “${d.label}”`}
           </button>
           <button class="btn quiet" type="button" onClick={onBack}>
@@ -377,73 +404,69 @@ function ActForm({ held, kind, onBack, onAccept }: { held: ActsCatalogue; kind: 
 export function ActsScreen({ kind }: { kind?: string }) {
   const { snap } = useApp();
   const catalogue = snap.catalogue;
+  const declared = catalogue?.vocabulary === "declared" ? catalogue : null;
   // The catalogue the person chose the act from stays the form's until they accept another:
-  // a refresh of the snapshot behind an open form changes nothing in it.
-  const opened = useRef<{ kind: string; catalogue: ActsCatalogue } | null>(null);
+  // a refresh of the snapshot behind an open form changes nothing in it. The act's status is kept
+  // with it, so neither is lost while the room's acts cannot be read.
+  const opened = useRef<Opened | null>(null);
   const [, redraw] = useState(0);
   if (!kind) opened.current = null;
-  else if (opened.current?.kind !== kind) opened.current = catalogue?.vocabulary === "declared" && Object.hasOwn(catalogue.acts, kind) ? { kind, catalogue } : null; // G5U:form-holds-catalogue
+  else if (opened.current?.kind !== kind) opened.current = declared && Object.hasOwn(declared.acts, kind) ? { kind, catalogue: declared, status: { state: "editing" } } : null; // G5U:form-holds-catalogue
 
   const back = () => {
     opened.current = null;
     location.hash = href.acts();
   };
 
-  if (catalogue === null) {
-    return (
-      <div class="stack">
-        <div class="section-head">
-          <h1>Acts</h1>
-        </div>
-        <p class="muted" data-acts="unavailable">
-          This connection cannot read the room's acts.
-        </p>
-      </div>
-    );
-  }
-  if (catalogue.vocabulary !== "declared") {
-    return (
-      <div class="stack">
-        <div class="section-head">
-          <h1>Acts</h1>
-        </div>
-        <div class="card pad stack-sm" data-acts="legacy">
-          <p>This room uses the built-in review acts: claim, propose, note, review, check, land and release.</p>
-          <p class="muted">Its policy declares no acts of its own. When a policy that does is landed, they are listed here.</p>
-        </div>
-      </div>
-    );
-  }
-
   const chosen = opened.current;
-  const entries = Object.entries(catalogue.acts);
   return (
     <div class="stack">
       <div class="section-head">
         <h1>Acts</h1>
-        <p>
-          What this room's policy lets people do, in its own words. Policy version <code>{catalogue.policy}</code>, since entry {catalogue.since}.
-        </p>
+        {declared && (
+          <p>
+            What this room's policy lets people do, in its own words. Policy version <code>{declared.policy}</code>, since entry {declared.since}.
+          </p>
+        )}
       </div>
-      {kind && !chosen && (
+      {catalogue === null && (
+        <p class="muted" data-acts="unavailable">
+          This connection cannot read the room's acts.{chosen && " The form below is as you opened it. It sends no new act until the acts can be read again."}
+        </p>
+      )}
+      {catalogue !== null && !declared && (
+        <div class="card pad stack-sm" data-acts="legacy">
+          <p>This room uses the built-in review acts: claim, propose, note, review, check, land and release.</p>
+          <p class="muted">Its policy declares no acts of its own. When a policy that does is landed, they are listed here.</p>
+        </div>
+      )}
+      {declared && kind && !chosen && (
         <p class="muted" data-acts="no-such-act">
           This room's policy does not declare an act called <code>{kind}</code>.
         </p>
       )}
-      {chosen ? (
+      {chosen && (
         <ActForm
           key={chosen.kind}
           held={chosen.catalogue}
           kind={chosen.kind}
+          status={chosen.status}
+          setStatus={(s) => {
+            // Written to the act it belongs to, even if the person has since opened another.
+            chosen.status = s;
+            redraw((n) => n + 1);
+          }}
+          available={declared !== null}
           onBack={back}
           onAccept={(fresh) => {
-            opened.current = { kind: chosen.kind, catalogue: fresh };
+            chosen.catalogue = fresh;
             redraw((n) => n + 1);
           }}
         />
-      ) : (
+      )}
+      {declared && !chosen && (
         <ul class="stack" data-acts="declared" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {entries.map(([k, a]) => (
+          {Object.entries(declared.acts).map(([k, a]) => (
             <li class="card pad stack-sm" key={k} data-act={k}>
               <div class="row">
                 <strong>{a.declaration.label}</strong>
@@ -470,7 +493,7 @@ export function ActsScreen({ kind }: { kind?: string }) {
               </div>
             </li>
           ))}
-          {entries.length === 0 && <li class="muted">This policy declares no acts.</li>}
+          {Object.keys(declared.acts).length === 0 && <li class="muted">This policy declares no acts.</li>}
         </ul>
       )}
     </div>
