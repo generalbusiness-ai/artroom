@@ -1,7 +1,8 @@
 /**
- * Helpers shared by the Room's core workerd tests (admission, landing,
- * founding and log): the scenes most tests start from, and the small reads
- * they repeat. They sit beside `support.ts`, which makes rooms and clients.
+ * Helpers shared by acts.test.ts, worker.test.ts and log-tokens.test.ts: the
+ * scenes most tests start from, the small reads they repeat, and the
+ * object's restarts and alarms. They sit beside `support.ts`, which makes
+ * rooms and clients.
  */
 
 import { env } from "cloudflare:workers";
@@ -136,26 +137,3 @@ export const settle = (r: TestRoom) =>
 /** Run the object's stored alarm now; false when none is stored. */
 export const alarm = (r: TestRoom) => runDurableObjectAlarm(stubOf(r));
 export const storedAlarm = (r: TestRoom) => inDO(r, (_room, state) => state.storage.getAlarm());
-
-/**
- * Count the rows this object's SQL writes while `fn` runs.
- */
-export async function rowsWritten(r: TestRoom, fn: (room: Room) => Promise<unknown> | unknown): Promise<number> {
-  return inDO(r, async (room, state) => {
-    const sql = room.core.sql as { all: (q: string, ...b: unknown[]) => unknown[] };
-    const real = sql.all;
-    let written = 0;
-    sql.all = (q: string, ...b: unknown[]) => {
-      const c = state.storage.sql.exec(q, ...(b as never[]));
-      const rows = c.toArray();
-      written += c.rowsWritten;
-      return rows;
-    };
-    try {
-      await fn(room);
-      return written;
-    } finally {
-      sql.all = real;
-    }
-  });
-}
