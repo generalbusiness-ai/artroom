@@ -49,16 +49,16 @@ const WITNESSES: readonly Witness[] = [
     load: () => import("./landing.test.ts"),
   },
   {
-    file: "obligations.test.ts",
+    file: "obligations.cases.ts",
     only: /R-OBL-3|R-OBL-5|R-LAND-1|R-REV-3/,
     shows: "review and check obligations and revoked evidence, with a v2 checker configuration and the check act it names (conversion 3)",
-    load: () => import("./obligations.test.ts"),
+    load: () => import("./obligations.cases.ts"),
   },
   {
-    file: "roster.test.ts",
+    file: "roster.cases.ts",
     only: /R-GEN-4|R-ADM-3b|R-ADM-4|R-ADM-5|MCP redemption/,
     shows: "the roster op table in a v2 room, and delegations and a room-custody session as signed maps (conversion 4)",
-    load: () => import("./roster.test.ts"),
+    load: () => import("./roster.cases.ts"),
   },
 ];
 
