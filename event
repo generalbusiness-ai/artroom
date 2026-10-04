@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:762d735353c0c017c0e6489703962a43628e1622","text":"Merge retired a covered predecessor; the successor is at release/third-party/licenses/zod-4.4.3.txt."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:768c96b747d16e46933990fbff61f2ff13a03580","text":"Merge retired a covered predecessor; the successor is at packages/mcp/tsconfig.build.json."}
