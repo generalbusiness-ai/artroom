@@ -3304,6 +3304,8 @@ Status: implemented, pending review. Gitseq request `5d41ea36` (builder's own, f
 
 **The change.** `judgeBearer` calls `authenticateHash`: one judgment. No other source changed.
 
+**One existing test changed.** `review-aabda1ed.cases.ts`, "response-loss recovery ...", made a new act with a stranded session after its member key was retired, and expected the refusal `delegation-invalid` from admission. The session has ended by then, so the answer is now `unauthenticated`, before anything is signed. The test says so.
+
 **Witness.** `packages/room/test/workerd/worker.test.ts`, against a real Room: "a bearer session ends with its grantor ...". The grantor's key is revoked as `retired`, so that the delegation itself stays unrevoked and only the grantor's revocation can end the session; a `compromised` revocation revokes the delegation too and would hide the omission. Then the MCP list, an exact retry and a workspace request are all `unauthenticated`, nothing is recorded, and the first act's signed envelope, taken from the log and submitted, returns the first record. A second session whose member is removed gets the same answer.
 
 **Control.** One, with `scripts/control.mjs`: the old three checks in place of the one judgment. The test fails by its assertion ("expected a failure, got" the first record). Distinguishes.
