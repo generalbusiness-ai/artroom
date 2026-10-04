@@ -1,0 +1,797 @@
+{
+  "numTotalTestSuites": 22,
+  "numPassedTestSuites": 22,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 63,
+  "numPassedTests": 1,
+  "numFailedTests": 0,
+  "numPendingTests": 62,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791090550318,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "identifiers and the sealed log"
+          ],
+          "fullName": "admission, lanes and proposals identifiers and the sealed log R-ID-3, R-GEN-1: the room ID is room_ and the first 32 hex of the genesis digest; genesis is entry 0 with the first admin's signature, and the initial policy activates at seq 1",
+          "status": "skipped",
+          "title": "R-ID-3, R-GEN-1: the room ID is room_ and the first 32 hex of the genesis digest; genesis is entry 0 with the first admin's signature, and the initial policy activates at seq 1",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "identifiers and the sealed log"
+          ],
+          "fullName": "admission, lanes and proposals identifiers and the sealed log R-ID-1, R-ID-2, R-ID-8, R-LOG-12: an entry ID is act_<seq>_<hash8>, a lane's ID is its claim's ID, the sealed claim does not name its lane, and operation IDs come from sequence numbers",
+          "status": "skipped",
+          "title": "R-ID-1, R-ID-2, R-ID-8, R-LOG-12: an entry ID is act_<seq>_<hash8>, a lane's ID is its claim's ID, the sealed claim does not name its lane, and operation IDs come from sequence numbers",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-SIG and R-ADM-1 steps 1, 2 and 5: an act that fails them is not recorded"
+          ],
+          "fullName": "admission, lanes and proposals R-SIG and R-ADM-1 steps 1, 2 and 5: an act that fails them is not recorded R-SIG-5, R-SIG-1: a signature by another key, under another domain tag, or over an envelope for another room is unauthenticated",
+          "status": "skipped",
+          "title": "R-SIG-5, R-SIG-1: a signature by another key, under another domain tag, or over an envelope for another room is unauthenticated",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-SIG and R-ADM-1 steps 1, 2 and 5: an act that fails them is not recorded"
+          ],
+          "fullName": "admission, lanes and proposals R-SIG and R-ADM-1 steps 1, 2 and 5: an act that fails them is not recorded R-SIG-3, R-SIG-4, R-SIG-6, R-PATH-1: an envelope outside the profile is a thrown failure; a body outside it is a refusal with no entry",
+          "status": "skipped",
+          "title": "R-SIG-3, R-SIG-4, R-SIG-6, R-PATH-1: an envelope outside the profile is a thrown failure; a body outside it is a refusal with no entry",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-SIG and R-ADM-1 steps 1, 2 and 5: an act that fails them is not recorded"
+          ],
+          "fullName": "admission, lanes and proposals R-SIG and R-ADM-1 steps 1, 2 and 5: an act that fails them is not recorded R-ADM-1: authority (step 4) is judged before the body (step 5) and the secret scan (step 6)",
+          "status": "skipped",
+          "title": "R-ADM-1: authority (step 4) is judged before the body (step 5) and the secret scan (step 6)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-SIG and R-ADM-1 steps 1, 2 and 5: an act that fails them is not recorded"
+          ],
+          "fullName": "admission, lanes and proposals R-SIG and R-ADM-1 steps 1, 2 and 5: an act that fails them is not recorded R-ADM-8: a refusal from a lane check is recorded, with the full envelope",
+          "status": "skipped",
+          "title": "R-ADM-8: a refusal from a lane check is recorded, with the full envelope",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-IDEM idempotency"
+          ],
+          "fullName": "admission, lanes and proposals R-IDEM idempotency R-IDEM-2: the same bytes again, eight at once and once more later, return the original record and create one entry",
+          "status": "skipped",
+          "title": "R-IDEM-2: the same bytes again, eight at once and once more later, return the original record and create one entry",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-IDEM idempotency"
+          ],
+          "fullName": "admission, lanes and proposals R-IDEM idempotency R-IDEM-3: the same key with different bytes is refused idempotency-mismatch, naming the original, and nothing is recorded",
+          "status": "skipped",
+          "title": "R-IDEM-3: the same key with different bytes is refused idempotency-mismatch, naming the original, and nothing is recorded",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-IDEM idempotency"
+          ],
+          "fullName": "admission, lanes and proposals R-IDEM idempotency R-IDEM-1: keys are scoped to the signing key",
+          "status": "skipped",
+          "title": "R-IDEM-1: keys are scoped to the signing key",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-IDEM idempotency"
+          ],
+          "fullName": "admission, lanes and proposals R-IDEM idempotency R-IDEM-2, R-IDEM-4: a recorded refusal replays as the same refusal; an unrecorded one leaves no record, and a retry under its key is judged afresh",
+          "status": "skipped",
+          "title": "R-IDEM-2, R-IDEM-4: a recorded refusal replays as the same refusal; an unrecorded one leaves no record, and a retry under its key is judged afresh",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-SEC secret scanning before recording"
+          ],
+          "fullName": "admission, lanes and proposals R-SEC secret scanning before recording R-SEC-1 to R-SEC-3: a token or a long random string in a note is refused secret-detected, unrecorded, without repeating it; a commit SHA is not a secret",
+          "status": "skipped",
+          "title": "R-SEC-1 to R-SEC-3: a token or a long random string in a note is refused secret-detected, unrecorded, without repeating it; a commit SHA is not a secret",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-ADM-9: a runtime failure records nothing"
+          ],
+          "fullName": "admission, lanes and proposals R-ADM-9: a runtime failure records nothing a policy engine fault during refuse is a retryable policy-runtime error; the same bytes again are admitted",
+          "status": "skipped",
+          "title": "a policy engine fault during refuse is a retryable policy-runtime error; the same bytes again are admitted",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-ADM-9: a runtime failure records nothing"
+          ],
+          "fullName": "admission, lanes and proposals R-ADM-9: a runtime failure records nothing R-PROP-1: an Artifacts failure before admission is unavailable and records nothing",
+          "status": "skipped",
+          "title": "R-PROP-1: an Artifacts failure before admission is unavailable and records nothing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-LANE lanes and leases"
+          ],
+          "fullName": "admission, lanes and proposals R-LANE lanes and leases R-LANE-1, R-LANE-2: a claim opens a lane at generation 0 and lease generation 1, held by the signer; the holder rescopes it with its lease and the expected generation",
+          "status": "skipped",
+          "title": "R-LANE-1, R-LANE-2: a claim opens a lane at generation 0 and lease generation 1, held by the signer; the holder rescopes it with its lease and the expected generation",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-LANE lanes and leases"
+          ],
+          "fullName": "admission, lanes and proposals R-LANE lanes and leases R-PATH-3: overlaps with held lanes are reported, conservatively, and certain for a literal path",
+          "status": "skipped",
+          "title": "R-PATH-3: overlaps with held lanes are reported, conservatively, and certain for a literal path",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-LANE lanes and leases"
+          ],
+          "fullName": "admission, lanes and proposals R-LANE lanes and leases R-LANE-3: only the holder may propose, release or renew; others are refused not-holder",
+          "status": "skipped",
+          "title": "R-LANE-3: only the holder may propose, release or renew; others are refused not-holder",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-LANE lanes and leases"
+          ],
+          "fullName": "admission, lanes and proposals R-LANE lanes and leases R-LANE-6, R-LANE-7, R-LANE-8: an old lease generation is fenced; a held lane cannot be taken over; a release keeps its handover note; after a take-over the old holder and old generations are refused",
+          "status": "skipped",
+          "title": "R-LANE-6, R-LANE-7, R-LANE-8: an old lease generation is fenced; a held lane cannot be taken over; a release keeps its handover note; after a take-over the old holder and old generations are refused",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-LANE lanes and leases"
+          ],
+          "fullName": "admission, lanes and proposals R-LANE lanes and leases R-ADM-11, R-LANE-5: an accepted holder act renews the lease; a recorded refusal does not",
+          "status": "skipped",
+          "title": "R-ADM-11, R-LANE-5: an accepted holder act renews the lease; a recorded refusal does not",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-LANE lanes and leases"
+          ],
+          "fullName": "admission, lanes and proposals R-LANE lanes and leases R-LANE-8, R-LANE-6: the object's alarm expires the lease, records lease-expired with no handover note, and fences the old holder",
+          "status": "skipped",
+          "title": "R-LANE-8, R-LANE-6: the object's alarm expires the lease, records lease-expired with no handover note, and fences the old holder",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-PROP proposals"
+          ],
+          "fullName": "admission, lanes and proposals R-PROP proposals R-PROP-1, R-PROP-2, R-PROP-5: propose pins the head as generation n+1, with the paths that changed; the same expected generation again is generation-moved",
+          "status": "skipped",
+          "title": "R-PROP-1, R-PROP-2, R-PROP-5: propose pins the head as generation n+1, with the paths that changed; the same expected generation again is generation-moved",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-PROP proposals"
+          ],
+          "fullName": "admission, lanes and proposals R-PROP proposals R-LANE-4: proposes sent at once for one generation: exactly one is admitted, and the others are recorded generation-moved",
+          "status": "skipped",
+          "title": "R-LANE-4: proposes sent at once for one generation: exactly one is admitted, and the others are recorded generation-moved",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-PROP proposals"
+          ],
+          "fullName": "admission, lanes and proposals R-PROP proposals R-PROP-1, R-PROP-4, R-PROP-6: a head not in the lane's fork is head-unknown; a changed path outside the claim is outside-claim; a diff over the bound is diff-too-large; each is recorded",
+          "status": "skipped",
+          "title": "R-PROP-1, R-PROP-4, R-PROP-6: a head not in the lane's fork is head-unknown; a changed path outside the claim is outside-claim; a diff over the bound is diff-too-large; each is recorded",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-PROP proposals"
+          ],
+          "fullName": "admission, lanes and proposals R-PROP proposals amendment 66d6fb14 (section 28): on propose, refuse rules run before the claim check, so the pack's jj-conflicts rule answers for conflict data outside the claim; other paths outside it are still outside-claim",
+          "status": "skipped",
+          "title": "amendment 66d6fb14 (section 28): on propose, refuse rules run before the claim check, so the pack's jj-conflicts rule answers for conflict data outside the claim; other paths outside it are still outside-claim",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-PROP proposals"
+          ],
+          "fullName": "admission, lanes and proposals R-PROP proposals R-POL-1: a proposal whose head has an invalid policy file is policy-invalid",
+          "status": "skipped",
+          "title": "R-POL-1: a proposal whose head has an invalid policy file is policy-invalid",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-PROP proposals"
+          ],
+          "fullName": "admission, lanes and proposals R-PROP proposals R-ADMIN-1, R-OBL-2: a change under .artroom/** gets obl_admin-approval, and a maintainer who is not an admin cannot meet it",
+          "status": "skipped",
+          "title": "R-ADMIN-1, R-OBL-2: a change under .artroom/** gets obl_admin-approval, and a maintainer who is not an admin cannot meet it",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-WS workspace credentials"
+          ],
+          "fullName": "admission, lanes and proposals R-WS workspace credentials R-WS-1, R-WS-2 (section 23, B watches A's workspace): B sees state, remote and lease generation, never a token; a token is the holder's, and only once the workspace is ready",
+          "status": "skipped",
+          "title": "R-WS-1, R-WS-2 (section 23, B watches A's workspace): B sees state, remote and lease generation, never a token; a token is the holder's, and only once the workspace is ready",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-WS workspace credentials"
+          ],
+          "fullName": "admission, lanes and proposals R-WS workspace credentials R-WS-2 (section 23): a token request with an old lease generation, under an expired delegation, after the key is revoked, and after the member is removed, is refused",
+          "status": "skipped",
+          "title": "R-WS-2 (section 23): a token request with an old lease generation, under an expired delegation, after the key is revoked, and after the member is removed, is refused",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "R-WS workspace credentials"
+          ],
+          "fullName": "admission, lanes and proposals R-WS workspace credentials R-WS-3, R-WS-4 (section 23): a lease's token is revoked when the lease ends, and it appears in no log entry, explanation, attention item, update, error or cached response",
+          "status": "skipped",
+          "title": "R-WS-3, R-WS-4 (section 23): a lease's token is revoked when the lease ends, and it appears in no log entry, explanation, attention item, update, error or cached response",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "concurrent admission"
+          ],
+          "fullName": "admission, lanes and proposals concurrent admission R-LOG-1, R-LOG-2, R-LOG-4, R-ADM-6: 24 acts sent at once by three members get unique, gapless sequence numbers; the whole log is one hash chain, each entry signed by the room key",
+          "status": "skipped",
+          "title": "R-LOG-1, R-LOG-2, R-LOG-4, R-ADM-6: 24 acts sent at once by three members get unique, gapless sequence numbers; the whole log is one hash chain, each entry signed by the room key",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "admission, lanes and proposals",
+            "concurrent admission"
+          ],
+          "fullName": "admission, lanes and proposals concurrent admission R-ADM-6: when the landing engine writes while an admission waits on policy, the admission decides again before it commits",
+          "status": "skipped",
+          "title": "R-ADM-6: when the landing engine writes while an admission waits on policy, the admission decides again before it commits",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-LAND-6, R-LAND-7 and R-LAND-9: a change before reservation ends the operation as retryable"
+          ],
+          "fullName": "landing, policy activation and checks R-LAND-6, R-LAND-7 and R-LAND-9: a change before reservation ends the operation as retryable section 23, a release during preparation: retryable, reason released; a second land meanwhile is land-in-progress",
+          "status": "skipped",
+          "title": "section 23, a release during preparation: retryable, reason released; a second land meanwhile is land-in-progress",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-LAND-6, R-LAND-7 and R-LAND-9: a change before reservation ends the operation as retryable"
+          ],
+          "fullName": "landing, policy activation and checks R-LAND-6, R-LAND-7 and R-LAND-9: a change before reservation ends the operation as retryable section 23, a new generation during preparation: retryable, reason generation-moved",
+          "status": "skipped",
+          "title": "section 23, a new generation during preparation: retryable, reason generation-moved",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-LAND-6, R-LAND-7 and R-LAND-9: a change before reservation ends the operation as retryable"
+          ],
+          "fullName": "landing, policy activation and checks R-LAND-6, R-LAND-7 and R-LAND-9: a change before reservation ends the operation as retryable section 23, Byte mismatch: a new objection between ready and reservation changes the land input; retryable, reason land-input-changed",
+          "status": "skipped",
+          "title": "section 23, Byte mismatch: a new objection between ready and reservation changes the land input; retryable, reason land-input-changed",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-LAND-6, R-LAND-7 and R-LAND-9: a change before reservation ends the operation as retryable"
+          ],
+          "fullName": "landing, policy activation and checks R-LAND-6, R-LAND-7 and R-LAND-9: a change before reservation ends the operation as retryable R-LAND-7: reservation judges the initiator's authority again; an initiator whose role no longer allows it is retryable, reason authority-lost",
+          "status": "skipped",
+          "title": "R-LAND-7: reservation judges the initiator's authority again; an initiator whose role no longer allows it is retryable, reason authority-lost",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-POL-7: the default land rule"
+          ],
+          "fullName": "landing, policy activation and checks R-POL-7: the default land rule an open objection refuses the land act itself (objection-open)",
+          "status": "skipped",
+          "title": "an open objection refuses the land act itself (objection-open)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-POL-9, R-LAND-5: a policy activation during preparation"
+          ],
+          "fullName": "landing, policy activation and checks R-POL-9, R-LAND-5: a policy activation during preparation section 23: the operation is prepared again under the new version and still lands; the activation is sealed right after the landing that caused it (R-PUB-9)",
+          "status": "skipped",
+          "title": "section 23: the operation is prepared again under the new version and still lands; the activation is sealed right after the landing that caused it (R-PUB-9)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-POL-9, R-LAND-5: a policy activation during preparation"
+          ],
+          "fullName": "landing, policy activation and checks R-POL-9, R-LAND-5: a policy activation during preparation section 23, Recompute after activation (R-POL-9): reopened 0 at activation; land is refused until an obligations-recomputed event lists the new obligation; a require rule that fails blocks landing",
+          "status": "skipped",
+          "title": "section 23, Recompute after activation (R-POL-9): reopened 0 at activation; land is refused until an obligations-recomputed event lists the new obligation; a require rule that fails blocks landing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-POL-9, R-LAND-5: a policy activation during preparation"
+          ],
+          "fullName": "landing, policy activation and checks R-POL-9, R-LAND-5: a policy activation during preparation R-POL-9: policy-activated names the checkers as name and digest pairs, sorted by name",
+          "status": "skipped",
+          "title": "R-POL-9: policy-activated names the checkers as name and digest pairs, sorted by name",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-LAND-8 and R-REV-7: acts admitted while a reservation is held"
+          ],
+          "fullName": "landing, policy activation and checks R-LAND-8 and R-REV-7: acts admitted while a reservation is held section 23, Paused push; a new generation, an objection, a retired key's revocation and a release: each is admitted with after; the landing completes",
+          "status": "skipped",
+          "title": "section 23, Paused push; a new generation, an objection, a retired key's revocation and a release: each is admitted with after; the landing completes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-LAND-8 and R-REV-7: acts admitted while a reservation is held"
+          ],
+          "fullName": "landing, policy activation and checks R-LAND-8 and R-REV-7: acts admitted while a reservation is held section 23, Paused push; a compromised key's revocation of evidence (R-REV-5, R-REV-6): an abort attempt is recorded at once; the push still lands; a revert lane opens",
+          "status": "skipped",
+          "title": "section 23, Paused push; a compromised key's revocation of evidence (R-REV-5, R-REV-6): an abort attempt is recorded at once; the push still lands; a revert lane opens",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-LAND-8 and R-REV-7: acts admitted while a reservation is held"
+          ],
+          "fullName": "landing, policy activation and checks R-LAND-8 and R-REV-7: acts admitted while a reservation is held R-REV-5: with no push that can still land, the abort attempt ends in aborted and frees the slot",
+          "status": "skipped",
+          "title": "R-REV-5: with no push that can still land, the abort attempt ends in aborted and frees the slot",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event"
+          ],
+          "fullName": "landing, policy activation and checks R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event section 23: a rule that blocks only at stage reservation passes at admission, then fails preparation; the operation is never ready",
+          "status": "skipped",
+          "title": "section 23: a rule that blocks only at stage reservation passes at admission, then fails preparation; the operation is never ready",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event"
+          ],
+          "fullName": "landing, policy activation and checks R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event a land evaluation is sealed only for the state at its own place in the log: a revocation admitted while the rules are evaluated reopens the obligation, and no land-evaluated event is sealed for the input that was true before it",
+          "status": "skipped",
+          "title": "a land evaluation is sealed only for the state at its own place in the log: a revocation admitted while the rules are evaluated reopens the obligation, and no land-evaluated event is sealed for the input that was true before it",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event"
+          ],
+          "fullName": "landing, policy activation and checks R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event a kept land evaluation is used only under the policy version that made it: after an activation that changes only the rule, the same operation and input are evaluated again, and the landing fails before reservation",
+          "status": "skipped",
+          "title": "a kept land evaluation is used only under the policy version that made it: after an activation that changes only the rule, the same operation and input are evaluated again, and the landing fails before reservation",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event"
+          ],
+          "fullName": "landing, policy activation and checks R-POL-6, R-LAND-4: the stage-specific land rule, and its sealed land-evaluated event section 23: a rule that passes at both stages: ready with a land input digest, and unchanged state builds the same bytes at reservation and lands",
+          "status": "skipped",
+          "title": "section 23: a rule that passes at both stages: ready with a land input digest, and unchanged state builds the same bytes at reservation and lands",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-ADMIN configuration recovery and sole-admin approval"
+          ],
+          "fullName": "landing, policy activation and checks R-ADMIN configuration recovery and sole-admin approval section 23, Policy lockout (R-ADMIN-5 to R-ADMIN-9): the sole admin repairs the policy through a configuration-recovery lane that no policy rule judges, whatever the policy port does with the lane's purpose; policy-activated follows",
+          "status": "skipped",
+          "title": "section 23, Policy lockout (R-ADMIN-5 to R-ADMIN-9): the sole admin repairs the policy through a configuration-recovery lane that no policy rule judges, whatever the policy port does with the lane's purpose; policy-activated follows",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-ADMIN configuration recovery and sole-admin approval"
+          ],
+          "fullName": "landing, policy activation and checks R-ADMIN configuration recovery and sole-admin approval section 23, Same lockout, two admins (R-ADMIN-5, R-ADMIN-7): the author's own approval is self-review, and the other admin's meets obl_admin-approval; a non-admin can neither act on the recovery lane nor take it over",
+          "status": "skipped",
+          "title": "section 23, Same lockout, two admins (R-ADMIN-5, R-ADMIN-7): the author's own approval is self-review, and the other admin's meets obl_admin-approval; a non-admin can neither act on the recovery lane nor take it over",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-ADMIN configuration recovery and sole-admin approval"
+          ],
+          "fullName": "landing, policy activation and checks R-ADMIN configuration recovery and sole-admin approval section 23, Sole admin changes policy (R-ADMIN-2): if a second admin joins before reservation, the flagged self-approval stops counting",
+          "status": "skipped",
+          "title": "section 23, Sole admin changes policy (R-ADMIN-2): if a second admin joins before reservation, the flagged self-approval stops counting",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-CARRY-13: every check carry judgment is a sealed check-carried event"
+          ],
+          "fullName": "landing, policy activation and checks R-CARRY-13: every check carry judgment is a sealed check-carried event a carry pass ends when its obligation is gone: an activation and its recomputation remove the check requirement while the carry rules are evaluated, no judgment of it is sealed, and the published log verifies",
+          "status": "skipped",
+          "title": "a carry pass ends when its obligation is gone: an activation and its recomputation remove the check requirement while the carry rules are evaluated, no judgment of it is sealed, and the published log verifies",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-CARRY-13: every check carry judgment is a sealed check-carried event"
+          ],
+          "fullName": "landing, policy activation and checks R-CARRY-13: every check carry judgment is a sealed check-carried event an activation that overtakes a carry pass: the held judgment is not sealed under the old version, no job is owed for it, and the check is carried once under the new version after the recomputation",
+          "status": "passed",
+          "title": "an activation that overtakes a carry pass: the held judgment is not sealed under the old version, no job is owed for it, and the check is carried once under the new version after the recomputation",
+          "duration": 113,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-CARRY-13: every check carry judgment is a sealed check-carried event"
+          ],
+          "fullName": "landing, policy activation and checks R-CARRY-13: every check carry judgment is a sealed check-carried event a carry judgment is sealed only on the facts at its own place in the log: the checker's key is revoked while the carry rules are evaluated, and the one sealed event says the check does not carry",
+          "status": "skipped",
+          "title": "a carry judgment is sealed only on the facts at its own place in the log: the checker's key is revoked while the carry rules are evaluated, and the one sealed event says the check does not carry",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-CARRY-13: every check carry judgment is a sealed check-carried event"
+          ],
+          "fullName": "landing, policy activation and checks R-CARRY-13: every check carry judgment is a sealed check-carried event R-CARRY-13, R-LOG-10 a carry rule refuses the check: a notCarried event with the decision, and a new job for I2; after an activation that allows it, a second event carries it under the new version, and the carry counts with that event; artroom verify replays every decision",
+          "status": "skipped",
+          "title": "R-CARRY-13, R-LOG-10 a carry rule refuses the check: a notCarried event with the decision, and a new job for I2; after an activation that allows it, a second event carries it under the new version, and the carry counts with that event; artroom verify replays every decision",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-CARRY-13: every check carry judgment is a sealed check-carried event"
+          ],
+          "fullName": "landing, policy activation and checks R-CARRY-13: every check carry judgment is a sealed check-carried event R-CARRY-13 a policy activation after the carry: the carry stops counting, and the next judgment is a new event under the new version; a stored carry without its sealed event never counts",
+          "status": "skipped",
+          "title": "R-CARRY-13 a policy activation after the carry: the carry stops counting, and the next judgment is a new event under the new version; a stored carry without its sealed event never counts",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-CARRY-14, R-CARRY-15: the runner pin, and a filtered job only for the recorded commit"
+          ],
+          "fullName": "landing, policy activation and checks R-CARRY-14, R-CARRY-15: the runner pin, and a filtered job only for the recorded commit R-CARRY-14 the pin changes from R to S by an approved change; a check made under R is judged against the current pin and does not carry, and the judgment is not sealed twice",
+          "status": "skipped",
+          "title": "R-CARRY-14 the pin changes from R to S by an approved change; a check made under R is judged against the current pin and does not carry, and the judgment is not sealed twice",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-CARRY-14, R-CARRY-15: the runner pin, and a filtered job only for the recorded commit"
+          ],
+          "fullName": "landing, policy activation and checks R-CARRY-14, R-CARRY-15: the runner pin, and a filtered job only for the recorded commit R-CARRY-14 no runner pinned: the check never carries (runner-changed), though a carry rule allows it; a check on I2 itself meets the obligation, with any runner",
+          "status": "skipped",
+          "title": "R-CARRY-14 no runner pinned: the check never carries (runner-changed), though a carry rule allows it; a check on I2 itself meets the obligation, with any runner",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-CARRY-14, R-CARRY-15: the runner pin, and a filtered job only for the recorded commit"
+          ],
+          "fullName": "landing, policy activation and checks R-CARRY-14, R-CARRY-15: the runner pin, and a filtered job only for the recorded commit R-CARRY-15 the publisher writes the snapshot with another identity: its ID differs and no job is issued; once it writes the recorded commit, the job is issued for it (R-CARRY-16 is in snapshot-repos.test.ts)",
+          "status": "skipped",
+          "title": "R-CARRY-15 the publisher writes the snapshot with another identity: its ID differs and no job is issued; once it writes the recorded commit, the job is issued for it (R-CARRY-16 is in snapshot-repos.test.ts)",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding"
+          ],
+          "fullName": "landing, policy activation and checks R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding R-EXEC-8, R-EXEC-9, R-EXEC-10 a whole-tree job carries base, volatile, advisory, runner and a GitAuthEnv with a read token for the canonical repository, revoked after the answer",
+          "status": "skipped",
+          "title": "R-EXEC-8, R-EXEC-9, R-EXEC-10 a whole-tree job carries base, volatile, advisory, runner and a GitAuthEnv with a read token for the canonical repository, revoked after the answer",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding"
+          ],
+          "fullName": "landing, policy activation and checks R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding R-EXEC-8 a job is not issued once its landing has ended",
+          "status": "skipped",
+          "title": "R-EXEC-8 a job is not issued once its landing has ended",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding"
+          ],
+          "fullName": "landing, policy activation and checks R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding R-EXEC-8 a job is not issued once its obligation is met on the integration",
+          "status": "skipped",
+          "title": "R-EXEC-8 a job is not issued once its obligation is met on the integration",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding"
+          ],
+          "fullName": "landing, policy activation and checks R-EXEC-8 to R-EXEC-10: jobs go over the checker's service binding R-EXEC-10 the job's volatile is the configuration's; a check that says otherwise is check-binding and leaves no evidence, and one that agrees is admitted",
+          "status": "skipped",
+          "title": "R-EXEC-10 the job's volatile is the configuration's; a check that says otherwise is check-binding and leaves no evidence, and one that agrees is admitted",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-OBL-7: advisory obligations never block a landing"
+          ],
+          "fullName": "landing, policy activation and checks R-OBL-7: advisory obligations never block a landing R-OBL-7 the obligation is advisory by its configuration: its job is still issued, and a failing check on the landing's integration is recorded while the landing proceeds; obligation-open is never raised for it",
+          "status": "skipped",
+          "title": "R-OBL-7 the obligation is advisory by its configuration: its job is still issued, and a failing check on the landing's integration is recorded while the landing proceeds; obligation-open is never raised for it",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-OBL-7: advisory obligations never block a landing"
+          ],
+          "fullName": "landing, policy activation and checks R-OBL-7: advisory obligations never block a landing R-OBL-7, R-REV-3 a landing does not rely on advisory evidence: a passing advisory check between readiness and reservation leaves the land input as it was, and the checker's key compromised before reservation reopens the obligation without stopping the landing",
+          "status": "skipped",
+          "title": "R-OBL-7, R-REV-3 a landing does not rely on advisory evidence: a passing advisory check between readiness and reservation leaves the land input as it was, and the checker's key compromised before reservation reopens the obligation without stopping the landing",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "landing, policy activation and checks",
+            "R-OBL-7: advisory obligations never block a landing"
+          ],
+          "fullName": "landing, policy activation and checks R-OBL-7: advisory obligations never block a landing R-EXEC-8, R-CARRY-14, R-OBL-7, R-POL-9 with no service binding no job is owed, and the landing waits for a check; a check stating another runner than the pin is check-binding; an activation that makes the checker advisory lets the waiting landing proceed",
+          "status": "skipped",
+          "title": "R-EXEC-8, R-CARRY-14, R-OBL-7, R-POL-9 with no service binding no job is owed, and the landing waits for a check; a check stating another runner than the pin is check-binding; an activation that makes the checker advisory lets the waiting landing proceed",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791090551584,
+      "endTime": 1791090551697,
+      "status": "passed",
+      "message": "",
+      "name": "/private/tmp/artroom-checker-stage2-39430-repairs-9z8jkr5i/fixture/packages/room/test/workerd/acts.test.ts"
+    }
+  ]
+}
