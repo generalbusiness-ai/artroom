@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/mcp/src/server.ts at exact 50216bb110b4ad86484fa93b37ea90f105aad8f8 on request/test-overhead, under promise git:sha1…adcd8b0 on request git:sha1…d289787","body":{"commit":"50216bb110b4ad86484fa93b37ea90f105aad8f8","path":"packages/mcp/src/server.ts"}}
+{"kind":"artifact","text":"packages/mcp/src/stdio.ts at exact 50216bb110b4ad86484fa93b37ea90f105aad8f8 on request/test-overhead, under promise git:sha1…adcd8b0 on request git:sha1…d289787","body":{"commit":"50216bb110b4ad86484fa93b37ea90f105aad8f8","path":"packages/mcp/src/stdio.ts"}}
