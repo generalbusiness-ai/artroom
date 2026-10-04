@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/room/src/core.ts at exact 0138a05ca9439dde52fcae3e7cc646682b1187dd on request/test-overhead, under promise git:sha1…0a8b8c7 on request git:sha1…500f079","body":{"commit":"0138a05ca9439dde52fcae3e7cc646682b1187dd","path":"packages/room/src/core.ts"}}
+{"kind":"artifact","text":"packages/room/src/declared.ts at exact 0138a05ca9439dde52fcae3e7cc646682b1187dd on request/test-overhead, under promise git:sha1…0a8b8c7 on request git:sha1…500f079","body":{"commit":"0138a05ca9439dde52fcae3e7cc646682b1187dd","path":"packages/room/src/declared.ts"}}
