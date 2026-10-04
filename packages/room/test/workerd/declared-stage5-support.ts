@@ -9,9 +9,8 @@ import { exports } from "cloudflare:workers";
 import { expect } from "vitest";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { connect, type HttpRoomClient } from "@generalbusiness/artroom-client";
-import type { ActDeclaration, DelegationId, HttpRoom, PolicyDocument, PolicyDocumentV2, Redeemed, Role, RosterRecord, Signer } from "@generalbusiness/artroom-contract";
-import { ok } from "./declared-support.ts";
-import { b64url, call, clock, day, digestBytes, iso, randomBytes, type Client, type TestRoom } from "./support.ts";
+import type { ActDeclaration, DelegationId, PolicyDocument, PolicyDocumentV2, Signer } from "@generalbusiness/artroom-contract";
+import { clock, type TestRoom } from "./support.ts";
 import type { KeyPair } from "../../src/crypto.ts";
 
 export const ORIGIN = "https://artroom.test";
@@ -23,25 +22,17 @@ export interface Seen {
   readonly body: string | null;
 }
 
-/** A fetch into this Worker that records what the client sent, and can lose a response once. */
-export function workerFetch(): { fetch: typeof fetch; seen: Seen[]; loseNext: (path: string) => void } {
+/** A fetch into this Worker that records what the client sent. */
+export function workerFetch(): { fetch: typeof fetch; seen: Seen[] } {
   const seen: Seen[] = [];
-  let lose: string | null = null;
   const f = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const req = new Request(input as RequestInfo, init);
     const path = new URL(req.url).pathname.replace(/^\/v1\/rooms\/[^/]+/, "");
     const body = req.method === "POST" ? await req.clone().text() : null;
     seen.push({ method: req.method, path, body });
-    const res = await exports.default.fetch(req);
-    if (lose !== null && path === lose) {
-      lose = null;
-      await res.arrayBuffer();
-      // The room answered, and the answer never arrived.
-      throw new TypeError("connection closed");
-    }
-    return res;
+    return exports.default.fetch(req);
   };
-  return { fetch: f as typeof fetch, seen, loseNext: (path) => void (lose = path) };
+  return { fetch: f as typeof fetch, seen };
 }
 
 /** A contract `Signer` for a test key: Ed25519 over the bytes the client gives it. */
@@ -58,24 +49,8 @@ export async function httpClient(r: TestRoom, keys: KeyPair, opts: { delegation?
   return room as HttpRoomClient;
 }
 
-/** The client package's handle over HTTPS for a bearer token: acts go to the MCP endpoint (R-CRED-10). */
-export async function bearerClient(r: TestRoom, b: Redeemed, f: typeof fetch = workerFetch().fetch): Promise<HttpRoom> {
-  return connect({ url: ORIGIN }, r.id, { kind: "bearer", token: b.bearer }, { fetch: f, now: () => clock.now });
-}
-
-/** A room-custody invitation with a `v2` session, redeemed: the bearer an MCP agent gets (R-CRED-3 as amended). */
-export async function bearer(r: TestRoom, handle: `@${string}`, role: Role, session: { kinds: readonly string[]; acts: Readonly<Record<string, string>> }): Promise<Redeemed> {
-  const bytes = randomBytes(32);
-  const inv = await ok<RosterRecord>(
-    r,
-    r.admin as Client,
-    "roster",
-    null,
-    { op: "invite", member: handle, role, custody: "room", expiresAt: iso(clock.now + day), secretHash: digestBytes(bytes), session: { ...session, lanes: "*", ttlSeconds: 3600 } },
-    { binding: null },
-  );
-  return call<Redeemed>(r.stub.redeem({ custody: "room", invitation: inv.id, secret: b64url(bytes) }, "x"));
-}
+/** A room-custody invitation with a session, redeemed: the bearer an MCP agent gets (R-CRED-3 as amended). */
+export { bearer } from "./declared-support.ts";
 
 let rpcId = 0;
 

@@ -1,14 +1,13 @@
 /**
- * The vocabulary a workerd run tests the Room against (docs/protocol.md
+ * The vocabulary a workerd test file tests the Room against (docs/protocol.md
  * section 33.6, request fd6f00b6 condition 3).
  *
- * - The legacy run (vitest.workers.config.ts) is the existing suite as it
- *   is: every room's document is `v1`, so the legacy vocabulary. Nothing
- *   here changes anything in it.
- * - The declared run (vitest.workers.declared.config.ts) runs the same
- *   suite against the code-review `v2` declarations. Every room's document
- *   is the test's document as `v2` with `CODE_REVIEW_ACTS` (the run's
- *   premise, `documents`), and the harness applies the four fixture-format
+ * - A test file runs as it is written: every room's document is `v1`, so the
+ *   legacy vocabulary. Nothing here changes anything in it.
+ * - declared-run.test.ts calls `runDeclared` and then loads a few of the
+ *   same test files again. In that file every room's document is the test's
+ *   document as `v2` with `CODE_REVIEW_ACTS` (the run's premise,
+ *   `documents`), and the harness applies the four fixture-format
  *   conversions of section 33.6, and no others:
  *   1. `bindings`: envelopes of declared kinds are `v: 2` with the active
  *      declaration's binding (R-DECL-16);
@@ -19,11 +18,12 @@
  *      configuration's digest;
  *   4. `grant-maps`: `delegate` ops and room-custody sessions carry signed
  *      maps from kind to binding instead of kind lists or `*` (R-DECL-17).
- *   Each conversion logs `[declared-conversion] <conversion> :: <test>` once
- *   per test, so the report lists every converted test from the run itself.
+ *   `applied` counts the tests each conversion was applied in.
+ *
+ * The switch is module state. Each test file has its own instance of every
+ * module it loads, so it is on in declared-run.test.ts and nowhere else.
  */
 
-import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { expect } from "vitest";
 import type { PolicyDocument, Role, RoomId } from "@generalbusiness/artroom-contract";
@@ -31,10 +31,18 @@ import { codeReviewPolicy, defaultPolicy, delegableBy, isPlatformKind, CODE_REVI
 import type { Room } from "../../src/index.ts";
 import { digestJson } from "../../src/crypto.ts";
 
-/** True in the declared run. */
-export const DECLARED = (env as unknown as { ARTROOM_TEST_VOCABULARY?: string }).ARTROOM_TEST_VOCABULARY === "code-review";
+/** True in the declared run: in declared-run.test.ts, after `runDeclared`. */
+export let DECLARED = false;
+
+/** Start the declared run in this test file. Call it before the witness files are loaded. */
+export function runDeclared(): void {
+  DECLARED = true;
+}
 
 export type Conversion = "documents" | "bindings" | "recover" | "checker-v2" | "grant-maps";
+
+/** How many tests each conversion was applied in, so far in this test file. */
+export const applied: Record<Conversion, number> = { documents: 0, bindings: 0, recover: 0, "checker-v2": 0, "grant-maps": 0 };
 
 const logged = new Set<string>();
 
@@ -44,12 +52,12 @@ export function converted(c: Conversion): void {
   const key = `${c}\u0000${test}`;
   if (logged.has(key)) return;
   logged.add(key);
-  console.log(`[declared-conversion] ${c} :: ${test}`);
+  applied[c]++;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** A policy document in the run's vocabulary: as written in the legacy run; as `v2` with the code-review declarations in the declared run. */
+/** A policy document in the file's vocabulary: as written; as `v2` with the code-review declarations in the declared run. */
 export function inVocabulary<D extends PolicyDocument>(doc: D): D {
   if (!DECLARED || !isObj(doc) || doc.format !== "artroom-policy-v1") return doc;
   converted("documents");
@@ -123,7 +131,7 @@ function knownOf(room: RoomId): Known {
   return k;
 }
 
-/** Read the room's active bindings and roles, before an act is signed. Declared run only; a no-op in the legacy run. */
+/** Read the room's active bindings and roles, before an act is signed. Declared run only; otherwise it does nothing. */
 export async function refresh(room: RoomId, stub: DurableObjectStub<Room>): Promise<void> {
   if (!DECLARED) return;
   const read = await runInDurableObject(stub, (r: Room) => {
@@ -175,9 +183,9 @@ function grantMap(k: Known, kinds: unknown, role: Role | undefined): { kinds: st
 }
 
 /**
- * An act as the run signs it. In the legacy run, as the test wrote it. In
- * the declared run, with conversions 2, 4 and 3 (a check's configuration
- * digest), then 1 (the binding) applied.
+ * An act as the file signs it: as the test wrote it, or, in the declared
+ * run, with conversions 2, 4 and 3 (a check's configuration digest), then 1
+ * (the binding) applied.
  */
 export function actInVocabulary(
   room: RoomId,
