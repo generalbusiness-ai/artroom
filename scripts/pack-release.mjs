@@ -5,7 +5,10 @@
 //
 // For each package it builds `dist`, copies the built files, LICENSE and NOTICE
 // into a staging directory outside the repository, writes the tarball's manifest
-// there (scripts/release-lib.mjs, publishManifest) and runs `npm pack`. It writes
+// there (scripts/release-lib.mjs, publishManifest) and runs `npm pack`. The CLI
+// is a bundle, so its tarball also gets THIRD-PARTY-NOTICES.txt: the licence
+// texts of the packages whose code the bundle contains. The pack stops if the
+// bundle contains a package that release/third-party does not record. It writes
 // <output directory>/release-manifest.json: the source commit, whether the tree
 // was clean, and each tarball's name, version, file name, bytes and SHA-256.
 // It publishes nothing. Run `npm ci` first. docs/release.md says more.
@@ -14,7 +17,7 @@ import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { NOTICES, PACKAGES, declaredFiles, manifestFaults, packageDir, publishManifest, root } from "./release-lib.mjs";
+import { BUNDLED, BUNDLE_FILE, NOTICES, PACKAGES, THIRD_PARTY_NOTICES, bundleFaults, declaredFiles, manifestFaults, packageDir, publishManifest, root, thirdParty, thirdPartyNotices } from "./release-lib.mjs";
 
 const outArg = process.argv[2];
 if (!outArg || outArg.startsWith("-") || process.argv.length > 3) {
@@ -55,7 +58,15 @@ for (const short of PACKAGES) {
   const stage = join(staging, short);
   mkdirSync(stage);
   writeFileSync(join(stage, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  for (const file of manifest.files) cpSync(join(NOTICES.includes(file) ? root : dir, file), join(stage, file), { recursive: true });
+  if (short === BUNDLED) {
+    const faults = bundleFaults(readFileSync(join(dir, BUNDLE_FILE), "utf8"));
+    if (faults.length > 0) {
+      console.error(`${manifest.name}: the third-party notices do not match the bundle:\n${faults.map((f) => `  ${f}`).join("\n")}`);
+      process.exit(1);
+    }
+    writeFileSync(join(stage, THIRD_PARTY_NOTICES), thirdPartyNotices(manifest.name, manifest.version));
+  }
+  for (const file of manifest.files.filter((f) => f !== THIRD_PARTY_NOTICES)) cpSync(join(NOTICES.includes(file) ? root : dir, file), join(stage, file), { recursive: true });
   if (existsSync(join(dir, "README.md"))) cpSync(join(dir, "README.md"), join(stage, "README.md"));
   for (const { what, path } of declaredFiles(manifest)) {
     if (!existsSync(join(stage, path))) {
@@ -74,6 +85,7 @@ for (const short of PACKAGES) {
     sha256: createHash("sha256").update(bytes).digest("hex"),
     files: packed.files.length,
     unpackedBytes: packed.unpackedSize,
+    ...(short === BUNDLED ? { thirdParty: thirdParty().map(({ name, version, license, embeddedIn, sha256 }) => ({ name, version, license, ...(embeddedIn ? { embeddedIn } : {}), licenseSha256: sha256 })) } : {}),
   });
 }
 rmSync(staging, { recursive: true, force: true });

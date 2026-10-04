@@ -492,6 +492,7 @@ The scripts are in `scripts/`. The consumer fixture is `release/consumer/`.
 |---|---|---|
 | The six released packages can be built and packed as their manifests claim: one nonzero version, exact dependencies between them, a command with no runtime dependency, and every export and bin naming a source file the build covers. | request 7e82100b | `scripts/release-manifest.test.mjs` (in the gate) |
 | The packed tarballs install outside the repository, every claimed Node subpath loads, a consumer typechecks under NodeNext and bundler resolution, both commands run, the command installs alone, and every export, type and bin in a tarball is a file in it. | request 7e82100b | `scripts/check-release.mjs` (`npm run release:check`; outside the gate, because it installs from the network) |
+| The command's tarball carries the complete licence text of every third-party package whose code its bundle contains, bundled directly or embedded in a bundled package's own build. The recorded texts have their recorded hashes, and a directly bundled package's installed licence file is the recorded one. | request 7e82100b, review 59605d51 | `scripts/release-manifest.test.mjs`: "the recorded third-party licence texts are intact ..."; "a bundle is compared with the record by what it contains ..." (in the gate). The real bundle is compared in `scripts/pack-release.mjs` and `scripts/check-release.mjs` |
 
 ## The 36 repaired defects of declared acts stage 2
 

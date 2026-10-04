@@ -7,7 +7,11 @@
 // release-manifest.json. The check:
 //   1. each tarball has the bytes and SHA-256 the manifest records;
 //   2. in each tarball, every export, declaration and bin its package.json
-//      names is a file in the tarball; LICENSE and NOTICE are there; no test,
+//      names is a file in the tarball; LICENSE and NOTICE are there; the CLI,
+//      which is a bundle, carries THIRD-PARTY-NOTICES.txt, and that file holds
+//      the recorded licence text of every package the bundle in the tarball
+//      contains (checked by content, against release/third-party and the
+//      installed packages, so run it at the release's commit); no test,
 //      TypeScript source or configuration file is; dependencies on Artroom
 //      packages name the exact release version;
 //   3. in a fresh directory outside the repository, it installs all six tarballs
@@ -27,7 +31,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { NOTICES, SCOPE, WORKER_ONLY, declaredFiles, root } from "./release-lib.mjs";
+import { BUNDLED, BUNDLE_FILE, NOTICES, SCOPE, THIRD_PARTY_NOTICES, WORKER_ONLY, bundleFaults, declaredFiles, root, thirdParty, thirdPartyNotices } from "./release-lib.mjs";
 
 const releaseArg = process.argv[2];
 if (!releaseArg || releaseArg.startsWith("-") || process.argv.length > 3) {
@@ -65,7 +69,27 @@ for (const p of release.packages) {
   record(`${p.name}: exports, declarations and bins are in the tarball`, missing.length === 0, missing.join("; ") || `${declaredFiles(manifest).length} targets`);
   const notices = NOTICES.filter((f) => !listed.includes(f));
   record(`${p.name}: LICENSE and NOTICE`, notices.length === 0, notices.length ? `missing ${notices.join(", ")}` : "");
-  const allowed = (f) => ["package.json", "README.md", ...NOTICES].includes(f) || /^dist\/[^/]+\.(js|d\.ts)$/.test(f) || f === "bin/artroom.js";
+  const bundled = p.name === `${SCOPE}${BUNDLED}`;
+  if (bundled) {
+    const has = listed.includes(THIRD_PARTY_NOTICES) && listed.includes(BUNDLE_FILE);
+    const text = has ? run("tar", ["-xzOf", file, `package/${THIRD_PARTY_NOTICES}`]).out : "";
+    let faults = ["the tarball lacks the bundle or the notices file"];
+    if (has) {
+      try {
+        faults = bundleFaults(run("tar", ["-xzOf", file, `package/${BUNDLE_FILE}`]).out);
+      } catch (e) {
+        faults = [e.message];
+      }
+      if (text !== thirdPartyNotices(manifest.name, manifest.version)) faults.push("the notices file is not the text built from release/third-party");
+      for (const t of thirdParty()) {
+        const body = t.text.toString("utf8").replace(/\r\n/g, "\n").replace(/\s+$/, "");
+        if (!text.includes(`${t.name} ${t.version}\nDeclared licence: ${t.license}\n`) || !text.includes(body)) faults.push(`the notices file lacks the licence text of ${t.name} ${t.version}`);
+        if (!(p.thirdParty ?? []).some((q) => q.name === t.name && q.version === t.version && q.licenseSha256 === t.sha256)) faults.push(`the release manifest does not record ${t.name} ${t.version}`);
+      }
+    }
+    record(`${p.name}: third-party licence texts for everything in the bundle`, faults.length === 0, faults.join("; ") || `${thirdParty().length} packages, ${Buffer.byteLength(text)} bytes`);
+  }
+  const allowed = (f) => ["package.json", "README.md", ...NOTICES].includes(f) || (bundled && f === THIRD_PARTY_NOTICES) || /^dist\/[^/]+\.(js|d\.ts)$/.test(f) || f === "bin/artroom.js";
   const stray = listed.filter((f) => !allowed(f) || /(^|\/)(test|tests|measure|scripts|results)\//.test(f) || /\.test\./.test(f));
   record(`${p.name}: only built files`, stray.length === 0, stray.length ? stray.join(", ") : `${listed.length} files`);
   const wrong = [];

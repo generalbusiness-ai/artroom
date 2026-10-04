@@ -33,7 +33,8 @@ release script writes the tarball's manifest itself:
    as before.
 2. The script copies `dist` (and `bin` for the CLI), the package's README,
    and `LICENSE` and `NOTICE` from the repository root into a staging
-   directory outside the repository.
+   directory outside the repository. For the CLI it also writes
+   `THIRD-PARTY-NOTICES.txt` there (see "Third-party code in the command").
 3. It writes the staged `package.json` from the workspace manifest
    (`publishManifest` in [scripts/release-lib.mjs](../scripts/release-lib.mjs)).
    Each `./src/x.ts` export becomes `{ "types": "./dist/x.d.ts", "default":
@@ -56,6 +57,47 @@ together, and in `packages/ui/package.json`, then run
 
 The CLI's bundle holds everything it runs, so its manifest lists no runtime
 dependency. Its Artroom packages are development dependencies.
+
+## Third-party code in the command
+
+The five libraries are compiled, not bundled. Their tarballs hold only
+Artroom code, and npm installs what they depend on as separate packages
+with their own licence files.
+
+The command is different. `dist/artroom.js` is one bundled file that
+contains code from other packages, and nothing else is installed with it.
+So its tarball carries `THIRD-PARTY-NOTICES.txt`: for each such package,
+its name, version, declared licence and the complete text of the licence
+file it ships. That text holds the package's copyright and permission
+notices.
+
+The record is [release/third-party](../release/third-party):
+`packages.json` lists each package with the SHA-256 of its licence file,
+and `licenses/` holds the files, copied unchanged from the published
+packages. Two kinds of package are listed:
+
+- **bundled directly**: the bundler took files from the installed package;
+- **embedded**: a bundled package's own published build already contains
+  it. Such an entry has `embeddedIn`. The MCP server package embeds a
+  schema validator and its helpers this way.
+
+Nobody maintains the list of what is in the bundle by hand. The scripts
+read it from the bundle: the bundler writes a comment naming every module
+file it includes, and where such a file has a source map, the map names
+the packages and versions that file was built from. `release:pack` stops
+if the bundle contains a package the record lacks, or the record has a
+package the bundle does not contain. `release:check` does the same
+comparison on the bundle inside the tarball, and checks that the notices
+file in the tarball holds each recorded licence text.
+
+When a dependency of the command changes, `release:pack` names what
+differs. To repair the record, fetch the exact version
+(`npm pack <name>@<version>` in a scratch directory), copy its licence
+file into `release/third-party/licenses/`, and update `packages.json` with
+the version, the declared licence and the file's SHA-256. If a package
+ships a separate notice file, add its text to the same licence file.
+Read the licence before you add it: this record is where a new licence
+obligation is noticed.
 
 ## Make a release
 
@@ -82,6 +124,10 @@ checks that release from outside the repository:
 - every export, declaration and bin a tarball's manifest names is a file in
   that tarball; `LICENSE` and `NOTICE` are present; no test, TypeScript
   source or configuration file is;
+- the CLI tarball holds `THIRD-PARTY-NOTICES.txt`, with the recorded
+  licence text of every package its bundle contains. This is checked by
+  content against `release/third-party` and the installed packages, so run
+  the check in a checkout of the release's commit, after `npm ci`;
 - all six tarballs install together into a copy of
   [release/consumer](../release/consumer) in a fresh temporary directory.
   The lock file is saved as `<output directory>/consumer-package-lock.json`.

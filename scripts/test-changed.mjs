@@ -80,9 +80,9 @@ for (const [label, name] of [["git package", "@generalbusiness/artroom-git"], ["
 }
 
 // The release manifests have a test of their own, which reads only manifests and build configurations.
-const release = rootFile ?? changed.find((f) => /^packages\/[^/]+\/(package|tsconfig\.build)\.json$/.test(f) || /^scripts\/(release-|pack-release|check-release)/.test(f));
+const release = rootFile ?? changed.find((f) => /^packages\/[^/]+\/(package|tsconfig\.build)\.json$/.test(f) || /^scripts\/(release-|pack-release|check-release)/.test(f) || /^release\/third-party\//.test(f));
 if (release) run("release manifests", `because ${release} changed`, "node", ["--test", "scripts/release-manifest.test.mjs"]);
-else results.push({ label: "release manifests", text: "not run: no package manifest, build configuration or release script changed", ok: true });
+else results.push({ label: "release manifests", text: "not run: no package manifest, build configuration, release script or third-party record changed", ok: true });
 
 console.error(`\nChanged files: ${changed.length}, compared with ${since ?? "HEAD"}.`);
 for (const r of results) console.error(`  ${r.label}: ${r.text}`);
