@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:adc3c61d925aba8c8617d23dcaa378aac89e2bee","text":"Merge retired a covered predecessor; the successor is at release/third-party/licenses/ajv-formats-3.0.1.txt."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:afb471180dfd6ebe344f91857cefac8fd17c3e2d","text":"Merge retired a covered predecessor; the successor is at packages/client/package.json."}
