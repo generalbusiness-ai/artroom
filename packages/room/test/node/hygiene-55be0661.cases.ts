@@ -9,8 +9,8 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { unstable_readConfig } from "wrangler";
 import { publicUrl } from "../../src/config.ts";
+import { readJsonc } from "./jsonc.ts";
 
 describe("publicUrl", () => {
   it("is the https:// origin it was given", () => {
@@ -18,24 +18,25 @@ describe("publicUrl", () => {
     expect(publicUrl({ PUBLIC_URL: "https://room.example.com:8443" })).toBe("https://room.example.com:8443");
   });
 
-  it.each([
-    ["not set", undefined],
-    ["empty", ""],
-    ["not a URL", "artroom.example.workers.dev"],
-    ["plain http", "http://room.example.com"],
-    ["a trailing slash", "https://room.example.com/"],
-    ["a path", "https://room.example.com/base"],
-    ["a query", "https://room.example.com?x=1"],
-    ["a fragment", "https://room.example.com#x"],
-    ["credentials", "https://user@room.example.com"],
-    ["an upper-case host, not in normal form", "https://Room.example.com"],
-  ])("refuses a PUBLIC_URL that is %s", (_why, v) => {
-    expect(() => publicUrl(v === undefined ? {} : { PUBLIC_URL: v })).toThrow(/PUBLIC_URL must be this deployment's https:\/\/ origin/);
+  it("refuses a PUBLIC_URL that is not set, or is anything but an https:// origin in normal form", () => {
+    for (const [why, v] of [
+      ["not set", undefined],
+      ["empty", ""],
+      ["not a URL", "artroom.example.workers.dev"],
+      ["plain http", "http://room.example.com"],
+      ["a trailing slash", "https://room.example.com/"],
+      ["a path", "https://room.example.com/base"],
+      ["a query", "https://room.example.com?x=1"],
+      ["a fragment", "https://room.example.com#x"],
+      ["credentials", "https://user@room.example.com"],
+      ["an upper-case host, not in normal form", "https://Room.example.com"],
+    ] as const)
+      expect(() => publicUrl(v === undefined ? {} : { PUBLIC_URL: v }), why).toThrow(/PUBLIC_URL must be this deployment's https:\/\/ origin/);
   });
 });
 
 describe("the deployable configs", () => {
-  const read = (file: string) => unstable_readConfig({ config: new URL(file, import.meta.url).pathname }) as unknown as { vars: Record<string, string> };
+  const read = (file: string) => readJsonc<{ vars: Record<string, string> }>(file, import.meta.url);
 
   it("wrangler.jsonc has no PUBLIC_URL, so a deploy must give its own, and names no example host anywhere", () => {
     expect(read("../../wrangler.jsonc").vars["PUBLIC_URL"]).toBeUndefined();

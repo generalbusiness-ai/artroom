@@ -317,6 +317,8 @@ test runs. So some test files are only a list of case files
 `jobs-and-snapshots`, `obligations-and-carry`, `roster-and-redemption`,
 `publication-and-workspaces` and `alarms-and-diagnoses`. A case file is
 written like any test file, and each test still makes its own room. The
+Node tests are grouped the same way (`test/node/*.cases.ts`), in
+`pure-parts`, `deploy-and-source-rules` and `measure-scripts`. The
 sections below were written when each review landed. They name the tests as
 they were then; request ecbc722a later removed tests that another test
 already decided, and its report maps each invariant to its witness.
@@ -783,7 +785,7 @@ object, and every retained file's body. With an active segment over
 Tests: [test/workerd/log-bounded.test.ts](test/workerd/log-bounded.test.ts)
 (reads of at most `READ_LIMITS.entries`, none of a published full segment,
 retained bodies only when new, and a verified log) and
-[test/node/logremote.test.ts](test/node/logremote.test.ts). The live
+[test/node/logremote.cases.ts](test/node/logremote.cases.ts). The live
 matrix and memory figures are in `notes/log-bounded.md`; the harness is in
 [measure/logbig/](measure/logbig/).
 
@@ -1462,7 +1464,7 @@ room and imports a repository on the same deployment.
 |---|---|
 | 1 | `test/workerd/founding-gaps.test.ts` (first lane lands; push fails, is refused or its answer is lost; land on no main); `packages/git/test/first-commit.test.ts` (the commit equals `git commit-tree`'s; real `receive-pack` accepts the pack and refuses an existing main; only a clear `ok` counts) |
 | 2 | `founding-gaps.test.ts` (no active token at sealing; a lost create; revocation fails, then the alarm settles it before founding); `packages/git/test/workspaces.test.ts`, five canonical-repository cases |
-| 3 | `founding-gaps.test.ts` (an import lands and publishes in its own namespace on a deployment that also founds publicly; refusals at draft and found); `test/node/config.test.ts` (production bindings and log remote); `packages/git/test/ref-fence.test.ts` (sandbox namespaces) |
+| 3 | `founding-gaps.test.ts` (an import lands and publishes in its own namespace on a deployment that also founds publicly; refusals at draft and found); `test/node/config.cases.ts` (production bindings and log remote); `packages/git/test/ref-fence.test.ts` (sandbox namespaces) |
 
 Each mutation below was made once, and the named suite run; every one
 failed at least one test (21 of 21 killed).
@@ -1539,7 +1541,7 @@ bindings, because the test pool cannot have Artifacts bindings.
 |---|---|
 | 1 | `packages/git/test/workspaces.test.ts`: healthy (answered) control; no canonical mint; a lost create that applies late, across a restart and after a successful retry; the alarm deletes a late repository before founding; refused control; unconfirmed revocation; spent token; refused first commit; after founding nothing is touched. `founding-gaps.test.ts`: no `createToken` at founding; a lost create; the alarm before founding |
 | 2 | `workspaces.test.ts`: inventories incomplete, without a total, with a record without an ID, with an unknown state; an active token nobody owes |
-| 3 | `founding-gaps.test.ts`: `IMPORT_NAMESPACE` without `IMPORT_ARTIFACTS`, and no `ARTIFACTS`, refused at draft and found with the registry checked; the two-binding import control; `test/node/config.test.ts` |
+| 3 | `founding-gaps.test.ts`: `IMPORT_NAMESPACE` without `IMPORT_ARTIFACTS`, and no `ARTIFACTS`, refused at draft and found with the registry checked; the two-binding import control; `test/node/config.cases.ts` |
 
 Mutations, made once each after committing, with the named suite run: 26
 of 28 were killed. The checker's three diagnostics are among the tests.
@@ -1654,7 +1656,7 @@ The smoke script no longer takes `genesis.repo`'s name (the identity's base)
 for the public room's repository: it finds the sealed incarnation (the
 highest `<base>-<step>`, `incarnationOf`) for its founding checks, ref reads
 and verify, and its cleanup reaches the base name, every incarnation and
-their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.test.ts`
+their forks (`cleanupRun` with `incarnations`); `test/node/spike-smoke.cases.ts`
 covers both.
 
 ## Client and deployment hygiene (request 55be0661)
@@ -1678,7 +1680,7 @@ including the checker's own fixture
 
 | Finding | Fix | Tests |
 |---|---|---|
-| SEC-04: `PUBLIC_URL` fell back to `https://artroom.example.workers.dev` (src/room.ts), and wrangler.jsonc set that placeholder. Redemption names that host in `Redeemed.mcp`, and the CLI prints a `claude mcp add` command that sends the bearer token there. | `publicUrl()` in src/config.ts requires an `https://` origin with nothing after the host, and has no default. The Worker entrypoint (src/worker.ts constructor) and every Room object (src/room.ts constructor) call it first, so neither starts without one, for HTTPS or RPC. wrangler.jsonc no longer sets `PUBLIC_URL`; a deploy passes `--var PUBLIC_URL:https://<host>`. | test/node/hygiene-55be0661.test.ts (the accepted and refused values; wrangler.jsonc has no `PUBLIC_URL` and names no example host; the spike's value is accepted). test/workerd/hygiene-55be0661.test.ts (the Worker and a Room object refuse to start without it, or with a value that is not an origin). |
+| SEC-04: `PUBLIC_URL` fell back to `https://artroom.example.workers.dev` (src/room.ts), and wrangler.jsonc set that placeholder. Redemption names that host in `Redeemed.mcp`, and the CLI prints a `claude mcp add` command that sends the bearer token there. | `publicUrl()` in src/config.ts requires an `https://` origin with nothing after the host, and has no default. The Worker entrypoint (src/worker.ts constructor) and every Room object (src/room.ts constructor) call it first, so neither starts without one, for HTTPS or RPC. wrangler.jsonc no longer sets `PUBLIC_URL`; a deploy passes `--var PUBLIC_URL:https://<host>`. | test/node/hygiene-55be0661.cases.ts (the accepted and refused values; wrangler.jsonc has no `PUBLIC_URL` and names no example host; the spike's value is accepted). test/workerd/hygiene-55be0661.test.ts (the Worker and a Room object refuse to start without it, or with a value that is not an origin). |
 | SEC-05: the CLI wrote room-supplied values verbatim into the git config file the repository includes (packages/cli/src/git.ts): the workspace remote and token in the setting, and the lane and lease in the first-line comment that marks whose credential it is. A newline in any of them ends its line and adds settings: a remote ending `"]`, newline, `[core]`, newline, `sshCommand = ...`, a token, a `Claim.lane` or a lease with a newline each set `core.sshCommand`. All four were reproduced (the remote and token on main, the lane and lease on e90cc7c0). | Every value written into the file is checked before anything changes, in packages/cli/src/git.ts. `checkGrant`: the remote must be a plain `https://` URL in normal form (no credentials, query, fragment, dot segments or characters outside `A-Za-z0-9._~/-` in the path), and the token may hold only the RFC 6750 token characters and `?` and `=`, up to 4096. `checkMarker`: the lane must be a canonical lane ID (`act_<seq>_<8 hex>`), the lease a whole number, and the installation ID an idempotency key. In packages/cli/src/main.ts, a claim's lane is selected only if canonical; `laneOf` refuses any other `--lane` or stored lane before the destination is reserved; `workspace` checks the grant's remote, token and lease before anything is pending. `configureWorkspace` checks all five again at its own boundary. | packages/cli/test/hygiene-55be0661.test.ts: 14 refused remotes, 10 tokens, 7 lanes, 6 leases and 5 installation IDs, each named; the refusal does not repeat the token; `configureWorkspace` given an injecting remote, token, lane, lease or installation ID refuses and changes nothing; the whole file, written with every admitted character in every field, reads back through git as exactly one setting, every other line is a comment, and the ownership reader reads the mark back exactly; `artroom workspace` given an injecting remote or token exits 1, and a lease from a malicious room (in both the lane and the grant) exits 1, each with no remote, no credential, no `core.sshCommand` and nothing pending, after which a valid workspace installs and releases; a claim answered with an injecting lane exits 1 and selects nothing; an injecting `--lane` is a usage error before the destination is reserved. A redemption with an injecting MCP URL or bearer exits 1, saves nothing and prints no command. packages/cli/test/checker-hygiene-marker.test.ts: the checker's fixture, unchanged. |
 | SEC-11: the HTTPS routes read a body whole and then compared its length in UTF-16 units with 1 MiB, so a body without `Content-Length` was read entirely first (src/http.ts). The MCP route had no cap (packages/mcp/src/worker.ts). | Both count bytes as the body streams in and stop reading past 1 MiB: 413 `payload-too-large` on the HTTPS routes, a 413 JSON-RPC error on the MCP route. A declared `Content-Length` over 1 MiB is refused before any read. The MCP route reads the body only after the bearer is accepted. | test/workerd/hygiene-55be0661.test.ts: a 16 MiB stream with no length is refused after at most 1 MiB plus two chunks is pulled (main pulled all 16 MiB); 1.5 MiB of two-byte characters is refused; a large declared length is refused with nothing pulled; exactly 1 MiB is read. packages/mcp/test/workerd/body-cap.test.ts: the same three, an unknown bearer refused with nothing pulled, and exactly 1 MiB handed on. |
 
@@ -2128,7 +2130,7 @@ Left unchanged, with the reason:
 | `src/worker.ts` RPC entry (`RoomWireTarget`, `Artroom`) | No catch: `unwire` rethrows the Room's `ArtroomError` to the caller |
 
 **Tests.** `test/workerd/request-d268d249.cases.ts` (38 tests) and
-`test/node/diag.test.ts` (59 tests).
+`test/node/diag.cases.ts` (59 tests).
 
 - One test per pre-admission step (10). Each fails the step once at the
   Artifacts port (`failNext`, which now takes the error to throw) or, for

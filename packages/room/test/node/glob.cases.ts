@@ -31,7 +31,9 @@ describe("R-PATH-2 matching", () => {
     ["abcabc", "a*c*c", true],
     ["abc", "a*c*c", false],
   ];
-  for (const [path, pattern, want] of cases) it(`${path} ${want ? "matches" : "does not match"} ${pattern}`, () => expect(matchGlob(path, pattern)).toBe(want));
+  it("matches by segment, with * inside one segment and ** across any number", () => {
+    for (const [path, pattern, want] of cases) expect(matchGlob(path, pattern), `${path} against ${pattern}`).toBe(want);
+  });
 });
 
 describe("R-PATH-3 overlap", () => {

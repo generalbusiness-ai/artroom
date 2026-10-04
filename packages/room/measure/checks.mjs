@@ -1,7 +1,7 @@
 // The review-and-check flow of the live smoke runs (request 9f81f372):
 // what spike-smoke.mjs (SPIKE_PHASE=checks) and mcp-stage0.mjs (--checks)
 // share. Everything here is pure, or reads only the spike env file, so it is
-// tested in Node (test/node/checks.test.ts) with no live call.
+// tested in Node (test/node/checks.cases.ts) with no live call.
 //
 // The room is an import: its repository's first commit already holds the
 // policy and the checker's configuration, so the room starts under them.

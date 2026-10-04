@@ -1,5 +1,5 @@
 /**
- * A fixture for the mint lane C source scan (`mint-sites-scan.test.ts`): a
+ * A fixture for the mint lane C source scan (`mint-sites-scan.cases.ts`): a
  * source file outside the allowed files that reaches Artifacts' token
  * creation in every syntactic form the scan must catch, one per line marked
  * `// reach`, executable TypeScript syntax included (namespaces, enums,

@@ -425,8 +425,29 @@ export class Client {
     return s.token;
   }
 
+  /** The session `read` made when a test gave it no token, and the room times between which it is used again. */
+  private kept: { readonly token: string; readonly from: number; readonly until: number } | null = null;
+
+  /**
+   * A read. With no token, the client makes a read session and keeps it for
+   * its later reads: a session request is a signed write, about 2.5 ms, and
+   * a test reads many times. If the room no longer accepts the kept session
+   * (its key was revoked, or it ran out), the client asks for a new one, so
+   * the caller sees what a new session request gives, as before.
+   */
   async read<Q extends ReadQuery>(q: Q, token?: string): Promise<ReadResults[Q["q"]]> {
-    return call<ReadResults[Q["q"]]>(this.room.stub.read(token ?? (await this.session()), q));
+    if (token !== undefined) return call<ReadResults[Q["q"]]>(this.room.stub.read(token, q));
+    const kept = this.kept;
+    if (kept && clock.now >= kept.from && clock.now < kept.until) {
+      const w = (await this.room.stub.read(kept.token, q)) as unknown as Wire<ReadResults[Q["q"]]>;
+      if (!("error" in w) || w.error.code !== "unauthenticated") return unwire(w);
+    }
+    this.kept = null;
+    const from = clock.now;
+    const fresh = await this.session();
+    // A session lasts an hour of room time; the last minute is left unused.
+    this.kept = { token: fresh, from, until: from + 59 * 60_000 };
+    return call<ReadResults[Q["q"]]>(this.room.stub.read(fresh, q));
   }
 }
 

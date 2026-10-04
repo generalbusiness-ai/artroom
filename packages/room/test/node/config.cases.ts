@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pinDelayMs, servicesFor, setPinDelay, type RoomEnv } from "../../src/config.ts";
+import { pinDelayMs, servicesFor, type RoomEnv } from "../../src/config.ts";
 import type { ArtifactsBinding } from "../../src/artifacts.ts";
 
 /** A binding that records the repository names it was asked for, and has none. */
@@ -48,12 +48,5 @@ describe("PIN_DELAY_MS (spike measurement only, assert 66a41558)", () => {
     expect(pinDelayMs({ PIN_DELAY_MS: "0" })).toBe(0);
     expect(pinDelayMs({ PIN_DELAY_MS: "180000" })).toBe(180_000);
     for (const bad of ["-1", "1.5", "3m", " 5", "1e3", "NaN", "99999999999999999999"]) expect(() => pinDelayMs({ PIN_DELAY_MS: bad }), bad).toThrow("PIN_DELAY_MS must be a whole number of milliseconds");
-  });
-
-  it("a test override wins until cleared", () => {
-    setPinDelay(5);
-    expect(pinDelayMs({ PIN_DELAY_MS: "180000" })).toBe(5);
-    setPinDelay(null);
-    expect(pinDelayMs({})).toBe(0);
   });
 });

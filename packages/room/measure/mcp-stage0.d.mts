@@ -1,4 +1,4 @@
-// Types for the parts of mcp-stage0.mjs that test/node/mcp-stage0.test.ts imports: its cleanup and finalizer.
+// Types for the parts of mcp-stage0.mjs that test/node/mcp-stage0.cases.ts imports: its cleanup and finalizer.
 
 import type { Api, CleanupOutcome, Duty } from "./cleanup.mjs";
 

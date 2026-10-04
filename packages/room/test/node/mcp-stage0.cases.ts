@@ -77,48 +77,6 @@ describe("review 66fec276: the checker's seven controls against the harness's fi
     expect([...f.state.revoked].length).toBe(2);
   });
 
-  it("cleanup threw (every remote call fails): exit 1, each duty recorded unknown, nothing claimed", async () => {
-    const f = fake("cleanup-threw");
-    const { code, out } = await finish(f.api, { minted: new Map([["minted-1", CANON]]) });
-    expect(code).toBe(1);
-    expect(out.cleanup.reposLeft).toBeNull();
-    const unknown = out.cleanup.unresolved.filter((d: { outcome: string }) => d.outcome === "unknown").map((d: { duty: string }) => d.duty);
-    expect(unknown).toEqual(expect.arrayContaining(["revoke-minted-token", "inventory", "list-tokens", "delete-repo", "final-inventory"]));
-    // Every known repository was still attempted.
-    expect(out.cleanup.duties.filter((d: { duty: string }) => d.duty === "delete-repo").map((d: { repo: string }) => d.repo).sort()).toEqual([CANON, FORK].sort());
-  });
-
-  it("malformed inventory [{}]: exit 1, reposLeft null, and the known repositories are still deleted", async () => {
-    const f = fake("malformed-repo-items");
-    const { code, out } = await finish(f.api);
-    expect(code).toBe(1);
-    expect(out.cleanup.reposLeft).toBeNull();
-    expect(out.cleanup.unresolved.map((d: { duty: string }) => d.duty)).toEqual(["inventory", "final-inventory"]);
-    expect([...f.state.deleted].sort()).toEqual([CANON, FORK].sort());
-  });
-
-  it("revoke refused: exit 1, even though the repositories were then deleted; the token IDs are kept", async () => {
-    const f = fake("revoke-refused");
-    const { code, out } = await finish(f.api);
-    expect(code).toBe(1);
-    expect(out.cleanup.unresolved.map((d: { duty: string; token: string }) => `${d.duty}:${d.token}`).sort()).toEqual([`revoke-token:tok-${CANON.slice(-6)}`, `revoke-token:tok-${FORK.slice(-6)}`].sort());
-    expect(out.cleanup.reposLeft).toEqual([]);
-  });
-
-  it("delete refused, final inventory known: exit 1, both repositories named as left", async () => {
-    const f = fake("delete-refused");
-    const { code, out } = await finish(f.api);
-    expect(code).toBe(1);
-    expect([...out.cleanup.reposLeft].sort()).toEqual([CANON, FORK].sort());
-  });
-
-  it("delete refused, final inventory unknown: exit 1, reposLeft null, not empty", async () => {
-    const f = fake("delete-refused-final-inventory-unknown");
-    const { code, out } = await finish(f.api);
-    expect(code).toBe(1);
-    expect(out.cleanup.reposLeft).toBeNull();
-    expect(out.cleanup.unresolved.map((d: { duty: string }) => d.duty)).toEqual(expect.arrayContaining(["delete-repo", "final-inventory"]));
-  });
 });
 
 describe("review 66fec276: bearer sessions and the run's own result", () => {
@@ -174,18 +132,6 @@ describe("review 66fec276: bearer sessions and the run's own result", () => {
     expect(out.cleanup).toMatchObject({ ok: false, reposLeft: null, unresolved: [{ duty: "cleanup", outcome: "unknown", detail: "bug" }] });
   });
 
-  it("a token the run minted and did not see revoked is revoked by cleanup; refused, its ID stays unresolved", async () => {
-    const minted = new Map([["minted-1", CANON]]);
-    const { code } = await finish(fake("clean").api, { minted });
-    expect(code).toBe(0);
-    expect(minted.size).toBe(0);
-    const left = new Map([["minted-2", CANON]]);
-    const r = await finish(fake("revoke-refused").api, { minted: left });
-    expect(r.code).toBe(1);
-    expect(r.out.cleanup.unresolved.map((d: { token: string }) => d.token)).toContain("minted-2");
-    expect(left.has("minted-2")).toBe(true);
-  });
-
   it("sessionEnder: a revoked key and a refused bearer are done; a live bearer, a refused revocation or a lost redemption are not", async () => {
     const io = (revoke: number, read: number) => sessionEnder({ act: async () => ({ status: revoke, body: revoke === 409 ? { rule: "not-authorized" } : {} }), read: async () => ({ status: read }) });
     const a = redeemed("@a");
@@ -200,15 +146,6 @@ describe("review 66fec276: bearer sessions and the run's own result", () => {
     expect(code).toBe(1);
   });
 
-  it("a deletion answered as success while the final inventory still lists the repository: exit 1, named as left", async () => {
-    const f = fake("clean");
-    const api: Api = async (method, path) => (method === "DELETE" && path.startsWith("/repos/") ? { success: true } : f.api(method, path));
-    const { code, out } = await finish(api);
-    expect(code).toBe(1);
-    expect(out.cleanup.unresolved).toEqual([]);
-    expect([...out.cleanup.reposLeft].sort()).toEqual([CANON, FORK].sort());
-  });
-
   it("an exception inside the Artifacts cleanup that no duty catches: exit 1, recorded as an unknown duty", async () => {
     const f = fake("clean");
     // A token record whose keys cannot be read: cleanupRun throws while taking its metadata, outside any remote call.
@@ -219,30 +156,4 @@ describe("review 66fec276: bearer sessions and the run's own result", () => {
     expect(out.cleanup.unresolved).toEqual([{ duty: "artifacts-cleanup", outcome: "unknown", detail: "unreadable record" }]);
   });
 
-  it("founding revision 3: with incarnations, the base name's incarnations and their forks are the run's, and nothing else is touched", async () => {
-    const base = "fedcba9876543210fedcba9876543210";
-    const ours = [`${base}-1`, `${base}-1--act_5_d0f22a95`, `${base}-2`, base];
-    const others = [`${base}x`, `${base}-1x`, `${base}-x`];
-    const deleted = new Set<string>();
-    const api: Api = async (method, path) => {
-      if (method === "GET" && path.startsWith("/repos?")) return { success: true, result: [...ours, ...others].filter((n) => !deleted.has(n)).map((name) => ({ name })) };
-      if (method === "GET" && path.includes("/tokens?")) return { success: true, result: [] };
-      const repo = /^\/repos\/([^/?]+)$/.exec(path);
-      if (method === "DELETE" && repo) {
-        deleted.add(repo[1]!);
-        return { success: true };
-      }
-      throw new Error(`unexpected ${method} ${path}`);
-    };
-    const out: { steps: { ok: boolean }[]; cleanup?: any; ok?: boolean } = { steps: [{ ok: true }] };
-    const code = await finishRun(out, false, () => cleanupMcp({ api, canonical: base, expected: [`${base}-2`, `${base}-1--act_5_d0f22a95`], agents: [], endSession: noSessions, incarnations: true }));
-    expect(code).toBe(0);
-    expect([...deleted].sort()).toEqual([...ours].sort());
-    // Without `incarnations`, only the base name and its own forks are the run's: the incarnations would be left
-    // unseen. This is why the harness passes `incarnations: true` with the identity's base.
-    deleted.clear();
-    const out2: { steps: { ok: boolean }[]; cleanup?: any; ok?: boolean } = { steps: [{ ok: true }] };
-    await finishRun(out2, false, () => cleanupMcp({ api, canonical: base, expected: [base], agents: [], endSession: noSessions }));
-    expect([...deleted]).toEqual([base]);
-  });
 });

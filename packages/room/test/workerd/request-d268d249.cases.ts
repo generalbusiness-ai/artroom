@@ -319,7 +319,7 @@ describe("request d268d249: the parallel catch-all 5xx mappings log the same way
 /**
  * Checker report on 0e058f13: credentials known by their syntax were kept
  * when short or quoted. The redaction of each syntax is a pure function,
- * tested case by case in test/node/diag.test.ts. Here the same messages go
+ * tested case by case in test/node/diag.cases.ts. Here the same messages go
  * through a retained job error, which is stored and shown by other code.
  */
 const SYNTAX_CASES: [string, string, string[]][] = [
