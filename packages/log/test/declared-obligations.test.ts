@@ -507,11 +507,12 @@ describe("check-carried events are judged (R-CARRY-6 to R-CARRY-14)", () => {
       expect(full.cannotProve.join("\n")).toContain(claim);
     }
     // It does not deny the checks that still ran, and it says what the one kept guard on landings sees.
-    for (const denial of ["no Git object was read", "passes this run"]) expect(said).not.toContain(denial);
+    for (const denial of ["no Git object was read", "passes this run", "compared no recorded context"]) expect(said).not.toContain(denial);
     expect(said).toContain("a land evaluation is refused while the admin-approval obligation is open");
     expect(said).toContain("this run read Git objects where they were present");
     expect(said).toContain("Obligations that rules open are known only by replay");
     expect(said).toContain("each check-carried event names an earlier accepted check");
+    expect(said).toContain("compared the changed paths in a version's retained proposal context with them");
     // The run did read Git objects for the version's witness, as it says: here, the objects of both proposal heads.
     const read: string[] = [];
     const git = await publish(forged);
