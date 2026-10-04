@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:354a9747bdac06923690c5fd3d2a0fa48a8caf1a","text":"Merge retired a covered predecessor; the successor is at packages/log/test/fixtures/declared-snapshot.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:38f27e3f72ff2d5cb226aacb8ad6af056ad4a1aa","text":"Merge retired a covered predecessor; the successor is at packages/ui/test/declared-rendering.test.tsx."}
