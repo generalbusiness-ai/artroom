@@ -241,7 +241,7 @@ of its "WAKE CHECKLIST" and its "ALL FOUR" part was applied.
 ## Independent check
 
 An independent reviewer compared revision 3 with 008, 007, Rev 2 and
-the request (`wake-verify.md` in this directory). It reported 14
+the request (`wake-verify.md`, a scratch report that is not kept in the repository; this section is its summary). It reported 14
 findings. I checked each against the sources. All 14 were right and
 all 14 were applied. Line numbers are in the edited file.
 

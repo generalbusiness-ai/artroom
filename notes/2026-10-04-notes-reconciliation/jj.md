@@ -4,7 +4,7 @@ Edited files, on branch `request/notes-reconcile`:
 - `notes/2026-10-01-research-jj.md`, the reconciled note;
 - `notes/2026-10-01-artroom-plan.md`, one paragraph of section 3 and a dated revision note, on the planner's direction `fceb27d0`.
 
-The first reconciliation is at commit `508ac63b`. The changes that apply direction `fceb27d0` are in the working tree and are not committed.
+The first reconciliation is at commit `508ac63b`. The changes that apply direction `fceb27d0` were in the working tree when this checklist was written, on 2026-10-04; they were committed afterwards, at `b878fee9`.
 
 - Before: 247 lines, 12,816 bytes, SHA-256 `8563588cd23c7047eb3572bd61b78b432b87eef85141e467cb08d63b72aa516f` (matches the identity the clarification gives for commit `b3050dc6`).
 - At commit `508ac63b` (with the independent check applied): 667 lines, 37,755 bytes, SHA-256 `166871a97f04633e7919cb960dd5b620518271a1e5e1bf65cbb5006943e18d67`.
@@ -175,7 +175,7 @@ All other ids resolved: `966aeaad`, `bfb563fe`, `e7cc8c03`, `cb4613c9`, `6649bb5
 
 ## Independent check
 
-Report: `jj-verify.md` in this directory (13 findings). Each was checked against plans/011, the original note at `HEAD`, review `6649bb50` and main `e6e67828`. All 13 were applied. Line numbers in this table are those of the note at commit `508ac63b`.
+Report: `jj-verify.md` (13 findings), a scratch report of the independent reader, which is not kept in the repository; this section is its summary. Each was checked against plans/011, the original note at `HEAD`, review `6649bb50` and main `e6e67828`. All 13 were applied. Line numbers in this table are those of the note at commit `508ac63b`.
 
 | # | Finding | Checked against | What was done (lines) |
 |---|---|---|---|
@@ -258,4 +258,4 @@ git diff notes/2026-10-01-artroom-plan.md | grep '^[+-]'   # one revision note a
 
 The same style and link checks were run again on the note, with the same results.
 
-No runtime suite, install, jj command, web request or gitseq write was run. The changes for direction `fceb27d0` are not committed.
+No runtime suite, install, jj command, web request or gitseq write was run. When these checks were run, on 2026-10-04, the changes for direction `fceb27d0` were not yet committed; they were committed afterwards, at `b878fee9`.

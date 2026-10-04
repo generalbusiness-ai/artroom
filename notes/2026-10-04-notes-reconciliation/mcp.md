@@ -168,7 +168,7 @@ by id; the frozen file was found in the tree of `b15eca8d` as
 ## Independent check
 
 An independent reviewer compared revision 4 with plans/009, revision 3,
-the request, main and the candidate (`mcp-verify.md`, beside this file).
+the request, main and the candidate (`mcp-verify.md`, a scratch report that is not kept in the repository; this section is its summary).
 It reported 10 findings. I checked each against the sources. All 10 were
 right and all 10 are applied.
 
