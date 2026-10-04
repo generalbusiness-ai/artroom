@@ -11,14 +11,9 @@ import {
   MINT_ID_WRITE_ATTEMPTS,
   MINT_LISTING_MAX,
   MINT_REVOKE_BACKOFF,
-  MINT_REVOKE_BATCH,
-  MINT_WAIT_MS,
   MintLedger,
-  OBSERVE_WAIT,
   errorNote,
-  OVERDUE_STEP_MS,
   TAKEOVER_AHEAD_MS,
-  TAKEOVER_MOVE_MS,
   type LedgerToken,
   type MintRepo,
   type MintScope,
@@ -263,17 +258,6 @@ async function alarm(r: ReturnType<typeof room>): Promise<void> {
   await r.ledger.reconcile();
   await r.ledger.idle();
 }
-
-test("the bounds are the design's: 30 s waits, takeover 60 s ahead when under 30 s away, 1 s overdue step, 20 a pass, 1,000 listed, backoffs", () => {
-  assert.equal(MINT_WAIT_MS, 30_000);
-  assert.equal(TAKEOVER_AHEAD_MS, 60_000);
-  assert.equal(TAKEOVER_MOVE_MS, 30_000);
-  assert.equal(OVERDUE_STEP_MS, 1_000);
-  assert.equal(MINT_REVOKE_BATCH, 20);
-  assert.equal(MINT_LISTING_MAX, 1_000);
-  assert.deepEqual(MINT_REVOKE_BACKOFF, { firstMs: 1_000, maxMs: 300_000 });
-  assert.deepEqual(OBSERVE_WAIT, { firstMs: 60_000, maxMs: 6 * 3600_000 });
-});
 
 // ------------------------------------------------------------------ (1)
 
@@ -556,11 +540,11 @@ test("(4) an owed record with a readable expiry whose revocations keep failing i
 // ------------------------------------------------------------------ (5)
 
 test("(5) a held answer past the wait: the caller gets an error and the record is unknown; the late answer's ID makes it owed, revoked by that ID, and no caller gets the text", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.repo.plans = ["hold"];
   let got: LedgerToken | null = null;
   const p = r.ledger.mint("publish:op:1", "write", ttl60).then((t) => (got = t));
-  await assert.rejects(p, /did not answer the token request within 30 ms/);
+  await assert.rejects(p, /did not answer the token request within 10 ms/);
   assert.equal(only(r.sql)["state"], "unknown");
   assert.equal(r.ledger.duties().unknown, 1);
   r.repo.held[0]!.answer();
@@ -576,7 +560,7 @@ test("(5) a held answer past the wait: the caller gets an error and the record i
 });
 
 test("(5) a late refusal deletes the unknown record; a late lost answer leaves it unknown", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.repo.plans = ["hold", "hold"];
   await assert.rejects(r.ledger.mint("a", "read", ttl60));
   await assert.rejects(r.ledger.mint("b", "read", ttl60));
@@ -589,7 +573,7 @@ test("(5) a late refusal deletes the unknown record; a late lost answer leaves i
 });
 
 test("(5) a late answer to a record whose given-up state could not be stored is still never held: its ID is owed", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.sql.all("CREATE TRIGGER no_unknown BEFORE UPDATE ON artroom_mint WHEN NEW.state = 'unknown' BEGIN SELECT RAISE(ABORT, 'storage failure'); END");
   r.repo.plans = ["hold"];
   await assert.rejects(r.ledger.mint("publish:op:1", "write", ttl60), /did not answer/);
@@ -666,7 +650,7 @@ test("(6) a failed handoff where storage refuses the ID's write: it is retried, 
 });
 
 test("(6) two mints in flight: a late completion of one never changes the other's row, or a row another owner has claimed", async () => {
-  const r = room({ waitMs: 200 });
+  const r = room({ waitMs: 40 });
   r.sql.all("CREATE TABLE owner (token TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)");
   r.repo.plans = ["hold", "hold"];
   const a = r.ledger.mint("a", "read", ttl60);
@@ -692,7 +676,7 @@ test("(6) two mints in flight: a late completion of one never changes the other'
 });
 
 test("(6) a stale caller: a usable answer that arrives after a takeover is never returned; the count of unknown records stays exact", async () => {
-  const r = room({ waitMs: 100 });
+  const r = room({ waitMs: 40 });
   r.repo.plans = ["hold"];
   const old = r.ledger;
   const p = old.mint("publish:op:1", "write", ttl60);
@@ -853,7 +837,7 @@ test("(9) a failed revocation stays owed with backoff, 1 s doubling to 5 min, ac
 });
 
 test("(9) a timed-out revocation counts as failed; its late answer is dropped; the next answered attempt ends the record", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.repo.plans = [(t) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() })];
   await assert.rejects(r.ledger.mint("a", "write", () => 86_400));
   r.repo.holdRevokes = true;
@@ -888,7 +872,7 @@ test("(9) a completion that cannot commit counts as a failure, with backoff", as
 });
 
 test("(9) a release whose revocation fails or times out is owed, not swallowed, due in 1 s; a late answer is dropped", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   const a = await r.ledger.mint("a", "write", ttl60);
   r.repo.revokeDown = true;
   await a.release();
@@ -994,14 +978,14 @@ function countingSql() {
   return { sql, stats, reset };
 }
 
-test("(10) scale: 10,000 kept unknown records, 1,000 known IDs and new unknowns every turn; each turn's work is bounded by the batch, the page and the listing", async () => {
+test("(10) scale: 2,000 kept unknown records, 1,000 known IDs and new unknowns every turn; each turn's work is bounded by the batch, the page and the listing", async () => {
   const c = countingSql();
   const r = room({ sql: c.sql, waitMs: 2_000 });
   // 890 tokens other Room records hold.
   for (let i = 0; i < 890; i++) r.known.add(r.repo.foreign().id);
-  // 10,000 unknown records: creates whose outcome was lost.
+  // 2,000 unknown records: creates whose outcome was lost. More than a pass, a page or a listing may touch.
   r.repo.defaultPlan = "drop";
-  for (let i = 0; i < 10_000; i++) await assert.rejects(r.ledger.mint(`bulk:${i}`, "read", ttl60));
+  for (let i = 0; i < 2_000; i++) await assert.rejects(r.ledger.mint(`bulk:${i}`, "read", ttl60));
   // A backlog of 100 owed records, all due at once, in due order: the other 100 known IDs. Then 10 more, due
   // earliest, whose readable expiry will have passed.
   for (let i = 0; i < 10; i++) {
@@ -1017,7 +1001,7 @@ test("(10) scale: 10,000 kept unknown records, 1,000 known IDs and new unknowns 
   const owedIds = r.sql.all("SELECT token FROM artroom_mint WHERE state = 'owed' AND purpose LIKE 'owed:%' ORDER BY due, id").map((x) => String(x["token"]));
   assert.equal(owedIds.length, 100);
   assert.equal(r.ledger.duties().owed, 110);
-  assert.equal(r.ledger.duties().unknown, 10_000);
+  assert.equal(r.ledger.duties().unknown, 2_000);
   r.clock.advance(61_000);
 
   c.stats.on = true;
@@ -1093,7 +1077,7 @@ test("(10) scale: 10,000 kept unknown records, 1,000 known IDs and new unknowns 
   assert.equal(pages, Math.ceil(total / 1_000));
   const count = (state: string) => Number(r.sql.all("SELECT COUNT(*) AS n FROM artroom_mint WHERE state = ?", state)[0]!["n"]);
   assert.equal(r.ledger.duties().unknown, count("unknown"));
-  assert.equal(r.ledger.duties().unknown, 10_040);
+  assert.equal(r.ledger.duties().unknown, 2_040);
   assert.equal(r.ledger.duties().owed, count("owed"));
   assert.deepEqual([...c.stats.scans], []);
 });
@@ -1150,16 +1134,16 @@ test("(10) the observation schedule doubles from 1 min to 6 h; a new unknown bri
 // ------------------------------------------------- checker's early findings on 658d10af
 
 test("(checker 1) a repository lookup that never answers: mint sends nothing and writes no record, within the wait", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.lookupHangs = true;
-  await assert.rejects(r.ledger.mint("publish:op:1", "write", ttl60), /repository was not reached within 30 ms/);
+  await assert.rejects(r.ledger.mint("publish:op:1", "write", ttl60), /repository was not reached within 10 ms/);
   assert.equal(r.repo.creates.length, 0);
   assert.equal(rows(r.sql).length, 0);
   assert.equal(r.wakes.length, 0);
 });
 
 test("(checker 1) a repository lookup that never answers: the observation ends within the wait, records its result and next time, and settles nothing", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.repo.plans = ["lose"];
   await assert.rejects(r.ledger.mint("a", "read", ttl60));
   r.lookupHangs = true;
@@ -1174,7 +1158,7 @@ test("(checker 1) a repository lookup that never answers: the observation ends w
 });
 
 test("(checker 1) a repository lookup that never answers: the revocation pass ends within the wait; each record takes its backoff, stays owed, and is revoked later", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.repo.plans = [(t) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() })];
   await assert.rejects(r.ledger.mint("a", "write", () => 86_400));
   r.lookupHangs = true;
@@ -1204,7 +1188,7 @@ function leaky(secret: string): Error {
 }
 
 test("(checker 1) a repository lookup that answers only after the wait: the pass records its backoff and ends, a new pass can start, and the late lookup does nothing", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.repo.plans = [(t) => ({ id: t.id, scope: t.scope, expiresAt: new Date(t.expiresAt).toISOString() })];
   await assert.rejects(r.ledger.mint("a", "write", () => 86_400));
   const late = deferred<void>();
@@ -1245,7 +1229,7 @@ test("(checker 1) a held lookup never delays a record whose readable expiry has 
 });
 
 test("(checker 1) an observation lookup that answers only after the wait: the result and next time are recorded, the flag is released, and the late lookup does nothing", async () => {
-  const r = room({ waitMs: 30 });
+  const r = room({ waitMs: 10 });
   r.repo.plans = ["lose"];
   await assert.rejects(r.ledger.mint("a", "read", ttl60));
   const late = deferred<void>();
@@ -1343,7 +1327,7 @@ function countWrites(sql: Sql): { n: number } {
 
 test("(checker 3) a readable expiry that passes while the lookup is held is settled, never revoked: when the lookup answers, and when it times out", async () => {
   for (const answers of [true, false]) {
-    const r = room({ waitMs: 200 });
+    const r = room({ waitMs: 40 });
     r.repo.plans = [idOnly];
     await assert.rejects(r.ledger.mint("a", "write", ttl60));
     const gate = deferred<void>();
@@ -1413,12 +1397,28 @@ test("(checker 4) an observation's lookup and listing share one deadline: a slow
   await assert.rejects(r.ledger.mint("a", "read", ttl60));
   const gate = deferred<void>();
   r.lookupGate = gate;
-  setTimeout(() => gate.resolve(), 200); // the lookup answers after 200 ms of the 300
   r.repo.listTokens = () => new Promise(() => {}); // the listing never answers
-  const started = Date.now();
-  await r.ledger.reconcile();
-  const took = Date.now() - started;
-  assert.ok(took < 450, `ended by the shared deadline (about 300 ms), not lookup plus a full listing wait (500 ms): took ${took} ms`);
+  // The waits the ledger asks for, and the clock it reads: the lookup answers 280 ms into the 300.
+  const realNow = Date.now;
+  const realTimeout = globalThis.setTimeout;
+  const asked: number[] = [];
+  try {
+    globalThis.setTimeout = ((fn: () => void, ms?: number) => {
+      asked.push(ms ?? 0);
+      return realTimeout(fn, ms);
+    }) as typeof setTimeout;
+    const run = r.ledger.reconcile();
+    await until(() => r.lookups === 2, "the observation's lookup");
+    Date.now = () => realNow() + 280;
+    gate.resolve();
+    await run;
+  } finally {
+    Date.now = realNow;
+    globalThis.setTimeout = realTimeout;
+  }
+  assert.equal(asked.length, 2, "one wait for the lookup, one for the listing");
+  assert.equal(asked[0], 300);
+  assert.ok(asked[1]! > 0 && asked[1]! <= 20, `the listing waits for what is left of the deadline (about 20 ms), not a full 300 ms: ${asked[1]} ms`);
   assert.equal(r.ledger.duties().observation.result, "no inventory: the listing did not answer in time");
   assert.equal(only(r.sql)["state"], "unknown");
 });

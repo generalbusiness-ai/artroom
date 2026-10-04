@@ -225,6 +225,7 @@ test("fork creation retries Artifacts' internal error 10400, and a fork whose re
   s2.ws.open(s2.lane, 1, s2.clock.t + LEASE_MS);
   assert.equal((await s2.ws.provision(s2.lane)).state, "ready");
   assert.equal(s2.fork().live().length, 1);
+  assert.equal(s2.fork().source, "artifacts:ns/canon", "the fork the lost create made, not a new one");
   void fork;
 });
 
@@ -317,14 +318,6 @@ test("a repository at the fork's name that is not a fork of this canonical repo 
     assert.equal(await ws.revoke(lane, 1), 0);
     assert.deepEqual(squatter.live(), [theirs.id], "release does not touch it either");
   }
-});
-
-test("a fork of this canonical repo whose creation response was lost is reused", async () => {
-  const { clock, ns, ws, lane, fork } = setup();
-  ns.forkFailures.push("lost-after-create");
-  ws.open(lane, 1, clock.t + LEASE_MS);
-  assert.equal((await ws.provision(lane)).state, "ready");
-  assert.equal(fork().source, "artifacts:ns/canon");
 });
 
 // ------------------------------------------------------------------ review 50104b16, P1.3: tokens within the lease

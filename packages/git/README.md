@@ -278,16 +278,40 @@ From the repository root, after `npm install`:
 ```sh
 cd packages/git
 npm run typecheck            # wrangler types, then tsc for src and for the Node tests
-npm test                     # Node: real git and node:sqlite
-npm run test:workers         # workerd: Durable Object SQLite, alarms, instance aborts
-npm run test:log             # lane L's LogPublisher and verifier through pushLog (vitest, Node)
+npm test                     # Node, one process: real git and node:sqlite
 ```
 
-The Node tests build real repositories with git and run the publisher's
-exact git commands against them. Each landing test name starts with the
-plan's acceptance case or the rule it shows. The workerd tests run the
-engine inside a Durable Object, abort the instance (`abortAllDurableObjects`),
-and let the alarm finish the landing.
+The tests run in one process (`--test-isolation=none`). They were serial
+before for no recorded reason: each test has its own temporary directory
+and its own SQLite, and the suite also passed with files in parallel.
+
+- `test/gitops.test.ts` runs the publisher's exact git commands against
+  real git and local bare repositories. The repositories are written as
+  files by `test/support.ts` (git objects built and hashed in the test
+  process), so the processes a test starts are the commands under test,
+  git's own answer where it is the oracle, and the controls.
+- `test/landing.test.ts` runs the landing engine on real SQLite and the
+  canonical repository in memory (`MemoryCanonical`). Each test name
+  starts with the plan's acceptance case or the rule it shows.
+- `test/git-publisher.test.ts` runs one script through the git publisher
+  over real git and through the memory repository, and compares every
+  answer, the merge commit included. It also lands a lane through the
+  engine and real git, across a restart with a fresh sandbox.
+- `test/treediff.test.ts` reads trees from memory and asks git where git
+  is the oracle.
+
+Removed with request ecbc722a, because the root gate never ran them:
+
+- `test-workers/` ran the engine in a stand-in Room under workerd. The
+  production Room hosts the engine now, and its own workerd tests
+  (`packages/room/test/workerd/`) abort the real object and run its
+  alarms. The gateway's refusals, which only that suite tested, are in
+  `test/ref-fence.test.ts` (`gatewayFetch`).
+- `test-log/` ran lane L's publisher through `pushLog` and `stageLog`
+  against real git (60 s). `test/gitops.test.ts` now checks that the
+  sandbox answers each staging call and the push as lane L's own model of
+  a remote (`MemoryGit`) does, and that the two packages' transfer bounds
+  are the same numbers. Lane L tests its publisher against that model.
 
 ## Live runs
 
@@ -325,13 +349,16 @@ path unchanged: the push to the lane's fork, pinning at
 `refs/artroom/heads/<lane>/<generation>`, and the landing. Nothing on the
 path rewrites a commit: pinning copies objects, and a landing either
 fast-forwards main to the head or makes a merge commit whose second parent
-is the head. `test/jj-change-id.test.ts` checks the raw commit bytes at each
-step, for a commit written by jj and one built with `git hash-object`, with
-both kinds of landing. It uses real git and the real pinning, landing
-engine and publisher code; the fork and canonical repo are local bare repos,
-and the Room and tokens are fakes. `measure/jj-change-id.mjs` runs the same
-check against real Artifacts through the measurement harness; it held on
-2026-10-01 (`measure/results/jj-change-id-*.json`).
+is the head. The tests check the raw commit bytes of a commit built with the
+header where jj writes it: after pinning from a fork (`test/gitops.test.ts`,
+"pinning: …") and as the second parent of a landing's merge commit
+(`test/git-publisher.test.ts`, "landing over real git: …"). They use real
+git and the real pinning, landing engine and publisher code; the fork and
+canonical repo are local bare repos, and the Room and tokens are fakes. The
+tests no longer run the jj program: what jj writes is jj's own, and
+`measure/jj-change-id.mjs` runs the check with jj against real Artifacts
+through the measurement harness; it held on 2026-10-01
+(`measure/results/jj-change-id-*.json`).
 
 ## Limits and choices
 
@@ -386,10 +413,11 @@ Tests:
 - `test/gitops.test.ts`: "only a landed push is ok, only a read-back lease
   refusal is lease-mismatch, any other rejection is refused; everything
   else is unknown, with the token redacted".
-- `test-log/pushlog.test.ts`: "a remote that refuses the pack with
-  Artifacts' code: pushLog reports rejected, lane L sees refused with the
-  code, reads the ref back at the parent, and does not push again" (a
-  pre-receive hook gives the code, so git reports `[remote rejected]`).
+- `test-log/pushlog.test.ts` (removed with request ecbc722a; the two
+  tests above remain): "a remote that refuses the pack with Artifacts'
+  code: pushLog reports rejected, lane L sees refused with the code, reads
+  the ref back at the parent, and does not push again" (a pre-receive hook
+  gave the code, so git reported `[remote rejected]`).
 
 Each change was broken on purpose and a named test failed
 (`notes/amendment4-log.md`).
@@ -460,13 +488,10 @@ lease do not change, and `pushLog`'s type, parent and closure checks are
 as before.
 
 Tests (`test/gitops.test.ts`, "de5289a5: …"): the final append applied
-with its answer lost; an interruption between append and hashing with a
-new client over the same filesystem; a lost hash-object answer, a failed
-hash-object and a failed cleanup; a complete file with wrong or too many
-bytes; exact type and size; another batch's staging left alone. In
-`test-log/pushlog.test.ts`, the checker's scenario through lane L's real
-publisher: the same publisher lands the same commit, and so does a
-reopened publisher over a new client after the first stopped. Each test
-fails on the code before the fix; each guard has a mutant that a test
-kills.
+with its answer lost, settled by a new client over the same filesystem,
+and the commit then lands; a lost hash-object answer, a failed hash-object
+and a failed cleanup; a complete file with wrong or too many bytes; exact
+type and size; another batch's staging left alone. `test-log/pushlog.test.ts`
+ran the checker's scenario through lane L's real publisher; it was removed
+with request ecbc722a.
 
