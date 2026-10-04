@@ -10,6 +10,9 @@ Section 11 lists eight repairs made after the first static review of this
 source (report `d3930ee8`). Entries 2, 29, 31, 39 and 40 are corrected in
 place where a repair made them untrue.
 
+Section 12 is one repair made after a supplementary finding of the same
+review (event `fbcdc3bd`). Entries 55 and 78 are corrected in place.
+
 Each entry is a place where the contract was silent or needed a concrete
 form, what was implemented, and why. Nothing here is adopted by being
 implemented. An entry stays open until the contract's owner accepts it,
@@ -106,7 +109,7 @@ section 4 below.
 | 52 | The ordinals of a deciding entry's sends. | A child's genesis: the result at ordinal 0, then the sends its act declares, from 1. A directory's genesis: its act's sends from 0. A delivery of a request: the handler's sends from 0, then the one result. | Section 7.2's two tables: I.0 sends its result at ordinal 0, and C.20 sends its `create` at ordinal 0 and also a result. |
 | 53 | The seed of a scope a genesis creates. | Its cause is the digest of the creating scope's own seed. Its ordinal counts the creations of that entry, from 0. | Section 7.2, the third kind of cause. |
 | 54 | How a held duty is represented. | The scope's state holds the ordinals of its genesis entry's sends that must not be dispatched: every send of a provisional genesis but ordinal 0. The entry that records the confirmation empties the list. Their requests are outstanding from the genesis. | Section 7.2. A runtime reads the list before it dispatches. Replay cannot check dispatch timing, as section 9.3 says. |
-| 55 | Which foreign entries a genesis or a delivery records in `uses`. | The source entry, with the digest of its canonical bytes; for a child's genesis, then each fact its fields name. | Section 9.2: the bytes of a foreign entry that a judgment read are a retained input, and the judge reads the source entry. |
+| 55 | Which foreign entries a genesis or a delivery records in `uses`. | The source entry, with the digest of its canonical bytes; for a child's genesis, applied or refused, then each fact its fields name, once those facts are read. A delivery of a result, and a diagnosis, also record each fact that the clause they run reads (section 12). | Section 9.2: the bytes of a foreign entry that a judgment read are a retained input, and the judge reads the source entry. |
 | 56 | What the state keeps of a genesis. | Its hash, and for a child the source fact and ordinal of the creation request. A repeat of that request is answered from the same index as a repeat of any delivery. | The confirmation's three conditions and the repeat both read them. |
 
 ## 8. Delivery
@@ -144,7 +147,7 @@ section 4 below.
 | 75 | How preparation knows which rules an input meets. | `prepareRules` judges the input over the snapshot as a commit would, with each rule guard passed over, and collects what each would read. A rule guard after a guard that fails is not prepared. In the commit, a rule guard with no prepared result for its input digest is `unavailable`. | Section 5.2, steps 5 and 6.4. |
 | 76 | The result of a rule that does not evaluate. | A rule holds only when its expression gives `true`. Any other value, and any deterministic refusal of the profile, is false. A fault of the engine prepares nothing. | A rule is a Boolean guard, and the same expression and input always end the same way. |
 | 77 | The profile `restricted@1`. | The restricted JSONata evaluator of the earlier model, on the pinned engine, with its budgets unchanged and no budget shared between two rules. The package's README has the review. A rule input over 256 KiB makes the rule false. | A prepared result is identified by the rule and its input digest alone. |
-| 78 | What an entry's `prepared` holds. | Exactly the results its guards read, in the order read. | Section 4.1: "each rule evaluated". |
+| 78 | What an entry's `prepared` holds. | Exactly the results its guards read, in the order read. This holds for an entry that records a refusal too: a refused genesis, and the deciding entry of a request or the entry of an advisory whose handler refused (section 12). | Section 4.1: "each rule evaluated". |
 
 ## 11. Repairs after the first static review (d3930ee8)
 
@@ -185,3 +188,27 @@ Decisions made in these repairs, for review:
   page of live items for each timed rule. A type's `max` bounds that
   page. Revision 8's separate index of live timed items in due order is
   not implemented.
+
+## 12. Repair after the supplementary finding (fbcdc3bd)
+
+The review found that an entry which records a refusal, or a later clause,
+did not record everything its judgment read. One repair, with two tests
+that failed before it.
+
+| What was lost | What changed | Witness |
+|---|---|---|
+| A rule result that a guard read before a written refusal. | A refusal from the guards, effects or sends of a genesis act or a handler carries the prepared results read so far. A refused genesis, the deciding entry of a refused request, and the entry of an advisory whose handler refused each record them in `prepared`. | A child genesis and a delivered request, each under a rule whose prepared result is false: the written entry holds that result. |
+| The facts a refused genesis read. | Once the named facts are read, a refused genesis records them in `uses` after the source entry, as an applied one does. A genesis refused before that point, for a field that is not a value of its type, records the source entry only. | A child genesis whose `fact` guard is false: the entry holds the source entry and the named fact. |
+| The facts a later clause read. | A clause with effects reads every fact that the origin entry's fields name. The entry that records it, a delivery of a result or a diagnosis, now records those facts in `uses`, after the source entry and without repeating it. A clause with no effects reads none. | A diagnosis whose `undelivered` clause runs for an origin that names a fact: the diagnosis entry holds that fact. |
+
+Not changed: a refused act writes no entry and records nothing. The
+decision, the effects and the sends of every entry are as before.
+
+What this repair claims. The failure was evidence missing from the entry
+that made the judgment. For a refused genesis that is also a missing
+retained input: the creator may pass a fact reference on without reading
+it, so no other scope's entry need hold it. For a later clause the origin
+entry already recorded the same facts, so its history was not made
+impossible to derive; the entry now states what it read. A verifier may
+also be able to compute a rule result again from the rule and its input,
+so not every refusal under a rule was impossible to replay before.

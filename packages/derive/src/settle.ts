@@ -56,10 +56,10 @@ export function judgeDiagnosis(view: StateView, definition: ValidDefinition, dia
   if (attempts.length === 0 || attempts.some((a) => timeMs(a.at) === null || !ANSWERS.includes(a.answer))) return invalid("the log holds at least one attempt, each with a time and an answer");
 
   const finding = attempts.every((a) => ROUTING.includes(a.answer)) ? "undelivered" : "delivery-unavailable";
-  const ran = finding === "undelivered" ? runClause(view, definition, context, admit.scope, request, "undelivered") : { result: "ran", effects: [], judgesTime: false } as const;
+  const ran = finding === "undelivered" ? runClause(view, definition, context, admit.scope, request, "undelivered") : { result: "ran", effects: [], uses: [], judgesTime: false } as const;
   if (ran.result === "unavailable") return ran;
   if (ran.judgesTime && context.clock.behind) return { result: "unavailable", reason: "clock-behind" };
-  return { result: "write", draft: { input: { type: "diagnosis", of: { seq: of.seq, n: of.n }, finding, attempts }, uses: [], prepared: [], effects: ran.effects, sends: [], judgesTime: ran.judgesTime } };
+  return { result: "write", draft: { input: { type: "diagnosis", of: { seq: of.seq, n: of.n }, finding, attempts }, uses: ran.uses, prepared: [], effects: ran.effects, sends: [], judgesTime: ran.judgesTime } };
 }
 
 /**

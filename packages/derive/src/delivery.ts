@@ -4,7 +4,7 @@
  * advisory.
  */
 
-import type { Advisory, Control, Effect, Entry, FactRef, Message, Prepared, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import type { Advisory, Control, Effect, Entry, FactRef, FactUse, Message, Prepared, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { bound, isEntryOf, runClause, runHandler, updateOf, useOf, type Clause, type Ran, type Reading } from "./frame.ts";
 import type { Judgment } from "./judge.ts";
@@ -98,8 +98,9 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
 
   const use = useOf(from, source);
   /** Section 5.3: an entry that judges no time condition may be written clamped; one that does is `clock-behind`. */
-  const write = (input: Extract<Judgment, { result: "write" }>["draft"]["input"], effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean): Judgment =>
-    (judgesTime && clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { input, uses: [use], prepared, effects, sends, judgesTime } });
+  /** `read`: the foreign entries a clause read beside the source entry. Each fact is recorded once (section 9.2). */
+  const write = (input: Extract<Judgment, { result: "write" }>["draft"]["input"], effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[] = []): Judgment =>
+    (judgesTime && clock.behind ? { result: "unavailable", reason: "clock-behind" } : { result: "write", draft: { input, uses: [use, ...read.filter((u) => u.fact.hash !== from.hash)], prepared, effects, sends, judgesTime } });
   /** Section 7.2: the cause of any scope this delivery's handler creates names this one delivery. */
   const cause = () => deliveryCauseDigest({ v: 1, from, n, message: messageDigest(message) });
 
@@ -110,7 +111,8 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
     const b = bound(definition, message, from);
     const ran: Ran | null = b?.handler && under(b.handler, context.source) ? runHandler(view, definition, context, scope, b.handler, b.kind, b.fields, cause()) : null;
     if (ran?.result === "unavailable") return ran;
-    const done = ran?.result === "ran" ? ran : { effects: [], sends: [], prepared: [], judgesTime: false };
+    // A handler that refuses leaves the entry with no effect. The entry still records each rule result its guards read.
+    const done = ran?.result === "ran" ? ran : { effects: [], sends: [], prepared: ran?.prepared ?? [], judgesTime: false };
     return write({ type: "delivery", from, n, message: message as Advisory }, done.effects, done.sends, done.prepared, done.judgesTime);
   }
   if (message.class !== "request" || !isScopeRef(delivered.to)) return unverified("not a message of a class the contract defines");
@@ -143,7 +145,8 @@ export function judgeDelivery(view: StateView, definition: ValidDefinition, deli
   const ran = runHandler(view, definition, context, scope, handler, b.kind, b.fields, cause());
   if (ran.result === "unavailable") return ran;
   // A refusal, among them `duplicate-relation` for a handler whose sends hold two for one key: no effect and no send but the result.
-  if (ran.result === "refused") return decide("refused", ran.reason);
+  // The deciding entry records each rule result a guard read before the refusal (section 9.2).
+  if (ran.result === "refused") return decide("refused", ran.reason, [], [], ran.prepared);
   return decide("applied", undefined, [...platform, ...ran.effects], ran.sends, ran.prepared, ran.judgesTime);
 }
 
@@ -177,7 +180,7 @@ function confirmation(scope: ScopeState, { from, n }: Delivered, message: Contro
  * request. It runs the matching clause of the send.
  */
 function result(view: StateView, definition: ValidDefinition, context: DeliveryContext, scope: ScopeState, { from, n }: Delivered, message: Result, source: Entry,
-  write: (input: { type: "delivery"; from: FactRef; n: number; message: Result; clause: Exclude<Clause, "undelivered"> }, effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean) => Judgment): Judgment {
+  write: (input: { type: "delivery"; from: FactRef; n: number; message: Result; clause: Exclude<Clause, "undelivered"> }, effects: readonly Effect[], sends: readonly Send[], prepared: readonly Prepared[], judgesTime: boolean, read: readonly FactUse[]) => Judgment): Judgment {
   const unverified = (detail: string): Judgment => ({ result: "source-unverified", detail });
   const of = message.of;
   const request = isObject(of) && isFactRef(of.from) && isLocalId(of.n) && same(of.from.at, scope.at) ? view.request(of.from.seq, of.n) : null;
@@ -202,5 +205,5 @@ function result(view: StateView, definition: ValidDefinition, context: DeliveryC
   if (ran.result === "unavailable") return ran;
   // Section 7.2: the creator confirms the incarnation of the first applied result it records, and no other.
   const confirm: Send[] = clause === "applied" && request.type === "create" ? [{ n: 0, to: from.at, message: { class: "control", type: "confirm", genesis: from } }] : [];
-  return write({ type: "delivery", from, n, message, clause }, ran.effects, confirm, [], ran.judgesTime);
+  return write({ type: "delivery", from, n, message, clause }, ran.effects, confirm, [], ran.judgesTime, ran.uses);
 }

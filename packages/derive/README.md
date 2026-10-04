@@ -95,7 +95,8 @@ guard names one.
 3. The judge takes the records in its context. A rule guard reuses one only
    when its digest is the digest of what the rule reads in the commit.
    Otherwise the answer is `unavailable`. The entry records each result its
-   guards read.
+   guards read, also when the entry records a refusal: a refused genesis, or
+   a delivery whose handler refused.
 
 `RULE_PROFILES`, from the `rule` entry point, is a profile table for
 `validateDefinition` that also checks each rule's text against the profile.

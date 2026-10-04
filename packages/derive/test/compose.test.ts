@@ -2,9 +2,9 @@ import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Attempt, Input, Result, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, factRefOf, intentDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { MemoryState, checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, stateDigest } from "../src/index.ts";
-import type { Creation, Source } from "../src/index.ts";
-import { Ledger, Scope, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, on, sent, t, ticketDefinition } from "./fixtures.ts";
+import { MemoryState, checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, judgeOutcome, prepareRules, stateDigest, useOf } from "../src/index.ts";
+import type { Creation, DeliveryContext, Judged, Source, ValidDefinition } from "../src/index.ts";
+import { Ledger, Scope, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant } from "./fixtures.ts";
 
 const { rita, una } = keys;
 const unverified = { result: "source-unverified" };
@@ -217,6 +217,75 @@ describe("what a receiver checks in the source entry (section 7.4)", () => {
     ].map((j) => j.result)).toEqual(Array(5).fill("source-unverified"));
     // The unchanged inputs pass the same checks.
     expect([genesis(asked, source).result, judged(D, S, 2).result]).toEqual(["write", "write"]);
+  });
+});
+
+describe("what a written refusal or a later clause records of what it read (section 9.2)", () => {
+  /** The creation that D.1 asks for, as it reaches a ticket under another definition, with `more` fields in its message. The source entry is made by hand. */
+  function creationUnder(D: Ledger, definition: ValidDefinition, more: Record<string, unknown> = {}): { asked: Creation; context: DeliveryContext } {
+    const { asked } = creation(D, 1);
+    const seed: Seed = { ...asked.to, definition: definition.digest };
+    const message = { ...asked.message, body: { fields: { ...(asked.message.body as { fields: object }).fields, ...more } } };
+    const made = resealed(D, 1, [{ n: 0, to: seed, message }]);
+    return { asked: { ...asked, name: scopeIdOf(seed), to: seed, message, from: factRefOf(made.entry) }, context: { ...reading(D), source: made } };
+  }
+  /** Each rule the input meets, prepared as false. */
+  const falsely = (state: MemoryState, definition: ValidDefinition, judged: Judged) => prepareRules(state, definition, judged).map((a) => ({ rule: a.rule, input: a.digest, result: false }));
+
+  test("a rule that is false: the refused genesis and the refused deciding entry of a request each record the result their guard read", () => {
+    const strict = variant(ticket, (def) => {
+      def.rules.never = "false";
+      def.acts.file.guards.push({ rule: "never" });
+      def.receives.closes.guards.push({ rule: "never" });
+    });
+    const D = founded();
+    D.did(rita, "open-issue", fields({ title: "A" }));
+    const { asked, context } = creationUnder(D, strict);
+    const forGenesis = falsely(new MemoryState(), strict, { genesis: asked, context });
+    expect(forGenesis).toHaveLength(1);
+    expect(judgeGenesis(new MemoryState(), strict, asked, { ...context, prepared: forGenesis })).toMatchObject({
+      result: "write", draft: { input: { decision: "refused" }, prepared: forGenesis, effects: [], sends: [{ n: 0, message: { outcome: "refused", reason: "guard-failed" } }] },
+    });
+
+    // A lane's update reaches a ticket whose handler for it is under the same rule.
+    const I = new Scope(strict, rita.member, true, 1);
+    const P = new Scope(ticketDefinition);
+    P.did(rita, "link", fields({ target: I.at, about: 0 }));
+    const { delivered, source } = sent(P, 2);
+    const arrival = arriving(I, delivered, source);
+    const forHandler = falsely(I.state, strict, { delivery: delivered, context: arrival });
+    expect(forHandler).toHaveLength(1);
+    expect(judgeDelivery(I.state, strict, delivered, { ...arrival, prepared: forHandler })).toMatchObject({
+      result: "write", draft: { input: { decision: "refused", reason: "guard-failed" }, prepared: forHandler, effects: [] },
+    });
+  });
+
+  test("a fact guard that is false: the refused genesis records the named fact it read, and a later clause records the facts it reads again", () => {
+    // P: a lane's `assign` entry, which names una as performer. The creation passes the reference on; the creator did not read P.
+    const l = new Scope(laneDefinition);
+    l.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
+    const entry = l.did(rita, "assign", { ...on(l, 2), ...fields({ performer: una.member }) });
+    const fetched = { fact: l.fact(entry.seq), entry, under: "lane" };
+    const proof = { type: "fact", kind: "assign", under: "lane", required: true };
+    const cited = variant(ticket, (def) => {
+      def.acts.file.fields.proof = proof;
+      def.acts.file.guards.push({ fact: { field: "proof", where: [{ equals: { a: { field: "performer" }, b: { field: "opener" } } }] } });
+    });
+    const D = founded();
+    D.did(rita, "open-issue", fields({ title: "A" }));
+    const { asked, context } = creationUnder(D, cited, { proof: fetched.fact });
+    // The opener is rita, so the guard is false. The entry holds the source entry and P: the child can derive the refusal again from its own retained bytes.
+    expect(judgeGenesis(new MemoryState(), cited, asked, { ...context, facts: [fetched] })).toMatchObject({
+      result: "write", draft: { input: { decision: "refused" }, uses: [useOf(asked.from, context.source!.entry), useOf(fetched.fact, entry)], sends: [{ message: { outcome: "refused", reason: "guard-failed" } }] },
+    });
+
+    // An `ask` whose fields name P. Its `undelivered` clause runs in a later entry and reads P again; the origin entry recorded P first.
+    const asking = variant(ticket, (def) => { def.acts.ask.fields.proof = proof; });
+    const S = new Scope(asking);
+    expect(S.act(una, "ask", fields({ desk: D.at, proof: fetched.fact }), { facts: [fetched] }).result).toBe("write");
+    expect(judgeDiagnosis(S.state, asking, { of: { seq: 2, n: 0 }, attempts: [{ at: t(0), answer: "not-found" }] }, { ...reading(S), facts: [fetched], origin: S.last })).toMatchObject({
+      result: "write", draft: { input: { finding: "undelivered" }, uses: [useOf(fetched.fact, entry)], effects: [{ effect: "state", item: 2, state: "failed" }] },
+    });
   });
 });
 

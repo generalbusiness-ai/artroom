@@ -4,7 +4,7 @@
  * for, and of a child, which a `create` send of its creator asks for.
  */
 
-import type { Entry, FactRef, Incarnation, Request, Result, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Entry, FactRef, FactUse, Incarnation, Prepared, Request, Result, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
 import { deliveryCauseDigest, intentDigest, isDigest, isIncarnation, messageDigest, scopeIdOf, seedDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery, sentBy, type DeliveryContext } from "./delivery.ts";
 import { creationFields, derive, isIntent, readFacts, readFields, useOf } from "./frame.ts";
@@ -94,9 +94,14 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
   const input = (decision: "applied" | "refused") =>
     ({ type: "genesis", seed, inc: asked.inc, founding, source: child?.from ?? null, n: child?.n ?? null, message: child?.message ?? null, decision }) as const;
   const sourceUse = source ? [useOf(source.fact, source.entry)] : [];
-  /** Section 7.2: a refused genesis is written, sends its `refused` result and nothing else, and is terminal. */
-  const refuse = (reason: NonNullable<Result["reason"]>): Judgment =>
-    ({ result: "write", draft: { input: input("refused"), uses: sourceUse, prepared: [], effects: [], sends: result("refused", reason), judgesTime: founding !== null } });
+  /**
+   * Section 7.2: a refused genesis is written, sends its `refused` result and
+   * nothing else, and is terminal. Section 9.2: it records what its judgment
+   * read: the source entry, each named fact once those are read, and each rule
+   * result a guard read before the refusal.
+   */
+  const refuse = (reason: NonNullable<Result["reason"]>, uses: readonly FactUse[] = sourceUse, prepared: readonly Prepared[] = []): Judgment =>
+    ({ result: "write", draft: { input: input("refused"), uses, prepared, effects: [], sends: result("refused", reason), judgesTime: founding !== null } });
 
   // The genesis act, with the opener's parties from the creation message, or with the founding intent's fields. It has no signer:
   // nobody signs for a scope that does not exist yet, and the founding rule is the authority note's.
@@ -115,8 +120,8 @@ export function judgeGenesis(view: StateView, definition: ValidDefinition, asked
   // A child's result is at ordinal 0; the sends its act declares follow. Each scope a genesis creates has that genesis's own seed digest as its cause.
   const ran = derive(j, act, act.on, seedDigest(seed), child ? 1 : 0);
   if (ran.result === "unavailable") return ran;
-  if (ran.result === "refused") return refuse(ran.reason);
-  // No item exists before a genesis, so no transition is due (section 5.2, step 6.3), and no entry precedes it, so the clock is not behind.
   const uses = [...sourceUse, ...named.uses.filter((u) => u.fact.hash !== source?.fact.hash)];
+  if (ran.result === "refused") return refuse(ran.reason, uses, ran.prepared);
+  // No item exists before a genesis, so no transition is due (section 5.2, step 6.3), and no entry precedes it, so the clock is not behind.
   return { result: "write", draft: { input: input("applied"), uses, prepared: ran.prepared, effects: ran.effects, sends: [...result("applied"), ...ran.sends], judgesTime: founding !== null || ran.judgesTime } };
 }

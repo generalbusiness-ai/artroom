@@ -168,7 +168,8 @@ export interface Forms { guards: readonly Guard[]; effects: readonly EffectForm[
 
 export type Ran =
   | { result: "ran"; effects: Effect[]; sends: Send[]; prepared: Prepared[]; judgesTime: boolean }
-  | { result: "refused"; reason: RefusalReason; detail: string }
+  /** `prepared`: the rule results the guards read before the refusal. An entry that records the refusal records them (section 9.2). */
+  | { result: "refused"; reason: RefusalReason; detail: string; prepared: Prepared[] }
   | { result: "unavailable"; reason: UnavailableReason };
 
 /** True when an effect sets a slot from the commit time. */
@@ -183,13 +184,13 @@ const timesEffect = (e: EffectForm): boolean => "value" in e && "time" in e.valu
 export function derive(j: Judging, forms: Forms, opens: string | null, cause: Digest, first = 0): Ran {
   for (const [i, guard] of forms.guards.entries()) {
     const result = judgeGuard(j, guard);
-    if (result === "fail") return { result: "refused", reason: "guard-failed", detail: `guards.${i}` };
+    if (result === "fail") return { result: "refused", reason: "guard-failed", detail: `guards.${i}`, prepared: j.used };
     if (result !== "pass") return { result: "unavailable", reason: result };
   }
   const effects = deriveEffects(j, forms.effects, forms.attention, opens);
-  if (!effects.ok) return { result: "refused", reason: effects.reason, detail: effects.detail };
+  if (!effects.ok) return { result: "refused", reason: effects.reason, detail: effects.detail, prepared: j.used };
   const sends = deriveSends(j, forms.sends, effects.working, cause, first);
-  if (!sends.ok) return { result: "refused", reason: sends.reason, detail: sends.detail };
+  if (!sends.ok) return { result: "refused", reason: sends.reason, detail: sends.detail, prepared: j.used };
   const judgesTime = forms.guards.some((g) => "before" in g || "after" in g) || forms.effects.some(timesEffect);
   return { result: "ran", effects: effects.effects, sends: sends.sends, prepared: j.used, judgesTime };
 }
@@ -203,10 +204,10 @@ export function runHandler(view: StateView, definition: ValidDefinition, context
   const subjects = new Map<string, Item>();
   for (const [name, also] of Object.entries(handler.also)) {
     const item = localItem(view, scope, fields[also.by]);
-    if (item?.type !== also.item) return { result: "refused", reason: "no-item", detail: `${also.by} names no ${also.item}` };
+    if (item?.type !== also.item) return { result: "refused", reason: "no-item", detail: `${also.by} names no ${also.item}`, prepared: [] };
     subjects.set(`also.${name}`, item);
   }
-  if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return { result: "refused", reason: "alias", detail: "two names resolve to one item" };
+  if (new Set([...subjects.values()].map((i) => i.id)).size !== subjects.size) return { result: "refused", reason: "alias", detail: "two names resolve to one item", prepared: [] };
   const j: Judging = {
     view, definition, bounds: context.bounds, clock: context.clock, scope, self: scope.head.seq + 1, kind, fields, fieldTypes: {}, subjects, signer: null,
     facts: new Map(), prepared: context.prepared, used: [], asked: context.asked,
@@ -226,9 +227,13 @@ export type Clause = keyof ResultClauses | "conflict";
  * checked against the hash the state keeps. The subjects are read as they are
  * now. A clause whose effects cannot apply now, as when its item has reached
  * a final state, changes nothing: the result is still recorded.
+ *
+ * `uses`: the foreign entries this judgment read. A clause with effects reads
+ * every fact the origin's fields name, so the entry that records the clause
+ * records them again (section 9.2). The origin entry recorded them first.
  */
 export function runClause(view: StateView, definition: ValidDefinition, context: Reading & { origin?: Entry | null | undefined }, scope: ScopeState, request: OwnRequest, clause: Clause):
-  { result: "ran"; effects: Effect[]; judgesTime: boolean } | { result: "unavailable"; reason: UnavailableReason } {
+  { result: "ran"; effects: Effect[]; uses: FactUse[]; judgesTime: boolean } | { result: "unavailable"; reason: UnavailableReason } {
   const origin = context.origin;
   if (!origin || origin.seq !== request.seq || entryHash(origin) !== request.hash) return { result: "unavailable", reason: "unavailable" };
   const { declared } = definition;
@@ -257,7 +262,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
   if (!form || "index" in form) throw new Error(`entry ${origin.seq} declares no request at ordinal ${request.n}`);
   const clauses: ResultClauses & { conflict?: readonly EffectForm[] } = "create" in form ? form.create.result : "tell" in form ? form.tell.result : form.relate.result;
   const forms = clauses[clause] ?? [];
-  if (forms.length === 0) return { result: "ran", effects: [], judgesTime: false };
+  if (forms.length === 0) return { result: "ran", effects: [], uses: [], judgesTime: false };
 
   // The uses of the origin are the facts its fields name; a clause may read one (section 6.6, a party from a fetched fact).
   const facts = readFacts(view, frame.fieldTypes, frame.fields, context.facts);
@@ -272,5 +277,5 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
     facts: facts.facts, prepared: [], used: [],
   };
   const effects = deriveEffects(j, forms, [], null);
-  return { result: "ran", effects: effects.ok ? effects.effects : [], judgesTime: forms.some(timesEffect) };
+  return { result: "ran", effects: effects.ok ? effects.effects : [], uses: facts.uses, judgesTime: forms.some(timesEffect) };
 }
