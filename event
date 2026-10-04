@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d94391191995cd52e3fc6ee9ea78ac7c499362e0","text":"Merge retired a covered predecessor; the successor is at release/third-party/licenses/content-type-1.0.5.txt."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:dc5ce10bc076f688050d83998a65431f93c3d190","text":"Merge retired a covered predecessor; the successor is at packages/cli/package.json."}
