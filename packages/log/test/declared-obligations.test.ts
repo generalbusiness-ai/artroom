@@ -38,9 +38,10 @@ import { describe, expect, test } from "vitest";
 import type { LogEntry, PolicyDocumentV2, PolicyVersion, ReplayContext, Sha, SystemEvent } from "@generalbusiness/artroom-contract";
 import { CODE_REVIEW_ACTS, carry, policy, replay, requireCheck, requireReview } from "@generalbusiness/artroom-policy";
 import { digestJson } from "../src/crypto.ts";
-import { type VerifyReason } from "../src/verify.ts";
+import type { GitReader } from "../src/git.ts";
+import { verifyLog, type VerifyReason } from "../src/verify.ts";
 import { DeclaredRoom, pair, type Fixture } from "./support/declared-room.ts";
-import { actAt, contextOf, decisionsAt, forgeCall, insert, keep, open, policyOf, reseal, setDecisions, verify, type Log } from "./support/fixtures.ts";
+import { actAt, contextOf, decisionsAt, forgeCall, insert, keep, open, policyOf, publish, reseal, setDecisions, verify, type Log } from "./support/fixtures.ts";
 import { keys } from "./support/room-sim.ts";
 import carryJson from "./fixtures/declared-carry.json";
 import plainJson from "./fixtures/declared-carry-plain.json";
@@ -58,6 +59,9 @@ function prefix(f: Fixture, through: number): Log {
   log.entries.length = through + 1;
   return log;
 }
+
+/** A retained context, as far as the tests below change it. */
+type Shaped = { input: { proposal?: { changed: unknown }; obligations?: unknown } };
 
 /** Verify `log` and expect `reason` at `seq`, with the verified prefix ending just before it. */
 async function expectFailure(log: Log, reason: VerifyReason, seq: number, opts: Parameters<typeof verify>[1] = {}) {
@@ -505,6 +509,62 @@ describe("check-carried events are judged (R-CARRY-6 to R-CARRY-14)", () => {
       expect(said).not.toContain(claim);
       expect(full.cannotProve.join("\n")).toContain(claim);
     }
+    // It does not deny the checks that still ran, and it says what the one kept guard on landings sees.
+    for (const denial of ["no Git object was read", "passes this run", "compared no recorded context"]) expect(said).not.toContain(denial);
+    expect(said).toContain("a land evaluation is refused while the admin-approval obligation is open");
+    expect(said).toContain("this run read Git objects where they were present");
+    expect(said).toContain("Obligations that rules open are known only by replay");
+    expect(said).toContain("each check-carried event names an earlier accepted check");
+    expect(said).toContain("this run compared the context's changed paths with Git's, and took Git's list where the context left a change out");
+    expect(said).toContain("did not rebuild or compare the complete rule context");
+    // The run did read Git objects for the version's witness, as it says: here, the objects of both proposal heads.
+    const read: string[] = [];
+    const git = await publish(forged);
+    const watched: GitReader = { readRef: (ref) => git.readRef(ref), readObject: (sha) => (read.push(sha), git.readObject(sha)) };
+    expect(await verifyLog(watched, { replayDecisions: false })).toMatchObject({ ok: true, mode: "integrity" });
+    const heads = forged.entries.flatMap((e) => (e.entry.type === "act" && e.entry.act.envelope.kind === "propose" ? [(e.entry.act.envelope.body as { head: string }).head] : []));
+    expect(heads.length).toBeGreaterThan(0);
+    for (const head of heads) expect(read).toContain(head);
+  });
+
+  test("with replay off the guard on landings still runs, as the report says: a land evaluation with admin approval open is refused, and one with a rule's obligation open passes", async () => {
+    // Admin approval is derived from the document and the changed paths, with no policy evaluation.
+    const admin = prefix(CARRY, S.t6twoAdmins);
+    await evaluatedAt(admin, S.t6twoAdmins + 1, S.t6land, { obligations: (o) => o.map((x) => ({ ...x, met: true })), policy: idOf(admin, S.activated3) });
+    const kept = await verify(admin, { replayDecisions: false });
+    expect(kept).toMatchObject({ ok: false, mode: "integrity", carryAccounting: "none", verifiedThrough: S.t6twoAdmins });
+    expect(kept.failures[0]).toMatchObject({ reason: "guard-failed", seq: S.t6twoAdmins + 1 });
+    expect(kept.failures[0]!.detail).toMatch(/the obligation obl_admin-approval is not met/);
+    // An obligation a rule opens is known only by replay: the same forgery passes with replay off, and fails with it on.
+    const rule = prefix(CARRY, S.t5revoked);
+    await evaluatedAt(rule, S.t5revoked + 1, S.t5land, { obligations: (o) => o.map((x) => ({ ...x, met: true })), policy: idOf(rule, S.activated3) });
+    expect(await verify(rule, { replayDecisions: false })).toMatchObject({ ok: true, mode: "integrity", failures: [] });
+    expect((await expectFailure(rule, "guard-failed", S.t5revoked + 1)).detail).toMatch(/the obligation obl_tests is not met/);
+  });
+
+  test.each([
+    { name: "a proposal's changed list holds null", at: "propose2" as const, change: (c: Shaped): void => { c.input.proposal!.changed = [null]; }, says: /context\.input\.proposal\.changed\[0\] is not an object/ },
+    { name: "a proposal's changed list is not a list", at: "propose2" as const, change: (c: Shaped): void => { c.input.proposal!.changed = "src/a.ts"; }, says: /context\.input\.proposal\.changed is not an array/ },
+    { name: "a renamed path has no from", at: "propose2" as const, change: (c: Shaped): void => { c.input.proposal!.changed = [{ status: "renamed", path: "src/a.ts" }]; }, says: /changed\[0\]\.from is not a string/ },
+    { name: "a land input's obligations hold null", at: "land" as const, change: (c: Shaped): void => { c.input.obligations = [null]; }, says: /context\.input\.obligations\[0\] is not an object/ },
+  ])("a retained context that verify reads by shape is malformed when that shape is wrong, in a report and not a throw: $name", async ({ at, change, says }) => {
+    const seq = S[at];
+    // The control: the log cut after this entry verifies, with replay on and off.
+    for (const replayDecisions of [true, false]) expect(await verify(prefix(CARRY, seq), { replayDecisions })).toMatchObject({ ok: true, verifiedThrough: seq });
+    // The same log, with one recorded context changed in that one place, kept under its own digest and resealed.
+    const forged = prefix(CARRY, seq);
+    const recorded = decisionsAt(forged, seq);
+    const first = recorded.find((d) => (at === "land" ? d.kind === "land" : (contextOf(forged, d) as unknown as Shaped).input.proposal))!;
+    const context = structuredClone(contextOf(forged, first)) as unknown as Shaped;
+    change(context);
+    const digest = keep(forged, context);
+    setDecisions(forged, seq, recorded.map((d) => (d.input === first.input ? { ...d, input: digest } : d)));
+    expect((await expectFailure(forged, "malformed", seq)).detail).toMatch(says);
+    // With replay off the entry is not judged by its context, and the retained file is still reported malformed.
+    const integrity = await verify(forged, { replayDecisions: false });
+    expect(integrity).toMatchObject({ ok: false, mode: "integrity" });
+    expect(integrity.failures.map((x) => x.reason)).toEqual(["malformed"]);
+    expect(integrity.failures[0]!.detail).toMatch(says);
   });
 
   test("decision-extra: a judgement no landing of that version owes: one naming another version's landing, one for a failing check, and one for an obligation the version does not have", async () => {

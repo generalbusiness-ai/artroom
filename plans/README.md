@@ -2939,7 +2939,9 @@ The tree was clean before and after the gates.
 
 ## Declared acts stage 2 (request fd6f00b6)
 
-Status: implemented, pending review. Gitseq request `fd6f00b6` (planner to builder), stage 2 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), under [docs/protocol.md](../docs/protocol.md) section 33 (stage 1, landed at `815e3383`) and the planner's clarification, assert `869d9aad`. Branch `request/decl-stage2`, cut from main `815e3383` and merged with main `a04c774b` (mint lane F). The head for review is the commit that carries this section. Nothing was pushed or deployed, and no Cloudflare credential was used.
+Status on 2026-10-04: approved. Review `9cb05da9` approved the head `39430e23` (ratified `93974c40`), after the repairs described under "State at the integration head". An earlier approval, `25bede37`, was withdrawn. All of it is on the integration branch `request/test-overhead`; nothing has landed on main. The line below is the earlier status, kept as history.
+
+Earlier status: implemented, pending review. Gitseq request `fd6f00b6` (planner to builder), stage 2 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), under [docs/protocol.md](../docs/protocol.md) section 33 (stage 1, landed at `815e3383`) and the planner's clarification, assert `869d9aad`. Branch `request/decl-stage2`, cut from main `815e3383` and merged with main `a04c774b` (mint lane F). The head for review is the commit that carries this section. Nothing was pushed or deployed, and no Cloudflare credential was used.
 
 The Room now admits acts from its active document's vocabulary. Under a `v1` document that is the legacy vocabulary, on the code path it had. Under a `v2` document it is the document's declarations. The code-review declarations ship as data, and a room adopts them only by activating a `v2` document (R-DECL-1); a room with no policy file still gets the R-POL-7 default, which is `v1`.
 
@@ -3287,7 +3289,9 @@ Main `a04c774b` had 2,626 passed and 2 skipped (review `daba6bca`), and `a42c4d8
 
 ## Declared acts stage 3 (request 1e8fee4b)
 
-Status: implemented, pending review. Gitseq request `1e8fee4b` (planner to builder), stage 3 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), approved as design in review `1808ae17`, as clarified by the planner's assert `869d9aad` in answer to the checker's request `41892cb2`. Branch `request/decl-stage3`, with main `a04c774b` merged. The head for review is the commit that carries this section. Nothing was pushed or deployed, and no Cloudflare credential was used.
+Status on 2026-10-04: open. The latest review, at `947fb909`, requested changes: complete carry accounting is owed and stays owed under this request. The verifier as delivered is under review as a bounded release of its own (request `42342e35`, below). All of it is on the integration branch `request/test-overhead`; nothing has landed on main. The line below is the earlier status, kept as history.
+
+Earlier status: implemented, pending review. Gitseq request `1e8fee4b` (planner to builder), stage 3 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), approved as design in review `1808ae17`, as clarified by the planner's assert `869d9aad` in answer to the checker's request `41892cb2`. Branch `request/decl-stage3`, with main `a04c774b` merged. The head for review is the commit that carries this section. Nothing was pushed or deployed, and no Cloudflare credential was used.
 
 This branch changes `packages/log` and this file, and nothing else.
 
@@ -3607,13 +3611,13 @@ The review of `7931d5e8` (changes requested, `12b1e0a9`) added one: while the ro
 
 The review of `9451aa24` (changes requested, `17ce6443`) found one more case of the same kind: two different acts started together under a key the handle did not yet hold. Whichever lost its answer first became the kept act, and the other could not replace it, so a repeat of the act the room had accepted was built again and refused. A key now carries one intent at a time, decided before anything is awaited or signed: a second call with the same key and the same intent shares the first call's outcome, and one with another intent is refused `bad-request` with nothing signed or sent. Witnesses in `packages/client/test/prepared.test.ts`: "a key carries one intent at a time ..." and "the same act started twice together under one key is one act ...". Three controls distinguish: the shared call, the one intent per key, and the count of places before any await.
 
-The review of `2ba30aa8` (changes requested, `26231a05`) found that the shared outcome was entered too late. The handle entered the key with no promise, and then started the act. Starting the act can run the caller's `onPrepared` hook at once: a bearer session awaits nothing before the hook, and neither does a key handle that repeats an act it kept. A hook that made the same call again got `undefined` where a promise is declared. The room still recorded one act. The promise is now made and entered before the act starts, so such a call gets the first call's promise. The one intent per key, the shared call, the count of places and the cleanup are unchanged. A hook must not await the call it repeats, because that promise settles only after the hook returns; the option's description says so. Witnesses in `packages/client/test/prepared.test.ts`: "a hook that makes the same call again, before it returns, gets the first call's promise", once for a bearer session on a new key, with the same call after the first returned as its control, and once for a key on an act the handle kept. Control, by hand: on the source of `2ba30aa8` both tests fail ("expected undefined to be an instance of Promise"; "expected undefined to be Promise") and the other 106 client tests pass; with the repair all 108 pass. `scripts/control.mjs` was not used, because restoring the earlier order takes more than one replaced passage.
+The review of `2ba30aa8` (changes requested, `26231a05`) found that the shared outcome was entered too late. The handle entered the key with no promise, and then started the act. Starting the act can run the caller's `onPrepared` hook at once: a bearer session awaits nothing before the hook, and neither does a key handle that repeats an act it kept. A hook that made the same call again got `undefined` where a promise is declared. The room still recorded one act. The promise is now made and entered before the act starts, so such a call gets the first call's promise. The one intent per key, the shared call, the count of places and the cleanup are unchanged. A hook must not await the call it repeats, because that promise settles only after the hook returns; the option's description says so. Witnesses in `packages/client/test/prepared.test.ts`: "a hook that makes the same call again, before it returns, gets the first call's promise", once for a bearer session on a new key (one hook and one `bearerAct` call on the room's wire, not an HTTP POST), with the same call after the first returned as its control, and once for a key on an act the handle kept. Control, by hand: on the source of `2ba30aa8` both tests fail ("expected undefined to be an instance of Promise"; "expected undefined to be Promise") and the other 106 client tests pass; with the repair all 108 pass. `scripts/control.mjs` was not used, because restoring the earlier order takes more than one replaced passage.
 
 The authenticated UI entry is no longer in this request. The planner's decision `bdd0ebd5` (scope amendment `98a292d4`) moves the live Acts page entry and its real-browser, real-Room witness to request `cfbde32f`, which depends on `18815307` for the browser's credential. Stage 5 keeps authenticated access by the client, HTTPS, MCP and the command line, the generic typed form and its LiveRoom adapter with their component tests, and every other original condition.
 
 One consequence of the first repair: a bearer session now refuses input that is not plain data too. Before, only a key handle did, at signing; a bearer would have sent it as JSON.
 
-Each repair has one control with `scripts/control.mjs` that distinguishes.
+Each repair before the one for `26231a05` has one control with `scripts/control.mjs` that distinguishes. That last repair has the control by hand described above.
 
 **Limits, restated.**
 
@@ -3624,7 +3628,9 @@ Each repair has one control with `scripts/control.mjs` that distinguishes.
 
 **Below, stale.** "For the planner or hugh", points 9 and 10, say stage 2 has moved and the MCP core lacks later commits; this head composes all of them. The UI's "Not done" list says a lost answer is not retried from the form; it is, since `f606dd89`. The quoted CLI message under `bdc35c53` is the "sent again" wording only.
 
-Status: implemented, provisional, not for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used. No reviewer has approved any head of this branch.
+Status on 2026-10-04: approved. Review `b90f2211` approved the head `6b877f6b` (ratified `0ddc47f5`), for the request as amended: the authenticated UI entry moved to request `cfbde32f`. All of it is on the integration branch `request/test-overhead`; nothing has landed on main. The line below is the earlier status, kept as history.
+
+Earlier status: implemented, provisional, not for review. Gitseq request `a5d64b35` (planner to builder), stage 5 of 7 in section 8.5 of [notes/2026-10-02-declared-acts.md](../notes/2026-10-02-declared-acts.md), with the planner's acceptance clarification `fa120186` and timing amendment `41a5a2b4`. Branch `request/decl-stage5`. Nothing was pushed or deployed, and no Cloudflare credential was used. No reviewer has approved any head of this branch.
 
 How to read this section. The parts from "What was built" to "The UI" describe the composed head `b7b9d8df` as it was reported then: the stage 5 lane's work, the UI lane's work (`request/decl-stage5-ui`, `5dc0d044`), and the stage 2 code as it stood at `15fa7f4c`. They are not rewritten, except choices 19, 20 and 22, a note at the head of the mutation table and of the old gates, and the last list, "For the planner or hugh". The part "Since `b7b9d8df`" has one section for each finding the checker or the planner made on that head or a later one, with its repair. Where the two parts disagree, the later one is right.
 
@@ -4018,7 +4024,9 @@ The UI count there is the stage 2 candidate's UI, before the UI lane was merged.
 > **Changed at composition.** This subsection is the UI lane's report as written at `5dc0d044`. Four things in it are no longer true of the composed head. Choice 4: the adapter keeps no earlier catalogue; the handle does, and drops them on a later activation. Choice 8: the thread's name comes from `threadTitle`. Choice 9: the thread list reads `Lane.kind`. The four items under "Asked of the companion lane" are answered in "The UI lane's four questions" and done. The suite has 195 tests and 51 mutants at the composed head. The gates of the composed head are under "Composition".
 
 
-Status: implemented on the stage 5 API commit `2eeb7e72`, as two commits, head `5dc0d04400336c31523054f765d16382960c3c91`. It changes only `packages/ui`. It is provisional in the same way as the rest of stage 5: it sits on the stage 2 candidate and is recomposed on main after stage 2 lands. Nothing was pushed or deployed.
+Status on 2026-10-04: reviewed as part of stage 5, approved in review `b90f2211` at `6b877f6b`. The live Acts page entry and its real-browser witness are owed under request `cfbde32f`. All of it is on the integration branch `request/test-overhead`; nothing has landed on main. The line below is the earlier status, kept as history.
+
+Earlier status: implemented on the stage 5 API commit `2eeb7e72`, as two commits, head `5dc0d04400336c31523054f765d16382960c3c91`. It changes only `packages/ui`. It is provisional in the same way as the rest of stage 5: it sits on the stage 2 candidate and is recomposed on main after stage 2 lands. Nothing was pushed or deployed.
 
 #### What was built
 
@@ -4583,7 +4591,37 @@ Not run at the present head: root `npm ci`, root `npm test`, the Room suites, an
 
 ## MCP core runtime (request 9ca1d290)
 
-### State at the integration head (written last)
+### State at the composed head, 2026-10-04 (written last)
+
+This is the head for condition 7: one composed head, reviewed for both scopes. It is the commit that adds this subsection, on `request/mcp-core-composed`, one commit after the integration head `d691e6e9` of `request/test-overhead`, which stays frozen for the verifier review (planner decision `5c020815`). The commit changes only this file, so source and tests are those of `d691e6e9`. Read this subsection first. The two below it are still right about what was built and repaired.
+
+**What the head contains, and the review each part has.**
+
+| Part | Request | Review |
+|---|---|---|
+| Test practice and reduction | `ecbc722a` | approved `b1738122` at `f6212850` |
+| Declared acts stage 2 | `fd6f00b6` | approved `9cb05da9` at `39430e23` |
+| Bearer sessions end with their grantor | `5d41ea36` | approved `65df0958` at `87cd5804` |
+| Declared acts stage 5 | `a5d64b35` | approved `b90f2211` at `6b877f6b` |
+| Installable packed packages | `7e82100b` | approved `81478e2d` at `1e444739` |
+| Intermediate verifier release | `42342e35` | awaiting an independent verdict at `d691e6e9` (invitation `a23cfe01`); not claimed here |
+| Declared acts stage 3, complete carry accounting | `1e8fee4b` | open and owed; not claimed here |
+| MCP core runtime | `9ca1d290` | this review |
+| MCP core contract, the planner's four paths | `a9788a59` / `ee3d9036` | this review, on the planner's artifacts published at this head |
+
+**What changed for the MCP core since the review `bc0d7f6b` at `50216bb1`.** No MCP source or test changed. The review's three points:
+
+- *Condition 7.* The planner publishes `docs/protocol.md`, `packages/contract/src/transports.ts`, `packages/contract/src/index.ts` and `packages/contract/examples/demo-loop.ts` at this head under `ee3d9036`. The review invitation names both scopes.
+- *The grantor rule.* Decided and built under request `5d41ea36`: a bearer session ends when its grantor's key is revoked, for a read, an act and an exact retry alike. R-CRED-10 says so, and the witness runs against a real Room.
+- *Dependencies with open findings.* Stage 2 and stage 5 are repaired and approved, as the table shows. The verifier release has no verdict yet; the whole head lands only after it has one (`5c020815`). No earlier approval is carried across a repair: each row names the review of the repaired head.
+
+Other changes on the branch since `50216bb1` that touch files this request lists: `packages/client/src/room.ts` and its tests (stage 5's repairs, reviewed there); `docs/protocol.md` (R-CRED-10 for the grantor rule, R-DECL-25 for the verifier's report, both reviewed in their own lanes); the six package manifests and `tsconfig.build.json` files (packaging). The MCP package's source and its tests are as they were at `50216bb1`.
+
+**Conditions of the request.** As in the table of the next subsection: conditions 1 to 6 delivered, and condition 7 met by this head, the planner's publication and this review.
+
+**Limits, restated.** No test runs the real `artroom mcp` binary against a real Room, or an expired bearer over stdio. Neither is a condition of the request, and the planner has confirmed that (chat, 2026-10-04). The Room method `caller(token)` is a seam outside `RoomWire`; the planner accepted it in `3d8a74a9`. The gate's result at this head is in the review invitation.
+
+### State at the integration head (written earlier, at `50216bb1`)
 
 The MCP core is now reviewed on `request/test-overhead`, the integration branch (assert `dae9a1f3`), composed with stage 2 (approved at `4ec48aa1`, review `25bede37`), stage 3 and stage 5. The branch `request/mcp-core-runtime` stays at `729fb330`. Read this subsection first, then "State at `8b46e825`", which is still right about what was built and repaired. This subsection replaces that note's "Stopped, and owed" list and the provisional status below it.
 
@@ -4649,7 +4687,9 @@ The rest of this section describes `b359e278` and is no longer current. It is ke
 - **Not shown by any test here:** the real `artroom mcp` binary against the real Room, and an expired bearer over stdio.
 - The final integration still follows reviewed stage 5 on main.
 
-Status: implemented, provisional, not yet for review. Gitseq request `9ca1d290` (planner to builder): the runtime of the adopted MCP core, composed with the planner's contract (`request/mcp-core-current`, `1d9ac5ad`) and with stage 5's generic surfaces. Branch `request/mcp-core-runtime`. Code head `217f01f6`; the commit that adds this section changes only this file. Nothing was pushed or deployed, and no Cloudflare credential was used.
+Status on 2026-10-04: changes requested (`bc0d7f6b`, at `50216bb1`). What it asked for: the grantor rule, since approved under request `5d41ea36`; and the planner's four contract artifacts republished at the final composed head, with a review bound to both scopes. That republication and review are still owed. All of it is on the integration branch `request/test-overhead`; nothing has landed on main. The line below is the earlier status, kept as history.
+
+Earlier status: implemented, provisional, not yet for review. Gitseq request `9ca1d290` (planner to builder): the runtime of the adopted MCP core, composed with the planner's contract (`request/mcp-core-current`, `1d9ac5ad`) and with stage 5's generic surfaces. Branch `request/mcp-core-runtime`. Code head `217f01f6`; the commit that adds this section changes only this file. Nothing was pushed or deployed, and no Cloudflare credential was used.
 
 Two things are true of this head and must change before review:
 
@@ -4855,7 +4895,7 @@ The declared run's skips are the tests that found their own rooms (stage 2's, st
 
 ## Installable packed packages (request 7e82100b)
 
-Status: implemented, repaired after review `59605d51` (changes requested), pending review again. Gitseq request `7e82100b` (planner to builder, replacing `64dc6f04`), promise `1eb5788c`, under the planner's note `plans/013-2026-10-04-first-jam-release.md` (decision `b6dd55dc`). On `request/test-overhead`. Nothing was published to a registry, and no provider was contacted.
+Status on 2026-10-04: approved. Review `81478e2d` approved the head `1e444739` (ratified `99d8496b`), after the repair for review `59605d51`. The candidate packed from `1b40b7ec` is not the final release: the release is packed again from the commit that lands. Gitseq request `7e82100b` (planner to builder, replacing `64dc6f04`), promise `1eb5788c`, under the planner's note `plans/013-2026-10-04-first-jam-release.md` (decision `b6dd55dc`). On `request/test-overhead`. Nothing was published to a registry, and no provider was contacted.
 
 **What this is.** Six packages that a repository outside this one can install: contract, policy, client, mcp, log and the `artroom` command. It is the installability the first jam task needs. The public-package starter and its conformance route stay owed under request `f3299ab4`. Publishing to a public registry is the owner's decision and is not part of this.
 
@@ -4969,15 +5009,36 @@ Witness: `packages/log/test/cli.node.test.ts`, "the report says, for a program a
 
 Controls: the decoder's check; the mode and its statements. Each distinguishes.
 
+**One repair from the review of `f2582a68`** (changes requested, `7df5edb5`; the planner's note `plans/016-2026-10-04-verification-mode-clarification.md` gives the wording rule). The integrity run's description denied work the run still does. It said no Git object was read to witness a version, and that a land evaluation with an obligation open passes. Both were wrong:
+
+- With replay off, verify still reads Git objects for a version's changed paths.
+- It still refuses a land evaluation while the admin-approval obligation is open. That obligation is known without replay, from the receipt that opened it or from the document and the changed paths. Obligations that rules open are known only by replay, so the integrity run does not see those.
+- It still checks that a check names its checker's configuration and, where a prepared event exists, an integration and input the event names; and that each check-carried event names an earlier accepted check of the same lane and obligation and an activated policy, with an outcome of the right shape.
+
+No check was added or removed. The report now says this. The integrity run's statement has two entries. The first says what was not done: no decision evaluated, no call, input or budget checked, no carry judgment replayed or accounted for, no land input rebuilt; and the run "does not detect" the forgeries that need those. The second names the checks that still ran, says the landing guard is not a replay of the land input and sees only the admin-approval obligation, and says what the run did with Git objects. Where Git objects and a version's retained proposal context were both present, it compared the context's changed paths with Git's and took Git's list where the context left a change out. That comparison goes one way and refuses nothing: it does not reject a change the context has and Git lacks, and it does not show that the context's base is the merge base. The run did not rebuild or compare the complete rule context or its budget, and it refuses no context mismatch; only a full run does. The wording at `f8d8980a` said no recorded context was compared with Git objects. Review `925790d7` (changes requested) showed from the source that this was too broad, and this is the correction. It changes text only. The categorical "passes this run" is gone. The command's mode line, the `mode` field's description, the log package's README and R-DECL-25 say the same. `mode` and `carryAccounting` are unchanged.
+
+Witnesses in `packages/log/test/declared-obligations.test.ts`:
+
+- "with replay off the report says so ...", extended: the report has neither denial, names the kept checks, and a reader that records each object read shows the run read the objects of the proposal heads.
+- "with replay off the guard on landings still runs, as the report says ...": a forged land evaluation with admin approval open is refused `guard-failed` with replay off; the same forgery for an obligation a rule opens passes with replay off and is refused with replay on.
+
+No source control was run for this repair: it changes text, and the two tests show behaviour that was already there. Before the change the first test fails on the two denials.
+
+**A second repair at the same head, raised by the planner while that review ran** (chat, 2026-10-04; source-qualified by the planner, then run here). Verify reads some parts of a retained context by their shape, before or without replaying it: a proposal's `base` and `changed` list for the Git comparison above, a carry context's `changedSince`, and a land input's `obligations` and `reviews`. The decoder checked only that a retained context has a known kind, an input and a budget. A retained context whose `changed` list held `null`, kept under its own digest in a resealed log, made verify throw a `TypeError`, with replay on or off, when the Git objects were present. The decoder now checks those parts: such a context is `malformed`. In a full run the failure is at the entry that names the context, with the verified prefix before it. In an integrity run the entry is not judged by its context, and the retained file is still reported `malformed`, so the run fails with a report.
+
+Witness: `declared-obligations.test.ts`, "a retained context that verify reads by shape is malformed when that shape is wrong, in a report and not a throw", four cases, each paired with the same log unchanged, which verifies in both modes. Control, by hand, with the decoder as it was at `342d67c3`: all four fail. The `null` item throws the `TypeError`. The other three (a `changed` that is not a list, a renamed path with no `from`, a land input whose obligations hold `null`) did not throw before: a full run refused them as `context-mismatch`, and they are now `malformed`. With the repair all four pass, and the other 301 log tests pass unchanged, which shows the fixtures' own contexts have these shapes. This is a check of the fields verify reads, not a complete schema for retained contexts. The logs are signed synthetic logs; they do not show that a real Room would record such a context.
+
 **The argument that needs its own review.** [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md), "What an omission can do" (2026-10-03), argues that a removed judgment which did not carry cannot admit a landing that should not be admitted. That is an argument from the source, not something a test shows, and stage 2's approval does not establish it. The verifier's output does not rely on it and does not repeat it: it says only what verify checks and what it does not.
 
-**Still owed, in full, under `1e8fee4b` / `3af8ebc7`.** Complete carry accounting: every pass and every judgment the Room owed, missing, extra and substituted, with all ten acceptance cases of the carry-pass amendment and the planner's points A to F. The amendment is not adopted: draft 2 was returned with changes (`794e6f86`), and its revision is owed. The Room's side, with the `prepared` event, is stage 4's (`48c021ea`). Stage 6 keeps the derivation of lane, lease and landing transitions.
+**Still owed, in full, under `1e8fee4b` / `3af8ebc7`.** Complete carry accounting: every pass and every judgment the Room owed, missing, extra and substituted, with all ten acceptance cases of the carry-pass amendment and the planner's points A to F. The planner accepted draft 3 of the amendment as amended by `plans/015-2026-10-04-carry-pass-draft3-decision.md` (report `7634a884`, ratified `6693d748`); that complete copy governs when it is built. The Room's side, with the `prepared` event, is stage 4's (`48c021ea`). Stage 6 keeps the derivation of lane, lease and landing transitions.
 
 **Gates.** The review request gives the gate's result at the head sent.
 
 ## Bearer sessions end with their grantor (request 5d41ea36)
 
-Status: implemented, pending review. Gitseq request `5d41ea36` (builder's own, found while reducing the Room's tests), on `request/test-overhead`. The MCP core's review (`bc0d7f6b`) asked for it to be completed.
+Status on 2026-10-04: approved. Review `65df0958` approved the head `87cd5804` (ratified). All of it is on the integration branch `request/test-overhead`; nothing has landed on main. The line below is the earlier status, kept as history.
+
+Earlier status: implemented, pending review. Gitseq request `5d41ea36` (builder's own, found while reducing the Room's tests), on `request/test-overhead`. The MCP core's review (`bc0d7f6b`) asked for it to be completed.
 
 **The rule (condition 1).** The room judges a token the same way for a read, an act and a request. A session ends when its token is unknown or expired, its session key is revoked, its delegation is revoked or expired, the key of the delegation's grantor is revoked for any reason, or its member is no longer active. After that, an exact retry of an act the session made earlier is `unauthenticated`: the room signs nothing for the session, so there is no envelope to replay. A signed envelope that someone kept is not a session matter: submitted as its own bytes, it gets its record (R-IDEM-2). A change of the member's role, or of what the delegation's kinds mean, does not end the session; it is judged when a new act is admitted. R-CRED-10 in [docs/protocol.md](../docs/protocol.md) now says this. That sentence is contract text, so it is for the planner to accept.
 
@@ -4993,7 +5054,9 @@ Status: implemented, pending review. Gitseq request `5d41ea36` (builder's own, f
 
 ## Test overhead (request ecbc722a)
 
-Status: implemented, pending review. Gitseq request `ecbc722a` (planner to builder, relaying the project owner's new highest priority), promise `1c6bf45c`. Branch `request/test-overhead`. Nothing was pushed or deployed.
+Status on 2026-10-04: approved. Review `b1738122` approved the head `f6212850` (ratified). All of it is on the integration branch `request/test-overhead`; nothing has landed on main. The line below is the earlier status, kept as history.
+
+Earlier status: implemented, pending review. Gitseq request `ecbc722a` (planner to builder, relaying the project owner's new highest priority), promise `1c6bf45c`. Branch `request/test-overhead`. Nothing was pushed or deployed.
 
 The request: cut Artroom's test overhead at least ten times. Remove every test that does not prove a useful invariant, make the expensive useful tests cheap, measure before and after, and stop the exhaustive mutation sweeps.
 

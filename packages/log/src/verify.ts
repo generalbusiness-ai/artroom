@@ -208,11 +208,18 @@ export interface VerifyReport {
   /**
    * What this run checked. `full`: everything this verifier checks.
    * `integrity`: the caller turned replay off (`replayDecisions: false`,
-   * `--no-replay`). The run checked the log's hashes, seals, order,
-   * publication history and each act's authority, and nothing that needs a
-   * policy evaluation: no decision was replayed, no required call derived,
-   * no input rebuilt, no Git witness read, and no carry judgement or land
-   * input checked. A log that passes in this mode may fail in `full`.
+   * `--no-replay`). No policy was evaluated: no decision was replayed, no
+   * required call derived, no input rebuilt, and no carry judgement or land
+   * input checked. The checks that need no policy evaluation still ran:
+   * decoding, hashes, seals, order, publication history, each act's
+   * authority, a check's configuration and prepared input, the linkage of
+   * each check-carried event, and the guard that refuses a land evaluation
+   * while the admin-approval obligation is open, for which Git objects are
+   * read where present. Where Git objects and a retained proposal context
+   * are both present, the context's changed paths are compared with Git's,
+   * one way, and Git's list is used where the context omits a change. The
+   * complete rule context is not rebuilt or compared. `cannotProve` says what that guard does and does not show. A
+   * log that passes in this mode may fail in `full`.
    */
   readonly mode: "full" | "integrity";
 }
@@ -288,7 +295,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
           "Carry judgements are accounted for in part (R-CARRY-13). Verify replays each check-carried judgement that is recorded, and a carry that is not recorded meets no obligation. It detects a second judgement of the same check, a carry that skipped a newer passing check, and a land evaluation made while a blocking obligation was open. It does not derive the whole list of judgements the room owed. So it cannot show that a judgement which did not carry is missing when no later judgement carried; that a whole carry pass is missing, as for an advisory obligation; that the recorded judgements are all of them, in the room's order, with the inputs and the evaluation budget the room used; or that an extra judgement belongs to no pass. The log does not record when the room started or ended a pass, waited, was cancelled, prepared a landing again, or skipped carrying for a recovery landing.",
         ]
       : [
-          "Policy was not replayed in this run, because the caller turned replay off. No policy decision was evaluated again, no required call was derived, no rule input was rebuilt, no Git object was read to witness a version, and no carry judgement or land input was checked. A log with a wrong decision, a missing or extra call, a substituted context, a second judgement of one check, or a land evaluation with an obligation open passes this run. Run without --no-replay to make those checks.",
+          "Policy was not replayed in this run, because the caller turned replay off. No policy decision was evaluated again. The calls the room had to make, their inputs and their evaluation budget were not checked. No carry judgement was replayed or accounted for, and no land input was rebuilt. This run does not detect a wrong decision, a missing or extra call, a substituted context, a second judgement of one check, or a carry that skipped a newer check. Run without --no-replay to make those checks.",
+          "Checks that need no policy evaluation still ran in this run, and a log can fail them. They are: decoding, hashes, seals, order, publication history and each act's authority; that an accepted check names the configuration the active document gives its checker and, where the log has a prepared event for it, an integration and input that the event names; that each check-carried event names an earlier accepted check of the same lane and obligation and an activated policy, with an outcome of the right shape; and one guard on landings. Under a v2 document, a land evaluation is refused while the admin-approval obligation is open on its integration. That obligation is known without replay, from the receipt that opened it or from the policy document and the version's changed paths. For those paths this run read Git objects where they were present, and otherwise took the retained context. The guard reads approvals as the log records them. It is not a replay of the land input. Obligations that rules open are known only by replay, so this run did not see them, and it refuses no land evaluation on their account. Where Git objects and a version's retained proposal context were both present, this run compared the context's changed paths with Git's, and took Git's list where the context left a change out. That comparison goes one way and refuses nothing: it does not reject a change the context has and Git lacks, and it does not show that the context's base is the merge base. This run did not rebuild or compare the complete rule context or its budget, and it does not refuse a context that differs from the one the room used. Only a full run does that.",
         ]),
     "What a verified prefix means: every check this run makes passed for the entries it names. It does not mean that every duty of the room was done, that publication is complete, or that each transition of the room's state was derived again.",
   ];

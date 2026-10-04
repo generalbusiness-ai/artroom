@@ -4316,11 +4316,20 @@ not derive the whole list of judgments the Room owed. Its report says so
 to a program, as `carryAccounting: "partial"`, and to a person, in the
 list of what it cannot prove. The report also names what the run checked:
 `mode` is `full`, or `integrity` when the caller turned replay off
-(`--no-replay`). An integrity run checks hashes, seals, order, publication
-history and each act's authority, and nothing that needs a policy
-evaluation; then `carryAccounting` is `none`, and the report makes no
-statement that a decision, a call, a Git witness or a carry judgment was
-checked. The list for a full run names: a missing judgment that did not carry when
+(`--no-replay`). An integrity run evaluates no policy; then
+`carryAccounting` is `none`, and the report makes no statement that a
+decision, a call or a carry judgment was checked. It still
+makes the checks that need no policy evaluation: decoding, hashes, seals,
+order, publication history, each act's authority, a check's configuration
+and prepared input, what each check-carried event names, and the refusal
+of a land evaluation while the admin-approval obligation is open, for
+which it reads Git objects where they are present. Where they are, it
+also compares the changed paths of a retained proposal context with them,
+one way: it uses Git's list where the context omits a change, and refuses
+nothing. It does not rebuild or compare the complete rule context. The report names those checks
+and says what they do not show: an obligation that a rule opens is known
+only by replay, and a context that differs from the one the Room used is
+not detected. The list for a full run names: a missing judgment that did not carry when
 no later one carried; a missing whole pass; the order, inputs and budget
 of the judgments; an extra judgment that belongs to no pass; and waiting,
 cancellation, repeated preparation and recovery, which the log does not

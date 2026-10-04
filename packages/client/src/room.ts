@@ -200,9 +200,11 @@ function ownedIntent<T, B>(target: T, body: B): { readonly target: T; readonly b
 
 /**
  * `ActOptions`, plus a hook to persist the prepared act before it is first sent.
- * The act is sent when the hook returns, or when the promise it returns settles.
- * A hook may make the same call again: it gets the first call's promise. It must
- * not await that promise, which settles only after the hook has returned.
+ * The act is sent after the hook returns, or after the promise it returns is
+ * fulfilled. If the hook throws, or its promise rejects, the act is not sent
+ * and the call rejects. A hook may make the same call again: it gets the first
+ * call's promise. It must not await that promise, which settles only after the
+ * hook has returned.
  */
 export interface ClientActOptions extends ActOptions {
   readonly onPrepared?: (act: PreparedAct) => void | Promise<void>;
