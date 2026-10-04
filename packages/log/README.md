@@ -300,9 +300,13 @@ exactly one policy version, chosen by event kind:
 - each failure, with a named reason;
 - what verification cannot prove (R-LOG-15): acts after the last published
   entry; lanes, leases, obligations and landings; and the room clock;
+- what the run checked: `mode` is `"full"`, or `"integrity"` with
+  `--no-replay`, which checks hashes, seals, order, history and authority
+  and replays nothing. The text output prints the mode, and the statements
+  of what was and was not checked follow it;
 - how far check carry judgments are accounted for: `carryAccounting` is
-  `"partial"` in the JSON report, and "Carry accounting: partial." in the
-  text. Verify replays the judgments that are recorded and detects three
+  `"partial"` in the JSON report of a full run, and "Carry accounting:
+  partial." in the text; `"none"` for an integrity run. Verify replays the judgments that are recorded and detects three
   omissions; it does not derive every judgment the room owed, and the
   list of what it cannot prove says what that leaves out (protocol
   R-DECL-25).

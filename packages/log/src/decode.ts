@@ -364,6 +364,9 @@ function signedEnvelope(v: unknown, path: string): void {
     str(b.obligation, p("body.obligation"));
     str(b.check, p("body.check"));
     str(b.config, p("body.config"));
+    // What the check ran on (R-OBL-3): verify reads both to find the integration the check counts for.
+    str(b.integration, p("body.integration"));
+    oneOf(obj(b.input, p("body.input")).kind, p("body.input.kind"), ["tree", "filtered"]); // V:d-check-input
   }
 }
 

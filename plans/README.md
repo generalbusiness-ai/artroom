@@ -3391,6 +3391,15 @@ Status: implemented, pending review. Gitseq request `42342e35` (planner to build
 
 Witness: `packages/log/test/cli.node.test.ts`, "the report says, for a program and for a person, that carry judgements are accounted for only in part ...".
 
+**Two repairs from the review of `391d20cd`** (changes requested, `63af1ce0`):
+
+| Finding | What was wrong | Repair | Witness |
+|---|---|---|---|
+| The report claimed checks that `--no-replay` skips | With replay off, verify skips every policy evaluation, yet the list of what it cannot prove still said that decisions and carry judgments were replayed and calls derived, and `carryAccounting` said `partial`. A log with a judgment that a full run refuses passed, under those claims | The report has `mode`: `full` or `integrity`. In an integrity run `carryAccounting` is `none`, and the statements about replay, derived calls, Git witnesses and carry are replaced by one that says none of it was done and what such a run lets through. The text output prints the mode | `declared-obligations.test.ts`: "with replay off the report says so ..."; `cli.node.test.ts` |
+| A signed legacy check with no `input` made verify throw | The decoder checked a legacy check's obligation, checker and configuration, not the `input` and `integration` that verify reads later, so a `TypeError` escaped and the command printed no report | The decoder requires both. Such an entry is `malformed` at its seq, with the verified prefix, with replay on or off | `amendment-3.test.ts`: "a signed check with no input, or no integration, is malformed at its entry ..." |
+
+Controls: the decoder's check; the mode and its statements. Each distinguishes.
+
 **The argument that needs its own review.** [notes/2026-10-03-carry-accounting.md](../notes/2026-10-03-carry-accounting.md), "What an omission can do" (2026-10-03), argues that a removed judgment which did not carry cannot admit a landing that should not be admitted. That is an argument from the source, not something a test shows, and stage 2's approval does not establish it. The verifier's output does not rely on it and does not repeat it: it says only what verify checks and what it does not.
 
 **Still owed, in full, under `1e8fee4b` / `3af8ebc7`.** Complete carry accounting: every pass and every judgment the Room owed, missing, extra and substituted, with all ten acceptance cases of the carry-pass amendment and the planner's points A to F. The amendment is not adopted: draft 2 was returned with changes (`794e6f86`), and its revision is owed. The Room's side, with the `prepared` event, is stage 4's (`48c021ea`). Stage 6 keeps the derivation of lane, lease and landing transitions.

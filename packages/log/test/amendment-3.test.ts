@@ -46,6 +46,23 @@ function tamper(sim: RoomSim, seq: number, change: (ev: CheckCarried) => CheckCa
 }
 
 describe("edit 1: the decoder reads check-carried events", () => {
+  test("a signed check with no input, or no integration, is malformed at its entry: a named failure with the verified prefix, with replay on and off, never a throw", async () => {
+    for (const drop of ["input", "integration"] as const) {
+      const sim = await base();
+      sim.activate(CARRY("true"), DEMO_CHECKERS); // 6
+      const lane = entryId(2, sim.entries[2]!.hash);
+      const body: Record<string, unknown> = { ...checkBody(), obligation: "obl_test" };
+      delete body[drop];
+      sim.accept(sim.envelope(keys.alice, "check", { lane, generation: 1 }, body as never), alice); // 7
+      for (const replayDecisions of [true, false]) {
+        const r = await verifyLog(await publishAs(sim, sim.entries), { replayDecisions });
+        expect(r.failures[0], `${drop}, replay ${replayDecisions}`).toMatchObject({ reason: "malformed", seq: 7 });
+        expect(r.failures[0]!.detail).toContain(`body.${drop}`);
+        expect(r.verifiedThrough).toBe(6);
+      }
+    }
+  });
+
   test("a check-carried event with decisions verifies, and its decisions are replayed", async () => {
     const { sim, lane2, check } = await room();
     await sim.checkCarried(check, lane2); // 8

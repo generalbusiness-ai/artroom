@@ -200,10 +200,21 @@ export interface VerifyReport {
    * detected (a duplicate, a newer check skipped on the way to a carry, a
    * land evaluation with a blocking obligation open); the judgments the
    * room owed are not derived as a whole. `cannotProve` says what that
-   * leaves out. This verifier answers `partial` for every log: no log yet
-   * records carry passes.
+   * leaves out. No log yet records carry passes, so a full run answers
+   * `partial` for every log. `none`: the run did not replay decisions
+   * (`mode` is `integrity`), so no carry judgement was checked at all.
    */
-  readonly carryAccounting: "partial";
+  readonly carryAccounting: "partial" | "none";
+  /**
+   * What this run checked. `full`: everything this verifier checks.
+   * `integrity`: the caller turned replay off (`replayDecisions: false`,
+   * `--no-replay`). The run checked the log's hashes, seals, order,
+   * publication history and each act's authority, and nothing that needs a
+   * policy evaluation: no decision was replayed, no required call derived,
+   * no input rebuilt, no Git witness read, and no carry judgement or land
+   * input checked. A log that passes in this mode may fail in `full`.
+   */
+  readonly mode: "full" | "integrity";
 }
 
 const same = (a: unknown, b: unknown) => canonicalize(a) === canonicalize(b);
@@ -257,18 +268,29 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
   const failures: VerifyFailure[] = [];
   const fail = (f: VerifyFailure) => failures.push(f);
   const head = await reader.readRef(ref);
+  // What the report says it checked must be what this run checked: with replay off, the statements that describe
+  // replay are replaced by one that says it was not done.
+  const replaying = opts.replayDecisions !== false;
   const cannotProve = [
     "Whether any act was admitted after the last published entry: unpublished acts cannot be proven to exist or not to exist.",
-    "Lanes, leases, obligations and landings (R-LOG-15): verify checks each act's authority and replays every policy decision, but does not re-derive lane, lease, obligation or landing transitions, or the effects in receipts.",
+    replaying
+      ? "Lanes, leases, obligations and landings (R-LOG-15): verify checks each act's authority and replays every policy decision, but does not re-derive lane, lease, obligation or landing transitions, or the effects in receipts."
+      : "Lanes, leases, obligations and landings (R-LOG-15): this run checked each act's authority. It does not re-derive lane, lease, obligation or landing transitions, or the effects in receipts.",
     "The room clock: expiry checks use each entry's recorded `at`, which only the room key vouches for.",
     "Refusals that are never recorded (R-ADM-8): kind-undeclared, binding-stale and the other refusals of admission steps 1 to 6 leave no entry, so verify can neither see nor prove them.",
-    "Under a v1 document, entries are judged by the legacy vocabulary as before declared acts: the decisions present are replayed, but the calls the room had to make are not derived (R-DECL-1).",
-    "Under a v2 document, the required evaluation calls are derived and their inputs rebuilt from the thread, roster, obligation and evidence fold, which takes receipt effects as recorded: lane, lease and landing transitions, the obligations effects, and the platform guards behind a recorded refusal are not re-derived (stage 6).",
-    "A version's changed paths are checked against Git objects, from the base its context names to its head, when the objects are present; without them they are the retained context's, reported as git-unwitnessed. That the base is the merge base of main and the head needs main's history, which the log does not carry.",
-    "The paths changed since an earlier verdict's head, which decide whether it carries, are read from Git objects. Without them they are the retained carry context's, where one is recorded; where none is, whether the verdict carried is undecided, and so is each land input that depends on it. Each is reported as git-unwitnessed.",
-    "Whether the room prepared a check's integration, for a version or landing with no prepared event: rooms seal prepared events from stage 4 (R-DECL-20); verify checks a check against them where they are present. Until then a check on a filtered snapshot does not name the integration it counts for, and a check carry's new tree and snapshot are not in the log: verify takes them from the retained context and reports git-unwitnessed.",
-    "Carry judgements are accounted for in part (R-CARRY-13). Verify replays each check-carried judgement that is recorded, and a carry that is not recorded meets no obligation. It detects a second judgement of the same check, a carry that skipped a newer passing check, and a land evaluation made while a blocking obligation was open. It does not derive the whole list of judgements the room owed. So it cannot show that a judgement which did not carry is missing when no later judgement carried; that a whole carry pass is missing, as for an advisory obligation; that the recorded judgements are all of them, in the room's order, with the inputs and the evaluation budget the room used; or that an extra judgement belongs to no pass. The log does not record when the room started or ended a pass, waited, was cancelled, prepared a landing again, or skipped carrying for a recovery landing.",
-    "What a verified prefix means: every check this verifier makes passed for the entries it names. It does not mean that every duty of the room was done, that publication is complete, or that each transition of the room's state was derived again.",
+    ...(replaying
+      ? [
+          "Under a v1 document, entries are judged by the legacy vocabulary as before declared acts: the decisions present are replayed, but the calls the room had to make are not derived (R-DECL-1).",
+          "Under a v2 document, the required evaluation calls are derived and their inputs rebuilt from the thread, roster, obligation and evidence fold, which takes receipt effects as recorded: lane, lease and landing transitions, the obligations effects, and the platform guards behind a recorded refusal are not re-derived (stage 6).",
+          "A version's changed paths are checked against Git objects, from the base its context names to its head, when the objects are present; without them they are the retained context's, reported as git-unwitnessed. That the base is the merge base of main and the head needs main's history, which the log does not carry.",
+          "The paths changed since an earlier verdict's head, which decide whether it carries, are read from Git objects. Without them they are the retained carry context's, where one is recorded; where none is, whether the verdict carried is undecided, and so is each land input that depends on it. Each is reported as git-unwitnessed.",
+          "Whether the room prepared a check's integration, for a version or landing with no prepared event: rooms seal prepared events from stage 4 (R-DECL-20); verify checks a check against them where they are present. Until then a check on a filtered snapshot does not name the integration it counts for, and a check carry's new tree and snapshot are not in the log: verify takes them from the retained context and reports git-unwitnessed.",
+          "Carry judgements are accounted for in part (R-CARRY-13). Verify replays each check-carried judgement that is recorded, and a carry that is not recorded meets no obligation. It detects a second judgement of the same check, a carry that skipped a newer passing check, and a land evaluation made while a blocking obligation was open. It does not derive the whole list of judgements the room owed. So it cannot show that a judgement which did not carry is missing when no later judgement carried; that a whole carry pass is missing, as for an advisory obligation; that the recorded judgements are all of them, in the room's order, with the inputs and the evaluation budget the room used; or that an extra judgement belongs to no pass. The log does not record when the room started or ended a pass, waited, was cancelled, prepared a landing again, or skipped carrying for a recovery landing.",
+        ]
+      : [
+          "Policy was not replayed in this run, because the caller turned replay off. No policy decision was evaluated again, no required call was derived, no rule input was rebuilt, no Git object was read to witness a version, and no carry judgement or land input was checked. A log with a wrong decision, a missing or extra call, a substituted context, a second judgement of one check, or a land evaluation with an obligation open passes this run. Run without --no-replay to make those checks.",
+        ]),
+    "What a verified prefix means: every check this run makes passed for the entries it names. It does not mean that every duty of the room was done, that publication is complete, or that each transition of the room's state was derived again.",
   ];
   const empty = (extra: Partial<VerifyReport> = {}): VerifyReport => ({
     ok: false,
@@ -285,7 +307,8 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     unsupported: null,
     limits: [],
     cannotProve,
-    carryAccounting: "partial",
+    carryAccounting: replaying ? "partial" : "none",
+    mode: replaying ? "full" : "integrity",
     ...extra,
   });
   if (!head) {
@@ -1524,6 +1547,7 @@ export async function verifyLog(reader: GitReader, opts: VerifyOptions = {}): Pr
     unsupported,
     limits,
     cannotProve,
-    carryAccounting: "partial",
+    carryAccounting: replaying ? "partial" : "none",
+    mode: replaying ? "full" : "integrity",
   };
 }

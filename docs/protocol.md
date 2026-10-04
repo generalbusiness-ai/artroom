@@ -4314,7 +4314,13 @@ open in the fold, `decision-missing` naming an earlier passing check that
 has no judgment, or else `guard-failed` naming the obligation. It does
 not derive the whole list of judgments the Room owed. Its report says so
 to a program, as `carryAccounting: "partial"`, and to a person, in the
-list of what it cannot prove: a missing judgment that did not carry when
+list of what it cannot prove. The report also names what the run checked:
+`mode` is `full`, or `integrity` when the caller turned replay off
+(`--no-replay`). An integrity run checks hashes, seals, order, publication
+history and each act's authority, and nothing that needs a policy
+evaluation; then `carryAccounting` is `none`, and the report makes no
+statement that a decision, a call, a Git witness or a carry judgment was
+checked. The list for a full run names: a missing judgment that did not carry when
 no later one carried; a missing whole pass; the order, inputs and budget
 of the judgments; an extra judgment that belongs to no pass; and waiting,
 cancellation, repeated preparation and recovery, which the log does not

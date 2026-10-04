@@ -117,6 +117,8 @@ describe("artroom verify, on a fresh clone", () => {
     const said = report.cannotProve.join("\n");
     for (const part of ["a whole carry pass is missing", "did not carry is missing", "in the room's order", "evaluation budget", "extra judgement", "prepared a landing again", "recovery landing", "What a verified prefix means"]) expect(said).toContain(part);
     // The text output carries the same statements, also when verification fails.
+    expect(report).toMatchObject({ mode: "full" });
+    expect(tampered.stdout).toContain("Mode: full.");
     expect(tampered.stdout).toContain("Carry accounting: partial.");
     expect(tampered.stdout).toContain("Cannot prove: Carry judgements are accounted for in part");
   });
