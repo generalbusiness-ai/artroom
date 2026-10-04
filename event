@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:334cdf52fde2daa4019cf1fc43a1d8b599b111cd","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3360b28859dd98cf5e7641f4786c39e2d3302d58","text":"Merge retired a covered predecessor; the successor is at packages/room/test/node/crypto.cases.ts."}
