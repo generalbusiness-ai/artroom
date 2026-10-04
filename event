@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/log/README.md at exact 15680192f93b6268f405b52b21ce0874060bc193 on request/test-overhead, under promise git:sha1…709814c on request git:sha1…dc40d42","body":{"commit":"15680192f93b6268f405b52b21ce0874060bc193","path":"packages/log/README.md"}}
+{"kind":"artifact","text":"packages/log/src/entries.ts at exact 15680192f93b6268f405b52b21ce0874060bc193 on request/test-overhead, under promise git:sha1…709814c on request git:sha1…dc40d42","body":{"commit":"15680192f93b6268f405b52b21ce0874060bc193","path":"packages/log/src/entries.ts"}}
