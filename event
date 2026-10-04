@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2b6406bd3538d3ad9f325334f64a87c650b6eed8","text":"Merge retired a covered predecessor; the successor is at packages/room/src/requests.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:571d20c2ec9fe96ab0f7e55c7c2b3af2fc924940","text":"Merge retired a covered predecessor; the successor is at plans/test-invariants.md."}
