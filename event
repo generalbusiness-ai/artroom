@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:774e9f4ccd5f7c6e203a1b6e8782eb3250351bca","text":"Merge retired a covered predecessor; the successor is at packages/room/src/mcp.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:77b7487ba4101f466c1f2f1c298eb698172ee32a","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/body-cap.test.ts."}
