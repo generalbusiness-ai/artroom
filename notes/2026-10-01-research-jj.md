@@ -622,8 +622,9 @@ baseline only.
 
 jj, as first retrieved 2026-10-01 (history). These links follow the
 moving `main` branch, so they are replaced above by pinned ones. The
-first version named 0.45.1 as the "latest release"; that was true only
-of the day it was read.
+first version of this note called 0.45.1 the "latest release". That is
+the claim it made on 2026-10-01. This revision does not confirm it, and
+uses 0.45.1 only as the pinned version it compares against.
 - Changelog: <https://github.com/jj-vcs/jj/blob/main/CHANGELOG.md>
 - Concurrency design: <https://github.com/jj-vcs/jj/blob/main/docs/technical/concurrency.md>
 - Operation log: <https://github.com/jj-vcs/jj/blob/main/docs/operation-log.md>

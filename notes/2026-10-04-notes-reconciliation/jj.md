@@ -4,6 +4,8 @@ Edited files, on branch `request/notes-reconcile`:
 - `notes/2026-10-01-research-jj.md`, the reconciled note;
 - `notes/2026-10-01-artroom-plan.md`, one paragraph of section 3 and a dated revision note, on the planner's direction `fceb27d0`.
 
+Line numbers in this checklist are those of the note as it was at commit `b878fee9`. One later rewording, of the sentence about the "latest release" in section 8 (planner note `415314b0`), made that passage one line longer: every line after 626 is now one line lower than the number given here.
+
 The first reconciliation is at commit `508ac63b`. The changes that apply direction `fceb27d0` were in the working tree when this checklist was written, on 2026-10-04; they were committed afterwards, at `b878fee9`.
 
 - Before: 247 lines, 12,816 bytes, SHA-256 `8563588cd23c7047eb3572bd61b78b432b87eef85141e467cb08d63b72aa516f` (matches the identity the clarification gives for commit `b3050dc6`).
@@ -74,7 +76,7 @@ Line numbers in sections A and B refer to the note in the working tree, after di
 | # | Item (source) | Where delivered | Note |
 |---|---|---|---|
 | B19 | jj baseline is pinned v0.45.1, retrieved 2026-10-04 (011 preamble, section 9) | Lines 33-39; section 8 lines 611-621 | Rewritten |
-| B20 | Baseline is not a claim about the latest release or every client version (6649 group 3; 011 preamble) | Lines 37-40, 126, 623-626 | Rewritten ("0.45.1 latest release" corrected) |
+| B20 | Baseline is not a claim about the latest release or every client version (6649 group 3; 011 preamble) | Lines 37-40, 126, 623-627 | Rewritten. The first version's "latest release" is recorded as the claim that note made on 2026-10-01, and is not confirmed (planner note 415314b0) |
 | B21 | Original retrieval date 2026-10-01 and the moving `main` links (original note section 8) | Lines 623-632 | Kept as history |
 | B22 | `change-id` header default, 0.30.0, 2025-06-04 (original; 011 section 2) | Line 122 | Unchanged pin |
 | B23 | `jj gerrit upload`, 0.34.0, 2025-10-01, experimental; not a complete review service (original; 011 section 2) | Line 123 | Pin unchanged; qualifier added |
