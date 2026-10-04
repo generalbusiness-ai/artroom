@@ -8,6 +8,8 @@
 // through the engine and real git, across a restart.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Sha } from "@generalbusiness/artroom-contract";
 import { Landing, type PublisherPort } from "../src/landing/engine.ts";
 import { GitPublisher } from "../src/publisher/git-publisher.ts";
@@ -56,6 +58,11 @@ test("the memory repository answers the engine as the git publisher does over re
   const f = new Fixture();
   t.after(() => f.dispose());
   const h = history(f);
+  // The publisher's own repository has a HEAD whose tree holds those attributes. (Git 2.43 read a bare
+  // repository's attributes from HEAD unless told otherwise; later versions read them only when told.)
+  const sandbox = await f.ops.repo(f.canonical);
+  f.git.writeInto(sandbox);
+  writeFileSync(join(sandbox, "HEAD"), `${h.main}\n`);
   const real = await script(new GitPublisher(f.ops, f.canonical), h);
   const memory = new MemoryCanonical();
   assert.deepEqual(history(memory), h, "the same commits in both");
@@ -80,8 +87,8 @@ test("the memory repository answers the engine as the git publisher does over re
   // A conflict lists the paths and stores nothing. The repository's attributes cannot change a merge.
   assert.deepEqual(real.conflict, { kind: "conflict", paths: ["src/b.txt"] });
   assert.equal(f.ref(integrationRef(opId(1), 3)), null);
-  const plain = await localExec(["git", "--git-dir", f.canonical, "-c", `attr.tree=${h.clash}`, "merge-tree", "--write-tree", "--name-only", h.main, h.clash], { env: {} });
-  assert.equal(plain.code, 0, "control: plain git, reading the attributes, merges the same two commits with union");
+  const plain = await localExec(["git", "--git-dir", sandbox, "-c", "attr.tree=HEAD", "merge-tree", "--write-tree", "--name-only", h.main, h.clash], { env: {} });
+  assert.equal(plain.code, 0, "control: plain git in the same repository, reading the attributes, merges the same two commits with union");
   assert.deepEqual(real.notPinned, { kind: "error", detail: "integration failed: Error" });
   // Compare-and-swap on main. Repeating a push that landed is "up to date": git checks no lease when nothing would change.
   assert.deepEqual([real.stale, real.landed, real.again], ["push answered: rejected (lease)", "push answered: landed", "push answered: landed"]);
