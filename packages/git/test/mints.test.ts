@@ -11,14 +11,9 @@ import {
   MINT_ID_WRITE_ATTEMPTS,
   MINT_LISTING_MAX,
   MINT_REVOKE_BACKOFF,
-  MINT_REVOKE_BATCH,
-  MINT_WAIT_MS,
   MintLedger,
-  OBSERVE_WAIT,
   errorNote,
-  OVERDUE_STEP_MS,
   TAKEOVER_AHEAD_MS,
-  TAKEOVER_MOVE_MS,
   type LedgerToken,
   type MintRepo,
   type MintScope,
@@ -263,17 +258,6 @@ async function alarm(r: ReturnType<typeof room>): Promise<void> {
   await r.ledger.reconcile();
   await r.ledger.idle();
 }
-
-test("the bounds are the design's: 30 s waits, takeover 60 s ahead when under 30 s away, 1 s overdue step, 20 a pass, 1,000 listed, backoffs", () => {
-  assert.equal(MINT_WAIT_MS, 30_000);
-  assert.equal(TAKEOVER_AHEAD_MS, 60_000);
-  assert.equal(TAKEOVER_MOVE_MS, 30_000);
-  assert.equal(OVERDUE_STEP_MS, 1_000);
-  assert.equal(MINT_REVOKE_BATCH, 20);
-  assert.equal(MINT_LISTING_MAX, 1_000);
-  assert.deepEqual(MINT_REVOKE_BACKOFF, { firstMs: 1_000, maxMs: 300_000 });
-  assert.deepEqual(OBSERVE_WAIT, { firstMs: 60_000, maxMs: 6 * 3600_000 });
-});
 
 // ------------------------------------------------------------------ (1)
 

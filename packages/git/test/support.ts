@@ -535,7 +535,8 @@ export class MemoryCanonical extends CanonicalModel {
     },
     push: async (req): Promise<PushOutcome> => {
       const main = this.ref("refs/heads/main");
-      if (!this.git.has(req.integration)) return { outcome: "error", detail: `before the push: integration ${req.integration} not found at ${req.integrationRef}` };
+      // As a sandbox that has nothing: the integration is fetched from the ref the engine names, or nothing is sent.
+      if (this.ref(req.integrationRef) !== req.integration) return { outcome: "error", detail: `before the push: integration ${req.integration} not found at ${req.integrationRef}` };
       // Git checks no lease when nothing would change.
       if (main === req.integration) return { outcome: "landed", detail: "=\trefs/heads/main\t[up to date]" };
       if (main !== req.expectedMain) return { outcome: "rejected", reason: "lease", detail: "!\trefs/heads/main\t[rejected] (stale info)" };
