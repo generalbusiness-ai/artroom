@@ -96,7 +96,7 @@ Files are in `packages/log/test/`. Only `golden.test.ts` also runs in workerd.
 | `artroom verify` exits 0, 1 or 2, and fetches the room's pinned heads. | R-LOG-10 | `cli.node.test.ts` |
 | A declared log is decoded by grammar, and an entry outside it is `malformed` at its seq. | R-SIG-4, R-DECL-2, R-DECL-16 | `declared-stage3.test.ts`: "condition 1: decoding by grammar (R-SIG-4" |
 | Kind, binding, body, target and grants are judged under the document in force at the entry's seq. | R-DECL-1, 4, 5, 10 to 12, 16, 17, 21; R-ADM-5 | `declared-stage3.test.ts`: "condition 1: decoding by grammar, and kind" |
-| A `v1` log verifies as it did. | R-DECL-1 | `declared-stage3.test.ts`: "the legacy rule:"; "condition 3:" |
+| A `v1` log verifies as it did, and a verifier that judged its `v1`-era entries by the `v2` declarations would fail it. | R-DECL-1, R-DECL-21, R-DECL-25 | `declared-stage3.test.ts`: "the legacy rule:"; "condition 3:"; `declared-legacy-negative.test.ts` (the whole log, under a verifier with that one fault) |
 | A steps version or profile the verifier lacks stops verification as a limit, not as a failure. | R-DECL-14, R-DECL-22 | `declared-stage3.test.ts`: "condition 1: the steps version" |
 | The calls admission had to make are derived, and a missing, extra or differing one is named. | R-DECL-20, R-DECL-25, R-ADM-1 | `declared-stage3.test.ts`: "condition 2:" |
 | A `recover` op is judged by the role table of the legacy act it stands for, and is accepted only from an admin's own key. | R-DECL-21, R-GEN-5, R-ADMIN-5 | `declared-stage3.test.ts`: "a recover op is judged by the role table" |

@@ -1784,7 +1784,9 @@ I then read the rest of the Room's landing code for the same pattern, a read, an
 
 **Controls**, each one change with `scripts/control.mjs`, each "distinguishes": the recover role lookup; the check-step lookup; the admin-only acceptance of `recover`; Rule 1 as a whole; Rule 1's owed-carry branch; Rule 2; the land fence; the carry fence; the policy match of a kept land evaluation; the end of a carry pass.
 
-**Still open in this request.** Complete carry accounting, above. The acceptance case "legacy recovery replay" asks that a verifier changed to judge the `v1`-era entries under the `v2` declarations fails; the test shows this for the judging function, not for a whole verify run, as it did before the test reduction.
+**The legacy recovery replay, its negative half** (review `6263fdec`). The acceptance case asks that a verifier changed to judge the `v1`-era entries under the `v2` declarations fails. The test showed this for the judging function only. `packages/log/test/declared-legacy-negative.test.ts` now runs the whole shipped verifier over the whole published log with one thing replaced in its module graph, the vocabulary a `v1` document means, and it fails at the first `v1`-era envelope, entry 2, with `binding-stale`. No seam was added to the source for this.
+
+**Still open in this request.** Complete carry accounting, above. The planner's review of the proposed amendment asked for changes A to F (`85032553`); the revision is owed, then the build with the `prepared` event.
 
 ### Prerequisite and composition (assert 869d9aad)
 
