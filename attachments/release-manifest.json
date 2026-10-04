@@ -1,0 +1,67 @@
+{
+  "release": "artroom packed release, manifest version 1",
+  "sourceCommit": "980618d16f78714f755b1a1922c49d50e8f001a2",
+  "sourceTree": "3b5960e5515fba0f2553803d68f1759e1ddbd9d9",
+  "treeClean": true,
+  "version": "0.1.0-dev.1",
+  "builtWith": {
+    "node": "v26.10.0",
+    "npm": "11.19.1"
+  },
+  "packages": [
+    {
+      "name": "@generalbusiness/artroom-contract",
+      "version": "0.1.0-dev.1",
+      "file": "generalbusiness-artroom-contract-0.1.0-dev.1.tgz",
+      "bytes": 51379,
+      "sha256": "834e61bad0d625cdbd85b7cc16c8fe17d0abd17c87e86f00671c7ca7e1fe23ef",
+      "files": 37,
+      "unpackedBytes": 190544
+    },
+    {
+      "name": "@generalbusiness/artroom-policy",
+      "version": "0.1.0-dev.1",
+      "file": "generalbusiness-artroom-policy-0.1.0-dev.1.tgz",
+      "bytes": 75663,
+      "sha256": "1ae1d1be10fc804c4f9687f4eb2187cd46bf720034de4604cf1b7c49e3feaedb",
+      "files": 52,
+      "unpackedBytes": 253513
+    },
+    {
+      "name": "@generalbusiness/artroom-client",
+      "version": "0.1.0-dev.1",
+      "file": "generalbusiness-artroom-client-0.1.0-dev.1.tgz",
+      "bytes": 50772,
+      "sha256": "806422fbd39c42bc66abdfdafabac9109d1af5599605492d1833ed0fe2741d98",
+      "files": 26,
+      "unpackedBytes": 168257
+    },
+    {
+      "name": "@generalbusiness/artroom-mcp",
+      "version": "0.1.0-dev.1",
+      "file": "generalbusiness-artroom-mcp-0.1.0-dev.1.tgz",
+      "bytes": 34476,
+      "sha256": "8a69286e0d285c245b4731318686785e0125b6c01d8e28540eb907673f60b8aa",
+      "files": 20,
+      "unpackedBytes": 127713
+    },
+    {
+      "name": "@generalbusiness/artroom-log",
+      "version": "0.1.0-dev.1",
+      "file": "generalbusiness-artroom-log-0.1.0-dev.1.tgz",
+      "bytes": 125887,
+      "sha256": "605c6b188f580a838dd1939f91b86dceadeb6b8b9a579dbe78b0b3badcc18280",
+      "files": 40,
+      "unpackedBytes": 445146
+    },
+    {
+      "name": "@generalbusiness/artroom-cli",
+      "version": "0.1.0-dev.1",
+      "file": "generalbusiness-artroom-cli-0.1.0-dev.1.tgz",
+      "bytes": 220872,
+      "sha256": "f569f9292abf572cafa2d8266d6e12bb18e07044c56c1875d96258f6cafeb311",
+      "files": 6,
+      "unpackedBytes": 1088904
+    }
+  ]
+}
