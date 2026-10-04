@@ -15,6 +15,22 @@ export interface DeclaredDefinition {
   items: Record<string, ItemType>;       // at most 12
   acts: Record<string, ActType>;         // at most 48
   receives: Record<string, ReceiveType>; // at most 24
+  timed: Record<string, TimedRule>;      // the timed rules, by name (section 5.2)
+}
+
+/**
+ * A timed rule (section 5.2). The contract names timed rules and gives the
+ * definition no member for them; this is the concrete form. A live item of
+ * type `on`, in one of `states`, whose value slot `deadline` holds a time,
+ * holds that deadline under this rule. The effects change that item only
+ * (section 6.8) and must take it out of `states`.
+ */
+export interface TimedRule {
+  on: string;                              // the item type; this makes it a timed item type
+  states: readonly string[];               // live states in which the rule applies
+  deadline: string;                        // a value slot of type `time`
+  effects: readonly EffectForm[];
+  attention: readonly Notify[];
 }
 
 // ---------------------------------------------------------------- section 6.2

@@ -7,11 +7,26 @@ import type { Digest } from "./scope.ts";
 import type { Receipt } from "./entry.ts";
 
 /**
- * Why a judged input was refused. These are the reasons the contract names
- * (sections 6.3, 6.4 and 9.2). It names none for a failed guard or for
- * missing authority; the derivation step adds those.
+ * Why a judged input was refused. The first line holds the reasons the
+ * contract names (sections 6.3, 6.4 and 9.2). It names none for a failed
+ * guard, for missing authority or for an input that names nothing the scope
+ * has; the rest are the derivation step's names for those.
  */
-export type RefusalReason = "revision-moved" | "alias" | "duplicate-relation" | "required-unset" | "scope-full";
+export type RefusalReason =
+  | "revision-moved" | "alias" | "duplicate-relation" | "required-unset" | "scope-full"
+  | "bad-intent"        // the signature, the shape, `expected` or `notAfter` is not what an intent must be
+  | "misaddressed"      // `to` is not this scope and incarnation
+  | "expired"           // the commit clock is at or past `notAfter`
+  | "scope-refused"     // the scope's genesis was refused; it admits nothing
+  | "unknown-act"       // the kind is not an act of the definition, or is its genesis act
+  | "bad-field"         // a field is unknown, missing or not a value of its type
+  | "no-item"           // `on`, an `also` field or an item field names no item of that type
+  | "final"             // a transition of an item in a final state
+  | "unauthorized"      // no presented grant is current and covers the action, the key and the scope
+  | "guard-failed"
+  | "slot-full"         // a party list would pass its `max`
+  | "type-full"         // an opening would pass the type's `max` of live items
+  | "send-unresolved";  // a send's target or item resolves to nothing
 
 /** Why an input was not judged. A retry is judged again (sections 4.2, 5.2, 5.3 and 6.5). */
 export type UnavailableReason = "dependency-unavailable" | "busy" | "clock-behind" | "scope-provisional" | "guard-incomplete" | "unavailable";

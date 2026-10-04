@@ -64,6 +64,12 @@ export interface FactUse { fact: FactRef; content: Digest }
 /** One rule expression evaluated in preparation (section 5.2, step 5). */
 export interface Prepared { rule: string; input: Digest; result: boolean }
 
+/**
+ * In a message, `self` is not expanded by the sender: the receiver reads it as
+ * the envelope's `from` (section 6.4). This is its form on the wire.
+ */
+export interface SelfMark { self: true }
+
 /** A creation is addressed by a seed and names no incarnation (section 7.2). */
 export interface Send { n: number; to: ScopeRef | Seed; message: Message }
 

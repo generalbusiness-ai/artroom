@@ -23,7 +23,7 @@ export const cause: DeliveryCause = { v: 1, from: { at: directory, seq: 5, hash:
 
 export const definition: DeclaredDefinition = {
   format: "artroom-definition-1", profile: { name: "restricted", version: 1 }, capabilities: [],
-  genesis: "file", items: {}, acts: {}, receives: {},
+  genesis: "file", items: {}, acts: {}, receives: {}, timed: {},
 };
 
 export const entry: Entry = {

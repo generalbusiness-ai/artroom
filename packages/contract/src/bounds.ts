@@ -26,6 +26,10 @@ export interface Bounds {
   sends: number;                   // of one act
   attention: number;               // of one act
 
+  // Section 6.5: one range guard with a `where`. The contract owes these to the proof plan.
+  guardPage: number;               // items in one page of the scan
+  guardScan: number;               // items one guard reads before its scan stops unfinished
+
   // Section 7.5: a running scope
   entryBytes: number;
   usesPerEntry: number;            // foreign entries used by one entry
@@ -55,6 +59,8 @@ export const PROPOSED_BOUNDS: Bounds = {
   effects: 16,
   sends: 8,
   attention: 8,
+  guardPage: 100,
+  guardScan: 1000,
   entryBytes: 256 * 1024,
   usesPerEntry: 64,
   sendsPerEntry: 32,
